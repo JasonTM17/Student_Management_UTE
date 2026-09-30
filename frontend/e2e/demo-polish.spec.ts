@@ -282,10 +282,16 @@ async function mockStudent(page: Page, singleTerm = false) {
         }],
         meta: { total: 1, page: 1, limit: 20, totalPages: 1 },
       },
+      // The round window is relative to "now": a fixed date became a time
+      // bomb the moment the calendar passed it (2026-09-30) and the
+      // window-aware register page rendered its empty state before the
+      // search box ever mounted.
       '/api/v1/registration/rounds': [{
         id: 'round-demo', semesterId: 'term-2', name: 'Registration',
-        kind: 'REGISTRATION', status: 'OPEN', windowStart: '2026-09-01T00:00:00Z',
-        windowEnd: '2026-09-30T00:00:00Z', creditLimit: 18,
+        kind: 'REGISTRATION', status: 'OPEN',
+        windowStart: new Date(Date.now() - 7 * 86_400_000).toISOString(),
+        windowEnd: new Date(Date.now() + 30 * 86_400_000).toISOString(),
+        creditLimit: 18,
       }],
       // Window-aware registration (register page) fetches eligibility and the
       // credit-limit application for the OPEN round, and the student dashboard
@@ -293,7 +299,8 @@ async function mockStudent(page: Page, singleTerm = false) {
       '/api/v1/me/registration/eligibility': {
         roundId: 'round-demo', semesterId: 'term-2', kind: 'REGISTRATION',
         eligible: true, creditLimit: 18, creditsUsed: 3, creditsRemaining: 15,
-        windowStart: '2026-09-01T00:00:00Z', windowEnd: '2026-09-30T00:00:00Z',
+        windowStart: new Date(Date.now() - 7 * 86_400_000).toISOString(),
+        windowEnd: new Date(Date.now() + 30 * 86_400_000).toISOString(),
       },
       '/api/v1/me/registration/summary': {
         roundId: 'round-demo', creditLimit: 18, creditsUsed: 3, creditsRemaining: 15,
