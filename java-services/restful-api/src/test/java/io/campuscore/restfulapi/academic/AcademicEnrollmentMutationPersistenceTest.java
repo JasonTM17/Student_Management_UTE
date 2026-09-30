@@ -461,6 +461,21 @@ class AcademicEnrollmentMutationPersistenceTest {
     @Test
     void onlyAnApprovedApplicationRaisesOneStudentFromTwentyEightToThirtyCredits() throws Exception {
         LocalDateTime now = localDateTime(BASE_TIME);
+        // The 28 used credits must come from the section's CURRENT course
+        // credits (the quota basis since the stale-snapshot fix), so this test
+        // enrolls the student in a dedicated 28-credit course.
+        jdbc.update(
+                "INSERT INTO \"academic\".\"Course\""
+                        + " (\"id\", \"code\", \"name\", \"nameEn\", \"nameVi\", \"credits\","
+                        + " \"departmentId\", \"semesterId\", \"isActive\", \"createdAt\", \"updatedAt\")"
+                        + " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                "course-cap", "SE405", "Capstone", "Capstone", "Capstone", 28,
+                "department-1", "semester-1", true, now, now);
+        jdbc.update(
+                "INSERT INTO \"academic\".\"Section\""
+                        + " (\"id\", \"sectionNumber\", \"courseId\", \"semesterId\", \"capacity\","
+                        + " \"enrolledCount\", \"status\", \"version\") VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+                "section-cap", "01", "course-cap", "semester-1", 35, 0, "OPEN", 0);
         jdbc.update(
                 "INSERT INTO \"academic\".\"Enrollment\""
                         + " (\"id\", \"studentId\", \"sectionId\", \"semesterId\", \"status\", \"enrolledAt\","
@@ -468,10 +483,10 @@ class AcademicEnrollmentMutationPersistenceTest {
                         + " VALUES (?, ?, ?, ?, 'ENROLLED', ?, 'NOT_GRADED', ?, ?, ?, 0)",
                 "enrollment-standard-cap",
                 "student-1",
-                "section-open",
+                "section-cap",
                 "semester-1",
                 now,
-                "course-open",
+                "course-cap",
                 "round-open",
                 28);
 
@@ -537,6 +552,55 @@ class AcademicEnrollmentMutationPersistenceTest {
                         .content("{\"sectionId\":\"section-two\"}"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.sectionId").value("section-two"));
+    }
+
+    @Test
+    void quotaCountsTheCurrentSectionCreditsNotTheEnrollmentSnapshot() throws Exception {
+        // Regression for the 15-vs-16 quota drift: the course was raised from
+        // 15 to 16 credits AFTER the student registered, so the enrollment row
+        // still carries the stale 15-credit snapshot while the section's
+        // current credits are 16. Eligibility (and the summary screen) must
+        // bill the current 16 — the pre-fix creditsUsed() summed the snapshot
+        // and reported 15, letting a student register past the credit cap.
+        LocalDateTime now = localDateTime(BASE_TIME);
+        jdbc.update(
+                "INSERT INTO \"academic\".\"Course\""
+                        + " (\"id\", \"code\", \"name\", \"nameEn\", \"nameVi\", \"credits\","
+                        + " \"departmentId\", \"semesterId\", \"isActive\", \"createdAt\", \"updatedAt\")"
+                        + " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                "course-stale", "SE406", "Stale Credits", "Stale Credits", "Stale Credits", 16,
+                "department-1", "semester-1", true, now, now);
+        jdbc.update(
+                "INSERT INTO \"academic\".\"Section\""
+                        + " (\"id\", \"sectionNumber\", \"courseId\", \"semesterId\", \"capacity\","
+                        + " \"enrolledCount\", \"status\", \"version\") VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+                "section-stale", "01", "course-stale", "semester-1", 35, 0, "OPEN", 0);
+        jdbc.update(
+                "INSERT INTO \"academic\".\"Enrollment\""
+                        + " (\"id\", \"studentId\", \"sectionId\", \"semesterId\", \"status\", \"enrolledAt\","
+                        + " \"gradeStatus\", \"courseId\", \"roundId\", \"creditsSnapshot\", \"version\")"
+                        + " VALUES (?, ?, ?, ?, 'ENROLLED', ?, 'NOT_GRADED', ?, ?, ?, 0)",
+                "enrollment-stale-credits",
+                "student-1",
+                "section-stale",
+                "semester-1",
+                now,
+                "course-stale",
+                "round-open",
+                15);
+
+        mvc.perform(get("/api/v1/me/registration/eligibility")
+                        .with(studentJwt("student-user-1", "student-1"))
+                        .param("roundId", "round-open"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.creditsUsed").value(16))
+                .andExpect(jsonPath("$.creditsRemaining").value(12));
+
+        mvc.perform(get("/api/v1/me/registration/summary")
+                        .with(studentJwt("student-user-1", "student-1")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.creditsUsed").value(16))
+                .andExpect(jsonPath("$.creditsRemaining").value(12));
     }
 
     @Test
