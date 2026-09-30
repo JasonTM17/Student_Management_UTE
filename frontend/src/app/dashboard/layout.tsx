@@ -926,17 +926,13 @@ export default function DashboardLayout({
           ))}
         </nav>
           <div className={cn('pt-2 border-t border-white/10 mt-2', sidebarCollapsed ? 'px-1' : 'px-2')}>
-            {/* The academic assistant stays reachable from the page header pill;
-                the sidebar keeps only the specialized launcher so the menu does
-                not carry two entries for the same panel. */}
-            <button
-              onClick={() => {
-                if (typeof window !== 'undefined') {
-                  window.dispatchEvent(
-                    new CustomEvent('open-campus-assistant', { detail: { mode: 'specialized' } }),
-                  );
-                }
-              }}
+            {/* The specialized assistant has a dedicated full-page workspace:
+                the launcher is a real route (owner feedback 2026-09-30 — the
+                event-only launcher read as "trang này chưa có"). The academic
+                drawer stays reachable from the header pill and the floating
+                mascot. */}
+            <LocalizedLink
+              href="/dashboard/assistant-specialized"
               className={cn(
                 'group flex min-h-11 w-full items-center gap-3 rounded-md px-3 py-2 text-sm font-medium text-[var(--portal-sidebar-muted)] transition-colors duration-150 hover:bg-white/10 hover:text-[var(--portal-sidebar-text)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--portal-yellow)]',
                 sidebarCollapsed && 'justify-center px-0',
@@ -948,7 +944,7 @@ export default function DashboardLayout({
               {!sidebarCollapsed ? (
                 <span>{messages.assistant.specializedLabel}</span>
               ) : null}
-            </button>
+            </LocalizedLink>
           </div>
 
         <div
