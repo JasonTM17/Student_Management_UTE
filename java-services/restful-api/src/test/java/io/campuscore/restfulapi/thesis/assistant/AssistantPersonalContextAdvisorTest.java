@@ -1355,6 +1355,37 @@ class AssistantPersonalContextAdvisorTest {
         assertFalse(response.answer().contains("phê duyệt"), response.answer());
     }
 
+    @Test
+    void todayClassExistenceQuestionsRouteToDayTimetable() {
+        // Audit ca-nhan Q2 + giang-vien Q7 (M6 battery FAIL): "có lớp (học)
+        // không" must answer the ASKED DAY, not the full enrollment list —
+        // and the lecturer variant must not fall through to RAG NO_MATCH.
+        when(enrollmentService.findStudentEnrollments("student-profile", null)).thenReturn(List.of(
+                enrollment("SE013", "Nhập môn lập trình", "Introduction to Programming",
+                        CURRENT_TERM_START,
+                        List.of(new SectionScheduleResponse("sch-1", 3, "07:00", "09:30",
+                                new io.campuscore.restfulapi.academic.web.AcademicEnrollmentReadDtos
+                                        .ClassroomSummary("room-1", "A", "103"))))));
+        when(enrollmentService.findStudentTranscript("student-profile")).thenReturn(null);
+
+        ChatResponse student = advisor.answer(
+                chatRequest("vi", "Hôm nay tôi có lớp học không?"), jwtStudent());
+        assertNotNull(student);
+        assertEquals("PERSONAL_CONTEXT", student.reasonCode());
+        // Either the today list or the honest empty message — never a dump.
+        assertTrue(student.answer().contains("Lịch học Thứ") || student.answer().contains("không có lịch học vào"),
+                student.answer());
+
+        when(sectionService.findLecturerSchedule("lecturer-profile", null)).thenReturn(List.of(
+                lecturerSection("sec-today", "SE402", "Cơ sở dữ liệu", 3)));
+        ChatResponse teacher = advisor.answer(
+                chatRequest("vi", "Hôm nay tôi có lớp nào không?"), jwtLecturer());
+        assertNotNull(teacher, "the existence question must be intercepted, not answered by RAG");
+        assertEquals("PERSONAL_CONTEXT", teacher.reasonCode());
+        assertTrue(teacher.answer().contains("Lịch giảng dạy") || teacher.answer().contains("ca giảng dạy"),
+                teacher.answer());
+    }
+
     private static LecturerScheduleResponse lecturerSection(
             String sectionId, String courseCode, String title, int credits) {
         return new LecturerScheduleResponse("id-" + sectionId, sectionId, sectionId + "-01", courseCode,
