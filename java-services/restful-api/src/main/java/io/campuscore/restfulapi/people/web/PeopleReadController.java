@@ -39,14 +39,15 @@ public class PeopleReadController {
 
     @Operation(summary = "Danh bạ sinh viên (Giảng viên / Admin)", description = "Truy vấn danh sách sinh viên theo trang và trạng thái học vụ")
     @ApiResponses({
-        @ApiResponse(responseCode = "200", description = "Truy vấn thành công danh sách sinh viên")
+        @ApiResponse(responseCode = "200", description = "Truy vấn thành công danh sách sinh viên"),
+        @ApiResponse(responseCode = "400", description = "Trạng thái học vụ không hợp lệ (chỉ nhận ACTIVE)")
     })
     @GetMapping("students")
     @PreAuthorize("hasAnyRole('LECTURER', 'ADMIN', 'SUPER_ADMIN')")
     public StudentListResponse getStudents(
             @Parameter(description = "Số trang") @RequestParam(defaultValue = "1") int page,
             @Parameter(description = "Số lượng bản ghi mỗi trang") @RequestParam(defaultValue = "20") int limit,
-            @Parameter(description = "Trạng thái học vụ (ENROLLED, LEAVE, GRADUATED)") @RequestParam(required = false) String status,
+            @Parameter(description = "Trạng thái học vụ (ACTIVE) — giá trị khác trả về 400") @RequestParam(required = false) String status,
             @RequestParam MultiValueMap<String, String> queryParameters) {
         requireAllowedQuery(queryParameters, Set.of("page", "limit", "status"));
         return people.findStudents(page, limit, status);
