@@ -1386,6 +1386,47 @@ class AssistantPersonalContextAdvisorTest {
                 teacher.answer());
     }
 
+    @Test
+    void interceptsPendingGradeCountAndHybridDiacriticGrades() {
+        // Audit quét toàn hệ thống chatbot-1/chatbot-2 (both verified):
+        // "điem cua toi" (đ kept, tone dropped) missed GRADES_INTENT because
+        // CASE_INSENSITIVE never folds đ↔d, and the pending-grade count
+        // question fell to the prerequisite KB while 5 in-progress courses
+        // were awaiting grades.
+        assertTrue(advisor.handles("điem cua toi"));
+        assertTrue(advisor.handles("Điểm của tôi"));
+        assertTrue(advisor.handles("Tôi học còn bao nhiêu môn chưa có điểm?"));
+        assertTrue(advisor.handles("How many of my courses still have no grade?"));
+        // Public rule wording without first person stays on the knowledge path.
+        assertFalse(advisor.handles("Học phần chưa có điểm công bố được tính thế nào?"));
+    }
+
+    @Test
+    void pendingGradesAnswerCountsUngradedActiveCourses() {
+        when(enrollmentService.findStudentEnrollments("student-profile", null)).thenReturn(List.of(
+                enrollmentWithGradeStatus("SE013", "ENROLLED", "NOT_GRADED"),
+                enrollmentWithGradeStatus("SE014", "ENROLLED", "NOT_GRADED"),
+                enrollmentWithGradeStatus("SE410", "ENROLLED", "PUBLISHED")));
+
+        ChatResponse response = advisor.answer(
+                chatRequest("vi", "Tôi học còn bao nhiêu môn chưa có điểm?"), jwtStudent());
+
+        assertNotNull(response);
+        assertEquals("PERSONAL_CONTEXT", response.reasonCode());
+        assertTrue(response.answer().contains("còn 2 môn chưa có điểm công bố"), response.answer());
+        assertTrue(response.answer().contains("SE013"), response.answer());
+        assertTrue(response.answer().contains("SE014"), response.answer());
+        assertFalse(response.answer().contains("SE410"), response.answer());
+    }
+
+    private static EnrollmentResponse enrollmentWithGradeStatus(String code, String status, String gradeStatus) {
+        EnrollmentResponse base = enrollment(code, "Học phần " + code, "Course " + code, CURRENT_TERM_START, List.of());
+        return new EnrollmentResponse(
+                base.id(), base.studentId(), base.sectionId(), base.semesterId(), base.status(),
+                base.enrolledAt(), base.droppedAt(), gradeStatus, base.finalGrade(), base.letterGrade(),
+                base.createdAt(), base.updatedAt(), base.student(), base.section(), base.semester());
+    }
+
     private static LecturerScheduleResponse lecturerSection(
             String sectionId, String courseCode, String title, int credits) {
         return new LecturerScheduleResponse("id-" + sectionId, sectionId, sectionId + "-01", courseCode,

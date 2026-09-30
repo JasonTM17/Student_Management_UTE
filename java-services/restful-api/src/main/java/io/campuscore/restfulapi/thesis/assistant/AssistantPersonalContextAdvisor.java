@@ -239,14 +239,18 @@ public class AssistantPersonalContextAdvisor {
                     // gate then served the student's own transcript instead of
                     // the public knowledge path. A bare "điểm" only counts as a
                     // personal-grades signal when a possessive follows.
-                    + "|(?:điểm|diem)\\s*(?:số|so|tổng\\s*kết|tong\\s*ket|thành\\s*phần|thanh\\s*phan|quá\\s*trình|qua\\s*trinh|học\\s*kỳ|hoc\\s*ky|học\\s*tập|hoc\\s*tap)"
-                    + "|(?:điểm|diem)\\s*(?:của|cua)\\s*(?:tôi|mình|em|toi|minh)"
+                    + "|(?:điểm|diem|điem)\\s*(?:số|so|tổng\\s*kết|tong\\s*ket|thành\\s*phần|thanh\\s*phan|quá\\s*trình|qua\\s*trinh|học\\s*kỳ|hoc\\s*ky|học\\s*tập|hoc\\s*tap)"
+                    // Audit quét toàn hệ thống chatbot-1: the hybrid
+                    // missing-diacritic form "điem" (đ kept, tone dropped) is
+                    // the most common fast-typing variant and matched neither
+                    // stem; CASE_INSENSITIVE does not fold đ↔d.
+                    + "|(?:điểm|diem|điem)\\s*(?:của|cua)\\s*(?:tôi|mình|em|toi|minh)"
                     // Audit ca-nhan Q6: "Điểm các môn của tôi trong học kỳ 2..."
                     // — the possessive can sit a few words after "điểm"; the
                     // short lazy gap keeps it personal while the first-person
                     // gate in isGradesIntent still excludes "điểm chuẩn..."
                     // policy wording with no "của tôi".
-                    + "|(?:điểm|diem)[^?!.]{0,12}?(?:của|cua)\\s*(?:tôi|mình|em)\\b"
+                    + "|(?:điểm|diem|điem)[^?!.]{0,12}?(?:của|cua)\\s*(?:tôi|mình|em)\\b"
                     + "|(?:my\\s+)?(?:grades?|scores?|marks?|transcript)",
             Pattern.CASE_INSENSITIVE | Pattern.UNICODE_CASE);
 
@@ -426,6 +430,28 @@ public class AssistantPersonalContextAdvisor {
                 && ADVISEE_ROSTER_INTENT.matcher(message).find();
     }
 
+    /**
+     * "Tôi học còn bao nhiêu môn chưa có điểm?" — count of in-progress
+     * enrolled courses still awaiting published grades (audit quét toàn hệ
+     * thống chatbot-2: the question fell to the prerequisite-regulation KB
+     * while the transcript data showed exactly 5 pending courses). The
+     * FIRST_PERSON gate keeps the public rule question on the knowledge path.
+     */
+    private static final Pattern PENDING_GRADES_INTENT = Pattern.compile(
+            "(?:bao\\s*nhiêu|mấy|bao\\s*nhieu|how\\s+many)[^?!.]{0,30}?(?:môn|mon|học\\s*phần|hoc\\s*phan|courses?|subjects?)"
+                    + "[^?!.]{0,35}?(?:chưa\\s*có\\s*điểm|chua\\s*co\\s*diem|chưa\\s*có\\s*điểm\\s*công\\s*bố|no\\s+grade|not\\s+graded|awaiting\\s+grade)"
+                    + "|(?:chưa\\s*có\\s*điểm|chua\\s*co\\s*diem)[^?!.]{0,30}?(?:bao\\s*nhiêu|mấy|bao\\s*nhieu)"
+                    + "|how\\s+many\\s+(?:of\\s+my\\s+)?courses?[^?!.]{0,30}?(?:still\\s+)?(?:have\\s+no|without)\\s+grade",
+            Pattern.CASE_INSENSITIVE | Pattern.UNICODE_CASE);
+
+    private static boolean isPendingGradesIntent(String message) {
+        if (!StringUtils.hasText(message)) return false;
+        if (ENROLLMENT_HOWTO_INTENT.matcher(message).find()) return false;
+        if (CREDITS_POLICY_INTENT.matcher(message).find()) return false;
+        return FIRST_PERSON_PRONOUN.matcher(message).find()
+                && PENDING_GRADES_INTENT.matcher(message).find();
+    }
+
     /** "Lớp SE013 học phòng nào, giờ nào?" — a concrete section code plus room/time wording. */
     private static boolean isSectionDetailIntent(String message) {
         if (!StringUtils.hasText(message)) return false;
@@ -564,6 +590,7 @@ public class AssistantPersonalContextAdvisor {
                 || isCreditsRemainingIntent(message)
                 || isCreditsAccumulatedIntent(message)
                 || isLecturerTeachingCreditsIntent(message)
+                || isPendingGradesIntent(message)
                 || isSectionDetailIntent(message);
     }
 
@@ -709,6 +736,12 @@ public class AssistantPersonalContextAdvisor {
             // the credit-limit regulation instead).
             if (StringUtils.hasText(studentId)) {
                 return accumulatedCreditsAnswer(studentId, locale);
+            }
+            return null;
+        }
+        if (isPendingGradesIntent(message)) {
+            if (StringUtils.hasText(studentId)) {
+                return pendingGradesAnswer(studentId, locale);
             }
             return null;
         }
@@ -1073,6 +1106,57 @@ public class AssistantPersonalContextAdvisor {
         answer.append(vi
                 ? "\n(Số liệu tính theo điểm tốt nhất mỗi môn — chính sách học lại, trùng với trang Bảng điểm.)"
                 : "\n(Figures count your best attempt per course (retake policy) and match the Transcript page.)");
+        return answer.toString();
+    }
+
+    /**
+     * "Tôi học còn bao nhiêu môn chưa có điểm?" — counted IN CODE over the
+     * asker's active enrollments whose grades are not published yet, listing
+     * the courses by name (audit quét toàn hệ thống chatbot-2: the question
+     * fell to the prerequisite KB while exactly 5 in-progress courses were
+     * pending).
+     */
+    private String pendingGradesAnswer(String studentId, String locale) {
+        boolean vi = "vi".equals(locale);
+        List<EnrollmentResponse> active = enrollments.findStudentEnrollments(studentId, null).stream()
+                .filter(item -> ACTIVE_ENROLLMENT_STATUSES.contains(item.status()))
+                .toList();
+        List<EnrollmentResponse> pending = active.stream()
+                .filter(item -> !"PUBLISHED".equalsIgnoreCase(item.gradeStatus()))
+                .toList();
+        if (active.isEmpty()) {
+            return vi
+                    ? "Bạn hiện không có học phần nào đang học, nên không có môn nào chờ điểm."
+                    : "You have no in-progress courses right now, so no grades are pending.";
+        }
+        if (pending.isEmpty()) {
+            return vi
+                    ? "Tất cả " + active.size() + " học phần đang học của bạn đều đã có điểm công bố."
+                    : "All " + active.size() + " of your in-progress courses already have published grades.";
+        }
+        StringBuilder answer = new StringBuilder();
+        answer.append(vi
+                ? "Trong " + active.size() + " học phần đang học, bạn còn " + pending.size()
+                        + " môn chưa có điểm công bố:\n"
+                : "Of your " + active.size() + " in-progress courses, " + pending.size()
+                        + " still await published grades:\n");
+        int rendered = 0;
+        for (EnrollmentResponse item : pending) {
+            if (rendered++ >= 10) {
+                answer.append("\n• ").append(vi
+                        ? "… và " + (pending.size() - rendered + 1) + " môn khác."
+                        : "… and " + (pending.size() - rendered + 1) + " more courses.");
+                break;
+            }
+            String courseCode = item.section() != null && item.section().course() != null
+                    ? item.section().course().code() : null;
+            String courseTitle = item.section() != null && item.section().course() != null
+                    ? courseLabel(item.section().course(), locale) : null;
+            answer.append("\n• ").append(courseName(courseCode, courseTitle, null));
+        }
+        answer.append(vi
+                ? "\n\nĐiểm sẽ xuất hiện ở trang Điểm số ngay khi giảng viên nhập và Phòng Đào tạo công bố."
+                : "\n\nGrades appear on the Grades page as soon as lecturers submit and the office publishes them.");
         return answer.toString();
     }
 

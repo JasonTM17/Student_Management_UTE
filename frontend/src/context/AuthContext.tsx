@@ -81,6 +81,31 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (isTwoFactorChallenge(response)) {
       return response;
     }
+    // Session-cookie verification with one silent retry: the same-origin
+    // proxy intermittently drops the login response's Set-Cookie, which
+    // surfaced as an instant "Lần đăng nhập của bạn đã kết thúc" banner right
+    // after a successful sign-in (production repro, PR #26 thread). me() runs
+    // with skipAuthRedirect, so a failed probe can never bounce the user
+    // through redirectToLogin mid-login.
+    let sessionVerified = false;
+    for (let attempt = 0; attempt < 2 && !sessionVerified; attempt += 1) {
+      if (attempt > 0) {
+        try {
+          await authApi.login(email, password);
+        } catch {
+          break;
+        }
+      }
+      try {
+        await authApi.me();
+        sessionVerified = true;
+      } catch {
+        sessionVerified = false;
+      }
+    }
+    if (!sessionVerified) {
+      console.warn('auth: session cookie missing after sign-in; the portal may ask you to sign in again');
+    }
     setIsLoggingOut(false);
     setUser(response.user);
     return response.user;
