@@ -15,6 +15,7 @@ import io.campuscore.restfulapi.engagement.repository.AnnouncementAuditRepositor
 import io.campuscore.restfulapi.engagement.repository.AnnouncementWriteRepository;
 import io.campuscore.restfulapi.engagement.repository.AnnouncementWriteRepository.CreateAnnouncementCommand;
 import io.campuscore.restfulapi.engagement.repository.AnnouncementWriteRepository.UpdateAnnouncementCommand;
+import io.campuscore.restfulapi.engagement.service.AnnouncementStudentNotifier;
 import io.campuscore.restfulapi.engagement.service.AnnouncementWriteService;
 import io.campuscore.restfulapi.engagement.web.AnnouncementReadDtos.AnnouncementResponse;
 import io.campuscore.restfulapi.engagement.web.AnnouncementWriteDtos.CreateAnnouncementRequest;
@@ -135,7 +136,8 @@ class AnnouncementWriteServiceSanitizationTest {
             } catch (Exception exception) {
                 throw new IllegalStateException(exception);
             }
-            this.service = new AnnouncementWriteService(announcements, audits, mapper);
+            this.service = new AnnouncementWriteService(
+                    announcements, audits, mock(AnnouncementStudentNotifier.class), mapper);
         }
     }
 }

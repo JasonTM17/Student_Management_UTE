@@ -10,6 +10,7 @@ import static org.mockito.Mockito.when;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.campuscore.restfulapi.engagement.repository.AnnouncementAuditRepository;
 import io.campuscore.restfulapi.engagement.repository.AnnouncementWriteRepository;
+import io.campuscore.restfulapi.engagement.service.AnnouncementStudentNotifier;
 import io.campuscore.restfulapi.engagement.service.AnnouncementWriteService;
 import io.campuscore.restfulapi.engagement.web.AnnouncementReadDtos.AnnouncementResponse;
 import io.campuscore.restfulapi.engagement.web.AnnouncementWriteDtos.CreateAnnouncementRequest;
@@ -130,7 +131,8 @@ class AnnouncementWriteServiceLecturerTest {
         AnnouncementAuditRepository audits = mock(AnnouncementAuditRepository.class);
         ObjectMapper mapper = mock(ObjectMapper.class);
         when(mapper.writeValueAsString(any())).thenReturn("{}");
-        return new Fixture(announcements, new AnnouncementWriteService(announcements, audits, mapper));
+        return new Fixture(announcements, new AnnouncementWriteService(
+                announcements, audits, mock(AnnouncementStudentNotifier.class), mapper));
     }
 
     private static AnnouncementResponse announcement(String lecturerId) {

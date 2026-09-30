@@ -98,7 +98,20 @@ public final class AcademicEnrollmentReadDtos {
             String enrollmentStatus) {
     }
 
-    public record TranscriptSummary(BigDecimal cumulativeGpa, int totalCreditsEarned, int totalCreditsAttempted) {
+    /**
+     * Human-readable explanation of the GPA/credit basis, in both campus
+     * languages. The summary counts the best attempt per course (retake
+     * policy), which can legitimately differ from the per-semester totals in
+     * {@code semesters[]} — the note stops that from reading as a bug.
+     */
+    public record TranscriptBasisNote(String vi, String en) {
+    }
+
+    public record TranscriptSummary(
+            BigDecimal cumulativeGpa,
+            int totalCreditsEarned,
+            int totalCreditsAttempted,
+            TranscriptBasisNote basisNote) {
     }
 
     public record TranscriptSemester(

@@ -11,6 +11,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import io.campuscore.restfulapi.engagement.repository.AnnouncementAuditRepository;
 import io.campuscore.restfulapi.engagement.repository.AnnouncementAuditRepository.AuditCommand;
 import io.campuscore.restfulapi.engagement.repository.AnnouncementWriteRepository;
+import io.campuscore.restfulapi.engagement.service.AnnouncementStudentNotifier;
 import io.campuscore.restfulapi.engagement.service.AnnouncementWriteService;
 import io.campuscore.restfulapi.engagement.web.AnnouncementReadDtos.AnnouncementResponse;
 import io.campuscore.restfulapi.engagement.web.AnnouncementWriteDtos.LifecycleRequest;
@@ -32,7 +33,8 @@ class AnnouncementWriteServiceConcurrencyTest {
         AnnouncementWriteRepository announcements = mock(AnnouncementWriteRepository.class);
         AnnouncementAuditRepository audits = mock(AnnouncementAuditRepository.class);
         ObjectMapper objectMapper = mapper();
-        AnnouncementWriteService service = new AnnouncementWriteService(announcements, audits, objectMapper);
+        AnnouncementWriteService service = new AnnouncementWriteService(
+                announcements, audits, mock(AnnouncementStudentNotifier.class), objectMapper);
         AnnouncementResponse before = announcement("Original", 0, null);
         AnnouncementResponse after = announcement("Updated", 1, null);
         when(announcements.findByIdForUpdate("notice-1")).thenReturn(Optional.of(before));
@@ -73,7 +75,7 @@ class AnnouncementWriteServiceConcurrencyTest {
     void lifecycleMutationsLockTheRowBeforeRecordingTheirAfterSnapshot() throws Exception {
         AnnouncementWriteRepository announcements = mock(AnnouncementWriteRepository.class);
         AnnouncementAuditRepository audits = mock(AnnouncementAuditRepository.class);
-        AnnouncementWriteService service = new AnnouncementWriteService(announcements, audits, mapper());
+        AnnouncementWriteService service = new AnnouncementWriteService(announcements, audits, mock(AnnouncementStudentNotifier.class), mapper());
         AnnouncementResponse active = announcement("Active", 0, null);
         AnnouncementResponse archived = announcement("Active", 1, CREATED_AT.plusSeconds(1));
         AnnouncementResponse restored = announcement("Active", 2, null);
@@ -102,7 +104,7 @@ class AnnouncementWriteServiceConcurrencyTest {
     void legacyDeleteLocksTheRowBeforeSoftArchiving() throws Exception {
         AnnouncementWriteRepository announcements = mock(AnnouncementWriteRepository.class);
         AnnouncementAuditRepository audits = mock(AnnouncementAuditRepository.class);
-        AnnouncementWriteService service = new AnnouncementWriteService(announcements, audits, mapper());
+        AnnouncementWriteService service = new AnnouncementWriteService(announcements, audits, mock(AnnouncementStudentNotifier.class), mapper());
         AnnouncementResponse active = announcement("Active", 0, null);
         AnnouncementResponse archived = announcement("Active", 1, CREATED_AT.plusSeconds(1));
         when(announcements.findByIdForUpdate("notice-1")).thenReturn(Optional.of(active));
