@@ -45,15 +45,18 @@ public class AnnouncementWriteService {
 
     private final AnnouncementWriteRepository announcements;
     private final AnnouncementAuditRepository audits;
+    private final AnnouncementStudentNotifier studentNotifier;
     private final ObjectMapper objectMapper;
     private final Clock clock = Clock.systemUTC();
 
     public AnnouncementWriteService(
             AnnouncementWriteRepository announcements,
             AnnouncementAuditRepository audits,
+            AnnouncementStudentNotifier studentNotifier,
             ObjectMapper objectMapper) {
         this.announcements = announcements;
         this.audits = audits;
+        this.studentNotifier = studentNotifier;
         this.objectMapper = objectMapper;
     }
 
@@ -101,7 +104,27 @@ public class AnnouncementWriteService {
                 lecturer ? lecturerId : request.lecturerId(),
                 now));
         appendAudit("CREATED", publisher, actorLabel, "Announcement created", null, created, now);
+        notifyActiveStudents(created);
         return created;
+    }
+
+    /**
+     * R7 fan-out (in-app inbox notice for every ACTIVE student). Fail-soft by
+     * contract: the notifier runs in its own transaction and any RuntimeException
+     * here is swallowed with a WARN, so a notification-side outage can never
+     * roll back the announcement that was just published.
+     */
+    private void notifyActiveStudents(AnnouncementResponse created) {
+        try {
+            int sent = studentNotifier.fanOutToActiveStudents(created);
+            LOGGER.info("Announcement {} fanned out to {} active students", created.id(), sent);
+        } catch (RuntimeException exception) {
+            LOGGER.warn(
+                    "Announcement {} was created but the student notification fan-out failed: {}",
+                    created.id(),
+                    exception.getMessage(),
+                    exception);
+        }
     }
 
     @Transactional

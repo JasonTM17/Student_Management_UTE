@@ -22,6 +22,7 @@ import io.campuscore.restfulapi.academic.web.AcademicEnrollmentReadDtos.StudentG
 import io.campuscore.restfulapi.academic.web.AcademicEnrollmentReadDtos.StudentGradeSectionRow;
 import io.campuscore.restfulapi.academic.web.AcademicEnrollmentReadDtos.StudentGradesByEnrollmentResponse;
 import io.campuscore.restfulapi.academic.web.AcademicEnrollmentReadDtos.StudentSummary;
+import io.campuscore.restfulapi.academic.web.AcademicEnrollmentReadDtos.TranscriptBasisNote;
 import io.campuscore.restfulapi.academic.web.AcademicEnrollmentReadDtos.TranscriptResponse;
 import io.campuscore.restfulapi.academic.web.AcademicEnrollmentReadDtos.TranscriptSemester;
 import io.campuscore.restfulapi.academic.web.AcademicEnrollmentReadDtos.TranscriptSummary;
@@ -44,6 +45,17 @@ import org.springframework.web.server.ResponseStatusException;
 @Profile("persistence")
 public class AcademicEnrollmentReadService {
     public static final int MAX_PAGE_SIZE = 100;
+
+    /**
+     * Basis note shipped with every transcript summary: the summary counts the
+     * best attempt per course (retake policy) while the per-semester blocks
+     * count every attempt, so the two numbers legitimately differ. Label is
+     * fixed — the backend persistence test pins the copy; the FE transcript
+     * page renders the note conditionally when the field is present.
+     */
+    private static final TranscriptBasisNote TRANSCRIPT_BASIS_NOTE = new TranscriptBasisNote(
+            "GPA và tín chỉ tính theo điểm tốt nhất mỗi môn (chính sách học lại)",
+            "GPA and credits use your best attempt per course (retake policy)");
 
     // Feedback item 2: the 4.0 conversion follows the official HCMUTE table
     // for the 10-point scale (A+/A=4.0, B+=3.5, B=3.0, C+=2.5, C=2.0, D+=1.5,
@@ -207,7 +219,8 @@ public class AcademicEnrollmentReadService {
         }
 
         return new TranscriptResponse(
-                new TranscriptSummary(gpa(totalPoints, totalAttempted), totalEarned, totalAttempted),
+                new TranscriptSummary(
+                        gpa(totalPoints, totalAttempted), totalEarned, totalAttempted, TRANSCRIPT_BASIS_NOTE),
                 bySemester.values().stream().map(TranscriptAccumulator::response).toList());
     }
 
