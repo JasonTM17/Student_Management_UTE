@@ -31,6 +31,9 @@ public class PeopleReadRepository {
     private static final String USER_TABLE = "\"campuscore_auth\".\"User\"";
     private static final String CURRICULUM_TABLE = "\"academic\".\"Curriculum\"";
     private static final String DEPARTMENT_TABLE = "\"academic\".\"Department\"";
+    // The only status PeopleReadService.STUDENT_STATUSES admits; kept in sync
+    // by that service's validation and referenced here for the fan-out roster.
+    private static final String ACTIVE_STUDENT_STATUS = "ACTIVE";
     private static final RowMapper<StudentResponse> STUDENT_MAPPER = PeopleReadRepository::mapStudent;
     private static final RowMapper<LecturerResponse> LECTURER_MAPPER = PeopleReadRepository::mapLecturer;
 
@@ -60,6 +63,38 @@ public class PeopleReadRepository {
                 parameters,
                 Long.class);
         return Objects.requireNonNullElse(count, 0L);
+    }
+
+    /**
+     * Auth-account ids of every ACTIVE student, in stable order. This is the
+     * fan-out roster for campus-wide notices (R7 announcement notifications).
+     * The join mirrors {@link #studentSelect()}'s user join: the notification's
+     * {@code user_id} carries a foreign key to {@code campuscore_auth."User"},
+     * so a student row without a matching account must not reach the batch.
+     * {@code DISTINCT} collapses any accidental duplicate account link.
+     */
+    public List<String> findActiveStudentUserIds() {
+        return jdbc.queryForList(
+                "SELECT DISTINCT student.\"userId\" FROM " + STUDENT_TABLE + " student"
+                        + " JOIN " + USER_TABLE + " user_account ON user_account.\"id\" = student.\"userId\""
+                        + " WHERE student.\"status\" = :status"
+                        + " ORDER BY 1",
+                new MapSqlParameterSource("status", ACTIVE_STUDENT_STATUS),
+                String.class);
+    }
+    /** Active students whose academic year is one of the given years (empty/NULL years = all). */
+    public List<String> findActiveStudentUserIdsInYears(List<Integer> years) {
+        if (years == null || years.isEmpty()) {
+            return findActiveStudentUserIds();
+        }
+        return jdbc.queryForList(
+                "SELECT DISTINCT student.\"userId\" FROM " + STUDENT_TABLE + " student"
+                        + " JOIN " + USER_TABLE + " user_account ON user_account.\"id\" = student.\"userId\""
+                        + " WHERE student.\"status\" = :status AND student.\"year\" IN (:years)"
+                        + " ORDER BY 1",
+                new MapSqlParameterSource("status", ACTIVE_STUDENT_STATUS)
+                        .addValue("years", years),
+                String.class);
     }
 
     public Optional<StudentResponse> findStudentById(String id) {

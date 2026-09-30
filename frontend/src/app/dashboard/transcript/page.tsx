@@ -64,6 +64,23 @@ function getGradePoint(record: StudentGradeRecord) {
   return resolveGradePoint(record);
 }
 
+// The transcript summary is best-attempt basis (repeat-course policy), so it can
+// legitimately differ from the semester rows. The backend explains that with an
+// optional basisNote on the summary; accept both a plain string and a {vi,en}
+// object so the note renders as soon as either shape arrives.
+function resolveBasisNote(
+  basisNote: string | { vi?: string; en?: string } | undefined,
+  locale: string,
+): string | null {
+  if (!basisNote) return null;
+  if (typeof basisNote === 'string') {
+    return basisNote.trim() || null;
+  }
+  const text = locale === 'vi' ? basisNote.vi : basisNote.en;
+  const fallback = text ?? basisNote.vi ?? basisNote.en ?? '';
+  return fallback.trim() || null;
+}
+
 export default function TranscriptPage() {
   const { user, hasAccess, isLoading: authLoading } = useRequireAuth(['STUDENT']);
   const { locale, formatNumber, messages } = useI18n();
@@ -72,6 +89,7 @@ export default function TranscriptPage() {
       cumulativeGpa: number;
       totalCreditsEarned: number;
       totalCreditsAttempted: number;
+      basisNote?: string | { vi?: string; en?: string };
     };
     semesters: StudentTranscriptSemester[];
   } | null>(null);
@@ -185,6 +203,11 @@ export default function TranscriptPage() {
 
   const tenScaleTrendPoints = useMemo(
     () => buildTenScaleTrendPoints(transcriptData?.semesters ?? [], locale),
+    [locale, transcriptData],
+  );
+
+  const summaryBasisNote = useMemo(
+    () => resolveBasisNote(transcriptData?.summary?.basisNote, locale),
     [locale, transcriptData],
   );
 
@@ -547,6 +570,13 @@ export default function TranscriptPage() {
               </CardContent>
             </Card>
           </div>
+
+          {summaryBasisNote ? (
+            <p className="-mt-2 flex items-start gap-1.5 text-xs text-muted-foreground">
+              <Info className="mt-0.5 h-3.5 w-3.5 shrink-0 text-primary" />
+              <span>{summaryBasisNote}</span>
+            </p>
+          ) : null}
 
           <div className="grid gap-4 lg:grid-cols-2">
             <Card variant="elevated">

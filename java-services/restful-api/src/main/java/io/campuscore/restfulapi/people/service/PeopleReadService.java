@@ -39,6 +39,20 @@ public class PeopleReadService {
         return new StudentListResponse(data, meta(total, page, limit));
     }
 
+    /**
+     * Roster used by the announcement fan-out: the auth-account id of every
+     * ACTIVE student. Deliberately not paginated — the campus population is
+     * small (hundreds), and a partial roster would silently skip students.
+     */
+    @Transactional(readOnly = true)
+    public List<String> findActiveStudentUserIds() {
+        return people.findActiveStudentUserIds();
+    }
+    @Transactional(readOnly = true)
+    public List<String> findActiveStudentUserIdsInYears(List<Integer> years) {
+        return people.findActiveStudentUserIdsInYears(years);
+    }
+
     @Transactional(readOnly = true)
     public StudentResponse findStudent(String id) {
         return findStudent(id, null);
