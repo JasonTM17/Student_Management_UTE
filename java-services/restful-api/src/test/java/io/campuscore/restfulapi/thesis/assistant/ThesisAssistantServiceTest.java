@@ -3,6 +3,7 @@ package io.campuscore.restfulapi.thesis.assistant;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
@@ -859,5 +860,41 @@ class ThesisAssistantServiceTest {
         assertEquals("The tuition table is not published by the portal.",
                 ThesisAssistantService.normalizeAssistantCopy(
                         "The tuition table is not available in the provided information.", "en"));
+    }
+
+    /**
+     * Owner request 2026-09-30: an off-topic general question ("Con gà có mấy
+     * cái chân") must be answered by the provider with the general prompt —
+     * never by the KB miss. Academic-signal questions and a dead provider
+     * return {@code null} so the normal chain runs.
+     */
+    @Test
+    void generalAnswerIfOffTopicAnswersGeneralQuestionsViaProvider() {
+        ThesisAssistantKnowledgeRepository knowledge = mock(ThesisAssistantKnowledgeRepository.class);
+        DeepSeekClient provider = mock(DeepSeekClient.class);
+        when(provider.complete(org.mockito.ArgumentMatchers.<DeepSeekClient.CompletionRequest>any(),
+                org.mockito.ArgumentMatchers.<java.util.function.Consumer<DeepSeekClient.ProviderSegment>>any()))
+                .thenReturn(new DeepSeekClient.CompletionResult(
+                        "Con gà có 2 chân.", List.of(), "stop"));
+        ThesisAssistantService service = new ThesisAssistantService(knowledge, provider,
+                mock(ThesisAssistantRepository.class),
+                new DeepSeekProperties(true, "fixture", "https://api.deepseek.com", "deepseek-v4-flash", 8000, 800),
+                null);
+
+        ChatResponse general = service.generalAnswerIfOffTopic("Con gà có mấy cái chân", "vi", null);
+        assertNotNull(general);
+        assertEquals("ANSWERED", general.reasonCode());
+        assertEquals("Con gà có 2 chân.", general.answer());
+        assertTrue(general.citations().isEmpty());
+        assertFalse(general.degraded());
+
+        // Academic wording keeps the grounded RAG chain.
+        assertNull(service.generalAnswerIfOffTopic("Lịch thi cuối kỳ khi nào?", "vi", null));
+        // Provider dead → null so the normal NO_MATCH/curated chain runs.
+        ThesisAssistantService deadProvider = new ThesisAssistantService(knowledge, provider,
+                mock(ThesisAssistantRepository.class),
+                new DeepSeekProperties(false, "fixture", "https://api.deepseek.com", "deepseek-v4-flash", 8000, 800),
+                null);
+        assertNull(deadProvider.generalAnswerIfOffTopic("Con gà có mấy cái chân", "vi", null));
     }
 }

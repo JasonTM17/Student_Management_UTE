@@ -131,6 +131,14 @@ public class ThesisAssistantController {
                 return personal;
             }
         }
+        // Off-topic general questions ("Con gà có mấy cái chân") carry no
+        // academic signal, so the campus corpus could never ground them; the
+        // provider answers them directly instead of the KB miss (owner
+        // request 2026-09-30).
+        ChatResponse general = assistant.generalAnswerIfOffTopic(request.message(), locale, request.clientRequestId());
+        if (general != null) {
+            return general;
+        }
         String owner = subject(actor);
         if (remoteRag()) {
             return chatRemoteWithFallback(request, owner, dbDownAtRequestStart);
@@ -291,11 +299,17 @@ public class ThesisAssistantController {
                         ? personalContext.answer(request, actor) : null;
                 if (personal != null) {
                     personalContext.stream(personal, request, sink);
-                } else if (remoteRag()) {
-                    streamRemoteWithFallback(request, owner, sink, httpRequest);
                 } else {
-                    assistant.stream(request.message(), request.locale(), request.conversationId(), owner,
-                            request.clientRequestId(), sink, request.scope());
+                    ChatResponse general = assistant.generalAnswerIfOffTopic(request.message(),
+                            AssistantInputGuard.normalizeLocale(request.locale()), request.clientRequestId());
+                    if (general != null) {
+                        ThesisAssistantService.streamLocalResponse(general, request.clientRequestId(), sink);
+                    } else if (remoteRag()) {
+                        streamRemoteWithFallback(request, owner, sink, httpRequest);
+                    } else {
+                        assistant.stream(request.message(), request.locale(), request.conversationId(), owner,
+                                request.clientRequestId(), sink, request.scope());
+                    }
                 }
             }
             emitter.complete();
