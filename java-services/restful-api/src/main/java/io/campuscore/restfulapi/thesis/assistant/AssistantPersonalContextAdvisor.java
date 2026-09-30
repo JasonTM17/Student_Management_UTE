@@ -726,6 +726,27 @@ public class AssistantPersonalContextAdvisor {
             }
             return null;
         }
+        // Production audit Q2/Q6: "Hôm nay tôi có lớp (học) không?" reads as an
+        // enrollment-list question (lớp + interrogative) but it is a
+        // timetable-EXISTENCE question — for a student the enrollment branch
+        // dumped the whole list, and for a lecturer it matched neither the
+        // student list nor the teaching-list hint and died at RAG with
+        // NO_MATCH. A day word plus "có lớp/tiết/buổi/ca" (and no registration
+        // verb) routes to the day-filtered timetable instead.
+        Integer existenceDay = detectRequestedDay(message);
+        if (existenceDay != null
+                && Pattern.compile("(?:có|đang có|co|dang co)\\s*(?:lớp|tiết|buổi|ca|lop|tiet|buoi)\\b",
+                        Pattern.CASE_INSENSITIVE | Pattern.UNICODE_CASE).matcher(message).find()
+                && !Pattern.compile("đăng\\s*ký|dang\\s*ky", Pattern.CASE_INSENSITIVE | Pattern.UNICODE_CASE)
+                        .matcher(message).find()) {
+            if (StringUtils.hasText(studentId)) {
+                return studentAnswer(studentId, locale, existenceDay);
+            }
+            if (StringUtils.hasText(lecturerId) && sections != null) {
+                return lecturerAnswer(lecturerId, locale, existenceDay);
+            }
+            return null;
+        }
         if (isEnrollmentListIntent(message)) {
             // The section list is student-owned. A lecturer asking "Kỳ này tôi
             // phụ trách dạy những lớp học phần nào?" wants their teaching
