@@ -938,6 +938,245 @@ class AssistantPersonalContextAdvisorTest {
         org.mockito.Mockito.verifyNoInteractions(enrollmentService);
     }
 
+    // ------------------------------------------------------------------
+    // xrole-6 (production audit): the verb-first teaching-list phrasing
+    // "Học kỳ này tôi phụ trách những lớp nào?" was rejected because the
+    // entry gate never accepted "phụ trách" BEFORE the lớp noun; it fell
+    // to the RAG path although the lecturer timetable API has the rows.
+    // ------------------------------------------------------------------
+
+    @Test
+    void detectsVerbFirstTeachingListPhrasing() {
+        assertTrue(advisor.handles("Học kỳ này tôi phụ trách những lớp nào?"));
+        assertTrue(advisor.handles("hoc ky nay toi phu trach nhung lop nao"));
+        assertTrue(advisor.handles("Kỳ này tôi phụ trách lớp học phần nào?"));
+        // A public "who is in charge of this class" question has no
+        // interrogative after the lớp noun and no first-person pronoun —
+        // it must stay on the knowledge path, not open the personal gate.
+        assertFalse(advisor.handles("Giáo viên phụ trách lớp này là ai?"));
+        // Wukong round-4: the third-person form WITHOUT the "nào" tail is the
+        // same public question — the new branch must not swallow it either.
+        assertFalse(advisor.handles("Giáo viên phụ trách lớp nào?"));
+        assertFalse(advisor.handles("Khoa nào phụ trách lớp học phần nào trong học kỳ?"));
+    }
+
+    @Test
+    void workloadIntentStaysOffHowToAndAdviceWording() {
+        // Naming supervision groups inside a how-to/advice question is a
+        // knowledge ask — the workload list answers "what is my workload",
+        // never "should I" or "where is the page".
+        assertFalse(advisor.handles("Tôi duyệt nhóm hướng dẫn ở trang nào?"));
+        assertFalse(advisor.handles("Tôi có nên lập nhóm hướng dẫn mới không?"));
+        assertTrue(advisor.handles("Những nhóm sinh viên nào tôi đang hướng dẫn?"));
+    }
+
+    @Test
+    void answersVerbFirstTeachingListFromLecturerAssignments() {
+        when(sectionService.findLecturerSchedule("lecturer-profile", null)).thenReturn(List.of(
+                new LecturerScheduleResponse("id1", "sec1", "SE402-01", "SE402", "Phát triển ứng dụng web",
+                        "Web Application Development", "Phát triển ứng dụng web", 3, 35, 13, "CNTT", "CNTT", "CNTT",
+                        "OPEN", List.of(new io.campuscore.restfulapi.academic.web.AcademicSectionReadDtos
+                                .SectionScheduleResponse("s1", 5, "13:00", "15:30", "A", "102",
+                                new io.campuscore.restfulapi.academic.web.AcademicSectionReadDtos
+                                        .ClassroomSummary("c1", "A", "102"))))));
+
+        ChatResponse response = advisor.answer(
+                chatRequest("vi", "Học kỳ này tôi phụ trách những lớp nào?"), jwtLecturer());
+
+        assertNotNull(response);
+        assertEquals("PERSONAL_CONTEXT", response.reasonCode());
+        assertTrue(response.answer().contains("SE402"), response.answer());
+        assertTrue(response.answer().contains("Phát triển ứng dụng web"), response.answer());
+    }
+
+    // ------------------------------------------------------------------
+    // xrole-7 (production audit): "Những nhóm sinh viên nào tôi đang hướng
+    // dẫn?" was rejected although the same session's "Khối lượng hướng dẫn
+    // của tôi..." answered correctly — the workload intent only accepted
+    // quantity-first phrasings. It must route to the EXISTING workload
+    // composer (topics + group counts), never inventing student names.
+    // ------------------------------------------------------------------
+
+    @Test
+    void detectsGroupSupervisionPhrasingAsWorkloadIntent() {
+        assertTrue(advisor.handles("Những nhóm sinh viên nào tôi đang hướng dẫn?"));
+        assertTrue(advisor.handles("nhung nhom sinh vien nao toi dang huong dan"));
+        assertTrue(advisor.handles("Tôi đang hướng dẫn những nhóm nào?"));
+        // Policy wording about the supervision cap stays on the knowledge path.
+        assertFalse(advisor.handles("Trường quy định bao nhiêu nhóm hướng dẫn tối đa?"));
+    }
+
+    @Test
+    void answersGroupSupervisionPhrasingFromTheExistingWorkloadComposer() {
+        ThesisLecturerWorkloadService workloadService = mock(ThesisLecturerWorkloadService.class);
+        AssistantPersonalContextAdvisor workloadAdvisor =
+                new AssistantPersonalContextAdvisor(enrollmentService, sectionService, workloadService, null, null);
+        var topicA = new ThesisLecturerWorkloadService.SupervisedTopic(
+                UUID.randomUUID(), "Đề tài A", "PUBLISHED",
+                UUID.randomUUID(), "Đợt 1 KLTN 2026", "REGISTRATION_OPEN", null, 3, 1);
+        var topicB = new ThesisLecturerWorkloadService.SupervisedTopic(
+                UUID.randomUUID(), "Đề tài B", "PUBLISHED",
+                UUID.randomUUID(), "Đợt 1 KLTN 2026", "REGISTRATION_OPEN", null, 2, 0);
+        when(workloadService.workload("lecturer-profile")).thenReturn(
+                new ThesisLecturerWorkloadService.LecturerWorkload(List.of(topicA, topicB), List.of(), List.of()));
+
+        ChatResponse response = workloadAdvisor.answer(
+                chatRequest("vi", "Những nhóm sinh viên nào tôi đang hướng dẫn?"), jwtLecturer());
+
+        assertNotNull(response);
+        assertEquals("PERSONAL_CONTEXT", response.reasonCode());
+        String answer = response.answer();
+        // Grounded in the workload rows: totals summed in code, per-topic group
+        // counts echoed. No student name may appear because the composer never
+        // has one — the answer must not invent any.
+        assertTrue(answer.contains("tổng cộng 5 nhóm sinh viên trên 2 đề tài"), answer);
+        assertTrue(answer.contains("Đề tài A"), answer);
+        assertTrue(answer.contains("Số nhóm: 3"), answer);
+        assertTrue(answer.contains("1 nhóm đang chờ duyệt"), answer);
+        // A student actor without a lecturer profile still falls back to RAG.
+        Jwt studentActor = jwt("studentId", "student-profile");
+        assertNull(workloadAdvisor.answer(
+                chatRequest("vi", "Những nhóm sinh viên nào tôi đang hướng dẫn?"), studentActor));
+    }
+
+    // ------------------------------------------------------------------
+    // xrole-4 (production audit): "Nhóm luận văn của tôi là nhóm nào, có
+    // những ai?" only returned the topic + PENDING — the composer must also
+    // name the group: leader role, member roster, headcount vs the 3–4
+    // requirement, and the approval status WITH its stored reason. Every
+    // value is echoed from the group read path rows only.
+    // ------------------------------------------------------------------
+
+    @Test
+    void answersThesisGroupWithLeaderRoleRosterSizeAndApprovalReason() {
+        NamedParameterJdbcTemplate jdbc = mock(NamedParameterJdbcTemplate.class);
+        AssistantPersonalContextAdvisor thesisAdvisor = new AssistantPersonalContextAdvisor(
+                enrollmentService, sectionService, null, jdbc, null, null);
+        Map<String, Object> groupRow = new HashMap<>();
+        groupRow.put("group_id", "g1");
+        groupRow.put("group_status", "ACTIVE");
+        groupRow.put("approval_status", "PENDING");
+        groupRow.put("leader_student_id", "student-profile");
+        groupRow.put("rejection_reason", "Chưa đủ xác nhận của giảng viên phản biện");
+        groupRow.put("topic_title", "Hệ thống gợi ý học tập");
+        groupRow.put("round_name", "Đợt 1 KLTN 2026-2027");
+        // Roster rows mirror the ThesisGroupReadRepository join (Student + User).
+        Map<String, Object> me = thesisMemberRow("g1", "student-profile", true, 1, "Nguyễn", "An");
+        Map<String, Object> other1 = thesisMemberRow("g1", "student-b", false, 2, "Trần", "Bình");
+        Map<String, Object> other2 = thesisMemberRow("g1", "student-c", false, 3, "Lê", "Cường");
+        when(jdbc.queryForList(anyString(), any(MapSqlParameterSource.class)))
+                .thenAnswer(invocation -> ((String) invocation.getArgument(0)).contains("campuscore_auth")
+                        ? List.of(me, other1, other2)
+                        : List.of(groupRow));
+
+        ChatResponse response = thesisAdvisor.answer(
+                chatRequest("vi", "Nhóm luận văn của tôi là nhóm nào, có những ai?"), jwtStudent());
+
+        assertNotNull(response);
+        assertEquals("PERSONAL_CONTEXT", response.reasonCode());
+        String answer = response.answer();
+        assertTrue(answer.contains("Đợt 1 KLTN 2026-2027"), answer);
+        assertTrue(answer.contains("Hệ thống gợi ý học tập"), answer);
+        // Headcount vs the 3–4 requirement, computed from the real member rows.
+        assertTrue(answer.contains("Nhóm: 3 thành viên (yêu cầu 3-4)"), answer);
+        assertTrue(answer.contains("đủ số lượng theo yêu cầu"), answer);
+        // The asker is the group leader per leader_student_id / is_leader.
+        assertTrue(answer.contains("Vai trò của bạn: Nhóm trưởng"), answer);
+        assertTrue(answer.contains("Nguyễn An (nhóm trưởng)"), answer);
+        assertTrue(answer.contains("Trần Bình"), answer);
+        assertTrue(answer.contains("Lê Cường"), answer);
+        // Status plus the stored reason — the raw approval_status is kept,
+        // the reason is echoed only because the row has one.
+        assertTrue(answer.contains("Trạng thái duyệt: PENDING"), answer);
+        assertTrue(answer.contains("lý do: Chưa đủ xác nhận của giảng viên phản biện"), answer);
+    }
+
+    @Test
+    void thesisGroupBelowMinimumStatesTheShortfallAndPlainMembership() {
+        NamedParameterJdbcTemplate jdbc = mock(NamedParameterJdbcTemplate.class);
+        AssistantPersonalContextAdvisor thesisAdvisor = new AssistantPersonalContextAdvisor(
+                enrollmentService, sectionService, null, jdbc, null, null);
+        Map<String, Object> groupRow = new HashMap<>();
+        groupRow.put("group_id", "g2");
+        groupRow.put("group_status", "DRAFT");
+        groupRow.put("approval_status", "PENDING");
+        groupRow.put("leader_student_id", "student-leader");
+        groupRow.put("rejection_reason", null);
+        groupRow.put("topic_title", "Nền tảng quản lý thư viện");
+        groupRow.put("round_name", "Đợt 1 KLTN 2026-2027");
+        // The asker is a plain member; only two of the required three exist.
+        Map<String, Object> leader = thesisMemberRow("g2", "student-leader", true, 1, "Phạm", "Dũng");
+        Map<String, Object> asker = thesisMemberRow("g2", "student-profile", false, 2, "Hoàng", "Mai");
+        when(jdbc.queryForList(anyString(), any(MapSqlParameterSource.class)))
+                .thenAnswer(invocation -> ((String) invocation.getArgument(0)).contains("campuscore_auth")
+                        ? List.of(leader, asker)
+                        : List.of(groupRow));
+
+        ChatResponse response = thesisAdvisor.answer(
+                chatRequest("vi", "Nhóm luận văn của tôi là nhóm nào, có những ai?"), jwtStudent());
+
+        String answer = response.answer();
+        assertTrue(answer.contains("Nhóm: 2 thành viên (yêu cầu 3-4)"), answer);
+        assertTrue(answer.contains("còn thiếu 1 so với tối thiểu 3"), answer);
+        assertTrue(answer.contains("Vai trò của bạn: Thành viên"), answer);
+        assertFalse(answer.contains("Vai trò của bạn: Nhóm trưởng"), answer);
+        assertTrue(answer.contains("Phạm Dũng (nhóm trưởng)"), answer);
+        // No reason line is invented when rejection_reason is null.
+        assertFalse(answer.contains("lý do:"), answer);
+    }
+
+    // ------------------------------------------------------------------
+    // xrole-15 (production audit): PERSONAL_CONTEXT responses returned
+    // clientRequestId/requestId null, so the client could not correlate the
+    // intercepted answer with its pending request. Both the normal and the
+    // unavailable personal answers must echo request.clientRequestId().
+    // ------------------------------------------------------------------
+
+    @Test
+    void personalAnswerEchoesTheClientRequestId() {
+        when(enrollmentService.findStudentEnrollments("student-profile", null)).thenReturn(List.of(
+                enrollment("SE401", "Lập trình Java nâng cao", "Advanced Java", CURRENT_TERM_START,
+                        List.of(new SectionScheduleResponse("s1", 2, "07:00", "09:30",
+                                new ClassroomSummary("c1", "A", "101"))))));
+        UUID clientRequestId = UUID.randomUUID();
+
+        ChatResponse response = advisor.answer(
+                new ChatRequest("Lịch học của tôi tuần này?", "vi", clientRequestId, null), jwtStudent());
+
+        assertNotNull(response);
+        assertEquals("PERSONAL_CONTEXT", response.reasonCode());
+        assertEquals(clientRequestId, response.clientRequestId());
+        assertNotNull(response.requestId());
+    }
+
+    @Test
+    void unavailablePersonalAnswerStillEchoesTheClientRequestId() {
+        when(enrollmentService.findStudentEnrollments("student-profile", null))
+                .thenThrow(new DataAccessResourceFailureException("academic schema unavailable"));
+        UUID clientRequestId = UUID.randomUUID();
+
+        ChatResponse response = advisor.answer(
+                new ChatRequest("Lịch học của tôi tuần này?", "vi", clientRequestId, null), jwtStudent());
+
+        assertEquals("PERSONAL_CONTEXT_UNAVAILABLE", response.reasonCode());
+        assertEquals(clientRequestId, response.clientRequestId());
+    }
+
+    private static Map<String, Object> thesisMemberRow(
+            String groupId, String studentId, boolean leader, int order, String lastName, String firstName) {
+        Map<String, Object> row = new HashMap<>();
+        row.put("group_id", groupId);
+        row.put("student_id", studentId);
+        row.put("is_leader", leader);
+        row.put("member_order", order);
+        row.put("is_external", false);
+        row.put("display_name", null);
+        row.put("student_number", "SV00" + order);
+        row.put("first_name", firstName);
+        row.put("last_name", lastName);
+        return row;
+    }
+
     private static AcademicAttendanceReadDtos.AttendanceResponse attendanceRow(String status) {
         return new AcademicAttendanceReadDtos.AttendanceResponse(
                 "att-" + status, "student-1", "sec-401", Instant.now(), status, null, Instant.now(),
