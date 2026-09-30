@@ -11,6 +11,7 @@ import org.springframework.context.annotation.Profile;
 import org.springframework.jdbc.core.RowMapper;
 import org.springframework.jdbc.core.namedparam.MapSqlParameterSource;
 import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
+import org.springframework.jdbc.core.namedparam.SqlParameterSource;
 import org.springframework.stereotype.Repository;
 
 /** JDBC write adapter for the notification inbox. */
@@ -19,6 +20,10 @@ import org.springframework.stereotype.Repository;
 public class NotificationWriteRepository {
 
     private static final String TABLE = "notifications.notification";
+
+    private static final String INSERT_SQL = "INSERT INTO " + TABLE
+            + " (id, user_id, title, message, type, link, is_read, read_at, created_at, updated_at)"
+            + " VALUES (:id, :userId, :title, :message, :type, :link, FALSE, NULL, :createdAt, :createdAt)";
 
     private static final String SELECT_COLUMNS = """
             id, user_id, title, message, type, link, is_read, read_at, created_at, updated_at
@@ -58,20 +63,40 @@ public class NotificationWriteRepository {
     }
 
     public NotificationResponse create(CreateNotificationCommand command) {
-        jdbc.update(
-                "INSERT INTO " + TABLE
-                        + " (id, user_id, title, message, type, link, is_read, read_at, created_at, updated_at)"
-                        + " VALUES (:id, :userId, :title, :message, :type, :link, FALSE, NULL, :createdAt, :createdAt)",
-                new MapSqlParameterSource()
-                        .addValue("id", command.id())
-                        .addValue("userId", command.userId())
-                        .addValue("title", command.title())
-                        .addValue("message", command.message())
-                        .addValue("type", command.type())
-                        .addValue("link", command.link())
-                        .addValue("createdAt", Timestamp.from(command.createdAt())));
+        jdbc.update(INSERT_SQL, insertParameters(command));
         return findById(command.id())
                 .orElseThrow(() -> new IllegalStateException("created notification was not found"));
+    }
+
+    /**
+     * Multi-row insert for the announcement fan-out (R7). One JDBC batch keeps
+     * a campus-wide broadcast to a handful of round-trips instead of one
+     * {@link #create(CreateNotificationCommand)} per student (which would also
+     * re-SELECT every row it wrote). Returns the number of commands sent:
+     * drivers may report {@code SUCCESS_NO_INFO} per row, so the request count
+     * is the honest contract to callers. A failed batch throws and the caller
+     * transaction is expected to roll the whole fan-out back.
+     */
+    public int createBatch(List<CreateNotificationCommand> commands) {
+        if (commands == null || commands.isEmpty()) {
+            return 0;
+        }
+        SqlParameterSource[] batch = commands.stream()
+                .map(NotificationWriteRepository::insertParameters)
+                .toArray(SqlParameterSource[]::new);
+        jdbc.batchUpdate(INSERT_SQL, batch);
+        return commands.size();
+    }
+
+    private static MapSqlParameterSource insertParameters(CreateNotificationCommand command) {
+        return new MapSqlParameterSource()
+                .addValue("id", command.id())
+                .addValue("userId", command.userId())
+                .addValue("title", command.title())
+                .addValue("message", command.message())
+                .addValue("type", command.type())
+                .addValue("link", command.link())
+                .addValue("createdAt", Timestamp.from(command.createdAt()));
     }
 
     /**

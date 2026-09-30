@@ -139,6 +139,10 @@ class AcademicEnrollmentReadPersistenceTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.summary.cumulativeGpa").value(4.0))
                 .andExpect(jsonPath("$.summary.totalCreditsEarned").value(4))
+                .andExpect(jsonPath("$.summary.basisNote.vi")
+                        .value("GPA và tín chỉ tính theo điểm tốt nhất mỗi môn (chính sách học lại)"))
+                .andExpect(jsonPath("$.summary.basisNote.en")
+                        .value("GPA and credits use your best attempt per course (retake policy)"))
                 .andExpect(jsonPath("$.semesters[0].records[0].id").value("enrollment-1"));
 
         mvc.perform(get("/api/v1/grades/student-grades/enrollment/enrollment-1").with(adminJwt()))
