@@ -447,6 +447,48 @@ class AcademicEnrollmentMutationPersistenceTest {
     }
 
     @Test
+    void enrollPathBillsCurrentCourseCreditsNotTheStaleSnapshot() throws Exception {
+        // Regression for the WRITE path of the 15-vs-16 quota drift (Wukong
+        // round-4): the student's existing enrollment carries a stale
+        // 15-credit snapshot while the course now bills 16 credits. The cap
+        // check inside enrollLocked must bill the current 16 — pre-fix it
+        // summed the snapshot (15) and let 15+15=30 slip past a 30-credit cap
+        // that the current basis (16+15=31) correctly rejects.
+        LocalDateTime now = localDateTime(BASE_TIME);
+        jdbc.update(
+                "INSERT INTO \"academic\".\"Course\""
+                        + " (\"id\", \"code\", \"name\", \"nameEn\", \"nameVi\", \"credits\","
+                        + " \"departmentId\", \"semesterId\", \"isActive\", \"createdAt\", \"updatedAt\")"
+                        + " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                "course-stale-w", "SE416", "Stale Credits W", "Stale Credits W", "Stale Credits W", 16,
+                "department-1", "semester-1", true, now, now);
+        jdbc.update(
+                "INSERT INTO \"academic\".\"Section\""
+                        + " (\"id\", \"sectionNumber\", \"courseId\", \"semesterId\", \"capacity\","
+                        + " \"enrolledCount\", \"status\", \"version\") VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+                "section-stale-w", "01", "course-stale-w", "semester-1", 40, 0,
+                "OPEN", 0);
+        // Existing enrollment: snapshot says 15, current course credits say 16.
+        jdbc.update(
+                "INSERT INTO \"academic\".\"Enrollment\""
+                        + " (\"id\", \"studentId\", \"sectionId\", \"semesterId\", \"status\", \"enrolledAt\","
+                        + " \"gradeStatus\", \"courseId\", \"roundId\", \"creditsSnapshot\", \"version\")"
+                        + " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                "enr-stale-w", "student-1", "section-open", "semester-1", "ENROLLED",
+                now, "NONE", "course-open", "round-registration-demo", 15, 1);
+        jdbc.update("UPDATE \"academic\".\"Course\" SET \"credits\" = 16 WHERE \"id\" = 'course-open'");
+        jdbc.update("UPDATE \"academic\".\"RegistrationRound\" SET \"creditLimit\" = 30 WHERE \"kind\" = 'REGISTRATION'");
+
+        mvc.perform(post("/api/v1/me/enrollments")
+                        .with(studentJwt("student-user-1", "student-1"))
+                        .header("Idempotency-Key", "stale-w-1")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"sectionId\":\"section-stale-w\"}"))
+                .andExpect(status().isUnprocessableEntity())
+                .andExpect(jsonPath("$.code").value("CREDIT_CAP_EXCEEDED"));
+    }
+
+    @Test
     void creditCapExceededOnCanonicalRoute() throws Exception {
         jdbc.update("UPDATE \"academic\".\"RegistrationRound\" SET \"creditLimit\" = 2 WHERE \"kind\" = 'REGISTRATION'");
         mvc.perform(post("/api/v1/me/enrollments")

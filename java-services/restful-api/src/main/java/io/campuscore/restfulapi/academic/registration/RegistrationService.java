@@ -738,9 +738,14 @@ public class RegistrationService {
     }
 
     private List<Map<String, Object>> activeEnrollments(String studentId, String semesterId) {
+        // Credits come from the CURRENT section -> course definition, not the
+        // enrollment snapshot: a snapshot raised after registration would
+        // under-count the 30-credit cap on both the read and write paths.
         return jdbc.queryForList(
                 "SELECT enrollment.\"id\", enrollment.\"sectionId\" AS section_id, enrollment.\"courseId\" AS course_id,"
-                        + " enrollment.\"creditsSnapshot\" AS credits FROM " + ENROLLMENT + " enrollment"
+                        + " course.\"credits\" AS credits FROM " + ENROLLMENT + " enrollment"
+                        + " JOIN " + SECTION + " section ON section.\"id\" = enrollment.\"sectionId\""
+                        + " JOIN " + COURSE + " course ON course.\"id\" = section.\"courseId\""
                         + " WHERE enrollment.\"studentId\" = :studentId AND enrollment.\"semesterId\" = :semesterId"
                         + " AND enrollment.\"status\" IN ('ENROLLED', 'PENDING', 'CONFIRMED')",
                 new MapSqlParameterSource().addValue("studentId", studentId).addValue("semesterId", semesterId));
@@ -749,7 +754,9 @@ public class RegistrationService {
     private List<Map<String, Object>> lockActiveEnrollments(String studentId, String semesterId) {
         return jdbc.queryForList(
                 "SELECT enrollment.\"id\", enrollment.\"sectionId\" AS section_id, enrollment.\"courseId\" AS course_id,"
-                        + " enrollment.\"creditsSnapshot\" AS credits FROM " + ENROLLMENT + " enrollment"
+                        + " course.\"credits\" AS credits FROM " + ENROLLMENT + " enrollment"
+                        + " JOIN " + SECTION + " section ON section.\"id\" = enrollment.\"sectionId\""
+                        + " JOIN " + COURSE + " course ON course.\"id\" = section.\"courseId\""
                         + " WHERE enrollment.\"studentId\" = :studentId AND enrollment.\"semesterId\" = :semesterId"
                         + " AND enrollment.\"status\" IN ('ENROLLED', 'PENDING', 'CONFIRMED') FOR UPDATE",
                 new MapSqlParameterSource().addValue("studentId", studentId).addValue("semesterId", semesterId));
