@@ -120,7 +120,8 @@ public class ThesisAssistantController {
         // Conversational openers (greeting, thanks, identity) resolve locally
         // before anything else: they must never fall through to a knowledge
         // miss, and they are not charged against the daily RAG quota.
-        ChatResponse conversational = ThesisAssistantService.conversationalAnswer(request.message(), locale);
+        ChatResponse conversational = ThesisAssistantService.conversationalAnswer(
+                request.message(), locale, request.clientRequestId());
         if (conversational != null) {
             return conversational;
         }

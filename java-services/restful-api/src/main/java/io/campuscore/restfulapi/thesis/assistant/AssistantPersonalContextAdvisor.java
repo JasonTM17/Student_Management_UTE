@@ -15,6 +15,8 @@ import io.campuscore.restfulapi.academic.web.AcademicEnrollmentReadDtos.Enrollme
 import io.campuscore.restfulapi.academic.web.AcademicEnrollmentReadDtos.GradeSummary;
 import io.campuscore.restfulapi.academic.web.AcademicEnrollmentReadDtos.SectionScheduleResponse;
 import io.campuscore.restfulapi.academic.web.AcademicEnrollmentReadDtos.SemesterSummary;
+import io.campuscore.restfulapi.academic.web.AcademicEnrollmentReadDtos.TranscriptResponse;
+import io.campuscore.restfulapi.academic.web.AcademicEnrollmentReadDtos.TranscriptSummary;
 import io.campuscore.restfulapi.academic.web.AcademicSectionReadDtos.LecturerGradingSectionResponse;
 import io.campuscore.restfulapi.academic.web.AcademicSectionReadDtos.LecturerScheduleResponse;
 import io.campuscore.restfulapi.thesis.assistant.ThesisAssistantDtos.ChatRequest;
@@ -81,7 +83,14 @@ public class AssistantPersonalContextAdvisor {
             "lịch\\s*(?:học|dạy|giảng\\s*dạy|tuần|hôm\\s*nay|ngày\\s*mai|của\\s*tôi|thứ\\s*[2-7]|thứ\\s*(?:hai|ba|tư|bốn|năm|sáu|bảy)|chủ\\s*nhật|t[2-7]|cn)"
                     + "|lich\\s*(?:hoc|day|giang\\s*day|tuan|hom\\s*nay|ngay\\s*mai|cua\\s*toi|thu\\s*[2-7]|thu\\s*(?:hai|ba|tu|bon|nam|sau|bay)|chu\\s*nhat|t[2-7]|cn)"
                     + "|thời\\s*(?:khoá|khóa|khoa)\\s*biểu|thoi\\s*khoa\\s*bieu|\\btkb\\b"
-                    + "|(?:thứ\\s*[2-7]|thứ\\s*(?:hai|ba|tư|bốn|năm|sáu|bảy)|hôm\\s*nay|ngày\\s*mai|chủ\\s*nhật|hom\\s*nay|ngay\\s*mai|chu\\s*nhat)\\s*(?:tôi\\s*)?(?:có\\s*)?(?:học|dạy|lịch|tiết|môn|buổi|ca)"
+                    + "|(?:thứ\\s*[2-7]|thứ\\s*(?:hai|ba|tư|bốn|năm|sáu|bảy)|hôm\\s*nay|ngày\\s*mai|chủ\\s*nhật|hom\\s*nay|ngay\\s*mai|chu\\s*nhat)"
+                    // Audit ca-nhan Q2 / giang-vien Q7: "Hôm nay tôi có lớp học
+                    // không?" and "Thứ Hai hàng tuần tôi có môn nào, học mấy giờ,
+                    // ở phòng nào?" fell to the KB path because the noun group
+                    // had no "lớp" and the week-qualifier / first-person gap was
+                    // hard-capped at adjacent whitespace.
+                    + "(?:\\s*(?:hàng|mỗi|hang|moi)\\s*(?:tuần|ngày|tuan|ngay))?"
+                    + "(?:[^?!.]{0,15}?tôi)?\\s*(?:có\\s*)?(?:học|dạy|lịch|tiết|môn|buổi|ca|lớp|lop\\b)"
                     + "|học\\s*ngày\\s*nào|hoc\\s*ngay\\s*nao|m[oô]n\\s*nào\\s*học|mon\\s*nao\\s*hoc|tiết\\s*học|buổi\\s*học|ca\\s*học|ca\\s*dạy|tiết\\s*dạy"
                     // Lecturer teaching-load phrasings ("Kỳ này tôi phụ trách
                     // dạy những lớp học phần nào?") are the asker's own
@@ -232,6 +241,12 @@ public class AssistantPersonalContextAdvisor {
                     // personal-grades signal when a possessive follows.
                     + "|(?:điểm|diem)\\s*(?:số|so|tổng\\s*kết|tong\\s*ket|thành\\s*phần|thanh\\s*phan|quá\\s*trình|qua\\s*trinh|học\\s*kỳ|hoc\\s*ky|học\\s*tập|hoc\\s*tap)"
                     + "|(?:điểm|diem)\\s*(?:của|cua)\\s*(?:tôi|mình|em|toi|minh)"
+                    // Audit ca-nhan Q6: "Điểm các môn của tôi trong học kỳ 2..."
+                    // — the possessive can sit a few words after "điểm"; the
+                    // short lazy gap keeps it personal while the first-person
+                    // gate in isGradesIntent still excludes "điểm chuẩn..."
+                    // policy wording with no "của tôi".
+                    + "|(?:điểm|diem)[^?!.]{0,12}?(?:của|cua)\\s*(?:tôi|mình|em)\\b"
                     + "|(?:my\\s+)?(?:grades?|scores?|marks?|transcript)",
             Pattern.CASE_INSENSITIVE | Pattern.UNICODE_CASE);
 
@@ -288,6 +303,45 @@ public class AssistantPersonalContextAdvisor {
             Pattern.CASE_INSENSITIVE | Pattern.UNICODE_CASE);
 
     /**
+     * Accumulated-credits questions ("Tôi đã tích lũy được bao nhiêu tín chỉ?")
+     * ask for the transcript's cumulative earned total (38 credits, best attempt
+     * per course) — a different number from the registration budget, and the
+     * audit caught it being answered with the credit-LIMIT regulation instead
+     * (ca-nhan Q11, RAG_GROUNDED fallback oan).
+     */
+    private static final Pattern CREDITS_ACCUMULATED_INTENT = Pattern.compile(
+            "(?:đã|da)\\s*(?:tích\\s*lũy|tich\\s*luy|tích\\s*luy|hoàn\\s*thành|hoan\\s*thanh)"
+                    + "|(?:tích\\s*lũy|tich\\s*luy|tích\\s*luy)[^?!.]{0,20}?(?:bao\\s*nhiêu|bao\\s*nhieu|may|được|duoc)"
+                    + "|(?:bao\\s*nhiêu|bao\\s*nhieu|how\\s+many)\\s*(?:tín\\s*chỉ|tin\\s*chi|credits?)[^?!.]{0,25}?(?:đã|da|tích\\s*lũy|tich\\s*luy|accumulated|earned)"
+                    + "|how\\s+many\\s+credits[^?!.]{0,20}?(?:have\\s+i|did\\s+i|i)\\s*(?:accumulated|earned)",
+            Pattern.CASE_INSENSITIVE | Pattern.UNICODE_CASE);
+
+    /**
+     * Lecturer teaching-load credits ("Học kỳ này tôi dạy tất cả bao nhiêu tín
+     * chỉ?") — sum of the credits field over the asker's assigned sections.
+     * The system holds the data (the same schedule the timetable answer is
+     * built from), so the LLM's "không có thông tin" was a fallback oan
+     * (giang-vien Q7, high).
+     */
+    private static final Pattern LECTURER_TEACHING_CREDITS_INTENT = Pattern.compile(
+            "(?:dạy|day|giảng|giang|phụ\\s*trách|phu\\s*trach)[^?!.]{0,30}?(?:bao\\s*nhiêu|mấy|may|tổng\\s*số|tong\\s*so)"
+                    + "[^?!.]{0,15}?(?:tín\\s*chỉ|tin\\s*chi|credits?)"
+                    + "|(?:bao\\s*nhiêu|mấy|may|tổng\\s*số|tong\\s*so)\\s*(?:tín\\s*chỉ|tin\\s*chi|credits?)[^?!.]{0,30}?(?:dạy|day|giảng|giang|phụ\\s*trách|phu\\s*trach)"
+                    + "|how\\s+many\\s+credits[^?!.]{0,30}?(?:teach|lectur)",
+            Pattern.CASE_INSENSITIVE | Pattern.UNICODE_CASE);
+
+    /**
+     * Identity phrasing inside a supervision question ("Tôi đang hướng dẫn
+     * những sinh viên nào?") wants the student NAMES, not the workload counts
+     * the generic supervision answer prints (giang-vien Q5, medium).
+     */
+    private static final Pattern ADVISEE_ROSTER_INTENT = Pattern.compile(
+            "(?:những\\s*sinh\\s*viên|nhung\\s*sinh\\s*viên|các\\s*sinh\\s*viên|cac\\s*sinh\\s*viên|sv)[^?!.]{0,25}?(?:nào|nao|ai|được|duoc)"
+                    + "|(?:hướng\\s*dẫn|huong\\s*dan)[^?!.]{0,25}?(?:những\\s*ai|who|which\\s+students?|advisee)"
+                    + "|(?:who|which)\\s+(?:students?|advisees?)[^?!.]{0,25}?(?:supervis|advise|am\\s+i\\s+teaching)",
+            Pattern.CASE_INSENSITIVE | Pattern.UNICODE_CASE);
+
+    /**
      * Graduation-credit questions that carry the requirement number in the
      * sentence ("Còn thiếu bao nhiêu tín chỉ để đủ 143 tín chỉ tốt nghiệp?").
      * Two or three digits directly before "tín chỉ ... tốt nghiệp". A bare
@@ -335,6 +389,41 @@ public class AssistantPersonalContextAdvisor {
         if (ENROLLMENT_HOWTO_INTENT.matcher(message).find()) return false;
         if (CREDITS_POLICY_INTENT.matcher(message).find()) return false;
         return CREDITS_REMAINING_INTENT.matcher(message).find();
+    }
+
+    /**
+     * "Tôi đã tích lũy được bao nhiêu tín chỉ?" — accumulated, not remaining.
+     * Policy/graduation and how-to wording keep their own (or the knowledge)
+     * path; the first-person gate stops public "sinh viên tích lũy bao nhiêu
+     * tín chỉ để tốt nghiệp" rule questions from opening the personal record.
+     */
+    private static boolean isCreditsAccumulatedIntent(String message) {
+        if (!StringUtils.hasText(message)) return false;
+        if (isCreditsRemainingIntent(message)) return false;
+        if (isGraduationCreditsIntent(message)) return false;
+        if (ENROLLMENT_HOWTO_INTENT.matcher(message).find()) return false;
+        if (CREDITS_POLICY_INTENT.matcher(message).find()) return false;
+        return FIRST_PERSON_PRONOUN.matcher(message).find()
+                && CREDITS_ACCUMULATED_INTENT.matcher(message).find();
+    }
+
+    /** Lecturer teaching-credits total; policy/how-to wording stays knowledge. */
+    private static boolean isLecturerTeachingCreditsIntent(String message) {
+        if (!StringUtils.hasText(message)) return false;
+        if (ENROLLMENT_HOWTO_INTENT.matcher(message).find()) return false;
+        if (CREDITS_POLICY_INTENT.matcher(message).find()) return false;
+        return FIRST_PERSON_PRONOUN.matcher(message).find()
+                && LECTURER_TEACHING_CREDITS_INTENT.matcher(message).find();
+    }
+
+    /** Supervision question that asks for the students' identities (roster). */
+    private static boolean isAdviseeRosterIntent(String message) {
+        if (!StringUtils.hasText(message)) return false;
+        if (WORDING_POLICY_INTENT.matcher(message).find()) return false;
+        return FIRST_PERSON_PRONOUN.matcher(message).find()
+                && Pattern.compile("hướng\\s*dẫn|huong\\s*dan|supervis|advise",
+                        Pattern.CASE_INSENSITIVE | Pattern.UNICODE_CASE).matcher(message).find()
+                && ADVISEE_ROSTER_INTENT.matcher(message).find();
     }
 
     /** "Lớp SE013 học phòng nào, giờ nào?" — a concrete section code plus room/time wording. */
@@ -473,6 +562,8 @@ public class AssistantPersonalContextAdvisor {
                 || isEnrollmentListIntent(message)
                 || isGraduationCreditsIntent(message)
                 || isCreditsRemainingIntent(message)
+                || isCreditsAccumulatedIntent(message)
+                || isLecturerTeachingCreditsIntent(message)
                 || isSectionDetailIntent(message);
     }
 
@@ -560,7 +651,19 @@ public class AssistantPersonalContextAdvisor {
         // HTTP error for an innocent question.
         if (isLecturerWorkloadIntent(message)) {
             if (StringUtils.hasText(lecturerId) && lecturerWorkload != null) {
+                // Identity phrasing gets a named roster, not the count
+                // boilerplate the generic supervision answer prints
+                // (audit giang-vien Q5).
+                if (isAdviseeRosterIntent(message) && jdbc != null) {
+                    return adviseeRosterAnswer(lecturerId, locale);
+                }
                 return lecturerThesisAnswer(lecturerId, locale);
+            }
+            return null;
+        }
+        if (isLecturerTeachingCreditsIntent(message)) {
+            if (StringUtils.hasText(lecturerId) && sections != null) {
+                return lecturerTeachingCreditsAnswer(lecturerId, locale);
             }
             return null;
         }
@@ -596,6 +699,16 @@ public class AssistantPersonalContextAdvisor {
             // path (or a profile) the question falls back to the knowledge path.
             if (StringUtils.hasText(studentId) && registrationService != null) {
                 return creditsRemainingAnswer(studentId, locale);
+            }
+            return null;
+        }
+        if (isCreditsAccumulatedIntent(message)) {
+            // Accumulated credits are the transcript summary's earned total —
+            // best attempt per course — answered from the same read path the
+            // transcript page uses (audit ca-nhan Q11: the question fell to
+            // the credit-limit regulation instead).
+            if (StringUtils.hasText(studentId)) {
+                return accumulatedCreditsAnswer(studentId, locale);
             }
             return null;
         }
@@ -639,10 +752,12 @@ public class AssistantPersonalContextAdvisor {
 
     /**
      * Personal grades answer grounded in the asker's real grade rows. The
-     * cumulative GPA (4.0 scale) and credit totals are computed IN CODE across
-     * every published semester — never summed by a model — and the latest
-     * semester's figures are shown separately and labeled, because the two are
-     * routinely confused (production audit D-Q3).
+     * cumulative line is the transcript summary itself — the same
+     * best-attempt-per-course figures the portal transcript shows — never a
+     * sum over every attempt and never model-computed; the latest semester's
+     * figures are shown separately and labeled, because the two are routinely
+     * confused (production audit D-Q3; audit ca-nhan Q5: summing retake
+     * attempts contradicted the transcript page).
      */
     private String gradesAnswer(String studentId, String locale) {
         boolean vi = "vi".equals(locale);
@@ -661,12 +776,27 @@ public class AssistantPersonalContextAdvisor {
         for (GradeSummary grade : grades) {
             bySemester.computeIfAbsent(grade.semesterId(), ignored -> new ArrayList<>()).add(grade);
         }
-        GradeTotals cumulative = new GradeTotals();
+        // The cumulative line is the transcript summary itself (best attempt per
+        // course under the retake policy), NOT a sum over every attempt: the old
+        // all-rows accumulation counted retaken courses twice (57 credits / GPA
+        // 3.07 vs the portal's 38 / 3.11) and contradicted the transcript page
+        // the student sees side by side (production audit ca-nhan Q5, high).
+        TranscriptResponse transcript = enrollments.findStudentTranscript(studentId);
+        TranscriptSummary cumulative = transcript == null ? null : transcript.summary();
+        boolean fromTranscriptSummary = cumulative != null;
+        if (cumulative == null) {
+            // Defensive fallback: the transcript read path is unavailable.
+            // Compute cumulative from every published row so the answer still
+            // carries real numbers; this is the all-attempt basis and is
+            // deliberately labeled as such in the closing note.
+            GradeTotals fallback = new GradeTotals();
+            grades.forEach(fallback::add);
+            cumulative = new TranscriptSummary(fallback.gpa(), fallback.earnedCredits, fallback.gpaCredits, null);
+        }
         GradeSummary latestName = null;
         for (List<GradeSummary> rows : bySemester.values()) {
             GradeTotals semester = new GradeTotals();
             rows.forEach(semester::add);
-            cumulative.merge(semester);
             // The "latest semester" figures are the newest semester WITH
             // published grades — an in-progress current term (no letters yet)
             // must not shadow the last graded one.
@@ -674,14 +804,14 @@ public class AssistantPersonalContextAdvisor {
                 latestName = rows.isEmpty() ? null : rows.get(0);
             }
         }
-        if (cumulative.gpaCredits == 0) {
+        if (cumulative == null || cumulative.totalCreditsAttempted() <= 0) {
             answer.append("\n").append(vi
                     ? "Chưa có học kỳ nào có điểm đã công bố — các học phần đang học sẽ xuất hiện sau khi có điểm.\n"
                     : "No published grades yet — in-progress courses will appear once graded.\n");
         } else {
             answer.append("\n").append(vi ? "Tích lũy: " : "Cumulative: ")
-                    .append(cumulative.earnedCredits).append(vi ? " tín chỉ, GPA " : " credits, GPA ")
-                    .append(cumulative.gpa())
+                    .append(cumulative.totalCreditsEarned()).append(vi ? " tín chỉ, GPA " : " credits, GPA ")
+                    .append(cumulative.cumulativeGpa())
                     .append(vi ? " (thang 4)\n" : " (4.0 scale)\n");
             if (latestName != null) {
                 GradeTotals latest = new GradeTotals();
@@ -727,8 +857,12 @@ public class AssistantPersonalContextAdvisor {
                     : "\nYou can review each score component on the Grades page.");
         }
         answer.append(vi
-                ? "\n(Số liệu GPA và tín chỉ được tính trực tiếp từ bảng điểm đã công bố của bạn.)"
-                : "\n(GPA and credit figures are computed directly from your published transcript.)");
+                ? (fromTranscriptSummary
+                        ? "\n(Số liệu tích lũy lấy từ bản tóm tắt Bảng điểm của bạn: GPA và tín chỉ tính theo điểm tốt nhất mỗi môn — chính sách học lại.)"
+                        : "\n(Số liệu cộng trực tiếp từ các học phần đã có điểm; bản tóm tắt ở trang Bảng điểm là nguồn chính thức.)")
+                : (fromTranscriptSummary
+                        ? "\n(Cumulative figures come from your transcript summary: GPA and credits use your best attempt per course (retake policy).)"
+                        : "\n(Figures sum every published graded row; the Transcript page summary is the authoritative source.)"));
         return answer.toString();
     }
 
@@ -863,16 +997,210 @@ public class AssistantPersonalContextAdvisor {
         answer.append("• ").append(vi ? "Còn lại có thể đăng ký: " : "Still available: ")
                 .append(remaining).append(vi ? " tín chỉ\n" : " credits\n");
         if (summary.creditLimit() > CreditLimitApplicationService.STANDARD_LIMIT) {
+            // The approval claim must be backed by the application record —
+            // the summary response itself only reports the number, and a
+            // round-wide limit raise (no student application) would have made
+            // "đã được Phòng Đào tạo phê duyệt" a fabricated provenance
+            // (audit ca-nhan Q4, low). Ask the ledger; fall back to neutral
+            // wording whenever the lookup is unavailable.
+            boolean raisedByApplication = approvedLimitRaiseExists(studentId, summary.roundId());
             answer.append(vi
-                    ? "\nHạn mức " + summary.creditLimit() + " tín chỉ là mức đã được Phòng Đào tạo phê duyệt nâng từ mức chuẩn "
-                            + CreditLimitApplicationService.STANDARD_LIMIT + " tín chỉ.\n"
-                    : "\nYour " + summary.creditLimit() + "-credit limit was approved by the Academic Affairs Office above the standard "
-                            + CreditLimitApplicationService.STANDARD_LIMIT + " credits.\n");
+                    ? (raisedByApplication
+                            ? "\nHạn mức " + summary.creditLimit() + " tín chỉ của bạn áp dụng theo đơn xin nâng hạn mức đã được duyệt (mức chuẩn của đợt là "
+                                    + CreditLimitApplicationService.STANDARD_LIMIT + " tín chỉ).\n"
+                            : "\nHạn mức áp dụng cho đợt đăng ký hiện tại là " + summary.creditLimit()
+                                    + " tín chỉ (mức chuẩn " + CreditLimitApplicationService.STANDARD_LIMIT + " tín chỉ).\n")
+                    : (raisedByApplication
+                            ? "\nYour " + summary.creditLimit() + "-credit limit follows an approved application (the round's standard is "
+                                    + CreditLimitApplicationService.STANDARD_LIMIT + " credits).\n"
+                            : "\nThe limit for the current registration round is " + summary.creditLimit()
+                                    + " credits (standard " + CreditLimitApplicationService.STANDARD_LIMIT + ").\n"));
         }
         answer.append(vi
                 ? "\n(Số liệu tính trực tiếp từ hồ sơ đăng ký học phần của bạn.) Bạn có thể đăng ký thêm học phần ở khu Đăng ký học phần."
                 : "\n(Figures come directly from your registration records.) You can add more sections in the Course Registration area.");
         return answer.toString();
+    }
+
+    /**
+     * "Tôi đã tích lũy được bao nhiêu tín chỉ?" — the transcript summary's
+     * cumulative earned total (best attempt per course under the retake
+     * policy), the same numbers the portal transcript shows. Never the
+     * credit-LIMIT regulation, which is what the KB path answered instead
+     * (audit ca-nhan Q11).
+     */
+    private String accumulatedCreditsAnswer(String studentId, String locale) {
+        boolean vi = "vi".equals(locale);
+        TranscriptResponse transcript = enrollments.findStudentTranscript(studentId);
+        TranscriptSummary summary = transcript == null ? null : transcript.summary();
+        if (summary == null || summary.totalCreditsEarned() <= 0 && summary.totalCreditsAttempted() <= 0) {
+            return vi
+                    ? "Bạn chưa có tín chỉ tích lũy nào được công bố. Điểm học phần sẽ xuất hiện trên bảng điểm sau khi công bố, khi đó số tín chỉ tích lũy của bạn sẽ hiện ở đây."
+                    : "You have no published accumulated credits yet. Earned credits appear once your course grades are published on the transcript.";
+        }
+        StringBuilder answer = new StringBuilder();
+        answer.append(vi
+                ? "Theo bảng điểm đã công bố, bạn đã tích lũy được " + summary.totalCreditsEarned() + " tín chỉ"
+                : "According to your published transcript, you have accumulated " + summary.totalCreditsEarned() + " credits");
+        if (summary.cumulativeGpa() != null) {
+            answer.append(vi ? ", GPA tích lũy " : ", cumulative GPA ")
+                    .append(summary.cumulativeGpa())
+                    .append(vi ? " (thang 4)." : " (4.0 scale).");
+        } else {
+            answer.append(vi ? "." : ".");
+        }
+        answer.append(vi
+                ? "\n(Số liệu tính theo điểm tốt nhất mỗi môn — chính sách học lại, trùng với trang Bảng điểm.)"
+                : "\n(Figures count your best attempt per course (retake policy) and match the Transcript page.)");
+        return answer.toString();
+    }
+
+    /**
+     * "Học kỳ này tôi dạy tất cả bao nhiêu tín chỉ?" — summed IN CODE over the
+     * asker's distinct assigned sections (the same schedule source the teaching
+     * timetable answer uses; one row per section, credits carried per course).
+     * The LLM claimed no such data existed (audit giang-vien Q7) while
+     * GET /sections/my/schedule shows it.
+     */
+    private String lecturerTeachingCreditsAnswer(String lecturerId, String locale) {
+        boolean vi = "vi".equals(locale);
+        List<LecturerScheduleResponse> teaching = sections.findLecturerSchedule(lecturerId, null);
+        if (teaching == null || teaching.isEmpty()) {
+            return vi
+                    ? "Học kỳ này bạn chưa được phân công lớp học phần nào, nên tổng số tín chỉ giảng dạy là 0."
+                    : "You are not assigned to any sections this term, so your teaching credit total is 0.";
+        }
+        Map<String, LecturerScheduleResponse> distinctSections = new LinkedHashMap<>();
+        for (LecturerScheduleResponse row : teaching) {
+            String key = firstText(row.sectionId(), firstText(row.id(),
+                    row.courseCode() + "|" + row.sectionNumber()));
+            distinctSections.putIfAbsent(key, row);
+        }
+        int totalCredits = 0;
+        for (LecturerScheduleResponse row : distinctSections.values()) {
+            totalCredits += Math.max(0, row.credits());
+        }
+        StringBuilder answer = new StringBuilder();
+        answer.append(vi
+                ? "Học kỳ này bạn đang dạy " + distinctSections.size() + " lớp học phần, tổng cộng "
+                        + totalCredits + " tín chỉ:\n"
+                : "This term you teach " + distinctSections.size() + " sections, "
+                        + totalCredits + " credits in total:\n");
+        int rendered = 0;
+        for (LecturerScheduleResponse row : distinctSections.values()) {
+            if (rendered++ >= 12) {
+                answer.append("\n• ").append(vi
+                        ? "… và " + (distinctSections.size() - rendered + 1) + " lớp khác."
+                        : "… and " + (distinctSections.size() - rendered + 1) + " more sections.");
+                break;
+            }
+            answer.append("\n• ")
+                    .append(courseName(row.courseCode(),
+                            vi ? row.courseNameVi() : row.courseNameEn(), row.courseName()));
+            if (StringUtils.hasText(row.sectionNumber())) {
+                answer.append(vi ? " (lớp " : " (section ").append(row.sectionNumber()).append(")");
+            }
+            answer.append(vi ? " — " : " — ").append(row.credits())
+                    .append(vi ? " tín chỉ" : " credits");
+        }
+        answer.append(vi
+                ? "\n\n(Tổng tính trên từng lớp học phần được phân công; xem chi tiết ở trang Lịch giảng dạy.)"
+                : "\n\n(Total sums each assigned section once; see the Teaching Schedule page.)");
+        return answer.toString();
+    }
+
+    /**
+     * "Tôi đang hướng dẫn những sinh viên nào?" — names every member of every
+     * group attached to the asker's supervised topics, read from the same
+     * thesis_group_member projection the group pages use (member identity from
+     * the linked student profile, external members by recorded display name).
+     * Counts-only boilerplate left the "những sinh viên nào" half of the
+     * question unanswered (audit giang-vien Q5).
+     */
+    private String adviseeRosterAnswer(String lecturerId, String locale) {
+        boolean vi = "vi".equals(locale);
+        List<Map<String, Object>> rows = jdbc.queryForList(
+                "SELECT ts.topic_id, t.title AS topic_title, g.id AS group_id, "
+                        + "g.approval_status AS group_approval_status, "
+                        + "m.student_id, m.display_name, m.is_external, m.member_order, "
+                        + "s.\"studentId\" AS student_number, "
+                        + "u.\"firstName\" AS first_name, u.\"lastName\" AS last_name "
+                        + "FROM thesis.thesis_topic_supervisor ts "
+                        + "JOIN thesis.thesis_topic t ON t.id = ts.topic_id "
+                        + "LEFT JOIN thesis.thesis_group g ON g.topic_id = t.id "
+                        + "LEFT JOIN thesis.thesis_group_member m ON m.group_id = g.id "
+                        + "LEFT JOIN campuscore_auth.\"Student\" s ON s.\"id\" = m.student_id "
+                        + "LEFT JOIN campuscore_auth.\"User\" u ON u.\"id\" = s.\"userId\" "
+                        + "WHERE ts.lecturer_id = :lecturerId "
+                        + "ORDER BY t.title, g.id, m.member_order",
+                new MapSqlParameterSource("lecturerId", lecturerId));
+        if (rows == null || rows.isEmpty()) {
+            return vi
+                    ? "Hiện bạn chưa có nhóm sinh viên nào gắn với đề tài hướng dẫn, nên chưa có danh sách để liệt kê. "
+                            + "Khi sinh viên lập nhóm và chọn bạn làm giảng viên hướng dẫn, danh sách sẽ xuất hiện ở đây."
+                    : "No student groups are attached to your supervised topics yet, so there is no roster to list. "
+                            + "Once students form groups and assign you as supervisor, the roster will appear here.";
+        }
+        StringBuilder answer = new StringBuilder();
+        answer.append(vi ? "Sinh viên bạn đang hướng dẫn:\n" : "Students you are supervising:\n");
+        String currentTopic = null;
+        int names = 0;
+        for (Map<String, Object> row : rows) {
+            String topic = text(row, "topic_title");
+            if (!StringUtils.hasText(topic)) {
+                topic = vi ? "Đề tài chưa đặt tên" : "Untitled topic";
+            }
+            if (!topic.equals(currentTopic)) {
+                currentTopic = topic;
+                answer.append("\n• ").append(topic).append("\n");
+            }
+            String name = memberName(row);
+            String studentNumber = text(row, "student_number");
+            String label = firstText(name, firstText(studentNumber, text(row, "student_id")));
+            if (!StringUtils.hasText(label)) {
+                continue;
+            }
+            answer.append("    - ").append(label);
+            if (truthy(row.get("is_external"))) {
+                answer.append(vi ? " (thành viên ngoài)" : " (external member)");
+            }
+            answer.append("\n");
+            names++;
+        }
+        if (names == 0) {
+            return vi
+                    ? "Các đề tài bạn hướng dẫn chưa có nhóm nào được ghi nhận thành viên; hiện chỉ có danh sách đề tài. "
+                            + "Bạn có thể duyệt và theo dõi nhóm ở trang Quản lý Khóa luận."
+                    : "None of your supervised topics have group members recorded yet; only the topic list exists. "
+                            + "You can review and approve groups on the Thesis Management page.";
+        }
+        answer.append(vi
+                ? "\nDanh sách lấy từ hồ sơ nhóm do chính sinh viên và Phòng Đào tạo cập nhật."
+                : "\nThe roster reflects group records maintained by students and the Academic Affairs Office.");
+        return answer.toString();
+    }
+
+    /**
+     * True only when an APPROVED credit-limit application exists for this
+     * student and round. A missing ledger handle or any read failure answers
+     * FALSE — the composer then uses neutral wording instead of asserting a
+     * provenance the advisor cannot see.
+     */
+    private boolean approvedLimitRaiseExists(String studentId, String roundId) {
+        if (jdbc == null || !StringUtils.hasText(studentId) || !StringUtils.hasText(roundId)) {
+            return false;
+        }
+        try {
+            Integer count = jdbc.queryForObject(
+                    "SELECT COUNT(*) FROM academic.\"CreditLimitApplication\" "
+                            + "WHERE \"studentId\" = :studentId AND \"roundId\" = :roundId AND \"status\" = 'APPROVED'",
+                    new MapSqlParameterSource("studentId", studentId).addValue("roundId", roundId),
+                    Integer.class);
+            return count != null && count > 0;
+        } catch (RuntimeException exception) {
+            LOG.info("credit-limit application provenance unavailable: {}", exception.getClass().getSimpleName());
+            return false;
+        }
     }
 
     /**
@@ -1259,9 +1587,19 @@ public class AssistantPersonalContextAdvisor {
                     : "You have no published credits yet, so I cannot compute the gap to the " + required
                             + "-credit graduation requirement.";
         }
-        GradeTotals cumulative = new GradeTotals();
-        grades.forEach(cumulative::add);
-        int earned = cumulative.earnedCredits;
+        // Same best-attempt-per-course basis as the grades answer and the
+        // transcript page: graduation progress must never count a retake
+        // twice against the degree total (audit ca-nhan Q5 high finding).
+        TranscriptResponse transcript = enrollments.findStudentTranscript(studentId);
+        TranscriptSummary transcriptSummary = transcript == null ? null : transcript.summary();
+        int earned;
+        if (transcriptSummary != null) {
+            earned = transcriptSummary.totalCreditsEarned();
+        } else {
+            GradeTotals cumulative = new GradeTotals();
+            grades.forEach(cumulative::add);
+            earned = cumulative.earnedCredits;
+        }
         if (required > earned) {
             return vi
                     ? "Để đủ " + required + " tín chỉ tốt nghiệp, bạn còn thiếu " + (required - earned)
