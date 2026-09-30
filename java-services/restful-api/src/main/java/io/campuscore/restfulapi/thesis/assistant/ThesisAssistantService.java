@@ -802,6 +802,40 @@ public class ThesisAssistantService {
     }
 
     /**
+     * General-knowledge fallback for OFF-TOPIC questions ("Con gà có mấy cái
+     * chân"): carries no academic signal, so the campus corpus could never
+     * answer it and the old chain ended in the "Mình chưa tìm thấy..." KB
+     * miss. The provider now answers it directly with the general prompt —
+     * no retrieved context, no citations, no quota charge, never persisted.
+     * Academic-signal questions return {@code null} and keep the grounded RAG
+     * path; a provider miss also returns {@code null} so the caller falls
+     * back to the normal chain (owner request 2026-09-30).
+     */
+    public ChatResponse generalAnswerIfOffTopic(String message, String locale, UUID clientRequestId) {
+        String normalizedLocale = AssistantInputGuard.normalizeLocale(locale);
+        String normalized = AssistantInputGuard.normalizeMessage(message);
+        if (normalized.isBlank()) return null;
+        if (hasPublicScopeSignal(normalized)) return null;
+        if (deepSeek == null || !deepSeek.usable()) return null;
+        String generated;
+        try {
+            generated = provider.complete(new DeepSeekClient.CompletionRequest(
+                    normalized, normalizedLocale, "", List.of(), DeepSeekClient.generalPrompt(normalizedLocale)),
+                    ignored -> { }).answer();
+        } catch (DeepSeekClient.ProviderUnavailableException | DeepSeekClient.ProviderCancelledException
+                | InvalidSegmentException | ProviderOutputRejectedException exception) {
+            return null;
+        }
+        generated = normalizeAssistantCopy(generated, normalizedLocale);
+        if (!AssistantOutputGuard.isSafeForAnswer(generated, normalized)) {
+            return new ChatResponse(technicalOutputMessage(normalizedLocale), MODEL, true,
+                    "PROVIDER_UNSAFE_OUTPUT", normalizedLocale, List.of());
+        }
+        return new ChatResponse(generated, provider.model(), false, "ANSWERED", normalizedLocale, List.of(),
+                UUID.randomUUID(), clientRequestId, null, false, "COMPLETED", null, null);
+    }
+
+    /**
      * Emits a fully local response (conversational tier) as a complete SSE
      * conversation turn: meta with the response's own model, one replace
      * delta, and a completed done frame. Used by the stream endpoint for

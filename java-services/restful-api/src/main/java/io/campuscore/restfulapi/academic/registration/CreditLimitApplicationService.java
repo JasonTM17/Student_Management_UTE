@@ -40,9 +40,25 @@ public class CreditLimitApplicationService {
     private static final String USER = "campuscore_auth.\"User\"";
 
     private final NamedParameterJdbcTemplate jdbc;
+    /**
+     * Demo credit-limit override (env REGISTRATION_CREDIT_LIMIT_OVERRIDE).
+     * When set above 0 it becomes EVERY student's effective limit for the
+     * round, bypassing both the 28-credit standard and the application flow —
+     * the owner's "mở full hạn mức cho tất cả tài khoản" demo request
+     * (2026-09-30). 0 (default) keeps the standard/approved behaviour.
+     */
+    private final int limitOverride;
 
     public CreditLimitApplicationService(NamedParameterJdbcTemplate jdbc) {
+        this(jdbc, 0);
+    }
+
+    @org.springframework.beans.factory.annotation.Autowired
+    public CreditLimitApplicationService(
+            NamedParameterJdbcTemplate jdbc,
+            @org.springframework.beans.factory.annotation.Value("${REGISTRATION_CREDIT_LIMIT_OVERRIDE:0}") int limitOverride) {
         this.jdbc = jdbc;
+        this.limitOverride = Math.max(0, limitOverride);
     }
 
     @Transactional(readOnly = true)
@@ -164,6 +180,9 @@ public class CreditLimitApplicationService {
     /** Returns the standard round limit, raised only by a matching approved row. */
     @Transactional(readOnly = true)
     public int effectiveLimit(String studentId, Map<String, Object> round) {
+        if (limitOverride > 0) {
+            return limitOverride;
+        }
         int standard = standardLimit(round);
         Integer requested;
         try {

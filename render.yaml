@@ -45,6 +45,12 @@ services:
       # DEMO_ACCOUNTS_ROLES (see DemoAccountGate) to e.g. "STUDENT".
       - key: DEMO_ACCOUNTS_ENABLED
         value: "true"
+      # Owner decision (2026-09-30): unlimited registration credit for the
+      # demo — every account's effective limit becomes this value, bypassing
+      # the 28-credit standard and the raise-application flow. Set to "0" to
+      # restore the standard/approved behaviour.
+      - key: REGISTRATION_CREDIT_LIMIT_OVERRIDE
+        value: "999"
       - key: DEEPSEEK_ENABLED
         value: "true"
       - key: DEEPSEEK_API_KEY

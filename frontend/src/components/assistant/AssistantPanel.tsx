@@ -328,12 +328,28 @@ export function AssistantPanel() {
     const node = logRef.current;
     if (!node) return;
     if (userScrolledRef.current) return;
-    node.scrollTo({
-      top: node.scrollHeight,
-      behavior: isSending && !window.matchMedia('(prefers-reduced-motion: reduce)').matches
-        ? 'smooth'
-        : 'auto',
-    });
+    if (isSending) {
+      // While the answer is streaming, follow the growing tail so the user
+      // sees live progress — unless they scrolled up to re-read.
+      node.scrollTo({
+        top: node.scrollHeight,
+        behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches
+          ? 'auto'
+          : 'smooth',
+      });
+      return;
+    }
+    // When an answer settles, pin the TOP of the newest message instead of
+    // jumping past it: the opening lines are what the reader wants, and the
+    // old scroll-to-bottom parked the view past the text (production
+    // feedback: "mỗi lần trả lời là bị dịch xuống cuối đoạn chat").
+    const articles = node.querySelectorAll('[role="article"]');
+    const newest = articles[articles.length - 1] as HTMLElement | undefined;
+    if (newest) {
+      newest.scrollIntoView({ block: 'start', behavior: 'auto' });
+    } else {
+      node.scrollTo({ top: node.scrollHeight });
+    }
   }, [state.messages, isSending]);
 
   const handleLogScroll = () => {
