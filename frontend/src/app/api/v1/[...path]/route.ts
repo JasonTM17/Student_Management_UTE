@@ -58,7 +58,16 @@ async function handle(request: NextRequest, context: RouteContext) {
     }
   }
 
-  return new Response(response.body, {
+  // Buffer the upstream body instead of piping `response.body`. Streaming the
+  // body made the platform flush the outgoing headers from a different task
+  // than the one that appended `set-cookie`, and on Vercel's Node runtime the
+  // session cookies were dropped intermittently: the login POST answered 200
+  // with no Set-Cookie, so the very next page load redirected the user to
+  // /login?reason=session-expired (production repro 4/5 runs, fixed by this
+  // buffering — response bodies here are JSON-sized, so memory is a non-issue).
+  const bodyBuffer = await response.arrayBuffer();
+
+  return new Response(bodyBuffer, {
     status: response.status,
     statusText: response.statusText,
     headers: responseHeaders,
