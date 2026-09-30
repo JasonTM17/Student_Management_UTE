@@ -64,6 +64,13 @@ class ThesisAssistantConversationalTierTest {
         assertNull(ThesisAssistantService.conversationalAnswer(null, "vi"));
         assertNull(ThesisAssistantService.conversationalAnswer("   ", "vi"));
         assertNull(ThesisAssistantService.conversationalAnswer("Tôi muốn đăng ký đề tài khóa luận, các bước thế nào?", "vi"));
+        // Audit ca-nhan Q12: the "hai" greeting token hijacked the weekday
+        // word — "Thứ Hai hàng tuần tôi có môn nào..." got the self-intro.
+        assertNull(ThesisAssistantService.conversationalAnswer(
+                "Thứ Hai hàng tuần tôi có môn nào, học mấy giờ, ở phòng nào?", "vi"));
+        assertNull(ThesisAssistantService.conversationalAnswer("thứ hai tuần này có hạn nộp gì không?", "vi"));
+        // The bare greeting still works.
+        assertNotNull(ThesisAssistantService.conversationalAnswer("hai", "vi"));
     }
 
     @Test

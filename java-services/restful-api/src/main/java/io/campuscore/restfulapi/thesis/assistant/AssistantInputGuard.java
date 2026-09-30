@@ -23,7 +23,34 @@ public final class AssistantInputGuard {
                     + "|\\b(?:api\\s+(?:endpoint|endpoints|chatbot)|api\\s+key|system\\s+prompt|developer\\s+message|stack\\s+trace|traceback|deepseek(?:[- ]v?\\d+)?|provider|llm|jwt|database\\s+(?:password|credentials?))\\b"
                     + "|\\b(?:cho\\s+(?:tôi|ta)|xin|give\\s+me|show|provide|send)\\b.{0,80}\\b(?:api|endpoint|system\\s+prompt|developer\\s+message|câu\\s+lệnh|lệnh|command)\\b"
                     + "|\\b(?:bạn|bot|trợ\\s+lý|hệ\\s+thống|you|assistant)\\b.{0,40}\\b(?:đang\\s+(?:sử\\s+dụng|dùng|chạy)\\s+)?(?:mô\\s+hình|model|llm|provider|deepseek)\\b"
+                    // Data-exfiltration and privilege-escalation asks must be
+                    // refused explicitly at the guard (REJECTED + instant),
+                    // never routed to the LLM where they produced a polite
+                    // refusal after 6-13 s or — worse for SELECT/schema asks —
+                    // a NO_MATCH knowledge miss that implied the data existed
+                    // and only failed retrieval (audit an-ninh Q2/Q4/Q10).
+                    + "|\\bselect\\s+(?:\\*|\\w[\\w\\s,.\"'`*\\-]{0,40}?)\\bfrom\\s+[\"'`]?\\w"
+                    + "|\\b(?:drop|truncate)\\s+(?:table\\s+[\"'`]?\\w|table\\b|database\\b)"
+                    + "|\\b(?:insert\\s+into|delete\\s+from)\\s+[\"'`]?[a-z0-9_]*_[a-z0-9]+"
+                    // The table-dump phrase must name its DATA context —
+                    // "in ra toàn bộ bảng điểm" is a legitimate grades request,
+                    // "in ra toàn bộ bảng trong database" is not. The accented
+                    // form is paired with the identifier form below.
+                    + "|(?:xuất|in\\s*ra|xuất\\s*ra|đọc|dump)\\s+(?:ra\\s+)?(?:nội\\s*dung\\s+bảng|toàn\\s*bộ\\s*(?:các\\s*)?bảng|mọi\\s*bảng)\\s+(?:dữ\\s*liệu|database|cơ\\s*sở\\s*dữ\\s*liệu|db)\\b"
+                    + "|\\bschema\\b.{0,40}\\b(?:mọi|toàn\\s*bộ|tất\\s*cả|all)\\s*(?:bảng|tables?)"
+                    + "|nội\\s*dung\\s*bảng\\s+[a-z_][a-z0-9_]*"
+                    + "|\\bdba\\b|\\bsuperuser\\b"
+                    + "|(?:chuỗi|chain)\\s*kết\\s*nối|connection\\s*string|\\bjdbc:"
+                    + "|(?:tắt|vô\\s*hiệu\\s*hóa|tắt\\s*bỏ|disable)\\s+(?:mọi|tất\\s*cả|toàn\\s*bộ|all)\\s*(?:bước\\s*)?kiểm\\s*tra\\s*quyền"
+                    + "|(?:mở|cấp|grant|open)\\s+(?:cho\\s*(?:tôi|ta)\\s*)?(?:quyền\\s*)?truy\\s*cập\\s*trực\\s*tiếp\\s*(?:vào\\s*)?(?:database|cơ\\s*sở\\s*dữ\\s*liệu|db)"
+                    + "|(?:đóng\\s*vai|nhân\\s*vai|vào\\s*vai|act\\s+as|pretend\\s+(?:to\\s+be|you\\s+are)|role\\s*-?\\s*play)[^?!.]{0,60}?(?:\\bdba\\b|superuser|toàn\\s*quyền|root|siêu\\s*user|quản\\s*trị\\s*viên\\s*(?:toàn\\s*quyền|cơ\\s*sở\\s*dữ\\s*liệu))"
                     + ")");
+
+    /** The same refusal logic run against the fully diacritic-folded view —
+     *  unaccented "tat moi kiem tra quyen" must be blocked exactly like its
+     *  accented twin (same lockstep-derivation as PROMPT_INJECTION_FOLDED). */
+    private static final Pattern TECHNICAL_REQUEST_FOLDED = Pattern.compile(
+            foldForMatching(TECHNICAL_REQUEST.pattern()));
     // Vietnamese phrasing matters because the assistant audience is bilingual:
     // the English-only list let "bỏ qua tất cả hướng dẫn..." reach the provider.
     private static final Pattern PROMPT_INJECTION = Pattern.compile(
@@ -121,7 +148,12 @@ public final class AssistantInputGuard {
      * same input guard can still be used for provider text and knowledge rows.
      */
     public static boolean isTechnicalRequest(String value) {
-        return value != null && TECHNICAL_REQUEST.matcher(normalizeMessage(value)).find();
+        if (value == null) return false;
+        String normalized = normalizeMessage(value);
+        if (TECHNICAL_REQUEST.matcher(normalized).find()) return true;
+        // Same dual-view rule as injection: unaccented Vietnamese must not be
+        // able to phrase a data-exfiltration ask past the guard.
+        return TECHNICAL_REQUEST_FOLDED.matcher(foldForMatching(normalized)).find();
     }
 
     /**
