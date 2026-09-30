@@ -129,7 +129,10 @@ public class AssistantPersonalContextAdvisor {
     private static final Pattern LECTURER_TEACHING_LIST_HINT = Pattern.compile(
             "phụ\\s*trách\\s*dạy|phu\\s*trach\\s*day"
                     + "|lớp\\s*(?:học\\s*phần\\s*)?nào[^?!.]{0,40}?(?:dạy|phụ\\s*trách)"
-                    + "|lop\\s*(?:hoc\\s*phan\\s*)?nao[^?!.]{0,40}?(?:day|phu\\s*trach)",
+                    + "|lop\\s*(?:hoc\\s*phan\\s*)?nao[^?!.]{0,40}?(?:day|phu\\s*trach)"
+                    // "Học kỳ này tôi phụ trách những lớp nào?" — phụ trách sits
+                    // BEFORE the lớp noun, which the lớp-first alternatives miss.
+                    + "|phụ\\s*trách[^?!.]{0,25}?lớp|phu\\s*trach[^?!.]{0,25}?lop",
             Pattern.CASE_INSENSITIVE | Pattern.UNICODE_CASE);
 
     /**
@@ -229,11 +232,17 @@ public class AssistantPersonalContextAdvisor {
      * about raising the limit stays on the knowledge path.
      */
     private static final Pattern CREDITS_REMAINING_INTENT = Pattern.compile(
-            "còn\\s*bao\\s*nhiêu\\s*(?:được\\s*đăng\\s*ký\\s*)?tín\\s*chỉ|con\\s*bao\\s*nhieu\\s*(?:duoc\\s*dang\\s*ky\\s*)?tin\\s*chi"
+            // The verb phrase may sit either side of the quantity:
+            // "còn bao nhiêu tín chỉ" AND "còn được đăng ký bao nhiêu tín chỉ nữa"
+            // (the latter fell to the KB path and answered "no data" while
+            // /me/registration/summary reports creditsRemaining).
+            "còn\\s*(?:được\\s*đăng\\s*ký\\s*)?(?:thêm\\s*)?bao\\s*nhiêu\\s*(?:nữa\\s*)?tín\\s*chỉ"
+                    + "|con\\s*(?:duoc\\s*dang\\s*ky\\s*)?(?:them\\s*)?bao\\s*nhieu\\s*(?:nua\\s*)?tin\\s*chi"
                     + "|còn\\s*lạ[ií]\\s*(?:được\\s*)?bao\\s*nhiêu\\s*tín\\s*chỉ|con\\s*lai\\s*(?:duoc\\s*)?bao\\s*nhieu\\s*tin\\s*chi"
                     + "|còn\\s*thiếu\\s*(?:mấy|bao\\s*nhiêu)\\s*tín\\s*chỉ|con\\s*thieu\\s*(?:may|bao\\s*nhieu)\\s*tin\\s*chi"
                     + "|hạn\\s*mức\\s*tín\\s*chỉ|han\\s*muc\\s*tin\\s*chi"
-                    + "|credits?\\s+(?:do\\s+i\\s+have\\s+)?(?:left|remaining)|remaining\\s+credits?",
+                    + "|credits?\\s+(?:do\\s+i\\s+have\\s+)?(?:left|remaining|to\\s+register)|remaining\\s+credits?"
+                    + "|how\\s+many\\s+credits\\s+(?:can|do)\\s+i\\s+(?:still\\s+)?(?:register|take)",
             Pattern.CASE_INSENSITIVE | Pattern.UNICODE_CASE);
 
     /** Credit-limit policy wording ("xin nâng hạn mức") stays on the knowledge path. */
