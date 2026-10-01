@@ -433,6 +433,7 @@ public class ThesisMutationService {
         GroupRow group = lockGroup(groupId);
         boolean supervisorPath = authorizeMemberManagement(group, actor);
         requireRoundStatus(group.roundId(), RoundStatus.REGISTRATION_OPEN);
+        requireActiveRoster(group);
         if (!supervisorPath) {
             requireMutableMembership(group, actor);
         }
@@ -496,6 +497,7 @@ public class ThesisMutationService {
         GroupRow group = lockGroup(groupId);
         boolean supervisorPath = authorizeMemberManagement(group, actor);
         requireRoundStatus(group.roundId(), RoundStatus.REGISTRATION_OPEN);
+        requireActiveRoster(group);
         if (!supervisorPath) {
             requireMutableMembership(group, actor);
         }
@@ -585,6 +587,9 @@ public class ThesisMutationService {
         if (!isProgressStatus(status)) {
             throw invalid("Progress accepts only DRAFT, SUBMITTED, COMPLETED or CANCELLED");
         }
+        if (group.status() == GroupStatus.CANCELLED && status != GroupStatus.CANCELLED) {
+            throw conflict("GROUP_STATE_CONFLICT", "A cancelled group is historical and cannot reopen");
+        }
         // approveGroup flips approval_status while the status stays SUBMITTED, so an
         // approved group must not be demoted or cancelled behind the reviewer's back.
         if (group.approvalStatus() == ApprovalStatus.APPROVED
@@ -596,6 +601,12 @@ public class ThesisMutationService {
             throw conflict("GROUP_STATUS_INVALID", "A completed group cannot reopen; contact your supervisor");
         }
         jdbc.update("UPDATE thesis.thesis_group SET status = :status, updated_at = CURRENT_TIMESTAMP, version = version + 1 WHERE id = :groupId", params().addValue("status", status.name()).addValue("groupId", groupId));
+        if (status == GroupStatus.CANCELLED && group.status() != GroupStatus.CANCELLED) {
+            // H2's compatibility migration has no PostgreSQL trigger. PostgreSQL also derives
+            // this at the database boundary, so this remains an atomic, harmless no-op there.
+            jdbc.update("UPDATE thesis.thesis_group_member SET active_participation = FALSE WHERE group_id = :groupId AND active_participation = TRUE",
+                    params().addValue("groupId", groupId));
+        }
         return groups.findById(groupId);
     }
 
@@ -905,12 +916,21 @@ public class ThesisMutationService {
         }
     }
 
-    /** Highest existing member order plus one; keeps orders unique after removals. */
+    private void requireActiveRoster(GroupRow group) {
+        if (group.status() == GroupStatus.CANCELLED) {
+            throw conflict("GROUP_STATE_CONFLICT", "A cancelled group has a read-only historical roster");
+        }
+    }
+
+    /** Reuse a vacant slot; surviving members keep their identity and order. */
     private int nextMemberOrder(UUID groupId) {
-        Integer maxOrder = jdbc.queryForObject(
-                "SELECT COALESCE(MAX(member_order), 0) FROM thesis.thesis_group_member WHERE group_id = :groupId",
+        List<Integer> usedOrders = jdbc.queryForList(
+                "SELECT member_order FROM thesis.thesis_group_member WHERE group_id = :groupId",
                 params().addValue("groupId", groupId), Integer.class);
-        return (maxOrder == null ? 0 : maxOrder) + 1;
+        for (int order = 1; order <= MAX_GROUP_MEMBERS; order++) {
+            if (!usedOrders.contains(order)) return order;
+        }
+        throw conflict("GROUP_FULL", "The thesis group has no available member slot");
     }
 
     private static RoundType requireRoundType(String value) {
@@ -946,7 +966,15 @@ public class ThesisMutationService {
     }
 
     private void requireActiveStudent(String studentId) {
-        if (count("SELECT COUNT(*) FROM campuscore_auth.\"Student\" WHERE \"id\" = :studentId AND \"status\" = 'ACTIVE'", null, studentId) == 0) {
+        Integer present;
+        try {
+            present = jdbc.queryForObject(
+                    "SELECT 1 FROM campuscore_auth.\"Student\" WHERE \"id\" = :studentId AND \"status\" = 'ACTIVE' FOR UPDATE",
+                    params().addValue("studentId", studentId), Integer.class);
+        } catch (EmptyResultDataAccessException exception) {
+            present = null;
+        }
+        if (present == null) {
             throw new DomainException(HttpStatus.FORBIDDEN, "STUDENT_PROFILE_REQUIRED", "An active student profile is required");
         }
     }

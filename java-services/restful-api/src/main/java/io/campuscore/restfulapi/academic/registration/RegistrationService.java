@@ -452,6 +452,18 @@ public class RegistrationService {
         if (replay != null) {
             return;
         }
+        // Resolve the immutable owner without locking Enrollment. All mutations
+        // of one student's registration serialize on Student before taking any
+        // Enrollment lock, including administrative drops.
+        String targetStudentId;
+        try {
+            targetStudentId = jdbc.queryForObject(
+                    "SELECT \"studentId\" FROM " + ENROLLMENT + " WHERE \"id\" = :id",
+                    new MapSqlParameterSource("id", enrollmentId), String.class);
+        } catch (EmptyResultDataAccessException exception) {
+            throw problem(HttpStatus.NOT_FOUND, "ENROLLMENT_NOT_FOUND", "Enrollment not found");
+        }
+        lockStudent(targetStudentId);
         Map<String, Object> enrollment;
         try {
             enrollment = jdbc.queryForMap(
@@ -461,8 +473,9 @@ public class RegistrationService {
         } catch (EmptyResultDataAccessException exception) {
             throw problem(HttpStatus.NOT_FOUND, "ENROLLMENT_NOT_FOUND", "Enrollment not found");
         }
-        String targetStudentId = String.valueOf(enrollment.get("student_id"));
-        lockStudent(targetStudentId);
+        if (!targetStudentId.equals(String.valueOf(enrollment.get("student_id")))) {
+            throw problem(HttpStatus.CONFLICT, "ENROLLMENT_NOT_ACTIVE", "Enrollment changed during the request");
+        }
         boolean admin = roles != null && (roles.contains("ADMIN") || roles.contains("SUPER_ADMIN"));
         if (!admin && !studentId.equals(String.valueOf(enrollment.get("student_id")))) {
             throw problem(HttpStatus.FORBIDDEN, "ENROLLMENT_FORBIDDEN", "Enrollment does not belong to the current student");
@@ -470,11 +483,8 @@ public class RegistrationService {
         if (!List.of("ENROLLED", "PENDING").contains(String.valueOf(enrollment.get("status")))) {
             throw problem(HttpStatus.CONFLICT, "ENROLLMENT_NOT_ACTIVE", "Enrollment is no longer active");
         }
-        // Global lock order on mutation paths is Student → Enrollment → Section →
-        // Round. Taking the Section lock before the Round lock keeps dropLocked in
-        // the same order as enrollLocked; the opposite order (Round first) let a
-        // concurrent enroll+drop on the same section deadlock (40P01) — reproduced
-        // adversarially on Postgres 18 (Wukong evidence, 2026-09-26).
+        // Student serializes same-student operations. Across students, Section
+        // must precede Round on both enroll and drop to avoid a second lock cycle.
         lockSection(String.valueOf(enrollment.get("section_id")));
         openRound(String.valueOf(enrollment.get("semester_id")), "ADD_DROP");
         jdbc.update(
@@ -758,7 +768,10 @@ public class RegistrationService {
                         + " JOIN " + SECTION + " section ON section.\"id\" = enrollment.\"sectionId\""
                         + " JOIN " + COURSE + " course ON course.\"id\" = section.\"courseId\""
                         + " WHERE enrollment.\"studentId\" = :studentId AND enrollment.\"semesterId\" = :semesterId"
-                        + " AND enrollment.\"status\" IN ('ENROLLED', 'PENDING', 'CONFIRMED') FOR UPDATE",
+                        + " AND enrollment.\"status\" IN ('ENROLLED', 'PENDING', 'CONFIRMED')"
+                        // PostgreSQL otherwise locks the joined Section/Course rows too,
+                        // inverting Section -> Round for a different student's drop.
+                        + (postgres ? " FOR UPDATE OF enrollment" : " FOR UPDATE"),
                 new MapSqlParameterSource().addValue("studentId", studentId).addValue("semesterId", semesterId));
     }
 

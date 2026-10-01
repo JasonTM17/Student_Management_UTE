@@ -21,7 +21,7 @@ export interface SelectProps
 }
 
 const Select = React.forwardRef<HTMLSelectElement, SelectProps>(
-  ({ className, label, error, options, groups, 'aria-describedby': externalDescribedBy, ...props }, ref) => {
+  ({ className, label, error, options, groups, children, 'aria-describedby': externalDescribedBy, ...props }, ref) => {
     const generatedId = React.useId().replace(/:/g, '');
     const controlId = props.id ?? `select-${generatedId}`;
     const errorId = `select-error-${generatedId}`;
@@ -59,11 +59,11 @@ const Select = React.forwardRef<HTMLSelectElement, SelectProps>(
                     ))}
                   </optgroup>
                 ))
-              : options?.map((option) => (
+              : options ? options.map((option) => (
                   <option key={option.value} value={option.value}>
                     {option.label}
                   </option>
-                ))}
+                )) : children}
           </select>
           <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
         </div>

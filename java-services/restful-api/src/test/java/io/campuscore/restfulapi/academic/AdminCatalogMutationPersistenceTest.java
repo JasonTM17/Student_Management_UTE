@@ -155,6 +155,288 @@ class AdminCatalogMutationPersistenceTest {
     }
 
     @Test
+    void sectionCreateRejectsCapacityAboveScheduledRoom() throws Exception {
+        // The admin form chooses rooms in schedules, without a top-level classroomId.
+        mvc.perform(post("/api/v1/sections")
+                        .with(adminJwt())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"id":"section-too-large", "courseId":"course-old",
+                                 "semesterId":"semester-old", "capacity":41,
+                                 "schedules":[{"dayOfWeek":2, "startTime":"08:00", "endTime":"10:00", "classroomId":"room-1"}]}
+                                """))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("CAPACITY_EXCEEDS_ROOM"));
+
+        assertThat(jdbc.queryForObject(
+                "SELECT COUNT(*) FROM \"academic\".\"Section\" WHERE \"id\" = ?",
+                Integer.class, "section-too-large")).isZero();
+        assertThat(scheduleRows("section-too-large")).isEmpty();
+    }
+
+    @Test
+    void sectionScheduleReplacementRejectsUndersizedRoomAndRollsBack() throws Exception {
+        jdbc.update("UPDATE \"academic\".\"Classroom\" SET \"capacity\" = 20 WHERE \"id\" = 'room-2'");
+        List<Map<String, Object>> originalSchedules = scheduleRows("section-existing");
+
+        mvc.perform(put("/api/v1/sections/section-existing")
+                        .with(adminJwt())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"sectionNumber":"changed",
+                                 "schedules":[{"dayOfWeek":2, "startTime":"08:00", "endTime":"10:00", "classroomId":"room-2"}]}
+                                """))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("CAPACITY_EXCEEDS_ROOM"));
+
+        assertThat(jdbc.queryForObject(
+                "SELECT \"sectionNumber\" FROM \"academic\".\"Section\" WHERE \"id\" = ?",
+                String.class, "section-existing")).isEqualTo("01");
+        assertThat(scheduleRows("section-existing")).isEqualTo(originalSchedules);
+        assertThat(jdbc.queryForObject(
+                "SELECT \"id\" FROM \"academic\".\"SectionSchedule\" WHERE \"sectionId\" = ?",
+                String.class, "section-existing")).isEqualTo("schedule-old");
+    }
+
+    @Test
+    void sectionCapacityUpdateChecksRetainedScheduleRooms() throws Exception {
+        jdbc.update("UPDATE \"academic\".\"Section\" SET \"classroomId\" = NULL WHERE \"id\" = 'section-existing'");
+        List<Map<String, Object>> originalSchedules = scheduleRows("section-existing");
+
+        mvc.perform(put("/api/v1/sections/section-existing")
+                        .with(adminJwt())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"capacity\":41}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("CAPACITY_EXCEEDS_ROOM"));
+
+        assertThat(jdbc.queryForObject(
+                "SELECT \"capacity\" FROM \"academic\".\"Section\" WHERE \"id\" = ?",
+                Integer.class, "section-existing")).isEqualTo(30);
+        assertThat(scheduleRows("section-existing")).isEqualTo(originalSchedules);
+    }
+
+    @Test
+    void sectionCapacityUpdateUsesReplacementRoomsInsteadOfOldRooms() throws Exception {
+        jdbc.update("UPDATE \"academic\".\"Section\" SET \"classroomId\" = NULL WHERE \"id\" = 'section-existing'");
+        jdbc.update("UPDATE \"academic\".\"Classroom\" SET \"capacity\" = 60 WHERE \"id\" = 'room-2'");
+
+        mvc.perform(put("/api/v1/sections/section-existing")
+                        .with(adminJwt())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"capacity":50,
+                                 "schedules":[{"dayOfWeek":2, "startTime":"08:00", "endTime":"10:00", "classroomId":"room-2"}]}
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.capacity").value(50));
+
+        assertThat(scheduleRows("section-existing")).containsExactly(Map.of(
+                "classroomId", "room-2", "dayOfWeek", 2, "startTime", "08:00", "endTime", "10:00"));
+    }
+
+    @Test
+    void sectionScheduleOmissionPreservesAndExplicitEmptyListClears() throws Exception {
+        jdbc.update("UPDATE \"academic\".\"Section\" SET \"classroomId\" = NULL WHERE \"id\" = 'section-existing'");
+        List<Map<String, Object>> originalSchedules = scheduleRows("section-existing");
+
+        mvc.perform(put("/api/v1/sections/section-existing")
+                        .with(adminJwt())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"sectionNumber\":\"renamed\"}"))
+                .andExpect(status().isOk());
+
+        assertThat(scheduleRows("section-existing")).isEqualTo(originalSchedules);
+        assertThat(jdbc.queryForObject(
+                "SELECT \"id\" FROM \"academic\".\"SectionSchedule\" WHERE \"sectionId\" = ?",
+                String.class, "section-existing")).isEqualTo("schedule-old");
+
+        // Clearing the only scheduled room and increasing capacity is a valid atomic edit.
+        mvc.perform(put("/api/v1/sections/section-existing")
+                        .with(adminJwt())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"capacity\":41, \"schedules\":[]}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.capacity").value(41));
+        assertThat(scheduleRows("section-existing")).isEmpty();
+    }
+
+    @Test
+    void sectionUpdateRejectsLecturerConflictWithoutScheduleReplacement() throws Exception {
+        insertLecturer("lecturer-1");
+        insertLecturer("lecturer-2");
+        jdbc.update("UPDATE \"academic\".\"Section\" SET \"lecturerId\" = 'lecturer-1' WHERE \"id\" = 'section-existing'");
+        insertSection("section-other", "semester-old", "lecturer-2", "room-2");
+        insertSchedule("schedule-other", "section-other", "room-2", 1, "08:00", "10:00");
+        List<Map<String, Object>> originalSchedules = scheduleRows("section-existing");
+
+        mvc.perform(put("/api/v1/sections/section-existing")
+                        .with(adminJwt())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"lecturerId\":\"lecturer-2\"}"))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("SCHEDULE_CONFLICT"));
+
+        assertThat(jdbc.queryForObject(
+                "SELECT \"lecturerId\" FROM \"academic\".\"Section\" WHERE \"id\" = ?",
+                String.class, "section-existing")).isEqualTo("lecturer-1");
+        assertThat(scheduleRows("section-existing")).isEqualTo(originalSchedules);
+    }
+
+    @Test
+    void sectionUpdateRejectsSemesterRoomConflictWithoutScheduleReplacement() throws Exception {
+        insertSection("section-other", "semester-new", null, "room-1");
+        insertSchedule("schedule-other", "section-other", "room-1", 1, "08:00", "10:00");
+
+        mvc.perform(put("/api/v1/sections/section-existing")
+                        .with(adminJwt())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"semesterId\":\"semester-new\"}"))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("SCHEDULE_CONFLICT"));
+
+        assertThat(jdbc.queryForObject(
+                "SELECT \"semesterId\" FROM \"academic\".\"Section\" WHERE \"id\" = ?",
+                String.class, "section-existing")).isEqualTo("semester-old");
+        assertThat(jdbc.queryForObject(
+                "SELECT \"id\" FROM \"academic\".\"SectionSchedule\" WHERE \"sectionId\" = ?",
+                String.class, "section-existing")).isEqualTo("schedule-old");
+    }
+
+    @Test
+    void sectionUpdateAllowsNonconflictingLecturerAndPreservesSchedules() throws Exception {
+        insertLecturer("lecturer-1");
+        insertLecturer("lecturer-2");
+        jdbc.update("UPDATE \"academic\".\"Section\" SET \"lecturerId\" = 'lecturer-1' WHERE \"id\" = 'section-existing'");
+        insertSection("section-other", "semester-old", "lecturer-2", "room-2");
+        insertSchedule("schedule-other", "section-other", "room-2", 1, "10:00", "12:00");
+        List<Map<String, Object>> originalSchedules = scheduleRows("section-existing");
+
+        mvc.perform(put("/api/v1/sections/section-existing")
+                        .with(adminJwt())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"lecturerId\":\"lecturer-2\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.lecturerId").value("lecturer-2"));
+
+        assertThat(scheduleRows("section-existing")).isEqualTo(originalSchedules);
+        assertThat(jdbc.queryForObject(
+                "SELECT \"id\" FROM \"academic\".\"SectionSchedule\" WHERE \"sectionId\" = ?",
+                String.class, "section-existing")).isEqualTo("schedule-old");
+    }
+
+    @Test
+    void sectionSchedulesAllowGapBetweenSameRoomSlots() throws Exception {
+        jdbc.update("UPDATE \"academic\".\"SectionSchedule\" SET \"startTime\" = '10:00', \"endTime\" = '12:00' WHERE \"id\" = 'schedule-old'");
+
+        mvc.perform(post("/api/v1/sections")
+                        .with(adminJwt())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"id":"section-gap", "courseId":"course-old", "semesterId":"semester-old", "capacity":30,
+                                 "schedules":[
+                                   {"dayOfWeek":1, "startTime":"07:00", "endTime":"09:00", "classroomId":"room-1"},
+                                   {"dayOfWeek":1, "startTime":"13:00", "endTime":"15:00", "classroomId":"room-1"}]}
+                                """))
+                .andExpect(status().isOk());
+
+        assertThat(scheduleRows("section-gap")).hasSize(2);
+        assertThat(scheduleRows("section-existing")).containsExactly(Map.of(
+                "classroomId", "room-1", "dayOfWeek", 1, "startTime", "10:00", "endTime", "12:00"));
+    }
+
+    @Test
+    void sectionSchedulesAllowGapBetweenSameLecturerSlots() throws Exception {
+        insertLecturer("lecturer-1");
+        jdbc.update("UPDATE \"academic\".\"Section\" SET \"lecturerId\" = 'lecturer-1' WHERE \"id\" = 'section-existing'");
+        jdbc.update("UPDATE \"academic\".\"SectionSchedule\" SET \"startTime\" = '10:00', \"endTime\" = '12:00' WHERE \"id\" = 'schedule-old'");
+
+        mvc.perform(post("/api/v1/sections")
+                        .with(adminJwt())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"id":"section-gap", "courseId":"course-old", "semesterId":"semester-old",
+                                 "lecturerId":"lecturer-1", "capacity":30,
+                                 "schedules":[
+                                   {"dayOfWeek":1, "startTime":"07:00", "endTime":"09:00", "classroomId":"room-2"},
+                                   {"dayOfWeek":1, "startTime":"13:00", "endTime":"15:00", "classroomId":"room-2"}]}
+                                """))
+                .andExpect(status().isOk());
+
+        assertThat(scheduleRows("section-gap")).hasSize(2);
+    }
+
+    @Test
+    void sectionSchedulesRejectActualRoomOverlapAndRollBack() throws Exception {
+        mvc.perform(post("/api/v1/sections")
+                        .with(adminJwt())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"id":"section-overlap", "courseId":"course-old", "semesterId":"semester-old", "capacity":30,
+                                 "schedules":[{"dayOfWeek":1, "startTime":"08:00", "endTime":"10:00", "classroomId":"room-1"}]}
+                                """))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("SCHEDULE_CONFLICT"));
+
+        assertThat(jdbc.queryForObject(
+                "SELECT COUNT(*) FROM \"academic\".\"Section\" WHERE \"id\" = ?",
+                Integer.class, "section-overlap")).isZero();
+        assertThat(scheduleRows("section-overlap")).isEmpty();
+    }
+
+    @Test
+    void sectionSchedulesRejectActualLecturerOverlapAndRollBack() throws Exception {
+        insertLecturer("lecturer-1");
+        jdbc.update("UPDATE \"academic\".\"Section\" SET \"lecturerId\" = 'lecturer-1' WHERE \"id\" = 'section-existing'");
+
+        mvc.perform(post("/api/v1/sections")
+                        .with(adminJwt())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"id":"section-overlap", "courseId":"course-old", "semesterId":"semester-old",
+                                 "lecturerId":"lecturer-1", "capacity":30,
+                                 "schedules":[{"dayOfWeek":1, "startTime":"08:00", "endTime":"10:00", "classroomId":"room-2"}]}
+                                """))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("SCHEDULE_CONFLICT"));
+
+        assertThat(jdbc.queryForObject(
+                "SELECT COUNT(*) FROM \"academic\".\"Section\" WHERE \"id\" = ?",
+                Integer.class, "section-overlap")).isZero();
+        assertThat(scheduleRows("section-overlap")).isEmpty();
+    }
+
+    @Test
+    void sectionSchedulesAllowAdjacentRoomSlots() throws Exception {
+        mvc.perform(post("/api/v1/sections")
+                        .with(adminJwt())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"id":"section-adjacent", "courseId":"course-old", "semesterId":"semester-old", "capacity":30,
+                                 "schedules":[{"dayOfWeek":1, "startTime":"09:00", "endTime":"11:00", "classroomId":"room-1"}]}
+                                """))
+                .andExpect(status().isOk());
+        assertThat(scheduleRows("section-adjacent")).hasSize(1);
+    }
+
+    @Test
+    void sectionSchedulesAllowAdjacentLecturerSlots() throws Exception {
+        insertLecturer("lecturer-1");
+        jdbc.update("UPDATE \"academic\".\"Section\" SET \"lecturerId\" = 'lecturer-1' WHERE \"id\" = 'section-existing'");
+
+        mvc.perform(post("/api/v1/sections")
+                        .with(adminJwt())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"id":"section-adjacent", "courseId":"course-old", "semesterId":"semester-old",
+                                 "lecturerId":"lecturer-1", "capacity":30,
+                                 "schedules":[{"dayOfWeek":1, "startTime":"09:00", "endTime":"11:00", "classroomId":"room-2"}]}
+                                """))
+                .andExpect(status().isOk());
+        assertThat(scheduleRows("section-adjacent")).hasSize(1);
+    }
+
+    @Test
     void semesterUpdatePersistsCoreAcademicFields() throws Exception {
         mvc.perform(put("/api/v1/semesters/semester-old")
                         .with(adminJwt())
@@ -560,6 +842,7 @@ class AdminCatalogMutationPersistenceTest {
     private void clearTables() {
         jdbc.update("DELETE FROM \"academic\".\"SectionSchedule\"");
         jdbc.update("DELETE FROM \"academic\".\"Section\"");
+        jdbc.update("DELETE FROM \"academic\".\"Lecturer\"");
         jdbc.update("DELETE FROM \"academic\".\"Classroom\"");
         jdbc.update("DELETE FROM \"academic\".\"Course\"");
         jdbc.update("DELETE FROM \"academic\".\"Semester\"");
@@ -615,6 +898,28 @@ class AdminCatalogMutationPersistenceTest {
                         + " (\"id\", \"building\", \"roomNumber\", \"capacity\", \"type\", \"createdAt\", \"updatedAt\")"
                         + " VALUES (?, 'A', ?, 40, 'LECTURE', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)",
                 id, roomNumber);
+    }
+
+    private void insertLecturer(String id) {
+        jdbc.update("INSERT INTO \"academic\".\"Lecturer\""
+                        + " (\"id\", \"userId\", \"departmentId\", \"employeeId\", \"isActive\")"
+                        + " VALUES (?, ?, 'department-demo', ?, TRUE)",
+                id, id + "-user", id);
+    }
+
+    private void insertSection(String id, String semesterId, String lecturerId, String classroomId) {
+        jdbc.update("INSERT INTO \"academic\".\"Section\""
+                        + " (\"id\", \"sectionNumber\", \"courseId\", \"semesterId\", \"lecturerId\", \"classroomId\","
+                        + " \"capacity\", \"enrolledCount\", \"status\")"
+                        + " VALUES (?, ?, 'course-old', ?, ?, ?, 30, 0, 'OPEN')",
+                id, id, semesterId, lecturerId, classroomId);
+    }
+
+    private void insertSchedule(String id, String sectionId, String classroomId, int dayOfWeek, String startTime, String endTime) {
+        jdbc.update("INSERT INTO \"academic\".\"SectionSchedule\""
+                        + " (\"id\", \"sectionId\", \"classroomId\", \"dayOfWeek\", \"startTime\", \"endTime\")"
+                        + " VALUES (?, ?, ?, ?, ?, ?)",
+                id, sectionId, classroomId, dayOfWeek, startTime, endTime);
     }
 
     private List<Map<String, Object>> scheduleRows(String sectionId) {
