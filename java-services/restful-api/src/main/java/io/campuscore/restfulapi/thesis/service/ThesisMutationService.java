@@ -537,6 +537,11 @@ public class ThesisMutationService {
         GroupRow group = lockGroup(groupId);
         authorizeLeaderOrAdmin(group, actor);
         requireRoundStatus(group.roundId(), RoundStatus.REGISTRATION_OPEN);
+        // Round-5 post-deploy sweep: the topic binding and approval trace of a
+        // CANCELLED group are historical — the roster trigger cannot see this
+        // path, so the guard is enforced here too (admin early-return in
+        // authorizeLeaderOrAdmin used to let this through).
+        requireActiveRoster(group);
         UUID topicId = request == null ? null : request.topicId();
         if (topicId == null) {
             throw invalid("topicId is required");

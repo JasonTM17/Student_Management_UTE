@@ -5,8 +5,6 @@ import React, { useState, useMemo, useRef } from 'react';
 import { toast } from 'sonner';
 import {
   Award,
-  BarChart2,
-  LineChart,
   Download,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -35,7 +33,10 @@ export function StudentUteProfileGradeView({
   const { user, refreshUser } = useAuth();
   const { messages, locale } = useI18n();
   const card = messages.studentCard;
-  const [chartType, setChartType] = useState<'combo' | 'bar' | 'line'>('combo');
+  // Round-5: the line/bar/combo toggle is gone — 'line' rendered an empty
+  // plot and 'combo' was pixel-identical to 'bar' after the class-average
+  // series was removed. The widget now always draws the per-course bars.
+  const chartType = 'bar' as const;
   const [avatarPreview, setAvatarPreview] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -324,45 +325,6 @@ export function StudentUteProfileGradeView({
                 <div className="flex items-center gap-1.5 text-muted-foreground/70">
                   <button
                     type="button"
-                    onClick={() => setChartType('line')}
-                    className={cn(
-                      'p-1 rounded hover:bg-muted transition-colors',
-                      chartType === 'line' && 'text-primary bg-primary/10',
-                    )}
-                    title={card.chartLine}
-                    aria-label={card.chartLine}
-                    aria-pressed={chartType === 'line'}
-                  >
-                    <LineChart className="w-4 h-4" />
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setChartType('bar')}
-                    className={cn(
-                      'p-1 rounded hover:bg-muted transition-colors',
-                      chartType === 'bar' && 'text-primary bg-primary/10',
-                    )}
-                    title={card.chartBar}
-                    aria-label={card.chartBar}
-                    aria-pressed={chartType === 'bar'}
-                  >
-                    <BarChart2 className="w-4 h-4" />
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setChartType('combo')}
-                    className={cn(
-                      'p-1 rounded hover:bg-muted transition-colors',
-                      chartType === 'combo' && 'text-primary bg-primary/10',
-                    )}
-                    title={card.chartCombo}
-                    aria-label={card.chartCombo}
-                    aria-pressed={chartType === 'combo'}
-                  >
-                    <span className="text-[10px] font-bold px-1">Combo</span>
-                  </button>
-                  <button
-                    type="button"
                     onClick={handleDownloadChart}
                     className="inline-flex h-8 w-8 items-center justify-center rounded hover:bg-muted transition-colors"
                     title={card.chartDownload}
@@ -424,8 +386,7 @@ export function StudentUteProfileGradeView({
                   </text>
 
                   {/* Bars: Điểm của bạn */}
-                  {(chartType === 'combo' || chartType === 'bar') &&
-                    chartCourses.map((c, i) => {
+                  {chartCourses.map((c, i) => {
                       const stepX = plotWidth / chartCourses.length;
                       const x = padding.left + i * stepX + (stepX - barWidth) / 2;
                       const barH = (c.studentScore / 10) * plotHeight;

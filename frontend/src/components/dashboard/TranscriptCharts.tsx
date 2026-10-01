@@ -58,10 +58,7 @@ const valueLabelsPlugin = {
       meta.data.forEach((element, index) => {
         const raw = dataset.data[index];
         if (typeof raw !== 'number') return;
-        const text = datasetIndex === 0 || chart.data.datasets.length === 1
-          ? raw.toFixed(2)
-          : raw.toFixed(2);
-        ctx.fillText(text, element.x, element.y - 8);
+        ctx.fillText(raw.toFixed(2), element.x, element.y - 8);
       });
       ctx.restore();
     });

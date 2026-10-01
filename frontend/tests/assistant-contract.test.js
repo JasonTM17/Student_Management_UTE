@@ -982,7 +982,11 @@ test('assistant output guard hides technical commands from rendered and copied a
   assert.match(markdownSource, /sanitizeAssistantOutput/);
   assert.match(markdownSource, /guardOutput = true/);
   assert.match(messagesComponent, /guardOutput=\{!isUser\}/);
-  assert.match(messagesComponent, /isAssistantOutputSafe\(citation\.source\)/);
+  // Round-5: the citation-source check honors the answer scope — on the
+  // specialized page a citation 'source' line from the curated corpus
+  // (e.g. 'docker compose up') must not be silently dropped while its
+  // title/excerpt render.
+  assert.match(messagesComponent, /isAssistantOutputSafe\(citation\.source, scope\)/);
   assert.match(messagesComponent, /writeText\(visibleContent\)/);
   assert.match(messagesComponent, /normalizeAssistantCopy\(citation\.excerpt,/);
   assert.doesNotMatch(messagesComponent, /\{citation\.source\}/);
