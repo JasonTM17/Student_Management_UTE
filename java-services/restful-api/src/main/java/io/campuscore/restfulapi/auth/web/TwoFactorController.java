@@ -85,16 +85,38 @@ public class TwoFactorController {
         return new TwoFactorStatusResponse(true);
     }
 
+    /**
+     * Round-4 verified fix: disable is now a two-step flow like enable — the
+     * password alone used to remove the second factor, so a stolen session
+     * plus a phished password could unenroll the victim without touching
+     * their inbox. The password starts a DISABLE challenge (code emailed);
+     * the emailed code confirms the unenrollment.
+     */
+    @PostMapping("me/two-factor/disable/challenge")
+    @Operation(summary = "Bắt đầu tắt xác thực hai yếu tố", description = "Xác minh mật khẩu rồi gửi mã OTP tới email; dùng challengeId trả về để gọi confirm.")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Đã gửi mã xác nhận tới email"),
+            @ApiResponse(responseCode = "400", description = "Mật khẩu không đúng"),
+            @ApiResponse(responseCode = "409", description = "Tài khoản chưa bật xác thực hai yếu tố"),
+            @ApiResponse(responseCode = "502", description = "Không gửi được email")
+    })
+    public ChallengeResponse startDisable(
+            @AuthenticationPrincipal Jwt jwt,
+            @Valid @RequestBody DisableTwoFactorRequest request) {
+        String challengeId = twoFactor.startDisableChallenge(jwt.getSubject(), request.password());
+        return new ChallengeResponse(challengeId);
+    }
+
     @PostMapping("me/two-factor/disable")
-    @Operation(summary = "Tắt xác thực hai yếu tố", description = "Xác minh mật khẩu rồi tắt xác thực hai yếu tố; đăng nhập sau đó trở về một bước như cũ.")
+    @Operation(summary = "Xác nhận tắt xác thực hai yếu tố", description = "Xác minh mã OTP đã gửi qua email ở bước challenge rồi tắt xác thực hai yếu tố.")
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "Xác thực hai yếu tố đã được tắt"),
-            @ApiResponse(responseCode = "400", description = "Mật khẩu không đúng")
+            @ApiResponse(responseCode = "400", description = "Mã không đúng hoặc đã hết hạn")
     })
     public TwoFactorStatusResponse disable(
             @AuthenticationPrincipal Jwt jwt,
-            @Valid @RequestBody DisableTwoFactorRequest request) {
-        twoFactor.disable(jwt.getSubject(), request.password());
+            @Valid @RequestBody ConfirmTwoFactorRequest request) {
+        twoFactor.confirmDisable(jwt.getSubject(), request.challengeId(), request.code());
         return new TwoFactorStatusResponse(false);
     }
 

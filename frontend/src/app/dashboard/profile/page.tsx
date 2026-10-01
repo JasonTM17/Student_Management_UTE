@@ -181,6 +181,8 @@ export default function ProfilePage() {
   const [twoFactorPassword, setTwoFactorPassword] = useState('');
   const [twoFactorCode, setTwoFactorCode] = useState('');
   const [twoFactorChallengeId, setTwoFactorChallengeId] = useState('');
+  // Which flow the shared confirm-code form completes (round-4: disable is two-step too).
+  const [twoFactorPendingAction, setTwoFactorPendingAction] = useState<'enable' | 'disable'>('enable');
   const [isTwoFactorBusy, setIsTwoFactorBusy] = useState(false);
   const [twoFactorError, setTwoFactorError] = useState('');
   // Key the form by user id so it initializes only after the profile has
@@ -257,6 +259,7 @@ export default function ProfilePage() {
     setTwoFactorPassword('');
     setTwoFactorCode('');
     setTwoFactorChallengeId('');
+    setTwoFactorPendingAction('enable');
   };
 
   const handleEnableTwoFactor = async (e: React.FormEvent) => {
@@ -304,16 +307,26 @@ export default function ProfilePage() {
 
     setIsTwoFactorBusy(true);
     try {
-      const result = await authApi.confirmTwoFactorEnable(twoFactorChallengeId, normalizedCode);
-      setTwoFactorEnabled(Boolean(result.enabled));
-      resetTwoFactorFlow();
-      toast.success(messages.profile.twoFactor.enabledToast);
+      if (twoFactorPendingAction === 'disable') {
+        // Round-4 verified fix: the emailed code now guards turning 2FA OFF.
+        const result = await authApi.disableTwoFactor(twoFactorChallengeId, normalizedCode);
+        setTwoFactorEnabled(Boolean(result.enabled));
+        resetTwoFactorFlow();
+        toast.success(messages.profile.twoFactor.disabledToast);
+      } else {
+        const result = await authApi.confirmTwoFactorEnable(twoFactorChallengeId, normalizedCode);
+        setTwoFactorEnabled(Boolean(result.enabled));
+        resetTwoFactorFlow();
+        toast.success(messages.profile.twoFactor.enabledToast);
+      }
     } catch (error: unknown) {
       setTwoFactorError(
         campusCodeMessage(
           error,
           twoFactorErrorCopy,
-          messages.profile.twoFactor.errors.confirmFailed,
+          twoFactorPendingAction === 'disable'
+            ? messages.profile.twoFactor.errors.disableFailed
+            : messages.profile.twoFactor.errors.confirmFailed,
         ),
       );
     } finally {
@@ -331,10 +344,15 @@ export default function ProfilePage() {
 
     setIsTwoFactorBusy(true);
     try {
-      const result = await authApi.disableTwoFactor(twoFactorPassword);
-      setTwoFactorEnabled(Boolean(result.enabled));
-      resetTwoFactorFlow();
-      toast.success(messages.profile.twoFactor.disabledToast);
+      // Round-4 verified fix: the password now only STARTS the disable
+      // challenge; the emailed code confirms it (mirrors the enable flow).
+      const { challengeId } = await authApi.startDisableTwoFactor(twoFactorPassword);
+      setTwoFactorChallengeId(challengeId);
+      setTwoFactorPendingAction('disable');
+      setTwoFactorStage('confirm');
+      setTwoFactorPassword('');
+      setTwoFactorCode('');
+      setTwoFactorError('');
     } catch (error: unknown) {
       setTwoFactorError(
         campusCodeMessage(

@@ -7,7 +7,7 @@ ALTER TABLE campuscore_auth."User"
 CREATE TABLE IF NOT EXISTS campuscore_auth."TwoFactorChallenge" (
     "id" VARCHAR(120) PRIMARY KEY,
     "userId" VARCHAR(120) NOT NULL REFERENCES campuscore_auth."User" ("id") ON DELETE CASCADE,
-    "purpose" VARCHAR(16) NOT NULL CHECK ("purpose" IN ('LOGIN', 'ENABLE')),
+    "purpose" VARCHAR(16) NOT NULL CHECK ("purpose" IN ('LOGIN', 'ENABLE', 'DISABLE')),
     "codeHash" VARCHAR(64) NOT NULL,
     "expiresAt" TIMESTAMP WITH TIME ZONE NOT NULL,
     "consumedAt" TIMESTAMP WITH TIME ZONE,
