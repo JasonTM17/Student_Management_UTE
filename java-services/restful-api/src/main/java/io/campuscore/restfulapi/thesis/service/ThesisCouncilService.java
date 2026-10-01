@@ -350,6 +350,11 @@ public class ThesisCouncilService {
     @Transactional
     public ScoreResponse submitScore(UUID councilId, UUID topicId, String component, BigDecimal score, Jwt actor) {
         String lecturerId = requireCouncilLecturer(councilId, actor);
+        // Membership edits lock Council. Share that lock before the final
+        // permission check and first score, so a removal cannot pass its
+        // "no scores yet" check while this transaction is about to grade.
+        lockCouncil(councilId);
+        requireCouncilLecturer(councilId, actor);
         if (!councilHasTopic(councilId, topicId)) {
             throw conflict("TOPIC_NOT_ASSIGNED", "This council has not been assigned the topic");
         }
@@ -543,7 +548,12 @@ public class ThesisCouncilService {
 
     private void requireScoreReadAccess(UUID councilId, Jwt actor) {
         List<String> roles = actor == null ? null : actor.getClaimAsStringList("roles");
-        if (roles != null && (roles.contains("ADMIN") || roles.contains("TRUONG_KHOA"))) {
+        // Round-4 council sweep: SUPER_ADMIN is governance staff everywhere
+        // ADMIN is (same class of gap as ThesisReportService, fixed in
+        // be5ec0c0) — the controller already advertises SUPER_ADMIN on these
+        // routes while the service answered 403.
+        if (roles != null && (roles.contains("ADMIN") || roles.contains("SUPER_ADMIN")
+                || roles.contains("TRUONG_KHOA"))) {
             return;
         }
         String lecturerId = normalize(actor == null ? null : actor.getClaimAsString("lecturerId"));
@@ -612,7 +622,8 @@ public class ThesisCouncilService {
 
     private void requireGovernanceRole(Jwt actor, String message) {
         List<String> roles = actor == null ? null : actor.getClaimAsStringList("roles");
-        boolean allowed = roles != null && (roles.contains("ADMIN") || roles.contains("TRUONG_KHOA"));
+        boolean allowed = roles != null && (roles.contains("ADMIN") || roles.contains("SUPER_ADMIN")
+                || roles.contains("TRUONG_KHOA"));
         if (!allowed) {
             throw new DomainException(HttpStatus.FORBIDDEN, "COUNCIL_ADMIN_REQUIRED", message);
         }

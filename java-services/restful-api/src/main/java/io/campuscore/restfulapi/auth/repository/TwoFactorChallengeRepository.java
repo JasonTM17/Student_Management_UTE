@@ -23,6 +23,7 @@ public class TwoFactorChallengeRepository {
 
     public static final String PURPOSE_LOGIN = "LOGIN";
     public static final String PURPOSE_ENABLE = "ENABLE";
+    public static final String PURPOSE_DISABLE = "DISABLE";
 
     private static final String TABLE = "\"campuscore_auth\".\"TwoFactorChallenge\"";
     private static final RowMapper<ChallengeRecord> CHALLENGE_MAPPER =

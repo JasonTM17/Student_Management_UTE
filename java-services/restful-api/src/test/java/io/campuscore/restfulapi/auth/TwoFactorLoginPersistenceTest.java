@@ -458,17 +458,31 @@ class TwoFactorLoginPersistenceTest {
     }
 
     @Test
-    void disableRestoresTheSingleStepLoginContract() throws Exception {
+    void disableRequiresPasswordThenTheEmailedCodeAndRestoresSingleStepLogin() throws Exception {
         enableTwoFactorDirectly();
         MvcResult challenge = loginStudent()
                 .andExpect(jsonPath("$.twoFactorRequired").value(true))
                 .andReturn();
         assertNotNull(challenge);
 
-        mvc.perform(post("/api/v1/me/two-factor/disable")
+        // Round-4 verified fix: the password alone must NOT remove the second
+        // factor — it starts an emailed DISABLE challenge like the enable flow.
+        MvcResult disableChallenge = mvc.perform(post("/api/v1/me/two-factor/disable/challenge")
                         .with(jwt().jwt(token -> token.subject("student-user")))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"password\":\"" + STUDENT_PASSWORD + "\"}"))
+                .andExpect(status().isOk())
+                .andReturn();
+        String disableChallengeId = objectMapper
+                .readTree(disableChallenge.getResponse().getContentAsString())
+                .path("challengeId").asText();
+        String disableCode = latestCode();
+
+        mvc.perform(post("/api/v1/me/two-factor/disable")
+                        .with(jwt().jwt(token -> token.subject("student-user")))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"challengeId\":\"" + disableChallengeId
+                                + "\",\"code\":\"" + disableCode + "\"}"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.enabled").value(false));
 
