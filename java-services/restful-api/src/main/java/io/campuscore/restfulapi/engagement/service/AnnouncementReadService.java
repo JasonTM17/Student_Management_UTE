@@ -12,6 +12,8 @@ import java.time.Instant;
 import java.util.List;
 import java.util.Set;
 import org.springframework.context.annotation.Profile;
+import org.springframework.http.HttpStatus;
+import org.springframework.web.server.ResponseStatusException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -28,6 +30,20 @@ public class AnnouncementReadService {
 
     public AnnouncementReadService(AnnouncementReadRepository announcements) {
         this.announcements = announcements;
+    }
+
+    /**
+     * Round-3 ct-9: detail-by-id for authed staff clients — the collection
+     * endpoints existed but a single id used to answer 405 METHOD_NOT_ALLOWED.
+     * Archived rows included: the caller asked for one specific record.
+     */
+    @Transactional(readOnly = true)
+    public AnnouncementResponse get(String id) {
+        if (id == null || id.isBlank()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "announcement id is required");
+        }
+        return announcements.findById(id)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Announcement not found"));
     }
 
     @Transactional(readOnly = true)

@@ -54,6 +54,16 @@ public class AdminUserMutationController {
         return users.list(page, limit, status, search, role);
     }
 
+    @GetMapping("/{id}")
+    @Operation(summary = "Xem chi tiết một người dùng", description = "Truy xuất hồ sơ một người dùng theo id cho bảng điều khiển quản trị (trước đây trả 405).")
+    @ApiResponse(responseCode = "200", description = "Chi tiết người dùng kèm vai trò")
+    @ApiResponse(responseCode = "404", description = "Không tìm thấy người dùng")
+    public Map<String, Object> get(
+            @Parameter(description = "Mã định danh người dùng (User ID)") @PathVariable String id,
+            Authentication authentication) {
+        return users.get(id, isSuperAdmin(authentication));
+    }
+
     @PostMapping
     @Operation(summary = "Tạo tài khoản người dùng mới", description = "Phòng Đào tạo / Quản trị viên cấp tài khoản học vụ cho Sinh viên hoặc Giảng viên, hệ thống cấp phát mật khẩu tạm thời.")
     @ApiResponses({

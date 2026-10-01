@@ -567,7 +567,7 @@ class AnnouncementWritePersistenceTest {
                         .contentType("application/json")
                         .content("{\"title\":\"Missing\",\"reason\":\"Sửa bài bị thiếu\",\"expectedVersion\":0}"))
                 .andExpect(status().isNotFound())
-                .andExpect(jsonPath("$.code").value("HTTP_404"));
+                .andExpect(jsonPath("$.code").value("NOT_FOUND"));
 
         mvc.perform(put("/api/v1/announcements/existing-announcement")
                         .with(adminJwt("admin-1"))
@@ -690,7 +690,7 @@ class AnnouncementWritePersistenceTest {
         mvc.perform(delete("/api/v1/announcements/missing-announcement")
                         .with(adminJwt("admin-1")))
                 .andExpect(status().isNotFound())
-                .andExpect(jsonPath("$.code").value("HTTP_404"));
+                .andExpect(jsonPath("$.code").value("NOT_FOUND"));
 
         Integer remaining = jdbc.queryForObject(
                 "SELECT COUNT(*) FROM \"engagement\".\"Announcement\""

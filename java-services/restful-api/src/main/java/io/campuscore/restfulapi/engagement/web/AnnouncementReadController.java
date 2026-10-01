@@ -2,6 +2,7 @@ package io.campuscore.restfulapi.engagement.web;
 
 import io.campuscore.restfulapi.engagement.service.AnnouncementReadService;
 import io.campuscore.restfulapi.engagement.web.AnnouncementReadDtos.AnnouncementListResponse;
+import io.campuscore.restfulapi.engagement.web.AnnouncementReadDtos.AnnouncementResponse;
 import io.campuscore.restfulapi.engagement.web.AnnouncementReadDtos.PublicAnnouncementListResponse;
 import java.math.BigInteger;
 import java.util.Collection;
@@ -16,6 +17,7 @@ import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.util.MultiValueMap;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
@@ -54,6 +56,24 @@ public class AnnouncementReadController {
             @RequestParam MultiValueMap<String, String> queryParameters) {
         requireAllowedQuery(queryParameters, Set.of("page", "limit"));
         return announcements.findPublic(page, limit);
+    }
+
+    /**
+     * Round-3 ct-9: detail by id for authed staff clients — the collection
+     * endpoints existed but a single id answered 405 METHOD_NOT_ALLOWED.
+     * Read scope matches the collections the caller can already list; archived
+     * rows included because the caller asked for one specific record.
+     */
+    @Operation(summary = "Xem chi tiết một thông báo theo id", description = "Truy vấn nội dung đầy đủ của một thông báo cho giảng viên/quản trị viên")
+    @ApiResponses({
+        @ApiResponse(responseCode = "200", description = "Truy vấn chi tiết thành công"),
+        @ApiResponse(responseCode = "404", description = "Không tìm thấy thông báo")
+    })
+    @GetMapping("{id}")
+    @PreAuthorize("hasAnyRole('LECTURER', 'ADMIN', 'SUPER_ADMIN')")
+    public AnnouncementResponse getAnnouncement(
+            @Parameter(description = "Mã định danh thông báo") @PathVariable String id) {
+        return announcements.get(id);
     }
 
     @Operation(summary = "Lấy danh sách thông báo dành riêng cho người dùng", description = "Truy vấn thông báo phân quyền theo vai trò (Sinh viên, Giảng viên, Quản trị viên) và đối tượng lớp/học kỳ")

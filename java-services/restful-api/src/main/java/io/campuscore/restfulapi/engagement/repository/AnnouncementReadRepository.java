@@ -110,6 +110,16 @@ public class AnnouncementReadRepository {
         return Objects.requireNonNullElse(count, 0L);
     }
 
+    /** Round-3 ct-9: single announcement fetch for the detail endpoint. */
+    public java.util.Optional<AnnouncementResponse> findById(String id) {
+        return jdbc.query(
+                "SELECT " + SELECT_COLUMNS + " FROM " + TABLE + " WHERE \"id\" = :id",
+                new MapSqlParameterSource("id", id),
+                ROW_MAPPER)
+                .stream()
+                .findFirst();
+    }
+
     /**
      * Anonymous public feed: only announcements that are editorially PUBLISHED,
      * globally visible (isGlobal — no role/year/section scoping), inside their

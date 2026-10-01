@@ -574,32 +574,32 @@ class AcademicReadPersistenceTest {
         mvc.perform(get("/api/v1/courses/missing")
                         .with(jwt().jwt(token -> token.subject("student-user"))))
                 .andExpect(status().isNotFound())
-                .andExpect(jsonPath("$.code").value("HTTP_404"));
+                .andExpect(jsonPath("$.code").value("NOT_FOUND"));
 
         mvc.perform(get("/api/v1/academic-years/missing")
                         .with(jwt().jwt(token -> token.subject("student-user"))))
                 .andExpect(status().isNotFound())
-                .andExpect(jsonPath("$.code").value("HTTP_404"));
+                .andExpect(jsonPath("$.code").value("NOT_FOUND"));
 
         mvc.perform(get("/api/v1/classrooms/missing")
                         .with(jwt().jwt(token -> token.subject("student-user"))))
                 .andExpect(status().isNotFound())
-                .andExpect(jsonPath("$.code").value("HTTP_404"));
+                .andExpect(jsonPath("$.code").value("NOT_FOUND"));
 
         mvc.perform(get("/api/v1/faculties/missing")
                         .with(jwt().jwt(token -> token.subject("student-user"))))
                 .andExpect(status().isNotFound())
-                .andExpect(jsonPath("$.code").value("HTTP_404"));
+                .andExpect(jsonPath("$.code").value("NOT_FOUND"));
 
         mvc.perform(get("/api/v1/departments/missing")
                         .with(jwt().jwt(token -> token.subject("student-user"))))
                 .andExpect(status().isNotFound())
-                .andExpect(jsonPath("$.code").value("HTTP_404"));
+                .andExpect(jsonPath("$.code").value("NOT_FOUND"));
 
         mvc.perform(get("/api/v1/curricula/missing")
                         .with(jwt().jwt(token -> token.subject("student-user"))))
                 .andExpect(status().isNotFound())
-                .andExpect(jsonPath("$.code").value("HTTP_404"));
+                .andExpect(jsonPath("$.code").value("NOT_FOUND"));
 
         mvc.perform(get("/api/v1/classrooms")
                         .queryParam("building", "A")

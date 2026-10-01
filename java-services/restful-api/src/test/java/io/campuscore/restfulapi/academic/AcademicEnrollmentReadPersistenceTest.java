@@ -122,7 +122,7 @@ class AcademicEnrollmentReadPersistenceTest {
 
         mvc.perform(get("/api/v1/enrollments/enrollment-3").with(studentJwt("student-user-1", "student-1")))
                 .andExpect(status().isNotFound())
-                .andExpect(jsonPath("$.code").value("HTTP_404"));
+                .andExpect(jsonPath("$.code").value("NOT_FOUND"));
     }
 
     @Test
@@ -172,7 +172,7 @@ class AcademicEnrollmentReadPersistenceTest {
         mvc.perform(get("/api/v1/grades/student-grades/enrollment/enrollment-2")
                         .with(studentJwt("student-user-1", "student-1")))
                 .andExpect(status().isNotFound())
-                .andExpect(jsonPath("$.code").value("HTTP_404"));
+                .andExpect(jsonPath("$.code").value("NOT_FOUND"));
 
         // …while the published enrollment stays readable.
         mvc.perform(get("/api/v1/grades/student-grades/enrollment/enrollment-1")
@@ -238,7 +238,7 @@ class AcademicEnrollmentReadPersistenceTest {
         // Nonexistent enrollment still answers 404.
         mvc.perform(get("/api/v1/grades/student-grades/enrollment/enrollment-nonexistent").with(lecturerJwt("lecturer-other")))
                 .andExpect(status().isNotFound())
-                .andExpect(jsonPath("$.code").value("HTTP_404"));
+                .andExpect(jsonPath("$.code").value("NOT_FOUND"));
 
         mvc.perform(get("/api/v1/grades/items/lecturer/my")
                         .with(jwt().jwt(token -> token

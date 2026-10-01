@@ -73,9 +73,14 @@ public class GlobalExceptionHandler {
             ResponseStatusException exception,
             HttpServletRequest request) {
         HttpStatus status = HttpStatus.valueOf(exception.getStatusCode().value());
+        // Round-3 ct-8: a not-found raised through ResponseStatusException used
+        // to answer code HTTP_404 while DomainException paths answered
+        // NOT_FOUND for the same situation. The generic 404 now shares the
+        // semantic code; every other status keeps the HTTP_ form.
+        String code = status == HttpStatus.NOT_FOUND ? "NOT_FOUND" : "HTTP_" + status.value();
         return buildErrorResponse(
                 status,
-                "HTTP_" + status.value(),
+                code,
                 exception.getReason() == null ? status.getReasonPhrase() : exception.getReason(),
                 request,
                 Map.of());

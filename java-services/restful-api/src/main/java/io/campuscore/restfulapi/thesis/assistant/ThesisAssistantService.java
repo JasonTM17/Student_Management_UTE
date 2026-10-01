@@ -1081,6 +1081,26 @@ public class ThesisAssistantService {
      * behavior for a deleted conversationId. Returns the conversation id for
      * the response echo, or null when history persistence is not configured.
      */
+    /**
+     * Round-3 cb3-10: ledger parity for the personal-context path. A reused
+     * clientRequestId with a DIFFERENT payload conflicts exactly like the KB
+     * path's reserve (409 IDEMPOTENCY_CONFLICT); an exact replay falls through
+     * and gets a freshly computed answer — for personal data that is the
+     * correct replay semantics (the numbers may legitimately have changed).
+     * Silent no-op when the ledger is not configured (legacy/test profiles).
+     */
+    public void enforcePersonalIdempotency(String ownerId, UUID clientRequestId, String canonicalHash) {
+        if (turns == null || clientRequestId == null) return;
+        try {
+            String existing = turns.requestHashOf(ownerId, clientRequestId);
+            if (existing != null && !existing.equals(canonicalHash)) {
+                throw problem(409, "IDEMPOTENCY_CONFLICT", "Request key was already used with a different payload");
+            }
+        } catch (org.springframework.dao.EmptyResultDataAccessException ignored) {
+            // First use of this key — nothing to conflict with.
+        }
+    }
+
     public String recordPersonalTurn(String ownerId, String conversationId, String message,
             String answer, String locale, String reasonCode) {
         if (legacyHistory == null) return null;

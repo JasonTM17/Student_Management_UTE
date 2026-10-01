@@ -154,7 +154,7 @@ class PeopleReadPersistenceTest {
         mvc.perform(get("/api/v1/lecturers/missing")
                         .with(adminJwt()))
                 .andExpect(status().isNotFound())
-                .andExpect(jsonPath("$.code").value("HTTP_404"));
+                .andExpect(jsonPath("$.code").value("NOT_FOUND"));
     }
 
     @Test
@@ -182,7 +182,7 @@ class PeopleReadPersistenceTest {
         mvc.perform(get("/api/v1/students/student-other")
                         .with(studentJwt("user-student-old")))
                 .andExpect(status().isNotFound())
-                .andExpect(jsonPath("$.code").value("HTTP_404"));
+                .andExpect(jsonPath("$.code").value("NOT_FOUND"));
 
         mvc.perform(get("/api/v1/lecturers/lecturer-old")
                         .with(studentJwt("user-student-old")))

@@ -22,6 +22,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Profile;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.crypto.password.PasswordEncoder;
+import io.campuscore.restfulapi.audit.AdminAuditRecorder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
@@ -61,6 +62,7 @@ public class TwoFactorService {
     private final MailConfig mailConfig;
     private final Clock clock;
     private final SecureRandom secureRandom;
+    private final AdminAuditRecorder audit;
 
     @Autowired
     public TwoFactorService(
@@ -68,8 +70,9 @@ public class TwoFactorService {
             TwoFactorChallengeRepository challenges,
             PasswordEncoder passwordEncoder,
             EmailService emailService,
-            MailConfig mailConfig) {
-        this(users, challenges, passwordEncoder, emailService, mailConfig, Clock.systemUTC());
+            MailConfig mailConfig,
+            AdminAuditRecorder audit) {
+        this(users, challenges, passwordEncoder, emailService, mailConfig, audit, Clock.systemUTC());
     }
 
     TwoFactorService(
@@ -78,12 +81,14 @@ public class TwoFactorService {
             PasswordEncoder passwordEncoder,
             EmailService emailService,
             MailConfig mailConfig,
+            AdminAuditRecorder audit,
             Clock clock) {
         this.users = users;
         this.challenges = challenges;
         this.passwordEncoder = passwordEncoder;
         this.emailService = emailService;
         this.mailConfig = mailConfig;
+        this.audit = audit;
         this.clock = clock;
         this.secureRandom = new SecureRandom();
     }
@@ -127,6 +132,10 @@ public class TwoFactorService {
         verifyCode(challenge, code);
         users.setTwoFactorEnabled(userId, true);
         challenges.consume(challenge.id(), clock.instant());
+        // Round-3 ct-4: turning 2FA on is a security-posture change — the
+        // trail records who and when, next to the password events.
+        audit.record(userId, null, "TWO_FACTOR_ENABLED", "USER", userId,
+                "User enabled two-factor authentication");
     }
 
     /** Turns two-factor auth off after a password re-check. */
@@ -137,6 +146,8 @@ public class TwoFactorService {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid password");
         }
         users.setTwoFactorEnabled(userId, false);
+        audit.record(userId, null, "TWO_FACTOR_DISABLED", "USER", userId,
+                "User disabled two-factor authentication after a password re-check");
     }
 
     /**
