@@ -13,8 +13,25 @@ const SHELL_COMMAND = /(?:^|\n)\s*(?:[-•*]\s*)?(?:[$>#]\s*)?(?:curl|wget|invok
 const INLINE_COMMAND = /\b(?:curl|wget|invoke-webrequest|docker(?:\s+compose)?|docker-compose|kubectl|psql|mysql|redis-cli)\s+(?:https?:\/\/|[/-]|(?:compose|run|up|down|build|command|commands|example|instructions?)\b)/i;
 const SQL_COMMAND = /(?:^|\n)\s*(?:select|insert|update|delete|drop|alter|create)\s+(?:from|into|table|database|schema|index|view|users?|assistant|chat|\*)/im;
 const INTERNAL_ENDPOINT = /(?:https?:\/\/[^\s)]+\/api\/v\d(?:\/|\b)|(?<![\p{L}\p{N}_])\/api\/v\d(?:\/|\b)|\b(?:localhost|127\.0\.0\.1)\s*:\s*\d{2,5})/iu;
-const INTERNAL_DETAIL = /\b(?:system\s+prompt|developer\s+message|retrieved\s+context|api\s+endpoints?|curl\s+commands?|docker\s+compose(?:\s+instructions?)?|stack\s+trace|traceback|deepseek(?:[- ]v?\d+)?|provider\s+(?:error|response|model)|api\s+key|jwt\s+secret|bearer\s+token|v4\s+flash)\b/i;
+/**
+ * Leak markers that stay banned in EVERY scope: they name the machinery, never
+ * a lesson. The technical-phrasing half below is separate because the
+ * specialized corpus legitimately TEACHES it (Docker Compose, pipelines,
+ * EXPLAIN plans) — mirroring the server, where scope='specialized' skips the
+ * technical-request gate (round-3 chat-8).
+ */
+const INTERNAL_DETAIL_SECRET = /\b(?:system\s+prompt|developer\s+message|stack\s+trace|traceback|deepseek(?:[- ]v?\d+)?|provider\s+(?:error|response|model)|api\s+key|jwt\s+secret|bearer\s+token|v4\s+flash)\b/i;
+const INTERNAL_DETAIL_TECH = /\b(?:retrieved\s+context|api\s+endpoints?|curl\s+commands?|docker\s+compose(?:\s+instructions?)?)\b/i;
 const STACK_TRACE = /(?:exception\s+in\s+thread|traceback\s*\(most\s+recent\s+call\s+last\)|\bat\s+[\w.$]+\([^\n)]*:\d+[:)]|caused\s+by:)/i;
+
+/**
+ * Answer scope. 'specialized' is the curated professional corpus (DevOps,
+ * databases, testing…), whose answers legitimately contain command-style
+ * study content — the technical phrasing checks are skipped there while every
+ * secret/endpoint/stack-trace check still applies. 'academic' (default) keeps
+ * the full strict set.
+ */
+export type AssistantScope = 'academic' | 'specialized';
 // English function words the provider glues to a following number. The list
 // stays narrow and case-sensitive on purpose: a case-insensitive `is` used to
 // rewrite the course code "IS101" into "IS 101".
@@ -248,16 +265,26 @@ export function normalizeAssistantCopy(value: string, locale: string = 'vi'): st
 }
 
 /** Returns true when text is safe to show as an assistant answer. */
-export function isAssistantOutputSafe(value: string | null | undefined): boolean {
+export function isAssistantOutputSafe(
+  value: string | null | undefined,
+  scope: AssistantScope = 'academic',
+): boolean {
   if (!value?.trim()) return true;
   const normalized = normalizeAssistantOutput(value);
+  if (INTERNAL_ENDPOINT.test(normalized)
+      || INTERNAL_DETAIL_SECRET.test(normalized)
+      || STACK_TRACE.test(normalized)) {
+    return false;
+  }
+  // Round-5: the specialized corpus teaches command-style content; its answers
+  // were replaced wholesale by the technical-refusal copy ("Docker compose up"
+  // in a DevOps lesson tripped INLINE_COMMAND/INTERNAL_DETAIL_TECH).
+  if (scope === 'specialized') return true;
   return !CODE_FENCE.test(normalized)
     && !SHELL_COMMAND.test(normalized)
     && !INLINE_COMMAND.test(normalized)
     && !SQL_COMMAND.test(normalized)
-    && !INTERNAL_ENDPOINT.test(normalized)
-    && !INTERNAL_DETAIL.test(normalized)
-    && !STACK_TRACE.test(normalized);
+    && !INTERNAL_DETAIL_TECH.test(normalized);
 }
 
 /** Replace the complete answer so no safe-looking prefix can accompany a leak. */
@@ -265,6 +292,7 @@ export function sanitizeAssistantOutput(
   value: string,
   replacement: string,
   locale: string = 'vi',
+  scope: AssistantScope = 'academic',
 ): string {
-  return isAssistantOutputSafe(value) ? normalizeAssistantCopy(value, locale) : replacement;
+  return isAssistantOutputSafe(value, scope) ? normalizeAssistantCopy(value, locale) : replacement;
 }

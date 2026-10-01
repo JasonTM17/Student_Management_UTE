@@ -31,6 +31,7 @@ import {
   isAssistantOutputSafe,
   normalizeAssistantCopy,
   sanitizeAssistantOutput,
+  type AssistantScope,
 } from '@/lib/assistant-output-guard';
 
 type FeedbackReason =
@@ -57,6 +58,8 @@ interface AssistantMessagesProps {
   followUps?: readonly string[];
   followUpsLabel?: string;
   onFollowUp?: (suggestion: string) => void;
+  /** Answer scope for the copy guard: 'specialized' keeps corpus teachings. */
+  scope?: AssistantScope;
 }
 
 export function reasonLabel(
@@ -149,6 +152,7 @@ export function AssistantMessages({
   followUps,
   followUpsLabel,
   onFollowUp,
+  scope = 'academic',
 }: AssistantMessagesProps) {
   const { messages, locale, formatDateTime } = useI18n();
   const [openCitations, setOpenCitations] = useState<Record<string, boolean>>({});
@@ -164,6 +168,7 @@ export function AssistantMessages({
         message.content,
         messages.assistant.technicalBlocked,
         locale,
+        scope,
       );
       await navigator.clipboard.writeText(visibleContent);
       setCopiedId(message.id);
@@ -201,13 +206,14 @@ export function AssistantMessages({
               message.content,
               messages.assistant.technicalBlocked,
               locale,
+              scope,
             );
         const visibleCitations = isUser
           ? []
           : (message.citations ?? []).filter(
               (citation) =>
-                isAssistantOutputSafe(citation.title) &&
-                isAssistantOutputSafe(citation.excerpt) &&
+                isAssistantOutputSafe(citation.title, scope) &&
+                isAssistantOutputSafe(citation.excerpt, scope) &&
                 isAssistantOutputSafe(citation.source),
             ).map((citation) => ({
               ...citation,
@@ -280,6 +286,7 @@ export function AssistantMessages({
                       content={visibleContent}
                       streaming={Boolean(message.pending)}
                       guardOutput={!isUser}
+                      scope={scope}
                     />
                   )}
 
