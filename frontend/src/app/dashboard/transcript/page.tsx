@@ -591,48 +591,33 @@ export default function TranscriptPage() {
                         : copy.gpaBothTrend}
                   </p>
                 </div>
-                <div className="flex flex-wrap items-center gap-2">
-                  <div className="flex items-center rounded-lg border border-border/80 bg-muted/40 p-0.5 text-xs font-medium">
+                {/* Round-5 polish: a single pill-shaped segmented control —
+                    the active mode is a filled primary pill, the rest quiet. */}
+                <div
+                  className="inline-flex items-center gap-0.5 rounded-full border border-border/70 bg-muted/50 p-1 text-xs font-medium"
+                  role="group"
+                  aria-label={copy.gpaTrend}
+                >
+                  {([
+                    ['cumulative', copy.gpaAllTrend],
+                    ['semester', copy.gpaSemesterTrend],
+                    ['both', copy.gpaBothTrend],
+                  ] as const).map(([mode, label]) => (
                     <button
+                      key={mode}
                       type="button"
-                      aria-pressed={gpaMode === 'cumulative'}
-                      onClick={() => setGpaMode('cumulative')}
+                      aria-pressed={gpaMode === mode}
+                      onClick={() => setGpaMode(mode)}
                       className={cn(
-                        'rounded-md px-2 py-1 transition-colors',
-                        gpaMode === 'cumulative'
-                          ? 'bg-background text-foreground shadow-sm'
-                          : 'text-muted-foreground hover:text-foreground',
+                        'rounded-full px-3.5 py-1.5 transition-all duration-150',
+                        gpaMode === mode
+                          ? 'bg-primary text-primary-foreground shadow-sm'
+                          : 'text-muted-foreground hover:bg-background/70 hover:text-foreground',
                       )}
                     >
-                      {copy.gpaAllTrend}
+                      {label}
                     </button>
-                    <button
-                      type="button"
-                      aria-pressed={gpaMode === 'semester'}
-                      onClick={() => setGpaMode('semester')}
-                      className={cn(
-                        'rounded-md px-2 py-1 transition-colors',
-                        gpaMode === 'semester'
-                          ? 'bg-background text-foreground shadow-sm'
-                          : 'text-muted-foreground hover:text-foreground',
-                      )}
-                    >
-                      {copy.gpaSemesterTrend}
-                    </button>
-                    <button
-                      type="button"
-                      aria-pressed={gpaMode === 'both'}
-                      onClick={() => setGpaMode('both')}
-                      className={cn(
-                        'rounded-md px-2 py-1 transition-colors',
-                        gpaMode === 'both'
-                          ? 'bg-background text-foreground shadow-sm'
-                          : 'text-muted-foreground hover:text-foreground',
-                      )}
-                    >
-                      {copy.gpaBothTrend}
-                    </button>
-                  </div>
+                  ))}
                 </div>
               </CardHeader>
               <CardContent>
