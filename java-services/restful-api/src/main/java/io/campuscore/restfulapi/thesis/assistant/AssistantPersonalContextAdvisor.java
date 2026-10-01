@@ -389,7 +389,7 @@ public class AssistantPersonalContextAdvisor {
      * answer says so instead of silently substituting another semester.
      */
     private static final Pattern NAMED_SEMESTER = Pattern.compile(
-            "(?:h[oô]c\\s*k[ìy]|hoc\\s*ky)\\s*([1-3])(?:\\s*n[aă]m\\s*h[oô]c\\s*)?\\s*((?:19|20)\\d{2})\\s*[-–]\\s*((?:19|20)?\\d{2})"
+            "(?:h[oọô]c\\s*k[ỳìy]|hoc\\s*ky)\\s*([1-3])(?:\\s*n[ấaă]m\\s*h[oọô]c\\s*)?\\s*((?:19|20)\\d{2})\\s*[-–]\\s*((?:19|20)?\\d{2})"
                     + "|semester\\s*([1-3])[^\\d?!.]{0,24}((?:19|20)\\d{2})\\s*[-–]\\s*((?:19|20)?\\d{2})",
             Pattern.CASE_INSENSITIVE | Pattern.UNICODE_CASE);
 
