@@ -142,7 +142,7 @@ class AcademicAttendanceReadPersistenceTest {
 
         mvc.perform(get("/api/v1/attendance/missing").with(adminJwt()))
                 .andExpect(status().isNotFound())
-                .andExpect(jsonPath("$.code").value("HTTP_404"));
+                .andExpect(jsonPath("$.code").value("NOT_FOUND"));
 
         mvc.perform(get("/api/v1/attendance/attendance-1")
                         .with(studentJwt("student-user-2", "student-2")))

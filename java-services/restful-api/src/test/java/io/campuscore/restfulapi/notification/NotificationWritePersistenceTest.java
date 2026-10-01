@@ -123,7 +123,7 @@ class NotificationWritePersistenceTest {
         mvc.perform(patch("/api/v1/notifications/my/missing/read")
                         .with(jwt().jwt(token -> token.subject(STUDENT))))
                 .andExpect(status().isNotFound())
-                .andExpect(jsonPath("$.code").value("HTTP_404"));
+                .andExpect(jsonPath("$.code").value("NOT_FOUND"));
 
         mvc.perform(patch("/api/v1/notifications/my/other-unread/read")
                         .with(jwt().jwt(token -> token.subject(STUDENT))))
@@ -269,7 +269,7 @@ class NotificationWritePersistenceTest {
 
         mvc.perform(delete("/api/v1/notifications/missing").with(adminJwt()))
                 .andExpect(status().isNotFound())
-                .andExpect(jsonPath("$.code").value("HTTP_404"))
+                .andExpect(jsonPath("$.code").value("NOT_FOUND"))
                 .andExpect(jsonPath("$.message").value("Notification not found"));
 
         mvc.perform(delete("/api/v1/notifications/other")
@@ -341,7 +341,7 @@ class NotificationWritePersistenceTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"title\":\"Updated\"}"))
                 .andExpect(status().isNotFound())
-                .andExpect(jsonPath("$.code").value("HTTP_404"))
+                .andExpect(jsonPath("$.code").value("NOT_FOUND"))
                 .andExpect(jsonPath("$.message").value("Notification not found"));
 
         mvc.perform(put("/api/v1/notifications/target")

@@ -79,6 +79,24 @@ class TwoFactorLoginPersistenceTest {
     @BeforeEach
     void prepareTwoFactorFixture() {
         jdbc.execute("CREATE SCHEMA IF NOT EXISTS \"campuscore_auth\"");
+        // ct-4: 2FA enable/disable now writes the admin audit trail, so the
+        // fixture must provide the audit schema the recorder inserts into
+        // (same DDL as the H2 twin V18; Flyway is disabled for this test).
+        jdbc.execute("CREATE SCHEMA IF NOT EXISTS campuscore_audit");
+        jdbc.execute("""
+                CREATE TABLE IF NOT EXISTS campuscore_audit."AdminAudit" (
+                    "id" VARCHAR(120) PRIMARY KEY,
+                    "actorId" VARCHAR(120),
+                    "actorLabel" VARCHAR(240),
+                    "action" VARCHAR(48) NOT NULL,
+                    "entityType" VARCHAR(48) NOT NULL,
+                    "entityId" VARCHAR(120),
+                    "summary" VARCHAR(500),
+                    "beforeState" TEXT,
+                    "afterState" TEXT,
+                    "createdAt" TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP
+                )
+                """);
         jdbc.execute("""
                 CREATE TABLE IF NOT EXISTS "campuscore_auth"."User" (
                     "id" VARCHAR(120) PRIMARY KEY,

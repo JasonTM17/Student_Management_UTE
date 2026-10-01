@@ -169,7 +169,7 @@ class NotificationReadPersistenceTest {
 
         mvc.perform(get("/api/v1/notifications/missing").with(adminJwt()))
                 .andExpect(status().isNotFound())
-                .andExpect(jsonPath("$.code").value("HTTP_404"))
+                .andExpect(jsonPath("$.code").value("NOT_FOUND"))
                 .andExpect(jsonPath("$.message").value("Notification not found"));
     }
 

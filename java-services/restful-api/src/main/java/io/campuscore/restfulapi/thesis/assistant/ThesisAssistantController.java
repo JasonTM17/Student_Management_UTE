@@ -92,6 +92,16 @@ public class ThesisAssistantController {
         }
     }
 
+    /** Null-safe conversationId → UUID for the idempotency hash (invalid ids hash as new-conversation). */
+    private static UUID conversationUuid(String value) {
+        if (value == null || value.isBlank()) return null;
+        try {
+            return UUID.fromString(value);
+        } catch (IllegalArgumentException ignored) {
+            return null;
+        }
+    }
+
     /**
      * Round-3 chat-7: persists an intercepted PERSONAL_CONTEXT turn into the
      * requested conversation so the history endpoint shows it, and returns the
@@ -162,6 +172,11 @@ public class ThesisAssistantController {
             return conversational;
         }
         if (personalContext != null && personalContext.handles(request.message())) {
+            // Round-3 cb3-10: a reused clientRequestId with a different payload
+            // conflicts exactly like the KB path instead of being answered.
+            assistant.enforcePersonalIdempotency(subject(actor), request.clientRequestId(),
+                    AssistantInputGuard.canonicalHash(request.message(), locale,
+                            conversationUuid(request.conversationId())));
             ChatResponse personal = personalContext.answer(request, actor);
             if (personal != null) {
                 // Round-3 chat-7: an intercepted personal answer used to skip
@@ -343,6 +358,10 @@ public class ThesisAssistantController {
                 ChatResponse personal = personalContext != null && personalContext.handles(request.message())
                         ? personalContext.answer(request, actor) : null;
                 if (personal != null) {
+                    assistant.enforcePersonalIdempotency(owner, request.clientRequestId(),
+                            AssistantInputGuard.canonicalHash(request.message(),
+                                    AssistantInputGuard.normalizeLocale(request.locale()),
+                                    conversationUuid(request.conversationId())));
                     personal = persistPersonalTurn(request, personal, owner);
                     personalContext.stream(personal, request, sink);
                 } else {

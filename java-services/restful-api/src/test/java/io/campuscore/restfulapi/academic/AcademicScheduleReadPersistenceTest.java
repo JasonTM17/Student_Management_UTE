@@ -70,7 +70,7 @@ class AcademicScheduleReadPersistenceTest {
 
         mvc.perform(get("/api/v1/schedules/missing").with(jwt()))
                 .andExpect(status().isNotFound())
-                .andExpect(jsonPath("$.code").value("HTTP_404"));
+                .andExpect(jsonPath("$.code").value("NOT_FOUND"));
     }
 
     @Test

@@ -160,7 +160,7 @@ class AcademicSectionReadPersistenceTest {
 
         mvc.perform(get("/api/v1/sections/missing").with(adminJwt()))
                 .andExpect(status().isNotFound())
-                .andExpect(jsonPath("$.code").value("HTTP_404"));
+                .andExpect(jsonPath("$.code").value("NOT_FOUND"));
     }
 
     @Test
