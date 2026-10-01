@@ -109,7 +109,14 @@ public class AssistantPersonalContextAdvisor {
                     // own timetable.
                     + "|tôi\\s*[^?!.]{0,12}?phụ\\s*trách[^?!.]{0,25}?lớp\\s*(?:học\\s*phần\\s*)?nào"
                     + "|toi\\s*[^?!.]{0,12}?phu\\s*trach[^?!.]{0,25}?lop\\s*(?:hoc\\s*phan\\s*)?nao"
-                    + "|(my\\s+)?(class\\s+|teaching\\s+)?schedule|timetable|my\\s+classes|(classes|teaching)\\s+(today|tomorrow|on\\s+\\w+)",
+                    + "|(my\\s+)?(class\\s+|teaching\\s+)?schedule|timetable|my\\s+classes|(classes|teaching)\\s+(today|tomorrow|on\\s+\\w+)"
+                    // Round-3 chat-4: "Do I have class today?" and "What classes
+                    // do I have today?" fell to the KB path and the model denied
+                    // any schedule exists — while the Vietnamese twin answered
+                    // correctly. Both natural EN phrasings route to the personal
+                    // timetable (detectRequestedDay already understands today).
+                    + "|(?:do|does)\\s+i\\s+(?:have|got)\\s+(?:any\\s+)?(?:class(?:es)?|teaching|lessons?)\\b"
+                    + "|(?:what|which)\\s+classes?\\s+(?:do\\s+i\\s+have|am\\s+i\\s+(?:taking|having))\\b",
             Pattern.CASE_INSENSITIVE | Pattern.UNICODE_CASE);
 
     /**
@@ -262,12 +269,22 @@ public class AssistantPersonalContextAdvisor {
      * {@link #isEnrollmentListIntent(String)}.
      */
     private static final Pattern ENROLLMENT_LIST_INTENT = Pattern.compile(
-            "(?:lớp|lop|học\\s*phần|hoc\\s*phan|class).*?(?:nào|nao|gì|gi|which)\\b"
+            // Round-3 chat-2: "môn" (subject) joins the noun group —
+            // "Học kỳ 1 năm học 2025-2026 tôi học những môn nào?" hit the KB
+            // path, which answered "chưa công bố danh sách môn" while the
+            // transcript carried six graded courses for exactly that semester.
+            "(?:lớp|lop|học\\s*phần|hoc\\s*phan|môn|mon|class|course|subject).*?(?:nào|nao|gì|gi|which)\\b"
                     + "|(?:đã\\s*)?đăng\\s*ký.*?(?:lớp|lop|học\\s*phần|hoc\\s*phan|class)"
                     + "|(?:da\\s*)?dang\\s*ky.*?(?:lop|hoc\\s*phan|class)"
                     + "|(?:lớp|lop|học\\s*phần|hoc\\s*phan).*?(?:đã\\s*)?đăng\\s*ký"
                     + "|registered\\s+(?:in|for)\\s+(?:any\\s+|my\\s+)?(?:classes|sections?|courses?)"
-                    + "|registere?d\\s+(?:in|for)\\b",
+                    + "|registere?d\\s+(?:in|for)\\b"
+                    // Round-3 chat-5: "Which classes am I taking?" — the
+                    // interrogative sits BEFORE the noun, which the noun-first
+                    // alternative above cannot reach, and the existing EN
+                    // branches only know "registered in/for".
+                    + "|(?:which|what)\\s+(?:classes?|courses?|subjects?)\\s+(?:am\\s+i|do\\s+i)\\b"
+                    + "|am\\s+i\\s+(?:taking|attending|enrolled\\s+in)[^?!.]{0,20}?(?:class|course|subject)",
             Pattern.CASE_INSENSITIVE | Pattern.UNICODE_CASE);
 
     /**
@@ -297,7 +314,11 @@ public class AssistantPersonalContextAdvisor {
                     + "|còn\\s*lạ[ií]\\s*(?:được\\s*)?bao\\s*nhiêu\\s*tín\\s*chỉ|con\\s*lai\\s*(?:duoc\\s*)?bao\\s*nhieu\\s*tin\\s*chi"
                     + "|còn\\s*thiếu\\s*(?:mấy|bao\\s*nhiêu)\\s*tín\\s*chỉ|con\\s*thieu\\s*(?:may|bao\\s*nhieu)\\s*tin\\s*chi"
                     + "|hạn\\s*mức\\s*tín\\s*chỉ|han\\s*muc\\s*tin\\s*chi"
-                    + "|credits?\\s+(?:do\\s+i\\s+have\\s+)?(?:left|remaining|to\\s+register)|remaining\\s+credits?"
+                    // Round-3 chat-3: "How many credits remain?" — the verb
+                    // form "remain" was absent while "remaining" and the VI
+                    // twin both matched; the EN question got an LLM denial
+                    // contradicting /me/registration/summary (creditsRemaining).
+                    + "|credits?\\s+(?:do\\s+i\\s+have\\s+)?(?:left|remaining|remains?|to\\s+register)|remaining\\s+credits?"
                     + "|how\\s+many\\s+credits\\s+(?:can|do)\\s+i\\s+(?:still\\s+)?(?:register|take)",
             Pattern.CASE_INSENSITIVE | Pattern.UNICODE_CASE);
 
@@ -359,6 +380,43 @@ public class AssistantPersonalContextAdvisor {
                     + "|(\\d{2,3})\\s*tin\\s*chi[^?!.]{0,15}tot\\s*nghiep",
             Pattern.CASE_INSENSITIVE | Pattern.UNICODE_CASE);
 
+    /**
+     * Round-3 chat-6: a semester the asker NAMED ("Học kỳ 1 năm học 2025-2026",
+     * "semester 2 2025-2026"). The grades answer used to ignore it and always
+     * print the newest semester — asking for HK1 (GPA 3.16) returned HK2 (3.03)
+     * with no disclaimer. When a named semester parses, grades and course-list
+     * answers filter to it; when it cannot be found in the transcript, the
+     * answer says so instead of silently substituting another semester.
+     */
+    private static final Pattern NAMED_SEMESTER = Pattern.compile(
+            "(?:h[oô]c\\s*k[ìy]|hoc\\s*ky)\\s*([1-3])(?:\\s*n[aă]m\\s*h[oô]c\\s*)?\\s*((?:19|20)\\d{2})\\s*[-–]\\s*((?:19|20)?\\d{2})"
+                    + "|semester\\s*([1-3])[^\\d?!.]{0,24}((?:19|20)\\d{2})\\s*[-–]\\s*((?:19|20)?\\d{2})",
+            Pattern.CASE_INSENSITIVE | Pattern.UNICODE_CASE);
+
+    /** A named semester parsed out of the message: term number plus starting year. */
+    private record NamedSemester(int term, String yearStart) { }
+
+    private static NamedSemester parseNamedSemester(String message) {
+        if (!StringUtils.hasText(message)) return null;
+        java.util.regex.Matcher matcher = NAMED_SEMESTER.matcher(message);
+        if (!matcher.find()) return null;
+        String term = matcher.group(1) != null ? matcher.group(1) : matcher.group(4);
+        String yearStart = matcher.group(2) != null ? matcher.group(2) : matcher.group(5);
+        if (term == null || yearStart == null) return null;
+        return new NamedSemester(Integer.parseInt(term), yearStart);
+    }
+
+    /** True when a grade row's semester label IS the named semester (folded compare). */
+    private static boolean isNamedSemesterRow(GradeSummary grade, NamedSemester semester) {
+        if (semester == null || grade == null) return false;
+        String label = firstText(grade.semesterNameVi(), firstText(grade.semesterNameEn(), grade.semester()));
+        if (!StringUtils.hasText(label)) return false;
+        String folded = AssistantInputGuard.foldForMatching(label)
+                .replaceAll("\\s+", " ").toLowerCase(java.util.Locale.ROOT);
+        boolean termHit = folded.matches(".*\\b(?:hoc ky|semester)\\s*" + semester.term() + "\\b.*");
+        return termHit && folded.contains(semester.yearStart());
+    }
+
     /** A section / course code as printed on the portal ("SE013", "SE013-01"). */
     private static final Pattern SECTION_CODE = Pattern.compile(
             "(?<![A-Za-z0-9])[A-Z]{2}\\d{3}(?![0-9A-Za-z])");
@@ -380,6 +438,13 @@ public class AssistantPersonalContextAdvisor {
         if (!StringUtils.hasText(message)) return false;
         if (ENROLLMENT_HOWTO_INTENT.matcher(message).find()) return false;
         if (isSectionDetailIntent(message)) return false;
+        // Requirement wording ("What courses do I need to graduate?") is a
+        // curriculum-policy question, not a listing of current registrations.
+        if (Pattern.compile("need(?:s)?\\s+to\\s+(?:take|complete|graduate)|to\\s+graduate"
+                        + "|ph[ảa]i\\s*h[oọ]c|để\\s*tốt\\s*nghiệp|de\\s*tot\\s*nghiep",
+                Pattern.CASE_INSENSITIVE | Pattern.UNICODE_CASE).matcher(message).find()) {
+            return false;
+        }
         return FIRST_PERSON_PRONOUN.matcher(message).find()
                 && ENROLLMENT_LIST_INTENT.matcher(message).find();
     }
@@ -758,7 +823,7 @@ public class AssistantPersonalContextAdvisor {
         }
         if (isGradesIntent(message)) {
             if (StringUtils.hasText(studentId)) {
-                return gradesAnswer(studentId, locale);
+                return gradesAnswer(studentId, locale, message);
             }
             return null;
         }
@@ -771,7 +836,7 @@ public class AssistantPersonalContextAdvisor {
         // verb) routes to the day-filtered timetable instead.
         Integer existenceDay = detectRequestedDay(message);
         if (existenceDay != null
-                && Pattern.compile("(?:có|đang có|co|dang co)\\s*(?:lớp|tiết|buổi|ca|lop|tiet|buoi)\\b",
+                && Pattern.compile("(?:có|đang có|co|dang co)\\s*(?:lớp|tiết|buổi|ca|môn|lop|tiet|buoi|mon)\\b",
                         Pattern.CASE_INSENSITIVE | Pattern.UNICODE_CASE).matcher(message).find()
                 && !Pattern.compile("đăng\\s*ký|dang\\s*ky", Pattern.CASE_INSENSITIVE | Pattern.UNICODE_CASE)
                         .matcher(message).find()) {
@@ -784,6 +849,13 @@ public class AssistantPersonalContextAdvisor {
             return null;
         }
         if (isEnrollmentListIntent(message)) {
+            // Round-3 chat-2: a NAMED semester in the question asks about that
+            // semester's courses (the transcript's published rows are the
+            // durable record), not the current-term registration list.
+            NamedSemester namedSemester = parseNamedSemester(message);
+            if (namedSemester != null && StringUtils.hasText(studentId)) {
+                return namedSemesterCourseListAnswer(studentId, locale, namedSemester);
+            }
             // The section list is student-owned. A lecturer asking "Kỳ này tôi
             // phụ trách dạy những lớp học phần nào?" wants their teaching
             // assignments, so the teaching-list phrasing answers from the
@@ -795,7 +867,11 @@ public class AssistantPersonalContextAdvisor {
                     && LECTURER_TEACHING_LIST_HINT.matcher(message).find()) {
                 return lecturerAnswer(lecturerId, locale, null);
             }
-            return null;
+            // A lecturer phrasing without teaching-list vocabulary ("thứ 5 tôi
+            // dạy môn nào?") keeps its old route: the personal teaching
+            // timetable below. Returning null here used to be unreachable for
+            // students and wrong for lecturers once "môn" joined the noun
+            // group (round-3 chat-2/5).
         }
         Integer requestedDay = detectRequestedDay(message);
         if (StringUtils.hasText(studentId)) {
@@ -816,8 +892,9 @@ public class AssistantPersonalContextAdvisor {
      * confused (production audit D-Q3; audit ca-nhan Q5: summing retake
      * attempts contradicted the transcript page).
      */
-    private String gradesAnswer(String studentId, String locale) {
+    private String gradesAnswer(String studentId, String locale, String message) {
         boolean vi = "vi".equals(locale);
+        NamedSemester requested = parseNamedSemester(message);
         List<GradeSummary> grades = enrollments.findStudentGrades(studentId, null);
         if (grades == null || grades.isEmpty()) {
             return vi
@@ -827,15 +904,9 @@ public class AssistantPersonalContextAdvisor {
         StringBuilder answer = new StringBuilder();
         answer.append(vi ? "Kết quả học tập của bạn:\n" : "Your academic results:\n");
 
-        // Grades come ordered newest semester first, so the first group is the
-        // latest semester and the running total is the cumulative record.
-        Map<String, List<GradeSummary>> bySemester = new LinkedHashMap<>();
-        for (GradeSummary grade : grades) {
-            bySemester.computeIfAbsent(grade.semesterId(), ignored -> new ArrayList<>()).add(grade);
-        }
         // The cumulative line is the transcript summary itself (best attempt per
-        // course under the retake policy), NOT a sum over every attempt: the old
-        // all-rows accumulation counted retaken courses twice (57 credits / GPA
+        // course under the retake policy), NOT a sum over every attempt: the
+        // old all-rows accumulation counted retaken courses twice (57 credits / GPA
         // 3.07 vs the portal's 38 / 3.11) and contradicted the transcript page
         // the student sees side by side (production audit ca-nhan Q5, high).
         TranscriptResponse transcript = enrollments.findStudentTranscript(studentId);
@@ -850,6 +921,81 @@ public class AssistantPersonalContextAdvisor {
             grades.forEach(fallback::add);
             cumulative = new TranscriptSummary(fallback.gpa(), fallback.earnedCredits, fallback.gpaCredits, null);
         }
+
+        // Grades come ordered newest semester first, so the first group is the
+        // latest semester and the running total is the cumulative record.
+        Map<String, List<GradeSummary>> bySemester = new LinkedHashMap<>();
+        for (GradeSummary grade : grades) {
+            bySemester.computeIfAbsent(grade.semesterId(), ignored -> new ArrayList<>()).add(grade);
+        }
+
+        // Round-3 chat-6: when the asker NAMED a semester, answer THAT semester.
+        // The old behavior always printed the newest semester, so "Học kỳ 1
+        // (GPA 3.16)" was answered with HK2's 3.03 and no disclaimer.
+        List<GradeSummary> requestedRows = null;
+        String requestedLabel = null;
+        if (requested != null) {
+            for (List<GradeSummary> rows : bySemester.values()) {
+                if (!rows.isEmpty() && isNamedSemesterRow(rows.get(0), requested)) {
+                    requestedRows = rows;
+                    GradeSummary probe = rows.get(0);
+                    requestedLabel = vi
+                            ? firstText(probe.semesterNameVi(), probe.semester())
+                            : firstText(probe.semesterNameEn(), probe.semester());
+                    break;
+                }
+            }
+        }
+        if (requested != null && requestedRows != null) {
+            GradeTotals term = new GradeTotals();
+            requestedRows.forEach(term::add);
+            answer = new StringBuilder();
+            answer.append(vi ? "Kết quả " : "Results for ");
+            answer.append(StringUtils.hasText(requestedLabel)
+                    ? requestedLabel
+                    : (vi ? "học kỳ đã hỏi" : "the requested semester"));
+            answer.append(vi ? " của bạn:\n" : ":\n");
+            if (term.gpaCredits == 0) {
+                answer.append("\n").append(vi
+                        ? "Học kỳ này chưa có học phần nào có điểm công bố.\n"
+                        : "No published grades in this semester yet.\n");
+            } else {
+                answer.append("\n").append(vi ? "Số học kỳ này: " : "This semester: ")
+                        .append(term.earnedCredits).append(vi ? " tín chỉ, GPA " : " credits, GPA ")
+                        .append(term.gpa())
+                        .append(vi ? " (thang 4)\n" : " (4.0 scale)\n");
+            }
+            if (cumulative != null && cumulative.totalCreditsAttempted() > 0) {
+                answer.append("\n").append(vi ? "Tích lũy toàn khóa: " : "Cumulative: ")
+                        .append(cumulative.totalCreditsEarned())
+                        .append(vi ? " tín chỉ, GPA " : " credits, GPA ")
+                        .append(cumulative.cumulativeGpa())
+                        .append(vi ? " (thang 4)\n" : " (4.0 scale)\n");
+            }
+            int rendered = 0;
+            for (GradeSummary grade : requestedRows) {
+                if (rendered >= 10) {
+                    answer.append("\n").append(vi
+                            ? "… và " + (requestedRows.size() - rendered) + " học phần khác."
+                            : "… and " + (requestedRows.size() - rendered) + " more courses.");
+                    break;
+                }
+                appendGradeLine(answer, grade, vi);
+                rendered += 1;
+            }
+            answer.append(vi
+                    ? "\n(Bạn có thể xem chi tiết từng cột điểm của học kỳ này ở trang Bảng điểm.)"
+                    : "\n(Review each score component for this semester on the Grades page.)");
+            return answer.toString();
+        }
+        if (requested != null) {
+            answer.append("\n").append(vi
+                    ? "Mình không tìm thấy Học kỳ " + requested.term() + " (năm " + requested.yearStart()
+                            + ") trong bảng điểm của bạn — dưới đây là số liệu tích lũy và học kỳ gần nhất.\n"
+                    : "I could not find semester " + requested.term() + " (" + requested.yearStart()
+                            + ") in your transcript — showing cumulative and the latest semester instead.\n");
+        }
+
         GradeSummary latestName = null;
         for (List<GradeSummary> rows : bySemester.values()) {
             GradeTotals semester = new GradeTotals();
@@ -886,29 +1032,17 @@ public class AssistantPersonalContextAdvisor {
         }
 
         int rendered = 0;
-        int skipped = 0;
         for (GradeSummary grade : grades) {
             if (rendered >= 10) {
-                skipped += 1;
-                continue;
+                answer.append("\n").append(vi
+                        ? "… và " + (grades.size() - rendered) + " học phần khác. Xem đầy đủ ở trang Bảng điểm."
+                        : "… and " + (grades.size() - rendered) + " more courses. See the Grades page for the full list.");
+                break;
             }
-            String course = courseName(grade.courseCode(), courseText(grade, vi), null);
-            answer.append("\n• ").append(StringUtils.hasText(course) ? course : (vi ? "Học phần" : "Course"));
-            answer.append(vi ? ": " : ": ");
-            String letter = grade.letterGrade();
-            if (StringUtils.hasText(letter)) {
-                answer.append(vi ? "điểm " : "grade ").append(grade.finalGrade()).append(" (").append(letter).append(")");
-            } else {
-                answer.append(vi ? "chưa công bố" : "not published yet");
-            }
-            answer.append("\n");
+            appendGradeLine(answer, grade, vi);
             rendered += 1;
         }
-        if (skipped > 0) {
-            answer.append("\n").append(vi
-                    ? "… và " + skipped + " học phần khác. Xem đầy đủ ở trang Bảng điểm."
-                    : "… and " + skipped + " more courses. See the Grades page for the full list.");
-        } else {
+        if (rendered < 10) {
             answer.append(vi
                     ? "\nBạn có thể xem chi tiết từng cột điểm ở trang Bảng điểm."
                     : "\nYou can review each score component on the Grades page.");
@@ -921,6 +1055,20 @@ public class AssistantPersonalContextAdvisor {
                         ? "\n(Cumulative figures come from your transcript summary: GPA and credits use your best attempt per course (retake policy).)"
                         : "\n(Figures sum every published graded row; the Transcript page summary is the authoritative source.)"));
         return answer.toString();
+    }
+
+    /** One "• COURSE: grade (letter)" bullet; shared by both grades renderers. */
+    private static void appendGradeLine(StringBuilder answer, GradeSummary grade, boolean vi) {
+        String course = courseName(grade.courseCode(), courseText(grade, vi), null);
+        answer.append("\n• ").append(StringUtils.hasText(course) ? course : (vi ? "Học phần" : "Course"));
+        answer.append(vi ? ": " : ": ");
+        String letter = grade.letterGrade();
+        if (StringUtils.hasText(letter)) {
+            answer.append(vi ? "điểm " : "grade ").append(grade.finalGrade()).append(" (").append(letter).append(")");
+        } else {
+            answer.append(vi ? "chưa công bố" : "not published yet");
+        }
+        answer.append("\n");
     }
 
     /** Running GPA-4.0 totals over published grade rows (audit D-Q3: computed in code, never by the model). */
@@ -1990,6 +2138,69 @@ public class AssistantPersonalContextAdvisor {
         answer.append(vi
                 ? "\nBạn có thể xem lịch học dạng lưới ở trang Thời khóa biểu."
                 : "\nYou can see these sections as a weekly grid on the Schedule page.");
+        return answer.toString();
+    }
+
+    /**
+     * Round-3 chat-2: "Học kỳ 1 năm học 2025-2026 tôi học những môn nào?" —
+     * the courses of the NAMED semester, taken from the same published grade
+     * rows the transcript shows (the durable record of what was taken). A
+     * semester with no rows says so and falls back to the current-term list
+     * instead of claiming the portal has no data (the old KB answer asserted
+     * "chưa công bố danh sách môn" while six graded courses existed).
+     */
+    private String namedSemesterCourseListAnswer(String studentId, String locale, NamedSemester semester) {
+        boolean vi = "vi".equals(locale);
+        List<GradeSummary> grades = enrollments.findStudentGrades(studentId, null);
+        List<GradeSummary> rows = grades == null ? List.of() : grades.stream()
+                .filter(grade -> isNamedSemesterRow(grade, semester))
+                .toList();
+        if (rows.isEmpty()) {
+            return vi
+                    ? "Bảng điểm của bạn chưa có học phần nào cho Học kỳ " + semester.term()
+                            + " (bắt đầu năm " + semester.yearStart() + ").\n\n"
+                            + enrollmentListAnswer(studentId, locale)
+                    : "Your transcript has no courses recorded for semester " + semester.term()
+                            + " (starting " + semester.yearStart() + ").\n\n"
+                            + enrollmentListAnswer(studentId, locale);
+        }
+        GradeTotals term = new GradeTotals();
+        rows.forEach(term::add);
+        String label = vi
+                ? firstText(rows.get(0).semesterNameVi(), rows.get(0).semester())
+                : firstText(rows.get(0).semesterNameEn(), rows.get(0).semester());
+        StringBuilder answer = new StringBuilder();
+        answer.append(vi ? "Các học phần của bạn ở " : "Your courses in ");
+        answer.append(StringUtils.hasText(label) ? label : (vi ? "học kỳ đã hỏi" : "the requested semester"));
+        answer.append(vi ? ":\n" : ":\n");
+        if (term.gpaCredits > 0) {
+            answer.append("\n").append(vi ? "Số học kỳ này: " : "This semester: ")
+                    .append(term.earnedCredits).append(vi ? " tín chỉ, GPA " : " credits, GPA ")
+                    .append(term.gpa()).append(vi ? " (thang 4)\n" : " (4.0 scale)\n");
+        }
+        int rendered = 0;
+        for (GradeSummary grade : rows) {
+            if (rendered >= 10) {
+                answer.append("\n• … ").append(vi
+                        ? "và " + (rows.size() - rendered) + " học phần khác."
+                        : "and " + (rows.size() - rendered) + " more courses.");
+                break;
+            }
+            String course = courseName(grade.courseCode(), courseText(grade, vi), null);
+            answer.append("\n• ").append(StringUtils.hasText(course) ? course : (vi ? "Học phần" : "Course"));
+            String letter = grade.letterGrade();
+            if (StringUtils.hasText(letter)) {
+                answer.append(vi ? ": điểm " : ": grade ").append(grade.finalGrade())
+                        .append(" (").append(letter).append(")");
+            } else {
+                answer.append(vi ? ": chưa công bố" : ": not published yet");
+            }
+            answer.append("\n");
+            rendered += 1;
+        }
+        answer.append(vi
+                ? "\n(Danh sách lấy từ Bảng điểm — kết quả đã công bố của học kỳ này.)"
+                : "\n(Listed from your transcript — the published results for this semester.)");
         return answer.toString();
     }
 

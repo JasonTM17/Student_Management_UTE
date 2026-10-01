@@ -92,6 +92,37 @@ public class ThesisAssistantController {
         }
     }
 
+    /**
+     * Round-3 chat-7: persists an intercepted PERSONAL_CONTEXT turn into the
+     * requested conversation so the history endpoint shows it, and returns the
+     * response with the conversation id stamped. An unknown or foreign
+     * conversationId throws 404 CONVERSATION_NOT_FOUND — the same contract the
+     * KB path has always had — instead of answering 200 into a void. When the
+     * caller sent no conversationId (fresh-panel questions) the response stays
+     * unpersisted exactly as before.
+     */
+    private ChatResponse persistPersonalTurn(ChatRequest request, ChatResponse personal, String owner) {
+        if (request.conversationId() == null || request.conversationId().isBlank()) {
+            return personal;
+        }
+        try {
+            String conversationId = assistant.recordPersonalTurn(owner, request.conversationId(),
+                    request.message(), personal.answer(), personal.locale(), personal.reasonCode());
+            if (conversationId == null) {
+                return personal;
+            }
+            return new ChatResponse(personal.answer(), personal.model(), personal.degraded(),
+                    personal.reasonCode(), personal.locale(), personal.citations(), personal.requestId(),
+                    personal.clientRequestId(), personal.turnId(), personal.replayed(),
+                    personal.terminalStatus(), conversationId, personal.messageId(), personal.resetAt());
+        } catch (DataAccessException exception) {
+            // The answer itself is valid; a history-write outage must not turn
+            // it into a 5xx (same outage contract as the KB path).
+            LOG.warn("personal turn persistence skipped with {}", exception.getClass().getSimpleName());
+            return personal;
+        }
+    }
+
     @Operation(summary = "Gửi câu hỏi tới Trợ lý AI (JSON Block Mode)", description = "Hỏi đáp quy chế đào tạo, thời khóa biểu, tiến độ và đề tài khóa luận với mô hình AI RAG")
     @ApiResponses({
         @ApiResponse(responseCode = "200", description = "Nhận phản hồi từ trợ lý AI"),
@@ -112,7 +143,12 @@ public class ThesisAssistantController {
                     ThesisAssistantService.MODEL, true, guard.reasonCode(), locale, List.of(),
                     UUID.randomUUID(), request.clientRequestId(), null, false, "REJECTED", null, null);
         }
-        if (AssistantInputGuard.isTechnicalRequest(guard.normalizedMessage())) {
+        // Round-3 chat-8: the specialized scope serves the curated DevOps/REST
+        // corpus, so the general-chatbot technical gate must not run ahead of
+        // its routing — "Docker compose để chạy dự án" was blocked with zero
+        // citations before the scope was ever consulted. Privacy (inspect)
+        // and injection gates above still apply in every scope.
+        if (!request.isSpecializedScope() && AssistantInputGuard.isTechnicalRequest(guard.normalizedMessage())) {
             return new ChatResponse(ThesisAssistantService.technicalOutputMessage(locale),
                     ThesisAssistantService.MODEL, true, "TECHNICAL_REQUEST_BLOCKED", locale, List.of(),
                     UUID.randomUUID(), request.clientRequestId(), null, false, "REJECTED", null, null);
@@ -128,7 +164,12 @@ public class ThesisAssistantController {
         if (personalContext != null && personalContext.handles(request.message())) {
             ChatResponse personal = personalContext.answer(request, actor);
             if (personal != null) {
-                return personal;
+                // Round-3 chat-7: an intercepted personal answer used to skip
+                // the ledger entirely — the turn vanished from
+                // /conversations/{id}/messages and a deleted conversationId was
+                // answered 200 instead of the KB path's 404. Persist both
+                // sides and validate ownership exactly like the KB path.
+                return persistPersonalTurn(request, personal, subject(actor));
             }
         }
         // Off-topic general questions ("Con gà có mấy cái chân") carry no
@@ -285,7 +326,8 @@ public class ThesisAssistantController {
                 emitter.complete();
                 return emitter;
             }
-            if (AssistantInputGuard.isTechnicalRequest(guard.normalizedMessage())) {
+            if (AssistantInputGuard.isTechnicalRequest(guard.normalizedMessage())
+                    && !request.isSpecializedScope()) {
                 sendError(emitter, "TECHNICAL_REQUEST_BLOCKED", false);
                 emitter.complete();
                 return emitter;
@@ -300,6 +342,7 @@ public class ThesisAssistantController {
                 ChatResponse personal = personalContext != null && personalContext.handles(request.message())
                         ? personalContext.answer(request, actor) : null;
                 if (personal != null) {
+                    personal = persistPersonalTurn(request, personal, owner);
                     personalContext.stream(personal, request, sink);
                 } else {
                     ChatResponse general = assistant.generalAnswerIfOffTopic(request.message(),

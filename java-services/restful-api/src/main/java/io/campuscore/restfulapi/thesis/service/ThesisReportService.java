@@ -142,7 +142,8 @@ public class ThesisReportService {
     @Transactional(readOnly = true)
     public ReportResponse get(UUID groupId, Jwt actor) {
         GroupContext group = loadGroup(groupId);
-        boolean admin = hasRole(actor, "ADMIN") || hasRole(actor, "TRUONG_KHOA");
+        boolean admin = hasRole(actor, "ADMIN") || hasRole(actor, "SUPER_ADMIN")
+                || hasRole(actor, "TRUONG_KHOA");
         boolean lecturer = !admin && isActiveLecturerActor(actor);
         String actorLecturerId = lecturer ? lecturerId(actor) : "";
         boolean member = count("SELECT COUNT(*) FROM thesis.thesis_group_member WHERE group_id = :groupId AND student_id = :studentId",
@@ -193,7 +194,8 @@ public class ThesisReportService {
 
     @Transactional(readOnly = true)
     public List<ReportResponse> listByRound(UUID roundId, Jwt actor) {
-        boolean admin = hasRole(actor, "ADMIN") || hasRole(actor, "TRUONG_KHOA");
+        boolean admin = hasRole(actor, "ADMIN") || hasRole(actor, "SUPER_ADMIN")
+                || hasRole(actor, "TRUONG_KHOA");
         boolean lecturer = !admin && isActiveLecturerActor(actor);
         if (!admin && !lecturer) {
             throw new DomainException(HttpStatus.FORBIDDEN, "LECTURER_OR_STAFF_REQUIRED",
@@ -234,7 +236,8 @@ public class ThesisReportService {
      */
     @Transactional(readOnly = true)
     public List<RepositoryReportResponse> listRepository(UUID roundId, Jwt actor) {
-        boolean admin = hasRole(actor, "ADMIN") || hasRole(actor, "TRUONG_KHOA");
+        boolean admin = hasRole(actor, "ADMIN") || hasRole(actor, "SUPER_ADMIN")
+                || hasRole(actor, "TRUONG_KHOA");
         boolean lecturer = !admin && isActiveLecturerActor(actor);
         if (!admin && !lecturer) {
             throw new DomainException(HttpStatus.FORBIDDEN, "LECTURER_OR_STAFF_REQUIRED",

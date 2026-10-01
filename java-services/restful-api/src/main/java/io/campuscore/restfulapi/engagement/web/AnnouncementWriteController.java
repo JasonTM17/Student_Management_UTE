@@ -94,7 +94,8 @@ public class AnnouncementWriteController {
             @AuthenticationPrincipal Jwt jwt) {
         requireAllowedQuery(queryParameters, Set.of("page", "limit"));
         subject(jwt);
-        return announcements.history(id, page, limit);
+        return announcements.history(subject(jwt), jwt.getClaimAsStringList("roles"),
+                jwt.getClaimAsString("lecturerId"), id, page, limit);
     }
 
     @Operation(summary = "Đặt thứ tự hiển thị của thông báo", description = "Quản trị viên gán thứ tự hiển thị cho trang chủ; số nhỏ hơn hiển thị trước, thông báo không có thứ tự nằm cuối danh sách")

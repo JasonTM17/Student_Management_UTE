@@ -17,7 +17,16 @@ public final class AssistantInputGuard {
             "(?i)(?<![A-Za-z0-9])[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}(?![A-Za-z0-9])");
     private static final Pattern STUDENT_ID = Pattern.compile("(?i)\\b(?:student\\s*id|mssv|ma\\s*sv|sinh\\s*vien)\\s*[:#-]?\\s*[a-z0-9-]*\\d[a-z0-9-]{3,20}\\b");
     private static final Pattern SECRET = Pattern.compile("(?i)\\b(?:bearer\\s+|sk-[a-z0-9_-]{12,}|api[_ -]?key\\s*[:：=＝]|token\\s*[:：=＝]|pass(?:word|wd)\\s*[:：=＝])");
-    private static final Pattern TECHNICAL_REQUEST = Pattern.compile(
+    /**
+     * Round-3 chat-8: bare tool/keyword mentions are split out of the technical
+     * gate. "em muốn học về postgresql index", "hướng dẫn cài docker desktop"
+     * and "jwt là gì" are legitimate study questions about the very courses the
+     * portal teaches — they were refused with TECHNICAL_REQUEST_BLOCKED even in
+     * the specialized corpus. A hard ask (an imperative hand-over of a command,
+     * key or connection) is never exempted; only a bare token inside an explicit
+     * learning/install-study context is.
+     */
+    private static final Pattern TECHNICAL_TOKENS = Pattern.compile(
             "(?i)(?:"
                     + "\\b(?:curl|wget|invoke-webrequest|iwr|docker(?:\\s+compose)?|docker-compose|kubectl|helm|psql|mysql|redis-cli|npm|pnpm|yarn|bun|npx|mvnw?|gradlew?|git\\s+(?:push|pull|clone|commit|rebase|merge|remote|repo|command)|powershell|pwsh|bash)\\b"
                     // Round-2 sweep chat-2: natural phrasing slipped past the
@@ -25,7 +34,25 @@ public final class AssistantInputGuard {
                     // trường") — bare jdbc/postgres tokens are technical here.
                     + "|\\bjdbc\\b|\\bpostgres(?:ql)?\\b"
                     + "|\\b(?:api\\s+(?:endpoint|endpoints|chatbot)|api\\s+key|system\\s+prompt|developer\\s+message|stack\\s+trace|traceback|deepseek(?:[- ]v?\\d+)?|provider|llm|jwt|database\\s+(?:password|credentials?))\\b"
-                    + "|\\b(?:cho\\s+(?:tôi|ta)|xin|give\\s+me|show|provide|send)\\b.{0,80}\\b(?:api|endpoint|system\\s+prompt|developer\\s+message|câu\\s+lệnh|lệnh|command)\\b"
+                    + ")");
+    private static final Pattern TECHNICAL_TOKENS_FOLDED = Pattern.compile(
+            foldForMatching(TECHNICAL_TOKENS.pattern()));
+    /** Study/install wording that softens a bare token into a course question. */
+    private static final Pattern LEARNING_CONTEXT = Pattern.compile(
+            "(?i)(?:\\b(?:h[oọ]c|hoc|learn(?:ing|s)?|stud(?:y|ying|ies))\\b"
+                    + "|m[oô]n\\s*h[oọ]c|mon\\s*hoc"
+                    + "|h[uư][ớơ]ng\\s*d[âăa]n\\s*c[àa]i(?:\\s*[đd][ăâa]t)?|huong\\s*dan\\s*cai(?:\\s*dat)?"
+                    + "|c[àa]i\\s*[đd][ăâa]t|cai\\s*dat"
+                    + "|ch[uư][oơ]ng\\s*tr[ìi]nh\\s*h[oọ]c|chuong\\s*trinh\\s*hoc"
+                    + "|\\b(?:l[àa]\\s*g[ìi]|la\\s*gi|what\\s+(?:is|are))\\b)");
+    /** Typing noise (ẫ for â, missing tone marks) must not hide the learning
+     *  context — the folded view strips every tone mark, so "huong dan cai"
+     *  matches no matter which diacritic variant arrived. */
+    private static final Pattern LEARNING_CONTEXT_FOLDED = Pattern.compile(
+            foldForMatching(LEARNING_CONTEXT.pattern()));
+    private static final Pattern TECHNICAL_REQUEST_HARD = Pattern.compile(
+            "(?i)(?:"
+                    + "\\b(?:cho\\s+(?:tôi|ta)|xin|give\\s+me|show|provide|send)\\b.{0,80}\\b(?:api|endpoint|system\\s+prompt|developer\\s+message|câu\\s+lệnh|lệnh|command)\\b"
                     + "|\\b(?:bạn|bot|trợ\\s+lý|hệ\\s+thống|you|assistant)\\b.{0,40}\\b(?:đang\\s+(?:sử\\s+dụng|dùng|chạy)\\s+)?(?:mô\\s+hình|model|llm|provider|deepseek)\\b"
                     // Data-exfiltration and privilege-escalation asks must be
                     // refused explicitly at the guard (REJECTED + instant),
@@ -53,8 +80,8 @@ public final class AssistantInputGuard {
     /** The same refusal logic run against the fully diacritic-folded view —
      *  unaccented "tat moi kiem tra quyen" must be blocked exactly like its
      *  accented twin (same lockstep-derivation as PROMPT_INJECTION_FOLDED). */
-    private static final Pattern TECHNICAL_REQUEST_FOLDED = Pattern.compile(
-            foldForMatching(TECHNICAL_REQUEST.pattern()));
+    private static final Pattern TECHNICAL_REQUEST_HARD_FOLDED = Pattern.compile(
+            foldForMatching(TECHNICAL_REQUEST_HARD.pattern()));
     // Vietnamese phrasing matters because the assistant audience is bilingual:
     // the English-only list let "bỏ qua tất cả hướng dẫn..." reach the provider.
     private static final Pattern PROMPT_INJECTION = Pattern.compile(
@@ -154,10 +181,20 @@ public final class AssistantInputGuard {
     public static boolean isTechnicalRequest(String value) {
         if (value == null) return false;
         String normalized = normalizeMessage(value);
-        if (TECHNICAL_REQUEST.matcher(normalized).find()) return true;
+        // Hard asks (hand me a command / key / connection, exfiltration,
+        // privilege escalation) are technical in every phrasing.
+        if (TECHNICAL_REQUEST_HARD.matcher(normalized).find()) return true;
+        if (TECHNICAL_REQUEST_HARD_FOLDED.matcher(foldForMatching(normalized)).find()) return true;
+        // Bare tokens become legitimate study questions when the message names
+        // a learning or install-study context; without it the round-2 rule
+        // stands (a bare jdbc/postgres mention stays technical).
+        boolean learning = LEARNING_CONTEXT.matcher(normalized).find()
+                || LEARNING_CONTEXT_FOLDED.matcher(foldForMatching(normalized)).find();
+        if (learning) return false;
+        if (TECHNICAL_TOKENS.matcher(normalized).find()) return true;
         // Same dual-view rule as injection: unaccented Vietnamese must not be
         // able to phrase a data-exfiltration ask past the guard.
-        return TECHNICAL_REQUEST_FOLDED.matcher(foldForMatching(normalized)).find();
+        return TECHNICAL_TOKENS_FOLDED.matcher(foldForMatching(normalized)).find();
     }
 
     /**
@@ -222,13 +259,20 @@ public final class AssistantInputGuard {
      * readable separator such as whitespace, a dot, parentheses, or the
      * conventional hyphen used by grouped phone numbers.
      */
+    private static final Pattern YEAR_RANGE = Pattern.compile("(?:19|20)\\d{2}\\s*[-–/]\\s*(?:19|20)?\\d{2}");
+
     private static boolean containsPhone(String normalized) {
         Matcher matcher = PHONE.matcher(normalized);
         while (matcher.find()) {
             String candidate = matcher.group();
             if (isWithinUuid(normalized, matcher.start(), matcher.end())) continue;
-            // Academic year ranges such as 2023 - 2024 or 2026-2027 are legitimate academic metadata, not phone numbers
+            // Academic year ranges such as 2023 - 2024 or 2026-2027 are legitimate academic metadata, not phone numbers.
+            // Round-3 chat-1: the range may sit NEXT TO a term number — the
+            // candidate "1 2025-2026" from "GPA for semester 1 2025-2026" is a
+            // term plus year range, not a dial string. Any candidate containing
+            // a year range is exempt, wherever the range sits inside it.
             if (candidate.matches("(?:19|20)\\d{2}\\s*[-–/]\\s*(?:19|20)?\\d{2}")) continue;
+            if (YEAR_RANGE.matcher(candidate).find()) continue;
             long digits = candidate.chars().filter(Character::isDigit).count();
             boolean contiguous = candidate.matches("\\+?\\d{8,15}");
             boolean readableSeparator = candidate.indexOf(' ') >= 0
