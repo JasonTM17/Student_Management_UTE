@@ -128,6 +128,7 @@ export default function AssistantSpecializedPage() {
               followUps={isSending ? undefined : messages.assistant.specializedSuggestions}
               followUpsLabel={messages.assistant.followUpsLabel}
               onFollowUp={(suggestion) => void sendMessage(undefined, suggestion)}
+              scope="specialized"
             />
           )}
 
