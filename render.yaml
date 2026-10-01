@@ -51,6 +51,12 @@ services:
       # restore the standard/approved behaviour.
       - key: REGISTRATION_CREDIT_LIMIT_OVERRIDE
         value: "999"
+      # Owner decision (round-4 format sweep): the 20/day default burned through
+      # in one demo session, and a QUOTA_EXCEEDED answer degrades to the
+      # deterministic document fallback. 100/day keeps full LLM answers flowing
+      # through a demo day while still bounding provider spend.
+      - key: ASSISTANT_USER_DAILY_QUOTA
+        value: "100"
       - key: DEEPSEEK_ENABLED
         value: "true"
       - key: DEEPSEEK_API_KEY
