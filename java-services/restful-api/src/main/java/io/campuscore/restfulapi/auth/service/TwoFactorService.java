@@ -46,6 +46,7 @@ public class TwoFactorService {
     static final Duration CODE_TTL = Duration.ofMinutes(10);
 
     static final String CODE_TWO_FACTOR_ALREADY_ENABLED = "TWO_FACTOR_ALREADY_ENABLED";
+    static final String CODE_TWO_FACTOR_NOT_ENABLED = "TWO_FACTOR_NOT_ENABLED";
     static final String CODE_MAIL_DELIVERY_FAILED = "MAIL_DELIVERY_FAILED";
     static final String CODE_CHALLENGE_INVALID = "TWO_FACTOR_CHALLENGE_INVALID";
     static final String CODE_CODE_EXPIRED = "TWO_FACTOR_CODE_EXPIRED";
@@ -138,16 +139,38 @@ public class TwoFactorService {
                 "User enabled two-factor authentication");
     }
 
-    /** Turns two-factor auth off after a password re-check. */
+    /**
+     * Round-4 verified finding: turning 2FA OFF used to require only the
+     * password — the second factor was never asked when it was being removed,
+     * so a stolen session plus a phished password unenrolled the victim
+     * without touching their inbox. Disable now mirrors ENABLE: the password
+     * starts a challenge, and the emailed code confirms it.
+     */
     @Transactional
-    public void disable(String userId, String password) {
+    public String startDisableChallenge(String userId, String password) {
         AuthUserRecord user = requireActiveUser(userId);
         if (!passwordEncoder.matches(password == null ? "" : password, user.passwordHash())) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid password");
         }
+        if (!users.isTwoFactorEnabled(user.id())) {
+            throw new AppException(
+                    HttpStatus.CONFLICT,
+                    CODE_TWO_FACTOR_NOT_ENABLED,
+                    "Two-factor authentication is not enabled for this account");
+        }
+        return createAndDeliverChallenge(user.id(), TwoFactorChallengeRepository.PURPOSE_DISABLE);
+    }
+
+    /** Confirms the DISABLE challenge and flips the account switch off. */
+    @Transactional(noRollbackFor = AppException.class)
+    public void confirmDisable(String userId, String challengeId, String code) {
+        ChallengeRecord challenge = requireUsableChallenge(
+                challengeId, TwoFactorChallengeRepository.PURPOSE_DISABLE, userId);
+        verifyCode(challenge, code);
         users.setTwoFactorEnabled(userId, false);
+        challenges.consume(challenge.id(), clock.instant());
         audit.record(userId, null, "TWO_FACTOR_DISABLED", "USER", userId,
-                "User disabled two-factor authentication after a password re-check");
+                "User disabled two-factor authentication after password and emailed-code verification");
     }
 
     /**

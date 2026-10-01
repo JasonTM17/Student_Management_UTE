@@ -117,7 +117,10 @@ public class ThesisAssistantController {
         }
         try {
             String conversationId = assistant.recordPersonalTurn(owner, request.conversationId(),
-                    request.message(), personal.answer(), personal.locale(), personal.reasonCode());
+                    request.message(), personal.answer(), personal.locale(), personal.reasonCode(),
+                    request.clientRequestId(),
+                    AssistantInputGuard.canonicalHash(request.message(), personal.locale(),
+                            conversationUuid(request.conversationId())));
             if (conversationId == null) {
                 return personal;
             }

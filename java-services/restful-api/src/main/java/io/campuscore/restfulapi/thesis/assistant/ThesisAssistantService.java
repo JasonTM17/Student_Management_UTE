@@ -1102,7 +1102,7 @@ public class ThesisAssistantService {
     }
 
     public String recordPersonalTurn(String ownerId, String conversationId, String message,
-            String answer, String locale, String reasonCode) {
+            String answer, String locale, String reasonCode, UUID clientRequestId, String requestHash) {
         if (legacyHistory == null) return null;
         UUID conversation = parseConversation(conversationId);
         if (conversation == null) return null;
@@ -1110,8 +1110,18 @@ public class ThesisAssistantService {
         String model = "campuscore-personal-context";
         legacyHistory.appendMessage(conversation, "USER",
                 AssistantInputGuard.normalizeMessage(message), model, false, "RECEIVED");
-        legacyHistory.appendMessage(conversation, "ASSISTANT", answer, model, false,
+        UUID assistantMessage = legacyHistory.appendMessage(conversation, "ASSISTANT", answer, model, false,
                 reasonCode == null || reasonCode.isBlank() ? "PERSONAL_CONTEXT" : reasonCode);
+        // Round-3 cb3-10: consume the idempotency key like every KB turn so a
+        // personal-vs-personal key reuse conflicts instead of silently passing.
+        if (turns != null && clientRequestId != null && requestHash != null) {
+            try {
+                turns.recordCompletedPersonalTurn(ownerId, clientRequestId, requestHash, conversation, assistantMessage);
+            } catch (DataAccessException ignored) {
+                // The turn is already persisted and returned; a ledger outage
+                // must not fail it — the key just stays unconsumed.
+            }
+        }
         return conversation.toString();
     }
 

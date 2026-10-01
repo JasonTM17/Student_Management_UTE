@@ -268,6 +268,35 @@ public class ThesisAssistantTurnRepository {
                 String.class);
     }
 
+    /**
+     * Round-3 cb3-10 completion: an intercepted PERSONAL_CONTEXT turn records
+     * its own COMPLETED ledger row, so the idempotency key is consumed exactly
+     * like a KB turn — a later request reusing the key with a different
+     * payload conflicts (enforcePersonalIdempotency / reserve), and an exact
+     * replay resolves to the stored personal answer instead of a silent re-run.
+     * No lease, no quota: the interception contract stays quota-free.
+     */
+    @Transactional(transactionManager = AssistantDatabaseConfiguration.TRANSACTION_MANAGER)
+    public void recordCompletedPersonalTurn(
+            String ownerId,
+            UUID clientRequestId,
+            String requestHash,
+            UUID conversationId,
+            UUID assistantMessageId) {
+        String insert = "INSERT INTO assistant.chat_turn_ledger "
+                + "(turn_id,owner_id,client_request_id,request_hash,conversation_id,created_conversation,"
+                + "state,lease_owner,lease_generation,quota_reserved,result_message_id,terminal_reason,"
+                + "updated_at,tombstone_until) VALUES "
+                + "(:turn,:owner,:request,:hash,:conversation,FALSE,'COMPLETED','personal-context',0,FALSE,"
+                + ":message,'PERSONAL_CONTEXT',CURRENT_TIMESTAMP,:tombstone)"
+                + (postgres ? " ON CONFLICT DO NOTHING" : "");
+        jdbc.update(insert,
+                p().addValue("turn", UUID.randomUUID()).addValue("owner", ownerId)
+                        .addValue("request", clientRequestId).addValue("hash", requestHash)
+                        .addValue("conversation", conversationId).addValue("message", assistantMessageId)
+                        .addValue("tombstone", timestampAfterDays(TOMBSTONE_DAYS)));
+    }
+
     /** Cancellation callback is deferred until the short CAS transaction commits. */
     @Transactional(transactionManager = AssistantDatabaseConfiguration.TRANSACTION_MANAGER)
     public CancelResult cancel(UUID turnId, String ownerId, UUID clientRequestId,

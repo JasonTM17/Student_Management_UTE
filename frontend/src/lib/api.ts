@@ -460,10 +460,20 @@ export const authApi = {
     return response.data;
   },
 
-  disableTwoFactor: async (password: string): Promise<{ enabled: boolean }> => {
+  // Round-4 verified fix: disable is two-step — password starts an emailed
+  // challenge, the emailed code confirms. A stolen session + phished password
+  // alone can no longer unenroll the second factor.
+  startDisableTwoFactor: async (password: string): Promise<{ challengeId: string }> => {
+    const response = await api.post<{ challengeId: string }>(
+      '/me/two-factor/disable/challenge',
+      { password },
+    );
+    return response.data;
+  },
+  disableTwoFactor: async (challengeId: string, code: string): Promise<{ enabled: boolean }> => {
     const response = await api.post<{ enabled: boolean }>(
       '/me/two-factor/disable',
-      { password },
+      { challengeId, code },
     );
     return response.data;
   },
