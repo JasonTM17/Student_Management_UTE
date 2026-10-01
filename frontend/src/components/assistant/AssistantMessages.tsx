@@ -214,7 +214,7 @@ export function AssistantMessages({
               (citation) =>
                 isAssistantOutputSafe(citation.title, scope) &&
                 isAssistantOutputSafe(citation.excerpt, scope) &&
-                isAssistantOutputSafe(citation.source),
+                isAssistantOutputSafe(citation.source, scope),
             ).map((citation) => ({
               ...citation,
               title: normalizeAssistantCopy(citation.title, citation.locale === 'en' ? 'en' : locale),

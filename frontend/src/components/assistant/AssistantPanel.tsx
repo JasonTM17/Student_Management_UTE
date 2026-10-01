@@ -673,7 +673,7 @@ export function AssistantPanel() {
                   onFollowUp={(suggestion) =>
                     void sendMessage(undefined, suggestion)
                   }
-                  scope="academic"
+                  scope={mode === 'specialized' ? 'specialized' : 'academic'}
                 />
               )}
 
