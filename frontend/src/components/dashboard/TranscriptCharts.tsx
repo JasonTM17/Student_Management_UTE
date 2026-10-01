@@ -1,5 +1,18 @@
 'use client';
 
+import {
+  BarElement,
+  CategoryScale,
+  Chart as ChartJS,
+  Filler,
+  LinearScale,
+  LineElement,
+  PointElement,
+  Tooltip,
+  type ChartData,
+  type ChartOptions,
+} from 'chart.js';
+import { Bar, Line } from 'react-chartjs-2';
 import { cn } from '@/lib/utils';
 
 export interface GpaTrendPoint {
@@ -13,22 +26,103 @@ export interface GradeDistributionBucket {
   count: number;
 }
 
-const CHART_WIDTH = 320;
-const CHART_HEIGHT = 150;
-const PLOT_TOP = 16;
-const PLOT_BOTTOM = 118;
+ChartJS.register(
+  CategoryScale,
+  LinearScale,
+  PointElement,
+  LineElement,
+  BarElement,
+  Filler,
+  Tooltip,
+);
 
-function formatAxisLabel(label: string) {
-  return label.length > 10 ? `${label.slice(0, 9)}…` : label;
-}
+const SEMESTER_COLOR = '#2563eb';
+const CUMULATIVE_COLOR = '#10b981';
+const TEN_SCALE_COLOR = '#f59e0b';
+const GRID_COLOR = 'rgba(128, 128, 128, 0.16)';
+const TICK_COLOR = 'rgba(128, 128, 128, 0.95)';
+
+/** Draws the value above every point — the old SVG chart printed them inline. */
+const valueLabelsPlugin = {
+  id: 'valueLabels',
+  afterDatasetsDraw(chart: ChartJS<'line'>) {
+    const { ctx } = chart;
+    chart.data.datasets.forEach((dataset, datasetIndex) => {
+      const meta = chart.getDatasetMeta(datasetIndex);
+      if (meta.hidden) return;
+      const color = String(dataset.borderColor ?? '#333');
+      ctx.save();
+      ctx.fillStyle = color;
+      ctx.font = '600 11px system-ui, sans-serif';
+      ctx.textAlign = 'center';
+      meta.data.forEach((element, index) => {
+        const raw = dataset.data[index];
+        if (typeof raw !== 'number') return;
+        const text = datasetIndex === 0 || chart.data.datasets.length === 1
+          ? raw.toFixed(2)
+          : raw.toFixed(2);
+        ctx.fillText(text, element.x, element.y - 8);
+      });
+      ctx.restore();
+    });
+  },
+};
 
 /**
- * Dependency-free SVG line chart for the per-semester GPA trend on the 4.0
- * scale. The scale is fixed at 0..4 so two students' charts are visually
- * comparable. The 0..10 average lives in `TenScaleTrendChart` instead of being
- * overlaid here: on a shared plot the two series sat at nearly the same height
- * and the 10-scale line was unreadable.
+ * The 4.0 trend used a fixed 0..4 axis, which flattened a 3.16 → 3.03 move
+ * into an unreadable near-line. Chart.js gets a padded dynamic domain around
+ * the actual data instead, so real movement is visible while the axis stays
+ * honest (round ticks, no distortion).
  */
+function paddedDomain(values: number[], fallback: [number, number], cap?: number): { min: number; max: number } {
+  const real = values.filter((value) => Number.isFinite(value));
+  if (real.length === 0) return { min: fallback[0], max: fallback[1] };
+  const dataMin = Math.min(...real);
+  const dataMax = Math.max(...real);
+  let min = Math.floor((dataMin - 0.25) * 2) / 2;
+  let max = Math.ceil((dataMax + 0.25) * 2) / 2;
+  if (cap !== undefined) max = Math.min(max, cap);
+  min = Math.max(min, 0);
+  if (max - min < 0.5) max = min + 0.5;
+  return { min, max };
+}
+
+function baseLineOptions(domain: { min: number; max: number }, stepSize: number): ChartOptions<'line'> {
+  return {
+    responsive: true,
+    maintainAspectRatio: false,
+    interaction: { mode: 'nearest', intersect: false },
+    plugins: {
+      legend: { display: false },
+      tooltip: {
+        backgroundColor: 'rgba(15, 23, 42, 0.92)',
+        padding: 10,
+        cornerRadius: 8,
+        displayColors: true,
+        boxWidth: 10,
+        boxHeight: 10,
+      },
+    },
+    scales: {
+      x: {
+        grid: { display: false },
+        border: { color: GRID_COLOR },
+        ticks: { color: TICK_COLOR, font: { size: 11 } },
+      },
+      y: {
+        min: domain.min,
+        max: domain.max,
+        grid: { color: GRID_COLOR },
+        border: { display: false },
+        ticks: { color: TICK_COLOR, font: { size: 11 }, stepSize },
+      },
+    },
+  };
+}
+
+/** Both trend charts share the same panel height so cards stay aligned. */
+const CHART_HEIGHT_CLASS = 'h-60';
+
 export function GpaTrendChart({
   points,
   cumulativePoints,
@@ -43,153 +137,100 @@ export function GpaTrendChart({
   ariaLabel: string;
 }) {
   const activePoints = mode === 'cumulative' && cumulativePoints?.length ? cumulativePoints : points;
-  const step = activePoints.length > 1 ? (CHART_WIDTH - 48) / (activePoints.length - 1) : 0;
-  const yFor = (gpa: number) =>
-    PLOT_BOTTOM - (Math.min(Math.max(gpa, 0), 4) / 4) * (PLOT_BOTTOM - PLOT_TOP);
-  const xFor = (index: number) =>
-    activePoints.length === 1 ? CHART_WIDTH / 2 : 24 + index * step;
+  const labels = activePoints.map((point) => point.label);
+  const fullLabels = activePoints.map((point) => point.fullLabel);
 
-  const polyline = points
-    .map((point, index) => `${xFor(index)},${yFor(point.gpa).toFixed(1)}`)
-    .join(' ');
+  const showSemester = mode === 'semester' || mode === 'both';
+  const showCumulative =
+    (mode === 'cumulative' || mode === 'both') && cumulativePoints && cumulativePoints.length > 0;
 
-  const cumulativePolyline = cumulativePoints
-    ? cumulativePoints
-        .map((point, index) => `${xFor(index)},${yFor(point.gpa).toFixed(1)}`)
-        .join(' ')
-    : '';
+  const domainValues = [
+    ...(showSemester ? points.map((point) => point.gpa) : []),
+    ...(showCumulative ? (cumulativePoints ?? []).map((point) => point.gpa) : []),
+  ];
+  const domain = paddedDomain(domainValues, [0, 4], 4);
+
+  const datasets: ChartData<'line'>['datasets'] = [];
+  if (showSemester) {
+    datasets.push({
+      label: 'GPA Học kỳ',
+      data: points.map((point) => point.gpa),
+      borderColor: SEMESTER_COLOR,
+      backgroundColor: SEMESTER_COLOR,
+      borderWidth: 2.5,
+      tension: 0.25,
+      pointRadius: points.map((point) =>
+        isSelected(point, selectedLabel) ? 6 : 4,
+      ),
+      pointHoverRadius: 7,
+      pointBorderColor: points.map((point) =>
+        isSelected(point, selectedLabel) ? SEMESTER_COLOR : 'rgba(255,255,255,0.9)',
+      ),
+      pointBorderWidth: points.map((point) => (isSelected(point, selectedLabel) ? 3 : 2)),
+    });
+  }
+  if (showCumulative) {
+    datasets.push({
+      label: 'GPA Tích lũy (Tổng hợp)',
+      data: (cumulativePoints ?? []).map((point) => point.gpa),
+      borderColor: CUMULATIVE_COLOR,
+      backgroundColor: CUMULATIVE_COLOR,
+      borderWidth: 2.5,
+      borderDash: mode === 'both' ? [6, 4] : undefined,
+      tension: 0.25,
+      pointRadius: 4,
+      pointHoverRadius: 7,
+      pointBorderColor: 'rgba(255,255,255,0.9)',
+      pointBorderWidth: 2,
+    });
+  }
+
+  const options = baseLineOptions(domain, 0.5);
+  // Single-series view keeps the 0.01 precision; both-series view shows the
+  // same precision for both lines.
+  options.plugins = {
+    ...options.plugins,
+    tooltip: {
+      ...options.plugins?.tooltip,
+      callbacks: {
+        title: (items) => fullLabels[items[0]?.dataIndex ?? 0] ?? '',
+        label: (item) =>
+          `${item.dataset.label}: ${Number(item.raw).toFixed(2)}${mode === 'both' ? '' : ' / 4.0'}`,
+      },
+    },
+  };
 
   return (
     <div className="space-y-3">
-      <svg
-        viewBox={`0 0 ${CHART_WIDTH} ${CHART_HEIGHT}`}
-        className="h-auto w-full text-primary"
-        role="img"
-        aria-label={ariaLabel}
-      >
-        {[0, 1, 2, 3, 4].map((gpa) => (
-          <g key={gpa}>
-            <line
-              x1={20}
-              x2={CHART_WIDTH - 8}
-              y1={yFor(gpa)}
-              y2={yFor(gpa)}
-              stroke="currentColor"
-              strokeOpacity={gpa === 0 ? 0.35 : 0.12}
-              strokeWidth={1}
-            />
-            <text x={2} y={yFor(gpa) + 3} fontSize={8} fill="currentColor" fillOpacity={0.6}>
-              {gpa}
-            </text>
-          </g>
-        ))}
-
-        {/* Semester GPA line */}
-        {(mode === 'semester' || mode === 'both') && points.length > 1 ? (
-          <polyline
-            points={polyline}
-            fill="none"
-            stroke="currentColor"
-            strokeWidth={2}
-            strokeLinejoin="round"
-          />
-        ) : null}
-
-        {/* Cumulative Overall GPA line */}
-        {(mode === 'cumulative' || mode === 'both') &&
-        cumulativePoints &&
-        cumulativePoints.length > 1 ? (
-          <polyline
-            points={cumulativePolyline}
-            fill="none"
-            stroke="rgb(16, 185, 129)"
-            strokeWidth={2}
-            strokeDasharray={mode === 'both' ? '4 3' : undefined}
-            strokeLinejoin="round"
-          />
-        ) : null}
-
-        {/* Points for active view */}
-        {activePoints.map((point, index) => {
-          const x = xFor(index);
-          const y = yFor(point.gpa);
-          const isCum = mode === 'cumulative';
-          const isSelected =
-            Boolean(selectedLabel) &&
-            (point.label === selectedLabel ||
-              point.fullLabel === selectedLabel ||
-              selectedLabel?.includes(point.label));
-
-          return (
-            <g key={`${point.label}-${index}`}>
-              {isSelected ? (
-                <circle
-                  cx={x}
-                  cy={y}
-                  r={6.5}
-                  fill="none"
-                  stroke={isCum ? 'rgb(16, 185, 129)' : 'currentColor'}
-                  strokeWidth={2}
-                  strokeDasharray="2 2"
-                />
-              ) : null}
-              <circle
-                cx={x}
-                cy={y}
-                r={isSelected ? 4.5 : 3.5}
-                fill={isCum ? 'rgb(16, 185, 129)' : 'currentColor'}
-              >
-                <title>{`${point.fullLabel}: ${point.gpa.toFixed(2)}`}</title>
-              </circle>
-              <text
-                x={x}
-                y={y - 7}
-                fontSize={9}
-                textAnchor="middle"
-                fill={isCum ? 'rgb(16, 185, 129)' : 'currentColor'}
-                fontWeight={600}
-              >
-                {point.gpa.toFixed(2)}
-              </text>
-              <text
-                x={x}
-                y={CHART_HEIGHT - 4}
-                fontSize={8}
-                textAnchor="middle"
-                fill="currentColor"
-                fillOpacity={isSelected ? 1 : 0.7}
-                fontWeight={isSelected ? 700 : 400}
-              >
-                {formatAxisLabel(point.label)}
-              </text>
-            </g>
-          );
-        })}
-      </svg>
-
-      {/* Chart Legend */}
+      <div className={CHART_HEIGHT_CLASS} role="img" aria-label={ariaLabel}>
+        <Line data={{ labels, datasets }} options={options} plugins={[valueLabelsPlugin]} />
+      </div>
       <div className="flex flex-wrap items-center justify-center gap-4 text-xs">
-        {(mode === 'semester' || mode === 'both') && (
-          <div className="flex items-center gap-1.5 text-muted-foreground">
-            <span className="inline-block h-2.5 w-4 rounded bg-primary" />
-            <span>GPA Học kỳ</span>
+        {datasets.map((dataset) => (
+          <div key={dataset.label} className="flex items-center gap-1.5 text-muted-foreground">
+            <span
+              className="inline-block h-2.5 w-4 rounded"
+              style={{ backgroundColor: String(dataset.borderColor) }}
+            />
+            <span>{dataset.label}</span>
           </div>
-        )}
-        {(mode === 'cumulative' || mode === 'both') && cumulativePoints && (
-          <div className="flex items-center gap-1.5 text-muted-foreground">
-            <span className="inline-block h-2.5 w-4 rounded bg-emerald-500" />
-            <span>GPA Tích lũy (Tổng hợp)</span>
-          </div>
-        )}
+        ))}
       </div>
     </div>
   );
 }
 
+function isSelected(point: GpaTrendPoint, selectedLabel?: string) {
+  return Boolean(selectedLabel) &&
+    (point.label === selectedLabel ||
+      point.fullLabel === selectedLabel ||
+      selectedLabel?.includes(point.label));
+}
+
 /**
- * Dependency-free SVG line chart for the per-semester 0..10 average, on its own
- * 0..10 axis. Split out of the GPA trend chart so the 4.0 lines and the 10-point
- * average are each readable instead of overlapping on one plot.
+ * 0..10 per-semester average on its own axis (split from the 4.0 plot so the
+ * two series stay readable). Chart.js with a padded dynamic domain replaces
+ * the fixed 0..10 axis that made a 7.6 → 7.5 move look flat.
  */
 export function TenScaleTrendChart({
   points,
@@ -198,76 +239,71 @@ export function TenScaleTrendChart({
   points: GpaTrendPoint[];
   ariaLabel: string;
 }) {
-  const step = points.length > 1 ? (CHART_WIDTH - 48) / (points.length - 1) : 0;
-  const yFor = (value: number) =>
-    PLOT_BOTTOM - (Math.min(Math.max(value, 0), 10) / 10) * (PLOT_BOTTOM - PLOT_TOP);
-  const xFor = (index: number) => (points.length === 1 ? CHART_WIDTH / 2 : 24 + index * step);
-  const polyline = points
-    .map((point, index) => `${xFor(index)},${yFor(point.gpa).toFixed(1)}`)
-    .join(' ');
+  const labels = points.map((point) => point.label);
+  const fullLabels = points.map((point) => point.fullLabel);
+  const domain = paddedDomain(points.map((point) => point.gpa), [0, 10], 10);
+
+  const options = baseLineOptions(domain, 0.5);
+  options.plugins = {
+    ...options.plugins,
+    tooltip: {
+      ...options.plugins?.tooltip,
+      callbacks: {
+        title: (items) => fullLabels[items[0]?.dataIndex ?? 0] ?? '',
+        label: (item) => `${Number(item.raw).toFixed(1)} / 10`,
+      },
+    },
+  };
+
+  const data: ChartData<'line'> = {
+    labels,
+    datasets: [
+      {
+        label: 'ĐTB hệ 10',
+        data: points.map((point) => point.gpa),
+        borderColor: TEN_SCALE_COLOR,
+        backgroundColor: TEN_SCALE_COLOR,
+        borderWidth: 2.5,
+        tension: 0.25,
+        pointRadius: 4,
+        pointHoverRadius: 7,
+        pointBorderColor: 'rgba(255,255,255,0.9)',
+        pointBorderWidth: 2,
+        fill: false,
+      },
+    ],
+  };
 
   return (
-    <div className="space-y-3">
-      <svg
-        viewBox={`0 0 ${CHART_WIDTH} ${CHART_HEIGHT}`}
-        className="h-auto w-full text-amber-500"
-        role="img"
-        aria-label={ariaLabel}
-      >
-        {[0, 2, 4, 6, 8, 10].map((value) => (
-          <g key={value}>
-            <line
-              x1={20}
-              x2={CHART_WIDTH - 8}
-              y1={yFor(value)}
-              y2={yFor(value)}
-              stroke="currentColor"
-              strokeOpacity={value === 0 ? 0.35 : 0.12}
-              strokeWidth={1}
-            />
-            <text x={2} y={yFor(value) + 3} fontSize={8} fill="currentColor" fillOpacity={0.6}>
-              {value}
-            </text>
-          </g>
-        ))}
-
-        {points.length > 1 ? (
-          <polyline points={polyline} fill="none" stroke="currentColor" strokeWidth={2} strokeLinejoin="round" />
-        ) : null}
-
-        {points.map((point, index) => {
-          const x = xFor(index);
-          const y = yFor(point.gpa);
-          return (
-            <g key={`${point.label}-${index}`}>
-              <circle cx={x} cy={y} r={3.5} fill="currentColor">
-                <title>{`${point.fullLabel}: ${point.gpa.toFixed(1)}/10`}</title>
-              </circle>
-              <text x={x} y={y - 7} fontSize={9} textAnchor="middle" fill="currentColor" fontWeight={600}>
-                {point.gpa.toFixed(1)}
-              </text>
-              <text
-                x={x}
-                y={CHART_HEIGHT - 4}
-                fontSize={8}
-                textAnchor="middle"
-                fill="currentColor"
-                fillOpacity={0.7}
-              >
-                {formatAxisLabel(point.label)}
-              </text>
-            </g>
-          );
-        })}
-      </svg>
+    <div className={CHART_HEIGHT_CLASS} role="img" aria-label={ariaLabel}>
+      <Line data={data} options={options} plugins={[valueLabelsPlugin]} />
     </div>
   );
 }
 
 /**
- * Dependency-free SVG bar chart for the letter-grade distribution of the
- * currently selected transcript scope.
+ * Letter-grade distribution as a Chart.js bar chart with rounded bars and
+ * count labels above each bar.
  */
+const countLabelsPlugin = {
+  id: 'countLabels',
+  afterDatasetsDraw(chart: ChartJS<'bar'>) {
+    const { ctx } = chart;
+    const meta = chart.getDatasetMeta(0);
+    if (meta.hidden) return;
+    ctx.save();
+    ctx.fillStyle = '#2563eb';
+    ctx.font = '600 11px system-ui, sans-serif';
+    ctx.textAlign = 'center';
+    meta.data.forEach((element, index) => {
+      const raw = chart.data.datasets[0].data[index];
+      if (typeof raw !== 'number') return;
+      ctx.fillText(String(raw), element.x, element.y - 6);
+    });
+    ctx.restore();
+  },
+};
+
 export function GradeDistributionChart({
   buckets,
   ariaLabel,
@@ -276,56 +312,51 @@ export function GradeDistributionChart({
   ariaLabel: string;
 }) {
   const max = buckets.reduce((acc, bucket) => Math.max(acc, bucket.count), 0);
-  const slot = (CHART_WIDTH - 16) / Math.max(buckets.length, 1);
-  const barWidth = Math.min(34, slot * 0.6);
+  const options: ChartOptions<'bar'> = {
+    responsive: true,
+    maintainAspectRatio: false,
+    plugins: {
+      legend: { display: false },
+      tooltip: {
+        backgroundColor: 'rgba(15, 23, 42, 0.92)',
+        padding: 10,
+        cornerRadius: 8,
+        callbacks: { label: (item) => `${item.parsed.y} học phần` },
+      },
+    },
+    scales: {
+      x: {
+        grid: { display: false },
+        border: { color: GRID_COLOR },
+        ticks: { color: TICK_COLOR, font: { size: 11 } },
+      },
+      y: {
+        beginAtZero: true,
+        suggestedMax: Math.max(max + 1, 3),
+        grid: { color: GRID_COLOR },
+        border: { display: false },
+        ticks: { color: TICK_COLOR, precision: 0 },
+      },
+    },
+  };
+
+  const data: ChartData<'bar'> = {
+    labels: buckets.map((bucket) => bucket.letter),
+    datasets: [
+      {
+        label: 'Số học phần',
+        data: buckets.map((bucket) => bucket.count),
+        backgroundColor: 'rgba(37, 99, 235, 0.78)',
+        hoverBackgroundColor: '#2563eb',
+        borderRadius: 6,
+        maxBarThickness: 36,
+      },
+    ],
+  };
 
   return (
-    <svg
-      viewBox={`0 0 ${CHART_WIDTH} ${CHART_HEIGHT}`}
-      className={cn('h-auto w-full text-primary')}
-      role="img"
-      aria-label={ariaLabel}
-    >
-      {buckets.map((bucket, index) => {
-        const height =
-          max === 0 ? 0 : (bucket.count / max) * (PLOT_BOTTOM - PLOT_TOP);
-        const x = 8 + index * slot + (slot - barWidth) / 2;
-        const y = PLOT_BOTTOM - height;
-        return (
-          <g key={bucket.letter}>
-            <rect
-              x={x}
-              y={y}
-              width={barWidth}
-              height={Math.max(height, 1)}
-              rx={3}
-              fill="currentColor"
-              fillOpacity={0.75}
-            >
-              <title>{`${bucket.letter}: ${bucket.count}`}</title>
-            </rect>
-            <text
-              x={x + barWidth / 2}
-              y={y - 4}
-              fontSize={9}
-              textAnchor="middle"
-              fill="currentColor"
-            >
-              {bucket.count}
-            </text>
-            <text
-              x={x + barWidth / 2}
-              y={CHART_HEIGHT - 4}
-              fontSize={9}
-              textAnchor="middle"
-              fill="currentColor"
-              fillOpacity={0.7}
-            >
-              {bucket.letter}
-            </text>
-          </g>
-        );
-      })}
-    </svg>
+    <div className="h-56" role="img" aria-label={ariaLabel}>
+      <Bar data={data} options={options} plugins={[countLabelsPlugin]} className={cn('[&>*]:!bg-transparent')} />
+    </div>
   );
 }

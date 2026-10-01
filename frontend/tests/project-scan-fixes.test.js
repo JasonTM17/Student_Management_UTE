@@ -237,9 +237,12 @@ test('feedback polish: transcript semester selector is singular and chart contro
   const page = read('src/app/dashboard/transcript/page.tsx');
 
   assert.equal((page.match(/aria-label=\{copy\.selectSemester\}/g) ?? []).length, 1);
-  assert.match(page, /aria-pressed=\{gpaMode === 'cumulative'\}/);
-  assert.match(page, /aria-pressed=\{gpaMode === 'semester'\}/);
-  assert.match(page, /aria-pressed=\{gpaMode === 'both'\}/);
+  // Round-5: the toggle is a mapped segmented control; every mode still
+  // exposes its pressed state through the single aria-pressed expression.
+  assert.match(page, /aria-pressed=\{gpaMode === mode\}/);
+  assert.match(page, /\['cumulative', copy\.gpaAllTrend\]/);
+  assert.match(page, /\['semester', copy\.gpaSemesterTrend\]/);
+  assert.match(page, /\['both', copy\.gpaBothTrend\]/);
   // Honesty (phase 04, STUD-P2-6): the header must not claim a per-semester
   // GPA while the card shows the cumulative figure.
   assert.doesNotMatch(page, /description: `GPA, credits, and course outcomes for \$\{selectedSemesterName\}\.`/);
