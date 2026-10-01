@@ -19,6 +19,7 @@ import { Button } from '@/components/ui/button';
 import { useConfirmationDialog } from '@/components/ui/use-confirmation-dialog';
 import { cn } from '@/lib/utils';
 import { useI18n } from '@/i18n';
+import { useAuth } from '@/context/AuthContext';
 import { thesisApi, type AssistantConversation } from '@/lib/thesis-api';
 import {
   TRANSIENT_TERMINAL_CODES,
@@ -42,6 +43,8 @@ export { TRANSIENT_TERMINAL_CODES };
 
 export function AssistantPanel() {
   const { locale, messages } = useI18n();
+  const { isLecturer } = useAuth();
+  const academicSuggestions = isLecturer ? messages.assistant.lecturerSuggestions : messages.assistant.suggestions;
   const { confirm, confirmationDialog } = useConfirmationDialog();
   const [open, setOpen] = useState(false);
   // Assistant retrieval scope. The academic launcher opens the default corpus;
@@ -118,12 +121,12 @@ export function AssistantPanel() {
       );
     const rawDomain = lastGrounded?.citations?.[0]?.domain?.toUpperCase();
     const domain = rawDomain === 'ANNOUNCEMENTS' ? 'ANNOUNCEMENT' : rawDomain;
-    const byDomain = messages.assistant.followUpsByDomain as Record<
+    const byDomain = (isLecturer ? messages.assistant.lecturerFollowUpsByDomain : messages.assistant.followUpsByDomain) as Record<
       string,
       readonly string[]
     >;
-    return (domain && byDomain[domain]) || messages.assistant.suggestions;
-  }, [state.messages, isSending, messages, mode]);
+    return (domain && byDomain[domain]) || academicSuggestions;
+  }, [state.messages, isSending, messages, mode, isLecturer, academicSuggestions]);
 
   const latestSettledAssistant = [...state.messages]
     .reverse()
@@ -646,7 +649,7 @@ export function AssistantPanel() {
                   <div className="mt-1 flex flex-wrap justify-center gap-1.5 max-w-xs">
                     {(mode === 'specialized'
                       ? messages.assistant.specializedSuggestions
-                      : messages.assistant.suggestions
+                      : academicSuggestions
                     ).map((suggestion) => (
                       <button
                         key={suggestion}

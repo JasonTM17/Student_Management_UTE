@@ -309,7 +309,7 @@ export default function AttendancePage() {
                     </article>
                   ))}
                 </div>
-                <div className="hidden overflow-x-auto md:block">
+                <div role="region" aria-label={copy.byCourseTitle} tabIndex={0} className="hidden overflow-x-auto md:block focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
                   <table className="w-full min-w-[760px] text-sm">
                     <thead>
                       <tr className="border-b border-border/70 text-left text-muted-foreground">

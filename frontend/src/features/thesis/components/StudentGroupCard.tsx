@@ -165,12 +165,14 @@ export default function StudentGroupCard({
 
             {/* Member List Header & Count */}
             <div className="space-y-3">
-              <div className="flex items-center justify-between text-sm">
-                <span className="font-medium text-foreground">
+              <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 text-sm">
+                <span className="shrink-0 font-medium text-foreground">
                   {messages.thesis.memberCount.replace('{count}', String(members.length))}
                 </span>
                 <span className="text-xs text-muted-foreground">
-                  {members.length >= 4 ? messages.thesis.maxMembersReached : ''}
+                  {members.length < 3 && group.approvalStatus !== 'APPROVED' && group.status !== 'CANCELLED'
+                    ? messages.thesis.membersNeededForApproval.replace('{count}', String(3 - members.length))
+                    : members.length >= 4 ? messages.thesis.maxMembersReached : ''}
                 </span>
               </div>
 
@@ -191,7 +193,7 @@ export default function StudentGroupCard({
                             {member.displayName}
                           </span>
                           {member.isLeader ? (
-                            <span className="inline-flex items-center gap-1 rounded-md bg-amber-500/15 px-2 py-0.5 text-[11px] font-semibold text-amber-700 dark:text-amber-300">
+                            <span className="inline-flex items-center gap-1 rounded-md bg-amber-500/15 px-2 py-0.5 text-[11px] font-semibold text-amber-800 dark:text-amber-300">
                               <Shield className="h-3 w-3" />
                               {messages.thesis.leaderBadge}
                             </span>
