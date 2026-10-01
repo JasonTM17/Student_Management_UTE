@@ -664,6 +664,10 @@ public class ThesisAssistantService {
         return groundedFallback(message, locale, false);
     }
 
+    public ChatResponse groundedFallback(String message, String locale, boolean dbDownAtRequestStart) {
+        return groundedFallback(message, locale, dbDownAtRequestStart, null);
+    }
+
     /**
      * @param dbDownAtRequestStart true when the caller proved the database was
      *        already unavailable when this request began (the account-state
@@ -673,8 +677,10 @@ public class ThesisAssistantService {
      *        after the availability cooldown expired — the flag carries the
      *        proof, and the outage contract (KNOWLEDGE_UNAVAILABLE, degraded,
      *        no citations) must win over the curated content fallback.
+     * @param scope request scope; "specialized" skips the technical gate in
+     *        the lexical path (round-3 chat-8)
      */
-    public ChatResponse groundedFallback(String message, String locale, boolean dbDownAtRequestStart) {
+    public ChatResponse groundedFallback(String message, String locale, boolean dbDownAtRequestStart, String scope) {
         String normalizedLocale = AssistantInputGuard.normalizeLocale(locale);
         // A stopped database fails retrieval slower than every layered timeout
         // (gateway 15s > local budget 5s > Hikari 15s), so the outage must be
@@ -686,7 +692,7 @@ public class ThesisAssistantService {
         try {
             final String normalized = AssistantInputGuard.normalizeMessage(message);
             lexical = java.util.concurrent.CompletableFuture
-                    .supplyAsync(() -> lexicalAnswer(normalized, normalizedLocale))
+                    .supplyAsync(() -> lexicalAnswer(normalized, normalizedLocale, scope))
                     .get(LOCAL_FALLBACK_BUDGET_MS, java.util.concurrent.TimeUnit.MILLISECONDS);
         } catch (InterruptedException exception) {
             Thread.currentThread().interrupt();
@@ -1136,7 +1142,10 @@ public class ThesisAssistantService {
         }
         String normalized = guard.normalizedMessage();
         String normalizedLocale = AssistantInputGuard.normalizeLocale(locale);
-        if (AssistantInputGuard.isTechnicalRequest(normalized)) {
+        // Round-3 chat-8: same scope rule as the controller — the specialized
+        // scope serves the curated DevOps/REST corpus, so its requests must
+        // not be re-blocked here after the controller already passed them.
+        if (!"specialized".equalsIgnoreCase(scope) && AssistantInputGuard.isTechnicalRequest(normalized)) {
             emit(sink, new StreamError("TECHNICAL_REQUEST_BLOCKED", false));
             return new ChatResponse(technicalOutputMessage(normalizedLocale), MODEL, true,
                     "TECHNICAL_REQUEST_BLOCKED", normalizedLocale,
@@ -1613,6 +1622,10 @@ public class ThesisAssistantService {
     }
 
     private ChatResponse lexicalAnswer(String message, String locale) {
+        return lexicalAnswer(message, locale, null);
+    }
+
+    private ChatResponse lexicalAnswer(String message, String locale, String scope) {
         String normalized = AssistantInputGuard.normalizeMessage(message);
         if (normalized.isBlank()) throw new IllegalArgumentException("message is required");
         if (properties != null && normalized.length() > properties.maxMessageChars()) throw new IllegalArgumentException("message must contain at most " + properties.maxMessageChars() + " characters");
@@ -1622,7 +1635,9 @@ public class ThesisAssistantService {
             String blocked = guardMessage(guard.reasonCode(), normalizedLocale);
             return new ChatResponse(blocked, MODEL, true, guard.reasonCode(), normalizedLocale, List.of());
         }
-        if (AssistantInputGuard.isTechnicalRequest(normalized)) {
+        // Round-3 chat-8: parity with the controller and execute() gates — the
+        // specialized scope answers from the curated DevOps/REST corpus.
+        if (!"specialized".equalsIgnoreCase(scope) && AssistantInputGuard.isTechnicalRequest(normalized)) {
             return new ChatResponse(technicalOutputMessage(normalizedLocale), MODEL, true,
                     "TECHNICAL_REQUEST_BLOCKED", normalizedLocale, List.of());
         }

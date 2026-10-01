@@ -260,7 +260,8 @@ public class ThesisAssistantController {
      */
     private ChatResponse localGroundedFallback(ChatRequest request, boolean dbDownAtRequestStart) {
         try {
-            ChatResponse fallback = assistant.groundedFallback(request.message(), request.locale(), dbDownAtRequestStart);
+            ChatResponse fallback = assistant.groundedFallback(request.message(), request.locale(),
+                    dbDownAtRequestStart, request.scope());
             if (fallback != null) {
                 return fallback;
             }
