@@ -438,7 +438,13 @@ public class DeepSeekClient implements AssistantCompletionProvider {
                 // first-person "Tôi". Ban those explicitly and pin the pronoun.
                 + "When information is absent, state the fact as the portal (\"Cổng học vụ chưa công bố X\") — never \"ở đây\", \"thông tin được công bố ở đây\", \"thông tin hiện có\", \"chưa được nêu\", or \"không có trong dữ liệu ... mà tôi hỗ trợ\". "
                 + "In Vietnamese answers always refer to yourself as \"mình\", never \"Tôi\"; address the user as \"bạn\". "
-                + "If asked for technical details beyond the provided context, politely say you can only help with published academic information.";
+                // Round-3 chat-8: the blanket "only published academic
+                // information" refusal made the model turn away questions the
+                // provided context DOES cover — the specialized corpus teaches
+                // Docker/CI-CD study content and retrieval had already found
+                // the right document. In-scope corpus topics must be answered;
+                // only a genuinely absent topic gets the not-published line.
+                + "When the provided context covers the topic — including DevOps, Docker, CI/CD and software-engineering study content — answer from it; only when it is genuinely absent, say the portal has not published that detail and suggest the responsible office.";
     }
 
     /**
