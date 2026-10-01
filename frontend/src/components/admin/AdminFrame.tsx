@@ -21,6 +21,7 @@ import {
   Menu,
   Palette,
   School,
+  ScrollText,
   Users,
   X,
 } from 'lucide-react';
@@ -139,6 +140,11 @@ export function AdminFrame({
         { href: '/admin/assistant-knowledge', icon: BrainCircuit, label: messages.admin.menuItems[10]?.[0] },
         { href: '/admin/appearance', icon: Palette, label: messages.admin.menuItems[11]?.[0] },
         { href: '/admin/credit-limit-applications', icon: ClipboardCheck, label: messages.admin.menuItems[12]?.[0] },
+        {
+          href: '/admin/audit',
+          icon: ScrollText,
+          label: locale === 'vi' ? 'Nhật ký kiểm toán' : 'Audit trail',
+        },
       ],
     },
   ];

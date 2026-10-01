@@ -1333,6 +1333,45 @@ export const adminNotificationsApi = {
   },
 };
 
+// Admin audit trail (round-3 ct-2/ct-4 completion): the governance read side
+// for campuscore_audit."AdminAudit" — ADMIN/SUPER_ADMIN only on the backend.
+export interface AdminAuditEntry {
+  id: string;
+  actorId: string | null;
+  actorLabel: string | null;
+  action: string;
+  entityType: string;
+  entityId: string | null;
+  summary: string | null;
+  beforeState: string | null;
+  afterState: string | null;
+  createdAt: string;
+}
+
+export interface AdminAuditMeta {
+  total: number;
+  page: number;
+  limit: number;
+  totalPages: number;
+}
+
+export const adminAuditApi = {
+  list: async (params?: {
+    page?: number;
+    limit?: number;
+    action?: string;
+    entityType?: string;
+    entityId?: string;
+    actorId?: string;
+  }): Promise<{ data: AdminAuditEntry[]; meta: AdminAuditMeta }> => {
+    const response = await api.get<{ data: AdminAuditEntry[]; meta: AdminAuditMeta }>(
+      '/admin/audit',
+      { params },
+    );
+    return response.data;
+  },
+};
+
 // Student Conduct / Training Points ("Điểm rèn luyện" - DRL) API
 export interface ConductCriteriaScore {
   code: string;
