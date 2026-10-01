@@ -1104,16 +1104,24 @@ public class ThesisAssistantService {
     public String recordPersonalTurn(String ownerId, String conversationId, String message,
             String answer, String locale, String reasonCode, UUID clientRequestId, String requestHash) {
         if (legacyHistory == null) return null;
+        // A provided conversationId must exist and belong to the caller (KB-path
+        // 404 parity); a conversation-less personal turn is still answered —
+        // only its history has nowhere to land.
         UUID conversation = parseConversation(conversationId);
-        if (conversation == null) return null;
-        legacyHistory.requireOwnedConversation(conversation, ownerId);
+        if (conversation != null) {
+            legacyHistory.requireOwnedConversation(conversation, ownerId);
+        }
         String model = "campuscore-personal-context";
-        legacyHistory.appendMessage(conversation, "USER",
-                AssistantInputGuard.normalizeMessage(message), model, false, "RECEIVED");
-        UUID assistantMessage = legacyHistory.appendMessage(conversation, "ASSISTANT", answer, model, false,
-                reasonCode == null || reasonCode.isBlank() ? "PERSONAL_CONTEXT" : reasonCode);
+        UUID assistantMessage = null;
+        if (conversation != null) {
+            legacyHistory.appendMessage(conversation, "USER",
+                    AssistantInputGuard.normalizeMessage(message), model, false, "RECEIVED");
+            assistantMessage = legacyHistory.appendMessage(conversation, "ASSISTANT", answer, model, false,
+                    reasonCode == null || reasonCode.isBlank() ? "PERSONAL_CONTEXT" : reasonCode);
+        }
         // Round-3 cb3-10: consume the idempotency key like every KB turn so a
-        // personal-vs-personal key reuse conflicts instead of silently passing.
+        // personal-vs-personal key reuse conflicts instead of silently passing
+        // — including the conversation-less turns (prod probe found the gap).
         if (turns != null && clientRequestId != null && requestHash != null) {
             try {
                 turns.recordCompletedPersonalTurn(ownerId, clientRequestId, requestHash, conversation, assistantMessage);
@@ -1122,7 +1130,7 @@ public class ThesisAssistantService {
                 // must not fail it — the key just stays unconsumed.
             }
         }
-        return conversation.toString();
+        return conversation == null ? null : conversation.toString();
     }
 
     public List<ThesisAssistantRepository.Message> messages(UUID conversationId, String ownerId) {
