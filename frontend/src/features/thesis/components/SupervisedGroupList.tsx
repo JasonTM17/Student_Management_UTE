@@ -151,7 +151,7 @@ export default function SupervisedGroupList({
                         <Button
                           type="button"
                           size="sm"
-                          className="bg-emerald-600 text-white hover:bg-emerald-700"
+                          className="bg-emerald-700 text-white hover:bg-emerald-800"
                           onClick={() => void onApprove(group.id)}
                           disabled={isActionPending}
                         >

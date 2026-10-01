@@ -130,6 +130,8 @@ Tài khoản demo: `lecturer@campuscore.edu` | Mật khẩu: `password123`
 >
 > **Quản lý nhóm khóa luận:** giảng viên hướng dẫn thêm/xoá thành viên trong nhóm đang đăng ký
 > (3–4 thành viên, giữ nguyên đúng một nhóm trưởng) ngay trong khu vực *Hướng dẫn* của cổng khóa luận.
+> Nhóm đã hủy giữ nguyên lịch sử và không thể mở lại; sinh viên được tham gia nhóm mới khi đợt còn cho phép.
+> Chi tiết nâng cấp DB: [Lịch sử nhóm đã hủy](docs/integrations/thesis-cancellation-history.md).
 
 ---
 

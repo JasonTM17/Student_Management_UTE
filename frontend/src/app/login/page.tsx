@@ -138,6 +138,10 @@ export default function LoginPage() {
       return messages.login.errors.backendUnavailable;
     }
 
+    if (error.response.status === 429) {
+      return messages.common.campusErrors.codes.RATE_LIMIT_EXCEEDED;
+    }
+
     if (error.response.status >= 500) {
       return messages.login.errors.temporaryUnavailable;
     }
@@ -507,7 +511,7 @@ export default function LoginPage() {
                 {messages.login.emailLabel}
               </label>
               {demoCredentials && email === demoCredentials.email ? (
-                <span className="inline-flex items-center gap-1 text-[11px] font-medium text-amber-600 dark:text-amber-400">
+                <span className="inline-flex items-center gap-1 text-[11px] font-medium text-amber-700 dark:text-amber-400">
                   <span className="h-1.5 w-1.5 rounded-full bg-amber-500 animate-pulse" />
                   {locale === 'vi' ? 'Tài khoản demo để trải nghiệm' : 'Demo experience account'}
                 </span>

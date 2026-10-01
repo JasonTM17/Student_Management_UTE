@@ -110,7 +110,7 @@ public class AcademicEnrollmentReadRepository {
                         + " LEFT JOIN " + ACADEMIC_YEAR + " ay ON ay.\"id\" = semester.\"academicYearId\""
                         + " WHERE e.\"studentId\" = :studentId"
                         + (semesterId == null ? "" : " AND e.\"semesterId\" = :semesterId")
-                        + " AND (e.\"status\" = 'COMPLETED' OR e.\"gradeStatus\" IN ('PUBLISHED', 'APPEALED'))"
+                        + " AND e.\"gradeStatus\" IN ('PUBLISHED', 'APPEALED')"
                         + " ORDER BY ay.\"year\" DESC, semester.\"startDate\" DESC, course.\"code\" ASC",
                 optionalParameter(new MapSqlParameterSource("studentId", studentId), "semesterId", semesterId),
                 AcademicEnrollmentReadRepository::mapGradeSummary);

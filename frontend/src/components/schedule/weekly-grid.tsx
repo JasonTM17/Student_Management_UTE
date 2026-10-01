@@ -1,6 +1,5 @@
 'use client';
 
-import { Fragment } from 'react';
 import { Clock, GraduationCap, MapPin } from 'lucide-react';
 import {
   buildWeeklyGrid,
@@ -163,7 +162,8 @@ export function WeeklyGrid({
       {/* Desktop / Tablet Weekly Grid */}
       <div className={compact ? '' : 'hidden md:block'}>
         <div
-          className="grid gap-2 overflow-x-auto pb-2"
+          className="grid gap-2 overflow-x-auto pb-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          tabIndex={0}
           style={{
             gridTemplateColumns: compact
               ? '48px repeat(7, minmax(44px, 1fr))'
@@ -172,13 +172,16 @@ export function WeeklyGrid({
           role="table"
           aria-label={labels.gridAriaLabel}
         >
-          <div style={{ gridColumn: 1, gridRow: 1 }} />
+          <div role="row" className="contents">
+          <div role="columnheader" aria-label={locale === 'vi' ? 'Giờ' : 'Time'} style={{ gridColumn: 1, gridRow: 1 }} />
           {ORDERED_DAYS.map((dayNum, colIndex) => {
             const dayName = dayLabel(locale, dayNum);
             const isToday = dayNum === effectiveTodayDow;
             return (
               <div
                 key={`grid-header-${dayNum}`}
+                role="columnheader"
+                aria-colindex={colIndex + 2}
                 className={`rounded-lg py-2.5 px-1 text-center transition-all ${
                   isToday
                     ? 'border border-primary/50 bg-primary/10 text-primary shadow-sm font-black'
@@ -198,12 +201,14 @@ export function WeeklyGrid({
             );
           })}
 
+          </div>
           {weeklyGrid.slots.map((slot, slotIndex) => (
-            <Fragment key={`slot-${slot}`}>
+            <div role="row" aria-rowindex={slotIndex + 2} className="contents" key={`slot-${slot}`}>
               <div
                 className={`flex items-start justify-end text-xs font-semibold tabular-nums text-muted-foreground ${
                   compact ? 'pr-1 pt-1 text-[9px]' : 'pr-2 pt-2'
                 }`}
+                role="rowheader"
                 style={{ gridColumn: 1, gridRow: slotIndex + 2 }}
               >
                 {slot}
@@ -227,6 +232,8 @@ export function WeeklyGrid({
                   return (
                     <div
                       key={`cell-${dayNum}-${slot}`}
+                      role="cell"
+                      aria-colindex={colIndex + 2}
                       className={cn(
                         'rounded-lg border border-dashed border-border/70 transition hover:border-primary/40 hover:bg-card/90',
                         compact
@@ -243,7 +250,10 @@ export function WeeklyGrid({
                 return (
                   <div
                     key={`cell-${dayNum}-${slot}`}
+                      role="cell"
+                      aria-colindex={colIndex + 2}
                     className="flex min-w-0 flex-col gap-1.5"
+                    aria-rowspan={rowSpan}
                     style={{
                       gridColumn: colIndex + 2,
                       gridRow: `${slotIndex + 2} / span ${rowSpan}`,
@@ -275,10 +285,18 @@ export function WeeklyGrid({
                       return (
                         <div
                           key={item.id}
+                          role={onItemSelect ? 'button' : undefined}
+                          tabIndex={onItemSelect ? 0 : undefined}
+                          onKeyDown={onItemSelect ? (event) => {
+                            if (event.key === 'Enter' || event.key === ' ') {
+                              event.preventDefault();
+                              onItemSelect(item);
+                            }
+                          } : undefined}
                           onClick={onItemSelect ? () => onItemSelect(item) : undefined}
                           className={cn(
                             'flex-1 rounded-lg border p-2.5 text-xs leading-tight transition-all hover:scale-[1.01] hover:shadow-md',
-                            onItemSelect ? 'cursor-pointer' : '',
+                            onItemSelect ? 'cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring' : '',
                             blockTone(item),
                           )}
                           title={`${item.courseCode} - ${item.startTime}-${item.endTime}${labels.blockHint ? ` (${labels.blockHint})` : ''}`}
@@ -341,7 +359,7 @@ export function WeeklyGrid({
                   </div>
                 );
               })}
-            </Fragment>
+            </div>
           ))}
         </div>
       </div>
@@ -383,10 +401,18 @@ export function WeeklyGrid({
                     {dayItems.map((item) => (
                       <div
                         key={item.id}
-                        onClick={onItemSelect ? () => onItemSelect(item) : undefined}
+                        role={onItemSelect ? 'button' : undefined}
+                          tabIndex={onItemSelect ? 0 : undefined}
+                          onKeyDown={onItemSelect ? (event) => {
+                            if (event.key === 'Enter' || event.key === ' ') {
+                              event.preventDefault();
+                              onItemSelect(item);
+                            }
+                          } : undefined}
+                          onClick={onItemSelect ? () => onItemSelect(item) : undefined}
                         className={cn(
                           'rounded-lg border p-3 text-xs transition hover:shadow-sm',
-                          onItemSelect ? 'cursor-pointer' : '',
+                          onItemSelect ? 'cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring' : '',
                           blockTone(item),
                         )}
                       >

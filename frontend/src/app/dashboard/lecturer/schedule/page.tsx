@@ -1,6 +1,6 @@
 'use client';
 
-import { Fragment, useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   Calendar,
   CalendarDays,
@@ -475,18 +475,22 @@ export default function LecturerSchedulePage() {
                   {/* Desktop / Tablet Weekly Grid */}
                   <div className="hidden md:block">
                     <div
-                      className="grid gap-2 overflow-x-auto pb-2"
+                      className="grid gap-2 overflow-x-auto pb-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          tabIndex={0}
                       style={{ gridTemplateColumns: '72px repeat(7, minmax(130px, 1fr))' }}
                       role="table"
                       aria-label={copy.weeklyGrid}
                     >
-                      <div style={{ gridColumn: 1, gridRow: 1 }} />
+                      <div role="row" className="contents">
+          <div role="columnheader" aria-label={locale === 'vi' ? 'Giờ' : 'Time'} style={{ gridColumn: 1, gridRow: 1 }} />
                       {ORDERED_DAYS.map((dayNum, colIndex) => {
                         const dayName = locale === 'vi' ? DAY_LABELS_VI[dayNum] : DAY_LABELS_EN[dayNum];
                         const isToday = dayNum === todayDow;
                         return (
                           <div
                             key={`grid-header-${dayNum}`}
+                role="columnheader"
+                aria-colindex={colIndex + 2}
                             className={`rounded-lg py-2.5 px-1 text-center transition-all ${
                               isToday
                                 ? 'border border-primary/50 bg-primary/10 text-primary shadow-sm font-black'
@@ -504,11 +508,13 @@ export default function LecturerSchedulePage() {
                         );
                       })}
 
-                      {weeklyGrid.slots.map((slot, slotIndex) => (
-                        <Fragment key={`slot-${slot}`}>
+                      </div>
+          {weeklyGrid.slots.map((slot, slotIndex) => (
+                        <div role="row" aria-rowindex={slotIndex + 2} className="contents" key={`slot-${slot}`}>
                           <div
                             className="flex items-start justify-end pr-2 pt-2 text-xs font-semibold tabular-nums text-muted-foreground"
-                            style={{ gridColumn: 1, gridRow: slotIndex + 2 }}
+                            role="rowheader"
+                style={{ gridColumn: 1, gridRow: slotIndex + 2 }}
                           >
                             {slot}
                           </div>
@@ -528,6 +534,8 @@ export default function LecturerSchedulePage() {
                               return (
                                 <div
                                   key={`cell-${dayNum}-${slot}`}
+                      role="cell"
+                      aria-colindex={colIndex + 2}
                                   className={`min-h-[105px] rounded-lg border border-dashed border-border/70 transition hover:border-primary/40 hover:bg-card/90 ${
                                     isToday ? 'bg-primary/[0.02] border-primary/20' : 'bg-card/60'
                                   }`}
@@ -540,7 +548,10 @@ export default function LecturerSchedulePage() {
                             return (
                               <div
                                 key={`cell-${dayNum}-${slot}`}
+                      role="cell"
+                      aria-colindex={colIndex + 2}
                                 className="flex min-w-0 flex-col gap-1.5"
+                    aria-rowspan={rowSpan}
                                 style={{
                                   gridColumn: colIndex + 2,
                                   gridRow: `${slotIndex + 2} / span ${rowSpan}`,
@@ -572,6 +583,14 @@ export default function LecturerSchedulePage() {
                                   return (
                                     <div
                                       key={item.id}
+                                      role="button"
+                                      tabIndex={0}
+                                      onKeyDown={(event) => {
+                                        if (event.key === 'Enter' || event.key === ' ') {
+                                          event.preventDefault();
+                                          event.currentTarget.click();
+                                        }
+                                      }}
                                       onClick={() => {
                                         setSelectedDetail({
                                           courseCode: item.courseCode,
@@ -592,7 +611,7 @@ export default function LecturerSchedulePage() {
                                           status: matchingAgenda?.status,
                                         });
                                       }}
-                                      className={`flex-1 rounded-lg border p-2.5 text-xs leading-tight transition-all hover:scale-[1.01] hover:shadow-md cursor-pointer ${accentForCourse(
+                                      className={`flex-1 rounded-lg border p-2.5 text-xs leading-tight transition-all hover:scale-[1.01] hover:shadow-md cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${accentForCourse(
                                         item.courseCode,
                                       )}`}
                                       title={`${item.courseCode} - ${item.startTime}-${item.endTime} (${copy.clickToViewDetails})`}
@@ -643,7 +662,7 @@ export default function LecturerSchedulePage() {
                               </div>
                             );
                           })}
-                        </Fragment>
+                        </div>
                       ))}
                     </div>
                   </div>
@@ -685,6 +704,14 @@ export default function LecturerSchedulePage() {
                               {items.map((item) => (
                                 <div
                                   key={item.id}
+                                  role="button"
+                                  tabIndex={0}
+                                  onKeyDown={(event) => {
+                                    if (event.key === 'Enter' || event.key === ' ') {
+                                      event.preventDefault();
+                                      event.currentTarget.click();
+                                    }
+                                  }}
                                   onClick={() =>
                                     setSelectedDetail({
                                       courseCode: item.courseCode,
@@ -705,7 +732,7 @@ export default function LecturerSchedulePage() {
                                       status: item.status,
                                     })
                                   }
-                                  className={`rounded-lg border p-3 text-xs transition hover:shadow-sm cursor-pointer ${accentForCourse(
+                                  className={`rounded-lg border p-3 text-xs transition hover:shadow-sm cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${accentForCourse(
                                     item.courseCode,
                                   )}`}
                                 >
@@ -838,7 +865,7 @@ export default function LecturerSchedulePage() {
                               status: item.status,
                             })
                           }
-                          className={`rounded-lg border p-4 transition-all hover:scale-[1.01] hover:shadow-md cursor-pointer ${accentForCourse(
+                          className={`rounded-lg border p-4 transition-all hover:scale-[1.01] hover:shadow-md cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${accentForCourse(
                             item.courseCode,
                           )}`}
                         >

@@ -196,6 +196,31 @@ class AcademicEnrollmentReadPersistenceTest {
     }
 
     @Test
+    void completedEnrollmentDoesNotPublishDraftScoresThroughSummaryOrTranscript() throws Exception {
+        jdbc.update("UPDATE academic.\"Enrollment\" SET \"gradeStatus\" = 'DRAFT' WHERE \"id\" = 'enrollment-1'");
+        mvc.perform(get("/api/v1/enrollments/my/grades").with(studentJwt("student-user-1", "student-1")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(0));
+        mvc.perform(get("/api/v1/enrollments/my/transcript").with(studentJwt("student-user-1", "student-1")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.summary.totalCreditsEarned").value(0))
+                .andExpect(jsonPath("$.semesters.length()").value(0));
+        // Staff retain draft visibility; completion is independent of release.
+        mvc.perform(get("/api/v1/enrollments/enrollment-1").with(adminJwt()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.finalGrade").value(88.5));
+    }
+
+    @Test
+    void appealedPublishedGradeRemainsVisibleUntilARevisionBecomesDraft() throws Exception {
+        jdbc.update("UPDATE academic.\"Enrollment\" SET \"gradeStatus\" = 'APPEALED' WHERE \"id\" = 'enrollment-1'");
+        mvc.perform(get("/api/v1/enrollments/my/grades").with(studentJwt("student-user-1", "student-1")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(1))
+                .andExpect(jsonPath("$[0].finalGrade").value(88.5));
+    }
+
+    @Test
     void lecturerGradeReadsAreScopedToOwnedSectionsAndRequireLecturerClaim() throws Exception {
         mvc.perform(get("/api/v1/grades/items/lecturer/my").with(lecturerJwt("lecturer-1")))
                 .andExpect(status().isOk())

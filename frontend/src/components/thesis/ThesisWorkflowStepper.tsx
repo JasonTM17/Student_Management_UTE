@@ -177,7 +177,7 @@ export function ThesisWorkflowStepper({ round, formatDateTime }: ThesisWorkflowS
                   className={cn(
                     'flex h-6 w-6 items-center justify-center rounded-full text-xs font-bold',
                     isCurrentActive
-                      ? 'bg-emerald-600 text-white'
+                      ? 'bg-emerald-700 text-white'
                       : isCompleted
                       ? 'bg-primary text-primary-foreground'
                       : 'bg-muted text-muted-foreground',
@@ -187,12 +187,12 @@ export function ThesisWorkflowStepper({ round, formatDateTime }: ThesisWorkflowS
                 </span>
 
                 {isCompleted ? (
-                  <span className="inline-flex items-center gap-1 text-[11px] font-medium text-emerald-600 dark:text-emerald-400">
+                  <span className="inline-flex items-center gap-1 text-[11px] font-medium text-emerald-700 dark:text-emerald-400">
                     <CheckCircle2 className="h-3.5 w-3.5" />
                     {copy.stageProgress.done}
                   </span>
                 ) : isCurrentActive ? (
-                  <span className="inline-flex items-center gap-1 text-[11px] font-bold text-emerald-600 dark:text-emerald-400">
+                  <span className="inline-flex items-center gap-1 text-[11px] font-bold text-emerald-700 dark:text-emerald-400">
                     <span className="relative flex h-2 w-2">
                       <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
                       <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>

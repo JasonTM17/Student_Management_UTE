@@ -281,6 +281,15 @@ public class AdminCatalogMutationService {
         }
         if (replacesSchedules) {
             replaceSectionSchedules(id, input.get("schedules"));
+        } else if (SECTION.equals(table)) {
+            // Omitted schedules keep their rows, but new capacity or assignment
+            // must still be valid against that retained timetable.
+            if (input.containsKey("capacity")) {
+                requireScheduledRoomsFitCapacity(id);
+            }
+            if (input.containsKey("lecturerId") || input.containsKey("semesterId")) {
+                assertNoSectionConflicts(id);
+            }
         }
         return get(table, id);
     }
@@ -388,7 +397,23 @@ public class AdminCatalogMutationService {
                             .addValue("startTime", requiredScheduleText(schedule, "startTime"))
                             .addValue("endTime", requiredScheduleText(schedule, "endTime")));
         }
+        // Validate the effective replacement inside this transaction. This also
+        // allows clearing or moving old small rooms while increasing capacity.
+        requireScheduledRoomsFitCapacity(sectionId);
         assertNoSectionConflicts(sectionId);
+    }
+
+    private void requireScheduledRoomsFitCapacity(String sectionId) {
+        MapSqlParameterSource parameters = new MapSqlParameterSource("sectionId", sectionId);
+        int capacity = jdbc.queryForObject(
+                "SELECT \"capacity\" FROM " + SECTION + " WHERE \"id\" = :sectionId",
+                parameters, Integer.class);
+        List<String> classroomIds = jdbc.queryForList(
+                "SELECT DISTINCT \"classroomId\" FROM " + SECTION_SCHEDULE + " WHERE \"sectionId\" = :sectionId",
+                parameters, String.class);
+        for (String classroomId : classroomIds) {
+            requireRoomFitsCapacity(classroomId, capacity);
+        }
     }
 
     /**
@@ -397,22 +422,18 @@ public class AdminCatalogMutationService {
      * collisions the registrar then had to resolve by hand.
      */
     private void assertNoSectionConflicts(String sectionId) {
-        String semesterOf = "(SELECT \"semesterId\" FROM " + SECTION + " WHERE \"id\" = :sectionId)";
+        // Compare individual slots: MIN(start)/MAX(end) would occupy the free
+        // gap between two sessions and incorrectly reject another class there.
+        String overlappingSlots = " FROM " + SECTION_SCHEDULE + " ss"
+                + " JOIN " + SECTION + " me ON me.\"id\" = ss.\"sectionId\""
+                + " JOIN " + SECTION_SCHEDULE + " ss2 ON ss2.\"dayOfWeek\" = ss.\"dayOfWeek\""
+                + " AND ss2.\"startTime\" < ss.\"endTime\" AND ss2.\"endTime\" > ss.\"startTime\""
+                + " JOIN " + SECTION + " s2 ON s2.\"id\" = ss2.\"sectionId\""
+                + " WHERE ss.\"sectionId\" = :sectionId AND ss2.\"sectionId\" <> ss.\"sectionId\""
+                + " AND s2.\"semesterId\" = me.\"semesterId\"";
         Long roomClash = jdbc.queryForObject(
-                "SELECT COUNT(*) FROM " + SECTION_SCHEDULE + " ss2"
-                        + " JOIN " + SECTION + " s2 ON s2.\"id\" = ss2.\"sectionId\""
-                        + " WHERE ss2.\"sectionId\" <> :sectionId"
-                        + " AND s2.\"semesterId\" = " + semesterOf
-                        + " AND ss2.\"classroomId\" IN (SELECT \"classroomId\" FROM " + SECTION_SCHEDULE
-                        + " WHERE \"sectionId\" = :sectionId)"
-                        + " AND ss2.\"dayOfWeek\" IN (SELECT \"dayOfWeek\" FROM " + SECTION_SCHEDULE
-                        + " WHERE \"sectionId\" = :sectionId)"
-                        + " AND ss2.\"startTime\" < (SELECT MAX(\"endTime\") FROM " + SECTION_SCHEDULE
-                        + " WHERE \"sectionId\" = :sectionId AND \"dayOfWeek\" = ss2.\"dayOfWeek\""
-                        + "   AND \"classroomId\" = ss2.\"classroomId\")"
-                        + " AND ss2.\"endTime\" > (SELECT MIN(\"startTime\") FROM " + SECTION_SCHEDULE
-                        + " WHERE \"sectionId\" = :sectionId AND \"dayOfWeek\" = ss2.\"dayOfWeek\""
-                        + "   AND \"classroomId\" = ss2.\"classroomId\")",
+                "SELECT COUNT(*)" + overlappingSlots
+                        + " AND ss2.\"classroomId\" = ss.\"classroomId\"",
                 new MapSqlParameterSource("sectionId", sectionId),
                 Long.class);
         if (roomClash != null && roomClash > 0) {
@@ -420,19 +441,9 @@ public class AdminCatalogMutationService {
                     "The room is already booked for an overlapping slot in this semester");
         }
         Long lecturerClash = jdbc.queryForObject(
-                "SELECT COUNT(*) FROM " + SECTION_SCHEDULE + " ss2"
-                        + " JOIN " + SECTION + " s2 ON s2.\"id\" = ss2.\"sectionId\""
-                        + " JOIN " + SECTION + " me ON me.\"id\" = :sectionId"
-                        + " WHERE ss2.\"sectionId\" <> :sectionId"
+                "SELECT COUNT(*)" + overlappingSlots
                         + " AND me.\"lecturerId\" IS NOT NULL"
-                        + " AND s2.\"lecturerId\" = me.\"lecturerId\""
-                        + " AND s2.\"semesterId\" = me.\"semesterId\""
-                        + " AND ss2.\"dayOfWeek\" IN (SELECT \"dayOfWeek\" FROM " + SECTION_SCHEDULE
-                        + " WHERE \"sectionId\" = :sectionId)"
-                        + " AND ss2.\"startTime\" < (SELECT MAX(\"endTime\") FROM " + SECTION_SCHEDULE
-                        + " WHERE \"sectionId\" = :sectionId AND \"dayOfWeek\" = ss2.\"dayOfWeek\")"
-                        + " AND ss2.\"endTime\" > (SELECT MIN(\"startTime\") FROM " + SECTION_SCHEDULE
-                        + " WHERE \"sectionId\" = :sectionId AND \"dayOfWeek\" = ss2.\"dayOfWeek\")",
+                        + " AND s2.\"lecturerId\" = me.\"lecturerId\"",
                 new MapSqlParameterSource("sectionId", sectionId),
                 Long.class);
         if (lecturerClash != null && lecturerClash > 0) {
