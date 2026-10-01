@@ -50,6 +50,15 @@ const nextConfig = {
             key: 'Content-Security-Policy-Report-Only',
             value: contentSecurityPolicyReportOnly,
           },
+          // Round-3 contract ct-6: frame-ancestors lives inside the
+          // Report-Only CSP, so nothing ENFORCED blocked framing — the prod
+          // site could be embedded by a foreign page (clickjacking).
+          // X-Frame-Options is the enforced fallback until the staged CSP
+          // graduates to enforced (see RT-P2-4 comment above).
+          {
+            key: 'X-Frame-Options',
+            value: 'DENY',
+          },
         ],
       },
     ];

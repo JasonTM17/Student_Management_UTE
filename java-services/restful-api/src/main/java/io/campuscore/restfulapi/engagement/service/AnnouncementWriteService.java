@@ -322,11 +322,25 @@ public class AnnouncementWriteService {
 
     @Transactional(readOnly = true)
     public AnnouncementHistoryListResponse history(
+            String actorId,
+            List<String> roles,
+            String lecturerId,
             String announcementId,
             int page,
-            int limit) {        String id = requireText(announcementId, "announcement id");
+            int limit) {
+        String id = requireText(announcementId, "announcement id");
         requirePage(page, limit);
-        requireAnnouncement(id);
+        AnnouncementResponse announcement = requireAnnouncement(id);
+        // Round-3 contract ct-1: the audit trail carries actor identity and
+        // full before/after snapshots. It used to be readable by ANY lecturer
+        // for ANY announcement — including system/admin-authored ones whose
+        // write verbs are individually owner-scoped. Lecturers keep history
+        // for announcements they own; governance roles see everything.
+        if (!isGovernanceRole(roles)) {
+            if (lecturerId == null || lecturerId.isBlank() || !lecturerId.equals(announcement.lecturerId())) {
+                throw forbiddenLecturer();
+            }
+        }
         long total = audits.countByAnnouncementId(id);
         List<AnnouncementHistoryResponse> data =
                 audits.findByAnnouncementId(id, offset(page, limit), limit);
@@ -334,6 +348,11 @@ public class AnnouncementWriteService {
         return new AnnouncementHistoryListResponse(
                 data,
                 new PageMeta(total, page, limit, Math.toIntExact(totalPages)));
+    }
+
+    /** Governance roles read every announcement's history; lecturers only their own. */
+    private static boolean isGovernanceRole(List<String> roles) {
+        return roles != null && (roles.contains("ADMIN") || roles.contains("SUPER_ADMIN"));
     }
 
     private AnnouncementResponse transition(

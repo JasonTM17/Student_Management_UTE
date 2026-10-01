@@ -1067,6 +1067,28 @@ public class ThesisAssistantService {
         return legacyHistory.ensureConversation(ownerId, null, AssistantInputGuard.normalizeLocale(locale), properties.retentionDays()).toString();
     }
 
+    /**
+     * Round-3 chat-7: records both sides of an intercepted PERSONAL_CONTEXT
+     * turn so it shows up in /conversations/{id}/messages like every KB turn.
+     * The conversation must exist and belong to the caller — requireOwnedConversation
+     * throws 404 CONVERSATION_NOT_FOUND otherwise, matching the KB path's
+     * behavior for a deleted conversationId. Returns the conversation id for
+     * the response echo, or null when history persistence is not configured.
+     */
+    public String recordPersonalTurn(String ownerId, String conversationId, String message,
+            String answer, String locale, String reasonCode) {
+        if (legacyHistory == null) return null;
+        UUID conversation = parseConversation(conversationId);
+        if (conversation == null) return null;
+        legacyHistory.requireOwnedConversation(conversation, ownerId);
+        String model = "campuscore-personal-context";
+        legacyHistory.appendMessage(conversation, "USER",
+                AssistantInputGuard.normalizeMessage(message), model, false, "RECEIVED");
+        legacyHistory.appendMessage(conversation, "ASSISTANT", answer, model, false,
+                reasonCode == null || reasonCode.isBlank() ? "PERSONAL_CONTEXT" : reasonCode);
+        return conversation.toString();
+    }
+
     public List<ThesisAssistantRepository.Message> messages(UUID conversationId, String ownerId) {
         if (legacyHistory == null) return List.of();
         return legacyHistory.messages(conversationId, ownerId);

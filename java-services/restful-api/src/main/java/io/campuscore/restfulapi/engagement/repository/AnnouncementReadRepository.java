@@ -47,11 +47,16 @@ public class AnnouncementReadRepository {
      * Display ordering shared by the admin list and the public feed: an
      * administrator-assigned display order wins (ascending, rows without one
      * last), then newest first. The CASE keeps NULLS LAST semantics portable
-     * across PostgreSQL and H2.
+     * across PostgreSQL and H2. The trailing id keeps the rank total: seeded
+     * rows share createdAt in bulk (12 identical timestamps), and an OFFSET
+     * window over a tied order dropped records from full crawls and duplicated
+     * ids across adjacent pages (round-3 thesis-1).
      */
     static final String DISPLAY_ORDER_CLAUSE =
             " ORDER BY CASE WHEN \"displayOrder\" IS NULL THEN 1 ELSE 0 END,"
-                    + " \"displayOrder\", COALESCE(\"publishAt\", \"createdAt\") DESC";
+                    + " \"displayOrder\", COALESCE(\"publishAt\", \"createdAt\") DESC, \"id\" DESC";
+    /** The user feed orders by createdAt alone — the id tiebreaker is load-bearing. */
+    static final String USER_ORDER_CLAUSE = " ORDER BY \"createdAt\" DESC, \"id\" DESC";
     private static final RowMapper<AnnouncementResponse> ROW_MAPPER =
             AnnouncementReadRepository::mapRow;
 
@@ -91,7 +96,7 @@ public class AnnouncementReadRepository {
         where.parameters().addValue("offset", offset).addValue("limit", limit);
         return jdbc.query(
                 "SELECT " + SELECT_COLUMNS + " FROM " + TABLE + where.sql()
-                        + " ORDER BY \"createdAt\" DESC LIMIT :limit OFFSET :offset",
+                        + USER_ORDER_CLAUSE + " LIMIT :limit OFFSET :offset",
                 where.parameters(),
                 ROW_MAPPER);
     }

@@ -1,5 +1,6 @@
 package io.campuscore.restfulapi.thesis.service;
 
+import io.campuscore.restfulapi.audit.AdminAuditRecorder;
 import io.campuscore.restfulapi.thesis.domain.ApprovalStatus;
 import io.campuscore.restfulapi.thesis.domain.GroupStatus;
 import io.campuscore.restfulapi.thesis.domain.RoundStatus;
@@ -50,6 +51,7 @@ public class ThesisMutationService {
     private final ThesisTopicRepository topics;
     private final ThesisGroupReadRepository groups;
     private final ThesisRoundReadService roundReads;
+    private final AdminAuditRecorder audit;
 
     /**
      * Wires the write boundary over the shared JDBC template and the thesis repositories.
@@ -67,13 +69,15 @@ public class ThesisMutationService {
             ThesisRoundReadPort roundReadPort,
             ThesisTopicRepository topics,
             ThesisGroupReadRepository groups,
-            ThesisRoundReadService roundReads) {
+            ThesisRoundReadService roundReads,
+            AdminAuditRecorder audit) {
         this.jdbc = jdbc;
         this.rounds = rounds;
         this.roundReadPort = roundReadPort;
         this.topics = topics;
         this.groups = groups;
         this.roundReads = roundReads;
+        this.audit = audit;
     }
 
     /**
@@ -665,6 +669,12 @@ public class ThesisMutationService {
         int changed = jdbc.update("UPDATE thesis.thesis_group SET approval_status='REJECTED', approved_by=NULL, approved_at=NULL, rejection_reason=:reason, updated_at=CURRENT_TIMESTAMP, version=version+1 WHERE id=:id AND approval_status='PENDING'",
                 params().addValue("id", groupId).addValue("reason", reason));
         if (changed != 1) throw conflict("GROUP_APPROVAL_STATE_CONFLICT", "Only pending groups can be rejected");
+        // Round-3 contract ct-3: the group row nulls approved_by on rejection and
+        // has no rejected_by column, so without this trail the rejecting actor is
+        // untraceable — the one approval action with no who. Same lockstep
+        // transaction as the mutation (recorder runs MANDATORY).
+        audit.record(subject(actor), null, "THESIS_GROUP_REJECTED", "THESIS_GROUP", groupId.toString(),
+                "Thesis group rejected; reason: " + reason);
         return groups.findById(groupId);
     }
 
@@ -869,16 +879,24 @@ public class ThesisMutationService {
      * term and a graduation thesis later).
      */
     private void requireNotInAnotherActiveGroup(UUID roundId, String studentId) {
+        // Round-3 contract thesis-3: a leader's only way out of a group is
+        // PATCH progress → CANCELLED, but the member rows stayed — so the
+        // same-round membership check locked the leader out of every new group
+        // for the rest of the round. A cancelled group holds no seat.
         Integer sameRound = jdbc.queryForObject(
-                "SELECT COUNT(*) FROM thesis.thesis_group_member WHERE round_id = :roundId AND student_id = :studentId",
+                "SELECT COUNT(*) FROM thesis.thesis_group_member m "
+                        + "JOIN thesis.thesis_group g ON g.id = m.group_id "
+                        + "WHERE m.round_id = :roundId AND m.student_id = :studentId AND g.status <> 'CANCELLED'",
                 params().addValue("roundId", roundId).addValue("studentId", studentId), Integer.class);
         if (sameRound != null && sameRound > 0) {
             throw conflict("STUDENT_ALREADY_IN_GROUP", "Student already belongs to a group in this round");
         }
         Integer otherActive = jdbc.queryForObject(
                 "SELECT COUNT(*) FROM thesis.thesis_group_member m "
+                        + "JOIN thesis.thesis_group g ON g.id = m.group_id "
                         + "JOIN thesis.thesis_registration_round r ON r.id = m.round_id "
                         + "WHERE m.student_id = :studentId AND m.round_id <> :roundId "
+                        + "AND g.status <> 'CANCELLED' "
                         + "AND r.status IN ('DRAFT', 'PROPOSAL_OPEN', 'PROPOSALS_PUBLISHED', 'REGISTRATION_OPEN', 'REGISTRATION_CLOSED')",
                 params().addValue("studentId", studentId).addValue("roundId", roundId), Integer.class);
         if (otherActive != null && otherActive > 0) {
