@@ -284,7 +284,10 @@ public class ThesisAssistantService {
             Map.entry("giay xac nhan", "giấy xác nhận"),
             Map.entry("giay to", "giấy tờ"),
             Map.entry("nghi hoc", "nghỉ học"),
-            Map.entry("lam lai", "làm lại"));
+            Map.entry("lam lai", "làm lại"),
+            // Round-4 format sweep: unaccented "tu van" folds onto the same
+            // advisory phrase (the bare syllables are retrieval noise).
+            Map.entry("tu van", "tư vấn"));
     /**
      * Multi-part acronyms that the {@code [^\p{L}\p{N}]+} splitter shreds. The
      * corpus spells the concept "CI/CD", so every folded spelling collapses onto
@@ -1643,20 +1646,77 @@ public class ThesisAssistantService {
     private static String answerFromDocument(String message,
             ThesisAssistantKnowledgeRepository.KnowledgeDocument document) {
         String content = safe(document.content()).trim();
-        if (!isCreditLimitQuery(message) || content.isBlank()) return content;
-        java.util.regex.Matcher section = CREDIT_LIMIT_SECTION.matcher(content);
-        if (!section.find()) return content;
+        if (isCreditLimitQuery(message) && !content.isBlank()) {
+            java.util.regex.Matcher section = CREDIT_LIMIT_SECTION.matcher(content);
+            if (section.find()) {
+                int end = content.length();
+                java.util.regex.Matcher nextSection = NUMBERED_SECTION.matcher(content);
+                nextSection.region(section.end(), content.length());
+                if (nextSection.find()) end = nextSection.start();
+                String scoped = content.substring(section.end(), end).trim();
+                if (!scoped.isBlank()) {
+                    String heading = "en".equalsIgnoreCase(safe(document.locale()))
+                            ? "Credit limits" : "Giới hạn tín chỉ";
+                    return "**" + heading + "**\n\n" + scoped;
+                }
+            }
+        }
+        // Round-4 format sweep: degraded answers (QUOTA_EXCEEDED, provider
+        // truncated/unavailable) serve the top document verbatim. Give the raw
+        // content the same structure the LLM pathway produces — a title
+        // heading and one bullet per numbered point — so the panel renders a
+        // readable answer instead of one inline "1. … 2. …" paragraph.
+        return formatDocumentAnswer(document, content);
+    }
 
-        int end = content.length();
-        java.util.regex.Matcher nextSection = NUMBERED_SECTION.matcher(content);
-        nextSection.region(section.end(), content.length());
-        if (nextSection.find()) end = nextSection.start();
-        String scoped = content.substring(section.end(), end).trim();
-        if (scoped.isBlank()) return content;
+    /**
+     * Deterministic markdown shaping for a document answer: a {@code # }
+     * heading from the document title, then each top-level {@code N. }
+     * segment as a {@code - } bullet with its lead label bolded. Facts are
+     * never rewritten — only separators are added. Content that already
+     * carries markdown headings, or has no numbered segments, passes through.
+     */
+    static String formatDocumentAnswer(ThesisAssistantKnowledgeRepository.KnowledgeDocument document, String content) {
+        if (content == null || content.isBlank()) return content == null ? "" : content;
+        if (content.contains("\n#") || content.startsWith("# ")) return content;
+        java.util.List<Integer> marks = new java.util.ArrayList<>();
+        int cursor = 0;
+        int expected = 1;
+        while (expected <= 9) {
+            // The first segment may open the content directly ("1. …") with no
+            // leading space to anchor the generic marker.
+            int at = expected == 1 && content.startsWith("1. ")
+                    ? 0
+                    : content.indexOf(" " + expected + ". ", cursor);
+            if (at < 0) break;
+            int textStart = at + Integer.toString(expected).length() + 2;
+            marks.add(textStart);
+            cursor = textStart;
+            expected += 1;
+        }
+        if (marks.isEmpty()) return content;
+        String title = safe(document == null ? null : document.title()).trim();
+        StringBuilder shaped = new StringBuilder();
+        if (!title.isEmpty()) {
+            shaped.append("# ").append(title).append("\n\n");
+        }
+        for (int index = 0; index < marks.size(); index++) {
+            int start = marks.get(index);
+            int end = index + 1 < marks.size() ? marks.get(index + 1) - 1 : content.length();
+            String segment = content.substring(start, end).trim();
+            if (segment.isEmpty()) continue;
+            shaped.append("- ").append(formatSegmentLabel(segment)).append('\n');
+        }
+        return shaped.toString().stripTrailing();
+    }
 
-        String heading = "en".equalsIgnoreCase(safe(document.locale()))
-                ? "Credit limits" : "Giới hạn tín chỉ";
-        return "**" + heading + "**\n\n" + scoped;
+    /** "Chuẩn hóa: 1NF (giá trị nguyên tử)…" → "**Chuẩn hóa**: 1NF …"; a long or colon-less lead stays plain. */
+    private static String formatSegmentLabel(String segment) {
+        int colon = segment.indexOf(": ");
+        if (colon <= 0 || colon > 60) return segment;
+        String label = segment.substring(0, colon).trim();
+        if (label.isEmpty() || label.contains(";") || label.contains("(")) return segment;
+        return "**" + label + "**: " + segment.substring(colon + 2).trim();
     }
 
     private ChatResponse lexicalAnswer(String message, String locale) {
@@ -1679,7 +1739,13 @@ public class ThesisAssistantService {
             return new ChatResponse(technicalOutputMessage(normalizedLocale), MODEL, true,
                     "TECHNICAL_REQUEST_BLOCKED", normalizedLocale, List.of());
         }
-        LexicalResult result = retrieve(normalized, AssistantInputGuard.normalizeLocale(locale));
+        // Round-4 latent fix: the scope was only consulted for the technical
+        // gate and then dropped — every specialized question reaching this
+        // path (groundedFallback, legacyAnswer) searched the DEFAULT corpus,
+        // which excludes domain SPECIALIZED, so the curated professional set
+        // was silently unreachable here. Pass the scope through like the fast
+        // path does.
+        LexicalResult result = retrieve(normalized, AssistantInputGuard.normalizeLocale(locale), scope);
         if (result.error()) {
             return new ChatResponse(result.answer(), MODEL, true, "KNOWLEDGE_UNAVAILABLE", AssistantInputGuard.normalizeLocale(locale), List.of());
         }
@@ -1825,11 +1891,25 @@ public class ThesisAssistantService {
                 case "ký" -> expanded.add("đăng ký");
                 case "học" -> expanded.add("học phần");
                 case "phần" -> expanded.add("học phần");
+                // Round-4 format sweep: "tư vấn" is one concept; the bare
+                // syllables are noise that substring-matched "truy vấn" and
+                // "phỏng vấn", ranking the wrong doc #1 under quota (prod
+                // screenshot: DevOps question answered with the CSDL doc).
+                case "tư" -> expanded.add("tư vấn");
+                case "vấn" -> expanded.add("tư vấn");
                 default -> { }
             }
         }
         if ((baseTerms.contains("đăng") && baseTerms.contains("ký"))
                 || (foldedTerms.contains("dang") && foldedTerms.contains("ky"))) expanded.add("đăng ký");
+        if ((baseTerms.contains("tư") && baseTerms.contains("vấn"))
+                || (foldedTerms.contains("tu") && foldedTerms.contains("van"))) {
+            expanded.add("tư vấn");
+            // The bare syllables only substring-hit unrelated nouns ("truy
+            // vấn", "phỏng vấn", "tư duy"); the phrase term supersedes them.
+            expanded.removeIf(term -> term.equals("tư") || term.equals("vấn")
+                    || term.equals("tu") || term.equals("van"));
+        }
         if ((baseTerms.contains("học") && baseTerms.contains("phần"))
                 || (foldedTerms.contains("hoc") && foldedTerms.contains("phan"))) expanded.add("học phần");
         return expanded.stream().distinct().limit(16).toList();
