@@ -112,11 +112,17 @@ public class ThesisAssistantController {
      * unpersisted exactly as before.
      */
     private ChatResponse persistPersonalTurn(ChatRequest request, ChatResponse personal, String owner) {
-        if (request.conversationId() == null || request.conversationId().isBlank()) {
-            return personal;
-        }
         try {
-            String conversationId = assistant.recordPersonalTurn(owner, request.conversationId(),
+            // Round-3 cb3-7/cb3-10: a personal turn without a conversationId
+            // used to skip persistence entirely — the answer vanished from
+            // history AND the idempotency key stayed unconsumed (prod probe
+            // caught the 200-reuse). Create the conversation on the fly so
+            // every personal turn lands in history and consumes its key.
+            String targetConversation = request.conversationId();
+            if (targetConversation == null || targetConversation.isBlank()) {
+                targetConversation = assistant.createConversation(owner, personal.locale());
+            }
+            String conversationId = assistant.recordPersonalTurn(owner, targetConversation,
                     request.message(), personal.answer(), personal.locale(), personal.reasonCode(),
                     request.clientRequestId(),
                     AssistantInputGuard.canonicalHash(request.message(), personal.locale(),
@@ -133,6 +139,15 @@ public class ThesisAssistantController {
             // it into a 5xx (same outage contract as the KB path).
             LOG.warn("personal turn persistence skipped with {}", exception.getClass().getSimpleName());
             return personal;
+        } catch (DomainException exception) {
+            // History unconfigured (ASSISTANT_UNAVAILABLE) or the provided
+            // conversationId failed validation — validation 404s must surface,
+            // only the history-unconfigured case keeps the answer alive.
+            if ("ASSISTANT_UNAVAILABLE".equals(exception.code())) {
+                LOG.warn("personal turn persistence skipped: history unconfigured");
+                return personal;
+            }
+            throw exception;
         }
     }
 
