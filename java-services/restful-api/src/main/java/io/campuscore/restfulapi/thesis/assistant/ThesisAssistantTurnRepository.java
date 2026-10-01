@@ -255,6 +255,19 @@ public class ThesisAssistantTurnRepository {
         return cancel(turnId, ownerId, clientRequestId, ignored -> { });
     }
 
+    /**
+     * Round-3 cb3-10: the request hash recorded for a client request id, or
+     * null when the key was never used. The personal-context path consults it
+     * so a reused key with a different payload conflicts exactly like the KB
+     * path's reserve does. Read-only — no lease, no reservation.
+     */
+    public String requestHashOf(String ownerId, UUID clientRequestId) {
+        return jdbc.queryForObject(
+                "SELECT request_hash FROM assistant.chat_turn_ledger WHERE owner_id=:owner AND client_request_id=:request ORDER BY created_at DESC LIMIT 1",
+                p().addValue("owner", ownerId).addValue("request", clientRequestId),
+                String.class);
+    }
+
     /** Cancellation callback is deferred until the short CAS transaction commits. */
     @Transactional(transactionManager = AssistantDatabaseConfiguration.TRANSACTION_MANAGER)
     public CancelResult cancel(UUID turnId, String ownerId, UUID clientRequestId,

@@ -140,7 +140,7 @@ class ThesisAssistantTurnStateMachineTest {
     }
 
     @Test
-    void explicitConversationStaysHiddenUntilTheFirstTerminalCommit() throws Exception {
+    void explicitConversationIsListedImmediatelyAndSurvivesTheFirstTerminalCommit() throws Exception {
         String owner = "pending-owner-" + UUID.randomUUID();
         String created = mvc.perform(post("/api/v1/thesis/assistant/conversations")
                         .with(student(owner)).contentType("application/json")
@@ -149,8 +149,13 @@ class ThesisAssistantTurnStateMachineTest {
                 .andReturn().getResponse().getContentAsString();
         UUID conversation = UUID.fromString(mapper.readTree(created).get("id").asText());
 
+        // Round-3 cb3-9: a conversation the client created explicitly is
+        // VISIBLE right away — the old hidden-until-first-turn contract made
+        // an abandoned-but-real session an orphan the owner could not see or
+        // delete from the list. Ledger-created conversations still flip to
+        // visible on their first assistant append, unchanged.
         mvc.perform(get("/api/v1/thesis/assistant/conversations").with(student(owner)))
-                .andExpect(status().isOk()).andExpect(content().string("[]"));
+                .andExpect(status().isOk()).andExpect(content().string(containsString(conversation.toString())));
 
         UUID key = UUID.randomUUID();
         String payload = "{\"message\":\"How do I choose a thesis topic?\",\"locale\":\"en\",\"conversationId\":\""

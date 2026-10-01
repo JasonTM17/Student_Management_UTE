@@ -27,6 +27,7 @@ import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.security.oauth2.jwt.JwtException;
+import io.campuscore.restfulapi.audit.AdminAuditRecorder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
@@ -46,6 +47,7 @@ public class AuthLoginService {
     private final PasswordEncoder passwordEncoder;
     private final AuthTokenService tokens;
     private final TwoFactorService twoFactor;
+    private final AdminAuditRecorder audit;
     private final Clock clock;
 
     @Autowired
@@ -53,8 +55,9 @@ public class AuthLoginService {
             AuthUserRepository users,
             PasswordEncoder passwordEncoder,
             AuthTokenService tokens,
-            TwoFactorService twoFactor) {
-        this(users, passwordEncoder, tokens, twoFactor, Clock.systemUTC());
+            TwoFactorService twoFactor,
+            AdminAuditRecorder audit) {
+        this(users, passwordEncoder, tokens, twoFactor, audit, Clock.systemUTC());
     }
 
     AuthLoginService(
@@ -62,11 +65,13 @@ public class AuthLoginService {
             PasswordEncoder passwordEncoder,
             AuthTokenService tokens,
             TwoFactorService twoFactor,
+            AdminAuditRecorder audit,
             Clock clock) {
         this.users = users;
         this.passwordEncoder = passwordEncoder;
         this.tokens = tokens;
         this.twoFactor = twoFactor;
+        this.audit = audit;
         this.clock = clock;
     }
 
@@ -238,6 +243,11 @@ public class AuthLoginService {
         users.setMustChangePassword(user.id(), false);
         users.deleteAllRefreshSessions(user.id());
         users.clearUserRefreshToken(user.id());
+        // Round-3 ct-4: a self-service credential rotation is exactly the
+        // operation whose author an investigation needs to know — the trail
+        // previously covered only admin-initiated resets (PASSWORD_RESET).
+        audit.record(userId, null, "PASSWORD_CHANGED", "USER", userId,
+                "User rotated their own password; all sessions were revoked");
     }
 
     @Transactional

@@ -13,6 +13,7 @@ import java.util.Set;
 import java.util.UUID;
 import org.springframework.context.annotation.Profile;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.dao.EmptyResultDataAccessException;
 import org.springframework.http.HttpStatus;
 import org.springframework.jdbc.core.namedparam.MapSqlParameterSource;
 import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
@@ -226,6 +227,21 @@ public class AdminUserMutationService {
         audit.record(currentUserId, null, "USER_UNLOCKED", "USER", id,
                 "Cleared the login lockout for user " + id);
         return find(id);
+    }
+
+    /**
+     * Round-3 ct-9: single-user detail for the admin console (the collection
+     * existed; one id used to answer 405). A protected account's detail is
+     * subject to the same ceiling as managing it.
+     */
+    @Transactional(readOnly = true)
+    public Map<String, Object> get(String id, boolean canManageSuperAdmin) {
+        requireSuperAdminForProtectedAccount(id, canManageSuperAdmin, "view");
+        try {
+            return find(id);
+        } catch (EmptyResultDataAccessException exception) {
+            throw problem(HttpStatus.NOT_FOUND, "USER_NOT_FOUND", "User not found");
+        }
     }
 
     @Transactional

@@ -167,7 +167,12 @@ public class ThesisAssistantRepository {
         String predicate = boundary == null ? "" : " AND (updated_at < :cursorTime OR (updated_at=:cursorTime AND id < :cursorId))";
         MapSqlParameterSource params = p().addValue("owner", ownerId).addValue("limit", limit + 1);
         if (boundary != null) params.addValue("cursorTime", Timestamp.from(boundary.instant())).addValue("cursorId", boundary.id());
-        List<Conversation> rows = jdbc.query("SELECT id,title,locale,created_at,updated_at,owner_id FROM assistant.chat_conversation WHERE owner_id=:owner AND state='ACTIVE' AND expires_at>CURRENT_TIMESTAMP" + predicate + " ORDER BY updated_at DESC,id DESC LIMIT :limit",
+        // Round-3 cb3-9: PENDING joins the list — a conversation created
+        // explicitly via POST /conversations but never messaged was invisible
+        // here (an orphan the owner could not see or delete from the list).
+        // Crash residue between a ledger reserve and its first append shows up
+        // honestly as an empty conversation; retention still expires it.
+        List<Conversation> rows = jdbc.query("SELECT id,title,locale,created_at,updated_at,owner_id FROM assistant.chat_conversation WHERE owner_id=:owner AND state IN ('ACTIVE','PENDING') AND expires_at>CURRENT_TIMESTAMP" + predicate + " ORDER BY updated_at DESC,id DESC LIMIT :limit",
                 params, (rs, row) -> new Conversation(rs.getObject("id", UUID.class), rs.getString("title"), rs.getString("locale"), rs.getTimestamp("created_at").toInstant(), rs.getTimestamp("updated_at").toInstant(), rs.getString("owner_id")));
         boolean more = rows.size() > limit;
         if (more) rows = new ArrayList<>(rows.subList(0, limit));
