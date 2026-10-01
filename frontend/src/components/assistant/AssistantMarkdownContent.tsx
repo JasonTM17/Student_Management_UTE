@@ -10,7 +10,7 @@ import {
   sanitizeStreamingMarkdown,
   splitAssistantBlocks,
 } from '@/lib/assistant-inline-markdown-regex';
-import { sanitizeAssistantOutput } from '@/lib/assistant-output-guard';
+import { sanitizeAssistantOutput, type AssistantScope } from '@/lib/assistant-output-guard';
 
 interface AssistantMarkdownContentProps {
   content: string;
@@ -19,6 +19,8 @@ interface AssistantMarkdownContentProps {
   streaming?: boolean;
   /** Only assistant output is sanitized; user messages remain verbatim. */
   guardOutput?: boolean;
+  /** Answer scope: 'specialized' skips the technical-phrasing checks (round-5). */
+  scope?: AssistantScope;
 }
 
 export function AssistantMarkdownContent({
@@ -26,12 +28,13 @@ export function AssistantMarkdownContent({
   className,
   streaming = false,
   guardOutput = true,
+  scope = 'academic',
 }: AssistantMarkdownContentProps) {
   const { href, locale, messages } = useI18n();
   const router = useRouter();
   const renderedContent = streaming ? sanitizeStreamingMarkdown(content) : content;
   const safeContent = guardOutput
-    ? sanitizeAssistantOutput(renderedContent, messages.assistant.technicalBlocked, locale)
+    ? sanitizeAssistantOutput(renderedContent, messages.assistant.technicalBlocked, locale, scope)
     : renderedContent;
 
   // Structural blocks: pipe tables stay table-scoped; consecutive plain-text
