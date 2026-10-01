@@ -159,6 +159,8 @@ const archetypes: Array<{ persona: Persona | 'public'; route: string }> = [
   { persona: 'public', route: '/login' },
   { persona: 'student', route: '/dashboard' },
   { persona: 'student', route: '/dashboard/register' },
+  { persona: 'student', route: '/dashboard/schedule' },
+  { persona: 'lecturer', route: '/dashboard/lecturer/schedule' },
   { persona: 'lecturer', route: '/dashboard/lecturer/grades' },
   { persona: 'admin', route: '/admin/users' },
   { persona: 'admin', route: '/admin/assistant-knowledge' },

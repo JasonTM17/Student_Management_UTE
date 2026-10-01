@@ -54,6 +54,8 @@ export default function EnrollmentsPage() {
   const [enrollments, setEnrollments] = useState<Enrollment[]>([]);
   const [curriculumData, setCurriculumData] = useState<MyCurriculumResponse | null>(null);
   const [activeTab, setActiveTab] = useState<'curriculum' | 'enrollments'>('curriculum');
+  const [curriculumError, setCurriculumError] = useState('');
+  const [isCurriculumLoading, setIsCurriculumLoading] = useState(false);
   const [statusFilter, setStatusFilter] = useState<'ALL' | 'COMPLETED' | 'IN_PROGRESS' | 'NOT_STARTED'>('ALL');
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState('');
@@ -163,14 +165,27 @@ export default function EnrollmentsPage() {
           loadFailed: 'Your current enrollments could not be loaded.',
         };
 
+  const fetchCurriculum = useCallback(async () => {
+    setIsCurriculumLoading(true);
+    setCurriculumError('');
+    try {
+      setCurriculumData(await curriculumApi.getMyCurriculum());
+    } catch {
+      setCurriculumData(null);
+      setCurriculumError(locale === 'vi' ? 'Không tải được chương trình đào tạo.' : 'Your curriculum could not be loaded.');
+    } finally {
+      setIsCurriculumLoading(false);
+    }
+  }, [locale]);
+
   const fetchData = useCallback(async () => {
     setIsLoading(true);
     setError('');
 
     try {
-      const [enrollmentsData, curriculumResult] = await Promise.allSettled([
+      const [enrollmentsData] = await Promise.allSettled([
         enrollmentsApi.getMyEnrollments(),
-        curriculumApi.getMyCurriculum(),
+        fetchCurriculum(),
       ]);
 
       if (enrollmentsData.status === 'fulfilled') {
@@ -178,16 +193,12 @@ export default function EnrollmentsPage() {
       } else {
         setError(copy.loadFailed);
       }
-
-      if (curriculumResult.status === 'fulfilled') {
-        setCurriculumData(curriculumResult.value);
-      }
     } catch {
       setError(copy.loadFailed);
     } finally {
       setIsLoading(false);
     }
-  }, [copy.loadFailed]);
+  }, [copy.loadFailed, fetchCurriculum]);
 
   useEffect(() => {
     if (hasAccess) {
@@ -327,7 +338,7 @@ export default function EnrollmentsPage() {
   }, [curriculumCourses, statusFilter]);
 
   const summaryCards = useMemo(() => {
-    if (curriculumCourses.length > 0) {
+    if (curriculumData) {
       return [
         {
           label: copy.statCurriculumTotal,
@@ -356,30 +367,27 @@ export default function EnrollmentsPage() {
     return [
       {
         label: copy.statCurriculumTotal,
-        value: formatNumber(enrollments.length),
+        value: '—',
         subvalue: '',
         tone: metricToneClass('info'),
         icon: BookOpen,
       },
       {
         label: copy.statCompleted,
-        value: formatNumber(
-          enrollments.filter((e) => e.status === 'COMPLETED').length,
-        ),
+        value: '—',
         subvalue: '',
         tone: metricToneClass('success'),
         icon: CheckCircle2,
       },
       {
         label: copy.statInProgress,
-        value: formatNumber(activeEnrollments.length),
+        value: '—',
         subvalue: '',
         tone: metricToneClass('warning'),
         icon: Clock,
       },
     ];
   }, [
-    activeEnrollments.length,
     completedCurriculum,
     copy.creditsLabel,
     copy.statCompleted,
@@ -390,8 +398,8 @@ export default function EnrollmentsPage() {
     completedCurriculumCredits,
     curriculumCreditTarget,
     curriculumCourses,
+    curriculumData,
     curriculumTotalCredits,
-    enrollments,
     formatNumber,
     inProgressCurriculum.length,
     notStartedCurriculum.length,
@@ -496,7 +504,7 @@ export default function EnrollmentsPage() {
               </button>
             </div>
 
-            {activeTab === 'curriculum' && (
+            {activeTab === 'curriculum' && !isCurriculumLoading && !curriculumError && (
               <div className="flex flex-wrap items-center gap-1.5 text-xs">
                 {(
                   [
@@ -524,7 +532,13 @@ export default function EnrollmentsPage() {
             )}
           </div>
 
-          {activeTab === 'curriculum' && (
+          {activeTab === 'curriculum' && isCurriculumLoading && (
+            <LoadingState label={locale === 'vi' ? 'Đang tải chương trình đào tạo' : 'Loading curriculum'} />
+          )}
+          {activeTab === 'curriculum' && !isCurriculumLoading && curriculumError && (
+            <ErrorState title={copy.unavailableTitle} description={curriculumError} onRetry={() => void fetchCurriculum()} />
+          )}
+          {activeTab === 'curriculum' && !isCurriculumLoading && !curriculumError && (
             <div className="space-y-8">
               {curriculumData?.curriculum && (
                 <div className="rounded-xl border border-border/70 bg-card/60 p-4 sm:p-5">

@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { ClipboardList, Pencil, Plus, Trash2, X } from 'lucide-react';
 import { toast } from 'sonner';
@@ -106,6 +106,7 @@ interface Classroom {
 }
 
 interface ScheduleEntry {
+  rowId: string;
   dayOfWeek: number;
   startTime: string;
   endTime: string;
@@ -149,6 +150,9 @@ export default function AdminSectionsPage() {
   // A failed schedule read must never read as "no schedules added yet": this
   // flag keeps an outage distinguishable from a schedule-free section.
   const [schedulesError, setSchedulesError] = useState('');
+  const [schedulesLoaded, setSchedulesLoaded] = useState(true);
+  const nextScheduleId = useRef(0);
+  const createScheduleRowId = () => `schedule-row-${++nextScheduleId.current}`;
   const canAccess = Boolean(user && (isAdmin || isSuperAdmin));
   const { confirm, confirmationDialog } = useConfirmationDialog();
 
@@ -293,6 +297,10 @@ export default function AdminSectionsPage() {
             capacity: 'Sức chứa',
             status: 'Trạng thái',
             lecturer: 'Giảng viên',
+            day: 'Ngày học',
+            start: 'Giờ bắt đầu',
+            end: 'Giờ kết thúc',
+            room: 'Phòng học',
           },
           schedulesTitle: 'Lịch học',
           schedulesDescription:
@@ -360,6 +368,10 @@ export default function AdminSectionsPage() {
             capacity: 'Capacity',
             status: 'Status',
             lecturer: 'Lecturer',
+            day: 'Day of week',
+            start: 'Start time',
+            end: 'End time',
+            room: 'Classroom',
           },
           schedulesTitle: 'Schedules',
           schedulesDescription:
@@ -463,6 +475,7 @@ export default function AdminSectionsPage() {
     });
     setSchedules([]);
     setSchedulesError('');
+    setSchedulesLoaded(true);
   };
 
   const openCreate = () => {
@@ -474,16 +487,19 @@ export default function AdminSectionsPage() {
   // schedule read failed: a failed load is surfaced with a retry instead.
   const loadSectionSchedules = async (section: Section) => {
     setSchedulesError('');
+    setSchedulesLoaded(false);
     try {
       const fullSection = await adminSectionsApi.getById(section.id);
       setSchedules(
         (fullSection.schedules || []).map((schedule) => ({
+          rowId: schedule.id || createScheduleRowId(),
           dayOfWeek: schedule.dayOfWeek,
           startTime: schedule.startTime,
           endTime: schedule.endTime,
           classroomId: schedule.classroom?.id || '',
         })),
       );
+      setSchedulesLoaded(true);
     } catch {
       setSchedules([]);
       setSchedulesError(copy.schedulesLoadFailed);
@@ -553,7 +569,11 @@ export default function AdminSectionsPage() {
       const payload = {
         ...formData,
         capacity: Number(formData.capacity),
-        schedules: schedules.length > 0 ? schedules : undefined,
+        // An empty known list means delete every meeting. An unavailable read
+        // omits the field so a metadata edit preserves the stored schedule.
+        schedules: schedulesLoaded
+          ? schedules.map(({ dayOfWeek, startTime, endTime, classroomId }) => ({ dayOfWeek, startTime, endTime, classroomId }))
+          : undefined,
       };
 
       if (editingSection) {
@@ -582,7 +602,7 @@ export default function AdminSectionsPage() {
   const addSchedule = () => {
     setSchedules((current) => [
       ...current,
-      { dayOfWeek: 1, startTime: '09:00', endTime: '10:30', classroomId: '' },
+      { rowId: createScheduleRowId(), dayOfWeek: 1, startTime: '09:00', endTime: '10:30', classroomId: '' },
     ]);
   };
 
@@ -1039,7 +1059,7 @@ export default function AdminSectionsPage() {
             description={copy.schedulesDescription}
           >
             <div className="flex items-center justify-between">
-              <Button type="button" variant="outline" size="sm" onClick={addSchedule}>
+              <Button type="button" variant="outline" size="sm" onClick={addSchedule} disabled={!schedulesLoaded}>
                 <Plus className="mr-2 h-4 w-4" />
                 {copy.addSchedule}
               </Button>
@@ -1060,32 +1080,37 @@ export default function AdminSectionsPage() {
             ) : (
               <div className="space-y-3">
                 {schedules.map((schedule, idx) => (
-                  <div
-                    key={`${schedule.dayOfWeek}-${schedule.startTime}-${idx}`}
-                    className="grid gap-3 rounded-lg border border-border/70 bg-secondary/20 p-4 lg:grid-cols-[180px_1fr_1fr_220px_auto]"
+                  <fieldset
+                    key={schedule.rowId}
+                    className="grid min-w-0 grid-cols-1 gap-3 rounded-lg border border-border/70 bg-secondary/20 p-4 sm:grid-cols-2"
                   >
+                    <legend className="px-1 text-sm font-medium text-foreground">
+                      {locale === 'vi' ? `Lịch ${idx + 1}` : `Meeting ${idx + 1}`}
+                    </legend>
                     <Select
+                      label={copy.fields.day}
                       value={String(schedule.dayOfWeek)}
                       onChange={(event) =>
                         updateSchedule(idx, 'dayOfWeek', Number(event.target.value))
                       }
                       options={dayOptions}
                     />
-                    <Input
+                    <AdminFormField label={copy.fields.start}><Input
                       type="time"
                       value={schedule.startTime}
                       onChange={(event) =>
                         updateSchedule(idx, 'startTime', event.target.value)
                       }
-                    />
-                    <Input
+                    /></AdminFormField>
+                    <AdminFormField label={copy.fields.end}><Input
                       type="time"
                       value={schedule.endTime}
                       onChange={(event) =>
                         updateSchedule(idx, 'endTime', event.target.value)
                       }
-                    />
+                    /></AdminFormField>
                     <Select
+                      label={copy.fields.room}
                       value={schedule.classroomId}
                       onChange={(event) =>
                         updateSchedule(idx, 'classroomId', event.target.value)
@@ -1099,10 +1124,11 @@ export default function AdminSectionsPage() {
                       onClick={() => removeSchedule(idx)}
                       aria-label={copy.removeSchedule(idx + 1)}
                       title={copy.removeSchedule(idx + 1)}
+                      className="self-end justify-self-end sm:col-span-2"
                     >
                       <X className="h-4 w-4 text-destructive" />
                     </Button>
-                  </div>
+                  </fieldset>
                 ))}
               </div>
             )}

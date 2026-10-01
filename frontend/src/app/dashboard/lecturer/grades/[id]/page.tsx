@@ -86,6 +86,7 @@ export default function SectionGradingPage() {
   const [isPublishing, setIsPublishing] = useState(false);
   const [error, setError] = useState('');
   const [scoreErrors, setScoreErrors] = useState<Map<string, string>>(new Map());
+  const publishGuard = useRef({ sectionId: '', ready: false });
   const { confirm, confirmationDialog } = useConfirmationDialog();
 
   const sectionId = params?.id;
@@ -134,6 +135,7 @@ export default function SectionGradingPage() {
           saveGrades: 'Lưu điểm',
           savingGrades: 'Đang lưu điểm',
           publishGrades: 'Công bố điểm',
+          saveBeforePublish: 'Lưu các thay đổi trước khi công bố điểm.',
           publishingGrades: 'Đang công bố điểm',
           saved: 'Đã lưu điểm',
           saveFailed: 'Hiện chưa thể lưu điểm.',
@@ -176,6 +178,7 @@ export default function SectionGradingPage() {
           letterGradeLabel: (studentName: string) => `Xếp loại cho ${studentName}`,
           publishedStatus: 'Đã công bố',
           draftStatus: 'Bản nháp',
+          unsavedStatus: 'Chưa lưu',
           sectionPrefix: 'Lớp',
           unavailableTitle: 'Lớp học phần chưa sẵn sàng',
           exportCsv: 'Xuất CSV',
@@ -204,6 +207,7 @@ export default function SectionGradingPage() {
           saveGrades: 'Save grades',
           savingGrades: 'Saving grades',
           publishGrades: 'Release grades',
+          saveBeforePublish: 'Save your changes before releasing grades.',
           publishingGrades: 'Releasing grades',
           saved: 'Grades saved',
           saveFailed: 'Grades could not be saved.',
@@ -246,6 +250,7 @@ export default function SectionGradingPage() {
           letterGradeLabel: (studentName: string) => `Letter grade for ${studentName}`,
           publishedStatus: 'Published',
           draftStatus: 'Draft',
+          unsavedStatus: 'Unsaved',
           sectionPrefix: 'Class',
           unavailableTitle: 'Class grades unavailable',
           exportCsv: 'Export CSV',
@@ -268,6 +273,7 @@ export default function SectionGradingPage() {
 
   const fetchSectionGrades = useCallback(
     async (options?: { silent?: boolean; preserveLocalRows?: GradeUpdate[] }) => {
+    publishGuard.current.ready = false;
     if (!sectionId) {
       setError(copy.missingSection);
       setIsLoading(false);
@@ -360,7 +366,7 @@ export default function SectionGradingPage() {
   const { requestLeave, confirmLeave, cancelLeave, confirmOpen } = unsaved;
 
   const allGraded = useMemo(() => {
-    if (!sectionData) {
+    if (!sectionData || sectionData.enrollments.length === 0) {
       return false;
     }
 
@@ -369,7 +375,14 @@ export default function SectionGradingPage() {
     );
   }, [grades, sectionData]);
 
+  const publishReady = allGraded && !hasChanges && scoreErrors.size === 0
+    && !isSaving && !isRefreshing && !isPublishing && !isLoading && !error
+    && Boolean(sectionData?.enrollments.some((enrollment) => enrollment.gradeStatus !== 'PUBLISHED'));
+  publishGuard.current = { sectionId: sectionId ?? '', ready: Boolean(publishReady) };
+
   const markEdited = (enrollmentId: string) => {
+    // Invalidate before React renders: confirmation may still be awaiting a reply.
+    publishGuard.current.ready = false;
     setEditedIds((previous) => {
       if (previous.has(enrollmentId)) {
         return previous;
@@ -490,7 +503,7 @@ export default function SectionGradingPage() {
   };
 
   const handleSave = async () => {
-    if (!sectionId || !sectionData) {
+    if (!sectionId || !sectionData || isSaving || isPublishing || isRefreshing) {
       return;
     }
 
@@ -519,6 +532,7 @@ export default function SectionGradingPage() {
       return;
     }
 
+    publishGuard.current.ready = false;
     setIsSaving(true);
 
     try {
@@ -544,7 +558,7 @@ export default function SectionGradingPage() {
   };
 
   const handlePublish = async () => {
-    if (!sectionId || !sectionData || !allGraded) {
+    if (!sectionId || !publishGuard.current.ready) {
       return;
     }
 
@@ -554,10 +568,11 @@ export default function SectionGradingPage() {
       confirmText: copy.publishGrades,
     });
 
-    if (!shouldPublish) {
+    if (!shouldPublish || !publishGuard.current.ready || publishGuard.current.sectionId !== sectionId) {
       return;
     }
 
+    publishGuard.current.ready = false;
     setIsPublishing(true);
 
     try {
@@ -729,8 +744,8 @@ export default function SectionGradingPage() {
               </Button>
               <Button
                 type="button"
-                variant="outline"
-                disabled={!hasChanges || isSaving}
+                variant={hasChanges ? 'default' : 'outline'}
+                disabled={!hasChanges || isSaving || isPublishing || isRefreshing}
                 onClick={() => void handleSave()}
               >
                 <Save className="mr-2 h-4 w-4" />
@@ -742,7 +757,8 @@ export default function SectionGradingPage() {
               </Button>
               <Button
                 type="button"
-                disabled={!allGraded || isPublishing}
+                variant={hasChanges ? 'outline' : 'default'}
+                disabled={!publishReady}
                 onClick={() => void handlePublish()}
               >
                 <Send className="mr-2 h-4 w-4" />
@@ -751,6 +767,9 @@ export default function SectionGradingPage() {
             </div>
           }
         />
+        {hasChanges && (
+          <p role="status" className="mt-3 text-sm text-muted-foreground">{copy.saveBeforePublish}</p>
+        )}
       </div>
 
       <div className="grid gap-4 md:grid-cols-3 print:hidden">
@@ -823,7 +842,7 @@ export default function SectionGradingPage() {
                     studentCode: enrollment.studentCode,
                     email: enrollment.email,
                   }))}
-                  disabled={sectionData.enrollments.some((enrollment) => enrollment.gradeStatus === 'PUBLISHED')}
+                  disabled={isSaving || isPublishing || isRefreshing || sectionData.enrollments.some((enrollment) => enrollment.gradeStatus === 'PUBLISHED')}
                   onApply={applyImportedRows}
                 />
               )}
@@ -882,6 +901,11 @@ export default function SectionGradingPage() {
                         <p className="mt-1 break-words text-sm text-muted-foreground">
                           {enrollment.email ?? copy.unavailableEmail}
                         </p>
+                        {editedIds.has(enrollment.id) && (
+                          <span className="mt-2 inline-flex rounded-md border border-status-warning/40 bg-status-warning/10 px-2 py-1 text-xs font-medium text-foreground print:hidden">
+                            {copy.unsavedStatus}
+                          </span>
+                        )}
                       </div>
                       <span className="shrink-0 rounded-md bg-secondary px-2.5 py-1 text-xs font-medium text-foreground">
                         {isPublished
@@ -905,7 +929,7 @@ export default function SectionGradingPage() {
                             handleScoreChange(enrollment.id, 'processScore', event.target.value, event.target.validity.badInput)
                           }
                           error={scoreErrors.get(`${enrollment.id}:processScore`)}
-                          disabled={isPublished || isSaving}
+                          disabled={isPublished || isSaving || isPublishing || isRefreshing}
                           aria-label={copy.processScoreLabel(formatVietnameseName(enrollment.studentName))}
                         />
                       </label>
@@ -920,7 +944,7 @@ export default function SectionGradingPage() {
                             handleScoreChange(enrollment.id, 'finalExamScore', event.target.value, event.target.validity.badInput)
                           }
                           error={scoreErrors.get(`${enrollment.id}:finalExamScore`)}
-                          disabled={isPublished || isSaving}
+                          disabled={isPublished || isSaving || isPublishing || isRefreshing}
                           aria-label={copy.finalExamScoreLabel(formatVietnameseName(enrollment.studentName))} />
                       </label>
                     </div>
@@ -968,15 +992,14 @@ export default function SectionGradingPage() {
                           {enrollmentIndex + 1}
                         </td>
                         <td className="px-3 py-3.5">
-                          <div className="flex items-center gap-1.5 font-medium text-foreground">
-                            {isDirtyRow && (
-                              <span
-                                aria-hidden="true"
-                                className="h-1.5 w-1.5 shrink-0 rounded-full bg-status-warning print:hidden"
-                              />
-                            )}
+                          <div className="font-medium text-foreground">
                             {formatVietnameseName(enrollment.studentName)}
                           </div>
+                          {isDirtyRow && (
+                            <span className="mt-2 inline-flex rounded-md border border-status-warning/40 bg-status-warning/10 px-2 py-1 text-xs font-medium text-foreground print:hidden">
+                              {copy.unsavedStatus}
+                            </span>
+                          )}
                           <div className="mt-1 truncate text-xs text-muted-foreground print:hidden" title={enrollment.email ?? copy.unavailableEmail}>
                             {enrollment.email ?? copy.unavailableEmail}
                           </div>
@@ -1001,7 +1024,7 @@ export default function SectionGradingPage() {
                               }
                               onKeyDown={(event) => handleCellKeyDown(event, enrollmentIndex, 'processScore')}
                               error={scoreErrors.get(`${enrollment.id}:processScore`)}
-                              disabled={isPublished || isSaving}
+                              disabled={isPublished || isSaving || isPublishing || isRefreshing}
                               aria-label={copy.processScoreLabel(formatVietnameseName(enrollment.studentName))}
                             />
                           </div>
@@ -1019,7 +1042,7 @@ export default function SectionGradingPage() {
                               }
                               onKeyDown={(event) => handleCellKeyDown(event, enrollmentIndex, 'finalExamScore')}
                               error={scoreErrors.get(`${enrollment.id}:finalExamScore`)}
-                              disabled={isPublished || isSaving}
+                              disabled={isPublished || isSaving || isPublishing || isRefreshing}
                               aria-label={copy.finalExamScoreLabel(formatVietnameseName(enrollment.studentName))} />
                           </div>
                         </td>

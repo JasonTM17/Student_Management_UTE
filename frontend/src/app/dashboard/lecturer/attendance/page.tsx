@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useId, useMemo, useState } from 'react';
 import {
   AlertCircle,
   CalendarCheck,
@@ -67,6 +67,7 @@ export default function LecturerAttendancePage() {
   const { hasAccess, isLoading: authLoading } = useRequireAuth(['LECTURER']);
   const { locale, formatNumber, messages } = useI18n();
   const copy = messages.lecturerAttendance;
+  const controlId = useId().replace(/:/g, '');
   const { confirm, confirmationDialog } = useConfirmationDialog();
 
   const [semesters, setSemesters] = useState<Semester[]>([]);
@@ -390,10 +391,11 @@ export default function LecturerAttendancePage() {
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {/* Semester Filter */}
           <div className="space-y-1.5">
-            <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+            <label htmlFor={`${controlId}-semester`} className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
               {copy.selectSemester}
             </label>
             <Select
+              id={`${controlId}-semester`}
               value={selectedSemester}
               onChange={(e) => setSelectedSemester(e.target.value)}
               className="w-full"
@@ -409,10 +411,11 @@ export default function LecturerAttendancePage() {
 
           {/* Section Selector */}
           <div className="space-y-1.5">
-            <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+            <label htmlFor={`${controlId}-section`} className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
               {copy.selectSection}
             </label>
             <Select
+              id={`${controlId}-section`}
               value={selectedSectionId}
               onChange={(e) => setSelectedSectionId(e.target.value)}
               className="w-full font-medium"
@@ -432,10 +435,11 @@ export default function LecturerAttendancePage() {
 
           {/* Date Picker */}
           <div className="space-y-1.5">
-            <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+            <label htmlFor={`${controlId}-date`} className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
               {copy.dateLabel}
             </label>
             <Input
+              id={`${controlId}-date`}
               type="date"
               value={selectedDate}
               onChange={(e) => setSelectedDate(e.target.value)}
@@ -530,12 +534,12 @@ export default function LecturerAttendancePage() {
           {/* Quick action bar */}
           <div className="flex flex-wrap items-center justify-between gap-3 border-b pb-4 print:hidden">
             <div className="flex items-center gap-2 text-sm text-muted-foreground">
-              <span className="font-semibold text-foreground">{roster.length}</span> sinh viên
+              <span className="font-semibold text-foreground">{formatNumber(roster.length)}</span> {copy.statsTotalStudents}
               <span>•</span>
-              <span className="text-emerald-600 font-medium">{presentCount} có mặt</span>
+              <span className="text-emerald-700 dark:text-emerald-400 font-medium">{formatNumber(presentCount)} {copy.statuses.PRESENT}</span>
               <span>•</span>
-              <span className="text-rose-600 font-medium">{absentCount} vắng</span>
-              {lateCount > 0 && <span className="text-amber-600 font-medium">• {lateCount} trễ</span>}
+              <span className="text-rose-600 dark:text-rose-400 font-medium">{formatNumber(absentCount)} {copy.statuses.ABSENT}</span>
+              {lateCount > 0 && <span className="text-amber-700 dark:text-amber-400 font-medium">• {formatNumber(lateCount)} {copy.statuses.LATE}</span>}
             </div>
 
             <div className="flex items-center gap-2">
@@ -605,9 +609,10 @@ export default function LecturerAttendancePage() {
                           <button
                             type="button"
                             onClick={() => handleStatusChange(row.studentId, 'PRESENT')}
+                            aria-pressed={row.status === 'PRESENT'}
                             className={`flex items-center gap-1 rounded px-2.5 py-1 text-xs font-medium transition-colors ${
                               row.status === 'PRESENT'
-                                ? 'bg-emerald-600 text-white shadow-sm'
+                                ? 'bg-emerald-700 text-white shadow-sm'
                                 : 'text-muted-foreground hover:text-foreground'
                             }`}
                           >
@@ -617,6 +622,7 @@ export default function LecturerAttendancePage() {
                           <button
                             type="button"
                             onClick={() => handleStatusChange(row.studentId, 'ABSENT')}
+                            aria-pressed={row.status === 'ABSENT'}
                             className={`flex items-center gap-1 rounded px-2.5 py-1 text-xs font-medium transition-colors ${
                               row.status === 'ABSENT'
                                 ? 'bg-rose-600 text-white shadow-sm'
@@ -629,9 +635,10 @@ export default function LecturerAttendancePage() {
                           <button
                             type="button"
                             onClick={() => handleStatusChange(row.studentId, 'LATE')}
+                            aria-pressed={row.status === 'LATE'}
                             className={`flex items-center gap-1 rounded px-2.5 py-1 text-xs font-medium transition-colors ${
                               row.status === 'LATE'
-                                ? 'bg-amber-600 text-white shadow-sm'
+                                ? 'bg-amber-700 text-white shadow-sm'
                                 : 'text-muted-foreground hover:text-foreground'
                             }`}
                           >
@@ -641,9 +648,10 @@ export default function LecturerAttendancePage() {
                           <button
                             type="button"
                             onClick={() => handleStatusChange(row.studentId, 'EXCUSED')}
+                            aria-pressed={row.status === 'EXCUSED'}
                             className={`flex items-center gap-1 rounded px-2.5 py-1 text-xs font-medium transition-colors ${
                               row.status === 'EXCUSED'
-                                ? 'bg-sky-600 text-white shadow-sm'
+                                ? 'bg-sky-700 text-white shadow-sm'
                                 : 'text-muted-foreground hover:text-foreground'
                             }`}
                           >
