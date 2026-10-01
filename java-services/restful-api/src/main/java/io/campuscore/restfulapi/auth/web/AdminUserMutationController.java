@@ -76,6 +76,16 @@ public class AdminUserMutationController {
         return users.resetPassword(id, isSuperAdmin(authentication), currentUserId);
     }
 
+    @PostMapping("/{id}/unlock")
+    @Operation(summary = "Gỡ khóa đăng nhập", description = "Quản trị viên xóa trạng thái khóa tạm thời do đăng nhập sai nhiều lần và đặt lại bộ đếm lần thất bại.")
+    @ApiResponse(responseCode = "200", description = "Tài khoản được gỡ khóa, có thể đăng nhập lại ngay")
+    public Map<String, Object> unlock(
+            @Parameter(description = "Mã định danh người dùng (User ID)") @PathVariable String id,
+            Authentication authentication) {
+        String currentUserId = authentication != null ? authentication.getName() : null;
+        return users.unlock(id, isSuperAdmin(authentication), currentUserId);
+    }
+
     @PutMapping("/{id}")
     @Operation(summary = "Cập nhật tài khoản người dùng", description = "Chỉnh sửa thông tin hồ sơ họ tên, quyền hạn vai trò hoặc trạng thái tài khoản.")
     @ApiResponse(responseCode = "200", description = "Cập nhật thông tin người dùng thành công")

@@ -1501,4 +1501,24 @@ class AssistantPersonalContextAdvisorTest {
                         schedules),
                 null);
     }
+
+    /**
+     * Round-3 chat fixes (cb3-2..cb3-6): natural EN phrasings and the
+     * named-semester VI question used to fall to the KB path, where the model
+     * denied the data existed while the portal's own endpoints showed it. Each
+     * phrasing must route into the personal-context advisor; curriculum
+     * requirement wording stays on the knowledge path.
+     */
+    @Test
+    void round3ChatPhrasingsResolveAsPersonalContext() {
+        assertTrue(advisor.handles("How many credits remain?"));
+        assertTrue(advisor.handles("Do I have class today?"));
+        assertTrue(advisor.handles("What classes do I have today?"));
+        assertTrue(advisor.handles("Which classes am I taking?"));
+        assertTrue(advisor.handles("Học kỳ 1 năm học 2025-2026 tôi học những môn nào?"));
+        assertTrue(advisor.handles("Học kỳ 1 năm học 2025-2026 GPA của tôi là bao nhiêu?"));
+        assertTrue(advisor.handles("What is my GPA for semester 2 2025-2026?"));
+        // Requirement wording is a policy question, not a registration listing.
+        assertFalse(advisor.handles("What courses do I need to graduate?"));
+    }
 }

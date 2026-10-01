@@ -206,12 +206,32 @@ public class AdminUserMutationService {
         return withTemporaryPassword(find(id), temporaryPassword);
     }
 
+    /**
+     * Round-3 contract ct-7: five failed logins lock an account for 30 minutes
+     * and no API could clear it — the only clearing write (recordSuccessfulLogin)
+     * sits behind the very gate the lock trips, and the admin update path never
+     * touched lockedUntil, so "the correct password still says Invalid
+     * credentials" was unrecoverable for half an hour. An administrator can now
+     * lift the lock immediately. No session revocation: the lockout only gates
+     * new logins, never an established session.
+     */
     @Transactional
-    public Map<String, Object> update(String id, Map<String, Object> input) {
-        return update(id, input, false, null);
+    public Map<String, Object> unlock(String id, boolean canManageSuperAdmin, String currentUserId) {
+        requireSuperAdminForProtectedAccount(id, canManageSuperAdmin, "unlock");
+        int updated = jdbc.update(
+                "UPDATE " + USER + " SET \"lockedUntil\" = NULL, \"failedLoginAttempts\" = 0,"
+                        + " \"updatedAt\" = CURRENT_TIMESTAMP WHERE \"id\" = :id",
+                new MapSqlParameterSource().addValue("id", id));
+        if (updated == 0) throw problem(HttpStatus.NOT_FOUND, "USER_NOT_FOUND", "User not found");
+        audit.record(currentUserId, null, "USER_UNLOCKED", "USER", id,
+                "Cleared the login lockout for user " + id);
+        return find(id);
     }
 
     @Transactional
+    public Map<String, Object> update(String id, Map<String, Object> input) {
+        return update(id, input, false, null);
+    }    @Transactional
     public Map<String, Object> update(String id, Map<String, Object> input, boolean canManageSuperAdmin) {
         return update(id, input, canManageSuperAdmin, null);
     }
