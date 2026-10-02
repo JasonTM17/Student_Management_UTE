@@ -1,9 +1,11 @@
 package io.campuscore.restfulapi.academic.registration;
 
 import io.campuscore.restfulapi.academic.registration.CreditLimitApplicationDtos.Response;
+import io.campuscore.restfulapi.audit.AdminAuditRecorder;
 import io.campuscore.restfulapi.web.DomainException;
 import java.sql.Timestamp;
 import java.time.Instant;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -48,17 +50,25 @@ public class CreditLimitApplicationService {
      * (2026-09-30). 0 (default) keeps the standard/approved behaviour.
      */
     private final int limitOverride;
+    private final AdminAuditRecorder audit;
 
     public CreditLimitApplicationService(NamedParameterJdbcTemplate jdbc) {
-        this(jdbc, 0);
+        this(jdbc, 0, new AdminAuditRecorder(jdbc));
+    }
+
+    /** Compatibility constructor for callers that only exercise limit math; review() still audits through a recorder over the same template. */
+    public CreditLimitApplicationService(NamedParameterJdbcTemplate jdbc, int limitOverride) {
+        this(jdbc, limitOverride, new AdminAuditRecorder(jdbc));
     }
 
     @org.springframework.beans.factory.annotation.Autowired
     public CreditLimitApplicationService(
             NamedParameterJdbcTemplate jdbc,
-            @org.springframework.beans.factory.annotation.Value("${assistant.demo.credit-limit-override:0}") int limitOverride) {
+            @org.springframework.beans.factory.annotation.Value("${assistant.demo.credit-limit-override:0}") int limitOverride,
+            AdminAuditRecorder audit) {
         this.jdbc = jdbc;
         this.limitOverride = Math.max(0, limitOverride);
+        this.audit = audit;
     }
 
     @Transactional(readOnly = true)
@@ -174,7 +184,28 @@ public class CreditLimitApplicationService {
             throw problem(HttpStatus.CONFLICT, "CREDIT_LIMIT_APPLICATION_NOT_PENDING",
                     "Only a pending credit-limit application can be reviewed");
         }
+        // K15: approving/rejecting a per-student credit-limit exception is a
+        // privilege-affecting decision, so it must leave an audit row with the
+        // deciding admin and the state transition. The business rules above are
+        // unchanged; this only records the decision that already happened.
+        audit.record(cleanReviewer, null, "CREDIT_LIMIT_" + cleanDecision, "CreditLimitApplication", id,
+                "Credit-limit application " + id + " " + cleanDecision + " by " + cleanReviewer,
+                reviewState(current.get("status"), current.get("requested_limit"), current.get("round_id")),
+                reviewState(cleanDecision, current.get("requested_limit"), current.get("round_id")));
         return findById(id);
+    }
+
+    /**
+     * Before/after audit snapshot for a review decision: the transition, the
+     * requested limit and the round it belongs to. The applicant's reason and
+     * the reviewer note are deliberately not copied here.
+     */
+    private static Map<String, Object> reviewState(Object status, Object requestedLimit, Object roundId) {
+        Map<String, Object> state = new LinkedHashMap<>();
+        state.put("status", status == null ? null : String.valueOf(status));
+        state.put("requestedLimit", requestedLimit);
+        state.put("roundId", roundId == null ? null : String.valueOf(roundId));
+        return state;
     }
 
     /** Returns the standard round limit, raised only by a matching approved row. */
@@ -218,7 +249,8 @@ public class CreditLimitApplicationService {
 
     private Map<String, Object> lockById(String id) {
         try {
-            return jdbc.queryForMap("SELECT \"id\", \"roundId\" AS round_id, \"status\" FROM " + APPLICATION
+            return jdbc.queryForMap("SELECT \"id\", \"roundId\" AS round_id, \"status\","
+                    + " \"requestedLimit\" AS requested_limit FROM " + APPLICATION
                     + " WHERE \"id\" = :id FOR UPDATE", new MapSqlParameterSource("id", id));
         } catch (EmptyResultDataAccessException exception) {
             throw problem(HttpStatus.NOT_FOUND, "CREDIT_LIMIT_APPLICATION_NOT_FOUND",

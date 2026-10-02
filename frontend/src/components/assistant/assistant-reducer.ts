@@ -247,6 +247,13 @@ export function assistantReducer(
       };
     }
     case 'error':
+      // A 401 terminal state is fenced (authLockedRef) and must not be
+      // visually downgraded: a side call failing with a generic error (New
+      // Chat, history paging) may not replace the sign-in affordance with a
+      // retry button that can only ever no-op.
+      if (state.error === 'unauthorized' && (action.kind ?? 'unavailable') !== 'unauthorized') {
+        return state;
+      }
       return { ...state, error: action.kind ?? 'unavailable' };
     case 'stream-failed': {
       const last = state.messages[state.messages.length - 1];

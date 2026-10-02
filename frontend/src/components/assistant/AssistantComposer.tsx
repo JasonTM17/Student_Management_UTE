@@ -5,6 +5,7 @@ import {
   type KeyboardEvent,
   type RefObject,
   useEffect,
+  useId,
   useRef,
 } from 'react';
 import { Send, Square } from 'lucide-react';
@@ -19,6 +20,9 @@ interface AssistantComposerProps {
   onInputChange: (value: string) => void;
   onSubmit: (event: FormEvent<HTMLFormElement>) => void;
   onStop: () => void;
+  scope?: 'academic' | 'specialized';
+  /** Session ended: asks are refused until the user signs in again. */
+  authLocked?: boolean;
 }
 
 function handleComposerSubmitKeyDown(
@@ -42,8 +46,14 @@ export function AssistantComposer({
   onInputChange,
   onSubmit,
   onStop,
+  scope = 'academic',
+  authLocked = false,
 }: AssistantComposerProps) {
   const { messages } = useI18n();
+  const composerId = useId();
+  const placeholder = scope === 'specialized'
+    ? messages.assistant.specializedPlaceholder
+    : messages.assistant.placeholder;
 
   // While a turn is in flight the textarea is disabled (locked panel), which
   // also drops focus; hand focus back the moment the turn finishes so the
@@ -70,33 +80,33 @@ export function AssistantComposer({
           value={input}
           onChange={(event) => onInputChange(event.target.value)}
           onKeyDown={handleKeyDown}
-          placeholder={messages.assistant.placeholder}
+          placeholder={placeholder}
           name="assistant-message"
           autoComplete="off"
           rows={2}
           maxLength={2000}
-          disabled={isSending}
-          className="min-h-12 flex-1 resize-none border-0 bg-transparent px-1 py-1 text-base leading-6 text-foreground outline-none placeholder:text-muted-foreground disabled:cursor-not-allowed disabled:opacity-70 md:text-sm"
-          aria-label={messages.assistant.placeholder}
-          aria-describedby="assistant-composer-hint assistant-composer-count"
+          disabled={isSending || authLocked}
+          className="min-h-12 min-w-0 flex-1 resize-none border-0 bg-transparent px-1 py-1 text-base leading-6 text-foreground outline-none placeholder:text-muted-foreground disabled:cursor-not-allowed disabled:opacity-70 md:text-sm"
+          aria-label={placeholder}
+          aria-describedby={`${composerId}-hint ${composerId}-count`}
         />
         {isSending ? (
           <Button
             type="button"
             variant="secondary"
-            className="min-h-11 gap-1.5 rounded-xl px-3"
+            className="min-h-11 shrink-0 gap-1.5 rounded-xl px-3"
             onClick={onStop}
             aria-label={messages.assistant.stop}
           >
             <Square className="h-4 w-4" aria-hidden="true" />
-            <span>{messages.assistant.responding}</span>
+            <span>{messages.assistant.stopLabel}</span>
           </Button>
         ) : (
           <Button
             type="submit"
             size="icon"
             className="min-h-11 min-w-11 rounded-xl"
-            disabled={!input.trim()}
+            disabled={!input.trim() || authLocked}
             aria-label={messages.assistant.send}
           >
             <Send className="h-4 w-4" aria-hidden="true" />
@@ -112,13 +122,15 @@ export function AssistantComposer({
           </span>
           {/* aria-live announces the lock: users hear why the composer stopped
               accepting input instead of a silent dead panel. */}
-          <span id="assistant-composer-hint" aria-live="polite">
-            {isSending
-              ? messages.assistant.respondingHint
-              : messages.assistant.composerHint}
+          <span id={`${composerId}-hint`} aria-live="polite">
+            {authLocked
+              ? messages.assistant.signInRequired
+              : isSending
+                ? messages.assistant.respondingHint
+                : messages.assistant.composerHint}
           </span>
         </span>
-        <span id="assistant-composer-count">{input.length}/2000</span>
+        <span id={`${composerId}-count`} className="ml-2 shrink-0">{input.length}/2000</span>
       </div>
     </form>
   );

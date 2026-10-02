@@ -19,7 +19,7 @@ import {
 import { GradeDetailModal } from '@/components/dashboard/GradeDetailModal';
 import { cn } from '@/lib/utils';
 import { useRequireAuth } from '@/context/AuthContext';
-import { curriculumApi, gradesApi, semestersApi } from '@/lib/api';
+import { conductApi, curriculumApi, gradesApi, semestersApi } from '@/lib/api';
 import { getLocalizedFlatLabel, getLocalizedName } from '@/lib/academic-content';
 import {
   type MyCurriculumCourse,
@@ -103,6 +103,11 @@ export default function TranscriptPage() {
   );
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState('');
+  // The office-issued MSSV lives on the student record, not on the auth
+  // session (whose `studentId` is the internal profile id, e.g.
+  // "student-profile"). It is resolved through the student-readable conduct
+  // summary, which returns the real `studentCode`.
+  const [studentCode, setStudentCode] = useState('');
   const loadGeneration = useRef(0);
 
   const fetchSemesters = useCallback(async () => {
@@ -164,6 +169,28 @@ export default function TranscriptPage() {
     };
   }, [hasAccess]);
 
+  useEffect(() => {
+    if (!hasAccess) return;
+    let cancelled = false;
+    conductApi
+      .getMyConduct()
+      .then((summary) => {
+        if (cancelled) return;
+        const code = summary?.studentCode?.trim();
+        // The backend stringifies the column, so a missing record arrives as
+        // the literal "null"; treat that as unresolved rather than as an MSSV.
+        if (code && code !== 'null' && code !== 'undefined') setStudentCode(code);
+      })
+      .catch(() => {
+        // The MSSV is a display field: an unavailable lookup stays blank (the
+        // printout renders an em-dash) and never falls back to the internal
+        // profile id.
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [hasAccess]);
+
   const transcriptSemesters = useMemo(() => {
     const all = transcriptData?.semesters ?? [];
     if (!selectedSemester) return all;
@@ -209,6 +236,18 @@ export default function TranscriptPage() {
   const summaryBasisNote = useMemo(
     () => resolveBasisNote(transcriptData?.summary?.basisNote, locale),
     [locale, transcriptData],
+  );
+
+  // The printed conversion note reuses the same table the on-screen scale
+  // renders, so the letter bands cannot drift from the official scale.
+  const gradeScaleNote = useMemo(
+    () =>
+      CONVERSION_TABLE.map((row) =>
+        row.letter === 'F'
+          ? `${row.letter} (< 4.0: ${row.point.toFixed(1)})`
+          : `${row.letter} (${row.min.toFixed(1)} – ${bandUpperDisplay(row.max!)}: ${row.point.toFixed(1)})`,
+      ).join(', '),
+    [],
   );
 
   const curriculumCourses = curriculumData?.courses ?? [];
@@ -494,7 +533,7 @@ export default function TranscriptPage() {
                   missing field stays visibly blank instead of falling back to
                   another person's record. */}
               <span><strong>{locale === 'vi' ? 'Họ và tên:' : 'Full Name:'}</strong> {`${user?.lastName ?? ''} ${user?.firstName ?? ''}`.trim() || '—'}</span>
-              <span><strong>{locale === 'vi' ? 'Mã số SV:' : 'Student ID:'}</strong> {user?.studentId || '—'}</span>
+              <span><strong>{locale === 'vi' ? 'Mã số SV:' : 'Student ID:'}</strong> {studentCode || '—'}</span>
               <span><strong>{locale === 'vi' ? 'Ngành đào tạo:' : 'Major:'}</strong> {curriculumData?.curriculum?.name || '—'}</span>
               <span><strong>{locale === 'vi' ? 'Học kỳ in:' : 'Selected Term:'}</strong> {selectedSemesterName}</span>
             </div>
@@ -505,6 +544,7 @@ export default function TranscriptPage() {
             curriculumData={curriculumData}
             selectedSemesterId={selectedSemester}
             onSemesterChange={setSelectedSemester}
+            studentCode={studentCode}
             availableSemesters={semesters.map((s) => ({
               id: s.id,
               name: getLocalizedName(locale, s, s.name),
@@ -1085,8 +1125,14 @@ export default function TranscriptPage() {
           {/* Official Institutional Sign-off Block for Print Document */}
           <div className="hidden print:block mt-10 pt-6 border-t border-border/80">
             <div className="text-[11px] text-muted-foreground mb-4 space-y-1">
-              <p><strong>Ghi chú quy đổi thang điểm tín chỉ UTE / Bộ GD&ĐT:</strong></p>
-              <p>Thang điểm chữ: A+ (9.0-10: 4.0), A (8.5-8.9: 4.0), B+ (8.0-8.4: 3.5), B (7.0-7.9: 3.0), C+ (6.5-6.9: 2.5), C (5.5-6.4: 2.0), D+ (5.0-5.4: 1.5), D (4.0-4.9: 1.0), F (&lt;4.0: 0.0 - Chưa tích lũy, phải học lại).</p>
+              <p><strong>{locale === 'vi' ? 'Ghi chú quy đổi thang điểm tín chỉ UTE / Bộ GD&ĐT:' : 'Credit-scale conversion note (UTE / MOET):'}</strong></p>
+              <p>
+                {locale === 'vi' ? 'Thang điểm chữ: ' : 'Letter grades: '}
+                {gradeScaleNote}
+                {locale === 'vi'
+                  ? '. F (< 4.0): chưa tích lũy, phải học lại.'
+                  : '. F (< 4.0): not earned — the course must be retaken.'}
+              </p>
             </div>
             {/* Machine-generated documents claim no officials: the former
                 "TRƯỞNG KHOA CNTT" and "KT. HIỆU TRƯỞNG / PHÓ HIỆU TRƯỞNG"

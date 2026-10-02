@@ -294,7 +294,25 @@ public class ThesisAssistantService {
             // folded key also covers the accented phrase and keyboards without
             // diacritics, since folding happens before the lookup.
             Map.entry("csdl", "cơ sở dữ liệu"),
-            Map.entry("co so du lieu", "cơ sở dữ liệu"));
+            Map.entry("co so du lieu", "cơ sở dữ liệu"),
+            // V95 corpus completion: the new student-policy documents answer
+            // these phrases. The folded key doubles as retrieval alias AND
+            // public-scope signal (the pre-gate derives from this map), so a
+            // "kỷ luật" question reaches its document instead of being refused
+            // before the query ran.
+            Map.entry("ky luat", "kỷ luật"),
+            Map.entry("chung thuc", "chứng thực"),
+            Map.entry("chung nhan", "chứng nhận"),
+            Map.entry("the sinh vien", "thẻ sinh viên"),
+            Map.entry("the thu vien", "thẻ thư viện"),
+            Map.entry("trung tam thong bao", "trung tâm thông báo"),
+            Map.entry("hoan hoc phi", "hoàn học phí"),
+            Map.entry("hoan phi", "hoàn phí"),
+            Map.entry("hoc ky phu", "học kỳ phụ"),
+            Map.entry("chuyen doi tin chi", "chuyển đổi tín chỉ"),
+            Map.entry("chuyen nganh", "chuyển ngành"),
+            Map.entry("xep loai tot nghiep", "xếp loại tốt nghiệp"),
+            Map.entry("thoi gian dao tao", "thời gian đào tạo"));
     /**
      * Multi-part acronyms that the {@code [^\p{L}\p{N}]+} splitter shreds. The
      * corpus spells the concept "CI/CD", so every folded spelling collapses onto

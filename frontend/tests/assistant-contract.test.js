@@ -78,7 +78,10 @@ test('assistant panel opens from dashboard entries and restores focus to its tri
   assert.doesNotMatch(source, /data-assistant-launcher="campus-mark"/);
   assert.match(source, /open-campus-assistant/);
   assert.match(source, /triggerRef\.current = document\.activeElement/);
-  assert.match(source, /triggerRef\.current\?\.focus\(\)/);
+  // A floating launcher remounts after dismissal; the Browser regression checks
+  // that focus reaches that attached button rather than the detached trigger.
+  assert.match(source, /trigger\?\.isConnected \? trigger : floatingLauncherRef\.current/);
+  assert.match(source, /\)\?\.focus\(\)/);
 });
 
 test('quick suggestions create user turns while retries remain explicit', () => {
@@ -852,9 +855,10 @@ test('assistant UI strings are localized and reason labels cover personal contex
   assert.match(composerSource, /text-base[\s\S]*md:text-sm/);
   assert.match(composerSource, /name="assistant-message"/);
   assert.match(composerSource, /autoComplete="off"/);
-  assert.match(composerSource, /aria-describedby="assistant-composer-hint assistant-composer-count"/);
-  assert.match(composerSource, /id="assistant-composer-hint"/);
-  assert.match(composerSource, /id="assistant-composer-count"/);
+  assert.match(composerSource, /const composerId = useId\(\)/);
+  assert.match(composerSource, /aria-describedby=\{`\$\{composerId\}-hint \$\{composerId\}-count`\}/);
+  assert.match(composerSource, /id=\{`\$\{composerId\}-hint`\}/);
+  assert.match(composerSource, /id=\{`\$\{composerId\}-count`\}/);
 
   const panelSource = fs.readFileSync(path.join(root, 'src/components/assistant/AssistantPanel.tsx'), 'utf8');
   assert.doesNotMatch(panelSource, /aria-label="Cuộc trò chuyện mới"/);

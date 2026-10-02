@@ -65,6 +65,93 @@ test('studio page wires the seeding guard into a locale-independent init effect'
   );
 });
 
+// --- K1/K2: the studio draft keeps its edit context and exports keep their title ---
+
+const editorDraft = loadTs('src/lib/editor-document.ts');
+
+test('K1 editor-document round-trips the edit context stored with a draft', () => {
+  const draft = editorDraft.parseStoredEditorDocument(
+    JSON.stringify({
+      title: 'Thông báo học vụ',
+      category: 'notice',
+      content: '<p>Nội dung</p>',
+      editorType: 'tinymce',
+      updatedAt: '10:00:00',
+      editingId: 'ann-7',
+      editingVersion: 3,
+    }),
+  );
+  assert.equal(draft.editingId, 'ann-7');
+  assert.equal(draft.editingVersion, 3);
+});
+
+test('K1 legacy and malformed drafts hydrate without an edit context', () => {
+  const legacy = editorDraft.parseStoredEditorDocument(
+    JSON.stringify({ title: 'x', content: 'y', updatedAt: '09:00' }),
+  );
+  assert.equal(legacy.editingId, null);
+  assert.equal(legacy.editingVersion, 0);
+  assert.equal(editorDraft.parseStoredEditorDocument('{not json'), null);
+  assert.equal(editorDraft.parseStoredEditorDocument(null), null);
+});
+
+test('K1 the studio persists the edit context and Publish routes to update', () => {
+  assert.match(
+    editorPage,
+    /editingId,\s*\n\s*editingVersion,/,
+    'saveDraft must store the edit context',
+  );
+  assert.match(
+    editorPage,
+    /setEditingId\(parsed\.editingId\)/,
+    'hydrating a draft must restore editingId',
+  );
+  assert.match(
+    editorPage,
+    /setEditingVersion\(parsed\.editingVersion \?\? 0\)/,
+    'hydrating a draft must restore the version',
+  );
+  assert.match(
+    editorPage,
+    /if \(editingId\) \{\s*\n\s*await handleUpdateAnnouncement\(\);/,
+    'Publish in edit mode must update the record instead of creating a copy',
+  );
+});
+
+test('K1 the two edit-mode save buttons carry distinct labels and both update', () => {
+  // Both buttons still run the update path in edit mode.
+  assert.match(editorPage, /onClick=\{handleUpdateAnnouncement\}/);
+  assert.match(editorPage, /onClick=\{handlePublishAnnouncement\}/);
+  // The blue button is the plain save; the green one publishes the revision.
+  assert.match(editorPage, /editorCopy\.saving : editorCopy\.saveChanges/);
+  assert.match(editorPage, /\? editorCopy\.publishing[\s\S]{0,60}\? editorCopy\.publishChanges/);
+  // Neither locale may fall back to the same wording for both buttons.
+  const messages = read('src/i18n/messages.ts');
+  const labelsOf = (key) =>
+    [...messages.matchAll(new RegExp(`${key}: '([^']+)'`, 'g'))].map((match) => match[1]);
+  const saveLabels = labelsOf('saveChanges');
+  const publishLabels = labelsOf('publishChanges');
+  assert.ok(saveLabels.length >= 2, 'saveChanges must exist in both locales');
+  assert.equal(publishLabels.length, 2, 'publishChanges must exist in both locales');
+  assert.ok(
+    publishLabels.every((label) => !saveLabels.includes(label)),
+    'the two update buttons must not share a label',
+  );
+});
+
+test('K2 the export slug keeps Vietnamese words and both export paths share it', () => {
+  assert.equal(
+    editorDraft.slugifyDocumentTitle('Đề cương đề tài khóa luận tốt nghiệp'),
+    'de-cuong-de-tai-khoa-luan-tot-nghiep',
+  );
+  assert.equal(editorDraft.slugifyDocumentTitle('THÔNG BÁO HỌC VỤ'), 'thong-bao-hoc-vu');
+  assert.equal(editorDraft.slugifyDocumentTitle('   '), 'academic-document');
+  assert.equal(editorDraft.buildDocumentFilename('Đề tài tốt nghiệp', 'html'), 'de-tai-tot-nghiep.html');
+  assert.equal(editorDraft.buildDocumentFilename('', 'html'), 'academic-document.html');
+  assert.match(editorPage, /buildDocumentFilename\(title, ext\)/);
+  assert.doesNotMatch(editorPage, /\[\^a-z0-9-_\]/);
+});
+
 // --- A-P0-1: closing the create form must not wipe the issued credential ---
 
 const adminUsersPage = read('src/app/admin/users/page.tsx');

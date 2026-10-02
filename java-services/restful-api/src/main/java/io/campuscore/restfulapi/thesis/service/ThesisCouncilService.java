@@ -1,9 +1,11 @@
 package io.campuscore.restfulapi.thesis.service;
 
+import io.campuscore.restfulapi.audit.AdminAuditRecorder;
 import io.campuscore.restfulapi.web.DomainException;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.Instant;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -33,14 +35,18 @@ public class ThesisCouncilService {
     private static final String SCORE_COMPONENT = "DEFENSE";
 
     private final NamedParameterJdbcTemplate jdbc;
+    private final AdminAuditRecorder audit;
 
     /**
      * Creates the service over the shared named-parameter JDBC template.
      *
      * @param jdbc template used for the council, scoring, and result queries
+     * @param audit admin audit trail; score submissions and finalizations join the
+     *              caller's transaction so the grade and its trace commit together
      */
-    public ThesisCouncilService(NamedParameterJdbcTemplate jdbc) {
+    public ThesisCouncilService(NamedParameterJdbcTemplate jdbc, AdminAuditRecorder audit) {
         this.jdbc = jdbc;
+        this.audit = audit;
     }
 
     // ---------- councils ----------
@@ -342,7 +348,8 @@ public class ThesisCouncilService {
      *        {@code DEFENSE} component so every member's grade carries equal weight
      * @param score score between 0 and 10 inclusive
      * @param actor caller JWT, which must belong to a non-supervising council member
-     * @return the stored score with the grader and resolved component
+     * @return the stored score with the grader and resolved component; the write also records
+     *         a COUNCIL_SCORE_SUBMITTED audit row with the previous and new score
      * @throws DomainException with code TOPIC_NOT_ASSIGNED when the council does not grade the
      *         topic, FORBIDDEN with code COUNCIL_MEMBER_REQUIRED for a non-member, or
      *         VALIDATION_ERROR for an out-of-range score or a supervisor of the topic
@@ -376,6 +383,14 @@ public class ThesisCouncilService {
         if (topicRow.get("final_score") != null) {
             throw conflict("SCORE_ALREADY_FINALIZED", "The topic score has been finalized by the chair");
         }
+        // K16: the row is overwritten DELETE-then-INSERT, so the outgoing value
+        // only exists here — capture it for the audit trail before the delete.
+        BigDecimal previousScore = jdbc.query(
+                "SELECT score FROM thesis.thesis_topic_score WHERE topic_id = :topicId "
+                        + "AND lecturer_id = :lecturerId AND component = :component",
+                params().addValue("topicId", topicId).addValue("lecturerId", lecturerId)
+                        .addValue("component", resolvedComponent),
+                (rs, ignored) -> rs.getBigDecimal("score")).stream().findFirst().orElse(null);
         jdbc.update(
                 "DELETE FROM thesis.thesis_topic_score WHERE topic_id = :topicId AND lecturer_id = :lecturerId AND component = :component",
                 params().addValue("topicId", topicId).addValue("lecturerId", lecturerId)
@@ -386,6 +401,19 @@ public class ThesisCouncilService {
                 params().addValue("id", UUID.randomUUID()).addValue("topicId", topicId)
                         .addValue("councilId", councilId).addValue("lecturerId", lecturerId)
                         .addValue("component", resolvedComponent).addValue("score", score));
+        Map<String, Object> beforeState = new LinkedHashMap<>();
+        beforeState.put("component", resolvedComponent);
+        beforeState.put("lecturerId", lecturerId);
+        beforeState.put("score", previousScore);
+        Map<String, Object> afterState = new LinkedHashMap<>();
+        afterState.put("component", resolvedComponent);
+        afterState.put("lecturerId", lecturerId);
+        afterState.put("score", score);
+        audit.record(subject(actor), null, "COUNCIL_SCORE_SUBMITTED", "THESIS_TOPIC", topicId.toString(),
+                previousScore == null
+                        ? "Defense score " + score + " recorded for topic " + topicId
+                        : "Defense score for topic " + topicId + " changed from " + previousScore + " to " + score,
+                beforeState, afterState);
         return new ScoreResponse(topicId, lecturerId, resolvedComponent, score);
     }
 
@@ -423,7 +451,8 @@ public class ThesisCouncilService {
      * @param councilId council that graded the topic
      * @param topicId topic being closed out
      * @param actor caller JWT; must be the council chair
-     * @return the finalized result with the average, the chair, and the finalization instant
+     * @return the finalized result with the average, the chair, and the finalization instant;
+     *         a COUNCIL_SCORE_FINALIZED audit row records the frozen average
      * @throws DomainException with code COUNCIL_ROLE_REQUIRED for a non-chair, SCORES_INCOMPLETE
      *         while an eligible member has not graded, SCORES_REQUIRED with no usable score, or
      *         SCORE_ALREADY_FINALIZED when another chair froze the result first
@@ -468,6 +497,16 @@ public class ThesisCouncilService {
         if (changed != 1) {
             throw conflict("SCORE_ALREADY_FINALIZED", "The topic score has already been finalized");
         }
+        Map<String, Object> beforeState = new LinkedHashMap<>();
+        beforeState.put("final_score", null);
+        beforeState.put("result_status", null);
+        Map<String, Object> afterState = new LinkedHashMap<>();
+        afterState.put("final_score", average);
+        afterState.put("result_status", "GRADED");
+        afterState.put("finalized_by", subject(actor));
+        audit.record(subject(actor), null, "COUNCIL_SCORE_FINALIZED", "THESIS_TOPIC", topicId.toString(),
+                "Defense score finalized for topic " + topicId + " at " + average,
+                beforeState, afterState);
         return new TopicResult(topicId, average, subject(actor), Instant.now(), "GRADED");
     }
 

@@ -137,7 +137,9 @@ test('the authenticated portal assistant is a complete bottom-right RAG surface'
   assert.match(assistant, /aria-live=\{isSending \? 'off' : 'polite'\}/);
   assert.match(assistant, /event\.key !== 'Escape'/);
   assert.match(assistant, /aria-modal=\{isMobile\}/);
-  assert.match(assistant, /triggerRef\.current\?\.focus\(\)/);
+  // Focus returns to the opening trigger while it is still connected; a
+  // remounted launcher falls back to the stable floating launcher button.
+  assert.match(assistant, /trigger\?\.isConnected \? trigger : floatingLauncherRef\.current\)\?\.focus\(\)/);
   assert.match(assistant, /thesisApi\.chat\(message, locale\)/);
   assert.match(assistant, /KNOWLEDGE_UNAVAILABLE/);
   const assistantMessages = read('src/components/assistant/AssistantMessages.tsx');

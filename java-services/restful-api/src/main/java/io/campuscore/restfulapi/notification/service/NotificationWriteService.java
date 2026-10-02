@@ -1,5 +1,6 @@
 package io.campuscore.restfulapi.notification.service;
 
+import io.campuscore.restfulapi.audit.AdminAuditRecorder;
 import io.campuscore.restfulapi.notification.repository.NotificationWriteRepository;
 import io.campuscore.restfulapi.notification.repository.NotificationWriteRepository.CreateNotificationCommand;
 import io.campuscore.restfulapi.notification.repository.NotificationWriteRepository.PatchValue;
@@ -11,6 +12,10 @@ import io.campuscore.restfulapi.notification.web.NotificationWriteDtos.MarkAllRe
 import io.campuscore.restfulapi.notification.web.NotificationWriteDtos.UpdateNotificationRequest;
 import java.time.Clock;
 import java.time.Instant;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 import org.springframework.context.annotation.Profile;
@@ -27,10 +32,12 @@ public class NotificationWriteService {
     private static final Set<String> TYPES = Set.of("INFO", "WARNING", "ERROR", "SUCCESS");
 
     private final NotificationWriteRepository notifications;
+    private final AdminAuditRecorder audit;
     private final Clock clock = Clock.systemUTC();
 
-    public NotificationWriteService(NotificationWriteRepository notifications) {
+    public NotificationWriteService(NotificationWriteRepository notifications, AdminAuditRecorder audit) {
         this.notifications = notifications;
+        this.audit = audit;
     }
 
     @Transactional
@@ -59,13 +66,13 @@ public class NotificationWriteService {
     }
 
     @Transactional
-    public NotificationResponse create(CreateNotificationRequest request) {
+    public NotificationResponse create(CreateNotificationRequest request, String actorId) {
         String type = requireText(request.type(), "type");
         if (!TYPES.contains(type)) {
             throw new IllegalArgumentException("type must be INFO, WARNING, ERROR, or SUCCESS");
         }
         Instant now = Instant.now(clock);
-        return notifications.create(new CreateNotificationCommand(
+        NotificationResponse created = notifications.create(new CreateNotificationCommand(
                 UUID.randomUUID().toString(),
                 requireText(request.userId(), "userId"),
                 requireText(request.title(), "title"),
@@ -73,6 +80,12 @@ public class NotificationWriteService {
                 type,
                 request.link(),
                 now));
+        audit.record(actorId, null, "NOTIFICATION_CREATED", "NOTIFICATION", created.id(),
+                "Notification " + created.id() + " created for user " + created.userId()
+                        + " (type " + created.type() + ")",
+                null,
+                notificationState(created));
+        return created;
     }
 
     @Transactional
@@ -94,19 +107,22 @@ public class NotificationWriteService {
     }
 
     @Transactional
-    public DeleteNotificationResponse delete(String notificationId) {
-        requireText(notificationId, "notification id");
-        if (notifications.findById(notificationId).isEmpty()) {
-            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Notification not found");
-        }
-        notifications.deleteAny(notificationId);
+    public DeleteNotificationResponse delete(String notificationId, String actorId) {
+        String id = requireText(notificationId, "notification id");
+        NotificationResponse existing = notifications.findById(id)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Notification not found"));
+        notifications.deleteAny(id);
+        audit.record(actorId, null, "NOTIFICATION_DELETED", "NOTIFICATION", id,
+                "Notification " + id + " deleted (was addressed to user " + existing.userId() + ")",
+                notificationState(existing),
+                null);
         return new DeleteNotificationResponse("Notification deleted successfully");
     }
 
     @Transactional
-    public NotificationResponse update(String notificationId, UpdateNotificationRequest request) {
+    public NotificationResponse update(String notificationId, UpdateNotificationRequest request, String actorId) {
         String id = requireText(notificationId, "notification id");
-        notifications.findById(id)
+        NotificationResponse before = notifications.findById(id)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Notification not found"));
         if (request.has("type") && !TYPES.contains(request.type())) {
             throw new IllegalArgumentException("type must be INFO, WARNING, ERROR, or SUCCESS");
@@ -118,8 +134,40 @@ public class NotificationWriteService {
                 patch(request, "message", textPatch(request, "message", request.message())),
                 patch(request, "type", request.type()),
                 patch(request, "link", request.link())));
-        return notifications.findById(id)
+        NotificationResponse after = notifications.findById(id)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Notification not found"));
+        List<String> changedFields = changedFields(request);
+        if (!changedFields.isEmpty()) {
+            audit.record(actorId, null, "NOTIFICATION_UPDATED", "NOTIFICATION", id,
+                    "Notification " + id + " updated (fields: " + String.join(", ", changedFields) + ")",
+                    notificationState(before),
+                    notificationState(after));
+        }
+        return after;
+    }
+
+    private static List<String> changedFields(UpdateNotificationRequest request) {
+        List<String> fields = new ArrayList<>();
+        for (String field : List.of("userId", "title", "message", "type", "link")) {
+            if (request.has(field)) {
+                fields.add(field);
+            }
+        }
+        return fields;
+    }
+
+    /**
+     * Audit snapshot of an admin notification write. Deliberately excludes
+     * title/message: those carry the notification body, which may contain
+     * student-specific information and does not belong in the audit trail.
+     * Ownership (userId) and type are what a reviewer needs to reconstruct
+     * who the message was addressed to and how it was classified.
+     */
+    private static Map<String, Object> notificationState(NotificationResponse notification) {
+        Map<String, Object> state = new LinkedHashMap<>();
+        state.put("userId", notification.userId());
+        state.put("type", notification.type());
+        return state;
     }
 
     private static void requireSubject(String userId) {

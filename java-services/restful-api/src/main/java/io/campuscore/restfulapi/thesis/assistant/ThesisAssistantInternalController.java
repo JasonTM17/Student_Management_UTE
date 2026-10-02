@@ -9,9 +9,13 @@ import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.util.List;
 import java.util.UUID;
+import java.util.concurrent.Executor;
+import java.util.concurrent.FutureTask;
+import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.atomic.AtomicBoolean;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Profile;
 import org.springframework.http.HttpStatus;
@@ -40,10 +44,23 @@ public class ThesisAssistantInternalController {
 
     private final ThesisAssistantService assistant;
     private final AssistantRagProperties properties;
+    private final Executor streamExecutor;
 
     public ThesisAssistantInternalController(ThesisAssistantService assistant, AssistantRagProperties properties) {
+        this(assistant, properties, Runnable::run);
+    }
+
+    @Autowired
+    public ThesisAssistantInternalController(ThesisAssistantService assistant, AssistantRagProperties properties,
+            AssistantStreamExecutor streamExecutor) {
+        this(assistant, properties, streamExecutor::execute);
+    }
+
+    ThesisAssistantInternalController(ThesisAssistantService assistant, AssistantRagProperties properties,
+            Executor streamExecutor) {
         this.assistant = assistant;
         this.properties = properties;
+        this.streamExecutor = streamExecutor;
     }
 
     @PostMapping("/chat")
@@ -72,6 +89,9 @@ public class ThesisAssistantInternalController {
         String ownerId = owner(owner);
         SseEmitter emitter = new SseEmitter(120_000L);
         AtomicBoolean terminal = new AtomicBoolean(false);
+        AtomicBoolean transportClosed = new AtomicBoolean(false);
+        AtomicBoolean generationFinished = new AtomicBoolean(false);
+        Runnable generation = () -> {
         try {
             AssistantRlsContext.withInternalOwner(ownerId, () -> {
                 assistant.stream(request.message(), request.locale(), request.conversationId(), ownerId,
@@ -80,22 +100,38 @@ public class ThesisAssistantInternalController {
                                     || event instanceof ThesisAssistantService.StreamError) {
                                 terminal.set(true);
                             }
-                            send(emitter, event);
+                            if (!transportClosed.get()) send(emitter, event);
                         }, request.scope());
-                if (terminal.compareAndSet(false, true)) {
+                if (!transportClosed.get() && terminal.compareAndSet(false, true)) {
                     sendError(emitter, "ASSISTANT_STREAM_INCOMPLETE", true);
                 }
-                emitter.complete();
                 return null;
             });
         } catch (DomainException exception) {
             terminal.set(true);
-            sendError(emitter, exception.code(), exception.status().is5xxServerError()
+            if (!transportClosed.get()) sendError(emitter, exception.code(), exception.status().is5xxServerError()
                     || exception.status() == HttpStatus.TOO_MANY_REQUESTS);
-            emitter.complete();
         } catch (Exception exception) {
             terminal.set(true);
             LOG.warn("internal assistant stream failed with {}", exception.getClass().getSimpleName());
+            if (!transportClosed.get()) sendError(emitter, "ASSISTANT_UNAVAILABLE", true);
+        } finally {
+            generationFinished.set(true);
+            emitter.complete();
+        }
+        };
+        FutureTask<Void> task = new FutureTask<>(generation, null);
+        Runnable closeTransport = () -> {
+            transportClosed.set(true);
+            if (!generationFinished.get()) task.cancel(true);
+        };
+        emitter.onCompletion(closeTransport);
+        emitter.onTimeout(closeTransport);
+        emitter.onError(failure -> closeTransport.run());
+        try {
+            streamExecutor.execute(task);
+        } catch (RejectedExecutionException rejected) {
+            generationFinished.set(true);
             sendError(emitter, "ASSISTANT_UNAVAILABLE", true);
             emitter.complete();
         }

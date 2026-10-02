@@ -253,6 +253,9 @@ public class DeepSeekClient implements AssistantCompletionProvider {
             Consumer<ProviderSegment> sink, BooleanSupplier cancelled, Instant deadline) {
 
         StringBuilder answer = new StringBuilder();
+        // Token boundaries may consist only of spaces/newlines. Bind them to
+        // the next content token so the service receives no blank segment.
+        StringBuilder pendingWhitespace = new StringBuilder();
         List<ProviderSegment> segments = new ArrayList<>();
         int sequence = 0;
         String finishReason = null;
@@ -278,15 +281,20 @@ public class DeepSeekClient implements AssistantCompletionProvider {
                         sawDoneMarker = true;
                         break;
                     }
-                    if (parsed.text() != null && !parsed.text().isBlank()) {
-                        String text = parsed.text();
-                        if (utf8Bytes(answer) + utf8Bytes(text) > properties.maxResponseBytes()) {
-                            throw invalid("provider answer is too large");
+                    if (parsed.text() != null && !parsed.text().isEmpty()) {
+                        if (parsed.text().isBlank()) {
+                            pendingWhitespace.append(parsed.text());
+                        } else {
+                            String text = pendingWhitespace.toString() + parsed.text();
+                            pendingWhitespace.setLength(0);
+                            if (utf8Bytes(answer) + utf8Bytes(text) > properties.maxResponseBytes()) {
+                                throw invalid("provider answer is too large");
+                            }
+                            answer.append(text);
+                            ProviderSegment segment = segment(sequence++, text, parsed.sourceIds(), request);
+                            segments.add(segment);
+                            sink.accept(segment);
                         }
-                        answer.append(text);
-                        ProviderSegment segment = segment(sequence++, text, parsed.sourceIds(), request);
-                        segments.add(segment);
-                        sink.accept(segment);
                     }
                     if (parsed.finishReason() != null) finishReason = parsed.finishReason();
                 } else {
@@ -298,14 +306,19 @@ public class DeepSeekClient implements AssistantCompletionProvider {
                 ParsedFrame parsed = parseFrame(frame);
                 if (parsed != null && parsed.done()) {
                     sawDoneMarker = true;
-                } else if (parsed != null && parsed.text() != null && !parsed.text().isBlank()) {
-                    String text = parsed.text();
-                    if (utf8Bytes(answer) + utf8Bytes(text) > properties.maxResponseBytes()) throw invalid("provider answer is too large");
-                    answer.append(text);
-                    ProviderSegment segment = segment(sequence++, text, parsed.sourceIds(), request);
-                    segments.add(segment);
-                    sink.accept(segment);
-                    finishReason = parsed.finishReason();
+                } else if (parsed != null && parsed.text() != null && !parsed.text().isEmpty()) {
+                    if (parsed.text().isBlank()) {
+                        pendingWhitespace.append(parsed.text());
+                    } else {
+                        String text = pendingWhitespace.toString() + parsed.text();
+                        pendingWhitespace.setLength(0);
+                        if (utf8Bytes(answer) + utf8Bytes(text) > properties.maxResponseBytes()) throw invalid("provider answer is too large");
+                        answer.append(text);
+                        ProviderSegment segment = segment(sequence++, text, parsed.sourceIds(), request);
+                        segments.add(segment);
+                        sink.accept(segment);
+                        finishReason = parsed.finishReason();
+                    }
                 }
             }
         } catch (IOException exception) {

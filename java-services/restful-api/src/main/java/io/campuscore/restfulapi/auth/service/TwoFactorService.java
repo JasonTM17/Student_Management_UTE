@@ -4,9 +4,11 @@ import io.campuscore.restfulapi.auth.repository.AuthUserRepository;
 import io.campuscore.restfulapi.auth.repository.AuthUserRepository.AuthUserRecord;
 import io.campuscore.restfulapi.auth.repository.TwoFactorChallengeRepository;
 import io.campuscore.restfulapi.auth.repository.TwoFactorChallengeRepository.ChallengeRecord;
+import io.campuscore.restfulapi.auth.web.SessionCookieService;
 import io.campuscore.restfulapi.exception.AppException;
 import io.campuscore.restfulapi.mail.config.MailConfig;
 import io.campuscore.restfulapi.mail.service.EmailService;
+import jakarta.servlet.http.HttpServletRequest;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
@@ -21,10 +23,15 @@ import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Profile;
 import org.springframework.http.HttpStatus;
+import org.springframework.jdbc.core.namedparam.MapSqlParameterSource;
+import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import io.campuscore.restfulapi.audit.AdminAuditRecorder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.context.request.RequestAttributes;
+import org.springframework.web.context.request.RequestContextHolder;
+import org.springframework.web.context.request.ServletRequestAttributes;
 import org.springframework.web.server.ResponseStatusException;
 
 /**
@@ -56,6 +63,9 @@ public class TwoFactorService {
     private static final String MAIL_SUBJECT = "[CampusCore] Mã xác thực hai yếu tố";
     private static final String MAIL_TEMPLATE = "two-factor-code";
 
+    /** Mirrors AuthUserRepository's table constant; the repository has no delete-others API. */
+    private static final String SESSION_TABLE = "campuscore_auth.\"Session\"";
+
     private final AuthUserRepository users;
     private final TwoFactorChallengeRepository challenges;
     private final PasswordEncoder passwordEncoder;
@@ -64,6 +74,8 @@ public class TwoFactorService {
     private final Clock clock;
     private final SecureRandom secureRandom;
     private final AdminAuditRecorder audit;
+    private final SessionCookieService cookies;
+    private final NamedParameterJdbcTemplate jdbc;
 
     @Autowired
     public TwoFactorService(
@@ -72,8 +84,11 @@ public class TwoFactorService {
             PasswordEncoder passwordEncoder,
             EmailService emailService,
             MailConfig mailConfig,
-            AdminAuditRecorder audit) {
-        this(users, challenges, passwordEncoder, emailService, mailConfig, audit, Clock.systemUTC());
+            AdminAuditRecorder audit,
+            SessionCookieService cookies,
+            NamedParameterJdbcTemplate jdbc) {
+        this(users, challenges, passwordEncoder, emailService, mailConfig, audit, cookies, jdbc,
+                Clock.systemUTC());
     }
 
     TwoFactorService(
@@ -83,6 +98,8 @@ public class TwoFactorService {
             EmailService emailService,
             MailConfig mailConfig,
             AdminAuditRecorder audit,
+            SessionCookieService cookies,
+            NamedParameterJdbcTemplate jdbc,
             Clock clock) {
         this.users = users;
         this.challenges = challenges;
@@ -90,6 +107,8 @@ public class TwoFactorService {
         this.emailService = emailService;
         this.mailConfig = mailConfig;
         this.audit = audit;
+        this.cookies = cookies;
+        this.jdbc = jdbc;
         this.clock = clock;
         this.secureRandom = new SecureRandom();
     }
@@ -100,9 +119,10 @@ public class TwoFactorService {
 
     /**
      * Starts the ENABLE opt-in: password re-check, then a code is emailed to
-     * the account address. The challenge row and the email dispatch live in
-     * one transaction, so a failed send rolls the challenge back — the client
-     * gets 502 MAIL_DELIVERY_FAILED instead of an unusable code.
+     * the account address. The challenge row commits with this transaction and
+     * the email dispatch runs after commit (see {@link #deliver}), so a failed
+     * send still gives the client 502 MAIL_DELIVERY_FAILED and leaves no
+     * challenge row behind instead of an unusable code.
      */
     @Transactional
     public String startEnableChallenge(String userId, String password) {
@@ -121,10 +141,12 @@ public class TwoFactorService {
     }
 
     /**
-     * Confirms the ENABLE challenge and flips the account switch on.
-     * Wrong attempts must persist across the transaction boundary (same
-     * 5-strikes lock as the LOGIN branch), so AppException is exempted from
-     * the rollback.
+     * Confirms the ENABLE challenge and flips the account switch on. Wrong
+     * attempts must persist across the transaction boundary (same 5-strikes
+     * lock as the LOGIN branch), so AppException is exempted from the
+     * rollback. K17: refresh sessions issued before the switch flipped are
+     * revoked, keeping the caller's current session (see
+     * {@link #revokeOtherRefreshSessions(String)}).
      */
     @Transactional(noRollbackFor = AppException.class)
     public void confirmEnable(String userId, String challengeId, String code) {
@@ -137,6 +159,7 @@ public class TwoFactorService {
         // trail records who and when, next to the password events.
         audit.record(userId, null, "TWO_FACTOR_ENABLED", "USER", userId,
                 "User enabled two-factor authentication");
+        revokeOtherRefreshSessions(userId);
     }
 
     /**
@@ -161,7 +184,11 @@ public class TwoFactorService {
         return createAndDeliverChallenge(user.id(), TwoFactorChallengeRepository.PURPOSE_DISABLE);
     }
 
-    /** Confirms the DISABLE challenge and flips the account switch off. */
+    /**
+     * Confirms the DISABLE challenge and flips the account switch off.
+     * K17: like the enable path, refresh sessions issued before the change are
+     * revoked while the caller's current session survives.
+     */
     @Transactional(noRollbackFor = AppException.class)
     public void confirmDisable(String userId, String challengeId, String code) {
         ChallengeRecord challenge = requireUsableChallenge(
@@ -171,6 +198,52 @@ public class TwoFactorService {
         challenges.consume(challenge.id(), clock.instant());
         audit.record(userId, null, "TWO_FACTOR_DISABLED", "USER", userId,
                 "User disabled two-factor authentication after password and emailed-code verification");
+        revokeOtherRefreshSessions(userId);
+    }
+
+    /**
+     * K17: enabling or disabling two-factor auth is a security-posture change,
+     * so refresh sessions issued before it must stop working. The caller's
+     * current session — identified by the {@code cc_refresh_token} cookie — is
+     * kept so the user is not signed out in the middle of the flow; every other
+     * session of the account is deleted.
+     *
+     * <p>When no refresh token can be identified (non-browser client, or a
+     * request without the cookie), every session is revoked instead. That is
+     * the safe direction: the current access token stays valid until it
+     * expires, so the user is not dropped immediately, and the next refresh
+     * requires a fresh login.
+     */
+    private void revokeOtherRefreshSessions(String userId) {
+        String refreshToken = currentRefreshToken();
+        if (refreshToken == null || refreshToken.isBlank()) {
+            users.deleteAllRefreshSessions(userId);
+            users.clearUserRefreshToken(userId);
+            return;
+        }
+        // AuthUserRepository owns this table's CRUD but exposes no
+        // delete-others variant, so this single statement mirrors
+        // deleteAllRefreshSessions with the caller's token excluded.
+        jdbc.update(
+                "DELETE FROM " + SESSION_TABLE
+                        + " WHERE \"userId\" = :userId AND \"refreshToken\" <> :keepHash",
+                new MapSqlParameterSource()
+                        .addValue("userId", userId)
+                        .addValue("keepHash", sha256(refreshToken)));
+    }
+
+    /**
+     * Resolves the refresh token of the request being served, if any. Returns
+     * null when called outside a servlet request so the fallback (revoke all)
+     * stays well-defined.
+     */
+    private String currentRefreshToken() {
+        RequestAttributes attributes = RequestContextHolder.getRequestAttributes();
+        if (!(attributes instanceof ServletRequestAttributes servletAttributes)) {
+            return null;
+        }
+        HttpServletRequest request = servletAttributes.getRequest();
+        return cookies.refreshToken(request, null);
     }
 
     /**
@@ -203,8 +276,54 @@ public class TwoFactorService {
         // The digest binds the owner id: a code issued for one account can
         // never verify against another account's challenge (Wukong P2.3).
         String challengeId = challenges.insert(userId, purpose, sha256(userId + ':' + code), expiresAt);
-        sendCodeEmail(userId, code);
+        deliver(challengeId, userId, code);
         return challengeId;
+    }
+
+    /**
+     * SMTP runs in the after-commit phase. Spring still holds the
+     * transaction's JDBC connection at that point (it is released in the
+     * later cleanup step), so a degraded mail server pins one pooled
+     * connection for the send duration — the send is deliberately synchronous
+     * because the 502 MAIL_DELIVERY_FAILED contract needs its outcome. What
+     * the after-commit hop buys: DB locks are released and the committed
+     * challenge row is already visible to other transactions, so the write
+     * window no longer spans the SMTP round-trip. Spring propagates an
+     * afterCommit exception to the caller while the transaction stays
+     * committed, so a failed send still reads as 502 MAIL_DELIVERY_FAILED;
+     * the committed challenge row is deleted so no undelivered code can ever
+     * verify (same zero-row contract as rollback).
+     */
+    private void deliver(String challengeId, String userId, String code) {
+        if (org.springframework.transaction.support.TransactionSynchronizationManager
+                .isSynchronizationActive()) {
+            org.springframework.transaction.support.TransactionSynchronizationManager
+                    .registerSynchronization(
+                            new org.springframework.transaction.support.TransactionSynchronization() {
+                                @Override
+                                public void afterCommit() {
+                                    sendOrDrop(challengeId, userId, code);
+                                }
+                            });
+            return;
+        }
+        sendOrDrop(challengeId, userId, code);
+    }
+
+    private void sendOrDrop(String challengeId, String userId, String code) {
+        try {
+            sendCodeEmail(userId, code);
+        } catch (RuntimeException exception) {
+            try {
+                challenges.delete(challengeId);
+            } catch (RuntimeException deleteFailure) {
+                // The client must still learn the send failed (502), not the
+                // cleanup failure (500); an undeleted row expires with the
+                // code TTL and can never verify a code that was never sent.
+                exception.addSuppressed(deleteFailure);
+            }
+            throw exception;
+        }
     }
 
     private ChallengeRecord requireUsableChallenge(

@@ -92,6 +92,32 @@ public class TwoFactorChallengeRepository {
                         .addValue("consumedAt", offsetDateTime(consumedAt)));
     }
 
+    /**
+     * Removes a challenge outright — the failed-delivery path uses this so a
+     * code that never reached an inbox leaves no row behind at all (the
+     * mail-disabled contract asserts zero challenge rows after a failed send).
+     */
+    public void delete(String id) {
+        jdbc.update(
+                "DELETE FROM " + TABLE + " WHERE \"id\" = :id",
+                new MapSqlParameterSource("id", id));
+    }
+
+    /**
+     * Retention sweep: deletes challenges that were consumed before the cutoff
+     * or expired unconsumed before it. Unconsumed-but-expired rows are safe to
+     * drop because {@code requireUsableChallenge} already refuses them.
+     *
+     * @return the number of rows removed
+     */
+    public int purgeStale(Instant cutoff) {
+        return jdbc.update(
+                "DELETE FROM " + TABLE
+                        + " WHERE (\"consumedAt\" IS NOT NULL AND \"consumedAt\" < :cutoff)"
+                        + " OR (\"consumedAt\" IS NULL AND \"expiresAt\" < :cutoff)",
+                new MapSqlParameterSource("cutoff", offsetDateTime(cutoff)));
+    }
+
     private static ChallengeRecord mapChallenge(java.sql.ResultSet resultSet, int ignored)
             throws java.sql.SQLException {
         return new ChallengeRecord(

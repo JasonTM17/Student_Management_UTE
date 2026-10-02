@@ -40,6 +40,7 @@ async function handle(request: NextRequest, context: RouteContext) {
     headers,
     body: ['GET', 'HEAD'].includes(request.method) ? undefined : await request.arrayBuffer(),
     redirect: 'manual',
+    signal: request.signal,
   });
 
   const responseHeaders = new Headers(response.headers);
@@ -58,7 +59,19 @@ async function handle(request: NextRequest, context: RouteContext) {
     }
   }
 
-  // Buffer the upstream body instead of piping `response.body`. Streaming the
+  // SSE must reach the caller before upstream EOF: buffering hides every
+  // delta and heartbeat until the complete answer has been generated.
+  if (response.headers.get('content-type')?.split(';')[0].trim().toLowerCase() === 'text/event-stream') {
+    responseHeaders.set('Cache-Control', 'no-cache, no-transform');
+    responseHeaders.set('X-Accel-Buffering', 'no');
+    return new Response(response.body, {
+      status: response.status,
+      statusText: response.statusText,
+      headers: responseHeaders,
+    });
+  }
+
+  // Buffer non-streaming responses instead of piping `response.body`. Streaming the
   // body made the platform flush the outgoing headers from a different task
   // than the one that appended `set-cookie`, and on Vercel's Node runtime the
   // session cookies were dropped intermittently: the login POST answered 200

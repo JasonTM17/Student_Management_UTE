@@ -28,6 +28,7 @@ import {
 import { useAuth } from '@/context/AuthContext';
 import { BrandMark } from '@/components/BrandMark';
 import { ForcedPasswordRotationGate } from '@/components/auth/ForcedPasswordRotationGate';
+import { AssistantPanel } from '@/components/assistant/AssistantPanel';
 import { LanguageToggle } from '@/components/LanguageToggle';
 import { ThemeToggle } from '@/components/ThemeToggle';
 import { Button } from '@/components/ui/button';
@@ -390,6 +391,19 @@ export function AdminFrame({
             </div>
 
             <div className="flex shrink-0 items-center gap-2">
+              {user && !user.mustChangePassword ? (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  className="min-h-11 min-w-11 text-primary hover:bg-secondary/60"
+                  onClick={() => window.dispatchEvent(new CustomEvent('open-campus-assistant'))}
+                  aria-label={messages.assistant.title}
+                  title={messages.assistant.title}
+                >
+                  <BrainCircuit className="h-5 w-5" aria-hidden="true" />
+                </Button>
+              ) : null}
               <div className="hidden sm:flex items-center">
                 <LanguageToggle />
               </div>
@@ -529,6 +543,11 @@ export function AdminFrame({
           <div className="min-w-0 pt-6">{children}</div>
         </main>
       </div>
+      {user && !user.mustChangePassword ? (
+        <div className="print:hidden">
+          <AssistantPanel />
+        </div>
+      ) : null}
     </div>
   );
 }

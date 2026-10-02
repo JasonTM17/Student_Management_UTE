@@ -22,12 +22,271 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Executor;
+import java.util.concurrent.FutureTask;
+import java.util.concurrent.RejectedExecutionException;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.oauth2.jwt.Jwt;
+import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
+import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken;
+import org.springframework.security.web.method.annotation.AuthenticationPrincipalArgumentResolver;
+import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.MvcResult;
+import org.springframework.test.web.servlet.setup.MockMvcBuilders;
+import org.springframework.boot.autoconfigure.AutoConfigurations;
+import org.springframework.boot.autoconfigure.task.TaskExecutionAutoConfiguration;
+import org.springframework.boot.test.context.runner.ApplicationContextRunner;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.asyncDispatch;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 
 class ThesisAssistantControllerTest {
+
+    @Test
+    void assistantWorkerBeanPreservesTheDefaultApplicationExecutor() {
+        new ApplicationContextRunner()
+                .withConfiguration(AutoConfigurations.of(TaskExecutionAutoConfiguration.class))
+                .withPropertyValues("spring.profiles.active=persistence")
+                .withBean("assistantStreamExecutor", AssistantStreamExecutor.class, AssistantStreamExecutor::new)
+                .run(context -> {
+                    assertNotNull(context.getBean("assistantStreamExecutor", AssistantStreamExecutor.class));
+                    assertTrue(context.containsBean("applicationTaskExecutor"),
+                            "assistant workers must not suppress unrelated application async execution");
+                });
+    }
+
+    @Test
+    void publicWorkerRestoresContextBetweenDifferentOwnersAndRoles() {
+        ThesisAssistantService assistant = mock(ThesisAssistantService.class);
+        List<Runnable> tasks = new ArrayList<>();
+        Executor controlledExecutor = tasks::add;
+        ThesisAssistantController controller = new ThesisAssistantController(assistant, null, null, null, controlledExecutor);
+        List<AssistantRlsContext.Identity> identities = new ArrayList<>();
+        org.mockito.Mockito.doAnswer(invocation -> {
+            identities.add(AssistantRlsContext.forAccess(AssistantRlsBoundary.Access.AUTO));
+            return null;
+        }).when(assistant).stream(anyString(), anyString(), any(), anyString(), any(), any(), any());
+        try {
+            for (String owner : List.of("owner-a", "owner-b")) {
+                Jwt jwt = new Jwt("token", Instant.now(), Instant.now().plusSeconds(600),
+                        Map.of("alg", "HS256"), Map.of("sub", owner));
+                SecurityContextHolder.getContext().setAuthentication(new JwtAuthenticationToken(jwt,
+                        List.of(new SimpleGrantedAuthority(owner.equals("owner-a") ? "ROLE_STUDENT" : "ROLE_ADMIN"))));
+                controller.stream(request("Quy chế học vụ"), jwt, new MockHttpServletRequest());
+                SecurityContextHolder.clearContext();
+                Runnable task = tasks.remove(0);
+                task.run();
+                assertEquals(null, SecurityContextHolder.getContext().getAuthentication());
+                assertEquals(null, AssistantRlsContext.current());
+                assertTrue(!((FutureTask<?>) task).isCancelled(), "normal completion must not interrupt its own task");
+            }
+            assertEquals("owner-a", identities.get(0).ownerId());
+            assertTrue(!identities.get(0).admin());
+            assertEquals("owner-b", identities.get(1).ownerId());
+            assertTrue(identities.get(1).admin());
+            assertEquals(AssistantRlsContext.Scope.USER, identities.get(0).scope());
+            assertEquals(AssistantRlsContext.Scope.USER, identities.get(1).scope());
+        } finally {
+            SecurityContextHolder.clearContext();
+        }
+    }
+
+    @Test
+    void missingPublicActorFailsBeforeAnyWorkerSubmission() {
+        ThesisAssistantService assistant = mock(ThesisAssistantService.class);
+        List<Runnable> tasks = new ArrayList<>();
+        ThesisAssistantController controller = new ThesisAssistantController(assistant, null, null, null, tasks::add);
+        DomainException failure = assertThrows(DomainException.class,
+                () -> controller.stream(request("Quy chế học vụ"), null, new MockHttpServletRequest()));
+        assertEquals("UNAUTHENTICATED", failure.code());
+        assertTrue(tasks.isEmpty());
+        verifyNoInteractions(assistant);
+    }
+
+    @Test
+    void saturatedFourWorkerPoolRejectsWithoutDispatchAndRecoversAfterWorkersExit() throws Exception {
+        CountDownLatch entered = new CountDownLatch(4);
+        CountDownLatch release = new CountDownLatch(1);
+        CountDownLatch exited = new CountDownLatch(4);
+        try (AssistantStreamExecutor streams = new AssistantStreamExecutor()) {
+            for (int worker = 0; worker < 4; worker++) {
+                streams.execute(() -> {
+                    entered.countDown();
+                    try { release.await(); } catch (InterruptedException interrupted) { Thread.currentThread().interrupt(); }
+                    finally { exited.countDown(); }
+                });
+            }
+            assertTrue(entered.await(2, TimeUnit.SECONDS));
+            ThesisAssistantService assistant = mock(ThesisAssistantService.class);
+            var controller = new ThesisAssistantController(assistant, null, null, null, streams);
+            var mvc = MockMvcBuilders.standaloneSetup(controller)
+                    .setCustomArgumentResolvers(new AuthenticationPrincipalArgumentResolver()).build();
+            SecurityContextHolder.getContext().setAuthentication(new JwtAuthenticationToken(
+                    actor(), List.of(new SimpleGrantedAuthority("ROLE_STUDENT"))));
+            var result = mvc.perform(post("/api/v1/assistant/chat/stream")
+                    .contentType("application/json")
+                    .content("{\"message\":\"Quy chế học vụ\",\"locale\":\"vi\",\"clientRequestId\":\""
+                            + UUID.randomUUID() + "\"}"))
+                    .andReturn();
+            assertEquals(200, result.getResponse().getStatus());
+            String body = result.getResponse().getContentAsString();
+            assertTrue(body.contains("ASSISTANT_UNAVAILABLE"), body);
+            assertTrue(body.contains("\"retryable\":true"), body);
+            assertEquals(1, body.split("event:error", -1).length - 1);
+            verifyNoInteractions(assistant);
+            release.countDown();
+            assertTrue(exited.await(2, TimeUnit.SECONDS));
+            CountDownLatch recovered = new CountDownLatch(1);
+            for (int attempt = 0; attempt < 40 && recovered.getCount() != 0; attempt++) {
+                try { streams.execute(recovered::countDown); recovered.await(100, TimeUnit.MILLISECONDS); }
+                catch (RejectedExecutionException stillExiting) { Thread.sleep(10); }
+            }
+            assertTrue(recovered.await(1, TimeUnit.SECONDS), "released workers must admit another task");
+        } finally {
+            release.countDown();
+            SecurityContextHolder.clearContext();
+        }
+    }
+
+    @Test
+    void completionBeforeTheWorkerStartsFencesTheTaskWithoutLedgerCancellation() throws Exception {
+        ThesisAssistantService assistant = mock(ThesisAssistantService.class);
+        List<Runnable> tasks = new ArrayList<>();
+        var controller = new ThesisAssistantController(assistant, null, null, null, tasks::add);
+        var mvc = MockMvcBuilders.standaloneSetup(controller)
+                .setCustomArgumentResolvers(new AuthenticationPrincipalArgumentResolver()).build();
+        SecurityContextHolder.getContext().setAuthentication(new JwtAuthenticationToken(
+                actor(), List.of(new SimpleGrantedAuthority("ROLE_STUDENT"))));
+        try {
+            var result = mvc.perform(post("/api/v1/assistant/chat/stream")
+                    .contentType("application/json")
+                    .content("{\"message\":\"Quy chế học vụ\",\"locale\":\"vi\",\"clientRequestId\":\""
+                            + UUID.randomUUID() + "\"}"))
+                    .andReturn();
+            assertEquals(200, result.getResponse().getStatus());
+            assertTrue(result.getRequest().isAsyncStarted());
+            result.getRequest().getAsyncContext().complete();
+            Runnable task = tasks.remove(0);
+            task.run();
+            assertTrue(((FutureTask<?>) task).isCancelled());
+            verifyNoInteractions(assistant);
+        } finally {
+            SecurityContextHolder.clearContext();
+        }
+    }
+
+    @Test
+    void transportCompletionInterruptsActiveWorkAndFencesLateFramesWithoutCancellingTheLedger() throws Exception {
+        ThesisAssistantService assistant = mock(ThesisAssistantService.class);
+        CountDownLatch firstDeltaSent = new CountDownLatch(1);
+        CountDownLatch release = new CountDownLatch(1);
+        CountDownLatch workFinished = new CountDownLatch(1);
+        AtomicReference<Boolean> interrupted = new AtomicReference<>(false);
+        org.mockito.Mockito.doAnswer(invocation -> {
+            Consumer<ThesisAssistantService.StreamEvent> sink = invocation.getArgument(5);
+            sink.accept(new ThesisAssistantService.StreamMeta(UUID.randomUUID(), invocation.getArgument(4),
+                    null, null, "test-provider", "vi"));
+            sink.accept(new ThesisAssistantService.StreamDelta(0, "first grounded answer", List.of()));
+            firstDeltaSent.countDown();
+            try { release.await(5, TimeUnit.SECONDS); }
+            catch (InterruptedException transportClosed) { interrupted.set(true); }
+            try {
+                sink.accept(new ThesisAssistantService.StreamDelta(1, "late answer must stay hidden", List.of()));
+                return null;
+            } finally {
+                workFinished.countDown();
+            }
+        }).when(assistant).stream(anyString(), anyString(), any(), anyString(), any(), any(), any());
+        try (AssistantStreamExecutor streams = new AssistantStreamExecutor(1)) {
+            var controller = new ThesisAssistantController(assistant, null, null, null, streams);
+            var mvc = MockMvcBuilders.standaloneSetup(controller)
+                    .setCustomArgumentResolvers(new AuthenticationPrincipalArgumentResolver()).build();
+            SecurityContextHolder.getContext().setAuthentication(new JwtAuthenticationToken(
+                    actor(), List.of(new SimpleGrantedAuthority("ROLE_STUDENT"))));
+            var result = mvc.perform(post("/api/v1/assistant/chat/stream")
+                    .contentType("application/json")
+                    .content("{\"message\":\"Quy chế học vụ\",\"locale\":\"vi\",\"clientRequestId\":\""
+                            + UUID.randomUUID() + "\"}"))
+                    .andReturn();
+            assertTrue(firstDeltaSent.await(2, TimeUnit.SECONDS));
+            result.getRequest().getAsyncContext().complete();
+            assertTrue(workFinished.await(2, TimeUnit.SECONDS));
+            assertTrue(interrupted.get());
+            assertTrue(!result.getResponse().getContentAsString().contains("late answer must stay hidden"));
+            verify(assistant, never()).cancel(any(), anyString());
+        } finally {
+            release.countDown();
+            SecurityContextHolder.clearContext();
+        }
+    }
+
+    @Test
+    void httpStreamReturnsAndFlushesBeforeGenerationCompletesWithTheAuthenticatedOwner() throws Exception {
+        ThesisAssistantService assistant = mock(ThesisAssistantService.class);
+        AssistantStreamExecutor streams = new AssistantStreamExecutor(1);
+        ThesisAssistantController controller = new ThesisAssistantController(assistant, null, null, null, streams);
+        MockMvc mvc = MockMvcBuilders.standaloneSetup(controller)
+                .setCustomArgumentResolvers(new AuthenticationPrincipalArgumentResolver()).build();
+        CountDownLatch firstDeltaSent = new CountDownLatch(1);
+        CountDownLatch releaseGeneration = new CountDownLatch(1);
+        CountDownLatch generationFinished = new CountDownLatch(1);
+        AtomicReference<String> workerOwner = new AtomicReference<>();
+        org.mockito.Mockito.doAnswer(invocation -> {
+            Consumer<ThesisAssistantService.StreamEvent> sink = invocation.getArgument(5);
+            workerOwner.set(AssistantRlsContext.forAccess(AssistantRlsBoundary.Access.AUTO).ownerId());
+            sink.accept(new ThesisAssistantService.StreamMeta(UUID.randomUUID(), invocation.getArgument(4),
+                    null, null, "test-provider", "vi"));
+            sink.accept(new ThesisAssistantService.StreamDelta(0, "first grounded answer", List.of()));
+            firstDeltaSent.countDown();
+            try {
+                assertTrue(releaseGeneration.await(5, TimeUnit.SECONDS), "generation gate was not released");
+                sink.accept(new ThesisAssistantService.StreamDone(null, "ANSWERED", false, "COMPLETED"));
+                return null;
+            } finally {
+                generationFinished.countDown();
+            }
+        }).when(assistant).stream(anyString(), anyString(), any(), anyString(), any(), any(), any());
+
+        var requestThread = Executors.newSingleThreadExecutor();
+        try {
+            var response = requestThread.submit(() -> {
+                SecurityContextHolder.getContext().setAuthentication(new JwtAuthenticationToken(
+                        actor(), List.of(new SimpleGrantedAuthority("ROLE_STUDENT"))));
+                try {
+                    return mvc.perform(post("/api/v1/assistant/chat/stream")
+                            .contentType("application/json")
+                            .content("{\"message\":\"Quy chế học vụ\",\"locale\":\"vi\",\"clientRequestId\":\""
+                                    + UUID.randomUUID() + "\"}"))
+                            .andReturn();
+                } finally {
+                    SecurityContextHolder.clearContext();
+                }
+            });
+            assertTrue(firstDeltaSent.await(2, TimeUnit.SECONDS), "provider did not emit the first delta");
+            MvcResult result = response.get(500, TimeUnit.MILLISECONDS);
+            assertTrue(result.getRequest().isAsyncStarted(), "HTTP streaming must start before generation completes");
+            assertTrue(result.getResponse().getContentAsString().contains("first grounded answer"));
+            assertEquals("owner-a", workerOwner.get());
+            assertEquals(1, generationFinished.getCount(), "provider must still be gated during the first flush");
+
+            releaseGeneration.countDown();
+            assertTrue(generationFinished.await(2, TimeUnit.SECONDS));
+            result.getAsyncResult(2_000);
+            MvcResult completed = mvc.perform(asyncDispatch(result)).andReturn();
+            assertTrue(completed.getResponse().getContentAsString().contains("event:done"));
+        } finally {
+            releaseGeneration.countDown();
+            requestThread.shutdownNow();
+            assertTrue(requestThread.awaitTermination(2, TimeUnit.SECONDS));
+            streams.close();
+        }
+    }
 
     @Test
     void chatGuardRunsBeforeLocalOrRemoteDispatch() {

@@ -8,6 +8,7 @@ import {
   useRef,
   useState,
 } from 'react';
+import { usePathname, useRouter } from 'next/navigation';
 import {
   ArrowDown,
   History,
@@ -19,6 +20,7 @@ import { Button } from '@/components/ui/button';
 import { useConfirmationDialog } from '@/components/ui/use-confirmation-dialog';
 import { cn } from '@/lib/utils';
 import { useI18n } from '@/i18n';
+import { stripLocaleFromPathname } from '@/i18n/paths';
 import { useAuth } from '@/context/AuthContext';
 import { thesisApi, type AssistantConversation } from '@/lib/thesis-api';
 import {
@@ -42,10 +44,17 @@ import { useAssistantStream } from './useAssistantStream';
 export { TRANSIENT_TERMINAL_CODES };
 
 export function AssistantPanel() {
-  const { locale, messages } = useI18n();
+  const { locale, messages, href } = useI18n();
+  const router = useRouter();
   const { isLecturer } = useAuth();
   const academicSuggestions = isLecturer ? messages.assistant.lecturerSuggestions : messages.assistant.suggestions;
   const { confirm, confirmationDialog } = useConfirmationDialog();
+  // Portal header/sidebar entries stay mounted when the dialog opens. The
+  // floating duplicate covers mobile timetable rows and the chat composer,
+  // and cannot restore focus because opening the dialog unmounts its trigger.
+  const visiblePathname = usePathname();
+  const pathname = stripLocaleFromPathname(visiblePathname ?? '/').pathname;
+  const suppressLauncher = pathname.startsWith('/dashboard') || pathname.startsWith('/admin');
   const [open, setOpen] = useState(false);
   // Assistant retrieval scope. The academic launcher opens the default corpus;
   // the specialized launcher (Trợ lý chuyên sâu) narrows retrieval to the
@@ -67,6 +76,7 @@ export function AssistantPanel() {
 
   // Focus returns to whichever control opened the panel (header or sidebar launcher)
   const triggerRef = useRef<HTMLElement | null>(null);
+  const floatingLauncherRef = useRef<HTMLButtonElement>(null);
   const assistantDialogRef = useRef<HTMLElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const logRef = useRef<HTMLDivElement>(null);
@@ -105,6 +115,21 @@ export function AssistantPanel() {
     onReconcileHistory: reconcileHistory,
     onNewExchange: handleNewExchange,
   });
+
+  const closePanel = useCallback(() => {
+    if (isSending) void stopGeneration();
+    else abortStream();
+    setOpen(false);
+    setShowHistory(false);
+    selectedHistoryRef.current = false;
+    historyFetchedRef.current = false;
+    setHistoryStatus('idle');
+    setHistoryCursor(undefined);
+    requestAnimationFrame(() => {
+      const trigger = triggerRef.current;
+      (trigger?.isConnected ? trigger : floatingLauncherRef.current)?.focus();
+    });
+  }, [abortStream, isSending, stopGeneration]);
 
   // Follow-up chips follow the domain of the last grounded answer instead of
   // repeating the empty-state suggestions after every reply.
@@ -179,19 +204,22 @@ export function AssistantPanel() {
     if (!open) return undefined;
     const handleEscape = (event: globalThis.KeyboardEvent) => {
       if (event.key !== 'Escape') return;
+      const activeModal = document.activeElement?.closest(
+        '[role="dialog"][aria-modal="true"], [role="alertdialog"][aria-modal="true"]',
+      );
+      if (activeModal && activeModal !== assistantDialogRef.current) return;
       event.preventDefault();
       if (showHistory) {
         setShowHistory(false);
         requestAnimationFrame(() => inputRef.current?.focus());
       } else {
-        setOpen(false);
-        requestAnimationFrame(() => triggerRef.current?.focus());
+        closePanel();
       }
     };
     document.addEventListener('keydown', handleEscape);
     requestAnimationFrame(() => inputRef.current?.focus());
     return () => document.removeEventListener('keydown', handleEscape);
-  }, [open, showHistory]);
+  }, [closePanel, open, showHistory]);
 
   // Clicking anywhere outside the panel dismisses it, the way any floating
   // chat window behaves. Clicks inside a portal-rendered dialog (the confirm
@@ -208,11 +236,11 @@ export function AssistantPanel() {
       ) {
         return;
       }
-      setOpen(false);
+      closePanel();
     };
     document.addEventListener('pointerdown', handlePointerDown);
     return () => document.removeEventListener('pointerdown', handlePointerDown);
-  }, [open]);
+  }, [closePanel, open]);
 
   useEffect(() => {
     if (!open || !isMobile) return undefined;
@@ -349,7 +377,10 @@ export function AssistantPanel() {
     const articles = node.querySelectorAll('[role="article"]');
     const newest = articles[articles.length - 1] as HTMLElement | undefined;
     if (newest) {
-      newest.scrollIntoView({ block: 'start', behavior: 'auto' });
+      node.scrollTo({
+        top: node.scrollTop + newest.getBoundingClientRect().top - node.getBoundingClientRect().top,
+        behavior: 'auto',
+      });
     } else {
       node.scrollTo({ top: node.scrollHeight });
     }
@@ -375,21 +406,6 @@ export function AssistantPanel() {
         ? 'auto'
         : 'smooth',
     });
-  };
-
-  const closePanel = () => {
-    if (isSending) {
-      void stopGeneration();
-    } else {
-      abortStream();
-    }
-    setOpen(false);
-    setShowHistory(false);
-    selectedHistoryRef.current = false;
-    historyFetchedRef.current = false;
-    setHistoryStatus('idle');
-    setHistoryCursor(undefined);
-    requestAnimationFrame(() => triggerRef.current?.focus());
   };
 
   const selectConversation = async (conversation: AssistantConversation) => {
@@ -482,17 +498,25 @@ export function AssistantPanel() {
               ? messages.assistant.turnInProgress
               : messages.assistant.unavailable;
 
+  // Asking requires a live session: once the backend refuses with 401 the
+  // composer locks and the only offered action is signing in again — a retry
+  // here could never succeed against the same expired token.
+  const authRequired = state.error === 'unauthorized';
+  const goSignIn = () =>
+    router.push(`${href('/login')}?reason=session-expired`);
+
   return (
     <>
-      <div
-        className={cn(
-          'fixed z-50',
-          open
-            ? // Mobile: full-screen sheet; desktop: floating card bottom-right.
-              'inset-0 md:inset-auto md:bottom-6 md:right-6 md:w-[min(24rem,calc(100vw-2rem))]'
-            : 'bottom-[calc(5.5rem+env(safe-area-inset-bottom))] right-4 md:bottom-6 md:right-6',
-        )}
-      >
+      {open || !suppressLauncher ? (
+        <div
+          className={cn(
+            'fixed z-50',
+            open
+              ? // Mobile: full-screen sheet; desktop: floating card bottom-right.
+                'inset-0 md:inset-auto md:bottom-6 md:right-6 md:w-[min(24rem,calc(100vw-2rem))]'
+              : 'bottom-[calc(5.5rem+env(safe-area-inset-bottom))] right-4 md:bottom-6 md:right-6',
+          )}
+        >
         {open ? (
           <section
             ref={assistantDialogRef}
@@ -546,6 +570,10 @@ export function AssistantPanel() {
                   variant="ghost"
                   size="icon"
                   className="min-h-11 min-w-11 rounded-lg text-white/80 hover:bg-white/15 hover:text-white"
+                  // An expired session must not offer New Chat: its 401 would
+                  // replace the unauthorized state with a generic error and
+                  // visually unlock a composer that still cannot send.
+                  disabled={authRequired}
                   onClick={() => void createConversation()}
                   aria-label={messages.assistant.newConversation}
                   title={messages.assistant.newConversation}
@@ -655,6 +683,7 @@ export function AssistantPanel() {
                         key={suggestion}
                         type="button"
                         onClick={() => void sendMessage(undefined, suggestion)}
+                        disabled={isSending || authRequired}
                         className="min-h-11 rounded-md border border-primary/20 bg-primary/5 px-3 py-2 text-[11px] font-medium text-primary transition-colors hover:border-primary/40 hover:bg-primary/10"
                       >
                         {suggestion}
@@ -669,6 +698,7 @@ export function AssistantPanel() {
                     void setFeedback(messageId, rating, reason)
                   }
                   followUps={followUps}
+                  followUpsDisabled={authRequired}
                   followUpsLabel={messages.assistant.followUpsLabel}
                   onFollowUp={(suggestion) =>
                     void sendMessage(undefined, suggestion)
@@ -696,7 +726,16 @@ export function AssistantPanel() {
                   role="alert"
                 >
                   <p>{errorLabel}</p>
-                  {lastPrompt ? (
+                  {authRequired ? (
+                    <Button
+                      type="button"
+                      size="sm"
+                      className="mt-2 min-h-10 px-3"
+                      onClick={goSignIn}
+                    >
+                      {messages.assistant.signInAction}
+                    </Button>
+                  ) : lastPrompt ? (
                     <Button
                       type="button"
                       variant="ghost"
@@ -787,12 +826,15 @@ export function AssistantPanel() {
               onInputChange={setInput}
               onSubmit={(event) => void sendMessage(event)}
               onStop={() => void stopGeneration()}
+              scope={mode}
+              authLocked={authRequired}
             />
           </section>
         ) : (
           /* Floating chat launcher: one round mascot button in the bottom-right
              corner whenever the panel is closed. */
           <button
+            ref={floatingLauncherRef}
             type="button"
             onClick={() => {
               triggerRef.current = document.activeElement as HTMLElement | null;
@@ -810,7 +852,8 @@ export function AssistantPanel() {
             />
           </button>
         )}
-      </div>
+        </div>
+      ) : null}
       {confirmationDialog}
     </>
   );

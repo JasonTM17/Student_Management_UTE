@@ -11,6 +11,10 @@ import org.springframework.dao.DataAccessException;
 import jakarta.validation.Valid;
 import java.util.List;
 import java.util.UUID;
+import java.util.concurrent.Executor;
+import java.util.concurrent.FutureTask;
+import java.util.concurrent.RejectedExecutionException;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Consumer;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Profile;
@@ -18,6 +22,8 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.concurrent.DelegatingSecurityContextRunnable;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -49,6 +55,7 @@ public class ThesisAssistantController {
     private final RagAssistantGateway ragGateway;
     private final AssistantPersonalContextAdvisor personalContext;
     private final AssistantRlsState rlsState;
+    private final Executor streamExecutor;
 
     /** Compatibility constructor for focused controller tests. */
     public ThesisAssistantController(ThesisAssistantService assistant) {
@@ -68,16 +75,36 @@ public class ThesisAssistantController {
         this(assistant, ragGateway, personalContext, null);
     }
 
-    @Autowired
     public ThesisAssistantController(
             ThesisAssistantService assistant,
             RagAssistantGateway ragGateway,
             AssistantPersonalContextAdvisor personalContext,
             @org.springframework.beans.factory.annotation.Autowired(required = false) AssistantRlsState rlsState) {
+        this(assistant, ragGateway, personalContext, rlsState, Runnable::run);
+    }
+
+    @Autowired
+    public ThesisAssistantController(
+            ThesisAssistantService assistant,
+            RagAssistantGateway ragGateway,
+            AssistantPersonalContextAdvisor personalContext,
+            @org.springframework.beans.factory.annotation.Autowired(required = false) AssistantRlsState rlsState,
+            AssistantStreamExecutor streamExecutor) {
+        this(assistant, ragGateway, personalContext, rlsState, streamExecutor::execute);
+    }
+
+    /** Controlled executor seam for deterministic transport and ownership tests. */
+    ThesisAssistantController(
+            ThesisAssistantService assistant,
+            RagAssistantGateway ragGateway,
+            AssistantPersonalContextAdvisor personalContext,
+            AssistantRlsState rlsState,
+            Executor streamExecutor) {
         this.assistant = assistant;
         this.ragGateway = ragGateway;
         this.personalContext = personalContext;
         this.rlsState = rlsState;
+        this.streamExecutor = streamExecutor;
     }
 
     /**
@@ -339,33 +366,40 @@ public class ThesisAssistantController {
     public SseEmitter stream(@Valid @RequestBody ChatRequest request, @AuthenticationPrincipal Jwt actor,
             HttpServletRequest httpRequest) {
         requireAssistantRlsAvailable();
+        String owner = subject(actor);
+        boolean dbDownAtRequestStart = httpRequest != null && Boolean.TRUE.equals(
+                httpRequest.getAttribute(DatabaseAvailabilityTracker.REQUEST_ATTRIBUTE));
         SseEmitter emitter = new SseEmitter(120_000L);
+        AssistantInputGuard.GuardResult guard = AssistantInputGuard.inspect(request.message());
+        if (!guard.allowed()) {
+            sendError(emitter, guard.reasonCode(), false);
+            emitter.complete();
+            return emitter;
+        }
+        if (AssistantInputGuard.isTechnicalRequest(guard.normalizedMessage()) && !request.isSpecializedScope()) {
+            sendError(emitter, "TECHNICAL_REQUEST_BLOCKED", false);
+            emitter.complete();
+            return emitter;
+        }
+        AtomicBoolean transportClosed = new AtomicBoolean(false);
+        AtomicBoolean generationFinished = new AtomicBoolean(false);
         // Emit an SSE comment frame while the emitter is open so a proxy or CDN
         // cannot idle-kill the connection during a slow model start. Comment
         // frames (":heartbeat") are transport-level noise: SSE clients ignore
         // them, and the frontend stream parser skips them without disturbing
         // event ordering or the delta sequence.
         java.util.concurrent.ScheduledFuture<?> heartbeat = HEARTBEAT_SCHEDULER.scheduleWithFixedDelay(
-                () -> sendHeartbeat(emitter), HEARTBEAT_INTERVAL_MS, HEARTBEAT_INTERVAL_MS,
+                () -> { if (!transportClosed.get()) sendHeartbeat(emitter); },
+                HEARTBEAT_INTERVAL_MS, HEARTBEAT_INTERVAL_MS,
                 java.util.concurrent.TimeUnit.MILLISECONDS);
         Runnable stopHeartbeat = () -> heartbeat.cancel(false);
-        emitter.onCompletion(stopHeartbeat);
-        emitter.onTimeout(stopHeartbeat);
-        String owner = subject(actor);
-        Consumer<ThesisAssistantService.StreamEvent> sink = event -> send(emitter, event);
+        Consumer<ThesisAssistantService.StreamEvent> sink = event -> {
+            if (!transportClosed.get()) send(emitter, event);
+        };
+        var securityContext = SecurityContextHolder.createEmptyContext();
+        securityContext.setAuthentication(SecurityContextHolder.getContext().getAuthentication());
+        Runnable generation = () -> {
         try {
-            AssistantInputGuard.GuardResult guard = AssistantInputGuard.inspect(request.message());
-            if (!guard.allowed()) {
-                sendError(emitter, guard.reasonCode(), false);
-                emitter.complete();
-                return emitter;
-            }
-            if (AssistantInputGuard.isTechnicalRequest(guard.normalizedMessage())
-                    && !request.isSpecializedScope()) {
-                sendError(emitter, "TECHNICAL_REQUEST_BLOCKED", false);
-                emitter.complete();
-                return emitter;
-            }
             // Same conversational tier as the JSON path: openers answer
             // locally, never fall through to a knowledge miss.
             ChatResponse conversational = ThesisAssistantService.conversationalAnswer(request.message(),
@@ -389,23 +423,42 @@ public class ThesisAssistantController {
                     if (general != null) {
                         ThesisAssistantService.streamLocalResponse(general, request.clientRequestId(), sink);
                     } else if (remoteRag()) {
-                        streamRemoteWithFallback(request, owner, sink, httpRequest);
+                        streamRemoteWithFallback(request, owner, sink, dbDownAtRequestStart);
                     } else {
                         assistant.stream(request.message(), request.locale(), request.conversationId(), owner,
                                 request.clientRequestId(), sink, request.scope());
                     }
                 }
             }
-            emitter.complete();
         } catch (DomainException exception) {
-            sendError(emitter, exception.code(), exception.status().is5xxServerError() || exception.status() == HttpStatus.TOO_MANY_REQUESTS);
-            emitter.complete();
+            if (!transportClosed.get()) sendError(emitter, exception.code(),
+                    exception.status().is5xxServerError() || exception.status() == HttpStatus.TOO_MANY_REQUESTS);
         } catch (Exception exception) {
             LOG.warn("assistant stream failed with {}", exception.getClass().getSimpleName());
+            if (!transportClosed.get()) sendError(emitter, "ASSISTANT_UNAVAILABLE", true);
+        } finally {
+            // Transport cleanup must not interrupt a canonical result that has just finished.
+            generationFinished.set(true);
+            stopHeartbeat.run();
+            emitter.complete();
+        }
+        };
+        FutureTask<Void> task = new FutureTask<>(new DelegatingSecurityContextRunnable(generation, securityContext), null);
+        Runnable closeTransport = () -> {
+            transportClosed.set(true);
+            stopHeartbeat.run();
+            if (!generationFinished.get()) task.cancel(true);
+        };
+        emitter.onCompletion(closeTransport);
+        emitter.onTimeout(closeTransport);
+        emitter.onError(failure -> closeTransport.run());
+        try {
+            streamExecutor.execute(task);
+        } catch (RejectedExecutionException rejected) {
+            generationFinished.set(true);
+            stopHeartbeat.run();
             sendError(emitter, "ASSISTANT_UNAVAILABLE", true);
             emitter.complete();
-        } finally {
-            stopHeartbeat.run();
         }
         return emitter;
     }
@@ -570,9 +623,13 @@ public class ThesisAssistantController {
      */
     void streamRemoteWithFallback(ChatRequest request, String owner,
             Consumer<ThesisAssistantService.StreamEvent> sink, HttpServletRequest httpRequest) {
+        streamRemoteWithFallback(request, owner, sink, httpRequest != null && Boolean.TRUE.equals(
+                httpRequest.getAttribute(DatabaseAvailabilityTracker.REQUEST_ATTRIBUTE)));
+    }
+
+    private void streamRemoteWithFallback(ChatRequest request, String owner,
+            Consumer<ThesisAssistantService.StreamEvent> sink, boolean dbDownAtRequestStart) {
         String locale = AssistantInputGuard.normalizeLocale(request.locale());
-        boolean dbDownAtRequestStart = Boolean.TRUE.equals(
-                httpRequest.getAttribute(DatabaseAvailabilityTracker.REQUEST_ATTRIBUTE));
         ChatResponse fastPath = lexicalFastPathOrNull(request);
         if (fastPath != null) {
             emitLexicalFastPath(fastPath, request, locale, sink);

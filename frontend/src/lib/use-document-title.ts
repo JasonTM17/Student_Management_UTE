@@ -6,7 +6,8 @@ import { useEffect } from 'react';
  * Sets the browser-tab title for client pages. Next.js metadata exports are
  * server-only, so authenticated client pages use this hook instead. Next
  * re-applies the root metadata title after hydration, so the hook keeps a
- * MutationObserver on the <title> element and re-asserts the page title.
+ * MutationObserver on the head and re-asserts the page title, including when
+ * navigation metadata replaces the title element itself.
  */
 export function useDocumentTitle(title: string | undefined) {
   useEffect(() => {
@@ -22,10 +23,8 @@ export function useDocumentTitle(title: string | undefined) {
     };
 
     apply();
-    const titleElement = document.querySelector('title');
-    if (!titleElement) return;
     const observer = new MutationObserver(apply);
-    observer.observe(titleElement, {
+    observer.observe(document.head, {
       childList: true,
       characterData: true,
       subtree: true,

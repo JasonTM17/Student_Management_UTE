@@ -929,6 +929,8 @@ export const thesisApi = {
       onEvent: (event: AssistantStreamEvent) => void;
     },
   ): Promise<void> => {
+    if (options.signal?.aborted)
+      throw new Error('assistant stream aborted');
     const base = API_BASE_URL.endsWith('/')
       ? API_BASE_URL.slice(0, -1)
       : API_BASE_URL;
@@ -963,11 +965,11 @@ export const thesisApi = {
         body: JSON.stringify(requestBody),
       });
     };
-    // A dead proxy can stall the reader indefinitely after the headers arrive,
-    // leaving the panel in "thinking" until the student manually stops. The
-    // idle watchdog aborts when no bytes arrive within the window and honors
-    // the caller's signal (Stop button) at the same time.
+    // Keep-alive bytes prove only that the socket is alive. Require useful
+    // answer content within the idle window and bound the entire stream even
+    // when a broken upstream keeps producing deltas without finishing.
     const IDLE_TIMEOUT_MS = 45_000;
+    const STREAM_TIMEOUT_MS = 120_000;
     const controller = new AbortController();
     const onCallerAbort = () => controller.abort();
     options.signal?.addEventListener('abort', onCallerAbort);
@@ -979,6 +981,7 @@ export const thesisApi = {
       }, IDLE_TIMEOUT_MS);
     };
     resetIdleWatchdog();
+    const streamTimer = setTimeout(() => controller.abort(), STREAM_TIMEOUT_MS);
     // The watchdog cleanup must cover EVERY exit — including fetch failures,
     // the 401-refresh re-throw, and non-ok responses — so the arming try wraps
     // the whole request rather than only the read loop.
@@ -987,7 +990,6 @@ export const thesisApi = {
       if (response.status === 401) {
         try {
           await refreshSessionSingleFlight();
-          resetIdleWatchdog();
           response = await fetchStream();
         } catch {
           throw new Error('assistant stream unauthorized');
@@ -1008,26 +1010,36 @@ export const thesisApi = {
         (event) => {
           const validated = parseAssistantStreamEvent(event);
           order.accept(validated);
+          if (
+            ((validated.type === 'delta' || validated.type === 'replace') &&
+              typeof validated.text === 'string' && validated.text.trim()) ||
+            validated.type === 'citation'
+          ) resetIdleWatchdog();
           options.onEvent(validated as AssistantStreamEvent);
         },
         {
           onInvalid: () => {
             invalidFrame = true;
+            throw new Error('assistant stream contained malformed event');
           },
         },
       );
       const reader = response.body.getReader();
       const decoder = new TextDecoder();
       try {
-        while (true) {
+        while (order.currentPhase !== 'terminal') {
           const { done, value } = await reader.read();
           if (done) break;
-          resetIdleWatchdog();
           parser.push(decoder.decode(value, { stream: true }));
         }
-        parser.push(decoder.decode());
-        parser.end();
+        if (order.currentPhase !== 'terminal') {
+          parser.push(decoder.decode());
+          parser.end();
+        }
       } finally {
+        // `done`/`error` owns completion; a proxy may leave its socket open.
+        // Cancel without awaiting an upstream close acknowledgement.
+        void reader.cancel().catch(() => undefined);
         reader.releaseLock();
       }
       if (invalidFrame)
@@ -1036,6 +1048,7 @@ export const thesisApi = {
         throw new Error('assistant stream ended without a terminal event');
     } finally {
       if (idleTimer !== undefined) clearTimeout(idleTimer);
+      clearTimeout(streamTimer);
       options.signal?.removeEventListener('abort', onCallerAbort);
     }
   },

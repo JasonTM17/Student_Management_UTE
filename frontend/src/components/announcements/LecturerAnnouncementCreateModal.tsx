@@ -31,6 +31,7 @@ import { TinyMceEditor } from '@/components/ui/tinymce-editor';
 import { useConfirmationDialog } from '@/components/ui/use-confirmation-dialog';
 import { EDIT_BANNER_PRESETS } from '@/components/announcements/AnnouncementEditModal';
 import { cn } from '@/lib/utils';
+import { replaceCoverBlock, removeCoverBlock } from '@/lib/cover-banner';
 import { toast } from 'sonner';
 
 interface LecturerAnnouncementCreateModalProps {
@@ -217,20 +218,11 @@ export function LecturerAnnouncementCreateModal({
     const figureMarkup = `<figure class="my-3 text-center">\n  <img src="${bannerUrl}" alt="${bannerTitle}" class="w-full rounded-lg object-cover max-h-72 shadow-xs" />\n  <figcaption class="mt-1.5 text-xs text-muted-foreground italic">${bannerTitle}</figcaption>\n</figure>\n\n`;
 
     if (activeCoverUrl) {
-      const figureRegex = new RegExp(
-        `<figure[^>]*>[\\s\\S]*?(?:${activeCoverUrl.replace(/[.*+?^${}()|[\\]\\]/g, '\\$&')}|\\/images\\/(?:banners|news)\\/[^"']+)[\\s\\S]*?<\\/figure>\\s*`,
-        'i'
-      );
-      if (figureRegex.test(content)) {
-        setContent((prev) => prev.replace(figureRegex, figureMarkup));
-        return;
-      }
-      const imgRegex = new RegExp(
-        `<img[^>]+src=["']${activeCoverUrl.replace(/[.*+?^${}()|[\\]\\]/g, '\\$&')}["'][^>]*>\\s*`,
-        'i'
-      );
-      if (imgRegex.test(content)) {
-        setContent((prev) => prev.replace(imgRegex, figureMarkup));
+      // Splice only the block carrying the active cover URL; the old spanning
+      // regex could start at an earlier figure and delete everything between.
+      const replaced = replaceCoverBlock(content, activeCoverUrl, figureMarkup);
+      if (replaced !== null) {
+        setContent(replaced);
         return;
       }
     }
@@ -239,18 +231,9 @@ export function LecturerAnnouncementCreateModal({
 
   const handleRemoveBanner = () => {
     if (!activeCoverUrl) return;
-    const figureRegex = new RegExp(
-      `<figure[^>]*>[\\s\\S]*?${activeCoverUrl.replace(/[.*+?^${}()|[\\]\\]/g, '\\$&')}[\\s\\S]*?<\\/figure>\\s*`,
-      'gi'
-    );
-    if (figureRegex.test(content)) {
-      setContent((prev) => prev.replace(figureRegex, '').trim());
-    } else {
-      const imgRegex = new RegExp(
-        `<img[^>]+src=["']${activeCoverUrl.replace(/[.*+?^${}()|[\\]\\]/g, '\\$&')}["'][^>]*>\\s*`,
-        'gi'
-      );
-      setContent((prev) => prev.replace(imgRegex, '').trim());
+    const removed = removeCoverBlock(content, activeCoverUrl);
+    if (removed !== null) {
+      setContent(removed);
     }
   };
 
@@ -393,10 +376,14 @@ export function LecturerAnnouncementCreateModal({
         {/* Priority & Target Audience */}
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div className="space-y-1.5">
-            <label className="text-xs font-semibold text-foreground">
+            <label
+              htmlFor="lecturer-announcement-priority"
+              className="text-xs font-semibold text-foreground"
+            >
               {isVi ? 'Mức độ ưu tiên' : 'Priority'}
             </label>
             <select
+              id="lecturer-announcement-priority"
               value={priority}
               onChange={(e) => setPriority(e.target.value as any)}
               className="w-full rounded-md border border-border/80 bg-background px-3 py-2 text-sm text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"

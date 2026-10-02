@@ -429,6 +429,10 @@ public class AssistantPersonalContextAdvisor {
                     + "|(?:what|which)\\s+(?:room|time|period|building)|(?:when|what\\s+time)\\s+(?:is|does)",
             Pattern.CASE_INSENSITIVE | Pattern.UNICODE_CASE);
 
+    private static final Pattern WEEKLY_SCHEDULE_HINT = Pattern.compile(
+            "tuần\\s*này|tuan\\s*nay|\\bthis\\s+week\\b",
+            Pattern.CASE_INSENSITIVE | Pattern.UNICODE_CASE);
+
     private static boolean isConductIntent(String message) {
         return StringUtils.hasText(message) && CONDUCT_INTENT.matcher(message).find();
     }
@@ -848,7 +852,13 @@ public class AssistantPersonalContextAdvisor {
             }
             return null;
         }
-        if (isEnrollmentListIntent(message)) {
+        // A first-person course question can also ask for the timetable:
+        // "Tuần này tôi học những môn nào, ở phòng nào?" has no "lịch" noun.
+        // Keep the enrollment classifier's policy/ownership guards, but let
+        // current-week and room/time qualifiers reach the timetable below.
+        if (isEnrollmentListIntent(message)
+                && !WEEKLY_SCHEDULE_HINT.matcher(message).find()
+                && !SECTION_DETAIL_HINT.matcher(message).find()) {
             // Round-3 chat-2: a NAMED semester in the question asks about that
             // semester's courses (the transcript's published rows are the
             // durable record), not the current-term registration list.

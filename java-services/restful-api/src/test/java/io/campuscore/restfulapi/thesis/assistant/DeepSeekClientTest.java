@@ -7,9 +7,36 @@ import java.io.ByteArrayInputStream;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.util.List;
+import java.util.ArrayList;
 import org.junit.jupiter.api.Test;
 
 class DeepSeekClientTest {
+    @Test
+    void whitespaceOnlyTokensPreserveWordAndParagraphBoundariesWithoutBlankSegments() {
+        DeepSeekClient client = new DeepSeekClient(new DeepSeekProperties(false, "",
+                "https://api.deepseek.com", "deepseek-v4-flash", 8000, 800), new ObjectMapper());
+        var request = new AssistantCompletionProvider.CompletionRequest("question", "vi", "context", List.of("source-1"));
+        StringBuilder wire = new StringBuilder();
+        for (String text : List.of("lợi", " ", "ích", "\n\n", "Tối", " ", "ưu", " ", "SE421", " ", "A-101")) {
+            wire.append("data: {\"choices\":[{\"delta\":{\"content\":")
+                    .append(new ObjectMapper().valueToTree(text).toString()).append("},\"finish_reason\":null}]}\n\n");
+        }
+        wire.append("data: {\"choices\":[{\"delta\":{},\"finish_reason\":\"stop\"}]}\n\n")
+                .append("data: [DONE]\n\n");
+        var emitted = new ArrayList<AssistantCompletionProvider.ProviderSegment>();
+        var result = client.parseBody(new ByteArrayInputStream(wire.toString().getBytes(StandardCharsets.UTF_8)),
+                request, emitted::add, () -> false, Instant.now().plusSeconds(2));
+        assertEquals("lợi ích\n\nTối ưu SE421 A-101", result.answer());
+        assertEquals(result.answer(), emitted.stream().map(AssistantCompletionProvider.ProviderSegment::text)
+                .collect(java.util.stream.Collectors.joining()));
+        assertEquals(6, emitted.size());
+        for (int index = 0; index < emitted.size(); index++) {
+            assertEquals(index, emitted.get(index).sequence());
+            assertEquals(List.of("source-1"), emitted.get(index).sourceIds());
+            org.junit.jupiter.api.Assertions.assertFalse(emitted.get(index).text().isBlank());
+        }
+    }
+
     @Test
     void disabledProviderFailsBeforeAnyNetworkCall() {
         DeepSeekProperties properties = new DeepSeekProperties(false, "", "https://api.deepseek.com", "deepseek-v4-flash", 8000, 800);

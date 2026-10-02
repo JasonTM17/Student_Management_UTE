@@ -29,6 +29,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { useI18n } from '@/i18n';
 import { RichContentRenderer } from '@/components/ui/rich-content-renderer';
 import { TinyMceEditor } from '@/components/ui/tinymce-editor';
+import { replaceCoverBlock, removeCoverBlock } from '@/lib/cover-banner';
 import { cn } from '@/lib/utils';
 
 export const EDIT_BANNER_PRESETS = [
@@ -138,20 +139,11 @@ export function AnnouncementEditModal({
     const figureMarkup = `<figure class="my-3 text-center">\n  <img src="${bannerUrl}" alt="${bannerTitle}" class="w-full rounded-lg object-cover max-h-72 shadow-xs" />\n  <figcaption class="mt-1.5 text-xs text-muted-foreground italic">${bannerTitle}</figcaption>\n</figure>\n\n`;
 
     if (activeCoverUrl) {
-      const figureRegex = new RegExp(
-        `<figure[^>]*>[\\s\\S]*?(?:${activeCoverUrl.replace(/[.*+?^${}()|[\\]\\]/g, '\\$&')}|\\/images\\/(?:banners|news)\\/[^"']+)[\\s\\S]*?<\\/figure>\\s*`,
-        'i'
-      );
-      if (figureRegex.test(content)) {
-        setContent((prev) => prev.replace(figureRegex, figureMarkup));
-        return;
-      }
-      const imgRegex = new RegExp(
-        `<img[^>]+src=["']${activeCoverUrl.replace(/[.*+?^${}()|[\\]\\]/g, '\\$&')}["'][^>]*>\\s*`,
-        'i'
-      );
-      if (imgRegex.test(content)) {
-        setContent((prev) => prev.replace(imgRegex, figureMarkup));
+      // Splice only the block carrying the active cover URL; the old spanning
+      // regex could start at an earlier figure and delete everything between.
+      const replaced = replaceCoverBlock(content, activeCoverUrl, figureMarkup);
+      if (replaced !== null) {
+        setContent(replaced);
         return;
       }
     }
@@ -160,18 +152,9 @@ export function AnnouncementEditModal({
 
   const handleRemoveBanner = () => {
     if (!activeCoverUrl) return;
-    const figureRegex = new RegExp(
-      `<figure[^>]*>[\\s\\S]*?${activeCoverUrl.replace(/[.*+?^${}()|[\\]\\]/g, '\\$&')}[\\s\\S]*?<\\/figure>\\s*`,
-      'gi'
-    );
-    if (figureRegex.test(content)) {
-      setContent((prev) => prev.replace(figureRegex, '').trim());
-    } else {
-      const imgRegex = new RegExp(
-        `<img[^>]+src=["']${activeCoverUrl.replace(/[.*+?^${}()|[\\]\\]/g, '\\$&')}["'][^>]*>\\s*`,
-        'gi'
-      );
-      setContent((prev) => prev.replace(imgRegex, '').trim());
+    const removed = removeCoverBlock(content, activeCoverUrl);
+    if (removed !== null) {
+      setContent(removed);
     }
   };
 
@@ -320,10 +303,14 @@ export function AnnouncementEditModal({
         {/* Metadata Controls: Priority & Target Role */}
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <div>
-            <label className="mb-1 block text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+            <label
+              htmlFor="announcement-edit-priority"
+              className="mb-1 block text-xs font-semibold uppercase tracking-wider text-muted-foreground"
+            >
               {isVi ? 'Mức độ ưu tiên' : 'Priority'}
             </label>
             <select
+              id="announcement-edit-priority"
               value={priority}
               onChange={(e) => setPriority(e.target.value as any)}
               className="h-9 w-full rounded-md border border-input bg-background px-3 py-1.5 text-xs font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
@@ -336,10 +323,14 @@ export function AnnouncementEditModal({
           </div>
 
           <div>
-            <label className="mb-1 block text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+            <label
+              htmlFor="announcement-edit-target-role"
+              className="mb-1 block text-xs font-semibold uppercase tracking-wider text-muted-foreground"
+            >
               {isVi ? 'Đối tượng tiếp nhận' : 'Target Audience'}
             </label>
             <select
+              id="announcement-edit-target-role"
               value={targetRole}
               onChange={(e) => setTargetRole(e.target.value as any)}
               className="h-9 w-full rounded-md border border-input bg-background px-3 py-1.5 text-xs font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"

@@ -15,6 +15,7 @@ import java.math.BigDecimal;
 import java.sql.Timestamp;
 import java.time.Instant;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -716,6 +717,123 @@ class ThesisGovernanceIntegrationTest {
                 .andExpect(jsonPath("$.code").value("SCORE_ALREADY_FINALIZED"));
     }
 
+    // ---------- K16: score audit trail and SUPER_ADMIN parity ----------
+
+    @Test
+    void councilScoreWritesAndFinalizationLeaveAnAdminAuditTrail() throws Exception {
+        UUID roundId = insertRound("Gov Audit Round", "REGISTRATION_CLOSED",
+                Instant.now().minusSeconds(3_600), Instant.now().plusSeconds(3_600));
+        UUID topicId = insertPublishedTopic(roundId);
+        for (String lecturer : new String[] {"gov-audit-chair", "gov-audit-secretary", "gov-audit-member"}) {
+            ensureLecturer(lecturer);
+        }
+
+        mvc.perform(post("/api/v1/thesis/councils")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"roundId\":\"" + roundId + "\",\"name\":\"Hội đồng audit\"}")
+                        .with(truongKhoaJwt()))
+                .andExpect(status().isOk());
+        UUID councilId = jdbc.queryForObject(
+                "SELECT id FROM thesis.thesis_council WHERE name = 'Hội đồng audit'", UUID.class);
+        councilSeat(councilId, "gov-audit-chair", "CHAIR");
+        councilSeat(councilId, "gov-audit-secretary", "SECRETARY");
+        councilSeat(councilId, "gov-audit-member", "MEMBER");
+        mvc.perform(post("/api/v1/thesis/councils/{id}/topics", councilId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"topicId\":\"" + topicId + "\"}")
+                        .with(truongKhoaJwt()))
+                .andExpect(status().isOk());
+
+        // First score: no outgoing value; the trace carries the recorded one.
+        mvc.perform(post("/api/v1/thesis/councils/{councilId}/topics/{topicId}/scores", councilId, topicId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"score\":7}")
+                        .with(lecturerJwt("gov-audit-chair")))
+                .andExpect(status().isOk());
+        Map<String, Object> first = auditRow(topicId, "COUNCIL_SCORE_SUBMITTED", "score=7");
+        assertThat(first.get("actorId")).isEqualTo("gov-audit-chair");
+        assertThat(first.get("entityType")).isEqualTo("THESIS_TOPIC");
+        assertThat(String.valueOf(first.get("beforeState"))).contains("score=null");
+        assertThat(String.valueOf(first.get("afterState"))).contains("score=7");
+
+        // The DELETE-then-INSERT overwrite must still record old -> new.
+        mvc.perform(post("/api/v1/thesis/councils/{councilId}/topics/{topicId}/scores", councilId, topicId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"score\":8.5}")
+                        .with(lecturerJwt("gov-audit-chair")))
+                .andExpect(status().isOk());
+        Map<String, Object> overwrite = auditRow(topicId, "COUNCIL_SCORE_SUBMITTED", "score=8.5");
+        assertThat(String.valueOf(overwrite.get("beforeState"))).contains("score=7");
+        assertThat(String.valueOf(overwrite.get("afterState"))).contains("score=8.5");
+
+        // A refused finalize writes no finalization trace.
+        mvc.perform(post("/api/v1/thesis/councils/{councilId}/topics/{topicId}/finalize", councilId, topicId)
+                        .with(lecturerJwt("gov-audit-chair")))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("SCORES_INCOMPLETE"));
+        assertThat(auditRows(topicId, "COUNCIL_SCORE_FINALIZED")).isEmpty();
+
+        mvc.perform(post("/api/v1/thesis/councils/{councilId}/topics/{topicId}/scores", councilId, topicId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"score\":8}")
+                        .with(lecturerJwt("gov-audit-secretary")))
+                .andExpect(status().isOk());
+        mvc.perform(post("/api/v1/thesis/councils/{councilId}/topics/{topicId}/scores", councilId, topicId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"score\":9}")
+                        .with(lecturerJwt("gov-audit-member")))
+                .andExpect(status().isOk());
+
+        mvc.perform(post("/api/v1/thesis/councils/{councilId}/topics/{topicId}/finalize", councilId, topicId)
+                        .with(lecturerJwt("gov-audit-chair")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.finalScore").value(8.5));
+
+        Map<String, Object> finalized = auditRow(topicId, "COUNCIL_SCORE_FINALIZED", "final_score=8.5");
+        assertThat(finalized.get("actorId")).isEqualTo("gov-audit-chair");
+        assertThat(String.valueOf(finalized.get("beforeState"))).contains("final_score=null");
+        assertThat(String.valueOf(finalized.get("afterState"))).contains("result_status=GRADED");
+    }
+
+    @Test
+    void superAdminCountsAsGovernanceStaffForCouncilsAndScores() throws Exception {
+        UUID roundId = insertRound("Gov Super Admin Round", "REGISTRATION_CLOSED",
+                Instant.now().minusSeconds(3_600), Instant.now().plusSeconds(3_600));
+        UUID topicId = insertPublishedTopic(roundId);
+        for (String lecturer : new String[] {"gov-sa-chair", "gov-sa-secretary", "gov-sa-member"}) {
+            ensureLecturer(lecturer);
+        }
+
+        // Governance role: SUPER_ADMIN creates the council and assigns the topic.
+        mvc.perform(post("/api/v1/thesis/councils")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"roundId\":\"" + roundId + "\",\"name\":\"Hội đồng super admin\"}")
+                        .with(superAdminJwt()))
+                .andExpect(status().isOk());
+        UUID councilId = jdbc.queryForObject(
+                "SELECT id FROM thesis.thesis_council WHERE name = 'Hội đồng super admin'", UUID.class);
+        councilSeat(councilId, "gov-sa-chair", "CHAIR");
+        councilSeat(councilId, "gov-sa-secretary", "SECRETARY");
+        councilSeat(councilId, "gov-sa-member", "MEMBER");
+        mvc.perform(post("/api/v1/thesis/councils/{id}/topics", councilId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"topicId\":\"" + topicId + "\"}")
+                        .with(superAdminJwt()))
+                .andExpect(status().isOk());
+
+        mvc.perform(post("/api/v1/thesis/councils/{councilId}/topics/{topicId}/scores", councilId, topicId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"score\":8}")
+                        .with(lecturerJwt("gov-sa-chair")))
+                .andExpect(status().isOk());
+
+        // The controller advertised SUPER_ADMIN on this route while the service answered 403.
+        mvc.perform(get("/api/v1/thesis/councils/{councilId}/topics/{topicId}/scores", councilId, topicId)
+                        .with(superAdminJwt()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].score").value(8));
+    }
+
     // ---------- R9: publication and student results ----------
 
     @Test
@@ -1046,5 +1164,29 @@ class ThesisGovernanceIntegrationTest {
                         .subject("admin-user")
                         .claim("roles", List.of("ADMIN")))
                 .authorities(new SimpleGrantedAuthority("ROLE_ADMIN"));
+    }
+
+    private org.springframework.test.web.servlet.request.RequestPostProcessor superAdminJwt() {
+        return jwt().jwt(token -> token
+                        .subject("super-admin-user")
+                        .claim("roles", List.of("SUPER_ADMIN")))
+                .authorities(new SimpleGrantedAuthority("ROLE_SUPER_ADMIN"));
+    }
+
+    /** Audit rows of one action for one topic, newest or oldest order irrelevant. */
+    private List<Map<String, Object>> auditRows(UUID topicId, String action) {
+        return jdbc.queryForList(
+                "SELECT \"actorId\", \"entityType\", \"entityId\", \"beforeState\", \"afterState\" "
+                        + "FROM campuscore_audit.\"AdminAudit\" WHERE \"entityId\" = ? AND \"action\" = ?",
+                topicId.toString(), action);
+    }
+
+    /** The audit row whose after-state carries the given fragment. */
+    private Map<String, Object> auditRow(UUID topicId, String action, String afterStateFragment) {
+        return auditRows(topicId, action).stream()
+                .filter(row -> String.valueOf(row.get("afterState")).contains(afterStateFragment))
+                .findFirst()
+                .orElseThrow(() -> new AssertionError(
+                        "No " + action + " audit row with afterState containing " + afterStateFragment));
     }
 }

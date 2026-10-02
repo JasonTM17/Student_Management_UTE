@@ -135,6 +135,9 @@ export function useAssistantStream({
   const [state, dispatch] = useReducer(assistantReducer, initialState);
 
   const isSendingRef = useRef(false);
+  // A terminal401 survives conversation resets and alternate send entry points.
+  // A fresh authenticated page/hook starts with a new gate after sign-in.
+  const authLockedRef = useRef(false);
   // Ownership token for the send lock (see sendMessage's finally): releases are
   // keyed to the owning generation so a stale cleanup can never clear a newer
   // turn's lock, while every ownership-transfer path releases the lock itself.
@@ -267,6 +270,7 @@ export function useAssistantStream({
       options?: SendMessageOptions,
     ) => {
       event?.preventDefault();
+      if (authLockedRef.current) return;
       const message = (retryPrompt ?? input).trim();
       if (!message) return;
       if (isSending || isSendingRef.current) {
@@ -537,6 +541,7 @@ export function useAssistantStream({
             // a duplicate.
           } else {
             const kind = terminalFailure.kind;
+            if (kind === 'unauthorized') authLockedRef.current = true;
             // Governance (turn fencing): this branch is reached only when JSON
             // reconciliation returned a TERMINAL 4xx — 404 turn-not-found, a 409
             // whose code is anything other than TURN_IN_PROGRESS
@@ -563,6 +568,9 @@ export function useAssistantStream({
                 terminalFence: true,
               },
             });
+            if (kind === 'unauthorized') {
+              dispatch({ type: 'error', kind: 'unauthorized' });
+            }
             // Quota and authorization failures are terminal for this turn.
             retryRequestIdRef.current = undefined;
             retryConversationIdRef.current = undefined;
@@ -688,6 +696,7 @@ export function useAssistantStream({
 
   const resetConversation = useCallback(
     (conversationId?: string, messages?: ChatMessage[]) => {
+      if (authLockedRef.current) return;
       requestGenerationRef.current += 1;
       abortRef.current?.abort();
       isSendingRef.current = false;

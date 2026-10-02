@@ -48,6 +48,8 @@ function loadRichContentRenderer() {
     '@/lib/html-sanitizer': loadTs('src/lib/html-sanitizer.ts'),
     '@/lib/utils': { cn: (...args) => args.filter(Boolean).join(' ') },
     'lucide-react': new Proxy({}, { get: () => dummyComponent }),
+    // CodeBlock/SafeImage read the locale for copy/broken-image labels.
+    '@/i18n': { useI18n: () => ({ locale: 'vi' }) },
   });
 }
 
@@ -363,8 +365,12 @@ test('tinymce-editor component provides self-hosted offline wysiwyg capabilities
   assert.ok(pkg.dependencies['tinymce'], 'tinymce must be a dependency');
   assert.match(pkg.scripts.prebuild, /copy-tinymce\.mjs/);
 
-  // Dashboard editor integration
-  assert.match(editorPage, /import \{ TinyMceEditor \} from '@\/components\/ui\/tinymce-editor'/);
+  // Dashboard editor integration. The page also imports the K6 draft-clearing
+  // helper from the same module.
+  assert.match(
+    editorPage,
+    /import \{ TinyMceEditor, clearTinyMceAutosaveDrafts \} from '@\/components\/ui\/tinymce-editor'/,
+  );
   assert.match(editorPage, /<TinyMceEditor/);
 });
 
@@ -415,6 +421,92 @@ test('sortablejs integration empowers admin block building and announcement reor
 });
 
 
+
+// --- K3/K4/K5/K6 + F-2: TinyMCE shell and studio action integrity ---
+
+function loadTinymceEditorModule() {
+  const dummyComponent = function DummyComponent() {
+    return null;
+  };
+  return loadTsModule('src/components/ui/tinymce-editor.tsx', {
+    'lucide-react': new Proxy({}, { get: () => dummyComponent }),
+    '@/components/ui/button': { Button: dummyComponent },
+    '@/lib/announcement-limits': loadTs('src/lib/announcement-limits.ts'),
+    '@/lib/editor-document': loadTs('src/lib/editor-document.ts'),
+    '@/lib/utils': { cn: (...args) => args.filter(Boolean).join(' ') },
+    sonner: { toast: { success() {}, error() {}, info() {}, warning() {} } },
+  });
+}
+
+test('K5 internal TinyMCE paste is never rewritten; external paste gets cleaned', () => {
+  const editorModule = loadTinymceEditorModule();
+  // TinyMCE marks content copied from a TinyMCE editor as internal; this app's
+  // own editors set that marker, so their paste must pass through untouched.
+  assert.equal(editorModule.shouldCleanForeignPaste({ internal: true }), false);
+  assert.equal(editorModule.shouldCleanForeignPaste({ internal: false }), true);
+  assert.equal(editorModule.shouldCleanForeignPaste({}), true);
+  assert.equal(editorModule.shouldCleanForeignPaste(undefined), false);
+
+  const source = read('src/components/ui/tinymce-editor.tsx');
+  assert.match(source, /paste_postprocess: \(_editor: any, args: any\)/);
+  assert.match(source, /cleanForeignPasteTree\(args\.node as Element\)/);
+  // Junk attributes are dropped while the render allowlist (and the editor's
+  // own callout classes) survive.
+  assert.match(source, /element\.removeAttribute\(attribute\.name\)/);
+  assert.match(source, /PASTE_KEPT_CLASS/);
+});
+
+test('K3 a failed editor chunk import clears the cache so Retry re-imports', () => {
+  const source = read('src/components/ui/tinymce-editor.tsx');
+  assert.match(source, /if \(editorModulePromise\) return editorModulePromise;/);
+  assert.match(source, /editorModulePromise = null;/);
+  assert.match(source, /const attempt = import\('@tinymce\/tinymce-react'\)/);
+});
+
+test('K4 one fullscreen mechanism: the upstream plugin, no app-level overlay', () => {
+  const source = read('src/components/ui/tinymce-editor.tsx');
+  assert.doesNotMatch(source, /setIsFullscreen/, 'the app-level overlay state must be gone');
+  assert.doesNotMatch(
+    source,
+    /calc\(100vh - 120px\)/,
+    'the iframe height must not depend on a mount-time fullscreen flag',
+  );
+  assert.match(source, /'fullscreen',/, 'the upstream fullscreen plugin stays wired');
+  assert.match(source, /preview fullscreen/, 'its toolbar control stays available');
+});
+
+test('K6 crash drafts stay restorable while discarded drafts are cleared', () => {
+  const source = read('src/components/ui/tinymce-editor.tsx');
+  assert.match(source, /export function clearTinyMceAutosaveDrafts/);
+  // A crash or a closed tab must leave a way back in: the autosave plugin keeps
+  // writing the recovery draft and the File menu offers it again.
+  assert.match(source, /'autosave',/, 'the autosave plugin must stay wired');
+  assert.match(
+    source,
+    /file: \{ title: 'File', items: 'newdocument restoredraft \| preview \| print' \}/,
+    'the File menu must keep the manual recovery item',
+  );
+  assert.match(source, /autosave_prefix: `\$\{AUTOSAVE_KEY_PREFIX\}/);
+  // Active discards still wipe the draft, so the restoredraft item cannot bring
+  // back a body the author chose to throw away.
+  const calls =
+    read('src/app/dashboard/editor/page.tsx').match(/clearTinyMceAutosaveDrafts\(\)/g) ?? [];
+  assert.ok(calls.length >= 3, 'New Document, Cancel edit and modal close each clear the draft');
+});
+
+test('F-2 the feed-order save is locked against a double submission', () => {
+  const page = read('src/app/dashboard/editor/page.tsx');
+  const save = page.slice(
+    page.indexOf('const handleSaveNoticeOrder'),
+    page.indexOf('const fetchPublishedNotices'),
+  );
+  assert.match(save, /if \(isSavingNoticeOrder\) return;/);
+  assert.match(save, /finally \{\s*\n\s*setIsSavingNoticeOrder\(false\);/);
+  assert.ok(
+    (page.match(/disabled=\{isSavingNoticeOrder\}/g) ?? []).length >= 2,
+    'both save triggers must disable while a save is in flight',
+  );
+});
 
 // Round-2 review: an unclosed container from a legacy row used to emit its
 // source as escaped prose, so the reader saw stylesheet text under the article.

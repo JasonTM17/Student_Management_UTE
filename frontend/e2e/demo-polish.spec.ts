@@ -262,6 +262,17 @@ async function mockStudent(page: Page, singleTerm = false) {
       // The profile page's 2FA card loads the account's two-factor status on
       // mount (api.ts authApi.getTwoFactorStatus → /me/two-factor).
       '/api/v1/me/two-factor': { enabled: false },
+      // The transcript resolves the office-issued MSSV (not the internal
+      // profile id) from the student-readable conduct summary.
+      '/api/v1/conduct/my': {
+        studentId: 'student-profile',
+        studentCode: 'CS-DEMO-001',
+        fullName: 'Demo Student',
+        cumulativeAverageScore: 0,
+        cumulativeClassificationVi: '',
+        currentSemester: null,
+        history: [],
+      },
       '/api/v1/semesters': { data: terms },
       '/api/v1/notifications/my': { data: [] },
       // The sidebar badge reads the server-side counter (api.ts

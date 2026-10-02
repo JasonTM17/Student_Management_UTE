@@ -42,6 +42,7 @@ import {
   X,
 } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
+import { toast } from 'sonner';
 import { WorkspaceForbiddenState } from '@/components/ProtectedRoute';
 import { LanguageToggle } from '@/components/LanguageToggle';
 import { LocalizedLink } from '@/components/LocalizedLink';
@@ -236,6 +237,26 @@ function resolveNotificationTarget(notification: {
   return '/dashboard/notifications';
 }
 
+// Notification bodies are authored HTML (the same bodies the reader renders).
+// The bell shows a plain-text preview, so strip markup — figures included —
+// collapse the whitespace, and clamp. Unlike the announcement Sapo helper this
+// keeps punctuation: the bodies carry dates ('20-12-2026') and term codes
+// ('2026-2027') that must not lose their hyphens.
+function notificationPreview(content: string | undefined, maxLength = 160): string {
+  if (!content) {
+    return '';
+  }
+  const text = content
+    .replace(/<figure[\s\S]*?<\/figure>/gi, ' ')
+    .replace(/<[^>]*>/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+  if (text.length <= maxLength) {
+    return text;
+  }
+  return `${text.slice(0, maxLength).trim()}…`;
+}
+
 export default function DashboardLayout({
   children,
 }: {
@@ -359,6 +380,10 @@ export default function DashboardLayout({
       '/dashboard/profile': {
         title: messages.profile.title,
         description: messages.dashboardShell.routeDescriptions.profile,
+      },
+      '/dashboard/assistant-specialized': {
+        title: messages.assistant.specializedTitle,
+        description: messages.assistant.specializedTagline,
       },
       '/dashboard/register': {
         title: messages.dashboardShell.menu.courseRegistration,
@@ -1105,23 +1130,44 @@ export default function DashboardLayout({
                           {notifications.map((notification) => {
                             const targetUrl = resolveNotificationTarget(notification);
                             return (
-                              <button
+                              <LocalizedLink
                                 key={notification.id}
-                                type="button"
-                                onClick={async () => {
+                                href={targetUrl}
+                                onClick={() => {
+                                  // Reading a notification must never wait on
+                                  // the mark-read round trip. The row is an
+                                  // anchor now, so it navigates natively (and
+                                  // still opens in a new tab); the write settles
+                                  // in the background. A failed write restores
+                                  // the badge and tells the reader instead of
+                                  // failing silently.
                                   setNotificationsOpen(false);
-                                  try {
-                                    await notificationsApi.markRead(notification.id);
-                                    setNotifications((prev) =>
-                                      prev.filter((n) => n.id !== notification.id)
-                                    );
-                                    // The row was unread; keep the server-sourced
-                                    // badge in step with the local removal.
-                                    setUnreadCount((count) => Math.max(0, count - 1));
-                                  } catch (error) {
-                                    console.error('Failed to mark notification as read:', error);
-                                  }
-                                  router.push(href(targetUrl));
+                                  setNotifications((prev) =>
+                                    prev.filter((n) => n.id !== notification.id)
+                                  );
+                                  setUnreadCount((count) => Math.max(0, count - 1));
+                                  void notificationsApi
+                                    .markRead(notification.id)
+                                    .catch((error) => {
+                                      setUnreadCount((count) => count + 1);
+                                      // The optimistic filter already removed
+                                      // the row from the preview; without
+                                      // putting it back the badge counts an
+                                      // unread notification the dropdown no
+                                      // longer shows.
+                                      setNotifications((prev) =>
+                                        prev.some((n) => n.id === notification.id)
+                                          ? prev
+                                          : [notification, ...prev].slice(0, 5),
+                                      );
+                                      toast.error(
+                                        messages.dashboardShell.notifications.updateFailed,
+                                      );
+                                      console.error(
+                                        'Failed to mark notification as read:',
+                                        error,
+                                      );
+                                    });
                                 }}
                                 className="group flex w-full flex-col gap-1 rounded-lg border border-border/70 bg-secondary/40 p-2.5 text-left transition-all duration-150 hover:border-primary/50 hover:bg-secondary/80 hover:shadow-xs active:scale-[0.99] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring cursor-pointer"
                               >
@@ -1132,9 +1178,12 @@ export default function DashboardLayout({
                                   <ChevronRight className="h-3.5 w-3.5 shrink-0 text-muted-foreground transition-transform duration-150 group-hover:translate-x-0.5 group-hover:text-primary" />
                                 </div>
                                 <p className="line-clamp-2 text-[11.5px] leading-relaxed text-muted-foreground">
-                                  {notification.content || messages.dashboardShell.notifications.fallbackContent}
+                                  {/* Bodies are authored HTML; the preview is
+                                      plain text, never raw markup. */}
+                                  {notificationPreview(notification.content) ||
+                                    messages.dashboardShell.notifications.fallbackContent}
                                 </p>
-                              </button>
+                              </LocalizedLink>
                             );
                           })}
                         </div>

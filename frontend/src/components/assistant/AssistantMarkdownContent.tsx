@@ -9,6 +9,7 @@ import {
   ASSISTANT_INLINE_MARKDOWN_REGEX,
   sanitizeStreamingMarkdown,
   splitAssistantBlocks,
+  type AssistantRenderBlock,
 } from '@/lib/assistant-inline-markdown-regex';
 import { sanitizeAssistantOutput, type AssistantScope } from '@/lib/assistant-output-guard';
 
@@ -39,8 +40,22 @@ export function AssistantMarkdownContent({
 
   // Structural blocks: pipe tables stay table-scoped; consecutive plain-text
   // lines merge into one paragraph (see splitAssistantBlocks).
-  const blocks = React.useMemo(
-    () => splitAssistantBlocks(safeContent),
+  const blocks = React.useMemo(() => {
+    type ListBlock = { type: 'list'; ordered: boolean; items: { text: string; value?: number }[] };
+    const grouped: (AssistantRenderBlock | ListBlock)[] = [];
+    for (const block of splitAssistantBlocks(safeContent)) {
+      const text = block.type === 'text' ? block.lines[0] : '';
+      const ordered = text.match(/^(\d+)\.\s+(.*)$/);
+      const unordered = text.match(/^[*•\-]\s+(.*)$/);
+      if (ordered || unordered) {
+        const item = { text: ordered ? ordered[2] : unordered![1], value: ordered ? Number(ordered[1]) : undefined };
+        const previous = grouped[grouped.length - 1];
+        if (previous?.type === 'list' && previous.ordered === Boolean(ordered)) previous.items.push(item);
+        else grouped.push({ type: 'list', ordered: Boolean(ordered), items: [item] });
+      } else grouped.push(block);
+    }
+    return grouped;
+  },
     [safeContent],
   );
 
@@ -165,6 +180,16 @@ export function AssistantMarkdownContent({
       )}
     >
       {blocks.map((block, bIdx) => {
+        if (block.type === 'list') {
+          const List = block.ordered ? 'ol' : 'ul';
+          return (
+            <List key={bIdx} className={cn('space-y-1 pl-6 marker:font-semibold marker:text-primary', block.ordered ? 'list-decimal' : 'list-disc')}>
+              {block.items.map((item, index) => (
+                <li key={index} value={item.value} className="pl-1 leading-6">{renderInline(item.text)}</li>
+              ))}
+            </List>
+          );
+        }
         if (block.type === 'table') {
           const rows = block.lines;
           if (rows.length < 2) return null;
@@ -236,33 +261,6 @@ export function AssistantMarkdownContent({
         }
 
         const text = block.lines[0];
-        const orderedMatch = text.match(/^(\d+)\.\s+(.*)$/);
-        if (orderedMatch) {
-          const num = orderedMatch[1];
-          const itemText = orderedMatch[2];
-          return (
-            <div key={bIdx} className="flex items-start gap-2 pl-1 py-0.5">
-              <span className="mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-primary/10 text-[10px] font-semibold text-primary">
-                {num}
-              </span>
-              <div className="flex-1 leading-6">
-                {renderInline(itemText)}
-              </div>
-            </div>
-          );
-        }
-
-        if (text.startsWith('• ') || text.startsWith('- ') || text.startsWith('* ')) {
-          return (
-            <div key={bIdx} className="flex items-start gap-2 pl-1">
-              <span className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-primary" />
-              <div className="flex-1">
-                {renderInline(text.replace(/^[*•\-]\s*/, ''))}
-              </div>
-            </div>
-          );
-        }
-
         if (text.startsWith('#### ') || text.startsWith('### ')) {
           const heading = text.replace(/^#{3,4}\s*/, '');
           return (

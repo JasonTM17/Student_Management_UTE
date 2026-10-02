@@ -58,6 +58,7 @@ interface AssistantMessagesProps {
   followUps?: readonly string[];
   followUpsLabel?: string;
   onFollowUp?: (suggestion: string) => void;
+  followUpsDisabled?: boolean;
   /** Answer scope for the copy guard: 'specialized' keeps corpus teachings. */
   scope?: AssistantScope;
 }
@@ -152,6 +153,7 @@ export function AssistantMessages({
   followUps,
   followUpsLabel,
   onFollowUp,
+  followUpsDisabled = false,
   scope = 'academic',
 }: AssistantMessagesProps) {
   const { messages, locale, formatDateTime } = useI18n();
@@ -281,6 +283,8 @@ export function AssistantMessages({
                         {messages.assistant.thinking}
                       </span>
                     </div>
+                  ) : isUser ? (
+                    <p className="whitespace-pre-wrap">{visibleContent}</p>
                   ) : (
                     <AssistantMarkdownContent
                       content={visibleContent}
@@ -291,10 +295,13 @@ export function AssistantMessages({
                   )}
 
                   {/* Reason Code Badge */}
-                  {!isUser && message.reasonCode && (
+                  {!isUser && message.reasonCode && !(
+                    message.reasonCode === 'CANCELLED' &&
+                    visibleContent.trim() === messages.assistant.cancelled
+                  ) && (
                     <div className="mt-2 flex items-center gap-1.5 border-t border-border/60 pt-1.5 text-[11px] font-medium text-muted-foreground">
                       {message.reasonCode === 'ANSWERED' ? (
-                        <span className="inline-flex items-center gap-1 rounded-md bg-emerald-500/10 px-2 py-0.5 text-emerald-600 dark:text-emerald-400">
+                        <span className="inline-flex items-center gap-1 rounded-md bg-status-success/10 px-2 py-0.5 text-status-success-foreground">
                           <Sparkles className="h-3 w-3" />
                           {messages.assistant.answered}
                         </span>
@@ -523,6 +530,7 @@ export function AssistantMessages({
                       key={suggestion}
                       type="button"
                       onClick={() => onFollowUp(suggestion)}
+                      disabled={followUpsDisabled}
                       className="min-h-11 rounded-md border border-primary/20 bg-primary/5 px-3 py-2 text-[11px] font-medium text-primary transition-colors hover:border-primary/40 hover:bg-primary/10"
                     >
                       {suggestion}

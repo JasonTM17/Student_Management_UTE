@@ -10,8 +10,6 @@ import {
   FileText,
   HelpCircle,
   Loader2,
-  Maximize2,
-  Minimize2,
   RefreshCw,
   Sparkles,
   TriangleAlert,
@@ -23,6 +21,7 @@ import {
   MAX_INLINE_IMAGE_BYTES,
   assessAnnouncementContentLength,
 } from '@/lib/announcement-limits';
+import { buildDocumentFilename } from '@/lib/editor-document';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 
@@ -53,12 +52,20 @@ type EditorModuleState =
 let editorModulePromise: Promise<React.ComponentType<any>> | null = null;
 
 function loadEditorModule(): Promise<React.ComponentType<any>> {
-  if (!editorModulePromise) {
-    editorModulePromise = import('@tinymce/tinymce-react').then(
-      (mod) => mod.Editor as unknown as React.ComponentType<any>,
-    );
-  }
-  return editorModulePromise;
+  if (editorModulePromise) return editorModulePromise;
+  const attempt = import('@tinymce/tinymce-react').then(
+    (mod) => mod.Editor as unknown as React.ComponentType<any>,
+    (error) => {
+      // K3: this module-level cache used to keep the rejected promise forever,
+      // so "Retry" re-entered the error branch without ever attempting another
+      // import. Dropping the cache lets the next call re-import the chunk (and
+      // recover once the network is back).
+      editorModulePromise = null;
+      throw error;
+    },
+  );
+  editorModulePromise = attempt;
+  return attempt;
 }
 
 function useEditorModule(): [EditorModuleState, () => void] {
@@ -102,6 +109,117 @@ function EditorLoadError({ isVi, onRetry }: { isVi: boolean; onRetry: () => void
   );
 }
 
+// ---------------------------------------------------------------------------
+// K6: TinyMCE autosave draft hygiene
+// ---------------------------------------------------------------------------
+
+/** Must stay in sync with the `autosave_prefix` used in `init` below. */
+const AUTOSAVE_KEY_PREFIX = 'campuscore-tinymce-';
+
+/**
+ * Removes the drafts the autosave plugin keeps in localStorage (the `<prefix>…draft`
+ * and `…time` entries). The studio calls this when the author discards a
+ * document — New Document, Cancel edit, or closing the quick-edit modal — so a
+ * discarded body cannot be pulled back with File → Restore last draft. Drafts
+ * left by a crash or a closed tab are untouched and stay reachable through that
+ * same menu item.
+ */
+export function clearTinyMceAutosaveDrafts(): void {
+  if (typeof window === 'undefined') return;
+  try {
+    const storage = window.localStorage;
+    const stale: string[] = [];
+    for (let index = 0; index < storage.length; index += 1) {
+      const key = storage.key(index);
+      if (key && key.startsWith(AUTOSAVE_KEY_PREFIX) && (key.endsWith('draft') || key.endsWith('time'))) {
+        stale.push(key);
+      }
+    }
+    stale.forEach((key) => storage.removeItem(key));
+  } catch {
+    // Storage can be unavailable (private mode); nothing to clear then.
+  }
+}
+
+// ---------------------------------------------------------------------------
+// K5: foreign-paste cleanup
+// ---------------------------------------------------------------------------
+
+/**
+ * True when pasted content must be cleaned. `internal` is TinyMCE's marker for
+ * HTML copied out of a TinyMCE editor (this app's two editor instances both set
+ * it), so internal paste is left byte-for-byte alone; only external sources —
+ * Word, Google Docs, arbitrary web pages — are reduced to what the app renders.
+ */
+export function shouldCleanForeignPaste(args: { internal?: boolean } | null | undefined): boolean {
+  return Boolean(args) && args?.internal !== true;
+}
+
+/** Mirror of the backend AnnouncementHtmlSanitizer allowlist: what can render. */
+const PASTE_ALLOWED_TAGS = new Set([
+  'a', 'abbr', 'b', 'blockquote', 'br', 'caption', 'code', 'col', 'colgroup',
+  'dd', 'details', 'div', 'dl', 'dt', 'em', 'figcaption', 'figure', 'h1', 'h2',
+  'h3', 'h4', 'h5', 'h6', 'hr', 'i', 'img', 'li', 'mark', 'ol', 'p', 'pre',
+  's', 'small', 'span', 'strong', 'sub', 'summary', 'sup', 'table', 'tbody',
+  'td', 'tfoot', 'th', 'thead', 'time', 'tr', 'u', 'ul',
+]);
+
+/** Only attributes that carry meaning for the allowed formatting survive. */
+const PASTE_ALLOWED_ATTRS = new Set([
+  'href', 'src', 'alt', 'title', 'colspan', 'rowspan', 'scope', 'headers',
+  'start', 'type', 'datetime', 'width', 'height', 'loading', 'target', 'rel',
+]);
+
+const PASTE_DROP_TAGS = new Set([
+  'script', 'style', 'meta', 'link', 'title', 'base', 'iframe', 'object',
+  'embed', 'form', 'input', 'textarea', 'select', 'button', 'noscript',
+  'template', 'svg', 'math', 'canvas', 'video', 'audio', 'source', 'track',
+]);
+
+/** The editor's own callout wrapper classes must survive a copy/paste. */
+const PASTE_KEPT_CLASS = /^academic-callout(-|$)/;
+
+/**
+ * Walks the pasted fragment and strips foreign-source junk: comments (Word
+ * conditional blocks), Office-only elements (`o:p`, `w:*`, …) are removed or
+ * unwrapped, `style`/`class`/MSO attributes are dropped, and only the
+ * allowlisted formatting above is kept. Basic bold/italic/underline, lists,
+ * links, headings and paragraphs are tag-based and survive untouched.
+ */
+export function cleanForeignPasteTree(root: Element): void {
+  const comments: Comment[] = [];
+  const commentWalker = root.ownerDocument.createTreeWalker(root, NodeFilter.SHOW_COMMENT);
+  while (commentWalker.nextNode()) comments.push(commentWalker.currentNode as Comment);
+  comments.forEach((node) => node.remove());
+
+  const elements = Array.from(root.querySelectorAll('*'));
+  for (const element of elements) {
+    const tag = element.tagName.toLowerCase();
+    if (PASTE_DROP_TAGS.has(tag)) {
+      element.remove();
+      continue;
+    }
+    if (!PASTE_ALLOWED_TAGS.has(tag)) {
+      // Unwrap unknown wrappers instead of dropping their text.
+      const parent = element.parentNode;
+      if (!parent) continue;
+      while (element.firstChild) parent.insertBefore(element.firstChild, element);
+      parent.removeChild(element);
+      continue;
+    }
+    for (const attribute of Array.from(element.attributes)) {
+      const name = attribute.name.toLowerCase();
+      if (name === 'class') {
+        const kept = attribute.value.split(/\s+/).filter((cls) => PASTE_KEPT_CLASS.test(cls));
+        if (kept.length > 0) element.setAttribute('class', kept.join(' '));
+        else element.removeAttribute('class');
+        continue;
+      }
+      if (!PASTE_ALLOWED_ATTRS.has(name)) element.removeAttribute(attribute.name);
+    }
+  }
+}
+
 export interface TinyMceEditorProps {
   value: string;
   onChange: (value: string) => void;
@@ -112,6 +230,8 @@ export interface TinyMceEditorProps {
   readOnly?: boolean;
   locale?: 'vi' | 'en';
   id?: string;
+  /** Document title used for the downloaded file name (K2). */
+  documentTitle?: string;
   showTemplates?: boolean;
   showWordCount?: boolean;
   onInit?: (evt: any, editor: any) => void;
@@ -295,6 +415,7 @@ export function TinyMceEditor({
   readOnly = false,
   locale = 'vi',
   id,
+  documentTitle,
   showTemplates = true,
   showWordCount = true,
   onInit,
@@ -304,7 +425,6 @@ export function TinyMceEditor({
   const editorRef = useRef<any>(null);
   const [isDark, setIsDark] = useState(false);
   const [templatesOpen, setTemplatesOpen] = useState(false);
-  const [isFullscreen, setIsFullscreen] = useState(false);
   const [copied, setCopied] = useState(false);
   const [editorState, reloadEditor] = useEditorModule();
 
@@ -379,13 +499,18 @@ export function TinyMceEditor({
     }
   };
 
-  // Export HTML as file
+  // Export HTML as file. K2: same naming rule as the studio export — the
+  // title slug when there is one, otherwise the previous dated fallback.
   const handleExportHtml = () => {
     const blob = new Blob([value], { type: 'text/html;charset=utf-8' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `document-${new Date().toISOString().slice(0, 10)}.html`;
+    a.download = buildDocumentFilename(
+      documentTitle ?? '',
+      'html',
+      `document-${new Date().toISOString().slice(0, 10)}`,
+    );
     a.click();
     URL.revokeObjectURL(url);
   };
@@ -394,7 +519,6 @@ export function TinyMceEditor({
     <div
       className={cn(
         'relative flex flex-col rounded-lg border border-border/80 bg-card transition-all',
-        isFullscreen && 'fixed inset-0 z-50 m-0 h-screen w-screen rounded-none border-none p-6 shadow-2xl overflow-hidden bg-background',
         disabled && 'opacity-60 pointer-events-none',
         className
       )}
@@ -490,17 +614,6 @@ export function TinyMceEditor({
             <Download className="h-3.5 w-3.5" />
             <span className="hidden sm:inline">{isVi ? 'Tải HTML' : 'Export'}</span>
           </Button>
-
-          <Button
-            type="button"
-            variant="ghost"
-            size="sm"
-            onClick={() => setIsFullscreen(!isFullscreen)}
-            className="h-8 w-8 p-0"
-            title={isFullscreen ? (isVi ? 'Thoát toàn màn hình' : 'Exit fullscreen') : (isVi ? 'Toàn màn hình' : 'Fullscreen')}
-          >
-            {isFullscreen ? <Minimize2 className="h-3.5 w-3.5" /> : <Maximize2 className="h-3.5 w-3.5" />}
-          </Button>
         </div>
       </div>
 
@@ -556,9 +669,15 @@ export function TinyMceEditor({
           }}
           init={{
             license_key: 'gpl',
-            height: isFullscreen ? 'calc(100vh - 120px)' : height,
+            height,
             menubar: 'file edit view insert format tools table help',
             menu: {
+              // K6: the autosave plugin keeps writing a recovery draft, so the
+              // File menu keeps `restoredraft` as the only way to read it back
+              // after a crash or a closed tab (upstream's default file menu).
+              // The studio clears the draft on every active discard — New
+              // Document, Cancel edit, closing the quick-edit modal — so a body
+              // the author chose to throw away is never restorable here.
               file: { title: 'File', items: 'newdocument restoredraft | preview | print' },
               edit: { title: 'Edit', items: 'undo redo | cut copy paste pastetext | selectall | searchreplace' },
               view: { title: 'View', items: 'code | visualaid visualchars visualblocks | preview fullscreen' },
@@ -586,6 +705,10 @@ export function TinyMceEditor({
               'code',
               'codesample',
               'directionality',
+              // K4: the upstream fullscreen plugin is the single fullscreen
+              // mechanism. The old app-level overlay set the iframe height in
+              // `init`, which the React wrapper only reads at mount, so it kept
+              // the stale inline height around a full-screen frame.
               'fullscreen',
               'help',
               'image',
@@ -682,6 +805,16 @@ export function TinyMceEditor({
             // Pasted screenshots go through the same upload handler instead of
             // being silently dropped (TinyMCE's default rejects data images).
             paste_data_images: true,
+            // K5: TinyMCE 8 no longer filters Word/Google-Docs markup and the
+            // server sanitizer keeps class/style, so external paste is reduced
+            // to the app's rendering allowlist here. Internal
+            // editor-to-editor paste carries TinyMCE's `internal` marker and is
+            // left untouched.
+            paste_postprocess: (_editor: any, args: any) => {
+              if (shouldCleanForeignPaste(args) && args?.node) {
+                cleanForeignPasteTree(args.node as Element);
+              }
+            },
             images_upload_handler: (blobInfo: any) =>
               new Promise((resolve, reject) => {
                 // RT-P1-2: inline base64 payloads land in the announcement
@@ -776,7 +909,7 @@ export function TinyMceEditor({
             quickbars_selection_toolbar: 'bold italic underline | quicklink h2 h3 blockquote | forecolor backcolor',
             quickbars_insert_toolbar: 'quickimage quicktable | hr',
             autosave_interval: '30s',
-            autosave_prefix: 'campuscore-tinymce-{path}{query}-{id}-',
+            autosave_prefix: `${AUTOSAVE_KEY_PREFIX}{path}{query}-{id}-`,
             autosave_restore_when_empty: false,
             autosave_retention: '60m',
             skin: isDark ? 'oxide-dark' : 'oxide',

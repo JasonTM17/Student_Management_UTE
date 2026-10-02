@@ -79,6 +79,9 @@ function rendererStubs() {
     '@/lib/html-sanitizer': sanitizer,
     '@/lib/utils': utilsStub,
     'lucide-react': lucideStub,
+    // CodeBlock/SafeImage read the active locale for their copy-button and
+    // broken-image labels; the harness renders with the Vietnamese default.
+    '@/i18n': { useI18n: () => ({ locale: 'vi' }) },
   };
 }
 
@@ -116,13 +119,14 @@ test('RT-P3-a an HTML article produces contents entries with de-duplicated ancho
   const { extractTocHeadings } = loadToc(loadRenderer());
 
   const headings = extractTocHeadings(HTML_ARTICLE);
-  // The slug alphabet is `slugify`'s existing one, which keeps ASCII letters and
-  // digits only; what matters here is that TOC and markup derive the same ids.
+  // The slug alphabet is `slugify`'s, which keeps ASCII letters and digits but
+  // maps đ/Đ to d first (they have no NFD decomposition); what matters here is
+  // that TOC and markup derive the same ids.
   assert.deepEqual(
     headings.map((heading) => [heading.level, heading.id, heading.text]),
     [
-      [2, 'ieu-khoan', 'Điều khoản'],
-      [2, 'ieu-khoan-2', 'Điều khoản'],
+      [2, 'dieu-khoan', 'Điều khoản'],
+      [2, 'dieu-khoan-2', 'Điều khoản'],
       [3, 'phu-luc-bieu-mau', 'Phụ lục biểu mẫu'],
       [3, 'quy-trinh', 'Quy trình'],
     ],
@@ -173,17 +177,17 @@ test('RT-P3-a markdown bodies still produce contents and cannot collide either',
 
   assert.deepEqual(
     extractTocHeadings(markdown).map((heading) => heading.id),
-    ['thong-bao', 'ieu-khoan', 'ieu-khoan-2', 'phu-luc'],
+    ['thong-bao', 'dieu-khoan', 'dieu-khoan-2', 'phu-luc'],
     'a `#` line inside a fenced code block is source text, not a section',
   );
 
   const markup = renderedBodyHtml(markdown);
   // React puts the class after the id, so match the attribute, not the tag end.
   assert.match(markup, /<h1 id="thong-bao"/);
-  assert.match(markup, /<h2 id="ieu-khoan"/);
-  assert.match(markup, /<h2 id="ieu-khoan-2"/);
+  assert.match(markup, /<h2 id="dieu-khoan"/);
+  assert.match(markup, /<h2 id="dieu-khoan-2"/);
   assert.match(markup, /<h5 id="phu-luc"/);
-  assert.equal(markup.includes('id="ieu-khoan-3"'), false);
+  assert.equal(markup.includes('id="dieu-khoan-3"'), false);
   // The fenced `#` line stays inside the code block; it must not become a heading.
   assert.equal(markup.includes('id="khong-phai-tieu-de"'), false);
 });
@@ -293,7 +297,7 @@ function bodyOf(markup) {
 test('RT-P3-b the hero picture is shown once, not repeated under the hero', () => {
   const markup = magazineMarkup({});
   assert.equal(countOccurrences(markup, HERO_MARKER), 1, 'the body image became the hero, so the body drops it');
-  assert.match(markup, /<h2 id="ieu-khoan"/, 'stripping must not eat the rest of the body');
+  assert.match(markup, /<h2 id="dieu-khoan"/, 'stripping must not eat the rest of the body');
 });
 
 test('RT-P3-b a picture the hero never showed stays in the body', () => {

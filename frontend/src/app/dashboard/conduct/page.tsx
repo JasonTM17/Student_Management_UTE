@@ -552,6 +552,7 @@ export default function StudentConductPage() {
           <Calendar className="h-4 w-4 text-primary" />
           <span className="text-sm font-medium text-foreground">{copy.chooseSemester}</span>
           <select
+            aria-label={copy.chooseSemester}
             value={selectedSemesterId}
             onChange={(e) => setSelectedSemesterId(e.target.value)}
             className="w-full rounded-md border border-border bg-background px-3 py-1.5 text-sm font-semibold text-foreground focus:outline-none focus:ring-2 focus:ring-primary/40 sm:w-auto"

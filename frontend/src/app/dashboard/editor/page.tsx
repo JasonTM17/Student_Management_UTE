@@ -60,7 +60,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { PageHeader, SectionEyebrow } from '@/components/ui/page-header';
 import { LoadingState } from '@/components/ui/state-block';
 import { RichTextEditor } from '@/components/ui/rich-text-editor';
-import { TinyMceEditor } from '@/components/ui/tinymce-editor';
+import { TinyMceEditor, clearTinyMceAutosaveDrafts } from '@/components/ui/tinymce-editor';
 import { SortableList, DragHandle } from '@/components/ui/sortable-list';
 import {
   UnsavedChangesConfirmDialog,
@@ -70,9 +70,15 @@ import {
   findAnnouncementLengthViolation,
 } from '@/lib/announcement-limits';
 import { useUnsavedChangesGuard } from '@/lib/use-unsaved-changes-guard';
+import { replaceCoverBlock, removeCoverBlock } from '@/lib/cover-banner';
 import { WorkspaceForbiddenState } from '@/components/ProtectedRoute';
 import { cn } from '@/lib/utils';
-import { shouldSeedDefaultEditorDocument } from '@/lib/editor-document';
+import {
+  buildDocumentFilename,
+  parseStoredEditorDocument,
+  shouldSeedDefaultEditorDocument,
+  type StoredEditorDocument,
+} from '@/lib/editor-document';
 import {
   EDITOR_BLOCK_HTML,
   EDITOR_BLOCK_TYPES,
@@ -115,18 +121,24 @@ function buildDefaultBlocks(copy: Record<EditorBlockType, EditorBlockCopy>): Con
 }
 
 const PRIORITY_VALUES = ['URGENT', 'HIGH', 'NORMAL', 'LOW'] as const;
-const TARGET_ROLE_VALUES = ['ALL', 'STUDENT', 'LECTURER'] as const;
+const TARGET_ROLE_VALUES = ['ALL', 'BOTH', 'STUDENT', 'LECTURER'] as const;
+
+type TargetRoleOption = (typeof TARGET_ROLE_VALUES)[number];
+
+/**
+ * Maps the composer's audience choice onto the stored announcement audience.
+ * `BOTH` is a targeted STUDENT+LECTURER audience, distinct from `ALL`
+ * (isGlobal campus-wide): collapsing the two made editing a role-scoped
+ * notice silently turn it into a campus-wide one and add ADMIN to it.
+ */
+function audienceFor(role: TargetRoleOption) {
+  if (role === 'ALL') return { isGlobal: true, targetRoles: ['STUDENT', 'LECTURER', 'ADMIN'] };
+  if (role === 'BOTH') return { isGlobal: false, targetRoles: ['STUDENT', 'LECTURER'] };
+  return { isGlobal: false, targetRoles: [role] };
+}
 
 const STORAGE_KEY = 'campuscore_editor_document';
 const EDITOR_TYPE_KEY = 'campuscore_editor_engine';
-
-interface StoredDocument {
-  title: string;
-  category: string;
-  content: string;
-  editorType?: 'tinymce' | 'markdown';
-  updatedAt: string;
-}
 
 export default function AcademicEditorPage() {
   const { user, hasAccess, isLoading: authLoading, isForbidden } = useRequireAuth([
@@ -146,7 +158,7 @@ export default function AcademicEditorPage() {
   const [category, setCategory] = useState('notice');
   const [content, setContent] = useState('');
   const [priority, setPriority] = useState<'URGENT' | 'HIGH' | 'NORMAL' | 'LOW'>('NORMAL');
-  const [targetRole, setTargetRole] = useState<'ALL' | 'STUDENT' | 'LECTURER'>('ALL');
+  const [targetRole, setTargetRole] = useState<TargetRoleOption>('ALL');
   const [isPublishingNotice, setIsPublishingNotice] = useState(false);
   const [lastSaved, setLastSaved] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
@@ -154,6 +166,9 @@ export default function AcademicEditorPage() {
   const [editingVersion, setEditingVersion] = useState<number>(0);
   const [publishedNotices, setPublishedNotices] = useState<AnnouncementRecord[]>([]);
   const [loadingNotices, setLoadingNotices] = useState(false);
+  // An API outage must not read as an empty database: the honest error state
+  // stops an author from re-publishing a "missing" notice as a duplicate.
+  const [noticesLoadError, setNoticesLoadError] = useState(false);
   const [previewingNotice, setPreviewingNotice] = useState<AnnouncementRecord | null>(null);
   // A toast here expires and is routinely missed, so a deep link that failed to
   // resolve has to stay on the page until the author acknowledges it.
@@ -190,6 +205,9 @@ export default function AcademicEditorPage() {
   );
   const [blocks, setBlocks] = useState<ContentBlock[]>(defaultBlocks);
   const [hasUnsavedNoticeOrder, setHasUnsavedNoticeOrder] = useState(false);
+  // F-2: the order save runs a site-appearance PUT plus one PUT per dragged
+  // row; without an in-flight lock a double click re-runs the whole chain.
+  const [isSavingNoticeOrder, setIsSavingNoticeOrder] = useState(false);
   // The pinned-notices list is a `tbody` SortableList, which cannot carry its own
   // live region, so the page keeps the sentence here and renders it below.
   const [noticeMove, setNoticeMove] = useState('');
@@ -308,20 +326,27 @@ export default function AcademicEditorPage() {
         setEditorType(savedEngine);
       }
 
-      const raw = localStorage.getItem(STORAGE_KEY);
-      if (raw) {
-        const parsed = JSON.parse(raw) as StoredDocument;
-        setTitle(parsed.title || '');
-        setCategory(parsed.category || 'notice');
-        setContent(parsed.content || '');
+      const parsed = parseStoredEditorDocument(localStorage.getItem(STORAGE_KEY));
+      if (parsed) {
+        setTitle(parsed.title);
+        setCategory(parsed.category);
+        setContent(parsed.content);
         setLastSaved(parsed.updatedAt || null);
         if (parsed.editorType) {
           setEditorType(parsed.editorType);
         }
+        // K1: a draft saved while a saved announcement was open has to restore
+        // that edit context too. Without it a reload left editingId null and
+        // "Publish" silently created a duplicate of the record being updated;
+        // the amber editing banner keys off this state as well.
+        if (parsed.editingId) {
+          setEditingId(parsed.editingId);
+          setEditingVersion(parsed.editingVersion ?? 0);
+        }
         return;
       }
     } catch {
-      // ignore
+      // Storage can be unavailable (private mode); fall through to seeding.
     }
 
     if (!shouldSeedDefaultEditorDocument({ hasStoredDraft: false, editingId: editingIdRef.current })) {
@@ -361,12 +386,16 @@ export default function AcademicEditorPage() {
 
   const saveDraft = useCallback(() => {
     const timestamp = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
-    const payload: StoredDocument = {
+    const payload: StoredEditorDocument = {
       title,
       category,
       content,
       editorType,
       updatedAt: timestamp,
+      // K1: the draft carries the edit context, so hydrating it can resume the
+      // update of a saved announcement instead of losing that association.
+      editingId,
+      editingVersion,
     };
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
@@ -377,7 +406,7 @@ export default function AcademicEditorPage() {
       // so the author believed a draft existed that did not.
       toast.error(copy.draftSaveFailed);
     }
-  }, [category, content, copy.draftSaveFailed, copy.savedToast, editorType, title]);
+  }, [category, content, copy.draftSaveFailed, copy.savedToast, editingId, editingVersion, editorType, title]);
 
   const handleCopy = useCallback(async () => {
     try {
@@ -394,7 +423,9 @@ export default function AcademicEditorPage() {
     const isHtml = editorType === 'tinymce';
     const ext = isHtml ? 'html' : 'md';
     const mime = isHtml ? 'text/html;charset=utf-8' : 'text/markdown;charset=utf-8';
-    const filename = `${(title || 'academic-document').toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-_]/g, '')}.${ext}`;
+    // K2: Unicode-aware slug shared with the TinyMCE shell export, so both
+    // download buttons produce the same name for the same title.
+    const filename = buildDocumentFilename(title, ext);
 
     const blob = new Blob([content], { type: mime });
     const url = URL.createObjectURL(blob);
@@ -411,6 +442,11 @@ export default function AcademicEditorPage() {
     // RT-P3-3: routed through the unsaved-changes guard so the confirm text
     // and the beforeunload protection come from one mechanism.
     unsaved.requestLeave(() => {
+      // K1: "New Document" is the create-new flow, so it must also leave the
+      // edit context — otherwise Publish would overwrite the record that was
+      // open before the reset.
+      setEditingId(null);
+      setEditingVersion(0);
       setTitle('');
       setContent(defaultBodyFor());
       setLastSaved(null);
@@ -419,6 +455,9 @@ export default function AcademicEditorPage() {
       } catch {
         // ignore
       }
+      // K6: a discarded document must not be resurrected from TinyMCE's own
+      // autosave draft.
+      clearTinyMceAutosaveDrafts();
     });
   }, [defaultBodyFor, unsaved]);
 
@@ -442,12 +481,17 @@ export default function AcademicEditorPage() {
       return;
     }
     const compiled = `<div style="font-family: Arial, sans-serif; line-height: 1.6; color: #1e293b;">\n${active.map((b) => b.htmlContent).join('\n\n')}\n</div>`;
-    setContent(compiled);
-    toast.success(
-      isVi
-        ? `Đã áp dụng ${active.length} khối cấu trúc vào văn bản đang soạn!`
-        : `Applied ${active.length} structured blocks into document!`
-    );
+    // Compiling replaces the whole draft (title untouched but the body is
+    // rewritten), so it goes through the same unsaved-changes guard as New
+    // Document and Cancel — a one-click replace must not bypass the prompt.
+    unsaved.requestLeave(() => {
+      setContent(compiled);
+      toast.success(
+        isVi
+          ? `Đã áp dụng ${active.length} khối cấu trúc vào văn bản đang soạn!`
+          : `Applied ${active.length} structured blocks into document!`
+      );
+    });
   };
 
   // Insert a single block into TinyMCE
@@ -473,47 +517,26 @@ export default function AcademicEditorPage() {
   const handleApplyBanner = (bannerUrl: string, bannerTitle: string) => {
     const figureMarkup = `<figure class="my-3 text-center">\n  <img src="${bannerUrl}" alt="${bannerTitle}" class="w-full rounded-lg object-cover max-h-72 shadow-xs" />\n  <figcaption class="mt-1.5 text-xs text-muted-foreground italic">${bannerTitle}</figcaption>\n</figure>\n\n`;
 
-    if (activeCoverUrl) {
-      const figureRegex = new RegExp(
-        `<figure[^>]*>[\\s\\S]*?(?:${activeCoverUrl.replace(/[.*+?^${}()|[\\]\\]/g, '\\$&')}|\\/images\\/(?:banners|news)\\/[^"']+)[\\s\\S]*?<\\/figure>\\s*`,
-        'i'
-      );
-      if (figureRegex.test(content)) {
-        setContent((prev) => prev.replace(figureRegex, figureMarkup));
-        toast.success(isVi ? `Đã đổi ảnh bìa sang "${bannerTitle}"!` : `Changed cover banner to "${bannerTitle}"!`);
-        return;
-      }
-      const imgRegex = new RegExp(
-        `<img[^>]+src=["']${activeCoverUrl.replace(/[.*+?^${}()|[\\]\\]/g, '\\$&')}["'][^>]*>\\s*`,
-        'i'
-      );
-      if (imgRegex.test(content)) {
-        setContent((prev) => prev.replace(imgRegex, figureMarkup));
-        toast.success(isVi ? `Đã đổi ảnh bìa sang "${bannerTitle}"!` : `Changed cover banner to "${bannerTitle}"!`);
-        return;
-      }
-    }
-    setContent((prev) => figureMarkup + prev);
-    toast.success(isVi ? `Đã thêm ảnh bìa "${bannerTitle}"!` : `Added cover banner "${bannerTitle}"!`);
+    // Splice only the block that owns the active cover URL — a document may
+    // hold ordinary figures (inline screenshots) before the banner.
+    const replaced = activeCoverUrl
+      ? replaceCoverBlock(content, activeCoverUrl, figureMarkup)
+      : null;
+    setContent(replaced ?? figureMarkup + content);
+    toast.success(
+      replaced !== null
+        ? (isVi ? `Đã đổi ảnh bìa sang "${bannerTitle}"!` : `Changed cover banner to "${bannerTitle}"!`)
+        : (isVi ? `Đã thêm ảnh bìa "${bannerTitle}"!` : `Added cover banner "${bannerTitle}"!`),
+    );
   };
 
   const handleRemoveBanner = () => {
     if (!activeCoverUrl) return;
-    const figureRegex = new RegExp(
-      `<figure[^>]*>[\\s\\S]*?${activeCoverUrl.replace(/[.*+?^${}()|[\\]\\]/g, '\\$&')}[\\s\\S]*?<\\/figure>\\s*`,
-      'gi'
-    );
-    if (figureRegex.test(content)) {
-      setContent((prev) => prev.replace(figureRegex, '').trim());
-      toast.info(isVi ? 'Đã gỡ ảnh bìa học thuật khỏi văn bản.' : 'Removed cover banner from document.');
-    } else {
-      const imgRegex = new RegExp(
-        `<img[^>]+src=["']${activeCoverUrl.replace(/[.*+?^${}()|[\\]\\]/g, '\\$&')}["'][^>]*>\\s*`,
-        'gi'
-      );
-      setContent((prev) => prev.replace(imgRegex, '').trim());
-      toast.info(isVi ? 'Đã gỡ ảnh bìa học thuật khỏi văn bản.' : 'Removed cover banner from document.');
+    const removed = removeCoverBlock(content, activeCoverUrl);
+    if (removed !== null) {
+      setContent(removed);
     }
+    toast.info(isVi ? 'Đã gỡ ảnh bìa học thuật khỏi văn bản.' : 'Removed cover banner from document.');
   };
 
   // Reorder announcements via SortableJS
@@ -524,6 +547,11 @@ export default function AcademicEditorPage() {
 
   // Save announcements order to site appearance & Spring Boot backend
   const handleSaveNoticeOrder = async () => {
+    // F-2: the header button is rendered with animate-pulse while the order is
+    // unsaved, which invites the double click that used to re-run the whole
+    // PUT chain. One run at a time, and both triggers reflect it.
+    if (isSavingNoticeOrder) return;
+    setIsSavingNoticeOrder(true);
     try {
       const newOrder = publishedNotices.map((n) => n.id);
       const updated: SiteAppearance = {
@@ -600,6 +628,8 @@ export default function AcademicEditorPage() {
           : 'Could not save announcement order.'
       );
       void fetchPublishedNotices();
+    } finally {
+      setIsSavingNoticeOrder(false);
     }
   };
 
@@ -612,8 +642,9 @@ export default function AcademicEditorPage() {
       const ordered = siteAppearance.postOrder?.length > 0 ? orderByIds(raw, siteAppearance.postOrder) : raw;
       setPublishedNotices(ordered);
       setHasUnsavedNoticeOrder(false);
+      setNoticesLoadError(false);
     } catch {
-      // fallback
+      setNoticesLoadError(true);
     } finally {
       setLoadingNotices(false);
     }
@@ -651,12 +682,21 @@ export default function AcademicEditorPage() {
     if (ann.priority === 'URGENT' || ann.priority === 'HIGH' || ann.priority === 'NORMAL' || ann.priority === 'LOW') {
       setPriority(ann.priority as any);
     }
-    if (ann.isGlobal || !ann.targetRoles || ann.targetRoles.length === 0 || (ann.targetRoles.includes('STUDENT') && ann.targetRoles.includes('LECTURER'))) {
+    if (ann.isGlobal || !ann.targetRoles || ann.targetRoles.length === 0) {
       setTargetRole('ALL');
+    } else if (
+      ann.targetRoles.includes('STUDENT') &&
+      ann.targetRoles.includes('LECTURER')
+    ) {
+      // Targeted at both roles without being campus-wide: keep that state
+      // distinct so saving the studio edit does not silently globalize it.
+      setTargetRole('BOTH');
     } else if (ann.targetRoles.includes('STUDENT')) {
       setTargetRole('STUDENT');
     } else if (ann.targetRoles.includes('LECTURER')) {
       setTargetRole('LECTURER');
+    } else {
+      setTargetRole('ALL');
     }
     setEditorType('tinymce');
     setActiveTab('announcement');
@@ -672,17 +712,29 @@ export default function AcademicEditorPage() {
   }, [isVi]);
 
   // Auto load announcement from query param ?editId=... or ?id=...
+  // Runs once per mount: the effect keyed on isVi re-fired on every language
+  // toggle and refetched the record over an in-progress edit, resetting the
+  // draft to server values with no unsaved-changes prompt.
+  // The guard arms only when a fetch RESOLVES: arming before the request
+  // dead-locked the deep link under React StrictMode's mount→cleanup→remount
+  // (run 1 armed and was cancelled, run 2 saw the armed ref and returned).
+  const deepLinkLoadedRef = useRef(false);
   useEffect(() => {
     if (typeof window === 'undefined') return;
+    if (deepLinkLoadedRef.current) return;
     const params = new URLSearchParams(window.location.search);
     const targetId = params.get('editId') || params.get('id');
     if (!targetId) return;
 
     let cancelled = false;
+    const markLoaded = () => {
+      deepLinkLoadedRef.current = true;
+    };
     announcementsApi
       .getAll({ page: 1, limit: 50 })
       .then((res) => {
         if (cancelled) return;
+        markLoaded();
         const found = (res.data || []).find((a) => a.id === targetId);
         if (found) {
           setDeepLinkNotice(null);
@@ -700,6 +752,7 @@ export default function AcademicEditorPage() {
       })
       .catch(() => {
         if (!cancelled) {
+          markLoaded();
           setDeepLinkNotice({ targetId, reason: 'load-failed' });
           toast.error(
             isVi
@@ -726,8 +779,7 @@ export default function AcademicEditorPage() {
       createdAt: new Date().toISOString(),
       publishAt: new Date().toISOString(),
       publishedBy: authorName,
-      targetRoles: targetRole === 'ALL' ? ['STUDENT', 'LECTURER', 'ADMIN'] : [targetRole],
-      isGlobal: targetRole === 'ALL',
+      ...audienceFor(targetRole),
     });
   };
 
@@ -740,12 +792,29 @@ export default function AcademicEditorPage() {
       setEditingVersion(0);
       setTitle('');
       setContent(defaultBodyFor());
+      try {
+        // K1: the stored draft holds the edit context; cancelling the edit has
+        // to drop it as well, or the next reload restores the edit the author
+        // just left. K6: also drop the TinyMCE autosave draft.
+        localStorage.removeItem(STORAGE_KEY);
+      } catch {
+        // ignore
+      }
+      clearTinyMceAutosaveDrafts();
       toast.info(isVi ? 'Đã hủy chế độ sửa, bắt đầu soạn thảo văn bản mới' : 'Cancelled edit mode');
     });
   };
 
   // Publish announcement to backend feed
   const handlePublishAnnouncement = async () => {
+    // K1: when a saved announcement is open in the editor, "Publish" means
+    // "save this document". It must update the live record instead of pushing a
+    // duplicate of it; the create-new flow is reached by cancelling the edit or
+    // starting a new document, both of which clear editingId.
+    if (editingId) {
+      await handleUpdateAnnouncement();
+      return;
+    }
     if (!title.trim()) {
       toast.error(isVi ? 'Vui lòng nhập tiêu đề thông báo!' : 'Please enter announcement title!');
       return;
@@ -761,17 +830,12 @@ export default function AcademicEditorPage() {
 
     setIsPublishingNotice(true);
     try {
-      const targetRoles = targetRole === 'ALL'
-        ? ['STUDENT', 'LECTURER', 'ADMIN']
-        : [targetRole];
-
       await announcementsApi.create({
         title,
         content,
         priority,
-        targetRoles,
         targetYears: [],
-        isGlobal: targetRole === 'ALL',
+        ...audienceFor(targetRole),
       });
 
       toast.success(
@@ -806,17 +870,12 @@ export default function AcademicEditorPage() {
 
     setIsPublishingNotice(true);
     try {
-      const targetRoles = targetRole === 'ALL'
-        ? ['STUDENT', 'LECTURER', 'ADMIN']
-        : [targetRole];
-
       await announcementsApi.update(editingId, {
         title,
         content,
         priority,
-        targetRoles,
         targetYears: [],
-        isGlobal: targetRole === 'ALL',
+        ...audienceFor(targetRole),
         reason: 'Cập nhật nội dung văn bản học vụ',
         expectedVersion: editingVersion,
       });
@@ -883,10 +942,15 @@ export default function AcademicEditorPage() {
 
   // Load selected template into editor
   const applyTemplate = (templateContent: string, templateTitle: string) => {
-    setContent(templateContent);
-    setTitle(templateTitle);
-    setActiveTab('announcement');
-    toast.success(isVi ? 'Đã nạp mẫu văn bản vào trình soạn thảo!' : 'Template applied to editor!');
+    // Loading a template replaces the entire draft — behind the same
+    // unsaved-changes guard as every other destructive action on this page,
+    // so an author with a long in-progress document gets the confirm dialog.
+    unsaved.requestLeave(() => {
+      setContent(templateContent);
+      setTitle(templateTitle);
+      setActiveTab('announcement');
+      toast.success(isVi ? 'Đã nạp mẫu văn bản vào trình soạn thảo!' : 'Template applied to editor!');
+    });
   };
 
   const stats = useMemo(() => {
@@ -1219,12 +1283,13 @@ export default function AcademicEditorPage() {
                     disabled={isPublishingNotice}
                     size="sm"
                     className="gap-1.5 bg-emerald-600 hover:bg-emerald-700 dark:bg-emerald-700 dark:hover:bg-emerald-800 text-white font-semibold shadow-xs"
+                    title={editingId ? editorCopy.publishChangesTitle : undefined}
                   >
                     <Send className="h-4 w-4" />
                     {isPublishingNotice
                       ? editorCopy.publishing
                       : editingId
-                      ? editorCopy.publishNew
+                      ? editorCopy.publishChanges
                       : copy.publishAnnouncement}
                   </Button>
                   <Button
@@ -1521,6 +1586,7 @@ export default function AcademicEditorPage() {
                 height={580}
                 locale={isVi ? 'vi' : 'en'}
                 showTemplates={true}
+                documentTitle={title}
               />
             ) : (
               <RichTextEditor
@@ -1560,10 +1626,21 @@ export default function AcademicEditorPage() {
                       variant="default"
                       size="sm"
                       onClick={handleSaveNoticeOrder}
-                      className="h-8 gap-1.5 text-xs font-semibold bg-blue-600 hover:bg-blue-700 text-white shadow-xs animate-pulse"
+                      disabled={isSavingNoticeOrder}
+                      className="h-8 gap-1.5 text-xs font-semibold bg-blue-600 hover:bg-blue-700 text-white shadow-xs animate-pulse disabled:animate-none"
                     >
-                      <Save className="h-3.5 w-3.5" />
-                      <span>{isVi ? 'Lưu thứ tự ghim bài viết' : 'Save Feed Order'}</span>
+                      {isSavingNoticeOrder ? (
+                        <RefreshCw className="h-3.5 w-3.5 animate-spin" />
+                      ) : (
+                        <Save className="h-3.5 w-3.5" />
+                      )}
+                      <span>
+                        {isSavingNoticeOrder
+                          ? editorCopy.saving
+                          : isVi
+                          ? 'Lưu thứ tự ghim bài viết'
+                          : 'Save Feed Order'}
+                      </span>
                     </Button>
                   )}
                   <Button
@@ -1595,10 +1672,11 @@ export default function AcademicEditorPage() {
                   type="button"
                   size="sm"
                   onClick={handleSaveNoticeOrder}
+                  disabled={isSavingNoticeOrder}
                   className="h-7 px-3 text-xs bg-blue-600 hover:bg-blue-700 text-white font-semibold shrink-0 shadow-xs"
                 >
                   <Save className="h-3.5 w-3.5 mr-1" />
-                  {isVi ? 'Lưu ngay' : 'Save Now'}
+                  {isSavingNoticeOrder ? editorCopy.saving : isVi ? 'Lưu ngay' : 'Save Now'}
                 </Button>
               </div>
             )}
@@ -1610,6 +1688,17 @@ export default function AcademicEditorPage() {
                     <RefreshCw className="h-4 w-4 animate-spin text-primary" />
                     <span>{isVi ? 'Đang tải danh sách bài viết từ CSDL...' : 'Loading announcements...'}</span>
                   </div>
+                </div>
+              ) : noticesLoadError ? (
+                <div className="py-8 text-center text-xs text-destructive">
+                  <p>{isVi ? 'Không tải được danh sách thông báo từ máy chủ.' : 'Could not load announcements from the server.'}</p>
+                  <button
+                    type="button"
+                    className="mt-2 rounded-md border border-border px-3 py-1.5 text-xs font-medium text-foreground hover:bg-secondary"
+                    onClick={() => void fetchPublishedNotices()}
+                  >
+                    {isVi ? 'Thử lại' : 'Retry'}
+                  </button>
                 </div>
               ) : publishedNotices.length === 0 ? (
                 <div className="py-8 text-center text-xs text-muted-foreground">
@@ -1797,7 +1886,12 @@ export default function AcademicEditorPage() {
         <AnnouncementEditModal
           announcement={editingNoticeModal}
           isOpen={Boolean(editingNoticeModal)}
-          onClose={() => setEditingNoticeModal(null)}
+          onClose={() => {
+            setEditingNoticeModal(null);
+            // K6: closing the modal discards the in-modal draft, so drop the
+            // editor autosave copy that would otherwise restore it.
+            clearTinyMceAutosaveDrafts();
+          }}
           onSave={handleSaveModalEdit}
           onOpenStudio={(notice) => {
             setEditingNoticeModal(null);

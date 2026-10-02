@@ -68,8 +68,10 @@ public class NotificationWriteController {
     @PostMapping
     @PreAuthorize("hasAnyRole('ADMIN', 'SUPER_ADMIN')")
     @ResponseStatus(HttpStatus.CREATED)
-    public NotificationResponse create(@RequestBody JsonNode body) {
-        return notifications.create(CreateNotificationRequest.from(body));
+    public NotificationResponse create(
+            @AuthenticationPrincipal Jwt jwt,
+            @RequestBody JsonNode body) {
+        return notifications.create(CreateNotificationRequest.from(body), subject(jwt));
     }
 
     @Operation(summary = "Xóa thông báo khỏi hộp thư cá nhân", description = "Người dùng xóa một thông báo khỏi hộp thư cá nhân của mình")
@@ -90,8 +92,9 @@ public class NotificationWriteController {
     @DeleteMapping("{id}")
     @PreAuthorize("hasAnyRole('ADMIN', 'SUPER_ADMIN')")
     public DeleteNotificationResponse delete(
+            @AuthenticationPrincipal Jwt jwt,
             @Parameter(description = "Mã định danh thông báo (UUID)", required = true) @PathVariable String id) {
-        return notifications.delete(id);
+        return notifications.delete(id, subject(jwt));
     }
 
     @Operation(summary = "Quản trị cập nhật thông báo (Admin)", description = "Quản trị viên sửa đổi tiêu đề, nội dung thông báo hệ thống")
@@ -101,9 +104,10 @@ public class NotificationWriteController {
     @PutMapping("{id}")
     @PreAuthorize("hasAnyRole('ADMIN', 'SUPER_ADMIN')")
     public NotificationResponse update(
+            @AuthenticationPrincipal Jwt jwt,
             @Parameter(description = "Mã định danh thông báo (UUID)", required = true) @PathVariable String id,
             @RequestBody JsonNode body) {
-        return notifications.update(id, UpdateNotificationRequest.from(body));
+        return notifications.update(id, UpdateNotificationRequest.from(body), subject(jwt));
     }
 
     private String subject(Jwt jwt) {

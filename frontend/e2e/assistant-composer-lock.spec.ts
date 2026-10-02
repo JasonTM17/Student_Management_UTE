@@ -2,7 +2,7 @@ import { test, expect, type Page } from '@playwright/test';
 
 // Covers the composer lock contract fixed by fix/chatbot-grounding-and-input:
 // while a turn is in flight the panel is visibly locked (disabled textarea,
-// Stop + "Responding…" button, aria-live hint) instead of silently swallowing
+// visible Stop action and aria-live hint) instead of silently swallowing
 // later sends, and a settled conversation immediately accepts a new send.
 
 const student = { email: 'student@campuscore.edu', password: 'password123' };
@@ -94,11 +94,11 @@ test('composer locks while the assistant is answering and unlocks when the turn 
   await page.getByRole('button', { name: sendButtonName }).click();
 
   // Locked panel: the textarea is disabled, the send button became a Stop
-  // button labelled with the responding state, and the aria-live hint says why.
+  // button labelled with the action, and the aria-live hint says why.
   await expect(composer).toBeDisabled();
   const stopButton = page.getByRole('button', { name: stopButtonName });
   await expect(stopButton).toBeVisible();
-  await expect(stopButton).toContainText(/Responding…|Đang trả lời…/i);
+  await expect(stopButton).toContainText(/Stop|Dừng/i);
   await expect(page.getByRole('dialog')).toContainText(/the composer is locked|ô nhập tạm khóa/i);
   // The user message itself must still be visible (the send was not swallowed).
   // Assert the user bubble ("You"/"Bạn") — the assistant article is the pending

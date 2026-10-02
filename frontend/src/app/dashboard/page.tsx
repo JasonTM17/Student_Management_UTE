@@ -312,6 +312,8 @@ export default function DashboardPage() {
       tone: metricToneClass('info'),
       href: '/dashboard/enrollments',
       tooltip: locale === 'vi' ? 'Xem danh sách học phần' : 'View enrolled courses',
+      // Numeric chips are short by construction and may stay single-line.
+      wraps: false,
     },
     {
       // "Active" is the subset that has actually been enrolled — confirmed
@@ -323,6 +325,7 @@ export default function DashboardPage() {
       tone: metricToneClass('success'),
       href: '/dashboard/enrollments',
       tooltip: locale === 'vi' ? 'Xem các môn đang học' : 'View active courses',
+      wraps: false,
     },
     {
       label: copy.stats.pending,
@@ -331,14 +334,20 @@ export default function DashboardPage() {
       tone: metricToneClass('warning'),
       href: '/dashboard/register',
       tooltip: locale === 'vi' ? 'Đến trang đăng ký học phần' : 'Go to course registration',
+      wraps: false,
     },
     {
       label: copy.stats.term,
+      // The semester name is authored data ('Học kỳ 1 năm học 2026-2027' and
+      // longer). `truncate` turned it into "Học kỳ 1 n…" in the 4-column
+      // desktop grid, so this chip wraps instead; the three-line clamp keeps
+      // an arbitrarily long import from stretching the row.
       value: currentSemesterName,
       icon: Calendar,
       tone: metricToneClass('neutral'),
       href: '/dashboard/schedule',
       tooltip: locale === 'vi' ? 'Xem thời khóa biểu học kỳ' : 'View semester schedule',
+      wraps: true,
     },
   ];
 
@@ -405,7 +414,16 @@ export default function DashboardPage() {
                   </span>
                   <div className="min-w-0">
                     <div
-                      className="truncate text-xl font-bold leading-6 text-foreground group-hover:text-primary transition-colors"
+                      className={cn(
+                        'font-bold leading-6 text-foreground group-hover:text-primary transition-colors',
+                        chip.wraps
+                          ? // Authored names wrap instead of being clipped
+                            // mid-word by `truncate`; three lines clears the
+                            // seeded Vietnamese names down to the tightest
+                            // 4-column desktop card (~121px of text column).
+                            'line-clamp-3 break-words text-lg'
+                          : 'truncate text-xl',
+                      )}
                       title={chip.value}
                     >
                       {chip.value}

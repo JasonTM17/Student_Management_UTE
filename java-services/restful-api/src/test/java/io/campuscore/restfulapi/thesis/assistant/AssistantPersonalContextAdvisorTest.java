@@ -161,6 +161,49 @@ class AssistantPersonalContextAdvisorTest {
     }
 
     @Test
+    void weeklyCourseAndRoomQuestionsAnswerTheTimetableInsteadOfTheEnrollmentList() {
+        when(enrollmentService.findStudentEnrollments("student-profile", null)).thenReturn(List.of(
+                enrollment("SE401", "Lập trình Java nâng cao", "Advanced Java", CURRENT_TERM_START,
+                        List.of(new SectionScheduleResponse("s1", 2, "07:00", "09:30",
+                                new ClassroomSummary("c1", "A", "101"))))));
+
+        for (String question : List.of(
+                "Tuần này tôi học những môn nào, ở phòng nào?",
+                "Tuan nay toi hoc nhung mon nao, o phong nao?",
+                "Tuần này tôi học những môn nào?",
+                "Tôi học những môn nào, ở phòng nào?",
+                "Which classes am I taking this week, in which room?",
+                "What courses am I taking this week?")) {
+            assertTrue(advisor.handles(question), question);
+            ChatResponse response = advisor.answer(chatRequest("vi", question), jwtStudent());
+            assertNotNull(response, question);
+            assertEquals("PERSONAL_CONTEXT", response.reasonCode());
+            assertTrue(response.answer().contains("Lịch học cá nhân"), response.answer());
+            assertTrue(response.answer().contains("Thứ Hai 07:00-09:30"), response.answer());
+            assertTrue(response.answer().contains("phòng A 101"), response.answer());
+            assertFalse(response.answer().contains("ENROLLED"), response.answer());
+        }
+    }
+
+    @Test
+    void timetableDetailRoutingPreservesPlainEnrollmentAndPublicQuestions() {
+        when(enrollmentService.findStudentEnrollments("student-profile", null)).thenReturn(List.of(
+                enrollment("SE401", "Lập trình Java nâng cao", "Advanced Java", CURRENT_TERM_START,
+                        List.of(new SectionScheduleResponse("s1", 2, "07:00", "09:30",
+                                new ClassroomSummary("c1", "A", "101"))))));
+
+        ChatResponse enrollmentList = advisor.answer(
+                chatRequest("vi", "Tôi đã đăng ký những môn nào?"), jwtStudent());
+        assertNotNull(enrollmentList);
+        assertTrue(enrollmentList.answer().contains("SE401"), enrollmentList.answer());
+        assertFalse(enrollmentList.answer().contains("Lịch học cá nhân"), enrollmentList.answer());
+
+        assertFalse(advisor.handles("Tuần này học những môn nào, ở phòng nào?"));
+        assertFalse(advisor.handles("Tuần này tôi đăng ký môn học như thế nào?"));
+        assertFalse(advisor.handles("Tuần này tôi thi những môn nào, ở phòng thi nào?"));
+    }
+
+    @Test
     void streamsTheAlreadyComputedAnswerWithoutReadingPersonalRecordsAgain() {
         when(enrollmentService.findStudentEnrollments("student-profile", null)).thenReturn(List.of(
                 enrollment("SE401", "Lập trình Java nâng cao", "Advanced Java", CURRENT_TERM_START,

@@ -1688,6 +1688,7 @@ export const en = {
     },
     targetRoleOptions: {
       ALL: 'All',
+      BOTH: 'Students & Lecturers',
       STUDENT: 'Students',
       LECTURER: 'Lecturers',
     },
@@ -1699,8 +1700,9 @@ export const en = {
     exportMarkdown: 'Export .md',
     saveChanges: 'Save Changes',
     saveChangesTitle: 'Save changes to database',
+    publishChanges: 'Update & Publish',
+    publishChangesTitle: 'Save the changes and publish the updated notice to the campus feed',
     saving: 'Saving...',
-    publishNew: 'Publish as New',
     publishing: 'Publishing...',
     blockBuilderTitle: 'Institutional Content Blocks Builder',
     blockBuilderBadge: 'Drag & Drop',
@@ -2240,6 +2242,7 @@ export const en = {
     title: 'CampusUTE assistant',
     specializedLabel: 'Specialized AI Assistant',
     specializedTitle: 'Specialized Assistant',
+    specializedPlaceholder: 'Ask about programming, databases, testing or software engineering…',
     specializedTagline: 'Expert Q&A: programming, databases, architecture, testing, careers.',
     specializedSuggestions: [
       'How do SOLID principles and design patterns apply?',
@@ -2306,6 +2309,7 @@ export const en = {
     untitledConversation: 'Campus conversation',
     model: 'Source note',
     stop: 'Stop generating',
+    stopLabel: 'Stop',
     responding: 'Responding…',
     respondingHint:
       'Responding… the composer is locked until this answer finishes. Press Stop to unlock.',
@@ -2332,6 +2336,8 @@ export const en = {
     },
     offline: 'No network connection. Check your connection and try again.',
     sessionExpired: 'Your session has expired. Please sign in again.',
+    signInRequired: 'Asking is locked until you sign in again.',
+    signInAction: 'Sign in again',
     forbidden: 'This account is not allowed to use the assistant.',
     sensitiveBlocked:
       'Please do not enter email addresses, phone numbers, student IDs, or secrets into the assistant.',
@@ -4225,6 +4231,7 @@ export const vi: I18nMessages = {
     },
     targetRoleOptions: {
       ALL: 'Toàn trường',
+      BOTH: 'Sinh viên & Giảng viên',
       STUDENT: 'Sinh viên',
       LECTURER: 'Giảng viên',
     },
@@ -4236,8 +4243,9 @@ export const vi: I18nMessages = {
     exportMarkdown: 'Tải .md',
     saveChanges: 'Lưu cập nhật',
     saveChangesTitle: 'Lưu nội dung cập nhật vào cơ sở dữ liệu',
+    publishChanges: 'Cập nhật & phát hành',
+    publishChangesTitle: 'Lưu thay đổi và phát hành bản cập nhật lên Bảng tin Học vụ',
     saving: 'Đang lưu...',
-    publishNew: 'Đăng thành bài mới',
     publishing: 'Đang gửi...',
     blockBuilderTitle: 'Khung Lắp Ghép Khối Cấu Trúc Văn Bản',
     blockBuilderBadge: 'Sắp xếp trực quan',
@@ -4776,6 +4784,7 @@ export const vi: I18nMessages = {
     title: 'Trợ lý CampusUTE',
     specializedLabel: 'Trợ lý AI chuyên sâu',
     specializedTitle: 'Trợ lý chuyên sâu',
+    specializedPlaceholder: 'Hỏi về lập trình, cơ sở dữ liệu, kiểm thử hoặc kỹ thuật phần mềm…',
     specializedTagline: 'Hỏi đáp chuyên môn: lập trình, CSDL, kiến trúc, kiểm thử, nghề nghiệp.',
     specializedSuggestions: [
       'SOLID và design pattern ứng dụng thế nào?',
@@ -4842,6 +4851,7 @@ export const vi: I18nMessages = {
     untitledConversation: 'Hội thoại CampusUTE',
     model: 'Ghi chú nguồn',
     stop: 'Dừng tạo câu trả lời',
+    stopLabel: 'Dừng',
     responding: 'Đang trả lời…',
     respondingHint:
       'Đang trả lời… ô nhập tạm khóa cho đến khi câu trả lời xong. Nhấn Dừng để mở khóa.',
@@ -4868,6 +4878,8 @@ export const vi: I18nMessages = {
     },
     offline: 'Không có kết nối mạng. Hãy kiểm tra mạng rồi thử lại.',
     sessionExpired: 'Lần đăng nhập đã hết hạn. Vui lòng đăng nhập lại.',
+    signInRequired: 'Cần đăng nhập lại trước khi tiếp tục hỏi trợ lý.',
+    signInAction: 'Đăng nhập lại',
     forbidden: 'Tài khoản hiện không được phép dùng trợ lý.',
     sensitiveBlocked:
       'Vui lòng không nhập email, số điện thoại, mã sinh viên hoặc thông tin bí mật vào trợ lý.',

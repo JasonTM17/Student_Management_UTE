@@ -16,6 +16,7 @@ import io.campuscore.restfulapi.web.DomainException;
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
+import java.io.InputStream;
 import java.net.URI;
 import java.net.URLEncoder;
 import java.net.http.HttpClient;
@@ -31,6 +32,9 @@ import java.util.Map;
 import java.util.Set;
 import java.util.StringJoiner;
 import java.util.UUID;
+import java.util.concurrent.ScheduledThreadPoolExecutor;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Consumer;
 import org.springframework.context.annotation.Profile;
 import org.springframework.http.HttpStatus;
@@ -41,6 +45,17 @@ import org.springframework.stereotype.Component;
 public class RagAssistantGateway {
     private static final String OWNER_HEADER = "X-Assistant-Owner";
     private static final String TOKEN_HEADER = "X-Rag-Service-Token";
+    private static final ScheduledThreadPoolExecutor BODY_DEADLINES = bodyDeadlineScheduler();
+
+    private static ScheduledThreadPoolExecutor bodyDeadlineScheduler() {
+        var scheduler = new ScheduledThreadPoolExecutor(1, runnable -> {
+            Thread thread = new Thread(runnable, "assistant-rag-body-deadline");
+            thread.setDaemon(true);
+            return thread;
+        });
+        scheduler.setRemoveOnCancelPolicy(true);
+        return scheduler;
+    }
 
     private final AssistantRagProperties properties;
     private final ObjectMapper objectMapper;
@@ -112,16 +127,32 @@ public class RagAssistantGateway {
 
     public void stream(ChatRequest request, String ownerId, Consumer<ThesisAssistantService.StreamEvent> sink) {
         ensureReady();
+        long deadline = System.nanoTime() + TimeUnit.MILLISECONDS.toNanos(properties.readTimeoutMs());
         HttpRequest httpRequest = requestBuilder(uri("/chat/stream", Map.of(), Map.of()), ownerId, "text/event-stream", true)
                 .POST(bodyPublisher(request))
                 .build();
         try {
             HttpResponse<java.io.InputStream> response = httpClient.send(httpRequest, HttpResponse.BodyHandlers.ofInputStream());
-            if (!isSuccess(response.statusCode())) {
-                throw problem(response.statusCode(), new String(response.body().readAllBytes(), StandardCharsets.UTF_8));
-            }
-            try (BufferedReader reader = new BufferedReader(new InputStreamReader(response.body(), StandardCharsets.UTF_8))) {
-                parseStream(reader, guardedSink(sink, request == null ? "vi" : request.locale()));
+            try (InputStream body = response.body()) {
+                AtomicBoolean deadlineExpired = new AtomicBoolean(false);
+                // HttpRequest.timeout ends at headers for ofInputStream; bound all remaining body reads too.
+                var watchdog = BODY_DEADLINES.schedule(() -> {
+                    deadlineExpired.set(true);
+                    try { body.close(); } catch (IOException ignored) { }
+                }, Math.max(0, deadline - System.nanoTime()), TimeUnit.NANOSECONDS);
+                try {
+                    if (!isSuccess(response.statusCode())) {
+                        throw problem(response.statusCode(), new String(body.readAllBytes(), StandardCharsets.UTF_8));
+                    }
+                    try (BufferedReader reader = new BufferedReader(new InputStreamReader(body, StandardCharsets.UTF_8))) {
+                        boolean terminal = parseStream(reader, guardedSink(sink, request == null ? "vi" : request.locale()));
+                        if (!terminal && deadlineExpired.get()) {
+                            throw unavailable("RAG_SERVICE_UNAVAILABLE", "RAG service request failed");
+                        }
+                    }
+                } finally {
+                    watchdog.cancel(false);
+                }
             }
         } catch (IOException exception) {
             throw unavailable("RAG_SERVICE_UNAVAILABLE", "RAG service request failed");
@@ -239,13 +270,13 @@ public class RagAssistantGateway {
         }
     }
 
-    private void parseStream(BufferedReader reader, Consumer<ThesisAssistantService.StreamEvent> sink) throws IOException {
+    private boolean parseStream(BufferedReader reader, Consumer<ThesisAssistantService.StreamEvent> sink) throws IOException {
         String line;
         String eventName = null;
         StringBuilder data = new StringBuilder();
         while ((line = reader.readLine()) != null) {
             if (line.isBlank()) {
-                emit(eventName, data.toString(), sink);
+                if (emit(eventName, data.toString(), sink)) return true;
                 eventName = null;
                 data.setLength(0);
                 continue;
@@ -259,7 +290,7 @@ public class RagAssistantGateway {
                 data.append(line.substring(5).stripLeading());
             }
         }
-        emit(eventName, data.toString(), sink);
+        return emit(eventName, data.toString(), sink);
     }
 
     /**
@@ -393,9 +424,9 @@ public class RagAssistantGateway {
                 && AssistantOutputGuard.isSafe(citation.source());
     }
 
-    private void emit(String eventName, String payload, Consumer<ThesisAssistantService.StreamEvent> sink) throws IOException {
+    private boolean emit(String eventName, String payload, Consumer<ThesisAssistantService.StreamEvent> sink) throws IOException {
         if (eventName == null || eventName.isBlank() || payload == null || payload.isBlank()) {
-            return;
+            return false;
         }
         ThesisAssistantService.StreamEvent event = switch (eventName) {
             case "meta" -> decode(payload, ThesisAssistantService.StreamMeta.class);
@@ -409,6 +440,7 @@ public class RagAssistantGateway {
         if (event != null && sink != null) {
             sink.accept(event);
         }
+        return event instanceof ThesisAssistantService.StreamDone || event instanceof ThesisAssistantService.StreamError;
     }
 
     private <T extends ThesisAssistantService.StreamEvent> T decode(String payload, Class<T> type) throws IOException {

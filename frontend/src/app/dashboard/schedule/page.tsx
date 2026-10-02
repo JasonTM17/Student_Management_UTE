@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState, type KeyboardEvent } from 'react';
 import {
   Calendar,
   CalendarDays,
@@ -38,6 +38,10 @@ import {
 } from '@/components/schedule/weekly-grid';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { PageHeader, SectionEyebrow } from '@/components/ui/page-header';
+// One Unicode-aware slug rule across the student surfaces: the reader anchors
+// and every export filename share it, so a Vietnamese title keeps its letters
+// instead of degrading to "l_ch_h_c_h_c_k__1".
+import { slugify } from '@/components/ui/rich-content-renderer';
 import { Select } from '@/components/ui/select';
 import { Button } from '@/components/ui/button';
 import {
@@ -273,6 +277,21 @@ export default function SchedulePage() {
     });
   };
 
+  /**
+   * The day-grid and mobile-list cards are buttons in every way except the
+   * element name, so Enter/Space must open the detail modal exactly like a
+   * click does (the shared weekly grid already behaves this way).
+   */
+  const handleCardKeyDown = (
+    event: KeyboardEvent<HTMLDivElement>,
+    item: DayAgendaItem,
+  ) => {
+    if (event.key === 'Enter' || event.key === ' ') {
+      event.preventDefault();
+      setSelectedDetail(item);
+    }
+  };
+
   const copy =
     locale === 'vi'
       ? {
@@ -384,8 +403,11 @@ export default function SchedulePage() {
         ? `Lịch học - ${selectedSemesterName || 'CampusCore'}`
         : `Schedule - ${selectedSemesterName || 'CampusCore'}`;
     const icsContent = generateIcsCalendar(events, calName);
+    // K12: the filename uses the same Unicode-aware rule as the reader anchors
+    // (NFD-decompose, map đ/Đ, drop combining marks, collapse separators). The
+    // old ASCII-only filter turned "Lịch học Học kỳ 1" into "l_ch_h_c_h_c_k__1".
     const semCode = targetSemester?.name
-      ? targetSemester.name.toLowerCase().replace(/[^a-z0-9_-]/g, '_')
+      ? slugify(targetSemester.name) || 'semester'
       : 'semester';
     const filename = `lich-hoc-${semCode}.ics`;
     downloadIcsFile(filename, icsContent);
@@ -665,8 +687,11 @@ export default function SchedulePage() {
                       {(agendaByDay[selectedDayTab] ?? []).map((item) => (
                         <div
                           key={item.id}
+                          role="button"
+                          tabIndex={0}
+                          onKeyDown={(event) => handleCardKeyDown(event, item)}
                           onClick={() => setSelectedDetail(item)}
-                          className={`rounded-lg border p-4 transition-all hover:scale-[1.01] hover:shadow-md cursor-pointer ${accentForCourse(
+                          className={`rounded-lg border p-4 transition-all hover:scale-[1.01] hover:shadow-md cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${accentForCourse(
                             item.courseCode,
                           )}`}
                         >
@@ -755,8 +780,11 @@ export default function SchedulePage() {
                     return (
                       <div
                         key={`list-card-${item.id}`}
+                        role="button"
+                        tabIndex={0}
+                        onKeyDown={(event) => handleCardKeyDown(event, item)}
                         onClick={() => setSelectedDetail(item)}
-                        className={`rounded-lg border p-3 text-xs transition hover:shadow-sm cursor-pointer ${accentForCourse(
+                        className={`rounded-lg border p-3 text-xs transition hover:shadow-sm cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${accentForCourse(
                           item.courseCode,
                         )}`}
                       >

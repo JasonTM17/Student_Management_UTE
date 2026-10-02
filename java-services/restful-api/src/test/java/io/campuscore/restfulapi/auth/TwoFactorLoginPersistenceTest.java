@@ -2,6 +2,7 @@ package io.campuscore.restfulapi.auth;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.anyString;
@@ -19,9 +20,14 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.campuscore.restfulapi.mail.service.EmailService;
+import jakarta.servlet.http.Cookie;
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.ZoneOffset;
+import java.util.HexFormat;
 import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.BeforeEach;
@@ -498,6 +504,85 @@ class TwoFactorLoginPersistenceTest {
                 .andExpect(jsonPath("$.maskedEmail").doesNotExist());
     }
 
+    // ---------- K17: the security-posture change revokes old sessions ----------
+
+    @Test
+    void confirmEnableRevokesOtherRefreshSessionsAndKeepsTheCurrentOne() throws Exception {
+        DeviceSession currentDevice = loginDevice("device-a");
+        DeviceSession otherDevice = loginDevice("device-b");
+        assertEquals(2, sessionCount());
+
+        String challengeId = startEnableChallenge();
+        String code = latestCode();
+        mvc.perform(post("/api/v1/me/two-factor/confirm")
+                        .with(jwt().jwt(token -> token.subject("student-user")))
+                        .with(csrfPair(currentDevice))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"challengeId\":\"" + challengeId + "\",\"code\":\"" + code + "\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.enabled").value(true));
+
+        assertEquals(1, sessionCount(), "every session except the caller's must be revoked");
+        String keptHash = onlySessionHash();
+        assertEquals(sha256(currentDevice.refreshToken()), keptHash,
+                "the current device keeps its refresh session");
+        assertNotEquals(sha256(otherDevice.refreshToken()), keptHash,
+                "the other device's session is revoked");
+    }
+
+    @Test
+    void confirmDisableRevokesOtherRefreshSessionsAndKeepsTheCurrentOne() throws Exception {
+        DeviceSession currentDevice = loginDevice("device-a");
+        DeviceSession otherDevice = loginDevice("device-b");
+        jdbc.update("UPDATE \"campuscore_auth\".\"User\" SET \"twoFactorEnabled\" = TRUE WHERE \"id\" = 'student-user'");
+        assertEquals(2, sessionCount());
+
+        MvcResult challenge = mvc.perform(post("/api/v1/me/two-factor/disable/challenge")
+                        .with(jwt().jwt(token -> token.subject("student-user")))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"password\":\"" + STUDENT_PASSWORD + "\"}"))
+                .andExpect(status().isOk())
+                .andReturn();
+        String challengeId = objectMapper
+                .readTree(challenge.getResponse().getContentAsString())
+                .path("challengeId").asText();
+        String code = latestCode();
+
+        mvc.perform(post("/api/v1/me/two-factor/disable")
+                        .with(jwt().jwt(token -> token.subject("student-user")))
+                        .with(csrfPair(currentDevice))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"challengeId\":\"" + challengeId + "\",\"code\":\"" + code + "\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.enabled").value(false));
+
+        assertEquals(1, sessionCount(), "every session except the caller's must be revoked");
+        String keptHash = onlySessionHash();
+        assertEquals(sha256(currentDevice.refreshToken()), keptHash);
+        assertNotEquals(sha256(otherDevice.refreshToken()), keptHash);
+    }
+
+    @Test
+    void confirmWithoutARefreshCookieRevokesEverySession() throws Exception {
+        loginDevice("device-a");
+        loginDevice("device-b");
+        assertEquals(2, sessionCount());
+
+        String challengeId = startEnableChallenge();
+        String code = latestCode();
+        mvc.perform(post("/api/v1/me/two-factor/confirm")
+                        .with(jwt().jwt(token -> token.subject("student-user")))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"challengeId\":\"" + challengeId + "\",\"code\":\"" + code + "\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.enabled").value(true));
+
+        // No cookie means the caller's session cannot be identified; revoking
+        // everything is the safe direction (the access token still works until
+        // it expires, and the next refresh needs a fresh login).
+        assertEquals(0, sessionCount());
+    }
+
     @Test
     void enableWithWrongPasswordIsRejectedAndStoresNoChallenge() throws Exception {
         mvc.perform(post("/api/v1/me/two-factor/enable")
@@ -593,6 +678,74 @@ class TwoFactorLoginPersistenceTest {
                 "SELECT \"twoFactorEnabled\" FROM \"campuscore_auth\".\"User\" WHERE \"id\" = 'student-user'",
                 Boolean.class);
         assertTrue(flag);
+    }
+
+    /** A browser session issued by a real login: refresh token + its CSRF pair. */
+    private record DeviceSession(String refreshToken, String csrfToken) { }
+
+    /** Logs in and returns the issued session cookies. */
+    private DeviceSession loginDevice(String userAgent) throws Exception {
+        MvcResult result = mvc.perform(post("/api/v1/auth/login")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .header("User-Agent", userAgent)
+                        .content("{\"email\":\"" + STUDENT_EMAIL + "\",\"password\":\"" + STUDENT_PASSWORD + "\"}"))
+                .andExpect(status().isOk())
+                .andReturn();
+        Cookie refresh = result.getResponse().getCookie("cc_refresh_token");
+        Cookie csrf = result.getResponse().getCookie("cc_csrf");
+        assertNotNull(refresh, "a successful login must issue a refresh cookie");
+        assertNotNull(csrf, "a successful login must issue the CSRF cookie");
+        return new DeviceSession(refresh.getValue(), csrf.getValue());
+    }
+
+    /**
+     * Presents a device's session cookies. Sending the refresh cookie makes the
+     * request cookie-authenticated, so the double-submit CSRF pair is required
+     * (CsrfCookieFilter).
+     */
+    private org.springframework.test.web.servlet.request.RequestPostProcessor csrfPair(DeviceSession session) {
+        return request -> {
+            request.setCookies(
+                    new Cookie("cc_refresh_token", session.refreshToken()),
+                    new Cookie("cc_csrf", session.csrfToken()));
+            request.addHeader("X-CSRF-Token", session.csrfToken());
+            return request;
+        };
+    }
+
+    private int sessionCount() {
+        Integer count = jdbc.queryForObject(
+                "SELECT COUNT(*) FROM \"campuscore_auth\".\"Session\" WHERE \"userId\" = 'student-user'",
+                Integer.class);
+        return count == null ? 0 : count;
+    }
+
+    private String onlySessionHash() {
+        return jdbc.queryForObject(
+                "SELECT \"refreshToken\" FROM \"campuscore_auth\".\"Session\" WHERE \"userId\" = 'student-user'",
+                String.class);
+    }
+
+    private String startEnableChallenge() throws Exception {
+        MvcResult enable = mvc.perform(post("/api/v1/me/two-factor/enable")
+                        .with(jwt().jwt(token -> token.subject("student-user")))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"password\":\"" + STUDENT_PASSWORD + "\"}"))
+                .andExpect(status().isOk())
+                .andReturn();
+        return objectMapper
+                .readTree(enable.getResponse().getContentAsString())
+                .path("challengeId").asText();
+    }
+
+    /** Same digest the repository stores for a refresh token. */
+    private static String sha256(String value) {
+        try {
+            byte[] digest = MessageDigest.getInstance("SHA-256").digest(value.getBytes(StandardCharsets.UTF_8));
+            return HexFormat.of().formatHex(digest);
+        } catch (NoSuchAlgorithmException exception) {
+            throw new IllegalStateException("SHA-256 is required", exception);
+        }
     }
 
     /** Turns the switch on directly; the API flow is covered by lifecycle tests. */

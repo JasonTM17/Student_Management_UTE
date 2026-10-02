@@ -13,6 +13,7 @@ import { useI18n } from '@/i18n';
 import { authApi } from '@/lib/api';
 import { LocalizedLink } from '@/components/LocalizedLink';
 import { isDemoUser } from '@/lib/login-portal';
+import { slugify } from '@/components/ui/rich-content-renderer';
 import { StudentTranscriptSemester, MyCurriculumResponse } from '@/types/api';
 
 interface StudentUteProfileGradeViewProps {
@@ -21,6 +22,12 @@ interface StudentUteProfileGradeViewProps {
   selectedSemesterId?: string;
   onSemesterChange?: (semesterId: string) => void;
   availableSemesters?: Array<{ id: string; name: string }>;
+  /**
+   * The office-issued student code (MSSV) resolved from a student-readable
+   * record. The signed-in session's `studentId` is the internal profile id
+   * (`student-profile`), which must never be printed as if it were the MSSV.
+   */
+  studentCode?: string;
 }
 
 export function StudentUteProfileGradeView({
@@ -29,9 +36,10 @@ export function StudentUteProfileGradeView({
   selectedSemesterId,
   onSemesterChange,
   availableSemesters = [],
+  studentCode,
 }: StudentUteProfileGradeViewProps) {
   const { user, refreshUser } = useAuth();
-  const { messages, locale } = useI18n();
+  const { messages, locale, formatDate } = useI18n();
   const card = messages.studentCard;
   // Round-5: the line/bar/combo toggle is gone — 'line' rendered an empty
   // plot and 'combo' was pixel-identical to 'bar' after the class-average
@@ -42,6 +50,10 @@ export function StudentUteProfileGradeView({
 
   const handleAvatarChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
+    // Reset the input immediately: without this a rejected file keeps the
+    // input's value, the next pick of the same file never fires onChange and
+    // the retry control reads as broken.
+    e.target.value = '';
     if (!file) return;
     if (file.size > 5 * 1024 * 1024) {
       toast.error(card.toastPhotoTooLarge);
@@ -72,20 +84,25 @@ export function StudentUteProfileGradeView({
 
   const handleDownloadChart = () => {
     const svg = document.getElementById('grade-combo-chart');
-    if (svg) {
-      const serializer = new XMLSerializer();
-      const source = serializer.serializeToString(svg);
-      const blob = new Blob([source], { type: 'image/svg+xml;charset=utf-8' });
-      const url = URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      link.href = url;
-      link.download = `bieu-do-hoc-tap-${studentInfo.studentId}.svg`;
-      link.click();
-      URL.revokeObjectURL(url);
-      toast.success(card.toastDownloaded);
-    } else {
-      window.print();
+    if (!svg) {
+      // The chart element only exists when graded courses exist, and the
+      // control is disabled in that state. Never fall back to opening the
+      // print dialog from a control labelled "download chart" (F-3).
+      toast.info(card.chartNoData);
+      return;
     }
+    const serializer = new XMLSerializer();
+    const source = serializer.serializeToString(svg);
+    const blob = new Blob([source], { type: 'image/svg+xml;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `bieu-do-hoc-tap-${
+      studentCode ? slugify(studentCode) || 'sinh-vien' : 'sinh-vien'
+    }.svg`;
+    link.click();
+    URL.revokeObjectURL(url);
+    toast.success(card.toastDownloaded);
   };
 
   // Official student identity comes from the authenticated profile and the
@@ -93,15 +110,38 @@ export function StudentUteProfileGradeView({
   // with another person's data.
   const studentInfo = useMemo(() => {
     const empty = card.notAvailable;
+
+    // Dates render through the app's canonical formatter (dd/mm/yyyy in vi,
+    // the localized short form in en); a value that cannot be parsed is kept
+    // exactly as it arrived instead of being replaced by a guess.
+    const dateOfBirth = (() => {
+      if (!user?.dateOfBirth) return empty;
+      const parsed = new Date(user.dateOfBirth);
+      return Number.isNaN(parsed.getTime()) ? String(user.dateOfBirth) : formatDate(parsed);
+    })();
+
+    // The gender column stores an enum (MALE/FEMALE/OTHER). It must render as
+    // the locale's word — an unrecognized value stays verbatim, never mapped
+    // onto one of the known labels.
+    const gender = (() => {
+      const raw = user?.gender?.trim();
+      if (!raw) return empty;
+      const labels = messages.certificates;
+      if (raw === 'MALE') return labels.genderMale;
+      if (raw === 'FEMALE') return labels.genderFemale;
+      if (raw === 'OTHER') return labels.genderOther;
+      return raw;
+    })();
+
     return {
       name: user ? `${user.lastName ?? ''} ${user.firstName ?? ''}`.trim() || empty : empty,
-      studentId: user?.studentId || empty,
-      dateOfBirth: user?.dateOfBirth ? String(user.dateOfBirth).slice(0, 10) : empty,
+      studentId: studentCode?.trim() || empty,
+      dateOfBirth,
       address: user?.address || empty,
-      gender: user?.gender || empty,
+      gender,
       curriculumName: curriculumData?.curriculum?.name || empty,
     };
-  }, [card.notAvailable, curriculumData, user]);
+  }, [card.notAvailable, curriculumData, formatDate, messages.certificates, studentCode, user]);
 
   // The info-card badge must name the semester the data actually resolves to
   // (the current selection). Nothing selected or resolvable renders a plain
@@ -148,6 +188,10 @@ export function StudentUteProfileGradeView({
         studentScore: r.finalGrade as number,
       }));
   }, [transcriptSemesters]);
+
+  // The SVG only renders from real records, so the download control must be
+  // disabled — not silently repurposed — while there is nothing to chart.
+  const hasChartData = chartCourses.length > 0;
 
   // SVG Chart dimensions
   const chartWidth = 520;
@@ -291,10 +335,14 @@ export function StudentUteProfileGradeView({
               <div className="flex flex-wrap items-center gap-3 mb-3 text-xs">
                 {/* Semester Dropdown */}
                 <div className="w-[150px]">
-                  <label className="block text-[11px] text-muted-foreground mb-0.5 font-medium">
+                  <label
+                    htmlFor="grade-semester-select"
+                    className="block text-[11px] text-muted-foreground mb-0.5 font-medium"
+                  >
                     {card.semester}
                   </label>
                   <select
+                    id="grade-semester-select"
                     value={selectedSemesterId || ''}
                     onChange={(e) => onSemesterChange?.(e.target.value)}
                     className="w-full bg-background border border-border rounded px-2 py-1 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-primary"
@@ -326,8 +374,9 @@ export function StudentUteProfileGradeView({
                   <button
                     type="button"
                     onClick={handleDownloadChart}
-                    className="inline-flex h-8 w-8 items-center justify-center rounded hover:bg-muted transition-colors"
-                    title={card.chartDownload}
+                    disabled={!hasChartData}
+                    className="inline-flex h-8 w-8 items-center justify-center rounded hover:bg-muted transition-colors disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-transparent"
+                    title={hasChartData ? card.chartDownload : card.chartNoData}
                     aria-label={card.chartDownload}
                   >
                     <Download className="w-3.5 h-3.5" />
@@ -336,7 +385,7 @@ export function StudentUteProfileGradeView({
               </div>
 
               {/* SVG Responsive Bar Chart — rendered only from real records */}
-              {chartCourses.length === 0 ? (
+              {!hasChartData ? (
                 <p className="rounded-lg border border-dashed border-border px-4 py-10 text-center text-xs text-muted-foreground">
                   {card.chartNoData}
                 </p>

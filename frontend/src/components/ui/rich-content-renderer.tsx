@@ -17,6 +17,7 @@ import {
   ImageOff,
   Info,
 } from 'lucide-react';
+import { useI18n } from '@/i18n';
 import { cn } from '@/lib/utils';
 
 export interface RichContentRendererProps {
@@ -30,6 +31,11 @@ export function slugify(text: string): string {
     .toLowerCase()
     .normalize('NFD')
     .replace(/[\u0300-\u036f]/g, '')
+    // đ/Đ (U+0111/U+0110) have no NFD decomposition, so the ASCII strip below
+    // used to delete them outright and the anchor silently lost a letter
+    // ("Điều 1" → "ieu-1", "Đề cương" → "e-cuong"). Map them to d first, the
+    // same rule the export filename slug uses.
+    .replace(/[đĐ]/g, 'd')
     .replace(/[^a-z0-9]+/g, '-')
     .replace(/(^-|-$)+/g, '');
 }
@@ -179,12 +185,14 @@ const MARKDOWN_HEADING_CLASS_NAMES: Record<number, string> = {
 
 function SafeImage({ src, alt }: { src: string; alt: string }) {
   const [hasError, setHasError] = useState(false);
+  const { locale } = useI18n();
+  const vi = locale === 'vi';
 
   if (hasError) {
     return (
       <span className="my-3 flex flex-col items-center justify-center rounded-lg border border-dashed border-border/80 bg-secondary/30 p-6 text-center text-xs text-muted-foreground">
         <ImageOff className="mb-2 h-6 w-6 text-muted-foreground/60" />
-        <span>{alt ? `[Hình ảnh không tải được: ${alt}]` : '[Hình ảnh minh họa không thể hiển thị]'}</span>
+        <span>{alt ? (vi ? `[Hình ảnh không tải được: ${alt}]` : `[Image failed to load: ${alt}]`) : (vi ? '[Hình ảnh minh họa không thể hiển thị]' : '[Illustration image cannot be displayed]')}</span>
       </span>
     );
   }
@@ -324,6 +332,8 @@ function renderInline(text: string): React.ReactNode[] {
 // Code Block with Copy
 function CodeBlock({ code, language }: { code: string; language?: string }) {
   const [copied, setCopied] = useState(false);
+  const { locale } = useI18n();
+  const vi = locale === 'vi';
 
   const handleCopy = () => {
     if (navigator?.clipboard?.writeText) {
@@ -342,17 +352,17 @@ function CodeBlock({ code, language }: { code: string; language?: string }) {
           type="button"
           onClick={handleCopy}
           className="inline-flex items-center gap-1 rounded px-2 py-0.5 text-xs font-medium text-muted-foreground transition-colors hover:bg-background hover:text-foreground"
-          aria-label="Sao chép mã nguồn"
+          aria-label={vi ? 'Sao chép mã nguồn' : 'Copy source code'}
         >
           {copied ? (
             <>
               <Check className="h-3.5 w-3.5 text-status-success-foreground" />
-              <span className="text-status-success-foreground">Đã chép</span>
+              <span className="text-status-success-foreground">{vi ? 'Đã chép' : 'Copied'}</span>
             </>
           ) : (
             <>
               <Copy className="h-3.5 w-3.5" />
-              <span>Sao chép</span>
+              <span>{vi ? 'Sao chép' : 'Copy'}</span>
             </>
           )}
         </button>
