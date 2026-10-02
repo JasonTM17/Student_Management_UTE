@@ -120,6 +120,48 @@ function baseLineOptions(domain: { min: number; max: number }, stepSize: number)
 /** Both trend charts share the same panel height so cards stay aligned. */
 const CHART_HEIGHT_CLASS = 'h-60';
 
+/**
+ * Chart.js paints on a canvas, so a screen reader (or the e2e suite) sees
+ * nothing of the plotted values behind the summary aria-label. Every chart
+ * mirrors its plotted series into a visually-hidden table: the caption names
+ * it after the chart, so the data stays reachable with assistive tech and
+ * stays assertable in tests.
+ */
+function ChartDataTable({
+  caption,
+  columns,
+  rows,
+}: {
+  caption: string;
+  columns: [string, string, string];
+  rows: Array<[string, string, string]>;
+}) {
+  return (
+    <table className="sr-only">
+      <caption>{caption}</caption>
+      <thead>
+        <tr>
+          {columns.map((column) => (
+            <th key={column} scope="col">
+              {column}
+            </th>
+          ))}
+        </tr>
+      </thead>
+      <tbody>
+        {rows.map((row, index) => (
+          <tr key={`${row[0]}-${row[1]}-${index}`}>
+            <th scope="row">{row[0]}</th>
+            <td>{row[1]}</td>
+            <td>{row[2]}</td>
+          </tr>
+        ))}
+      </tbody>
+    </table>
+  );
+}
+
+
 export function GpaTrendChart({
   points,
   cumulativePoints,
@@ -202,6 +244,17 @@ export function GpaTrendChart({
       <div className={CHART_HEIGHT_CLASS} role="img" aria-label={ariaLabel}>
         <Line data={{ labels, datasets }} options={options} plugins={[valueLabelsPlugin]} />
       </div>
+      <ChartDataTable
+        caption={ariaLabel}
+        columns={['Kỳ', 'Chuỗi dữ liệu', 'Giá trị']}
+        rows={datasets.flatMap((dataset) =>
+          dataset.data.map((value, index) => [
+            fullLabels[index] ?? labels[index] ?? '',
+            String(dataset.label ?? ''),
+            Number(value).toFixed(2),
+          ] as [string, string, string]),
+        )}
+      />
       <div className="flex flex-wrap items-center justify-center gap-4 text-xs">
         {datasets.map((dataset) => (
           <div key={dataset.label} className="flex items-center gap-1.5 text-muted-foreground">
@@ -272,8 +325,19 @@ export function TenScaleTrendChart({
   };
 
   return (
-    <div className={CHART_HEIGHT_CLASS} role="img" aria-label={ariaLabel}>
-      <Line data={data} options={options} plugins={[valueLabelsPlugin]} />
+    <div className="space-y-3">
+      <div className={CHART_HEIGHT_CLASS} role="img" aria-label={ariaLabel}>
+        <Line data={data} options={options} plugins={[valueLabelsPlugin]} />
+      </div>
+      <ChartDataTable
+        caption={ariaLabel}
+        columns={['Kỳ', 'Chuỗi dữ liệu', 'Giá trị']}
+        rows={points.map((point, index) => [
+          fullLabels[index] ?? labels[index] ?? '',
+          'ĐTB hệ 10',
+          `${Number(point.gpa).toFixed(1)}/10`,
+        ] as [string, string, string])}
+      />
     </div>
   );
 }
@@ -352,8 +416,19 @@ export function GradeDistributionChart({
   };
 
   return (
-    <div className="h-56" role="img" aria-label={ariaLabel}>
-      <Bar data={data} options={options} plugins={[countLabelsPlugin]} className={cn('[&>*]:!bg-transparent')} />
+    <div className="space-y-3">
+      <div className="h-56" role="img" aria-label={ariaLabel}>
+        <Bar data={data} options={options} plugins={[countLabelsPlugin]} className={cn('[&>*]:!bg-transparent')} />
+      </div>
+      <ChartDataTable
+        caption={ariaLabel}
+        columns={['Xếp loại', 'Chuỗi dữ liệu', 'Số học phần']}
+        rows={buckets.map((bucket) => [
+          bucket.letter,
+          'Số học phần',
+          String(bucket.count),
+        ] as [string, string, string])}
+      />
     </div>
   );
 }
