@@ -287,7 +287,14 @@ public class ThesisAssistantService {
             Map.entry("lam lai", "làm lại"),
             // Round-4 format sweep: unaccented "tu van" folds onto the same
             // advisory phrase (the bare syllables are retrieval noise).
-            Map.entry("tu van", "tư vấn"));
+            Map.entry("tu van", "tư vấn"),
+            // Backlog sweep: "CSDL" is the acronym students actually type, but
+            // the corpus spells the concept out ("Cơ sở dữ liệu quan hệ") — the
+            // bare acronym matched nothing and the query fell to NO_MATCH. The
+            // folded key also covers the accented phrase and keyboards without
+            // diacritics, since folding happens before the lookup.
+            Map.entry("csdl", "cơ sở dữ liệu"),
+            Map.entry("co so du lieu", "cơ sở dữ liệu"));
     /**
      * Multi-part acronyms that the {@code [^\p{L}\p{N}]+} splitter shreds. The
      * corpus spells the concept "CI/CD", so every folded spelling collapses onto

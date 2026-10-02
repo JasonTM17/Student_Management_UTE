@@ -659,27 +659,40 @@ for (const singleTerm of [false, true]) {
       const termPrefix = locale === 'en' ? 'Semester' : 'Học kỳ';
       const chart = page.getByRole('img', { name: trendName, exact: true });
       await expect(chart).toBeVisible();
-      // Default 'Both' mode draws the semester line plus the cumulative line;
-      // one term leaves no segment to draw.
-      await expect(chart.locator('polyline')).toHaveCount(singleTerm ? 0 : 2);
-      const chartTitles = await chart.locator('circle title').allTextContents();
+      // Chart.js paints on a canvas, so the chart mirrors its plotted series
+      // into a visually-hidden data table (caption = the chart's accessible
+      // name) — the same localized labels the canvas tooltip shows. Default
+      // 'Both' mode plots the semester line plus the cumulative line; one term
+      // plots a single point per series.
+      const trendRows = page
+        .getByRole('table', { name: trendName, exact: true })
+        .locator('tbody tr');
+      await expect(trendRows).toHaveCount(singleTerm ? 2 : 4);
       const termNumbers = singleTerm ? [2] : [1, 2];
-      expect(chartTitles).toEqual(
-        termNumbers.map((number) => `${termPrefix} ${number}: ${number === 1 ? '3.00' : '3.30'}`),
-      );
+      for (const [rowIndex, number] of termNumbers.entries()) {
+        await expect(trendRows.nth(rowIndex).locator('th')).toHaveText(`${termPrefix} ${number}`);
+        await expect(trendRows.nth(rowIndex).locator('td').nth(1)).toHaveText(
+          number === 1 ? '3.00' : '3.30',
+        );
+      }
       // The 0-10 average gets its own axis in a second card.
-      const tenScaleChart = page.getByRole('img', {
-        name: `${trendName} — ${locale === 'en' ? '10-scale average' : 'ĐTB hệ 10'}`,
-        exact: true,
-      });
-      const tenScaleTitles = await tenScaleChart.locator('circle title').allTextContents();
-      expect(tenScaleTitles).toEqual(
-        termNumbers.map((number) => `${termPrefix} ${number}: 8.0/10`),
-      );
+      const tenScaleName = `${trendName} — ${locale === 'en' ? '10-scale average' : 'ĐTB hệ 10'}`;
+      const tenScaleRows = page
+        .getByRole('table', { name: tenScaleName, exact: true })
+        .locator('tbody tr');
+      await expect(tenScaleRows).toHaveCount(termNumbers.length);
+      for (const [rowIndex, number] of termNumbers.entries()) {
+        await expect(tenScaleRows.nth(rowIndex).locator('th')).toHaveText(`${termPrefix} ${number}`);
+        await expect(tenScaleRows.nth(rowIndex).locator('td').nth(1)).toHaveText('8.0/10');
+      }
       if (!singleTerm) {
         await semesterSelector.selectOption('term-1');
-        const distribution = page.getByRole('img', { name: /Grade distribution|Phân bố xếp loại/ });
-        await expect(distribution.locator('rect title')).toHaveText(['B: 1']);
+        const distributionRows = page
+          .getByRole('table', { name: /Grade distribution|Phân bố xếp loại/ })
+          .locator('tbody tr');
+        await expect(distributionRows).toHaveCount(1);
+        await expect(distributionRows.first().locator('th')).toHaveText('B');
+        await expect(distributionRows.first().locator('td').nth(1)).toHaveText('1');
       }
       const bothLabel = locale === 'en' ? 'Both' : 'Song song';
       const semesterModeLabel = locale === 'en' ? 'By semester' : 'Theo học kỳ';
