@@ -129,9 +129,12 @@ public class AcademicReadService {
 
     @Transactional(readOnly = true)
     public CourseResponse findCourse(String id) {
-        return academic.findCourseById(id)
+        CourseResponse course = academic.findCourseById(id)
                 .map(AcademicCatalogLocalizer::hydrateCourse)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Course not found"));
+        // Detail-only enrichment: the prerequisite chains render as chips on
+        // the course page and feed the registration guidance copy.
+        return course.withRequirements(academic.findCourseRequirements(id));
     }
 
     @Transactional(readOnly = true)
@@ -172,9 +175,16 @@ public class AcademicReadService {
                 .findCourseProgressByStudentId(studentId)
                 .stream()
                 .collect(Collectors.toMap(AcademicReadRepository.CourseProgressRow::courseId, row -> row));
-
+        Map<String, List<String>> prerequisitesByCourse = new java.util.HashMap<>();
+        academic.findPrerequisiteCodesByCourseIds(plan.stream().map(CurriculumCourseSummary::courseId).toList())
+                .forEach(row -> prerequisitesByCourse
+                        .computeIfAbsent(row.courseId(), key -> new java.util.ArrayList<>())
+                        .add(row.requiredCode()));
+        prerequisitesByCourse.values().forEach(java.util.Collections::sort);
         List<MyCurriculumCourse> courses = plan.stream()
-                .map(item -> toCurriculumCourse(item, coursesById.get(item.courseId()), progressByCourse.get(item.courseId())))
+                .map(item -> toCurriculumCourse(item, coursesById.get(item.courseId()),
+                        progressByCourse.get(item.courseId()),
+                        prerequisitesByCourse.getOrDefault(item.courseId(), List.of())))
                 .sorted(java.util.Comparator.comparingInt(MyCurriculumCourse::year)
                         .thenComparingInt(MyCurriculumCourse::semester)
                         .thenComparing(MyCurriculumCourse::code))
@@ -194,7 +204,8 @@ public class AcademicReadService {
     private static MyCurriculumCourse toCurriculumCourse(
             CurriculumCourseSummary item,
             AcademicReadRepository.CourseBriefRow course,
-            AcademicReadRepository.CourseProgressRow progress) {
+            AcademicReadRepository.CourseProgressRow progress,
+            List<String> prerequisites) {
         String status = switch (progress == null ? 0 : progress.progressLevel()) {
             case 2 -> "COMPLETED";
             case 1 -> "IN_PROGRESS";
@@ -212,7 +223,8 @@ public class AcademicReadService {
                 item.isMandatory(),
                 status,
                 progress == null ? null : progress.finalGrade(),
-                progress == null ? null : progress.letterGrade());
+                progress == null ? null : progress.letterGrade(),
+                prerequisites);
     }
 
     @Transactional(readOnly = true)

@@ -206,6 +206,32 @@ class ThesisAssistantServiceTest {
         assertTrue(ThesisAssistantService.isCreditLimitQuery("Hạn mức tín chỉ học kỳ này là bao nhiêu?"));
         assertTrue(ThesisAssistantService.isCreditLimitQuery("What is the credit cap this term?"));
         assertTrue(!ThesisAssistantService.isCreditLimitQuery("Có bao nhiêu tín chỉ trong chương trình đào tạo?"));
+        assertTrue(ThesisAssistantService.isPrerequisiteQuery("Học phần SE421 có môn tiên quyết gì?"));
+        assertTrue(ThesisAssistantService.isPrerequisiteQuery("mon tien quyet cua AI401 la gi?"));
+        assertTrue(ThesisAssistantService.isPrerequisiteQuery("What are the prerequisites of SE405?"));
+        assertTrue(!ThesisAssistantService.isPrerequisiteQuery("Tiên quyết là gì?"));
+        assertTrue(!ThesisAssistantService.isPrerequisiteQuery("Học phần học trước là sao?"));
+
+        // The per-course answer extracts the named course's section from the
+        // generated map and refuses a course the map does not list honestly.
+        var map = new ThesisAssistantKnowledgeRepository.KnowledgeDocument(
+                "map-doc", "catalog-prerequisite-map-vi", "vi",
+                "Bản đồ học phần tiên quyết toàn trường",
+                "## Danh sách chi tiết\n\n- **SE421** — Kiến trúc phần mềm nâng cao\n  - Học phần tiên quyết: SE405 — Kiến trúc phần mềm\n- **AI401** — Học sâu\n  - Học phần tiên quyết: SE411 — Nhập môn trí tuệ nhân tạo\n\n## Lưu ý\n\n- Ngưỡng áp dụng mức Đạt (D).",
+                "campuscore-prerequisite-map", "ACADEMIC_CATALOG", UUID.randomUUID(), 1);
+        String answer = ThesisAssistantService.prerequisiteAnswer("Học phần SE421 có môn tiên quyết gì?", map);
+        assertTrue(answer.contains("SE405"), "the answer must list the required course");
+        assertTrue(answer.contains("SE421"));
+        assertTrue(!answer.contains("AI401"), "other courses' chains must not leak into the answer");
+        String headAnswer = ThesisAssistantService.prerequisiteAnswer("Tiên quyết của SE401 là gì?", map);
+        assertTrue(headAnswer.contains("không có học phần tiên quyết"));
+        assertTrue(ThesisAssistantService.isPrerequisiteMapDocument(map));
+        var policyDoc = new ThesisAssistantKnowledgeRepository.KnowledgeDocument(
+                "policy-doc", "prerequisite-prior-corequisite-vi", "vi",
+                "Học phần tiên quyết, học phần học trước và học phần song hành",
+                "Quy định chung về học phần điều kiện.",
+                "campuscore-academic-regulations", "POLICY", UUID.randomUUID(), 1);
+        assertTrue(!ThesisAssistantService.isPrerequisiteMapDocument(policyDoc));
         assertTrue(ThesisAssistantService.retrievalTerms("When can I enroll in classes?").contains("registration"));
         assertTrue(ThesisAssistantService.retrievalTerms("When can I enroll in classes?").contains("sections"));
         assertTrue(ThesisAssistantService.retrievalTerms("Khi nao dang ky hoc phan?").contains("đăng ký"));

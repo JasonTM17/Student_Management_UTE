@@ -130,7 +130,8 @@ final class AcademicCatalogLocalizer {
                 course.isActive(),
                 course.createdAt(),
                 course.updatedAt(),
-                department);
+                department,
+                course.requirements());
     }
 
     static CurriculumResponse hydrateCurriculum(CurriculumResponse curriculum) {

@@ -68,6 +68,23 @@ class AcademicEnrollmentMutationPersistenceTest {
     void prepareFixture() {
         jdbc.execute("CREATE SCHEMA IF NOT EXISTS \"campuscore_auth\"");
         jdbc.execute("CREATE SCHEMA IF NOT EXISTS \"academic\"");
+        // Credit-limit review records the admin audit trail (two-write rule):
+        // without this DDL the review endpoint 500s in this standalone fixture.
+        jdbc.execute("CREATE SCHEMA IF NOT EXISTS \"campuscore_audit\"");
+        jdbc.execute("""
+                CREATE TABLE IF NOT EXISTS campuscore_audit."AdminAudit" (
+                    "id" VARCHAR(120) PRIMARY KEY,
+                    "actorId" VARCHAR(120),
+                    "actorLabel" VARCHAR(240),
+                    "action" VARCHAR(48) NOT NULL,
+                    "entityType" VARCHAR(48) NOT NULL,
+                    "entityId" VARCHAR(120),
+                    "summary" VARCHAR(500),
+                    "beforeState" TEXT,
+                    "afterState" TEXT,
+                    "createdAt" TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP
+                )
+                """);
         createTables();
         clearTables();
         insertFixture();
@@ -166,6 +183,112 @@ class AcademicEnrollmentMutationPersistenceTest {
                         "student-1",
                         sha256))
                 .isEqualTo(1);
+    }
+
+    @Test
+    void prerequisiteGateBlocksRegistrationUntilTheRequiredCourseIsCompleted() throws Exception {
+        // course-open (SE402) requires course-overlap (SE403) as a PREREQ.
+        jdbc.update(
+                "INSERT INTO \"academic\".\"CourseRequirement\""
+                        + " (\"id\", \"courseId\", \"requiredCourseId\", \"kind\", \"minLetterGrade\")"
+                        + " VALUES ('req-test-prereq', 'course-open', 'course-overlap', 'PREREQ', 'D')");
+
+        // No completed SE403 pass: registration is refused with the contract code.
+        mvc.perform(post("/api/v1/enrollments/enroll")
+                        .with(studentJwt("student-user-1", "student-1"))
+                        .header("Idempotency-Key", "enroll-prereq-blocked")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"sectionId\":\"section-open\"}"))
+                .andExpect(status().isUnprocessableEntity())
+                .andExpect(jsonPath("$.code").value("PREREQUISITE_UNMET"));
+        assertThat(jdbc.queryForObject(
+                        "SELECT COUNT(*) FROM \"academic\".\"Enrollment\" WHERE \"sectionId\" = 'section-open'",
+                        Integer.class))
+                .isEqualTo(0);
+
+        // A completed passing SE403 enrollment (any grade above F/W) unlocks it.
+        seedCompletedEnrollment("enrollment-prereq-pass", "section-overlap", "course-overlap", "D");
+
+        mvc.perform(post("/api/v1/enrollments/enroll")
+                        .with(studentJwt("student-user-1", "student-1"))
+                        .header("Idempotency-Key", "enroll-prereq-met")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"sectionId\":\"section-open\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("ENROLLED"));
+    }
+
+    @Test
+    void corequisiteGateRequiresAConcurrentEnrollmentInThePairedCourse() throws Exception {
+        // section-two (SE404) carries no schedules, so the paired enrollment
+        // cannot trip the schedule-overlap conflict (409) instead of the gate.
+        jdbc.update(
+                "INSERT INTO \"academic\".\"CourseRequirement\""
+                        + " (\"id\", \"courseId\", \"requiredCourseId\", \"kind\", \"minLetterGrade\")"
+                        + " VALUES ('req-test-coreq', 'course-open', 'course-two', 'COREQ', null)");
+
+        mvc.perform(post("/api/v1/enrollments/enroll")
+                        .with(studentJwt("student-user-1", "student-1"))
+                        .header("Idempotency-Key", "enroll-coreq-blocked")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"sectionId\":\"section-open\"}"))
+                .andExpect(status().isUnprocessableEntity())
+                .andExpect(jsonPath("$.code").value("COREQUISITE_UNMET"));
+
+        // An ACTIVE concurrent enrollment in the paired course satisfies the coreq.
+        seedActiveEnrollment("enrollment-coreq-active", "section-two", "course-two");
+
+        mvc.perform(post("/api/v1/enrollments/enroll")
+                        .with(studentJwt("student-user-1", "student-1"))
+                        .header("Idempotency-Key", "enroll-coreq-met")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"sectionId\":\"section-open\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("ENROLLED"));
+    }
+
+    @Test
+    void legacyPrerequisiteSpellingDoesNotGateRegistrationAfterTheV97Normalization() throws Exception {
+        // V97 normalizes seeded data to 'PREREQ'; the enforcement contract is
+        // an exact match, so a row still spelled 'PREREQUISITE' (unmigrated
+        // data) must NOT gate — this pins the exact-match contract the
+        // migration relies on.
+        jdbc.update(
+                "INSERT INTO \"academic\".\"CourseRequirement\""
+                        + " (\"id\", \"courseId\", \"requiredCourseId\", \"kind\", \"minLetterGrade\")"
+                        + " VALUES ('req-test-legacy', 'course-open', 'course-overlap', 'PREREQUISITE', 'D')");
+
+        mvc.perform(post("/api/v1/enrollments/enroll")
+                        .with(studentJwt("student-user-1", "student-1"))
+                        .header("Idempotency-Key", "enroll-legacy-kind")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"sectionId\":\"section-open\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("ENROLLED"));
+    }
+
+    /** Seeds one completed, passing enrollment used to satisfy a PREREQ check. */
+    private void seedCompletedEnrollment(String id, String sectionId, String courseId, String letterGrade) {
+        LocalDateTime now = localDateTime(BASE_TIME);
+        jdbc.update(
+                "INSERT INTO \"academic\".\"Enrollment\""
+                        + " (\"id\", \"studentId\", \"sectionId\", \"semesterId\", \"status\", \"enrolledAt\","
+                        + " \"gradeStatus\", \"courseId\", \"letterGrade\", \"creditsSnapshot\", \"version\")"
+                        + " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                id, "student-1", sectionId, "semester-0", "COMPLETED", now,
+                "PUBLISHED", courseId, letterGrade, 3, 0);
+    }
+
+    /** Seeds one active enrollment used to satisfy a COREQ check. */
+    private void seedActiveEnrollment(String id, String sectionId, String courseId) {
+        LocalDateTime now = localDateTime(BASE_TIME);
+        jdbc.update(
+                "INSERT INTO \"academic\".\"Enrollment\""
+                        + " (\"id\", \"studentId\", \"sectionId\", \"semesterId\", \"status\", \"enrolledAt\","
+                        + " \"gradeStatus\", \"courseId\", \"creditsSnapshot\", \"version\")"
+                        + " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                id, "student-1", sectionId, "semester-1", "ENROLLED", now,
+                "NOT_GRADED", courseId, 3, 0);
     }
 
     @Test

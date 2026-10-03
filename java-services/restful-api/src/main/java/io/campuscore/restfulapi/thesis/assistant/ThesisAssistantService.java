@@ -719,8 +719,23 @@ public class ThesisAssistantService {
         ChatResponse lexical;
         try {
             final String normalized = AssistantInputGuard.normalizeMessage(message);
+            // Same propagation contract as the fast path: the knowledge search
+            // resolves the caller's identity from the SecurityContext, which a
+            // pooled ForkJoin worker does not inherit — without the snapshot
+            // the local-KB fallback tier silently degraded to curated content.
+            var securityContext = org.springframework.security.core.context.SecurityContextHolder.getContext();
             lexical = java.util.concurrent.CompletableFuture
-                    .supplyAsync(() -> lexicalAnswer(normalized, normalizedLocale, scope))
+                    .supplyAsync(() -> {
+                        var snapshot = new org.springframework.security.core.context.SecurityContextImpl(
+                                securityContext.getAuthentication());
+                        var previous = org.springframework.security.core.context.SecurityContextHolder.getContext();
+                        org.springframework.security.core.context.SecurityContextHolder.setContext(snapshot);
+                        try {
+                            return lexicalAnswer(normalized, normalizedLocale, scope);
+                        } finally {
+                            org.springframework.security.core.context.SecurityContextHolder.setContext(previous);
+                        }
+                    })
                     .get(LOCAL_FALLBACK_BUDGET_MS, java.util.concurrent.TimeUnit.MILLISECONDS);
         } catch (InterruptedException exception) {
             Thread.currentThread().interrupt();
@@ -971,9 +986,30 @@ public class ThesisAssistantService {
         if (normalized.length() > properties.maxMessageChars()) return null;
         String normalizedLocale = AssistantInputGuard.normalizeLocale(locale);
         LexicalResult result;
+        // The retrieval runs off the servlet thread, but the knowledge search
+        // sits behind an RLS boundary that resolves the caller's identity from
+        // the SecurityContext. ForkJoin workers are pooled and do not inherit
+        // it, so the fast path used to succeed or fail depending on which
+        // worker happened to pick the task (course-code questions that widened
+        // the window were the reproducible victims). Carry the caller's
+        // context into the task explicitly and clear it afterwards.
+        var securityContext = org.springframework.security.core.context.SecurityContextHolder.getContext();
         try {
             result = java.util.concurrent.CompletableFuture
-                    .supplyAsync(() -> retrieve(normalized, normalizedLocale, scope))
+                    .supplyAsync(() -> {
+                        // Install a snapshot, not the caller's live instance: on
+                        // a slow retrieval the servlet thread may swap or clear
+                        // its own context while this worker is still reading.
+                        var snapshot = new org.springframework.security.core.context.SecurityContextImpl(
+                                securityContext.getAuthentication());
+                        var previous = org.springframework.security.core.context.SecurityContextHolder.getContext();
+                        org.springframework.security.core.context.SecurityContextHolder.setContext(snapshot);
+                        try {
+                            return retrieve(normalized, normalizedLocale, scope);
+                        } finally {
+                            org.springframework.security.core.context.SecurityContextHolder.setContext(previous);
+                        }
+                    })
                     .get(LOCAL_FALLBACK_BUDGET_MS, java.util.concurrent.TimeUnit.MILLISECONDS);
         } catch (InterruptedException exception) {
             Thread.currentThread().interrupt();
@@ -984,7 +1020,20 @@ public class ThesisAssistantService {
             return null;
         }
         if (result.error() || result.documents().isEmpty()) return null;
-        if (result.documents().get(0).lexicalScore() < properties.lexicalConfidentScore()) return null;
+        ThesisAssistantKnowledgeRepository.KnowledgeDocument top = result.documents().get(0);
+        // A per-course prerequisite question with the generated map on top is
+        // answered deterministically regardless of the score gate: the map is
+        // machine-generated from the requirement table, and the provider path
+        // cannot be trusted with it — the map exceeds the context budget and
+        // truncation silently dropped the requested course's section.
+        if (isPrerequisiteQuery(normalized) && isPrerequisiteMapDocument(top)) {
+            String section = prerequisiteAnswer(normalized, top);
+            if (section != null) {
+                return new ChatResponse(normalizeAssistantCopy(section, normalizedLocale), FAST_PATH_MODEL,
+                        false, "ANSWERED", normalizedLocale, primaryCitations(result.citations()));
+            }
+        }
+        if (top.lexicalScore() < properties.lexicalConfidentScore()) return null;
         return new ChatResponse(result.answer(), FAST_PATH_MODEL, false, "ANSWERED",
                 normalizedLocale, primaryCitations(result.citations()));
     }
@@ -1500,7 +1549,7 @@ public class ThesisAssistantService {
         // filter runs. A noisy top-five window could otherwise hide the one
         // authoritative credit-limit document behind broad "học kỳ" matches.
         int topK = topK();
-        int retrievalLimit = isCreditLimitQuery(message) ? topK * 2 : topK;
+        int retrievalLimit = isCreditLimitQuery(message) || isPrerequisiteQuery(message) ? topK * 2 : topK;
         try {
             // Unscoped retrieval keeps the historical three-argument call so the
             // published contract (and its tests) stays byte-identical; only the
@@ -1527,16 +1576,57 @@ public class ThesisAssistantService {
                             sourceId, sourceId, locale, row.title(), row.text(), "academic-catalog", row.entityType(), row.entityId(), row.updatedAt() == null ? null : row.updatedAt().toInstant());
                     if (isPublicKnowledgeSafe(candidate) && seen.add(sourceId)) documents.add(candidate);
                 }
-            } catch (DataAccessException ignored) {
+            } catch (DataAccessException | DomainException ignored) {
                 // Public catalog is an additive adapter. A catalog outage must not
                 // discard a valid curated answer or leak a database error to clients.
+                // DomainException: the catalog search resolves the RLS identity, and
+                // the async fast-path thread carries no SecurityContext — that used
+                // to blow up the whole lexical window for course-code questions
+                // (the only ones that fell below the window and entered the adapter).
             }
         }
-        documents = documents.stream().filter(document -> containsAnyTerm(document, terms)).limit(topK).toList();
+        // Prerequisite questions carry noisy short tokens ("có", "môn"), so the
+        // map may rank past the default window; keep the widened candidate set
+        // for them exactly like the search limit above does.
+        documents = documents.stream().filter(document -> containsAnyTerm(document, terms))
+                .limit(isPrerequisiteQuery(message) ? topK * 2 : topK).toList();
         if (isCreditLimitQuery(message)) {
             documents = documents.stream()
                     .filter(ThesisAssistantService::isCreditLimitDocument)
                     .toList();
+        } else if (isPrerequisiteQuery(message)) {
+            // A per-course prerequisite question must be answered from the
+            // generated map, not from whichever policy document also says
+            // "tiên quyết" in its title. Fail open: without the map in the
+            // window (fresh DB, missing migration) the policy doc keeps
+            // answering the generic rule.
+            List<ThesisAssistantKnowledgeRepository.KnowledgeDocument> prerequisiteDocuments = documents.stream()
+                    .filter(ThesisAssistantService::isPrerequisiteMapDocument)
+                    .toList();
+            if (prerequisiteDocuments.isEmpty()) {
+                // Deterministic code lookup: generic ranking noise (short
+                // tokens such as "có"/"môn") can bury the map behind broader
+                // documents, and only the map carries the requested course
+                // code, so a code-only re-search usually surfaces it. The
+                // addDocuments seen-set skips a map that the first pass
+                // already fetched but the window cut — behavior then degrades
+                // honestly to the policy answer instead of a wrong citation.
+                String courseCode = firstCourseCode(message);
+                if (courseCode != null) {
+                    try {
+                        addDocuments(documents, seen, knowledge.search(locale,
+                                List.of(foldForMatching(courseCode)), 3));
+                    } catch (DataAccessException ignored) {
+                        // The window stays as-is; the caller degrades honestly.
+                    }
+                    prerequisiteDocuments = documents.stream()
+                            .filter(ThesisAssistantService::isPrerequisiteMapDocument)
+                            .toList();
+                }
+            }
+            if (!prerequisiteDocuments.isEmpty()) {
+                documents = prerequisiteDocuments;
+            }
         } else if (isCourseRegistrationQuery(message)) {
             List<ThesisAssistantKnowledgeRepository.KnowledgeDocument> registrationDocuments = documents.stream()
                     .filter(document -> "REGISTRATION".equalsIgnoreCase(safe(document.domain())))
@@ -1553,7 +1643,7 @@ public class ThesisAssistantService {
                 .limit(PROMPT_DOCUMENT_LIMIT).toList();
         List<Citation> citations = promptDocuments.stream().map(ThesisAssistantService::citation).toList();
         String answer = normalizeAssistantCopy(documents.isEmpty() ? noMatchMessage(locale)
-                : answerFromDocument(message, documents.get(0)), locale);
+                : lexicalAnswerFor(message, documents.get(0)), locale);
         String context = buildGroundedContext(promptDocuments,
                 properties == null ? Integer.MAX_VALUE : properties.maxContextChars());
         List<String> sourceIds = citations.stream().map(Citation::sourceId).filter(value -> value != null && !value.isBlank()).toList();
@@ -1641,6 +1731,89 @@ public class ThesisAssistantService {
         if (message == null || message.isBlank()) return false;
         String folded = foldForMatching(message);
         return CREDIT_SIGNAL.matcher(folded).find() && CREDIT_LIMIT_SIGNAL.matcher(folded).find();
+    }
+
+    /**
+     * A per-course prerequisite question names a course code and asks about its
+     * "tiên quyết" chain ("SE421 có môn tiên quyết gì?"). The code term alone
+     * contributes at most a couple of retrieval points, so without this scoped
+     * selection the generic policy document — whose title repeats the phrase —
+     * outranks the generated map and the answer degrades to "chưa công bố".
+     */
+    static boolean isPrerequisiteQuery(String message) {
+        if (message == null || message.isBlank()) return false;
+        if (!COURSE_CODE.matcher(message).find()) return false;
+        String folded = foldForMatching(message);
+        return folded.contains("tien quyet")
+                || folded.contains("mon tien quyet")
+                || folded.contains("hoc phan tien quyet")
+                || folded.contains("prerequisite");
+    }
+
+    static boolean isPrerequisiteMapDocument(ThesisAssistantKnowledgeRepository.KnowledgeDocument document) {
+        return document != null && "campuscore-prerequisite-map".equals(document.source());
+    }
+
+    /** First course-code token in the message (SE421, AI401, ...), or null. */
+    static String firstCourseCode(String message) {
+        if (message == null) return null;
+        java.util.regex.Matcher code = COURSE_CODE.matcher(message);
+        return code.find() ? code.group() : null;
+    }
+
+    /**
+     * Answers a per-course prerequisite question from the generated map's own
+     * section for the named course: deterministic, provider-free, and always
+     * in sync with the registration table the map was generated from. Returns
+     * null when the map has no section for the requested code so the caller
+     * falls back to the full document.
+     */
+    static String prerequisiteAnswer(String message,
+            ThesisAssistantKnowledgeRepository.KnowledgeDocument document) {
+        java.util.regex.Matcher code = COURSE_CODE.matcher(message);
+        if (!code.find()) return null;
+        String requested = code.group().toUpperCase(java.util.Locale.ROOT);
+        String content = safe(document.content());
+        java.util.regex.Matcher section = java.util.regex.Pattern
+                .compile("(?m)^- \\*\\*" + java.util.regex.Pattern.quote(requested) + "\\*\\*")
+                .matcher(content);
+        if (!section.find()) {
+            // The map is generated from the full requirement table, so a
+            // missing section means the course is a chain head — state that
+            // honestly instead of falling back to the whole map.
+            return "vi".equals(document.locale())
+                    ? "Theo bảng ràng buộc đăng ký hiện hành, học phần " + requested
+                            + " **không có học phần tiên quyết** — bạn có thể đăng ký trực tiếp khi lớp mở."
+                    : "Under the current registration requirements, " + requested
+                            + " **has no prerequisite** — you can register it directly when a section opens.";
+        }
+        int end = content.length();
+        java.util.regex.Matcher next = java.util.regex.Pattern
+                .compile("(?m)^- \\*\\*|^## ")
+                .matcher(content);
+        next.region(section.end(), content.length());
+        if (next.find()) end = next.start();
+        String body = content.substring(section.start(), end).strip();
+        if ("vi".equals(document.locale())) {
+            return "Học phần tiên quyết của **" + requested + "** (theo bảng ràng buộc đăng ký):\n\n"
+                    + body
+                    + "\n\nBạn phải hoàn thành và đạt học phần tiên quyết (không tính F/W) trước khi được đăng ký "
+                    + requested + ".";
+        }
+        return "Prerequisites of **" + requested + "** (from the registration requirements):\n\n"
+                + body
+                + "\n\nYou must complete the prerequisite with a passing grade (F/W do not count) before registering "
+                + requested + ".";
+    }
+
+    /** Picks the per-course map section when the question names a course. */
+    private static String lexicalAnswerFor(String message,
+            ThesisAssistantKnowledgeRepository.KnowledgeDocument document) {
+        if (isPrerequisiteQuery(message) && isPrerequisiteMapDocument(document)) {
+            String section = prerequisiteAnswer(message, document);
+            if (section != null) return section;
+        }
+        return answerFromDocument(message, document);
     }
 
     /**

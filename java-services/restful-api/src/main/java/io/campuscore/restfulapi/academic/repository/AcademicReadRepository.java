@@ -5,6 +5,7 @@ import io.campuscore.restfulapi.common.LikePattern;
 import io.campuscore.restfulapi.academic.web.AcademicReadDtos.AcademicYearResponse;import io.campuscore.restfulapi.academic.web.AcademicReadDtos.ClassroomResponse;
 import io.campuscore.restfulapi.academic.web.AcademicReadDtos.ClassroomSectionSummary;
 import io.campuscore.restfulapi.academic.web.AcademicReadDtos.CourseResponse;
+import io.campuscore.restfulapi.academic.web.AcademicReadDtos.CourseRequirementSummary;
 import io.campuscore.restfulapi.academic.web.AcademicReadDtos.CurriculumCourseSummary;
 import io.campuscore.restfulapi.academic.web.AcademicReadDtos.CurriculumResponse;
 import io.campuscore.restfulapi.academic.web.AcademicReadDtos.DepartmentLecturerSummary;
@@ -705,7 +706,33 @@ public class AcademicReadRepository {
                 resultSet.getBoolean("isActive"),
                 instant(resultSet.getTimestamp("createdAt")),
                 instant(resultSet.getTimestamp("updatedAt")),
-                department);
+                department,
+                List.of());
+    }
+
+    /**
+     * Prerequisite chains for one course (detail endpoint only). Rows come
+     * from academic."CourseRequirement" with the required course's identity
+     * hydrated so the client can render "Tiên quyết: SE403 — ..." chips
+     * without a second lookup per entry.
+     */
+    public List<CourseRequirementSummary> findCourseRequirements(String courseId) {
+        return jdbc.query(
+                "SELECT req.\"requiredCourseId\", c.\"code\", c.\"name\", c.\"nameEn\", c.\"nameVi\","
+                        + " req.\"kind\", req.\"minLetterGrade\""
+                        + " FROM academic.\"CourseRequirement\" req"
+                        + " JOIN academic.\"Course\" c ON c.\"id\" = req.\"requiredCourseId\""
+                        + " WHERE req.\"courseId\" = :courseId"
+                        + " ORDER BY c.\"code\"",
+                new MapSqlParameterSource("courseId", courseId),
+                (resultSet, ignored) -> new CourseRequirementSummary(
+                        resultSet.getString("requiredCourseId"),
+                        resultSet.getString("code"),
+                        resultSet.getString("name"),
+                        resultSet.getString("nameEn"),
+                        resultSet.getString("nameVi"),
+                        resultSet.getString("kind"),
+                        resultSet.getString("minLetterGrade")));
     }
 
     private static CurriculumResponse mapCurriculum(ResultSet resultSet, int ignored)
@@ -813,6 +840,27 @@ public class AcademicReadRepository {
     }
 
     /**
+     * Flattened prerequisite codes (one row per requirement) for the given
+     * courses — feeds the curriculum plan's "Tiên quyết" chips in one query
+     * instead of one detail lookup per course.
+     */
+    public List<PrerequisiteCodeRow> findPrerequisiteCodesByCourseIds(List<String> courseIds) {
+        if (courseIds.isEmpty()) {
+            return List.of();
+        }
+        return jdbc.query(
+                "SELECT req.\"courseId\", c.\"code\" AS required_code"
+                        + " FROM academic.\"CourseRequirement\" req"
+                        + " JOIN academic.\"Course\" c ON c.\"id\" = req.\"requiredCourseId\""
+                        + " WHERE req.\"kind\" = 'PREREQ' AND req.\"courseId\" IN (:courseIds)"
+                        + " ORDER BY req.\"courseId\", c.\"code\"",
+                new MapSqlParameterSource("courseIds", courseIds),
+                (rs, ignored) -> new PrerequisiteCodeRow(
+                        rs.getString("courseId"),
+                        rs.getString("required_code")));
+    }
+
+    /**
      * Best progress per course for a student: 2 = passed/completed, 1 = active
      * enrollment, 0 = touched but not running (dropped/cancelled/failed).
      */
@@ -857,6 +905,11 @@ public class AcademicReadRepository {
             int progressLevel,
             java.math.BigDecimal finalGrade,
             String letterGrade) {
+    }
+
+    public record PrerequisiteCodeRow(
+            String courseId,
+            String requiredCode) {
     }
 
     private static Instant instant(Timestamp timestamp) {

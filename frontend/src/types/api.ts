@@ -90,6 +90,8 @@ export interface Course {
   isActive: boolean;
   createdAt: string;
   department?: Department;
+  /** Detail endpoint only: prerequisite chains from CourseRequirement. */
+  requirements?: CourseRequirementSummary[];
 }
 
 export interface Section {
@@ -399,6 +401,18 @@ export interface MyCurriculumCourse {
   status: 'COMPLETED' | 'IN_PROGRESS' | 'NOT_STARTED';
   finalGrade?: number | null;
   letterGrade?: string | null;
+  /** Required course codes (kind=PREREQ) from the registration requirement table. */
+  prerequisites?: string[];
+}
+
+export interface CourseRequirementSummary {
+  requiredCourseId: string;
+  code: string;
+  name: string;
+  nameEn?: string | null;
+  nameVi?: string | null;
+  kind: string;
+  minLetterGrade?: string | null;
 }
 
 export interface MyCurriculumResponse {

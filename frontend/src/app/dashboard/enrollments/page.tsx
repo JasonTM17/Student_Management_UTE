@@ -93,6 +93,8 @@ export default function EnrollmentsPage() {
           semesterPrefix: 'Học kỳ',
           mandatory: 'Bắt buộc',
           elective: 'Tự chọn',
+          prerequisiteChip: 'Tiên quyết:',
+          prerequisiteHint: 'Phải hoàn thành và đạt trước khi đăng ký môn này',
           creditsLabel: 'tín chỉ',
           gradeScore: 'Điểm',
           noCurriculumCourses: 'Không có môn học nào thuộc nhóm trạng thái này.',
@@ -143,6 +145,8 @@ export default function EnrollmentsPage() {
           semesterPrefix: 'Semester',
           mandatory: 'Mandatory',
           elective: 'Elective',
+          prerequisiteChip: 'Prerequisites:',
+          prerequisiteHint: 'Must be completed with a passing grade before registering this course',
           creditsLabel: 'credits',
           gradeScore: 'Grade',
           noCurriculumCourses: 'No courses found for the selected status filter.',
@@ -646,6 +650,22 @@ export default function EnrollmentsPage() {
                                     <h4 className="mt-1 font-medium text-foreground">
                                       {courseTitle}
                                     </h4>
+                                    {course.prerequisites && course.prerequisites.length > 0 ? (
+                                      <p
+                                        className="mt-1.5 flex flex-wrap items-center gap-1.5 text-[11px] text-muted-foreground"
+                                        title={copy.prerequisiteHint}
+                                      >
+                                        <span className="font-medium">{copy.prerequisiteChip}</span>
+                                        {course.prerequisites.map((code) => (
+                                          <span
+                                            key={code}
+                                            className="rounded bg-secondary px-1.5 py-0.5 font-mono text-[10px] font-semibold text-foreground"
+                                          >
+                                            {code}
+                                          </span>
+                                        ))}
+                                      </p>
+                                    ) : null}
                                   </div>
 
                                   <div className="flex shrink-0 items-center gap-2">

@@ -44,6 +44,17 @@ class AcademicReadPersistenceTest {
         // The account-state filter reads these columns on every authenticated
         // request, so the read-only fixture mirrors the production schema.
         jdbc.execute("CREATE SCHEMA IF NOT EXISTS \"campuscore_auth\"");
+        // The course-detail endpoint joins the requirement table for the
+        // prerequisite chips; without it the detail route 500s in this fixture.
+        jdbc.execute("""
+                CREATE TABLE IF NOT EXISTS "academic"."CourseRequirement" (
+                    "id" VARCHAR(120) PRIMARY KEY,
+                    "courseId" VARCHAR(120) NOT NULL,
+                    "requiredCourseId" VARCHAR(120) NOT NULL,
+                    "kind" VARCHAR(16) NOT NULL,
+                    "minLetterGrade" VARCHAR(16)
+                )
+                """);
         jdbc.execute("""
                 CREATE TABLE IF NOT EXISTS "campuscore_auth"."User" (
                     "id" VARCHAR(120) PRIMARY KEY,

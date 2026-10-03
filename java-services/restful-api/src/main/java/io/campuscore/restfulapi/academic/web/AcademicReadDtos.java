@@ -199,6 +199,16 @@ public final class AcademicReadDtos {
             List<SemesterCatalogSummary> semesters) {
     }
 
+    public record CourseRequirementSummary(
+            String requiredCourseId,
+            String code,
+            String name,
+            String nameEn,
+            String nameVi,
+            String kind,
+            String minLetterGrade) {
+    }
+
     public record CourseResponse(
             String id,
             String code,
@@ -216,7 +226,15 @@ public final class AcademicReadDtos {
             Instant createdAt,
             @JsonFormat(shape = JsonFormat.Shape.STRING, pattern = "yyyy-MM-dd'T'HH:mm:ss.SSSX", timezone = "UTC")
             Instant updatedAt,
-            DepartmentSummary department) {
+            DepartmentSummary department,
+            List<CourseRequirementSummary> requirements) {
+
+        /** Populated only on the detail endpoint; list rows carry an empty list. */
+        public CourseResponse withRequirements(List<CourseRequirementSummary> requirements) {
+            return new CourseResponse(id, code, name, nameEn, nameVi, description, descriptionEn,
+                    descriptionVi, credits, departmentId, semesterId, isActive, createdAt, updatedAt,
+                    department, requirements);
+        }
     }
 
     public record CurriculumCourseSummary(
@@ -279,7 +297,8 @@ public final class AcademicReadDtos {
             boolean isMandatory,
             String status,
             java.math.BigDecimal finalGrade,
-            String letterGrade) {
+            String letterGrade,
+            List<String> prerequisites) {
     }
 
     public record ClassroomSectionSummary(
