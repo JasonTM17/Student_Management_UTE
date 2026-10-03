@@ -1587,9 +1587,12 @@ public class ThesisAssistantService {
         }
         // Prerequisite questions carry noisy short tokens ("có", "môn"), so the
         // map may rank past the default window; keep the widened candidate set
-        // for them exactly like the search limit above does.
-        documents = documents.stream().filter(document -> containsAnyTerm(document, terms))
-                .limit(isPrerequisiteQuery(message) ? topK * 2 : topK).toList();
+        // for them exactly like the search limit above does. The wrapper list
+        // must stay MUTABLE: the prerequisite code-lookup adds re-searched
+        // documents into this list downstream, and Stream.toList() yields an
+        // immutable one (UnsupportedOperationException at addDocuments).
+        documents = new ArrayList<>(documents.stream().filter(document -> containsAnyTerm(document, terms))
+                .limit(isPrerequisiteQuery(message) ? topK * 2 : topK).toList());
         if (isCreditLimitQuery(message)) {
             documents = documents.stream()
                     .filter(ThesisAssistantService::isCreditLimitDocument)
