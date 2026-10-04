@@ -147,7 +147,9 @@ test.describe('public and auth', () => {
     await page.getByRole('tab', { name: /^admin$/i }).click();
     await expect(page.locator('[data-login-portal="admin"]')).toBeVisible();
     await expect(page.getByRole('heading', { name: /operations sign-in/i })).toBeVisible();
-    await expect(page.locator('form').getByText(/campus operations/i)).toBeVisible();
+    // The office-support hint is intentionally hidden on the admin portal —
+    // its absence is part of the distinct admin chrome.
+    await expect(page.locator('form').getByText(/campus operations|faculty office|academic office/i)).toHaveCount(0);
   });
 
   test('student credentials are rejected on the admin portal', async ({ page }) => {

@@ -570,10 +570,10 @@ test('demo polish: grade rows open API-backed midterm and final breakdown', asyn
   // renders through GRADE_ITEM_LABELS and the Grade Point cell uses toFixed(1).
   await expect(dialog.getByText('Course Grade Components (50% In-Course + 50% Final)')).toBeVisible();
   await expect(dialog.getByRole('row', {
-    name: /Midterm Exam MIDTERM 40% 8\.4 \/ 10/,
+    name: /Midterm Exam 40% 8\.4 \/ 10/,
   })).toBeVisible();
   await expect(dialog.getByRole('row', {
-    name: /Final exam score \(50%\) FINAL 60% 8\.8 \/ 10/,
+    name: /Final exam score \(50%\) 60% 8\.8 \/ 10/,
   })).toBeVisible();
   await expect(dialog.getByText('3.5', { exact: true })).toBeVisible();
   await noOverflow(page);
@@ -585,8 +585,8 @@ test('demo polish: thesis member details render and add-member form stays concis
   await page.goto('/en/dashboard/thesis');
   const main = page.locator('#dashboard-main-content');
 
-  // Standardized 3-4 group policy (V67/V72): the card renders '{count}/4 members'.
-  await expect(main.getByText('2/4 members')).toBeVisible();
+  // Standardized 1-3 group policy (V100/V101): the card renders '{count}/3 members'.
+  await expect(main.getByText('2/3 members')).toBeVisible();
   await expect(main.getByText('Demo Student', { exact: true })).toBeVisible();
   await expect(main.getByText('S20240001', { exact: true })).toBeVisible();
   await expect(main.getByText('demo@example.test', { exact: true })).toBeVisible();

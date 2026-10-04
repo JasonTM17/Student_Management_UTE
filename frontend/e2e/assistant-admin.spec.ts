@@ -411,8 +411,8 @@ test('authenticated admin can inspect reviewed guidance and public coverage', as
   await expect(page).toHaveURL(/\/admin(?:$|[/?#])/);
   await page.goto('/admin/assistant-knowledge');
 
-  await expect(page.getByRole('heading', { name: /CampusCore knowledge|Kho kiến thức CampusCore/i })).toBeVisible();
-  await expect(page.getByText(/Public CampusCore guidance|Phạm vi nội dung CampusCore công khai/i)).toBeVisible();
+  await expect(page.getByRole('heading', { name: /CampusUTE knowledge|Kho kiến thức CampusUTE/i })).toBeVisible();
+  await expect(page.getByText(/Public CampusUTE guidance|Phạm vi nội dung CampusUTE công khai/i)).toBeVisible();
   await expect(page.getByText('How to use the thesis assistant')).toBeVisible();
   await expect(page.getByText(/Published|Đã xuất bản/i).first()).toBeVisible();
 

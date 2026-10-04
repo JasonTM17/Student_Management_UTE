@@ -26,6 +26,12 @@ assistant:
     enabled: false
 
 spring:
+  test:
+    mockmvc:
+      # The default printing handler iterates live response headers while the
+      # SSE producer thread is still writing them — a real
+      # ConcurrentModificationException race in async stream tests.
+      print: NONE
   datasource:
     url: jdbc:h2:mem:restful_api;MODE=PostgreSQL;DATABASE_TO_LOWER=TRUE;DB_CLOSE_DELAY=-1
     username: sa
