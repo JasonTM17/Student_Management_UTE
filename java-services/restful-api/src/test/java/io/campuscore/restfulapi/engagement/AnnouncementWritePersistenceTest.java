@@ -350,7 +350,7 @@ class AnnouncementWritePersistenceTest {
     @Test
     void auditUsesHumanNameWhenTheTokenProvidesOneAndKeepsActorId() throws Exception {
         mvc.perform(post("/api/v1/announcements")
-                        .with(namedAdminJwt("admin-named", "Nguyễn", "Quản trị"))
+                        .with(namedAdminJwt("admin-named", "Trị", "Nguyễn Quản"))
                         .contentType("application/json")
                         .content("{\"title\":\"Named audit\",\"content\":\"Visible notice\"}"))
                 .andExpect(status().isCreated());
@@ -360,7 +360,7 @@ class AnnouncementWritePersistenceTest {
                         + " WHERE \"action\" = 'CREATED' AND \"actorId\" = 'admin-named'");
         org.junit.jupiter.api.Assertions.assertEquals("admin-named", audit.get("actorId"));
         org.junit.jupiter.api.Assertions.assertEquals(
-                "Nguyễn Quản trị · admin-named@campuscore.edu",
+                "Nguyễn Quản Trị · admin-named@campuscore.edu",
                 audit.get("actorLabel"));
     }
 
