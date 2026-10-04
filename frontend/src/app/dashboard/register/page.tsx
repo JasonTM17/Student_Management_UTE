@@ -8,6 +8,7 @@ import {
   CheckCircle2,
   ChevronDown,
   Clock3,
+  FileDown,
   Filter,
   Search,
   Send,
@@ -20,6 +21,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useRequireAuth } from '@/context/AuthContext';
 import { useI18n } from '@/i18n';
 import {
+  downloadRegistrationSlipPdf,
   enrollmentsApi,
   registrationApi,
   type CreditLimitApplication,
@@ -135,6 +137,7 @@ export default function RegisterPage() {
   // Feedback item 10: enrollment failures also render inline above the
   // catalog instead of vanishing with the toast.
   const [actionError, setActionError] = useState('');
+  const [downloadingSlip, setDownloadingSlip] = useState(false);
 
   // ---- filters persist in the URL (Advisor #8): read once on mount, then
   // mirror every change back with router.replace so copying the URL
@@ -623,6 +626,20 @@ export default function RegisterPage() {
     }
   };
 
+  const handleDownloadSlip = async () => {
+    if (downloadingSlip) return;
+    setDownloadingSlip(true);
+    try {
+      await downloadRegistrationSlipPdf(currentRound?.semesterId);
+      toast.success(copy.exportSlipSuccess);
+    } catch (cause) {
+      const message = actionMessage(cause) || copy.exportUnavailable;
+      toast.error(message);
+    } finally {
+      setDownloadingSlip(false);
+    }
+  };
+
   // ---- live countdown (ticks every second; hidden beyond seven days) ----
   const [nowTick, setNowTick] = useState(() => Date.now());
   useEffect(() => {
@@ -870,6 +887,21 @@ export default function RegisterPage() {
         eyebrow={<SectionEyebrow>{copy.eyebrow}</SectionEyebrow>}
         title={copy.title}
         description={copy.description}
+        actions={
+          registered.length > 0 ? (
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => void handleDownloadSlip()}
+              disabled={downloadingSlip}
+              className="gap-2"
+            >
+              <FileDown className="h-4 w-4" aria-hidden="true" />
+              {downloadingSlip ? copy.exportSlipDownloading : copy.exportSlip}
+            </Button>
+          ) : undefined
+        }
       />
       {roundsQuery.isLoading ? (
         <LoadingState label={messages.common.states.loadingContent} />
@@ -1278,6 +1310,20 @@ export default function RegisterPage() {
                     </>
                   )}
                 </div>
+
+                {registered.length > 0 ? (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="w-full gap-2 text-xs"
+                    onClick={() => void handleDownloadSlip()}
+                    disabled={downloadingSlip}
+                  >
+                    <FileDown className="h-3.5 w-3.5" aria-hidden="true" />
+                    {downloadingSlip ? copy.exportSlipDownloading : copy.exportSlip}
+                  </Button>
+                ) : null}
 
                 {registered.length === 0 ? (
                   <p className="text-sm text-muted-foreground">{copy.railEmpty}</p>

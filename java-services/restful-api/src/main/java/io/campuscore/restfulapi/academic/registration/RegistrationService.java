@@ -53,6 +53,7 @@ public class RegistrationService {
     private static final String SCHEDULE = "academic.\"SectionSchedule\"";
     private static final String CLASSROOM = "academic.\"Classroom\"";
     private static final String LECTURER = "academic.\"Lecturer\"";
+    private static final String SEMESTER = "academic.\"Semester\"";
     /** Display names live on the auth profile; same join convention as AcademicEnrollmentReadRepository. */
     private static final String AUTH_USER = "campuscore_auth.\"User\"";
     private static final String CURRICULUM_COURSE = "academic.\"CurriculumCourse\"";
@@ -344,6 +345,7 @@ public class RegistrationService {
         transactions.executeWithoutResult(status -> dropLocked(enrollmentId, studentId, roles, idempotencyKey, hash));
     }
 
+    @Transactional
     public SlipPayload slip(String studentId, String semesterId) {
         MapSqlParameterSource parameters = new MapSqlParameterSource("studentId", studentId);
         String sql = "SELECT \"sha256\", \"payload\" FROM " + SLIP + " WHERE \"studentId\" = :studentId";
@@ -353,11 +355,127 @@ public class RegistrationService {
         }
         sql += " ORDER BY \"createdAt\" DESC";
         List<Map<String, Object>> rows = jdbc.queryForList(sql, parameters);
-        if (rows.isEmpty()) {
-            throw problem(HttpStatus.NOT_FOUND, "ROUND_NOT_FOUND", "Registration slip not found");
+        if (!rows.isEmpty()) {
+            Map<String, Object> row = rows.get(0);
+            byte[] payload = payloadBytes(row.get("payload"));
+            if (isValidPdf(payload)) {
+                return new SlipPayload(String.valueOf(row.get("sha256")).trim(), payload);
+            }
         }
-        Map<String, Object> row = rows.get(0);
-        return new SlipPayload(String.valueOf(row.get("sha256")).trim(), payloadBytes(row.get("payload")));
+
+        // When no valid pre-persisted slip exists, dynamically generate and store a slip for active enrollments
+        String targetSemesterId = semesterId;
+        if (targetSemesterId == null || targetSemesterId.isBlank()) {
+            List<String> semesters = jdbc.queryForList(
+                    "SELECT DISTINCT \"semesterId\" FROM " + ENROLLMENT + " WHERE \"studentId\" = :studentId ORDER BY \"semesterId\" DESC",
+                    new MapSqlParameterSource("studentId", studentId), String.class);
+            if (!semesters.isEmpty()) {
+                targetSemesterId = semesters.get(0);
+            }
+        }
+        if (targetSemesterId != null && !targetSemesterId.isBlank()) {
+            List<Map<String, Object>> active = activeEnrollments(studentId, targetSemesterId);
+            if (!active.isEmpty()) {
+                Map<String, Object> first = active.get(0);
+                String enrollmentId = String.valueOf(first.get("id"));
+                String sectionId = String.valueOf(first.get("section_id"));
+
+                String studentCode = studentId;
+                String studentName = null;
+                try {
+                    Map<String, Object> stuInfo = jdbc.queryForMap(
+                            "SELECT s.\"studentId\" AS student_code, u.\"firstName\" AS first_name, u.\"lastName\" AS last_name"
+                                    + " FROM " + STUDENT + " s"
+                                    + " LEFT JOIN \"campuscore_auth\".\"User\" u ON u.\"id\" = s.\"userId\""
+                                    + " WHERE s.\"id\" = :studentId",
+                            new MapSqlParameterSource("studentId", studentId));
+                    if (stuInfo.get("student_code") != null) {
+                        studentCode = String.valueOf(stuInfo.get("student_code"));
+                    }
+                    studentName = displayName(
+                            (String) stuInfo.get("first_name"),
+                            (String) stuInfo.get("last_name"));
+                } catch (Exception ignored) {
+                }
+
+                String semesterName = targetSemesterId;
+                try {
+                    Map<String, Object> semInfo = jdbc.queryForMap(
+                            "SELECT \"name\" FROM " + SEMESTER + " WHERE \"id\" = :semesterId",
+                            new MapSqlParameterSource("semesterId", targetSemesterId));
+                    if (semInfo.get("name") != null) {
+                        semesterName = String.valueOf(semInfo.get("name"));
+                    }
+                } catch (Exception ignored) {
+                }
+
+                List<RegistrationPdfRenderer.CourseItem> courseItems = active.stream().map(row -> new RegistrationPdfRenderer.CourseItem(
+                        String.valueOf(row.get("course_code")),
+                        String.valueOf(row.get("course_name")),
+                        String.valueOf(row.get("section_number")),
+                        ((Number) row.get("credits")).intValue(),
+                        String.valueOf(row.get("id")),
+                        String.valueOf(row.get("section_id"))
+                )).toList();
+
+                byte[] pdf = pdfRenderer.renderEnriched(
+                        studentId,
+                        studentCode,
+                        studentName,
+                        targetSemesterId,
+                        semesterName,
+                        enrollmentId,
+                        sectionId,
+                        courseItems);
+                String digest = sha256(pdf);
+
+                String roundId = first.get("round_id") != null ? String.valueOf(first.get("round_id")) : null;
+                if (roundId == null || roundId.isBlank()) {
+                    List<String> roundIds = jdbc.queryForList(
+                            "SELECT \"id\" FROM " + ROUND + " WHERE \"semesterId\" = :semesterId ORDER BY \"windowStart\" DESC",
+                            new MapSqlParameterSource("semesterId", targetSemesterId), String.class);
+                    if (!roundIds.isEmpty()) {
+                        roundId = roundIds.get(0);
+                    } else {
+                        List<String> fallbackRounds = jdbc.queryForList(
+                                "SELECT \"id\" FROM " + ROUND + " ORDER BY \"windowStart\" DESC",
+                                new MapSqlParameterSource(), String.class);
+                        if (!fallbackRounds.isEmpty()) {
+                            roundId = fallbackRounds.get(0);
+                        }
+                    }
+                }
+
+                if (roundId != null && !roundId.isBlank()) {
+                    try {
+                        jdbc.update(
+                                "INSERT INTO " + SLIP
+                                        + " (\"id\", \"studentId\", \"semesterId\", \"roundId\", \"sha256\", \"byteSize\", \"payload\")"
+                                        + " SELECT :id, :studentId, :semesterId, :roundId, :sha, :size, :payload"
+                                        + " WHERE NOT EXISTS (SELECT 1 FROM " + SLIP
+                                        + " WHERE \"studentId\" = :studentId AND \"semesterId\" = :semesterId AND TRIM(\"sha256\") = :sha)",
+                                new MapSqlParameterSource()
+                                        .addValue("id", UUID.randomUUID().toString())
+                                        .addValue("studentId", studentId)
+                                        .addValue("semesterId", targetSemesterId)
+                                        .addValue("roundId", roundId)
+                                        .addValue("sha", digest)
+                                        .addValue("size", pdf.length)
+                                        .addValue("payload", pdf));
+                    } catch (Exception ignored) {
+                    }
+                }
+                return new SlipPayload(digest, pdf);
+            }
+        }
+
+        throw problem(HttpStatus.NOT_FOUND, "ROUND_NOT_FOUND", "Registration slip not found");
+    }
+
+    private static boolean isValidPdf(byte[] data) {
+        if (data == null || data.length < 50) return false;
+        String s = new String(data, StandardCharsets.US_ASCII);
+        return s.startsWith("%PDF-") && s.contains("startxref") && s.contains("%%EOF");
     }
 
     public record SlipPayload(String sha256, byte[] payload) {
@@ -753,11 +871,14 @@ public class RegistrationService {
         // under-count the 30-credit cap on both the read and write paths.
         return jdbc.queryForList(
                 "SELECT enrollment.\"id\", enrollment.\"sectionId\" AS section_id, enrollment.\"courseId\" AS course_id,"
-                        + " course.\"credits\" AS credits FROM " + ENROLLMENT + " enrollment"
+                        + " enrollment.\"roundId\" AS round_id, course.\"credits\" AS credits,"
+                        + " course.\"code\" AS course_code, course.\"name\" AS course_name, section.\"sectionNumber\" AS section_number"
+                        + " FROM " + ENROLLMENT + " enrollment"
                         + " JOIN " + SECTION + " section ON section.\"id\" = enrollment.\"sectionId\""
                         + " JOIN " + COURSE + " course ON course.\"id\" = section.\"courseId\""
                         + " WHERE enrollment.\"studentId\" = :studentId AND enrollment.\"semesterId\" = :semesterId"
-                        + " AND enrollment.\"status\" IN ('ENROLLED', 'PENDING', 'CONFIRMED')",
+                        + " AND enrollment.\"status\" IN ('ENROLLED', 'PENDING', 'CONFIRMED')"
+                        + " ORDER BY course.\"code\", section.\"sectionNumber\"",
                 new MapSqlParameterSource().addValue("studentId", studentId).addValue("semesterId", semesterId));
     }
 

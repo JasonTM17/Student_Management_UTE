@@ -186,6 +186,30 @@ class AcademicEnrollmentMutationPersistenceTest {
     }
 
     @Test
+    void slipGeneratesFallbackWhenNoSlipRowExists() throws Exception {
+        mvc.perform(post("/api/v1/me/enrollments")
+                        .with(studentJwt("student-user-1", "student-1"))
+                        .header("Idempotency-Key", "slip-fallback-enroll")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"sectionId\":\"section-open\"}"))
+                .andExpect(status().isOk());
+
+        jdbc.update("DELETE FROM \"academic\".\"RegistrationSlip\"");
+
+        mvc.perform(get("/api/v1/me/registration/slip")
+                        .with(studentJwt("student-user-1", "student-1")))
+                .andExpect(status().isOk())
+                .andExpect(header().exists("X-Content-SHA256"))
+                .andExpect(content().contentType(MediaType.APPLICATION_PDF));
+
+        assertThat(jdbc.queryForObject(
+                        "SELECT COUNT(*) FROM \"academic\".\"RegistrationSlip\" WHERE \"studentId\" = ?",
+                        Integer.class,
+                        "student-1"))
+                .isEqualTo(1);
+    }
+
+    @Test
     void prerequisiteGateBlocksRegistrationUntilTheRequiredCourseIsCompleted() throws Exception {
         // course-open (SE402) requires course-overlap (SE403) as a PREREQ.
         jdbc.update(

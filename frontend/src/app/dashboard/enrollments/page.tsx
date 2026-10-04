@@ -7,13 +7,14 @@ import {
   CheckCircle2,
   Clock,
   ChevronDown,
+  FileDown,
   GraduationCap,
   Layers,
   MapPin,
   Trash2,
 } from 'lucide-react';
 import { useRequireAuth } from '@/context/AuthContext';
-import { curriculumApi, enrollmentsApi } from '@/lib/api';
+import { curriculumApi, downloadRegistrationSlipPdf, enrollmentsApi } from '@/lib/api';
 import { getLocalizedName } from '@/lib/academic-content';
 import { isActiveEnrollment, isDroppableEnrollment } from '@/lib/enrollment-status';
 import { WorkspaceForbiddenState } from '@/components/ProtectedRoute';
@@ -60,6 +61,7 @@ export default function EnrollmentsPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState('');
   const [isDropping, setIsDropping] = useState<string | null>(null);
+  const [downloadingSlip, setDownloadingSlip] = useState(false);
   const { confirm, confirmationDialog } = useConfirmationDialog();
 
   const copy =
@@ -112,6 +114,10 @@ export default function EnrollmentsPage() {
             `Hủy ${courseLabel}? Hành động này giữ cho việc đổi lịch học luôn rõ ràng và có chủ đích.`,
           dropped: 'Đã hủy môn học',
           dropFailed: 'Hiện chưa thể hủy môn học này.',
+          exportSlip: 'Xuất phiếu đăng ký (PDF)',
+          exportSlipDownloading: 'Đang tải phiếu...',
+          exportSlipSuccess: 'Đã tải phiếu đăng ký học phần (PDF).',
+          exportUnavailable: 'Phiếu đăng ký chưa sẵn sàng.',
           studentProfileMissing:
             'Không tìm thấy hồ sơ sinh viên trong phiên hiện tại.',
           loadFailed: 'Hiện chưa thể tải danh sách môn học của bạn.',
@@ -164,6 +170,10 @@ export default function EnrollmentsPage() {
             `Drop ${courseLabel}? This keeps the action explicit and prevents accidental schedule changes.`,
           dropped: 'Course dropped',
           dropFailed: 'We could not drop this course.',
+          exportSlip: 'Download registration slip (PDF)',
+          exportSlipDownloading: 'Downloading slip...',
+          exportSlipSuccess: 'Registration slip downloaded.',
+          exportUnavailable: 'A registration slip is not available yet.',
           studentProfileMissing:
             'Your student profile is not available in this session.',
           loadFailed: 'Your current enrollments could not be loaded.',
@@ -409,6 +419,19 @@ export default function EnrollmentsPage() {
     notStartedCurriculum.length,
   ]);
 
+  const handleDownloadSlip = async () => {
+    if (downloadingSlip) return;
+    setDownloadingSlip(true);
+    try {
+      await downloadRegistrationSlipPdf();
+      toast.success(copy.exportSlipSuccess);
+    } catch (cause) {
+      toast.error(campusErrorMessage(cause, messages.common.campusErrors) || copy.exportUnavailable);
+    } finally {
+      setDownloadingSlip(false);
+    }
+  };
+
   if (authLoading) {
     return <LoadingState label={copy.loading} />;
   }
@@ -424,7 +447,22 @@ export default function EnrollmentsPage() {
         title={copy.title}
         description={copy.description}
         actions={
-          <LinkButton href="/dashboard/register">{copy.browseSections}</LinkButton>
+          <div className="flex flex-wrap items-center gap-2">
+            {enrollments.length > 0 ? (
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => void handleDownloadSlip()}
+                disabled={downloadingSlip}
+                className="gap-2"
+              >
+                <FileDown className="h-4 w-4" aria-hidden="true" />
+                {downloadingSlip ? copy.exportSlipDownloading : copy.exportSlip}
+              </Button>
+            ) : null}
+            <LinkButton href="/dashboard/register">{copy.browseSections}</LinkButton>
+          </div>
         }
       />
 
@@ -716,8 +754,21 @@ export default function EnrollmentsPage() {
                 />
               ) : (
                 <Card variant="muted">
-                  <CardHeader>
+                  <CardHeader className="flex flex-row items-center justify-between pb-2">
                     <CardTitle className="text-xl">{copy.recordTitle}</CardTitle>
+                    {enrollments.length > 0 ? (
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => void handleDownloadSlip()}
+                        disabled={downloadingSlip}
+                        className="gap-2 text-xs"
+                      >
+                        <FileDown className="h-3.5 w-3.5" aria-hidden="true" />
+                        {downloadingSlip ? copy.exportSlipDownloading : copy.exportSlip}
+                      </Button>
+                    ) : null}
                   </CardHeader>
                   <CardContent className="space-y-3 sm:space-y-4">
                     {enrollments.map((enrollment) => {

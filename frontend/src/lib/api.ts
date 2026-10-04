@@ -683,7 +683,38 @@ export const registrationApi = {
     );
     return response.data;
   },
+  downloadSlip: async (semesterId?: string): Promise<Blob> => {
+    try {
+      const response = await api.get<Blob>('/me/registration/slip', {
+        params: semesterId ? { semesterId } : undefined,
+        responseType: 'blob',
+      });
+      return response.data;
+    } catch (error: unknown) {
+      if (axios.isAxiosError(error) && error.response?.data instanceof Blob) {
+        try {
+          const text = await error.response.data.text();
+          error.response.data = JSON.parse(text);
+        } catch {
+          // non-JSON payload, keep as-is
+        }
+      }
+      throw error;
+    }
+  },
 };
+
+export async function downloadRegistrationSlipPdf(semesterId?: string): Promise<void> {
+  const blob = await registrationApi.downloadSlip(semesterId);
+  const url = URL.createObjectURL(blob);
+  const anchor = document.createElement('a');
+  anchor.href = url;
+  anchor.download = 'registration-slip.pdf';
+  document.body.appendChild(anchor);
+  anchor.click();
+  anchor.remove();
+  URL.revokeObjectURL(url);
+}
 
 export const adminRegistrationApi = {
   creditLimitApplications: async (
