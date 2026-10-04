@@ -1,11 +1,15 @@
--- Forward-only correction of exactly two unchanged V41 demonstration seeds.
--- Existing releases/checksums, human edits and foreign authority remain immutable.
-CREATE TEMP TABLE v97_seed_correction (
+-- Forward-only correction of exactly two unchanged V41 demonstration seeds
+-- (student-affairs-services-and-certificates-*). Chained after V98's release
+-- …098: the overlay projects the live …098 map, publishes …099 and activates
+-- it. Renumbered from an earlier V97 draft so the Flyway version stays unique
+-- next to V97__activate_course_prerequisites. Existing releases/checksums,
+-- human edits and foreign authority remain immutable.
+CREATE TEMP TABLE v99_seed_correction (
     id uuid PRIMARY KEY, slug text NOT NULL, locale text NOT NULL,
     old_hash text NOT NULL, content text NOT NULL
 ) ON COMMIT DROP;
 
-INSERT INTO v97_seed_correction VALUES
+INSERT INTO v99_seed_correction VALUES
 ('dcd11df4-2cb3-21fb-f9b5-638f12681c6b', 'student-affairs-services-and-certificates-vi', 'vi',
  'e1e32864b5236b0a9546e7ebaed28d32',
  '## Giấy xác nhận sinh viên và dịch vụ hỗ trợ
@@ -28,18 +32,18 @@ For health insurance and student support, ask the responsible office to confirm 
 -- Use the publisher's document/revision-before-singleton lock order. Wait for
 -- committed edits before checking eligibility; document locks fence new revisions.
 SELECT d.id FROM assistant.knowledge_document d
-JOIN v97_seed_correction c ON c.id=d.id
+JOIN v99_seed_correction c ON c.id=d.id
 JOIN assistant.knowledge_document_revision r ON r.document_id=d.id AND r.version=1
 ORDER BY d.id FOR UPDATE OF d, r;
 
 SELECT active_release_id FROM assistant.knowledge_runtime_state
  WHERE singleton=TRUE FOR UPDATE;
 
-CREATE TEMP TABLE v97_changed_document ON COMMIT DROP AS
+CREATE TEMP TABLE v99_changed_document ON COMMIT DROP AS
 SELECT d.id, c.slug, c.locale, c.old_hash, c.content,
        r.id AS old_revision_id, r.published_at AS old_published_at
 FROM assistant.knowledge_document d
-JOIN v97_seed_correction c ON c.id=d.id AND c.slug=d.slug AND c.locale=d.locale
+JOIN v99_seed_correction c ON c.id=d.id AND c.slug=d.slug AND c.locale=d.locale
 JOIN assistant.knowledge_document_revision r ON r.document_id=d.id AND r.version=1
 WHERE d.id=md5(c.slug || '-document')::uuid
   AND d.domain='POLICY' AND d.priority=25
@@ -58,35 +62,35 @@ WHERE d.id=md5(c.slug || '-document')::uuid
                    WHERE later.document_id=d.id AND later.version>1);
 
 UPDATE assistant.knowledge_document d
-   SET content=c.content, source='campuscore-student-affairs-corrected-v97',
+   SET content=c.content, source='campuscore-student-affairs-corrected-v99',
        updated_at=CURRENT_TIMESTAMP
-  FROM v97_changed_document c WHERE c.id=d.id;
+  FROM v99_changed_document c WHERE c.id=d.id;
 
 UPDATE assistant.knowledge_document_revision r SET state='ARCHIVED'
-  FROM v97_changed_document c WHERE r.document_id=c.id AND r.version=1;
+  FROM v99_changed_document c WHERE r.document_id=c.id AND r.version=1;
 
 INSERT INTO assistant.knowledge_document_revision
     (id,document_id,version,state,domain,locale,slug,title,content,source,priority,
      created_by,reviewed_by,published_at)
-SELECT md5(d.id::text || '-student-affairs-correction-v97')::uuid, d.id, 2,
+SELECT md5(d.id::text || '-student-affairs-correction-v99')::uuid, d.id, 2,
        'PUBLISHED',d.domain,d.locale,d.slug,d.title,d.content,d.source,d.priority,
        'system-migration','system-migration',CURRENT_TIMESTAMP
-FROM assistant.knowledge_document d JOIN v97_changed_document c ON c.id=d.id;
+FROM assistant.knowledge_document d JOIN v99_changed_document c ON c.id=d.id;
 
--- Preserve the entire immutable096 map. A changed base row is excluded even
+-- Preserve the entire immutable098 map. A changed base row is excluded even
 -- if authoring was an eligible original; never publish latest unrelated edits.
-CREATE TEMP TABLE v97_overlay ON COMMIT DROP AS
+CREATE TEMP TABLE v99_overlay ON COMMIT DROP AS
 SELECT c.id
 FROM assistant.knowledge_runtime_document p
-JOIN v97_changed_document c ON c.id::text=p.source_id
-WHERE p.release_id='00000000-0000-0000-0000-000000000096'::uuid
+JOIN v99_changed_document c ON c.id::text=p.source_id
+WHERE p.release_id='00000000-0000-0000-0000-000000000098'::uuid
   AND p.revision_id=c.old_revision_id AND p.version=1
   AND p.domain='POLICY' AND p.priority=25 AND p.slug=c.slug AND p.locale=c.locale
   AND p.source='campuscore-academic-enrichment' AND p.active=TRUE AND p.visibility='PUBLIC'
   AND p.published_at=c.old_published_at
   AND md5(p.title || E'\n' || p.content)=c.old_hash;
 
-CREATE TEMP TABLE v97_projected_runtime ON COMMIT DROP AS
+CREATE TEMP TABLE v99_projected_runtime ON COMMIT DROP AS
 SELECT p.source_id,COALESCE(r.id,p.revision_id) AS revision_id,
        COALESCE(r.version,p.version) AS version,COALESCE(r.domain,p.domain) AS domain,
        COALESCE(r.slug,p.slug) AS slug,COALESCE(r.locale,p.locale) AS locale,
@@ -96,41 +100,41 @@ SELECT p.source_id,COALESCE(r.id,p.revision_id) AS revision_id,
 FROM assistant.knowledge_runtime_state s
 JOIN assistant.knowledge_release current_release ON current_release.id=s.active_release_id
 JOIN assistant.knowledge_runtime_document p ON p.release_id=current_release.id
-LEFT JOIN v97_overlay c ON c.id::text=p.source_id
+LEFT JOIN v99_overlay c ON c.id::text=p.source_id
 LEFT JOIN assistant.knowledge_document_revision r ON r.document_id=c.id AND r.version=2 AND r.state='PUBLISHED'
 WHERE s.singleton=TRUE AND current_release.status='PUBLISHED'
   AND current_release.source IN ('MANUAL','LEGACY')
-  AND current_release.id='00000000-0000-0000-0000-000000000096'::uuid
-  AND EXISTS (SELECT 1 FROM v97_overlay);
+  AND current_release.id='00000000-0000-0000-0000-000000000098'::uuid
+  AND EXISTS (SELECT 1 FROM v99_overlay);
 
-CREATE TEMP TABLE v97_summary ON COMMIT DROP AS
+CREATE TEMP TABLE v99_summary ON COMMIT DROP AS
 SELECT COUNT(*)::integer AS row_count,
        encode(thesis.digest(COALESCE(string_agg(concat_ws('|',source_id,
          COALESCE(revision_id::text,''),version::text,domain,slug,locale,title,content,
          source,priority::text,active::text,visibility),E'\n' ORDER BY source_id),''),'sha256'),'hex') AS corpus_hash,
        COALESCE(jsonb_agg(jsonb_build_object('sourceId',source_id,'domain',domain,
          'slug',slug,'locale',locale) ORDER BY source_id),'[]'::jsonb) AS documents
-FROM v97_projected_runtime;
+FROM v99_projected_runtime;
 
 INSERT INTO assistant.knowledge_release
     (id,corpus_version,corpus_hash,row_count,source,status,manifest,created_by,activated_at,previous_release_id)
-SELECT '00000000-0000-0000-0000-000000000097'::uuid,'local-demo-v97',summary.corpus_hash,
+SELECT '00000000-0000-0000-0000-000000000099'::uuid,'local-demo-v99',summary.corpus_hash,
        summary.row_count,'MANUAL','PUBLISHED',
-       jsonb_build_object('schemaVersion',1,'corpusVersion','local-demo-v97','rowCount',summary.row_count,
+       jsonb_build_object('schemaVersion',1,'corpusVersion','local-demo-v99','rowCount',summary.row_count,
          'sha256',summary.corpus_hash,'documents',summary.documents),
        'system-migration',CURRENT_TIMESTAMP,s.active_release_id
-FROM v97_summary summary CROSS JOIN assistant.knowledge_runtime_state s
-WHERE s.singleton=TRUE AND EXISTS (SELECT 1 FROM v97_projected_runtime);
+FROM v99_summary summary CROSS JOIN assistant.knowledge_runtime_state s
+WHERE s.singleton=TRUE AND EXISTS (SELECT 1 FROM v99_projected_runtime);
 
 INSERT INTO assistant.knowledge_runtime_document
     (release_id,source_id,revision_id,version,domain,slug,locale,title,content,source,priority,active,visibility,published_at)
-SELECT '00000000-0000-0000-0000-000000000097'::uuid,source_id,revision_id,version,
+SELECT '00000000-0000-0000-0000-000000000099'::uuid,source_id,revision_id,version,
        domain,slug,locale,title,content,source,priority,active,visibility,published_at
-FROM v97_projected_runtime;
+FROM v99_projected_runtime;
 
 UPDATE assistant.knowledge_runtime_state s
    SET active_release_id=next_release.id,updated_at=CURRENT_TIMESTAMP
   FROM assistant.knowledge_release next_release
- WHERE s.singleton=TRUE AND next_release.id='00000000-0000-0000-0000-000000000097'::uuid
-   AND s.active_release_id='00000000-0000-0000-0000-000000000096'::uuid
-   AND EXISTS (SELECT 1 FROM v97_projected_runtime);
+ WHERE s.singleton=TRUE AND next_release.id='00000000-0000-0000-0000-000000000099'::uuid
+   AND s.active_release_id='00000000-0000-0000-0000-000000000098'::uuid
+   AND EXISTS (SELECT 1 FROM v99_projected_runtime);

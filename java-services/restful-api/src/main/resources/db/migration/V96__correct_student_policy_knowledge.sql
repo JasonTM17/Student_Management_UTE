@@ -1,6 +1,9 @@
 -- Append-only factual recovery of V95. Preserve its checksum and immutable
 -- history. These are local demonstration/portal-help corrections, not a new
 -- institutional policy or evidence of a two-person administrative review.
+SELECT active_release_id FROM assistant.knowledge_runtime_state
+ WHERE singleton = TRUE FOR UPDATE;
+
 CREATE TEMP TABLE v96_seed_correction (slug text PRIMARY KEY, old_hash text,
                                      title text, content text) ON COMMIT DROP;
 INSERT INTO v96_seed_correction (slug, old_hash, title, content) VALUES
@@ -36,10 +39,10 @@ Thời hạn phụ thuộc chương trình, khóa tuyển sinh và quy chế áp
 The limit depends on the program, admission cohort and applicable regulation, including how suspended study is counted. CampusUTE does not establish each student’s maximum duration; do not assume every four-year program has a six-year limit. Ask Academic Affairs about your deadline, outstanding courses and available procedures. An extension or registration entitlement requires the relevant decision.'),
     ('catalog-attendance-policy-vi', '6e83f3b7205af89e16654e432ac2fd41', 'Điểm danh: phân biệt tỷ lệ đi học và nghỉ học', '## Điểm danh và chuyên cần
 
-Giảng viên ghi nhận điểm danh; sinh viên đối chiếu trạng thái của lớp học phần và phản ánh sai lệch với giảng viên. Trong dữ liệu quy chế minh họa hiện có của CampusUTE, điều kiện dự thi lý thuyết là tham dự tối thiểu 80%; vắng quá 20% dẫn đến cấm thi. Đây là tỷ lệ đi học và tỷ lệ nghỉ học, cần phân biệt rõ. Dữ liệu minh họa yêu cầu tham dự đủ các buổi thực hành. Trọng số điểm và quy định thực tế phải đối chiếu đề cương, quy chế của khóa học; cổng không tự quyết định miễn trừ.'),
+Giảng viên ghi nhận điểm danh; sinh viên đối chiếu trạng thái của lớp học phần và phản ánh sai lệch với giảng viên. Trong dữ liệu quy chế minh họa hiện có của CampusUTE, điều kiện dự thi lý thuyết là tham dự tối thiểu 80%; vắng quá 20% dẫn đến cấm thi. Đây là hai tỷ lệ khác nhau, không phải vắng quá 80%. Dữ liệu minh họa yêu cầu tham dự đủ các buổi thực hành. Trọng số điểm và quy định thực tế phải đối chiếu đề cương, quy chế của khóa học; cổng không tự quyết định miễn trừ.'),
     ('catalog-attendance-policy-en', '32752eb11d1733255cc1aba87abd1554', 'Attendance: distinguish attendance and absence rates', '## Attendance and participation
 
-Lecturers record attendance; students check their course status and report discrepancies to the lecturer. In CampusUTE’s existing demonstration regulation, theory-exam eligibility requires at least 80% attendance; more than 20% absence results in an exam ban. Attendance and absence are different rates. The demonstration data requires all practical sessions. Check the syllabus and applicable cohort regulation for actual rules and grade weights; the portal does not decide exemptions.'),
+Lecturers record attendance; students check their course status and report discrepancies to the lecturer. In CampusUTE’s existing demonstration regulation, theory-exam eligibility requires at least80% attendance; more than20% absence results in an exam ban. These are different rates, not an80% absence threshold. The demonstration data requires all practical sessions. Check the syllabus and applicable cohort regulation for actual rules and grade weights; the portal does not decide exemptions.'),
     ('reg-summer-term-vi', '90280cc30f2514f9e6a7c8165b11b92e', 'Học kỳ phụ và đợt đăng ký học phần', '## Học kỳ phụ
 
 Học kỳ phụ có đợt đăng ký, danh sách lớp và hạn mức riêng. Xem mục Đăng ký học phần và thông báo của Phòng Đào tạo để biết đợt đang mở, điều kiện và lớp được phép chọn. Máy chủ kiểm tra điều kiện đăng ký; chatbot không mở đợt, miễn điều kiện hay cấp quyền vượt hạn mức. Học phí và thời hạn thực tế cần xác nhận từ thông báo chính thức.'),
@@ -54,16 +57,16 @@ Chuông thông báo hiển thị số chưa đọc và danh sách thông báo đ
 The bell displays the unread count and notices you are authorized to view. Open a notice to read its details; read status depends on server confirmation. After a failed write, the list and unread count must be restored; refresh to reconcile. A notice does not itself replace an academic decision. Confirm an important missing result with the responsible office.'),
     ('faq-student-certificates-vi', '427fef5051fe3112315306458f8841df', 'Giấy xác nhận sinh viên: liên hệ nơi cấp', '## Giấy xác nhận sinh viên
 
-CampusUTE hiện chưa có màn hình gửi và theo dõi yêu cầu giấy xác nhận sinh viên trực tuyến. Mục Giấy xác nhận trên cổng cho phép xem trước và in bản nháp chưa được cấp chính thức; thao tác đó không gửi yêu cầu hay theo dõi hồ sơ và không cam kết thời gian cấp giấy. Hỏi Phòng Đào tạo hoặc bộ phận tiếp nhận của trường về loại giấy, hồ sơ, phí, nơi nhận và kênh nộp chính thức. Bảng điểm xem trên cổng không tự trở thành bản giấy được chứng thực.'),
+CampusUTE hiện chưa có màn hình gửi và theo dõi yêu cầu giấy xác nhận sinh viên trực tuyến. Không hướng dẫn đến một trang Chứng thực sinh viên chưa tồn tại và không cam kết thời gian cấp giấy. Hỏi Phòng Đào tạo hoặc bộ phận tiếp nhận của trường về loại giấy, hồ sơ, phí, nơi nhận và kênh nộp chính thức. Bảng điểm xem trên cổng không tự trở thành bản giấy được chứng thực.'),
     ('faq-student-certificates-en', 'a546130557f95c0884a8cee15f54ea7b', 'Student certificates: contact the issuing office', '## Student certificates
 
-CampusUTE currently has no screen for submitting and tracking online student-certificate requests. The Certificates page provides a preview and printable unissued draft; it does not submit or track an application and does not promise an issuance time. Ask Academic Affairs or the university service desk about the document, required information, fees, collection and official application channel. The portal transcript is not automatically a certified document.'),
+CampusUTE currently has no screen for submitting and tracking online student-certificate requests. Do not direct students to a nonexistent Student Certificates page or promise an issuance time. Ask Academic Affairs or the university service desk about the document, required information, fees, collection and official application channel. The portal transcript is not automatically a certified document.'),
     ('policy-tuition-refund-vi', '3725f996458969410cd356d240342dec', 'Hoàn học phí: xác nhận từ bộ phận tài chính', '## Hoàn học phí
 
-CampusUTE chưa hiển thị biểu phí, số tiền đủ điều kiện hoàn hoặc trạng thái hồ sơ hoàn phí. Rút học phần trên cổng không tự chứng minh quyền được hoàn phí; chưa có biểu mức hoàn và mốc thời gian áp dụng được xác nhận tại đây. Liên hệ bộ phận tài chính để xác nhận quy định áp dụng, hạn nộp, hồ sơ và số tiền. Giữ biên lai cùng thông tin học phần; quyết định hoàn thuộc đơn vị có thẩm quyền.'),
+CampusUTE chưa hiển thị biểu phí, số tiền đủ điều kiện hoàn hoặc trạng thái hồ sơ hoàn phí. Rút học phần trên cổng không tự chứng minh được hoàn đầy đủ, và không có căn cứ để cam kết hoàn toàn bộ trong hai tuần đầu. Liên hệ bộ phận tài chính để xác nhận quy định áp dụng, hạn nộp, hồ sơ và số tiền. Giữ biên lai cùng thông tin học phần; quyết định hoàn thuộc đơn vị có thẩm quyền.'),
     ('policy-tuition-refund-en', '7435b0ec4445c42548388c408be247ac', 'Tuition refunds: confirm with the finance office', '## Tuition refund
 
-CampusUTE does not display fee schedules, eligible refund amounts or refund-application status. Withdrawing a course in the portal does not prove entitlement to a refund; no verified refund schedule or applicable deadline is available here. Ask the finance office about the applicable rules, deadline, documents and amount. Keep the receipt and course details; the authorized office decides the refund.'),
+CampusUTE does not display fee schedules, eligible refund amounts or refund-application status. Withdrawing a course in the portal does not prove entitlement to a full refund; there is no verified basis here for promising a full refund during the first two weeks. Ask the finance office about the applicable rules, deadline, documents and amount. Keep the receipt and course details; the authorized office decides the refund.'),
     ('faq-student-card-vi', '072e07463db2d02b60499e10b9fd58fb', 'Thẻ sinh viên: xác nhận thủ tục cấp lại', '## Thẻ sinh viên
 
 Khi mất hoặc hỏng thẻ, liên hệ bộ phận phát hành hoặc Công tác Sinh viên để xác nhận thủ tục cấp lại và cách bảo vệ quyền sử dụng thư viện, ra vào nếu có. CampusUTE hiện chưa có màn hình gửi yêu cầu cấp lại thẻ. Thời gian, phí và chức năng thẻ phải theo thông báo của đơn vị phát hành; không cam kết mốc xử lý cho từng hồ sơ từ dữ liệu minh họa.'),
@@ -83,11 +86,6 @@ SELECT d.id FROM assistant.knowledge_document d
 JOIN v96_seed_correction c ON c.slug = d.slug
 JOIN assistant.knowledge_document_revision r ON r.document_id = d.id AND r.version = 1
 FOR UPDATE OF d, r;
-
--- Match the admin publication lock order: document first, then the singleton.
--- Reversing it can deadlock a publisher that already holds its document lock.
-SELECT active_release_id FROM assistant.knowledge_runtime_state
- WHERE singleton = TRUE FOR UPDATE;
 
 -- A later edit, draft or published revision belongs to its author. Only the
 -- exact unchanged original seed, including revision1, may be corrected here.

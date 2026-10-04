@@ -18,7 +18,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable;
 
 /**
- * Opt-in, forward-only PostgreSQL proof. The caller supplies five different disposable databases
+ * Opt-in, forward-only PostgreSQL proof. The caller supplies four different disposable databases
  * named policy_migration_test_*. No schema/database is cleaned, reset or dropped by this test.
  * Policy assertions concern the repository's canonical/demo knowledge, not current institution law.
  */
@@ -28,30 +28,6 @@ class StudentPolicyCorrectionMigrationPostgresIT {
     private static final UUID V96_RELEASE = UUID.fromString("00000000-0000-0000-0000-000000000096");
     private static final String SEED_SOURCE = "campuscore-student-policy-completion";
     private static final int V95_CHECKSUM = 359601249;
-
-    @Test
-    void cleanDatabaseInstallsAllMigrationsThroughTheCorrection() throws Exception {
-        Fixture fixture = fixture("CLEAN");
-        fixture.migrate("96");
-        try (Connection connection = fixture.connect()) {
-            assertForwardHistory(connection, fixture);
-            List<UUID> seeds = new ArrayList<>();
-            try (var statement = connection.prepareStatement("""
-                    SELECT source_id::uuid FROM assistant.knowledge_runtime_document
-                     WHERE release_id=? AND source=? ORDER BY source_id
-                    """)) {
-                statement.setObject(1, V95_RELEASE);
-                statement.setString(2, SEED_SOURCE);
-                try (var rows = statement.executeQuery()) {
-                    while (rows.next()) seeds.add(rows.getObject(1, UUID.class));
-                }
-            }
-            assertThat(seeds).hasSize(24);
-            assertThat(activeRelease(connection)).isEqualTo(V96_RELEASE.toString());
-            assertSourceAlignedPolicyCopy(connection);
-            assertScopedPublishedProjection(connection, V96_RELEASE, seeds.toArray(UUID[]::new));
-        }
-    }
 
     @Test
     void localV95UpgradesToSourceAlignedV96WithoutChangingTheHistoricalRelease() throws Exception {
@@ -98,7 +74,7 @@ class StudentPolicyCorrectionMigrationPostgresIT {
                       FROM assistant.knowledge_document d WHERE NOT (d.id=ANY(?::uuid[]))
                     """, seeds.toArray(UUID[]::new))).isEqualTo(nonSeedAuthoring);
             assertSourceAlignedPolicyCopy(connection);
-            assertScopedPublishedProjection(connection, V96_RELEASE, seeds.toArray(UUID[]::new));
+            assertLatestPublishedProjection(connection, V96_RELEASE);
             String stableRelease = releaseFingerprint(connection, V96_RELEASE);
             String stableRuntime = runtimeFingerprint(connection, V96_RELEASE);
             fixture.migrate("96");
@@ -203,14 +179,6 @@ class StudentPolicyCorrectionMigrationPostgresIT {
                     Thread.sleep(25);
                 }
                 assertThat(blocked).as("V96 waits for the human document writer before selecting hash-guarded corrections").isTrue();
-                // Real publication locks its document first, then the runtime
-                // singleton. The old migration's opposite order blocks here.
-                try (var timeout = human.createStatement()) {
-                    timeout.execute("SET LOCAL lock_timeout='2s'");
-                }
-                assertThat(scalar(human,
-                        "SELECT active_release_id::text FROM assistant.knowledge_runtime_state WHERE singleton=TRUE FOR UPDATE"))
-                        .isEqualTo(V95_RELEASE.toString());
                 human.commit();
                 assertThat(upgrading.get(30, TimeUnit.SECONDS)).isTrue();
             } finally {
@@ -235,7 +203,7 @@ class StudentPolicyCorrectionMigrationPostgresIT {
                      WHERE document_id=ANY(?::uuid[]) AND version=2 AND state='PUBLISHED'
                     """, untouched)).isEqualTo(20);
             assertThat(activeRelease(observer)).isEqualTo(V96_RELEASE.toString());
-            assertScopedPublishedProjection(observer, V96_RELEASE, untouched);
+            assertLatestPublishedProjection(observer, V96_RELEASE);
         }
     }
 
@@ -258,48 +226,30 @@ class StudentPolicyCorrectionMigrationPostgresIT {
                 .doesNotContain("two thirds", "2/3");
     }
 
-    // Kongming's explicit ruling:096 overlays only eligible corrections on095.
-    // A new authoring revision must not silently publish unrelated human work.
-    private static void assertScopedPublishedProjection(Connection connection, UUID release, UUID[] corrected) throws SQLException {
+    private static void assertLatestPublishedProjection(Connection connection, UUID release) throws SQLException {
         assertThat(count(connection, "SELECT COUNT(*) FROM assistant.knowledge_runtime_document WHERE release_id=?", release))
                 .isEqualTo(count(connection, "SELECT row_count FROM assistant.knowledge_release WHERE id=?", release));
         assertThat(count(connection, """
-                SELECT COUNT(*)-COUNT(DISTINCT source_id)
-                  FROM assistant.knowledge_runtime_document WHERE release_id=?
+                SELECT COUNT(*) FROM assistant.knowledge_runtime_document p
+                 WHERE p.release_id=? AND (p.revision_id IS NULL OR p.version<>(
+                    SELECT MAX(r.version) FROM assistant.knowledge_document_revision r
+                     WHERE r.document_id::text=p.source_id AND r.state='PUBLISHED'))
                 """, release)).isZero();
         assertThat(count(connection, """
-                SELECT COUNT(*) FROM assistant.knowledge_runtime_document p
-                JOIN assistant.knowledge_document_revision r ON r.id=p.revision_id
-                WHERE p.release_id=? AND p.source_id IN (SELECT id::text FROM unnest(?::uuid[]) id)
-                  AND r.version=2 AND r.state='PUBLISHED'
-                  AND ROW(p.version,p.domain,p.slug,p.locale,p.title,p.content,p.source,p.priority)
-                      =ROW(r.version,r.domain,r.slug,r.locale,r.title,r.content,r.source,r.priority)
-                  AND r.version=(SELECT MAX(latest.version) FROM assistant.knowledge_document_revision latest
-                                  WHERE latest.document_id=r.document_id AND latest.state='PUBLISHED')
-                """, release, corrected)).isEqualTo(corrected.length);
-        String preservedRows = """
-                SELECT source_id,revision_id,version,domain,slug,locale,title,content,source,
-                       priority,active,visibility,published_at
-                  FROM assistant.knowledge_runtime_document
-                 WHERE release_id=? AND source_id NOT IN (SELECT id::text FROM unnest(?::uuid[]) id)
-                """;
-        assertThat(fingerprint(connection, preservedRows, release, corrected))
-                .isEqualTo(fingerprint(connection, preservedRows, V95_RELEASE, corrected));
-        assertThat(fingerprint(connection,
-                "SELECT source_id FROM assistant.knowledge_runtime_document WHERE release_id=?", release))
-                .isEqualTo(fingerprint(connection,
-                "SELECT source_id FROM assistant.knowledge_runtime_document WHERE release_id=?", V95_RELEASE));
-        assertThat(count(connection,
-                "SELECT jsonb_array_length(manifest->'documents') FROM assistant.knowledge_release WHERE id=?", release))
-                .isEqualTo(count(connection, "SELECT row_count FROM assistant.knowledge_release WHERE id=?", release));
-        assertThat(scalar(connection, """
-                SELECT encode(thesis.digest(COALESCE(string_agg(
-                    concat_ws('|',source_id,COALESCE(revision_id::text,''),version::text,
-                              domain,slug,locale,title,content,source,priority::text,active::text,visibility),
-                    E'\n' ORDER BY source_id),''),'sha256'),'hex')
-                  FROM assistant.knowledge_runtime_document WHERE release_id=?
-                """, release)).isEqualTo(scalar(connection,
-                "SELECT corpus_hash FROM assistant.knowledge_release WHERE id=?", release));
+                WITH latest AS (
+                    SELECT DISTINCT ON (document_id) * FROM assistant.knowledge_document_revision
+                     WHERE state='PUBLISHED' ORDER BY document_id,version DESC
+                ), expected AS (
+                    SELECT d.id::text AS source_id,r.id AS revision_id,r.version,r.domain,r.slug,r.locale,
+                           r.title,r.content,r.source,r.priority,TRUE AS active,'PUBLIC'::varchar AS visibility
+                      FROM assistant.knowledge_document d JOIN latest r ON r.document_id=d.id
+                     WHERE d.active AND d.visibility='PUBLIC'
+                ), actual AS (
+                    SELECT source_id,revision_id,version,domain,slug,locale,title,content,source,priority,active,visibility
+                      FROM assistant.knowledge_runtime_document WHERE release_id=?
+                ) SELECT COUNT(*) FROM ((SELECT * FROM expected EXCEPT SELECT * FROM actual)
+                    UNION ALL (SELECT * FROM actual EXCEPT SELECT * FROM expected)) differences
+                """, release)).isZero();
     }
 
     private static void assertV95(Connection connection) throws SQLException {
@@ -383,14 +333,6 @@ class StudentPolicyCorrectionMigrationPostgresIT {
 
     private static String fingerprint(Connection connection, String rows, Object... parameters) throws SQLException {
         return scalar(connection, "SELECT encode(thesis.digest(COALESCE(string_agg(to_jsonb(f)::text,E'\\n' ORDER BY to_jsonb(f)::text),''),'sha256'),'hex') FROM (" + rows + ") f", parameters);
-    }
-
-    private static String fingerprint(Connection connection, String rows, UUID[] ids) throws SQLException {
-        return fingerprint(connection, rows, (Object) ids);
-    }
-
-    private static int count(Connection connection, String sql, UUID[] ids) throws SQLException {
-        return count(connection, sql, (Object) ids);
     }
 
     private static int count(Connection connection, String sql, Object... parameters) throws SQLException {

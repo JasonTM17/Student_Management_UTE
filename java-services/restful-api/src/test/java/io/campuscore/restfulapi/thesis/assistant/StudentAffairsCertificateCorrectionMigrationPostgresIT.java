@@ -20,17 +20,17 @@ import org.junit.jupiter.params.provider.ValueSource;
 /** Forward-only proof on distinct caller-created local databases. Never clean, reset or drop. */
 @EnabledIfEnvironmentVariable(named = "CAMPUSCORE_CERTIFICATE_MIGRATION_ENABLED", matches = "true")
 class StudentAffairsCertificateCorrectionMigrationPostgresIT {
-    private static final UUID BASE = UUID.fromString("00000000-0000-0000-0000-000000000096");
-    private static final UUID NEXT = UUID.fromString("00000000-0000-0000-0000-000000000097");
+    private static final UUID BASE = UUID.fromString("00000000-0000-0000-0000-000000000098");
+    private static final UUID NEXT = UUID.fromString("00000000-0000-0000-0000-000000000099");
     // Independent, fixed V41 identities; never read the migration's eligibility table as an oracle.
     private static final UUID VI = UUID.fromString("dcd11df4-2cb3-21fb-f9b5-638f12681c6b");
     private static final UUID EN = UUID.fromString("51b2dfd2-722d-630c-fe0b-d6ba340e1aa9");
-    private static final String SOURCE = "campuscore-student-affairs-corrected-v97";
+    private static final String SOURCE = "campuscore-student-affairs-corrected-v99";
 
     @Test
     void cleanInstallationPublishesBothCorrectionsAndValidates() throws Exception {
         Fixture fixture = fixture("CLEAN");
-        fixture.migrate("97");
+        fixture.migrate("99");
         try (Connection connection = fixture.connect()) {
             assertHistory(connection, fixture);
             assertThat(active(connection)).isEqualTo(NEXT.toString());
@@ -40,9 +40,9 @@ class StudentAffairsCertificateCorrectionMigrationPostgresIT {
     }
 
     @Test
-    void normal096UpgradePreservesHistoryAndRerunIsStable() throws Exception {
+    void normal098UpgradePreservesHistoryAndRerunIsStable() throws Exception {
         Fixture fixture = fixture("LOCAL");
-        fixture.migrate("96");
+        fixture.migrate("98");
         try (Connection connection = fixture.connect()) {
             assertThat(active(connection)).isEqualTo(BASE.toString());
             assertThat(scalar(connection, "SELECT content FROM assistant.knowledge_runtime_document WHERE release_id=? AND source_id=?", BASE, VI.toString()))
@@ -50,7 +50,7 @@ class StudentAffairsCertificateCorrectionMigrationPostgresIT {
             String history = historical(connection);
             String unrelated = fingerprint(connection, "SELECT to_jsonb(d) AS document,(SELECT jsonb_agg(to_jsonb(r) ORDER BY version) FROM assistant.knowledge_document_revision r WHERE r.document_id=d.id) AS revisions FROM assistant.knowledge_document d WHERE d.id<>? AND d.id<>?", VI, EN);
             String originalPayloads = fingerprint(connection, "SELECT id,document_id,version,domain,locale,slug,title,content,source,priority,created_by,reviewed_by,published_at FROM assistant.knowledge_document_revision WHERE document_id IN (?,?) AND version=1", VI, EN);
-            fixture.migrate("97");
+            fixture.migrate("99");
             assertHistory(connection, fixture);
             assertThat(historical(connection)).isEqualTo(history);
             assertThat(fingerprint(connection, "SELECT to_jsonb(d) AS document,(SELECT jsonb_agg(to_jsonb(r) ORDER BY version) FROM assistant.knowledge_document_revision r WHERE r.document_id=d.id) AS revisions FROM assistant.knowledge_document d WHERE d.id<>? AND d.id<>?", VI, EN)).isEqualTo(unrelated);
@@ -59,7 +59,7 @@ class StudentAffairsCertificateCorrectionMigrationPostgresIT {
             assertProjection(connection, VI, EN);
             String stable = fingerprint(connection, "SELECT * FROM assistant.knowledge_runtime_document WHERE release_id=?", NEXT);
             String stableRelease = fingerprint(connection, "SELECT * FROM assistant.knowledge_release WHERE id=?", NEXT);
-            fixture.migrate("97");
+            fixture.migrate("99");
             assertThat(fingerprint(connection, "SELECT * FROM assistant.knowledge_runtime_document WHERE release_id=?", NEXT)).isEqualTo(stable);
             assertThat(fingerprint(connection, "SELECT * FROM assistant.knowledge_release WHERE id=?", NEXT)).isEqualTo(stableRelease);
         }
@@ -69,7 +69,7 @@ class StudentAffairsCertificateCorrectionMigrationPostgresIT {
     @ValueSource(strings = {"CONTENT", "REVISION_CONTENT", "DOCUMENT_METADATA", "REVISION_METADATA", "STATUS", "DRAFT", "PUBLISHED"})
     void humanAndMetadataDriftRemainExactWhileTheOtherSeedIsCorrected(String variant) throws Exception {
         Fixture fixture = fixture("DRIFT_" + variant);
-        fixture.migrate("96");
+        fixture.migrate("98");
         try (Connection connection = fixture.connect()) {
             switch (variant) {
                 case "CONTENT" -> execute(connection, "UPDATE assistant.knowledge_document SET content='Human certificate wording' WHERE id=?", VI);
@@ -90,7 +90,7 @@ class StudentAffairsCertificateCorrectionMigrationPostgresIT {
             }
             String preserved = authoring(connection, VI);
             String history = historical(connection);
-            fixture.migrate("97");
+            fixture.migrate("99");
             assertThat(authoring(connection, VI)).isEqualTo(preserved);
             assertThat(historical(connection)).isEqualTo(history);
             assertCorrections(connection, EN);
@@ -101,12 +101,12 @@ class StudentAffairsCertificateCorrectionMigrationPostgresIT {
     @Test
     void inFlightPublisherIsWaitedForBeforeEligibilityWithoutLockInversion() throws Exception {
         Fixture fixture = fixture("CONCURRENT");
-        fixture.migrate("96");
+        fixture.migrate("98");
         try (Connection observer = fixture.connect(); Connection writer = fixture.connect(); var executor = Executors.newSingleThreadExecutor()) {
             writer.setAutoCommit(false);
             execute(writer, "UPDATE assistant.knowledge_document SET priority=4 WHERE id=?", VI);
             int writerPid = count(writer, "SELECT pg_backend_pid()");
-            var migration = executor.submit(() -> fixture.migrate("97"));
+            var migration = executor.submit(() -> fixture.migrate("99"));
             try {
                 awaitBlocked(observer, writerPid);
                 execute(writer, "SET LOCAL lock_timeout='2s'");
@@ -127,7 +127,7 @@ class StudentAffairsCertificateCorrectionMigrationPostgresIT {
     @ValueSource(strings = {"FOREIGN", "NEWER"})
     void foreignOrNewerAuthorityIsNeverReplaced(String kind) throws Exception {
         Fixture fixture = fixture(kind);
-        fixture.migrate("96");
+        fixture.migrate("98");
         try (Connection connection = fixture.connect()) {
             UUID external = UUID.randomUUID();
             execute(connection, """
@@ -143,7 +143,7 @@ class StudentAffairsCertificateCorrectionMigrationPostgresIT {
             execute(connection, "UPDATE assistant.knowledge_runtime_state SET active_release_id=? WHERE singleton=TRUE", external);
             String state = fingerprint(connection, "SELECT * FROM assistant.knowledge_runtime_state");
             String history = historical(connection);
-            fixture.migrate("97");
+            fixture.migrate("99");
             assertThat(fingerprint(connection, "SELECT * FROM assistant.knowledge_runtime_state")).isEqualTo(state);
             assertThat(historical(connection)).isEqualTo(history);
             assertThat(count(connection, "SELECT COUNT(*) FROM assistant.knowledge_release WHERE id=?", NEXT)).isZero();
@@ -155,12 +155,12 @@ class StudentAffairsCertificateCorrectionMigrationPostgresIT {
     @Test
     void changedBasePayloadIsNotOverlaidEvenWhenOriginalAuthoringIsEligible() throws Exception {
         Fixture fixture = fixture("BASE_DRIFT");
-        fixture.migrate("96");
+        fixture.migrate("98");
         try (Connection connection = fixture.connect()) {
             // A deliberately different immutable fixture is an independent negative input.
             execute(connection, "UPDATE assistant.knowledge_runtime_document SET priority=6 WHERE release_id=? AND source_id=?", BASE, VI.toString());
             String history = historical(connection);
-            fixture.migrate("97");
+            fixture.migrate("99");
             assertThat(historical(connection)).isEqualTo(history);
             assertCorrections(connection, VI, EN);
             assertProjection(connection, EN);
@@ -181,7 +181,10 @@ class StudentAffairsCertificateCorrectionMigrationPostgresIT {
     private static void assertProjection(Connection connection, UUID... corrected) throws SQLException {
         assertThat(active(connection)).isEqualTo(NEXT.toString());
         UUID[] ids = corrected;
-        assertThat(count(connection, "SELECT COUNT(*) FROM assistant.knowledge_runtime_document WHERE release_id=?", NEXT)).isEqualTo(164);
+        // V99 overlays the …098 map without adding or removing rows, so the
+        // projected row count must equal the base release's on every database.
+        assertThat(count(connection, "SELECT COUNT(*) FROM assistant.knowledge_runtime_document WHERE release_id=?", NEXT))
+                .isEqualTo(count(connection, "SELECT COUNT(*) FROM assistant.knowledge_runtime_document WHERE release_id=?", BASE));
         assertThat(scalar(connection, "SELECT previous_release_id::text FROM assistant.knowledge_release WHERE id=?", NEXT)).isEqualTo(BASE.toString());
         assertThat(scalar(connection, "SELECT string_agg(source_id,E'\\n' ORDER BY source_id) FROM assistant.knowledge_runtime_document WHERE release_id=?", NEXT))
                 .isEqualTo(scalar(connection, "SELECT string_agg(source_id,E'\\n' ORDER BY source_id) FROM assistant.knowledge_runtime_document WHERE release_id=?", BASE));
@@ -211,10 +214,10 @@ class StudentAffairsCertificateCorrectionMigrationPostgresIT {
     }
 
     private static void assertHistory(Connection connection, Fixture fixture) throws SQLException {
-        assertThat(scalar(connection, "SELECT version FROM thesis.flyway_schema_history WHERE success ORDER BY installed_rank DESC LIMIT 1")).isEqualTo("97");
+        assertThat(scalar(connection, "SELECT version FROM thesis.flyway_schema_history WHERE success ORDER BY installed_rank DESC LIMIT 1")).isEqualTo("99");
         assertThat(count(connection, "SELECT checksum FROM thesis.flyway_schema_history WHERE version='95' AND success")).isEqualTo(359601249);
-        assertThat(count(connection, "SELECT checksum FROM thesis.flyway_schema_history WHERE version='96' AND success")).isEqualTo(-1758874941);
-        assertThat(fixture.flyway("97").validateWithResult().validationSuccessful).isTrue();
+        assertThat(count(connection, "SELECT checksum FROM thesis.flyway_schema_history WHERE version='96' AND success")).isEqualTo(1556597148);
+        assertThat(fixture.flyway("99").validateWithResult().validationSuccessful).isTrue();
     }
 
     private static String historical(Connection connection) throws SQLException {
