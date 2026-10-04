@@ -52,10 +52,19 @@ public class NotificationWriteRepository {
     }
 
     public Optional<NotificationResponse> findById(String notificationId) {
+        return findById(notificationId, false);
+    }
+
+    /** Admin mutation snapshot; the caller's transaction holds the lock through write/audit. */
+    public Optional<NotificationResponse> findByIdForUpdate(String notificationId) {
+        return findById(notificationId, true);
+    }
+
+    private Optional<NotificationResponse> findById(String notificationId, boolean forUpdate) {
         return jdbc.query(
                         "SELECT " + SELECT_COLUMNS
                                 + " FROM " + TABLE
-                                + " WHERE id = :id",
+                                + " WHERE id = :id" + (forUpdate ? " FOR UPDATE" : ""),
                         new MapSqlParameterSource("id", notificationId),
                         ROW_MAPPER)
                 .stream()
@@ -133,8 +142,8 @@ public class NotificationWriteRepository {
     }
 
     /** Admin path: unscoped by design, guarded by the ADMIN-only route. */
-    public void deleteAny(String notificationId) {
-        jdbc.update(
+    public int deleteAny(String notificationId) {
+        return jdbc.update(
                 "DELETE FROM " + TABLE + " WHERE id = :id",
                 new MapSqlParameterSource("id", notificationId));
     }

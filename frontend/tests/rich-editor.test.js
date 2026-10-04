@@ -489,9 +489,13 @@ test('K6 crash drafts stay restorable while discarded drafts are cleared', () =>
   assert.match(source, /autosave_prefix: `\$\{AUTOSAVE_KEY_PREFIX\}/);
   // Active discards still wipe the draft, so the restoredraft item cannot bring
   // back a body the author chose to throw away.
-  const calls =
-    read('src/app/dashboard/editor/page.tsx').match(/clearTinyMceAutosaveDrafts\(\)/g) ?? [];
-  assert.ok(calls.length >= 3, 'New Document, Cancel edit and modal close each clear the draft');
+  const studio = read('src/app/dashboard/editor/page.tsx');
+  const modal = read('src/components/announcements/AnnouncementEditModal.tsx');
+  assert.equal((studio.match(/clearTinyMceAutosaveDrafts\(studioEditorRef\.current\?\.id\)/g) ?? []).length, 2,
+    'New Document and Cancel edit clear only the studio editor draft');
+  assert.match(modal, /clearTinyMceAutosaveDrafts\(modalEditorRef\.current\?\.id\)/,
+    'modal close clears only the initialized modal editor draft');
+  assert.match(modal, /onClose=\{handleClose\}/, 'Escape/backdrop close uses the scoped cleanup');
 });
 
 test('F-2 the feed-order save is locked against a double submission', () => {

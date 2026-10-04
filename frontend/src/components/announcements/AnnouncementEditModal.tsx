@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   AlertCircle,
   Building2,
@@ -28,7 +28,7 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { useI18n } from '@/i18n';
 import { RichContentRenderer } from '@/components/ui/rich-content-renderer';
-import { TinyMceEditor } from '@/components/ui/tinymce-editor';
+import { TinyMceEditor, clearTinyMceAutosaveDrafts } from '@/components/ui/tinymce-editor';
 import { replaceCoverBlock, removeCoverBlock } from '@/lib/cover-banner';
 import { cn } from '@/lib/utils';
 
@@ -128,6 +128,11 @@ export function AnnouncementEditModal({
   const [editorMode, setEditorMode] = useState<'visual' | 'code' | 'preview'>('visual');
   const [isSaving, setIsSaving] = useState(false);
   const [validationError, setValidationError] = useState('');
+  const modalEditorRef = useRef<{ id: string } | null>(null);
+  const handleClose = () => {
+    clearTinyMceAutosaveDrafts(modalEditorRef.current?.id);
+    onClose();
+  };
 
   // Active cover image detection from content
   const activeCoverUrl =
@@ -239,7 +244,7 @@ export function AnnouncementEditModal({
       };
 
       await onSave(announcement.id, payload);
-      onClose();
+      handleClose();
     } catch (err: any) {
       setValidationError(
         err?.response?.data?.message ||
@@ -256,7 +261,7 @@ export function AnnouncementEditModal({
   return (
     <Modal
       isOpen={isOpen}
-      onClose={onClose}
+      onClose={handleClose}
       title={isVi ? 'Chỉnh sửa thông báo / công văn' : 'Edit Announcement'}
       className="max-w-3xl"
     >
@@ -459,6 +464,7 @@ export function AnnouncementEditModal({
               <TinyMceEditor
                 value={content}
                 onChange={setContent}
+                onInit={(_event, editor) => { modalEditorRef.current = editor; }}
                 locale={locale}
                 height={280}
                 placeholder={isVi ? 'Soạn thảo nội dung văn bản chuẩn học thuật...' : 'Compose document content...'}
@@ -518,7 +524,7 @@ export function AnnouncementEditModal({
               type="button"
               variant="ghost"
               size="sm"
-              onClick={onClose}
+              onClick={handleClose}
               disabled={isSaving}
               className="text-xs"
             >

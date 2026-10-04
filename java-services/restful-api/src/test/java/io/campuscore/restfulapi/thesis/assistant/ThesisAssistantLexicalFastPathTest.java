@@ -104,6 +104,22 @@ class ThesisAssistantLexicalFastPathTest {
     }
 
     @Test
+    void newStudentPolicyVocabularyReachesTheAcademicCorpus() {
+        List<String> topics = List.of("Kỷ luật", "Chứng thực", "Chứng nhận", "Thẻ sinh viên",
+                "Thẻ thư viện", "Trung tâm thông báo", "Hoàn học phí", "Hoàn phí", "Học kỳ phụ",
+                "Chuyển đổi tín chỉ", "Chuyển ngành", "Xếp loại tốt nghiệp", "Thời gian đào tạo");
+        for (String topic : topics) {
+            ThesisAssistantKnowledgeRepository knowledge = mock(ThesisAssistantKnowledgeRepository.class);
+            when(knowledge.search(anyString(), anyList(), anyInt())).thenReturn(List.of(
+                    document("policy-topic", topic, "Hướng dẫn " + topic + ": liên hệ đơn vị phụ trách.",
+                            "POLICY", 50)));
+            ChatResponse response = service(knowledge, DEFAULTS).lexicalFastPath(topic + "?", "vi", null);
+            assertTrue(response != null && "ANSWERED".equals(response.reasonCode()), topic);
+            verify(knowledge, org.mockito.Mockito.atLeastOnce()).search(anyString(), anyList(), anyInt());
+        }
+    }
+
+    @Test
     void registrationHowToCannotGrabAPolicyDocumentOnTheFastPath() {
         ThesisAssistantKnowledgeRepository knowledge = mock(ThesisAssistantKnowledgeRepository.class);
         when(knowledge.search(anyString(), anyList(), anyInt())).thenReturn(List.of(

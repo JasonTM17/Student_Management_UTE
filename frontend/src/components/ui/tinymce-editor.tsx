@@ -124,18 +124,15 @@ const AUTOSAVE_KEY_PREFIX = 'campuscore-tinymce-';
  * left by a crash or a closed tab are untouched and stay reachable through that
  * same menu item.
  */
-export function clearTinyMceAutosaveDrafts(): void {
-  if (typeof window === 'undefined') return;
+export function clearTinyMceAutosaveDrafts(editorId?: string): void {
+  if (typeof window === 'undefined' || !editorId) return;
   try {
     const storage = window.localStorage;
-    const stale: string[] = [];
-    for (let index = 0; index < storage.length; index += 1) {
-      const key = storage.key(index);
-      if (key && key.startsWith(AUTOSAVE_KEY_PREFIX) && (key.endsWith('draft') || key.endsWith('time'))) {
-        stale.push(key);
-      }
-    }
-    stale.forEach((key) => storage.removeItem(key));
+    // Match TinyMCE's path/query/id expansion. A modal discard must not erase
+    // the recovery copy belonging to the studio or another editor/route.
+    const prefix = `${AUTOSAVE_KEY_PREFIX}${window.location.pathname}${window.location.search}-${editorId}-`;
+    storage.removeItem(`${prefix}draft`);
+    storage.removeItem(`${prefix}time`);
   } catch {
     // Storage can be unavailable (private mode); nothing to clear then.
   }
