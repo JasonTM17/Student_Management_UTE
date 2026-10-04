@@ -455,6 +455,19 @@ public class ThesisAssistantController {
         try {
             streamExecutor.execute(task);
         } catch (RejectedExecutionException rejected) {
+            // Every student worker is busy waiting on the provider. Before
+            // giving up, let a deterministic fast-path question through on the
+            // servlet thread: it never touches the provider, so answering it
+            // under saturation is strictly better than ASSISTANT_UNAVAILABLE.
+            ChatResponse fastPath = lexicalFastPathOrNull(request);
+            if (fastPath != null) {
+                emitLexicalFastPath(fastPath, request,
+                        AssistantInputGuard.normalizeLocale(request.locale()), sink);
+                generationFinished.set(true);
+                stopHeartbeat.run();
+                emitter.complete();
+                return emitter;
+            }
             generationFinished.set(true);
             stopHeartbeat.run();
             sendError(emitter, "ASSISTANT_UNAVAILABLE", true);

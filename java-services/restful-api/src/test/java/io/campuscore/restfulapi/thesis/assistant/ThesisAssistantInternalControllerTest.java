@@ -78,7 +78,7 @@ class ThesisAssistantInternalControllerTest {
     @Test
     void httpStreamFlushesBeforeGenerationCompletesInTheVerifiedInternalOwnerScope() throws Exception {
         ThesisAssistantService service = Mockito.mock(ThesisAssistantService.class);
-        AssistantStreamExecutor streams = new AssistantStreamExecutor(1);
+        AssistantStreamExecutor streams = new AssistantStreamExecutor("assistant-stream-test-", 1);
         var controller = new ThesisAssistantInternalController(service,
                 new AssistantRagProperties("", "internal-token", true, 1_000, 30_000), streams);
         var mvc = MockMvcBuilders.standaloneSetup(controller).build();

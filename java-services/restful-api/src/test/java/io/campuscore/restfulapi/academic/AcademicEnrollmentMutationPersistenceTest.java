@@ -219,6 +219,38 @@ class AcademicEnrollmentMutationPersistenceTest {
     }
 
     @Test
+    void aGradedRowWithoutALetterDoesNotSatisfyThePrerequisiteGate() throws Exception {
+        // A producer bug could publish a COMPLETED row without a letter; the
+        // gate must require an actual passing letter, matching the knowledge
+        // copy ("môn chưa có điểm công bố chưa được tính là đã hoàn thành").
+        jdbc.update(
+                "INSERT INTO \"academic\".\"CourseRequirement\""
+                        + " (\"id\", \"courseId\", \"requiredCourseId\", \"kind\", \"minLetterGrade\")"
+                        + " VALUES ('req-test-null-letter', 'course-open', 'course-overlap', 'PREREQ', 'D')");
+        seedCompletedEnrollment("enrollment-null-letter", "section-overlap", "course-overlap", null);
+
+        mvc.perform(post("/api/v1/enrollments/enroll")
+                        .with(studentJwt("student-user-1", "student-1"))
+                        .header("Idempotency-Key", "enroll-null-letter-blocked")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"sectionId\":\"section-open\"}"))
+                .andExpect(status().isUnprocessableEntity())
+                .andExpect(jsonPath("$.code").value("PREREQUISITE_UNMET"));
+
+        // Completing with a real letter unlocks it.
+        jdbc.update(
+                "UPDATE \"academic\".\"Enrollment\" SET \"letterGrade\" = 'C' WHERE \"id\" = 'enrollment-null-letter'");
+
+        mvc.perform(post("/api/v1/enrollments/enroll")
+                        .with(studentJwt("student-user-1", "student-1"))
+                        .header("Idempotency-Key", "enroll-null-letter-met")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"sectionId\":\"section-open\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("ENROLLED"));
+    }
+
+    @Test
     void corequisiteGateRequiresAConcurrentEnrollmentInThePairedCourse() throws Exception {
         // section-two (SE404) carries no schedules, so the paired enrollment
         // cannot trip the schedule-overlap conflict (409) instead of the gate.

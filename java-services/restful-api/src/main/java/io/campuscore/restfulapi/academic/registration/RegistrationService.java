@@ -814,7 +814,11 @@ public class RegistrationService {
                 "SELECT COUNT(*) FROM " + ENROLLMENT
                         + " WHERE \"studentId\" = :studentId AND \"courseId\" = :courseId"
                         + " AND \"gradeStatus\" IN ('COMPLETED', 'PUBLISHED')"
-                        + " AND (\"letterGrade\" IS NULL OR \"letterGrade\" NOT IN ('F', 'W'))",
+                        // A passing letter is required: a graded row without a
+                        // letter (a producer bug) must never silently unlock a
+                        // prerequisite, matching the knowledge-base copy.
+                        + " AND \"letterGrade\" IS NOT NULL"
+                        + " AND \"letterGrade\" NOT IN ('F', 'W')",
                 new MapSqlParameterSource().addValue("studentId", studentId).addValue("courseId", courseId),
                 Long.class);
         return count != null && count > 0;

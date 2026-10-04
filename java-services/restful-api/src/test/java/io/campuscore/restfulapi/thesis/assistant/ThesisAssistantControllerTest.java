@@ -139,7 +139,11 @@ class ThesisAssistantControllerTest {
             assertTrue(body.contains("ASSISTANT_UNAVAILABLE"), body);
             assertTrue(body.contains("\"retryable\":true"), body);
             assertEquals(1, body.split("event:error", -1).length - 1);
-            verifyNoInteractions(assistant);
+            // Saturation rescue: the deterministic fast path is consulted on
+            // the servlet thread (the mock returns null here), but the local
+            // pipeline is still never dispatched while the pool is saturated.
+            verify(assistant).lexicalFastPath(anyString(), anyString(), any());
+            verify(assistant, never()).stream(anyString(), anyString(), any(), anyString(), any(), any(), any());
             release.countDown();
             assertTrue(exited.await(2, TimeUnit.SECONDS));
             CountDownLatch recovered = new CountDownLatch(1);
@@ -203,7 +207,7 @@ class ThesisAssistantControllerTest {
                 workFinished.countDown();
             }
         }).when(assistant).stream(anyString(), anyString(), any(), anyString(), any(), any(), any());
-        try (AssistantStreamExecutor streams = new AssistantStreamExecutor(1)) {
+        try (AssistantStreamExecutor streams = new AssistantStreamExecutor("assistant-stream-test-", 1)) {
             var controller = new ThesisAssistantController(assistant, null, null, null, streams);
             var mvc = MockMvcBuilders.standaloneSetup(controller)
                     .setCustomArgumentResolvers(new AuthenticationPrincipalArgumentResolver()).build();
@@ -229,7 +233,7 @@ class ThesisAssistantControllerTest {
     @Test
     void httpStreamReturnsAndFlushesBeforeGenerationCompletesWithTheAuthenticatedOwner() throws Exception {
         ThesisAssistantService assistant = mock(ThesisAssistantService.class);
-        AssistantStreamExecutor streams = new AssistantStreamExecutor(1);
+        AssistantStreamExecutor streams = new AssistantStreamExecutor("assistant-stream-test-", 1);
         ThesisAssistantController controller = new ThesisAssistantController(assistant, null, null, null, streams);
         MockMvc mvc = MockMvcBuilders.standaloneSetup(controller)
                 .setCustomArgumentResolvers(new AuthenticationPrincipalArgumentResolver()).build();

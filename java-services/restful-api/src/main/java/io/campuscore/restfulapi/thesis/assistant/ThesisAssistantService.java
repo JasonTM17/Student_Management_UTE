@@ -1626,6 +1626,26 @@ public class ThesisAssistantService {
                             .filter(ThesisAssistantService::isPrerequisiteMapDocument)
                             .toList();
                 }
+                // A prerequisite question WITHOUT a code ("môn nào có tiên
+                // quyết?") matches the policy/map vocabulary but ranks badly
+                // against the specialized corpus on that page — ground it in
+                // the map + policy documents instead of the curated fallback.
+                if (courseCode == null) {
+                    try {
+                        addDocuments(documents, seen, knowledge.search(locale,
+                                List.of("tiên quyết", "prerequisite"), 4));
+                    } catch (DataAccessException ignored) {
+                        // Same honest degradation as above.
+                    }
+                    prerequisiteDocuments = documents.stream()
+                            .filter(d -> isPrerequisiteMapDocument(d)
+                                    || (d.slug() != null
+                                            && d.slug().startsWith("prerequisite-prior-corequisite")))
+                            .toList();
+                    if (!prerequisiteDocuments.isEmpty()) {
+                        documents = prerequisiteDocuments;
+                    }
+                }
             }
             if (!prerequisiteDocuments.isEmpty()) {
                 documents = prerequisiteDocuments;
