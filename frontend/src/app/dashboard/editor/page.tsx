@@ -159,6 +159,8 @@ export default function AcademicEditorPage() {
   const [content, setContent] = useState('');
   const [priority, setPriority] = useState<'URGENT' | 'HIGH' | 'NORMAL' | 'LOW'>('NORMAL');
   const [targetRole, setTargetRole] = useState<TargetRoleOption>('ALL');
+  const [priorityKnown, setPriorityKnown] = useState(true);
+  const [audienceKnown, setAudienceKnown] = useState(true);
   const [isPublishingNotice, setIsPublishingNotice] = useState(false);
   const [lastSaved, setLastSaved] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
@@ -177,6 +179,7 @@ export default function AcademicEditorPage() {
     reason: 'not-found' | 'load-failed';
   } | null>(null);
   const [editingNoticeModal, setEditingNoticeModal] = useState<AnnouncementRecord | null>(null);
+  const studioEditorRef = useRef<{ id: string } | null>(null);
 
   // RT-P3-3: unsaved-changes guard (beforeunload + in-app confirm) shared with
   // the other editors via lib/use-unsaved-changes-guard.ts. A document is
@@ -342,7 +345,13 @@ export default function AcademicEditorPage() {
         if (parsed.editingId) {
           setEditingId(parsed.editingId);
           setEditingVersion(parsed.editingVersion ?? 0);
+          // Legacy edit drafts did not store these fields. Omit unknown
+          // metadata on PATCH instead of silently widening the live notice.
+          setPriorityKnown(Boolean(parsed.priority));
+          setAudienceKnown(Boolean(parsed.targetRole));
         }
+        if (parsed.priority) setPriority(parsed.priority);
+        if (parsed.targetRole) setTargetRole(parsed.targetRole);
         return;
       }
     } catch {
@@ -396,6 +405,8 @@ export default function AcademicEditorPage() {
       // update of a saved announcement instead of losing that association.
       editingId,
       editingVersion,
+      priority: priorityKnown ? priority : undefined,
+      targetRole: audienceKnown ? targetRole : undefined,
     };
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
@@ -406,7 +417,7 @@ export default function AcademicEditorPage() {
       // so the author believed a draft existed that did not.
       toast.error(copy.draftSaveFailed);
     }
-  }, [category, content, copy.draftSaveFailed, copy.savedToast, editingId, editingVersion, editorType, title]);
+  }, [audienceKnown, category, content, copy.draftSaveFailed, copy.savedToast, editingId, editingVersion, editorType, priority, priorityKnown, targetRole, title]);
 
   const handleCopy = useCallback(async () => {
     try {
@@ -447,6 +458,8 @@ export default function AcademicEditorPage() {
       // open before the reset.
       setEditingId(null);
       setEditingVersion(0);
+      setPriorityKnown(true);
+      setAudienceKnown(true);
       setTitle('');
       setContent(defaultBodyFor());
       setLastSaved(null);
@@ -457,7 +470,7 @@ export default function AcademicEditorPage() {
       }
       // K6: a discarded document must not be resurrected from TinyMCE's own
       // autosave draft.
-      clearTinyMceAutosaveDrafts();
+      clearTinyMceAutosaveDrafts(studioEditorRef.current?.id);
     });
   }, [defaultBodyFor, unsaved]);
 
@@ -677,6 +690,8 @@ export default function AcademicEditorPage() {
   const handleLoadAnnouncement = useCallback((ann: AnnouncementRecord) => {
     setEditingId(ann.id);
     setEditingVersion(ann.version ?? 0);
+    setPriorityKnown(true);
+    setAudienceKnown(true);
     setTitle(ann.title);
     setContent(ann.content);
     if (ann.priority === 'URGENT' || ann.priority === 'HIGH' || ann.priority === 'NORMAL' || ann.priority === 'LOW') {
@@ -790,6 +805,8 @@ export default function AcademicEditorPage() {
     unsaved.requestLeave(() => {
       setEditingId(null);
       setEditingVersion(0);
+      setPriorityKnown(true);
+      setAudienceKnown(true);
       setTitle('');
       setContent(defaultBodyFor());
       try {
@@ -800,7 +817,7 @@ export default function AcademicEditorPage() {
       } catch {
         // ignore
       }
-      clearTinyMceAutosaveDrafts();
+      clearTinyMceAutosaveDrafts(studioEditorRef.current?.id);
       toast.info(isVi ? 'Đã hủy chế độ sửa, bắt đầu soạn thảo văn bản mới' : 'Cancelled edit mode');
     });
   };
@@ -873,9 +890,8 @@ export default function AcademicEditorPage() {
       await announcementsApi.update(editingId, {
         title,
         content,
-        priority,
-        targetYears: [],
-        ...audienceFor(targetRole),
+        ...(priorityKnown ? { priority } : {}),
+        ...(audienceKnown ? audienceFor(targetRole) : {}),
         reason: 'Cập nhật nội dung văn bản học vụ',
         expectedVersion: editingVersion,
       });
@@ -1187,14 +1203,15 @@ export default function AcademicEditorPage() {
                   </label>
                   <Select
                     aria-label={copy.priorityLabel}
-                    value={priority}
-                    onChange={(e) =>
-                      setPriority(e.target.value as (typeof PRIORITY_VALUES)[number])
-                    }
-                    options={PRIORITY_VALUES.map((value) => ({
+                    value={editingId && !priorityKnown ? '' : priority}
+                    onChange={(e) => {
+                      setPriority(e.target.value as (typeof PRIORITY_VALUES)[number]);
+                      setPriorityKnown(true);
+                    }}
+                    options={[...(editingId && !priorityKnown ? [{ value: '', label: isVi ? 'Giữ nguyên mức ưu tiên đã lưu' : 'Keep saved priority' }] : []), ...PRIORITY_VALUES.map((value) => ({
                       value,
                       label: editorCopy.priorityOptions[value],
-                    }))}
+                    }))]}
                     className="h-10"
                   />
                 </div>
@@ -1204,14 +1221,15 @@ export default function AcademicEditorPage() {
                   </label>
                   <Select
                     aria-label={copy.targetRoleLabel}
-                    value={targetRole}
-                    onChange={(e) =>
-                      setTargetRole(e.target.value as (typeof TARGET_ROLE_VALUES)[number])
-                    }
-                    options={TARGET_ROLE_VALUES.map((value) => ({
+                    value={editingId && !audienceKnown ? '' : targetRole}
+                    onChange={(e) => {
+                      setTargetRole(e.target.value as (typeof TARGET_ROLE_VALUES)[number]);
+                      setAudienceKnown(true);
+                    }}
+                    options={[...(editingId && !audienceKnown ? [{ value: '', label: isVi ? 'Giữ nguyên đối tượng đã lưu' : 'Keep saved audience' }] : []), ...TARGET_ROLE_VALUES.map((value) => ({
                       value,
                       label: editorCopy.targetRoleOptions[value],
-                    }))}
+                    }))]}
                     className="h-10"
                   />
                 </div>
@@ -1583,6 +1601,7 @@ export default function AcademicEditorPage() {
               <TinyMceEditor
                 value={content}
                 onChange={setContent}
+                onInit={(_event, editor) => { studioEditorRef.current = editor; }}
                 height={580}
                 locale={isVi ? 'vi' : 'en'}
                 showTemplates={true}
@@ -1888,9 +1907,6 @@ export default function AcademicEditorPage() {
           isOpen={Boolean(editingNoticeModal)}
           onClose={() => {
             setEditingNoticeModal(null);
-            // K6: closing the modal discards the in-modal draft, so drop the
-            // editor autosave copy that would otherwise restore it.
-            clearTinyMceAutosaveDrafts();
           }}
           onSave={handleSaveModalEdit}
           onOpenStudio={(notice) => {

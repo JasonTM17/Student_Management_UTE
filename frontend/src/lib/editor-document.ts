@@ -31,6 +31,8 @@ export interface StoredEditorDocument {
   updatedAt: string;
   editingId?: string | null;
   editingVersion?: number;
+  priority?: 'URGENT' | 'HIGH' | 'NORMAL' | 'LOW';
+  targetRole?: 'ALL' | 'BOTH' | 'STUDENT' | 'LECTURER';
 }
 
 /**
@@ -71,6 +73,10 @@ export function parseStoredEditorDocument(raw: string | null): StoredEditorDocum
     updatedAt: typeof record.updatedAt === 'string' ? record.updatedAt : '',
     editingId,
     editingVersion,
+    priority: record.priority === 'URGENT' || record.priority === 'HIGH'
+      || record.priority === 'NORMAL' || record.priority === 'LOW' ? record.priority : undefined,
+    targetRole: record.targetRole === 'ALL' || record.targetRole === 'BOTH'
+      || record.targetRole === 'STUDENT' || record.targetRole === 'LECTURER' ? record.targetRole : undefined,
   };
 }
 

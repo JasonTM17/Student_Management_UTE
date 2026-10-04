@@ -109,9 +109,11 @@ public class NotificationWriteService {
     @Transactional
     public DeleteNotificationResponse delete(String notificationId, String actorId) {
         String id = requireText(notificationId, "notification id");
-        NotificationResponse existing = notifications.findById(id)
+        NotificationResponse existing = notifications.findByIdForUpdate(id)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Notification not found"));
-        notifications.deleteAny(id);
+        if (notifications.deleteAny(id) != 1) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Notification not found");
+        }
         audit.record(actorId, null, "NOTIFICATION_DELETED", "NOTIFICATION", id,
                 "Notification " + id + " deleted (was addressed to user " + existing.userId() + ")",
                 notificationState(existing),
@@ -122,7 +124,7 @@ public class NotificationWriteService {
     @Transactional
     public NotificationResponse update(String notificationId, UpdateNotificationRequest request, String actorId) {
         String id = requireText(notificationId, "notification id");
-        NotificationResponse before = notifications.findById(id)
+        NotificationResponse before = notifications.findByIdForUpdate(id)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Notification not found"));
         if (request.has("type") && !TYPES.contains(request.type())) {
             throw new IllegalArgumentException("type must be INFO, WARNING, ERROR, or SUCCESS");

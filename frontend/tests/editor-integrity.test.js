@@ -19,6 +19,59 @@ function loadTs(relativePath) {
   return moduleRecord.exports;
 }
 
+function loadDraftCleanup(windowMock) {
+  const ts = require('typescript');
+  const source = read('src/components/ui/tinymce-editor.tsx');
+  const ast = ts.createSourceFile('tinymce-editor.tsx', source, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX);
+  const declarations = ast.statements.filter((node) =>
+    (ts.isFunctionDeclaration(node) && node.name?.text === 'clearTinyMceAutosaveDrafts')
+    || (ts.isVariableStatement(node) && node.declarationList.declarations.some((declaration) =>
+      ts.isIdentifier(declaration.name) && declaration.name.text === 'AUTOSAVE_KEY_PREFIX')));
+  assert.equal(declarations.length, 2, 'execute the actual exported cleanup and its prefix');
+  const compiled = ts.transpileModule(declarations.map(node => node.getText(ast)).join('\n'), {
+    compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2020 },
+  }).outputText;
+  const moduleRecord = { exports: {} };
+  Function('window', 'module', 'exports', compiled)(windowMock, moduleRecord, moduleRecord.exports);
+  return moduleRecord.exports.clearTinyMceAutosaveDrafts;
+}
+
+test('discarding one TinyMCE editor preserves recovery drafts of other editors and routes', () => {
+  const location = { pathname: '/vi/dashboard/editor', search: '?editId=demo-1' };
+  const target = `campuscore-tinymce-${location.pathname}${location.search}-studio-`;
+  const other = `campuscore-tinymce-${location.pathname}${location.search}-modal-`;
+  const otherRoute = 'campuscore-tinymce-/en/dashboard/announcements-studio-';
+  const entries = new Map([
+    ...[target, other, otherRoute].flatMap(prefix => [[`${prefix}draft`, '<p>Unsaved</p>'], [`${prefix}time`, '1770000000000']]),
+    ['unrelated-app-setting', 'retained'],
+  ]);
+  const storage = {
+    get length() { return entries.size; },
+    key: index => [...entries.keys()][index] ?? null,
+    removeItem: key => entries.delete(key),
+  };
+  loadDraftCleanup({ location, localStorage: storage })('studio');
+  assert.equal(entries.has(`${target}draft`), false);
+  assert.equal(entries.has(`${target}time`), false);
+  for (const prefix of [other, otherRoute]) {
+    assert.equal(entries.get(`${prefix}draft`), '<p>Unsaved</p>', `${prefix} draft survives`);
+    assert.equal(entries.get(`${prefix}time`), '1770000000000', `${prefix} retention clock survives`);
+  }
+  assert.equal(entries.get('unrelated-app-setting'), 'retained');
+  assert.equal(entries.size, 5);
+});
+
+test('TinyMCE cleanup without an initialized editor never deletes any draft', () => {
+  const entries = new Map([['campuscore-tinymce-/vi/dashboard/editor-studio-draft', '<p>Recover me</p>']]);
+  const storage = {
+    get length() { return entries.size; },
+    key: index => [...entries.keys()][index] ?? null,
+    removeItem: key => entries.delete(key),
+  };
+  loadDraftCleanup({ location: { pathname: '/vi/dashboard/editor', search: '' }, localStorage: storage })();
+  assert.equal(entries.size, 1);
+});
+
 // --- T-P0-1: the editor must never reseed a live document on locale switch ---
 
 const editorPolicy = loadTs('src/lib/editor-document.ts');
@@ -68,6 +121,77 @@ test('studio page wires the seeding guard into a locale-independent init effect'
 // --- K1/K2: the studio draft keeps its edit context and exports keep their title ---
 
 const editorDraft = loadTs('src/lib/editor-document.ts');
+
+function loadStudioDraftActions(state, storage, updates) {
+  const ts = require('typescript');
+  const ast = ts.createSourceFile('page.tsx', editorPage, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX);
+  const pageFunction = ast.statements.find(node => ts.isFunctionDeclaration(node) && node.name?.text === 'AcademicEditorPage');
+  const audience = ast.statements.find(node => ts.isFunctionDeclaration(node) && node.name?.text === 'audienceFor');
+  const wanted = ['saveDraft', 'handleUpdateAnnouncement'];
+  const variables = pageFunction.body.statements.filter(node => ts.isVariableStatement(node)
+    && node.declarationList.declarations.some(declaration => wanted.includes(declaration.name.getText(ast))));
+  const hydrate = pageFunction.body.statements.find(node => ts.isExpressionStatement(node)
+    && ts.isCallExpression(node.expression) && node.expression.expression.getText(ast) === 'useEffect'
+    && node.expression.arguments[0].getText(ast).includes('parseStoredEditorDocument'));
+  assert.equal(variables.length, 2, 'execute actual save and update callbacks');
+  assert.ok(hydrate, 'execute actual storage hydration effect');
+  const source = [audience.getText(ast), ...variables.map(node => node.getText(ast)),
+    `const hydrateDraft = ${hydrate.expression.arguments[0].getText(ast)};`].join('\n');
+  const compiled = ts.transpileModule(source, {
+    compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2020 },
+  }).outputText;
+  const scope = {
+    ...state, copy: {}, locale: 'vi', isVi: true, useCallback: fn => fn,
+    localStorage: { getItem: key => storage.get(key) ?? null, setItem: (key, value) => storage.set(key, value) },
+    STORAGE_KEY: 'campuscore_editor_document', EDITOR_TYPE_KEY: 'campuscore_editor_engine',
+    toast: { success() {}, error() {} }, parseStoredEditorDocument: editorDraft.parseStoredEditorDocument,
+    findAnnouncementLengthViolation: () => null, fetchPublishedNotices: () => Promise.resolve(),
+    announcementsApi: { update: async (id, payload) => { updates.push({ id, payload }); return payload; } },
+    announcementLengthViolationMessage: () => '',
+  };
+  for (const property of ['title', 'category', 'content', 'editorType', 'editingId', 'editingVersion', 'priority', 'targetRole', 'priorityKnown', 'audienceKnown', 'lastSaved', 'isPublishingNotice']) {
+    scope[`set${property[0].toUpperCase()}${property.slice(1)}`] = value => {
+      state[property] = typeof value === 'function' ? value(state[property]) : value;
+    };
+  }
+  return Function('scope', `const { ${Object.keys(scope).join(', ')} } = scope;\n${compiled}\nreturn { saveDraft, hydrateDraft, handleUpdateAnnouncement };`)(scope);
+}
+
+for (const [targetRole, priority, roles] of [['BOTH', 'HIGH', ['STUDENT', 'LECTURER']], ['STUDENT', 'URGENT', ['STUDENT']]]) {
+  test(`stored ${targetRole}/${priority} edit keeps audience, priority and version on reload/update`, async () => {
+    const storage = new Map();
+    const updates = [];
+    const state = { title: 'Targeted notice', category: 'notice', content: '<p>Edited</p>', editorType: 'tinymce',
+      editingId: 'ann-targeted', editingVersion: 7, targetRole, priority, audienceKnown: true, priorityKnown: true };
+    loadStudioDraftActions(state, storage, updates).saveDraft();
+    const restored = { title: '', category: 'notice', content: '', editorType: 'tinymce', editingId: null,
+      editingVersion: 0, targetRole: 'ALL', priority: 'NORMAL', audienceKnown: true, priorityKnown: true };
+    loadStudioDraftActions(restored, storage, updates).hydrateDraft();
+    await loadStudioDraftActions(restored, storage, updates).handleUpdateAnnouncement();
+    assert.equal(updates.length, 1);
+    assert.equal(updates[0].id, 'ann-targeted');
+    assert.equal(updates[0].payload.expectedVersion, 7);
+    assert.equal(updates[0].payload.priority, priority);
+    assert.equal(updates[0].payload.isGlobal, false);
+    assert.deepEqual(updates[0].payload.targetRoles, roles);
+    assert.equal(Object.hasOwn(updates[0].payload, 'targetYears'), false, 'unexposed year filters are preserved server-side');
+  });
+}
+
+test('legacy edit draft omits unestablished metadata instead of widening an existing notice', async () => {
+  const storage = new Map([['campuscore_editor_document', JSON.stringify({ title: 'Legacy', content: '<p>Body</p>',
+    editingId: 'ann-old', editingVersion: 4 })]]);
+  const updates = [];
+  const state = { title: '', category: 'notice', content: '', editorType: 'tinymce', editingId: null,
+    editingVersion: 0, targetRole: 'ALL', priority: 'NORMAL', audienceKnown: true, priorityKnown: true };
+  loadStudioDraftActions(state, storage, updates).hydrateDraft();
+  await loadStudioDraftActions(state, storage, updates).handleUpdateAnnouncement();
+  assert.equal(updates.length, 1);
+  assert.equal(updates[0].payload.expectedVersion, 4);
+  for (const field of ['priority', 'isGlobal', 'targetRoles', 'targetYears']) {
+    assert.equal(Object.hasOwn(updates[0].payload, field), false, `${field} remains authoritative on the server`);
+  }
+});
 
 test('K1 editor-document round-trips the edit context stored with a draft', () => {
   const draft = editorDraft.parseStoredEditorDocument(
