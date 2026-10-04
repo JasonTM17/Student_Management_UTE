@@ -39,7 +39,7 @@ class RegistrationPdfRendererTest {
         assertThat(pdfString).contains("sem-2026-1");
         assertThat(pdfString).contains("enr-abc");
         assertThat(pdfString).contains("sec-xyz");
-        assertThat(pdfString).contains("CampusCore registration slip student=student-123 semester=sem-2026-1 enrollment=enr-abc section=sec-xyz");
+        assertThat(pdfString).contains("CampusUTE registration slip student=student-123 semester=sem-2026-1 enrollment=enr-abc section=sec-xyz");
         assertThat(pdfString).contains("TRUONG DAI HOC SU PHAM KY THUAT TP. HO CHI MINH");
 
         // Standard xref table and trailer checks
@@ -70,7 +70,7 @@ class RegistrationPdfRendererTest {
         assertThat(pdfBytes).isNotNull();
         String pdfString = new String(pdfBytes, StandardCharsets.ISO_8859_1);
         assertThat(pdfString).contains("%%EOF\r\n");
-        assertThat(pdfString).contains("CampusCore registration slip");
+        assertThat(pdfString).contains("CampusUTE registration slip");
     }
 
     @Test

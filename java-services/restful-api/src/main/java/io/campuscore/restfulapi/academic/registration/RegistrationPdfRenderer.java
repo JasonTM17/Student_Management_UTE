@@ -66,7 +66,7 @@ public class RegistrationPdfRenderer {
         String cleanEnrollmentId = safe(enrollmentId);
         String cleanSectionId = safe(sectionId);
 
-        String legacyText = "CampusCore registration slip student="
+        String legacyText = "CampusUTE registration slip student="
                 + cleanStudentId
                 + " semester="
                 + cleanSemesterId

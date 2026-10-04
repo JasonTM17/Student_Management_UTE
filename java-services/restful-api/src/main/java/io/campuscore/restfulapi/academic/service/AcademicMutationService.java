@@ -182,8 +182,8 @@ public class AcademicMutationService {
             csv.append(csv(row.get("id"))).append(',')
                     .append(csv(row.get("student_number"))).append(',')
                     .append(csv(row.get("email"))).append(',')
-                    .append(csv((String.valueOf(row.get("firstName")) + " "
-                            + String.valueOf(row.get("lastName"))).trim())).append(',')
+                    .append(csv((String.valueOf(row.get("lastName")) + " "
+                            + String.valueOf(row.get("firstName"))).trim())).append(',')
                     .append(csv(row.get("course_code"))).append(',')
                     .append(csv(row.get("course_name"))).append(',')
                     .append(csv(row.get("sectionNumber"))).append(',')

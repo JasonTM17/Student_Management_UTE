@@ -388,7 +388,7 @@ class AcademicEnrollmentMutationPersistenceTest {
                 .andExpect(jsonPath("$[0].schedules[0].startTime").value("07:00"))
                 .andExpect(jsonPath("$[0].schedules[0].endTime").value("09:30"))
                 .andExpect(jsonPath("$[0].schedules[0].room").value("A 101"))
-                .andExpect(jsonPath("$[0].schedules[0].lecturer").value("Minh Nguyen"))
+                .andExpect(jsonPath("$[0].schedules[0].lecturer").value("Nguyen Minh"))
                 .andExpect(jsonPath("$[0].schedules[1].dayOfWeek").value(4))
                 .andExpect(jsonPath("$[0].schedules[1].startTime").value("13:00"))
                 .andExpect(jsonPath("$[0].curriculumRelevance").value("MANDATORY"))

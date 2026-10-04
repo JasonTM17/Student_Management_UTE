@@ -29,6 +29,8 @@ jobs:
           java-version: '21'
           cache: maven
           cache-dependency-path: java-services/pom.xml
+      - name: Install pypdf for PDF parser round-trip tests
+        run: python -m pip install --quiet pypdf
       - name: Verify Java API
         run: mvn -q -f java-services/pom.xml verify
 
@@ -228,13 +230,15 @@ jobs:
           # rather than colliding with the demo student's seeded timetable.
           first_enrollment="$(curl --fail --silent --show-error -H 'Content-Type: application/json' -H "Authorization: Bearer $token" -H 'Idempotency-Key: ci-postgres-replay-0001' -d '{"sectionId":"section-auto-019"}' http://127.0.0.1:4010/api/v1/me/enrollments)"
           second_enrollment="$(curl --fail --silent --show-error -H 'Content-Type: application/json' -H "Authorization: Bearer $token" -H 'Idempotency-Key: ci-postgres-replay-0001' -d '{"sectionId":"section-auto-019"}' http://127.0.0.1:4010/api/v1/me/enrollments)"
-          FIRST_ENROLLMENT="$first_enrollment" SECOND_ENROLLMENT="$second_enrollment" python3 -c 'import json, os; first=json.loads(os.environ["FIRST_ENROLLMENT"]); second=json.loads(os.environ["SECOND_ENROLLMENT"]); assert first["status"] == "ENROLLED"; assert second["id"] == first["id"]; assert second["status"] == "ENROLLED"'
+          FIRST_ENROLLMENT="$first_enrollment" SECOND_ENROLLMENT="$second_enrollment" python3 -c 'import json, os; first=json.loads(os.environ["FIRST_ENROLLMENT"]); second=json.loads(os.environ["SECOND_ENROLLMENT"]); assert first["status"] == "ENROLLED", first; assert second["id"] == first["id"], (first, second); assert second["status"] == "ENROLLED", second'
           assistant="$(curl --fail --silent --show-error -H 'Content-Type: application/json' -H "Authorization: Bearer $token" -d '{"message":"Điều kiện đăng ký đề tài là gì?","locale":"vi","clientRequestId":"00000000-0000-0000-0000-000000000001"}' http://127.0.0.1:4010/api/v1/assistant/chat)"
-          ASSISTANT="$assistant" python3 -c 'import json, os; data=json.loads(os.environ["ASSISTANT"]); assert data["reasonCode"] == "PROVIDER_DISABLED" and data["degraded"] is True and len(data["citations"]) > 0'
+          # PROVIDER_DISABLED is the degraded grounded path; ANSWERED is the
+          # curated lexical fast path — both must still carry live citations.
+          ASSISTANT="$assistant" python3 -c 'import json, os; data=json.loads(os.environ["ASSISTANT"]); assert data["reasonCode"] in ("PROVIDER_DISABLED", "ANSWERED"), data; assert data["reasonCode"] == "ANSWERED" or data["degraded"] is True, data; assert len(data["citations"]) > 0, data'
           rag_rejection="$(docker compose exec -T rag-service wget --server-response --tries=1 --header='Content-Type: application/json' --header='X-Rag-Service-Token: wrong-token' --header='X-Assistant-Owner: ci-rag-probe' --post-data='{"message":"Điều kiện đăng ký đề tài là gì?","locale":"vi","clientRequestId":"00000000-0000-0000-0000-000000000003"}' -O /dev/null http://localhost:4011/internal/rag/assistant/chat 2>&1 || true)"
           printf '%s\n' "$rag_rejection" | grep -Eq 'HTTP/[0-9.]+ 403'
           rag_internal="$(docker compose exec -T rag-service wget --no-verbose --tries=1 --header='Content-Type: application/json' --header='X-Rag-Service-Token: dev-rag-service-token-rotate-before-exposing' --header='X-Assistant-Owner: ci-rag-probe' --post-data='{"message":"Điều kiện đăng ký đề tài là gì?","locale":"vi","clientRequestId":"00000000-0000-0000-0000-000000000003"}' -O- http://localhost:4011/internal/rag/assistant/chat)"
-          RAG_INTERNAL="$rag_internal" python3 -c 'import json, os; data=json.loads(os.environ["RAG_INTERNAL"]); assert data["reasonCode"] == "PROVIDER_DISABLED" and data["degraded"] is True and len(data["citations"]) > 0'
+          RAG_INTERNAL="$rag_internal" python3 -c 'import json, os; data=json.loads(os.environ["RAG_INTERNAL"]); assert data["reasonCode"] in ("PROVIDER_DISABLED", "ANSWERED"), data; assert data["reasonCode"] == "ANSWERED" or data["degraded"] is True, data; assert len(data["citations"]) > 0, data'
           docker compose stop postgres
           # With the database stopped, Hikari must evict its dead pooled
           # connections (validation timeout each) before the probe can answer;

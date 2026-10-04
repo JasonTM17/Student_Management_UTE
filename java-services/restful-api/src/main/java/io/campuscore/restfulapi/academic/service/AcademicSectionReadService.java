@@ -271,9 +271,9 @@ public class AcademicSectionReadService {
         if (row.lecturerFirstName() == null && row.lecturerLastName() == null) {
             return null;
         }
-        return ((row.lecturerFirstName() == null ? "" : row.lecturerFirstName().trim())
+        return ((row.lecturerLastName() == null ? "" : row.lecturerLastName().trim())
                 + " "
-                + (row.lecturerLastName() == null ? "" : row.lecturerLastName().trim())).trim();
+                + (row.lecturerFirstName() == null ? "" : row.lecturerFirstName().trim())).trim();
     }
 
     private static String requireProfileId(String name, String value) {

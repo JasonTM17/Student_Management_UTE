@@ -188,7 +188,7 @@ public class AnnouncementWriteController {
     private static String actorLabel(Jwt jwt) {
         String firstName = claimAsString(jwt, "firstName");
         String lastName = claimAsString(jwt, "lastName");
-        String fullName = (firstName + " " + lastName).trim();
+        String fullName = (lastName + " " + firstName).trim();
         String email = claimAsString(jwt, "email");
         if (!fullName.isBlank()) {
             return email.isBlank() ? fullName : fullName + " · " + email;
