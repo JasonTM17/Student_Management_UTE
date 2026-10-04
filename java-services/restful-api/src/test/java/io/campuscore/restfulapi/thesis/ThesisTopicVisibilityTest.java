@@ -17,6 +17,7 @@ import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.HttpStatus;
+import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.server.ResponseStatusException;
 
@@ -33,7 +34,7 @@ class ThesisTopicVisibilityTest {
     void setUp() {
         repository = mock(ThesisTopicRepository.class);
         rounds = mock(ThesisRoundReadPort.class);
-        service = new ThesisTopicService(repository, rounds);
+        service = new ThesisTopicService(repository, rounds, mock(NamedParameterJdbcTemplate.class));
     }
 
     @Test

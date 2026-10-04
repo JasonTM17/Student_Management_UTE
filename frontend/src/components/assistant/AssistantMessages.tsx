@@ -100,13 +100,16 @@ export function reasonLabel(
               ? messages.assistant.localAssist
               : message.reasonCode === 'PROVIDER_TRUNCATED'
               ? messages.assistant.incomplete
+            : message.reasonCode === 'NO_MATCH'
+              ? messages.assistant.noMatch
+            : message.reasonCode === 'CONVERSATIONAL' ||
+                message.reasonCode === 'GENERAL_ANSWER'
+              ? messages.assistant.localAssist
             : message.degraded
               ? messages.assistant.degraded
-              : message.reasonCode === 'NO_MATCH'
-                ? messages.assistant.noMatch
-                : message.reasonCode === 'ANSWERED'
+                : message.reasonCode === 'ANSWERED' || message.reasonCode === 'RAG_GROUNDED'
                   ? messages.assistant.answered
-                  : messages.assistant.answered;
+                  : messages.assistant.localAssist;
 }
 
 function citationDomainLabel(
@@ -142,8 +145,11 @@ function isLocalOnlyAssistantMessage(message: ChatMessage): boolean {
   return (
     message.role === 'assistant' &&
     !message.pending &&
-    (message.reasonCode === 'PERSONAL_CONTEXT' ||
-      message.reasonCode === 'LOCAL_ASSIST')
+    // PERSONAL_CONTEXT is persisted to history server-side (Round-3 ledger
+    // change) — listing it here contradicted the notice, claiming a saved
+    // answer was "not saved to conversation history".
+    (message.reasonCode === 'LOCAL_ASSIST' ||
+      message.reasonCode === 'CONVERSATIONAL')
   );
 }
 
@@ -300,12 +306,12 @@ export function AssistantMessages({
                     visibleContent.trim() === messages.assistant.cancelled
                   ) && (
                     <div className="mt-2 flex items-center gap-1.5 border-t border-border/60 pt-1.5 text-[11px] font-medium text-muted-foreground">
-                      {message.reasonCode === 'ANSWERED' ? (
+                      {message.reasonCode === 'ANSWERED' && !message.degraded ? (
                         <span className="inline-flex items-center gap-1 rounded-md bg-status-success/10 px-2 py-0.5 text-status-success-foreground">
                           <Sparkles className="h-3 w-3" />
                           {messages.assistant.answered}
                         </span>
-                      ) : message.reasonCode === 'RAG_GROUNDED' ? (
+                      ) : message.reasonCode === 'RAG_GROUNDED' && !message.degraded ? (
                         <span className="inline-flex items-center gap-1 rounded-md bg-primary/10 px-2 py-0.5 text-primary">
                           <ShieldCheck className="h-3 w-3" />
                           {messages.assistant.answered}

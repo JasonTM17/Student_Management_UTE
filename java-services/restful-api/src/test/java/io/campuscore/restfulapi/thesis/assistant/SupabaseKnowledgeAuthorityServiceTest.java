@@ -83,7 +83,8 @@ class SupabaseKnowledgeAuthorityServiceTest {
         SupabaseKnowledgeAuthorityService authority = mock(SupabaseKnowledgeAuthorityService.class);
         SupabaseKnowledgeSyncService sync = mock(SupabaseKnowledgeSyncService.class);
         AssistantRagProperties rag = new AssistantRagProperties("http://rag", "expected-token", true, 500, 1_000);
-        SupabaseKnowledgeInternalController controller = new SupabaseKnowledgeInternalController(authority, sync, rag);
+        SupabaseKnowledgeInternalController controller = new SupabaseKnowledgeInternalController(authority, sync, rag,
+                false);
 
         DomainException failure = assertThrows(DomainException.class,
                 () -> controller.list("wrong-token", "admin-a", null, null));
@@ -97,7 +98,8 @@ class SupabaseKnowledgeAuthorityServiceTest {
         SupabaseKnowledgeAuthorityService authority = mock(SupabaseKnowledgeAuthorityService.class);
         SupabaseKnowledgeSyncService sync = mock(SupabaseKnowledgeSyncService.class);
         AssistantRagProperties rag = new AssistantRagProperties("http://rag", "expected-token", true, 500, 1_000);
-        SupabaseKnowledgeInternalController controller = new SupabaseKnowledgeInternalController(authority, sync, rag);
+        SupabaseKnowledgeInternalController controller = new SupabaseKnowledgeInternalController(authority, sync, rag,
+                false);
         UUID document = UUID.randomUUID();
         when(sync.syncNow()).thenReturn(SupabaseKnowledgeSyncService.SyncResult.failed("Sync unavailable"));
 

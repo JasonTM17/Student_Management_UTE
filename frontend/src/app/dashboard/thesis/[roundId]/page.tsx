@@ -13,6 +13,8 @@ import { PageHeader, SectionEyebrow } from '@/components/ui/page-header';
 import { LocalizedLink } from '@/components/LocalizedLink';
 import { StatusBadge } from '@/components/thesis/StatusBadge';
 import { metricToneClass, type StatusTone } from '@/components/ui/status';
+import { useRequireAuth } from '@/context/AuthContext';
+import { WorkspaceForbiddenState } from '@/components/ProtectedRoute';
 import { useI18n } from '@/i18n';
 import {
   thesisApi,
@@ -24,6 +26,7 @@ import {
 export default function ThesisRoundDetailPage() {
   const { roundId } = useParams<{ roundId: string }>();
   const { messages } = useI18n();
+  const { user, isLoading: authLoading, hasAccess, isForbidden } = useRequireAuth();
   const [round, setRound] = useState<ThesisRound | null>(null);
   const [topics, setTopics] = useState<ThesisTopic[]>([]);
   const [groups, setGroups] = useState<ThesisGroup[]>([]);
@@ -57,12 +60,21 @@ export default function ThesisRoundDetailPage() {
   }, [roundId, messages.thesis.loadFailed]);
 
   useEffect(() => {
+    if (authLoading || isForbidden || !hasAccess) return;
     const signal = { cancelled: false };
     void reload(signal);
     return () => {
       signal.cancelled = true;
     };
-  }, [reload]);
+  }, [authLoading, hasAccess, isForbidden, reload]);
+
+  if (authLoading) {
+    return <LoadingState label={messages.thesis.loading} />;
+  }
+
+  if (isForbidden || !hasAccess) {
+    return <WorkspaceForbiddenState signedIn={Boolean(user)} />;
+  }
 
   if (isLoading) {
     return <LoadingState label={messages.thesis.loading} />;
@@ -120,7 +132,7 @@ export default function ThesisRoundDetailPage() {
                       <h3 className="text-sm font-semibold leading-6 text-foreground">{topic.title}</h3>
                       <StatusBadge status={topic.status} />
                     </div>
-                    <p className="mt-2 line-clamp-3 text-sm leading-6 text-muted-foreground">{topic.description}</p>
+                    <p className="mt-2 line-clamp-3 text-sm leading-6 text-muted-foreground" title={topic.description}>{topic.description}</p>
                     <p className="mt-3 text-xs text-muted-foreground">
                       {messages.thesis.detail.maxGroups}: {topic.maxGroups}
                     </p>

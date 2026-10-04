@@ -509,7 +509,7 @@ export default function ThesisAdvisorDirectoryPage() {
                 {record.user?.email ? (
                   <>
                     <span aria-hidden="true">•</span>
-                    <span className="truncate">{record.user.email}</span>
+                    <span className="truncate" title={record.user.email}>{record.user.email}</span>
                   </>
                 ) : null}
               </div>
@@ -803,12 +803,12 @@ export default function ThesisAdvisorDirectoryPage() {
                           <div className="flex items-start gap-3.5">
                             <AdvisorAvatar lecturer={lec} size="lg" />
                             <div className="min-w-0 flex-1">
-                              <h3 className="truncate text-base font-bold text-foreground">
+                              <h3 className="truncate text-base font-bold text-foreground" title={`${titlePrefix}${fullName}`}>
                                 {titlePrefix}{fullName}
                               </h3>
                               <p className="mt-0.5 flex items-center gap-1.5 truncate text-xs font-medium text-muted-foreground">
                                 <Building2 className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
-                                <span className="truncate">{departmentName(lec.departmentId)}</span>
+                                <span className="truncate" title={departmentName(lec.departmentId)}>{departmentName(lec.departmentId)}</span>
                               </p>
                               <div className="mt-1.5">
                                 <StatusPill tone={isAvailable ? 'success' : 'neutral'}>
@@ -824,11 +824,11 @@ export default function ThesisAdvisorDirectoryPage() {
                           <div className="mt-4 space-y-1.5 border-t border-border/70 pt-3 text-xs text-muted-foreground">
                             <div className="flex items-center gap-2 truncate">
                               <Mail className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
-                              <span className="truncate">{lec.user?.email || '—'}</span>
+                              <span className="truncate" title={lec.user?.email || undefined}>{lec.user?.email || '—'}</span>
                             </div>
                             <div className="flex items-center gap-2 truncate">
                               <MapPin className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
-                              <span className="truncate">{lec.office || '—'}</span>
+                              <span className="truncate" title={lec.office || undefined}>{lec.office || '—'}</span>
                             </div>
                           </div>
 

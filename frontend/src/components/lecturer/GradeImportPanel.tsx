@@ -87,7 +87,7 @@ export function GradeImportPanel({
             <span className="rounded-lg border border-border/80 px-2.5 py-1.5 hover:bg-secondary/60">
               {vi ? 'Chọn tệp CSV' : 'Choose a CSV file'}
             </span>
-            {fileName ? <span className="font-normal text-muted-foreground">{fileName}</span> : null}
+            {fileName ? <span className="min-w-0 max-w-[16rem] truncate font-normal text-muted-foreground" title={fileName}>{fileName}</span> : null}
           </label>
 
           <textarea

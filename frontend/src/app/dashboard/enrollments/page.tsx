@@ -78,7 +78,7 @@ export default function EnrollmentsPage() {
           emptyDescription:
             'Khi bạn đăng ký một lớp học phần, lịch học và thông tin lớp sẽ xuất hiện ở đây.',
           tabCurriculum: 'Chương trình đào tạo (CTĐT)',
-          tabEnrollments: 'Lớp học phần đang đăng ký',
+          tabEnrollments: 'Hồ sơ đăng ký học phần',
           statCurriculumTotal: 'Tổng môn học CTĐT',
           statCompleted: 'Đã hoàn tất',
           statInProgress: 'Đang học',
@@ -134,7 +134,7 @@ export default function EnrollmentsPage() {
           emptyDescription:
             'Once you enroll in a class, its schedule and details will appear here.',
           tabCurriculum: 'Curriculum Roadmap',
-          tabEnrollments: 'Enrolled Classes',
+          tabEnrollments: 'Enrollment Records',
           statCurriculumTotal: 'Total Curriculum Courses',
           statCompleted: 'Completed',
           statInProgress: 'In Progress',
@@ -816,8 +816,8 @@ export default function EnrollmentsPage() {
                                   </span>
                                   {enrollment.section?.lecturer ? (
                                     <span>
-                                      {enrollment.section.lecturer.user?.firstName}{' '}
-                                      {enrollment.section.lecturer.user?.lastName}
+                                      {(enrollment.section.lecturer as { fullName?: string }).fullName ??
+                                        `${enrollment.section.lecturer.user?.lastName ?? ''} ${enrollment.section.lecturer.user?.firstName ?? ''}`.trim()}
                                     </span>
                                   ) : null}
                                   {enrollment.section?.classroom ? (
@@ -862,8 +862,8 @@ export default function EnrollmentsPage() {
                                     </span>
                                     {enrollment.section?.lecturer ? (
                                       <span className="truncate">
-                                        {enrollment.section.lecturer.user?.firstName}{' '}
-                                        {enrollment.section.lecturer.user?.lastName}
+                                        {(enrollment.section.lecturer as { fullName?: string }).fullName ??
+                                          `${enrollment.section.lecturer.user?.lastName ?? ''} ${enrollment.section.lecturer.user?.firstName ?? ''}`.trim()}
                                       </span>
                                     ) : null}
                                     {enrollment.section?.classroom ? (

@@ -220,7 +220,7 @@ public class RegistrationPdfRenderer {
         streamLines.add("ET");
 
         streamLines.add("BT");
-        streamLines.add("/F1 7 Tf 54 90 Td (CampusCore Official Registration Document - Verified by SHA-256 Digest) Tj");
+        streamLines.add("/F1 7 Tf 54 90 Td (CampusUTE Official Registration Document - Verified by SHA-256 Digest) Tj");
         streamLines.add("ET");
 
         String streamContent = String.join("\n", streamLines) + "\n";

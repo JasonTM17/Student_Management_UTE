@@ -191,13 +191,13 @@ export function buildScheduleIcsEvents(
  */
 export function generateIcsCalendar(
   events: IcsEvent[],
-  calendarName = 'CampusCore Timetable',
+  calendarName = 'CampusUTE Timetable',
 ): string {
   const dtstamp = formatIcsUtcDateTime(new Date());
   const lines: string[] = [
     'BEGIN:VCALENDAR',
     'VERSION:2.0',
-    'PRODID:-//CampusCore UTE//Academic Timetable//VI',
+    'PRODID:-//CampusUTE//Academic Timetable//VI',
     'CALSCALE:GREGORIAN',
     'METHOD:PUBLISH',
     `X-WR-CALNAME:${escapeIcsText(calendarName)}`,

@@ -85,7 +85,7 @@ export default function AdminSemestersPage() {
   const [formData, setFormData] = useState({
     nameEn: '',
     nameVi: '',
-    type: 'FALL',
+    type: 'FIRST',
     academicYearId: '',
     startDate: '',
     endDate: '',
@@ -147,9 +147,13 @@ export default function AdminSemestersPage() {
 
   const semesterTypeOptions = useMemo(
     () => [
+      // FIRST/SECOND match the seeded semester vocabulary; FALL/SPRING stay so
+      // older records still resolve to a label instead of a raw enum.
+      { value: 'FIRST', label: locale === 'vi' ? 'Học kỳ 1' : 'Semester 1' },
+      { value: 'SECOND', label: locale === 'vi' ? 'Học kỳ 2' : 'Semester 2' },
+      { value: 'SUMMER', label: locale === 'vi' ? 'Học kỳ Hè' : 'Summer' },
       { value: 'FALL', label: locale === 'vi' ? 'Học kỳ Thu' : 'Fall' },
       { value: 'SPRING', label: locale === 'vi' ? 'Học kỳ Xuân' : 'Spring' },
-      { value: 'SUMMER', label: locale === 'vi' ? 'Học kỳ Hè' : 'Summer' },
     ],
     [locale],
   );
@@ -310,7 +314,7 @@ export default function AdminSemestersPage() {
     setFormData({
       nameEn: '',
       nameVi: '',
-      type: 'FALL',
+      type: 'FIRST',
       academicYearId: '',
       startDate: '',
       endDate: '',

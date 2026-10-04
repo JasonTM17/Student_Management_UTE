@@ -400,8 +400,8 @@ export default function SchedulePage() {
     }
     const calName =
       locale === 'vi'
-        ? `Lịch học - ${selectedSemesterName || 'CampusCore'}`
-        : `Schedule - ${selectedSemesterName || 'CampusCore'}`;
+        ? `Lịch học - ${selectedSemesterName || 'CampusUTE'}`
+        : `Schedule - ${selectedSemesterName || 'CampusUTE'}`;
     const icsContent = generateIcsCalendar(events, calName);
     // K12: the filename uses the same Unicode-aware rule as the reader anchors
     // (NFD-decompose, map đ/Đ, drop combining marks, collapse separators). The

@@ -203,7 +203,7 @@ function SafeImage({ src, alt }: { src: string; alt: string }) {
       <img
         src={src}
         alt={alt}
-        className="max-h-96 rounded-md border border-border/70 object-cover shadow-sm"
+        className="max-h-96 max-w-full h-auto rounded-md border border-border/70 object-cover shadow-sm"
         loading="lazy"
         onError={() => setHasError(true)}
       />
@@ -270,9 +270,9 @@ function renderInline(text: string): React.ReactNode[] {
             href={url}
             target={isExternal ? '_blank' : undefined}
             rel={isExternal ? 'noopener noreferrer' : undefined}
-            className="inline-flex items-center gap-1 font-medium text-primary underline underline-offset-4 transition-colors hover:text-primary/80"
+            className="inline-flex items-center gap-1 font-medium text-primary underline underline-offset-4 transition-colors hover:text-primary/80 [overflow-wrap:anywhere]"
           >
-            <span>{label || url}</span>
+            <span className="[overflow-wrap:anywhere]">{label || url}</span>
             {isExternal ? <ExternalLink className="inline h-3 w-3 shrink-0 opacity-70" aria-hidden="true" /> : null}
           </a>
         );

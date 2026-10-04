@@ -42,15 +42,18 @@ export function GradeDetailModal({ isOpen, onClose, record }: GradeDetailModalPr
   const { locale } = useI18n();
   const [data, setData] = useState<StudentGradesByEnrollmentResponse | null>(null);
   const [loading, setLoading] = useState(false);
+  const [detailFailed, setDetailFailed] = useState(false);
 
   useEffect(() => {
     if (!isOpen || !record?.id) {
       setData(null);
+      setDetailFailed(false);
       return;
     }
 
     let cancelled = false;
     setLoading(true);
+    setDetailFailed(false);
 
     gradesApi
       .getStudentGradesByEnrollment(record.id)
@@ -58,7 +61,10 @@ export function GradeDetailModal({ isOpen, onClose, record }: GradeDetailModalPr
         if (!cancelled) setData(res);
       })
       .catch(() => {
-        if (!cancelled) setData(null);
+        if (!cancelled) {
+          setData(null);
+          setDetailFailed(true);
+        }
       })
       .finally(() => {
         if (!cancelled) setLoading(false);
@@ -161,6 +167,14 @@ export function GradeDetailModal({ isOpen, onClose, record }: GradeDetailModalPr
             </span>
           </div>
 
+          {detailFailed ? (
+            <div className="rounded-md border border-amber-300/60 bg-amber-50 px-3 py-2 text-xs font-medium text-amber-900 dark:border-amber-500/40 dark:bg-amber-950/40 dark:text-amber-200">
+              {locale === 'vi'
+                ? 'Không tải được điểm thành phần mới nhất — bảng dưới hiển thị điểm tóm tắt đã lưu, có thể chưa đầy đủ.'
+                : 'Could not load the latest component scores — the table below shows saved summary scores and may be incomplete.'}
+            </div>
+          ) : null}
+
           {loading ? (
             <div className="flex items-center justify-center py-8 text-sm text-muted-foreground">
               <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -201,9 +215,6 @@ export function GradeDetailModal({ isOpen, onClose, record }: GradeDetailModalPr
                       <tr key={item.id} className="transition-colors hover:bg-secondary/15">
                         <td className="px-4 py-3 font-medium text-foreground">
                           {gradeItemLabel(item, locale)}
-                          <div className="text-[11px] text-muted-foreground uppercase font-mono">
-                            {item.gradeItemType}
-                          </div>
                         </td>
                         <td className="px-4 py-3 text-center text-muted-foreground font-mono">
                           {weightPct}

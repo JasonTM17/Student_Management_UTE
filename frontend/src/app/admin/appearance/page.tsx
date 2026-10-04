@@ -285,6 +285,28 @@ export default function AdminAppearancePage() {
                 />
               </label>
               <label className="block space-y-2">
+                <span className="text-sm font-medium text-foreground">{copy.heroImage}</span>
+                <Input
+                  value={draft.hero.image}
+                  placeholder="/hero-campus.jpg"
+                  onChange={(event) => {
+                    setDraft((current) => ({
+                      ...current,
+                      hero: { ...current.hero, image: event.target.value },
+                    }));
+                  }}
+                  onBlur={(event) => {
+                    const next = {
+                      ...draft,
+                      hero: { ...draft.hero, image: event.target.value },
+                    };
+                    setDraft(next);
+                    void persist(next);
+                  }}
+                />
+                <p className="text-xs text-muted-foreground">{copy.heroImageHint}</p>
+              </label>
+              <label className="block space-y-2">
                 <span className="text-sm font-medium text-foreground">{copy.heroDescription}</span>
                 <Textarea
                   value={draft.hero[copyLocale].description}

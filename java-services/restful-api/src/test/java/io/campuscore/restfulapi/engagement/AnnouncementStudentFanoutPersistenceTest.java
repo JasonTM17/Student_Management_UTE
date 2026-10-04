@@ -134,6 +134,7 @@ class AnnouncementStudentFanoutPersistenceTest {
                     "password" VARCHAR(200) NOT NULL DEFAULT 'password',
                     "firstName" VARCHAR(120) NOT NULL DEFAULT 'Test',
                     "lastName" VARCHAR(120) NOT NULL DEFAULT 'User',
+                    "avatar" VARCHAR(500),
                     "status" VARCHAR(40) NOT NULL DEFAULT 'ACTIVE',
                     "mustChangePassword" BOOLEAN NOT NULL DEFAULT FALSE,
                     "emailVerified" BOOLEAN NOT NULL DEFAULT TRUE,
@@ -208,6 +209,31 @@ class AnnouncementStudentFanoutPersistenceTest {
                 "SELECT message FROM notifications.notification WHERE title = ?", String.class, TITLE));
         assertEquals(1, messages.size());
         assertEquals("á".repeat(160), messages.iterator().next());
+    }
+
+    @Test
+    void notificationPreviewCarriesPlainTextAndNeverATruncatedTag() throws Exception {
+        // A body that opens with a base64 <img> used to be capped at 160 code
+        // points BEFORE tags were stripped, producing an unterminated "<img…"
+        // fragment inside every student notification preview.
+        String content = "<img src=\\\"data:image/png;base64,abcdef\\\" alt=\\\"x\\\">"
+                + "<p><strong>Đợt đăng ký đồ án</strong> mở từ 20/01.</p>";
+
+        mvc.perform(post("/api/v1/announcements")
+                        .with(adminJwt("fanout-admin"))
+                        .contentType("application/json")
+                        .content("{\"title\":\"Thông báo ảnh\",\"content\":\"" + content + "\"}"))
+                .andExpect(status().isCreated());
+
+        List<String> messages = jdbc.queryForList(
+                "SELECT DISTINCT message FROM notifications.notification WHERE title = ?",
+                String.class, "[Announcement] Thông báo ảnh");
+        assertEquals(1, messages.size());
+        String preview = messages.get(0);
+        org.junit.jupiter.api.Assertions.assertFalse(preview.contains("<"), preview);
+        org.junit.jupiter.api.Assertions.assertFalse(preview.contains("base64"), preview);
+        org.junit.jupiter.api.Assertions.assertTrue(preview.contains("Đợt đăng ký đồ án"), preview);
+        org.junit.jupiter.api.Assertions.assertTrue(preview.length() <= 160, preview);
     }
 
     @Test

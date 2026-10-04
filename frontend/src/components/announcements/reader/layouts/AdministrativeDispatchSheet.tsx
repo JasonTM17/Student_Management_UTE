@@ -6,17 +6,16 @@ import {
   Building2,
   Calendar,
   FileCheck,
-  ShieldCheck,
   Users,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { AnnouncementRecord } from '@/lib/api';
 import type { Locale } from '@/i18n/config';
+import { localeCodes } from '@/i18n/config';
 import { useI18n } from '@/i18n';
 import { RichContentRenderer } from '@/components/ui/rich-content-renderer';
 import {
   announcementAudienceBadge,
-  announcementDistribution,
   announcementSalutation,
   announcementSectionLabel,
   formatAnnouncementPublisher,
@@ -50,12 +49,15 @@ export function AdministrativeDispatchSheet({
     year: 'numeric',
   });
   // Vietnamese dispatch headings are prose ("ngày 21 tháng 9 năm 2026"), not a
-  // slashed date, so the parts are formatted separately and re-joined here
-  // rather than re-derived from the numeric date above.
-  const proseDay = formatDate(dateObj, { day: 'numeric' });
-  const proseMonthRaw = formatDate(dateObj, { month: 'long' });
+  // slashed date. formatDate always merges year+month+day defaults, so partial
+  // options would still render the full date — ask Intl for each single part
+  // through the same BCP-47 tag the provider uses.
+  const proseDay = new Intl.DateTimeFormat(localeCodes[locale], { day: 'numeric' }).format(dateObj);
+  const proseMonthRaw = new Intl.DateTimeFormat(localeCodes[locale], { month: 'long' }).format(dateObj);
+  // vi-VN emits the standalone month capitalized ("Tháng 9"); prose dates
+  // lowercase it ("ngày 21 tháng 9 năm 2026").
   const proseMonth = proseMonthRaw.charAt(0).toLowerCase() + proseMonthRaw.slice(1);
-  const proseYear = formatDate(dateObj, { year: 'numeric' });
+  const proseYear = new Intl.DateTimeFormat(localeCodes[locale], { year: 'numeric' }).format(dateObj);
 
   // Deterministic official reference number based on ID/date
   const docHash =
@@ -87,9 +89,8 @@ export function AdministrativeDispatchSheet({
         audience: 'Đối tượng áp dụng',
         section: 'Lớp học phần',
         salutation: 'Kính gửi',
-        distribution: 'Nơi nhận:',
-        eSealOrg: 'TRƯỜNG ĐH CÔNG NGHỆ KỸ THUẬT TP.HCM',
-        certStatus: 'Chứng thư số e-Office HCM-UTE hợp lệ',
+        issuedByLabel: 'Đơn vị ban hành',
+        signOffHint: 'Thông báo được ban hành điện tử trên Cổng học vụ',
       }
     : {
         ministryName: 'MINISTRY OF EDUCATION AND TRAINING',
@@ -104,9 +105,8 @@ export function AdministrativeDispatchSheet({
         audience: 'Target audience',
         section: 'Section',
         salutation: 'To',
-        distribution: 'Distribution:',
-        eSealOrg: 'HCM-UTE OFFICIAL E-OFFICE',
-        certStatus: 'HCM-UTE e-Office Digital Certificate Verified',
+        issuedByLabel: 'Issuing unit',
+        signOffHint: 'Published electronically on the Campus Portal',
       };
 
   const publisherName = formatAnnouncementPublisher(
@@ -118,96 +118,10 @@ export function AdministrativeDispatchSheet({
   const sectionLabel = announcementSectionLabel(announcement);
   const audienceBadge = announcementAudienceBadge(announcement, locale);
   const salutationTarget = announcementSalutation(announcement, locale);
-  const distributionRecipients = announcementDistribution(announcement, locale);
-
-  const getSignerInfo = (pub: string, loc: string, ann: AnnouncementRecord) => {
-    const p = pub.toLowerCase();
-    const title = (ann.title || '').toLowerCase();
-
-    // 1. Rector level documents
-    if (
-      p.includes('hiệu trưởng') ||
-      p.includes('ban giám hiệu') ||
-      p.includes('bgh') ||
-      p.includes('hội đồng trường') ||
-      p.includes('rector') ||
-      p.includes('board of rectors') ||
-      title.startsWith('quyết định')
-    ) {
-      return {
-        signatureTitle: loc === 'vi' ? 'HIỆU TRƯỞNG' : 'RECTOR',
-        role:
-          loc === 'vi'
-            ? 'TRƯỜNG ĐẠI HỌC CÔNG NGHỆ KỸ THUẬT TP.HCM'
-            : 'HO CHI MINH CITY UNIVERSITY OF TECHNOLOGY AND ENGINEERING',
-        name: 'PGS. TS. LÊ HIẾU GIANG',
-        sealUnit:
-          loc === 'vi'
-            ? 'Ban Giám hiệu - Trường ĐH Công nghệ Kỹ thuật TP.HCM'
-            : 'Board of Rectors - HCM-UTE',
-      };
-    }
-
-    // 2. Vice Rector
-    if (p.includes('phó hiệu trưởng') || p.includes('vice rector')) {
-      return {
-        signatureTitle: loc === 'vi' ? 'KT. HIỆU TRƯỞNG' : 'FOR THE RECTOR',
-        role: loc === 'vi' ? 'PHÓ HIỆU TRƯỞNG' : 'VICE RECTOR',
-        name: 'TS. QUÁCH THANH HẢI',
-        sealUnit:
-          loc === 'vi'
-            ? 'Ban Giám hiệu - Trường ĐH Công nghệ Kỹ thuật TP.HCM'
-            : 'Board of Rectors - HCM-UTE',
-      };
-    }
-
-    // 3. Student Affairs
-    if (p.includes('công tác sinh viên') || p.includes('ctsv') || p.includes('student affairs')) {
-      return {
-        signatureTitle: loc === 'vi' ? 'TL. HIỆU TRƯỞNG' : 'FOR THE RECTOR',
-        role: loc === 'vi' ? 'TRƯỞNG PHÒNG CÔNG TÁC SINH VIÊN' : 'HEAD OF STUDENT AFFAIRS',
-        name: 'ThS. ĐẶNG BÁ NGOẠN',
-        sealUnit: loc === 'vi' ? 'Phòng Công tác Sinh viên' : 'Student Affairs Office',
-      };
-    }
-
-    // 4. Testing & QA
-    if (
-      p.includes('khảo thí') ||
-      p.includes('đảm bảo chất lượng') ||
-      p.includes('đbcl') ||
-      p.includes('testing') ||
-      p.includes('qa')
-    ) {
-      return {
-        signatureTitle: loc === 'vi' ? 'TL. HIỆU TRƯỞNG' : 'FOR THE RECTOR',
-        role: loc === 'vi' ? 'TRƯỞNG PHÒNG KHẢO THÍ & ĐBCL' : 'HEAD OF TESTING & QA',
-        name: 'TS. NGUYỄN VĂN THÁI',
-        sealUnit: loc === 'vi' ? 'Phòng Khảo thí & ĐBCL' : 'Testing & QA Office',
-      };
-    }
-
-    // 5. IT Faculty
-    if (p.includes('khoa') || p.includes('công nghệ thông tin') || p.includes('cntt')) {
-      return {
-        signatureTitle: loc === 'vi' ? 'TL. HIỆU TRƯỞNG' : 'FOR THE RECTOR',
-        role: loc === 'vi' ? 'TRƯỞNG KHOA CÔNG NGHỆ THÔNG TIN' : 'DEAN OF FACULTY OF IT',
-        name: 'PGS. TS. HOÀNG VĂN DŨNG',
-        sealUnit: loc === 'vi' ? 'Khoa Công nghệ Thông tin' : 'Faculty of Information Technology',
-      };
-    }
-
-    // 6. Academic Affairs Office (Default)
-    return {
-      signatureTitle: loc === 'vi' ? 'TL. HIỆU TRƯỞNG' : 'FOR THE RECTOR',
-      role: loc === 'vi' ? 'TRƯỞNG PHÒNG ĐÀO TẠO' : 'HEAD OF ACADEMIC AFFAIRS',
-      name: 'TS. QUÁCH THANH HẢI',
-      sealUnit: loc === 'vi' ? 'Phòng Đào tạo' : 'Academic Affairs Office',
-    };
-  };
-
-  const signer = getSignerInfo(publisherName, locale, announcement);
-  const isReaderDark = preferences.theme === 'dark';
+  // Sign-off shows only data the record actually carries: the issuing unit
+  // (publishedBy) and the publish timestamp. Fabricating a named signatory or
+  // a "verified digital certificate" seal would present invented authority as
+  // fact on an official-looking document (audit finding 1).
 
   const subjectHeading = announcement.title.toUpperCase().startsWith('THÔNG BÁO')
     ? announcement.title.replace(/^THÔNG BÁO\s*[:-]?\s*/i, 'V/v ')
@@ -351,74 +265,18 @@ export function AdministrativeDispatchSheet({
         <DocumentAttachmentsList content={announcement.content} locale={locale} />
       </div>
 
-      {/* Institutional Sign-off Section */}
-      <div className="grid grid-cols-1 gap-6 pt-2 sm:grid-cols-2 sm:items-start text-xs">
-        {/* Left: Distribution / Nơi nhận */}
-        <div className="space-y-1.5">
-          <p className="font-bold italic text-foreground text-[12.5px]">{copy.distribution}</p>
-          <ul className="text-[11.5px] text-muted-foreground space-y-0.5 list-none pl-0 leading-tight">
-            {distributionRecipients.map((rec, idx) => (
-              <li key={idx}>{rec}</li>
-            ))}
-          </ul>
-        </div>
-
-        {/* Right: Signature & Electronic Seal */}
-        <div className="text-center sm:text-right space-y-1">
-          <p className="font-bold uppercase tracking-wider text-foreground text-xs">
-            {signer.signatureTitle}
-          </p>
-          <p className="font-bold uppercase tracking-wider text-primary text-xs">
-            {signer.role}
-          </p>
-
-          {/* Official Electronic Seal Box (Dấu Ký Số Điện Tử Chuẩn e-Office) */}
-          <div
-            className={cn(
-              'my-2 sm:ml-auto max-w-[260px] rounded border-2 p-2.5 text-left shadow-xs',
-              isReaderDark ? 'border-red-500 bg-red-950/40' : 'border-red-600 bg-red-50/80',
-            )}
-          >
-            <div
-              className={cn(
-                'flex items-center gap-1.5 border-b border-red-500/40 pb-1 text-[10.5px] font-bold uppercase tracking-tight',
-                isReaderDark ? 'text-red-400' : 'text-red-700',
-              )}
-            >
-              <ShieldCheck
-                className={cn(
-                  'h-4 w-4 shrink-0',
-                  isReaderDark ? 'text-red-400' : 'text-red-700',
-                )}
-              />
-              <span>KÝ BỞI: {copy.eSealOrg}</span>
-            </div>
-            <div
-              className={cn(
-                'pt-1.5 text-[10px] leading-snug space-y-0.5 font-sans',
-                isReaderDark ? 'text-red-300' : 'text-red-800',
-              )}
-            >
-              <p className="font-semibold">Đơn vị: {signer.sealUnit || publisherName}</p>
-              <p>Người ký: {signer.name}</p>
-              <p>
-                Ngày ký: {formatDateTime(dateObj)}
-              </p>
-              <p
-                className={cn(
-                  'text-[9.5px] italic',
-                  isReaderDark ? 'text-red-400' : 'text-red-700',
-                )}
-              >
-                ✓ {copy.certStatus}
-              </p>
-            </div>
-          </div>
-
-          <p className="font-bold text-foreground text-sm pt-1">
-            {signer.name}
-          </p>
-        </div>
+      {/* Institutional sign-off — honest issuing-unit block; no invented
+          signatory name or certificate seal (the record has neither). */}
+      <div className="pt-2 text-xs sm:text-right sm:ml-auto sm:max-w-xs space-y-1">
+        <p className="font-bold uppercase tracking-wider text-foreground text-xs">
+          {copy.issuedByLabel}
+        </p>
+        <p className="font-bold uppercase tracking-wider text-primary text-xs">
+          {publisherName}
+        </p>
+        <p className="text-[11px] italic text-muted-foreground">
+          {copy.signOffHint} — {formatDateTime(dateObj)}
+        </p>
       </div>
     </div>
   );

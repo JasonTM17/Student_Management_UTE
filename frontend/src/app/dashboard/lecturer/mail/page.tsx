@@ -37,6 +37,7 @@ import {
 import { calculateGrade } from '@/lib/grade-export';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Modal } from '@/components/ui/modal';
 import { Select } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -193,7 +194,7 @@ function Field({
         htmlFor={htmlFor}
         className={cn(
           'block text-sm font-medium text-foreground',
-          compact && 'mb-1',
+          compact ? 'mb-1' : 'mb-1.5',
           hideLabel && 'sr-only',
         )}
       >
@@ -209,7 +210,12 @@ function RailRow({ label, children }: { label: string; children: React.ReactNode
   return (
     <div className="flex items-start justify-between gap-3">
       <span className="shrink-0 text-xs font-medium text-muted-foreground">{label}</span>
-      <span className="min-w-0 truncate text-right text-sm font-semibold text-foreground">{children}</span>
+      <span
+        className="min-w-0 truncate text-right text-sm font-semibold text-foreground"
+        title={typeof children === 'string' ? children : undefined}
+      >
+        {children}
+      </span>
     </div>
   );
 }
@@ -283,6 +289,7 @@ export default function LecturerMailComposePage() {
   const [errorKind, setErrorKind] = useState<MailErrorKind | null>(null);
   const [sentThisSession, setSentThisSession] = useState(0);
   const [sent, setSent] = useState<SentRecord | null>(null);
+  const [previewOpen, setPreviewOpen] = useState(false);
   const successRef = useRef<HTMLDivElement>(null);
   const { confirm, confirmationDialog } = useConfirmationDialog();
 
@@ -327,6 +334,50 @@ export default function LecturerMailComposePage() {
 
   const totalCredits = useMemo(() => sumCourseCredits(courses), [courses]);
   const weightedAverage = useMemo(() => creditWeightedAverage10(grades), [grades]);
+
+  // Draft preview rows mirror the payload the send endpoint receives, so the
+  // modal shows what will actually merge into the email — not a canned sample.
+  const previewRows = useMemo<Array<[string, string]>>(() => {
+    const fields = copy.fields;
+    const empty = copy.previewEmptyField;
+    const value = (raw: string | undefined | null) => {
+      const trimmed = (raw ?? '').trim();
+      return trimmed === '' ? empty : trimmed;
+    };
+    if (template === 'notice') {
+      return [
+        [fields.email, value(notice.to)],
+        [fields.recipientName, value(notice.recipientName)],
+        [fields.category, value(copy.categories[notice.category as (typeof NOTICE_CATEGORIES)[number]])],
+        [fields.title, value(notice.title)],
+        [fields.author, value(notice.author)],
+        [fields.content, value(notice.content)],
+        [fields.highlights, highlights.length > 0 ? highlights.join(' • ') : empty],
+        [fields.actionUrl, value(notice.actionUrl)],
+        [fields.actionText, value(notice.actionText)],
+      ];
+    }
+    if (template === 'registration') {
+      return [
+        [fields.email, value(registration.to)],
+        [fields.studentName, value(registration.studentName)],
+        [fields.studentId, value(registration.studentId)],
+        [fields.department, value(registration.department)],
+        [fields.semester, value(registration.semester)],
+      ];
+    }
+    return [
+      [fields.email, value(gradeAlert.to)],
+      [fields.studentName, value(gradeAlert.studentName)],
+      [fields.studentId, value(gradeAlert.studentId)],
+      [fields.semester, value(gradeAlert.semester)],
+      [fields.gpa4, value(gradeAlert.gpa4)],
+      [fields.gpa10, value(gradeAlert.gpa10)],
+      [fields.academicStanding, value(gradeAlert.academicStanding)],
+      [fields.conductScore, value(gradeAlert.conductScore)],
+      [fields.conductRank, value(gradeAlert.conductRank)],
+    ];
+  }, [copy, template, notice, registration, gradeAlert, highlights]);
 
   // The letter grade fills itself from the 10-scale score; a manually typed
   // value in the row wins so exceptional cases stay expressible.
@@ -458,6 +509,19 @@ export default function LecturerMailComposePage() {
       });
       setSentThisSession((current) => current + 1);
       setAttemptedSend(false);
+      // A dispatched draft is done — clear the form so a second send never
+      // silently reuses the previous recipient's fields.
+      if (template === 'notice') {
+        setNotice(emptyNoticeForm);
+        setHighlights([]);
+        setHighlightDraft('');
+      } else if (template === 'registration') {
+        setRegistration(emptyRegistrationForm);
+        setCourses([]);
+      } else {
+        setGradeAlert(emptyGradeAlertForm);
+        setGrades([]);
+      }
     } catch (error) {
       setErrorKind(classifyMailError(error));
     } finally {
@@ -638,7 +702,7 @@ export default function LecturerMailComposePage() {
                         {highlights.map((chip) => (
                           <li key={chip}>
                             <span className="inline-flex max-w-full items-center gap-1.5 rounded-md border border-border/70 bg-secondary/60 px-2.5 py-1 text-xs font-medium text-foreground">
-                              <span className="max-w-72 truncate">{chip}</span>
+                              <span className="max-w-72 truncate" title={chip}>{chip}</span>
                               <button
                                 type="button"
                                 onClick={() => setHighlights((current) => current.filter((item) => item !== chip))}
@@ -1081,11 +1145,15 @@ export default function LecturerMailComposePage() {
               <Send className="mr-2 h-4 w-4" aria-hidden="true" />
               {isSending ? copy.sending : copy.send}
             </Button>
-            <Button asChild variant="outline" size="lg" className="w-full">
-              <a href={previewHref} target="_blank" rel="noreferrer noopener">
-                <Eye className="mr-2 h-4 w-4" aria-hidden="true" />
-                {copy.preview}
-              </a>
+            <Button
+              type="button"
+              variant="outline"
+              size="lg"
+              className="w-full"
+              onClick={() => setPreviewOpen(true)}
+            >
+              <Eye className="mr-2 h-4 w-4" aria-hidden="true" />
+              {copy.preview}
             </Button>
             <p className="text-center text-xs text-muted-foreground">{copy.previewHint}</p>
           </div>
@@ -1112,7 +1180,7 @@ export default function LecturerMailComposePage() {
                 </div>
                 <div className="flex gap-2">
                   <dt className="shrink-0 font-medium text-muted-foreground">{copy.successDeliveredTo}:</dt>
-                  <dd className="min-w-0 truncate font-semibold text-foreground">{sent.recipient}</dd>
+                  <dd className="min-w-0 truncate font-semibold text-foreground" title={sent.recipient}>{sent.recipient}</dd>
                 </div>
                 <div className="flex gap-2">
                   <dt className="shrink-0 font-medium text-muted-foreground">{copy.successSentAt}:</dt>
@@ -1125,6 +1193,80 @@ export default function LecturerMailComposePage() {
       </div>
 
       {confirmationDialog}
+
+      {/* Draft preview: the values below are exactly what dispatchForTemplate()
+          posts — the canned layout sample is only linked, never implied. */}
+      <Modal
+        isOpen={previewOpen}
+        onClose={() => setPreviewOpen(false)}
+        title={copy.previewDialogTitle}
+        description={copy.previewDialogNote}
+        className="max-w-lg"
+        showCloseButton
+      >
+        <div className="space-y-4">
+          <dl className="space-y-2.5">
+            {previewRows.map(([label, value]) => (
+              <div key={label} className="grid grid-cols-[minmax(0,9rem)_1fr] gap-3 text-sm">
+                <dt className="font-medium text-muted-foreground">{label}</dt>
+                <dd className="min-w-0 whitespace-pre-line break-words text-foreground">{value}</dd>
+              </div>
+            ))}
+          </dl>
+          {template === 'registration' && courses.length > 0 ? (
+            <table className="w-full text-left text-xs">
+              <thead className="text-muted-foreground">
+                <tr>
+                  <th className="py-1 pr-2 font-medium">{copy.fields.code}</th>
+                  <th className="py-1 pr-2 font-medium">{copy.fields.courseName}</th>
+                  <th className="py-1 pr-2 font-medium">{copy.fields.credits}</th>
+                  <th className="py-1 font-medium">{copy.fields.schedule}</th>
+                </tr>
+              </thead>
+              <tbody>
+                {courses.map((row, index) => (
+                  <tr key={index} className="border-t border-border/50">
+                    <td className="py-1 pr-2">{row.code.trim() || copy.previewEmptyField}</td>
+                    <td className="py-1 pr-2">{row.name.trim() || copy.previewEmptyField}</td>
+                    <td className="py-1 pr-2">{row.credits.trim() || copy.previewEmptyField}</td>
+                    <td className="py-1">{row.schedule.trim() || copy.previewEmptyField}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          ) : null}
+          {template === 'grade-alert' && grades.length > 0 ? (
+            <table className="w-full text-left text-xs">
+              <thead className="text-muted-foreground">
+                <tr>
+                  <th className="py-1 pr-2 font-medium">{copy.fields.code}</th>
+                  <th className="py-1 pr-2 font-medium">{copy.fields.courseName}</th>
+                  <th className="py-1 pr-2 font-medium">{copy.fields.score10}</th>
+                  <th className="py-1 font-medium">{copy.fields.letter}</th>
+                </tr>
+              </thead>
+              <tbody>
+                {grades.map((row, index) => (
+                  <tr key={index} className="border-t border-border/50">
+                    <td className="py-1 pr-2">{row.courseCode.trim() || copy.previewEmptyField}</td>
+                    <td className="py-1 pr-2">{row.courseName.trim() || copy.previewEmptyField}</td>
+                    <td className="py-1 pr-2">{row.score10.trim() || copy.previewEmptyField}</td>
+                    <td className="py-1">{row.scoreLetter.trim() || letterFor(row) || copy.previewEmptyField}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          ) : null}
+          <a
+            href={previewHref}
+            target="_blank"
+            rel="noreferrer noopener"
+            className="inline-flex items-center gap-1.5 text-xs font-medium text-primary hover:underline"
+          >
+            {copy.previewSampleLink}
+          </a>
+        </div>
+      </Modal>
     </div>
   );
 }

@@ -52,6 +52,42 @@ public class ThesisAssistantKnowledgeRepository {
         return "REPLACE(REPLACE(REPLACE(" + expression + ", CHR(10), ' '), CHR(13), ' '), CHR(9), ' ')";
     }
 
+    /**
+     * Plain-text twin of {@link #spaceDelimited(String)} — folds one
+     * materialized value into the same padded token stream the SQL builds
+     * inside the query, so a Java-side recomputation cannot drift from the
+     * retrieval engine's whole-word semantics.
+     */
+    private static String delimitedTokens(String value) {
+        String tokens = " " + (value == null ? "" : value.toLowerCase(java.util.Locale.ROOT)) + " ";
+        for (String delimiter : WORD_DELIMITERS) {
+            tokens = tokens.replace(delimiter, " ");
+        }
+        return tokens.replace("\n", " ").replace("\r", " ").replace("\t", " ");
+    }
+
+    /**
+     * Per-term contribution identical to the scoring CASE expression in
+     * {@link #search}: title substring 3, content substring 1, title
+     * whole-word 4, content whole-word 2. The lexical fast path uses this to
+     * demand corroboration from more than one term before trusting a top
+     * document — a single generic morpheme ("công" inside "Công nghệ") can
+     * reach the full 10 alone, and summing those used to let off-topic
+     * questions like "công thức nấu phở bò" answer from the IT-services
+     * document.
+     */
+    static int termContribution(String title, String content, String term) {
+        if (term == null || term.length() < 2) return 0;
+        String loweredTitle = title == null ? "" : title.toLowerCase(java.util.Locale.ROOT);
+        String loweredContent = content == null ? "" : content.toLowerCase(java.util.Locale.ROOT);
+        int score = 0;
+        if (loweredTitle.contains(term)) score += 3;
+        if (loweredContent.contains(term)) score += 1;
+        if (delimitedTokens(loweredTitle).contains(" " + term + " ")) score += 4;
+        if (delimitedTokens(loweredContent).contains(" " + term + " ")) score += 2;
+        return score;
+    }
+
     private final NamedParameterJdbcTemplate jdbc;
     private final boolean allowLegacyFallback;
 

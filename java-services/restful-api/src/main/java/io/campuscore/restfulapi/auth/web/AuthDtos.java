@@ -2,6 +2,7 @@ package io.campuscore.restfulapi.auth.web;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
 import java.time.Instant;
 import java.util.List;
@@ -32,7 +33,11 @@ public final class AuthDtos {
     public record UpdateProfileRequest(
             String firstName,
             String lastName,
-            @Size(max = 80, message = "phone must be at most 80 characters") String phone,
+            @Size(max = 80, message = "phone must be at most 80 characters")
+            @Pattern(
+                    regexp = "^$|^\\+?[0-9][0-9\\s()./-]{4,78}$",
+                    message = "phone must be a valid phone number")
+            String phone,
             String dateOfBirth,
             @Size(max = 500, message = "address must be at most 500 characters") String address,
             @Size(max = 200_000, message = "avatar must be a data URL of at most 200k characters") String avatar) {

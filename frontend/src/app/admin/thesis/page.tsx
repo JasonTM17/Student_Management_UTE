@@ -26,6 +26,7 @@ import { Modal } from '@/components/ui/modal';
 import { Select } from '@/components/ui/select';
 import { AdminFrame } from '@/components/admin/AdminFrame';
 import { AdminMetricCard } from '@/components/admin/AdminSurface';
+import { useConfirmationDialog } from '@/components/ui/use-confirmation-dialog';
 import { metricToneClass, statusToneClass } from '@/components/ui/status';
 import { cn } from '@/lib/utils';
 import {
@@ -119,6 +120,14 @@ export default function AdminThesisPage() {
   const [showAssignTopicModal, setShowAssignTopicModal] = useState(false);
   const [targetCouncilIdForTopic, setTargetCouncilIdForTopic] = useState('');
   const [selectedTopicIdToAssign, setSelectedTopicIdToAssign] = useState('');
+  const { confirm, confirmationDialog } = useConfirmationDialog();
+
+  // Edit-round modal state (schedule amendment while DRAFT/PROPOSAL_OPEN)
+  const [showEditRoundModal, setShowEditRoundModal] = useState(false);
+  const [editingRoundId, setEditingRoundId] = useState('');
+
+  // GVPB counter-reviewer assignment drafts, keyed by topic id
+  const [reviewerDrafts, setReviewerDrafts] = useState<Record<string, string>>({});
 
   const thesisAdminAccess = Boolean(isAdmin || isSuperAdmin || isFacultyHead);
   const canAccess = Boolean(user && thesisAdminAccess);
@@ -276,8 +285,18 @@ export default function AdminThesisPage() {
     }
   };
 
+  // The conditional fields mirror RoundType rules on the server: TLCN/KLTN
+  // require the GVPB deadline and the council report date, KLTN additionally
+  // requires the defense date. Submitting without them used to bounce off the
+  // backend as a generic failure — validate them here so the form says what
+  // is missing.
+  const needsGvpb = formType === 'TLCN' || formType === 'KLTN';
+  const needsDefense = formType === 'KLTN';
+
   const createRound = async () => {
-    if (!formName || !formStart || !formEnd || !formLecturerStart || !formLecturerEnd) {
+    if (!formName || !formStart || !formEnd || !formLecturerStart || !formLecturerEnd
+        || (needsGvpb && (!formGvpb || !formReportDate))
+        || (needsDefense && !formDefenseDate)) {
       setError(messages.thesis.admin.createIncomplete);
       return;
     }
@@ -293,13 +312,13 @@ export default function AdminThesisPage() {
         lecturerSubmitStart: new Date(formLecturerStart).toISOString(),
         lecturerSubmitEnd: new Date(formLecturerEnd).toISOString(),
         proposalPublishAt: formProposal ? new Date(formProposal).toISOString() : undefined,
-        gvpbDeadline: formGvpb ? new Date(formGvpb).toISOString() : undefined,
+        gvpbDeadline: needsGvpb && formGvpb ? new Date(formGvpb).toISOString() : undefined,
         reportDate:
-          (formType === 'TLCN' || formType === 'KLTN') && formReportDate
+          needsGvpb && formReportDate
             ? new Date(formReportDate).toISOString()
             : undefined,
         defenseDate:
-          formType === 'KLTN' && formDefenseDate
+          needsDefense && formDefenseDate
             ? new Date(formDefenseDate).toISOString()
             : undefined,
       });
@@ -326,6 +345,16 @@ export default function AdminThesisPage() {
     roundId: string,
     action: 'open' | 'close' | 'publish' | 'open-proposals' | 'publish-results',
   ) => {
+    // Lifecycle transitions move every group and lecturer in the round, so a
+    // single misclick cannot silently open registration or publish results.
+    const confirmed = await confirm({
+      title: messages.thesis.admin.transitionConfirmTitle,
+      message: transitionConfirmCopy(action),
+      confirmText: messages.common.actions.confirm,
+      cancelText: messages.common.actions.cancel,
+      variant: action === 'publish-results' || action === 'close' ? 'destructive' : 'default',
+    });
+    if (!confirmed) return;
     setIsSaving(true);
     setError('');
     setSuccess('');
@@ -349,6 +378,120 @@ export default function AdminThesisPage() {
       await loadData();
     } catch (err: unknown) {
       setError(transitionErrorMessage(err));
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const transitionConfirmCopy = (
+    action: 'open' | 'close' | 'publish' | 'open-proposals' | 'publish-results',
+  ): string => {
+    const copy = messages.thesis.admin.transitionConfirm;
+    if (action === 'open-proposals') return copy.openProposals;
+    if (action === 'open') return copy.openRegistration;
+    if (action === 'close') return copy.closeRegistration;
+    if (action === 'publish') return copy.publishProposals;
+    return copy.publishResults;
+  };
+
+  const toLocalInput = (iso?: string | null) => (iso ? iso.slice(0, 16) : '');
+
+  /** The edit modal reuses the create-form state; opening it loads the round. */
+  const openEditRoundModal = (round: ThesisRound) => {
+    setEditingRoundId(round.id);
+    setFormName(round.name);
+    setFormType(round.thesisType || 'MON_HOC');
+    setFormStart(toLocalInput(round.registrationStart));
+    setFormEnd(toLocalInput(round.registrationEnd));
+    setFormLecturerStart(toLocalInput(round.lecturerSubmitStart));
+    setFormLecturerEnd(toLocalInput(round.lecturerSubmitEnd));
+    setFormProposal(toLocalInput(round.proposalPublishAt));
+    setFormGvpb(toLocalInput(round.gvpbDeadline));
+    setFormReportDate(toLocalInput(round.reportDate));
+    setFormDefenseDate(toLocalInput(round.defenseDate));
+    setShowEditRoundModal(true);
+  };
+
+  const updateRound = async () => {
+    if (!editingRoundId) return;
+    if (!formName || !formStart || !formEnd || !formLecturerStart || !formLecturerEnd
+        || (needsGvpb && (!formGvpb || !formReportDate))
+        || (needsDefense && !formDefenseDate)) {
+      setError(messages.thesis.admin.createIncomplete);
+      return;
+    }
+    setIsSaving(true);
+    setError('');
+    setSuccess('');
+    try {
+      await thesisApi.updateRound(editingRoundId, {
+        name: formName,
+        thesisType: formType,
+        registrationStart: new Date(formStart).toISOString(),
+        registrationEnd: new Date(formEnd).toISOString(),
+        lecturerSubmitStart: new Date(formLecturerStart).toISOString(),
+        lecturerSubmitEnd: new Date(formLecturerEnd).toISOString(),
+        proposalPublishAt: formProposal ? new Date(formProposal).toISOString() : undefined,
+        gvpbDeadline: needsGvpb && formGvpb ? new Date(formGvpb).toISOString() : undefined,
+        reportDate: needsGvpb && formReportDate ? new Date(formReportDate).toISOString() : undefined,
+        defenseDate: needsDefense && formDefenseDate ? new Date(formDefenseDate).toISOString() : undefined,
+      });
+      setSuccess(messages.thesis.admin.editRoundSuccess);
+      setShowEditRoundModal(false);
+      setEditingRoundId('');
+      await loadData();
+      if (expandedRoundId === editingRoundId) {
+        await loadRoundDetail(editingRoundId);
+      }
+    } catch (err: unknown) {
+      setError(transitionErrorMessage(err));
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const cancelRound = async (roundId: string) => {
+    const confirmed = await confirm({
+      title: messages.thesis.admin.cancelRoundTitle,
+      message: messages.thesis.admin.cancelRoundConfirm,
+      confirmText: messages.thesis.admin.cancelRound,
+      cancelText: messages.common.actions.cancel,
+      variant: 'destructive',
+    });
+    if (!confirmed) return;
+    setIsSaving(true);
+    setError('');
+    setSuccess('');
+    try {
+      await thesisApi.cancelRound(roundId);
+      setSuccess(messages.thesis.admin.roundCancelled);
+      await loadData();
+    } catch (err: unknown) {
+      setError(transitionErrorMessage(err));
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleAssignReviewer = async (topicId: string, roundId: string) => {
+    const lecturerId = reviewerDrafts[topicId];
+    if (!lecturerId) return;
+    setIsSaving(true);
+    setError('');
+    setSuccess('');
+    try {
+      await thesisApi.assignReviewer(topicId, lecturerId);
+      setSuccess(messages.thesis.admin.reviewerAssigned);
+      await loadRoundDetail(roundId);
+    } catch (err: unknown) {
+      const code = getThesisErrorCode(err);
+      setError(
+        code === 'SUPERVISOR_CANNOT_REVIEW'
+          ? messages.thesis.admin.reviewerIsSupervisor
+          : code === 'GVPB_SCORE_SUBMITTED'
+            ? messages.thesis.admin.reviewerFrozen
+            : transitionErrorMessage(err),
+      );
     } finally {
       setIsSaving(false);
     }
@@ -536,6 +679,31 @@ export default function AdminThesisPage() {
                           {round.status === 'REGISTRATION_CLOSED' ? (
                             <Button type="button" size="sm" onClick={() => void transitionRound(round.id, 'publish-results')} disabled={isSaving}>
                               {messages.thesis.admin.publishResults}
+                            </Button>
+                          ) : null}
+                          {(round.status === 'DRAFT' || round.status === 'PROPOSAL_OPEN' || round.status === 'PROPOSALS_PUBLISHED') ? (
+                            <Button
+                              type="button"
+                              size="sm"
+                              variant="ghost"
+                              onClick={() => openEditRoundModal(round)}
+                              disabled={isSaving}
+                            >
+                              {messages.thesis.admin.editRound}
+                            </Button>
+                          ) : null}
+                          {round.status !== 'RESULTS_PUBLISHED'
+                          && round.status !== 'CLOSED'
+                          && round.status !== 'CANCELLED' ? (
+                            <Button
+                              type="button"
+                              size="sm"
+                              variant="ghost"
+                              className="text-destructive hover:text-destructive"
+                              onClick={() => void cancelRound(round.id)}
+                              disabled={isSaving}
+                            >
+                              {messages.thesis.admin.cancelRound}
                             </Button>
                           ) : null}
                         </div>
@@ -738,19 +906,75 @@ export default function AdminThesisPage() {
                                       <div className="space-y-1.5">
                                         {topicIds.map((tid: string) => {
                                           const top = topics.find((t) => t.id === tid);
+                                          const reviewerId = top?.gvpbLecturerId ?? '';
+                                          const reviewerLecturer = reviewerId
+                                            ? lecturers.find((l) => l.id === reviewerId)
+                                            : undefined;
+                                          const reviewerName = reviewerLecturer?.user
+                                            ? `${reviewerLecturer.user.lastName} ${reviewerLecturer.user.firstName}`
+                                            : reviewerId;
                                           return (
                                             <div
                                               key={tid}
-                                              className="flex items-center justify-between rounded-lg border border-border/50 bg-background/50 px-2.5 py-1.5 text-xs"
+                                              className="rounded-lg border border-border/50 bg-background/50 px-2.5 py-1.5 text-xs space-y-1.5"
                                             >
-                                              <span className="font-medium text-foreground line-clamp-1">
-                                                {top?.title || tid}
-                                              </span>
-                                              {top?.finalScore != null && (
-                                                <span className="shrink-0 rounded bg-status-success/20 px-1.5 py-0.5 text-[10px] font-semibold text-status-success-foreground">
-                                                  {messages.thesis.councils.finalScorePoints.replace('{score}', String(top.finalScore))}
+                                              <div className="flex items-center justify-between">
+                                                <span className="font-medium text-foreground line-clamp-1">
+                                                  {top?.title || tid}
                                                 </span>
-                                              )}
+                                                {top?.finalScore != null && (
+                                                  <span className="shrink-0 rounded bg-status-success/20 px-1.5 py-0.5 text-[10px] font-semibold text-status-success-foreground">
+                                                    {messages.thesis.councils.finalScorePoints.replace('{score}', String(top.finalScore))}
+                                                  </span>
+                                                )}
+                                              </div>
+                                              {/* GVPB counter-reviewer (spec: one reviewer per defended topic) */}
+                                              <div className="flex items-center gap-1.5">
+                                                <Select
+                                                  aria-label={messages.thesis.admin.assignReviewer}
+                                                  className="h-7 flex-1 text-xs"
+                                                  value={reviewerDrafts[tid] ?? reviewerId}
+                                                  onChange={(e) =>
+                                                    setReviewerDrafts((prev) => ({
+                                                      ...prev,
+                                                      [tid]: e.target.value,
+                                                    }))
+                                                  }
+                                                  options={[
+                                                    {
+                                                      value: '',
+                                                      label: `-- ${messages.thesis.admin.assignReviewer} --`,
+                                                    },
+                                                    ...lecturers.map((l) => ({
+                                                      value: l.id,
+                                                      label: l.user
+                                                        ? `${l.user.lastName} ${l.user.firstName}`
+                                                        : l.id,
+                                                    })),
+                                                  ]}
+                                                />
+                                                <Button
+                                                  type="button"
+                                                  variant="ghost"
+                                                  size="sm"
+                                                  className="h-7 px-2 text-xs text-primary"
+                                                  disabled={
+                                                    isSaving ||
+                                                    !(reviewerDrafts[tid] ?? reviewerId) ||
+                                                    (reviewerDrafts[tid] ?? reviewerId) === reviewerId
+                                                  }
+                                                  onClick={() => void handleAssignReviewer(tid, round.id)}
+                                                >
+                                                  {reviewerId
+                                                    ? messages.thesis.admin.reassignReviewer
+                                                    : messages.thesis.admin.assignReviewer}
+                                                </Button>
+                                              </div>
+                                              {reviewerId ? (
+                                                <p className="text-[10px] text-muted-foreground">
+                                                  {messages.thesis.admin.currentReviewer}: {reviewerName}
+                                                </p>
+                                              ) : null}
                                             </div>
                                           );
                                         })}
@@ -785,7 +1009,20 @@ export default function AdminThesisPage() {
           <Select
             label={messages.thesis.admin.thesisType}
             value={formType}
-            onChange={(e) => setFormType(e.target.value)}
+            onChange={(e) => {
+              const next = e.target.value;
+              setFormType(next);
+              // Conditional fields would otherwise smuggle stale values into a
+              // type where the server rejects them (e.g. a KLTN GVPB deadline
+              // on a MON_HOC round).
+              if (next !== 'TLCN' && next !== 'KLTN') {
+                setFormGvpb('');
+                setFormReportDate('');
+              }
+              if (next !== 'KLTN') {
+                setFormDefenseDate('');
+              }
+            }}
             options={[
               { value: 'MON_HOC', label: messages.thesis.admin.thesisTypeOptions.MON_HOC },
               { value: 'NCKH', label: messages.thesis.admin.thesisTypeOptions.NCKH },
@@ -820,22 +1057,22 @@ export default function AdminThesisPage() {
             {messages.thesis.admin.proposalPublishAt}
             <Input type="datetime-local" value={formProposal} onChange={(e) => setFormProposal(e.target.value)} />
           </label>
-          {formType === 'TLCN' || formType === 'KLTN' ? (
+          {needsGvpb ? (
             <label className="flex flex-col gap-2 text-sm font-medium text-foreground">
-              {messages.thesis.admin.gvpbDeadline}
-              <Input type="datetime-local" value={formGvpb} onChange={(e) => setFormGvpb(e.target.value)} />
+              {messages.thesis.admin.gvpbDeadline} <span className="text-destructive">*</span>
+              <Input type="datetime-local" value={formGvpb} onChange={(e) => setFormGvpb(e.target.value)} required />
             </label>
           ) : null}
-          {formType === 'TLCN' || formType === 'KLTN' ? (
+          {needsGvpb ? (
             <label className="flex flex-col gap-2 text-sm font-medium text-foreground">
-              {messages.thesis.admin.reportDate}
-              <Input type="datetime-local" value={formReportDate} onChange={(e) => setFormReportDate(e.target.value)} />
+              {messages.thesis.admin.reportDate} <span className="text-destructive">*</span>
+              <Input type="datetime-local" value={formReportDate} onChange={(e) => setFormReportDate(e.target.value)} required />
             </label>
           ) : null}
-          {formType === 'KLTN' ? (
+          {needsDefense ? (
             <label className="flex flex-col gap-2 text-sm font-medium text-foreground">
-              {messages.thesis.admin.defenseDate}
-              <Input type="datetime-local" value={formDefenseDate} onChange={(e) => setFormDefenseDate(e.target.value)} />
+              {messages.thesis.admin.defenseDate} <span className="text-destructive">*</span>
+              <Input type="datetime-local" value={formDefenseDate} onChange={(e) => setFormDefenseDate(e.target.value)} required />
             </label>
           ) : null}
           <div className="flex justify-end gap-2 pt-2">
@@ -958,6 +1195,100 @@ export default function AdminThesisPage() {
         </div>
       </Modal>
 
+      {/* Edit Round Modal — reuses the create-form fields, prefilled */}
+      <Modal
+        isOpen={showEditRoundModal}
+        onClose={() => {
+          setShowEditRoundModal(false);
+          setEditingRoundId('');
+        }}
+        title={messages.thesis.admin.editRoundTitle}
+      >
+        <div className="space-y-4">
+          <label className="flex flex-col gap-2 text-sm font-medium text-foreground">
+            {messages.thesis.admin.roundName}
+            <Input placeholder={messages.thesis.admin.roundNamePlaceholder} value={formName} onChange={(e) => setFormName(e.target.value)} />
+          </label>
+          <Select
+            label={messages.thesis.admin.thesisType}
+            value={formType}
+            onChange={(e) => {
+              const next = e.target.value;
+              setFormType(next);
+              if (next !== 'TLCN' && next !== 'KLTN') {
+                setFormGvpb('');
+                setFormReportDate('');
+              }
+              if (next !== 'KLTN') {
+                setFormDefenseDate('');
+              }
+            }}
+            options={[
+              { value: 'MON_HOC', label: messages.thesis.admin.thesisTypeOptions.MON_HOC },
+              { value: 'NCKH', label: messages.thesis.admin.thesisTypeOptions.NCKH },
+              { value: 'TLCN', label: messages.thesis.admin.thesisTypeOptions.TLCN },
+              { value: 'KLTN', label: messages.thesis.admin.thesisTypeOptions.KLTN },
+            ]}
+          />
+          <div className="grid gap-4 sm:grid-cols-2">
+            <label className="flex flex-col gap-2 text-sm font-medium text-foreground">
+              {messages.thesis.admin.registrationStart}
+              <Input type="datetime-local" value={formStart} onChange={(e) => setFormStart(e.target.value)} />
+            </label>
+            <label className="flex flex-col gap-2 text-sm font-medium text-foreground">
+              {messages.thesis.admin.registrationEnd}
+              <Input type="datetime-local" value={formEnd} onChange={(e) => setFormEnd(e.target.value)} />
+            </label>
+          </div>
+          <div>
+            <p className="text-sm font-medium text-foreground">{messages.thesis.admin.lecturerWindow}</p>
+            <div className="mt-2 grid gap-4 sm:grid-cols-2">
+              <label className="flex flex-col gap-2 text-sm font-medium text-foreground">
+                {messages.thesis.admin.lecturerSubmitStart}
+                <Input type="datetime-local" value={formLecturerStart} onChange={(e) => setFormLecturerStart(e.target.value)} />
+              </label>
+              <label className="flex flex-col gap-2 text-sm font-medium text-foreground">
+                {messages.thesis.admin.lecturerSubmitEnd}
+                <Input type="datetime-local" value={formLecturerEnd} onChange={(e) => setFormLecturerEnd(e.target.value)} />
+              </label>
+            </div>
+          </div>
+          <label className="flex flex-col gap-2 text-sm font-medium text-foreground">
+            {messages.thesis.admin.proposalPublishAt}
+            <Input type="datetime-local" value={formProposal} onChange={(e) => setFormProposal(e.target.value)} />
+          </label>
+          {needsGvpb ? (
+            <label className="flex flex-col gap-2 text-sm font-medium text-foreground">
+              {messages.thesis.admin.gvpbDeadline} <span className="text-destructive">*</span>
+              <Input type="datetime-local" value={formGvpb} onChange={(e) => setFormGvpb(e.target.value)} required />
+            </label>
+          ) : null}
+          {needsGvpb ? (
+            <label className="flex flex-col gap-2 text-sm font-medium text-foreground">
+              {messages.thesis.admin.reportDate} <span className="text-destructive">*</span>
+              <Input type="datetime-local" value={formReportDate} onChange={(e) => setFormReportDate(e.target.value)} required />
+            </label>
+          ) : null}
+          {needsDefense ? (
+            <label className="flex flex-col gap-2 text-sm font-medium text-foreground">
+              {messages.thesis.admin.defenseDate} <span className="text-destructive">*</span>
+              <Input type="datetime-local" value={formDefenseDate} onChange={(e) => setFormDefenseDate(e.target.value)} required />
+            </label>
+          ) : null}
+          <div className="flex justify-end gap-2 pt-2">
+            <Button type="button" variant="outline" onClick={() => {
+              setShowEditRoundModal(false);
+              setEditingRoundId('');
+            }}>
+              {messages.common.actions.cancel}
+            </Button>
+            <Button type="button" onClick={() => void updateRound()} disabled={isSaving}>
+              {messages.thesis.admin.editRound}
+            </Button>
+          </div>
+        </div>
+      </Modal>
+
       {/* Assign Topic Modal */}
       <Modal
         isOpen={showAssignTopicModal}
@@ -1013,6 +1344,7 @@ export default function AdminThesisPage() {
           })()}
         </div>
       </Modal>
+      {confirmationDialog}
     </AdminFrame>
   );
 }

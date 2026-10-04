@@ -72,7 +72,8 @@ public class AcademicMutationController {
             @AuthenticationPrincipal Jwt jwt,
             @Parameter(description = "Mã định danh ghi danh (UUID)", required = true) @PathVariable String id,
             @Parameter(description = "Khóa chống trùng lặp Idempotency") @RequestHeader(value = "Idempotency-Key", required = false) String idempotencyKey) {
-        mutations.drop(id, jwt.getClaimAsString("studentId"), jwt.getClaimAsStringList("roles"), idempotencyKey);
+        mutations.drop(id, jwt.getClaimAsString("studentId"), jwt.getClaimAsStringList("roles"), idempotencyKey,
+                jwt.getSubject());
         return ResponseEntity.ok()
                 .header("Deprecation", "true")
                 .body(Map.of("message", "Enrollment dropped successfully"));

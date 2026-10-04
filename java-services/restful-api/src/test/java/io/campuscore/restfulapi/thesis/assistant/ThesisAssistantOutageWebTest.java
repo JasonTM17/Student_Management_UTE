@@ -67,16 +67,28 @@ class ThesisAssistantOutageWebTest {
         };
 
         for (String[] question : handedOverQuestions) {
-            mvc.perform(post("/api/v1/thesis/assistant/chat")
+            // This test JWT carries no studentId claim. Depending on intent
+            // routing, each question either (a) reaches the personal advisor,
+            // which answers honestly that the account has no student profile
+            // (PERSONAL_CONTEXT, campuscore-personal-context), or (b) stays on
+            // the knowledge path, which during this outage must keep the
+            // degraded KNOWLEDGE_UNAVAILABLE contract — never a 5xx, never an
+            // invented answer.
+            String body = mvc.perform(post("/api/v1/thesis/assistant/chat")
                             .with(jwt().authorities(new SimpleGrantedAuthority("ROLE_STUDENT")))
                             .contentType("application/json")
                             .content("{\"message\":\"" + question[1]
                                     + "\",\"locale\":\"vi\",\"clientRequestId\":\"" + question[0] + "\"}"))
                     .andExpect(status().isOk())
-                    .andExpect(jsonPath("$.model").value("curated-lexical-rag"))
-                    .andExpect(jsonPath("$.degraded").value(true))
-                    .andExpect(jsonPath("$.reasonCode").value("KNOWLEDGE_UNAVAILABLE"))
-                    .andExpect(jsonPath("$.locale").value("vi"));
+                    .andExpect(jsonPath("$.locale").value("vi"))
+                    .andReturn().getResponse().getContentAsString();
+            boolean personal = body.contains("\"reasonCode\":\"PERSONAL_CONTEXT\"")
+                    && body.contains("\"model\":\"campuscore-personal-context\"");
+            boolean outage = body.contains("\"reasonCode\":\"KNOWLEDGE_UNAVAILABLE\"")
+                    && body.contains("\"model\":\"curated-lexical-rag\"")
+                    && body.contains("\"degraded\":true");
+            org.junit.jupiter.api.Assertions.assertTrue(personal || outage,
+                    "question '" + question[1] + "' must keep the honest personal or degraded-outage contract: " + body);
         }
     }
 }

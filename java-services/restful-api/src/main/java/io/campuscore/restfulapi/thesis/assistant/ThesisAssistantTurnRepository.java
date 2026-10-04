@@ -189,6 +189,67 @@ public class ThesisAssistantTurnRepository {
         return new DispatchDecision(true, true, "DISPATCHED");
     }
 
+    /**
+     * Standalone daily-quota charge for provider calls that legitimately skip
+     * the turn ledger (off-topic general answers). Uses the same
+     * {@code usage_bucket} USER/GLOBAL rows and the same campus wall-clock
+     * bucket date as {@code dispatch}, so ledgered and unledgered calls share
+     * one daily budget instead of off-topic questions burning unlimited
+     * provider tokens.
+     */
+    @Transactional(transactionManager = AssistantDatabaseConfiguration.TRANSACTION_MANAGER)
+    public java.time.LocalDate chargeStandaloneQuota(String ownerId, int userLimit, int globalLimit) {
+        LocalDate date = AssistantTimezone.currentBucketDate();
+        ensureBucket(date, ownerId, "USER");
+        ensureBucket(date, "*", "GLOBAL");
+        Integer user = lockedCount(date, ownerId, "USER");
+        Integer global = lockedCount(date, "*", "GLOBAL");
+        if (user == null || global == null || user >= Math.max(1, userLimit) || global >= Math.max(1, globalLimit)) {
+            return null;
+        }
+        incrementBucket(date, ownerId, "USER");
+        incrementBucket(date, "*", "GLOBAL");
+        return date;
+    }
+
+    /**
+     * Refund for a standalone quota charge whose provider call never produced
+     * an answer: the caller then falls through to the ledgered path, which
+     * charges its own unit — leaving the standalone charge would bill one
+     * user request twice. Decrements the same USER/GLOBAL buckets on the
+     * bucket date the charge actually used (the campus wall clock may have
+     * rolled past midnight between charge and refund), floored at 0.
+     */
+    @Transactional(transactionManager = AssistantDatabaseConfiguration.TRANSACTION_MANAGER)
+    public void refundStandaloneQuota(String ownerId, LocalDate chargeDate) {
+        if (chargeDate == null) return;
+        decrementBucket(chargeDate, ownerId, "USER");
+        decrementBucket(chargeDate, "*", "GLOBAL");
+    }
+
+    /**
+     * Consumes the idempotency key for a standalone (ledger-skipping) turn so
+     * a later request reusing the key with a DIFFERENT payload conflicts in
+     * {@code enforcePersonalIdempotency}/{@code requestHashOf} exactly like
+     * the ledgered paths. An exact replay is still answered fresh — the same
+     * semantics the personal-context path documents — and each fresh answer
+     * is a real provider call, so it keeps paying its quota.
+     */
+    @Transactional(transactionManager = AssistantDatabaseConfiguration.TRANSACTION_MANAGER)
+    public void recordStandaloneTurn(String ownerId, UUID clientRequestId, String requestHash) {
+        String insert = "INSERT INTO assistant.chat_turn_ledger "
+                + "(turn_id,owner_id,client_request_id,request_hash,conversation_id,created_conversation,"
+                + "state,lease_owner,lease_generation,quota_reserved,result_message_id,terminal_reason,"
+                + "updated_at,tombstone_until) VALUES "
+                + "(:turn,:owner,:request,:hash,NULL,FALSE,'COMPLETED','standalone-quota',0,TRUE,"
+                + "NULL,'GENERAL_ANSWER',CURRENT_TIMESTAMP,:tombstone)"
+                + (postgres ? " ON CONFLICT DO NOTHING" : "");
+        jdbc.update(insert,
+                p().addValue("turn", UUID.randomUUID()).addValue("owner", ownerId)
+                        .addValue("request", clientRequestId).addValue("hash", requestHash)
+                        .addValue("tombstone", timestampAfterDays(TOMBSTONE_DAYS)));
+    }
+
     @Transactional(transactionManager = AssistantDatabaseConfiguration.TRANSACTION_MANAGER)
     public TerminalResult complete(UUID turnId, String ownerId, long generation, String prompt,
             String model, String answer, boolean degraded, String reasonCode, List<Citation> citations) {
@@ -669,6 +730,11 @@ public class ThesisAssistantTurnRepository {
 
     private void incrementBucket(LocalDate date, String owner, String scope) {
         jdbc.update("UPDATE assistant.usage_bucket SET request_count=request_count+1 WHERE bucket_date=:date AND owner_id=:owner AND scope=:scope",
+                p().addValue("date", date).addValue("owner", owner).addValue("scope", scope));
+    }
+
+    private void decrementBucket(LocalDate date, String owner, String scope) {
+        jdbc.update("UPDATE assistant.usage_bucket SET request_count=GREATEST(request_count-1,0) WHERE bucket_date=:date AND owner_id=:owner AND scope=:scope",
                 p().addValue("date", date).addValue("owner", owner).addValue("scope", scope));
     }
 

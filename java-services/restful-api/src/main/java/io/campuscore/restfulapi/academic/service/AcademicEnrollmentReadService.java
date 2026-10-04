@@ -85,11 +85,15 @@ public class AcademicEnrollmentReadService {
 
     @Transactional(readOnly = true)
     public List<EnrollmentResponse> findStudentEnrollments(String studentId, String semesterId) {
-        return academic.findStudentEnrollments(
+        List<EnrollmentRow> rows = academic.findStudentEnrollments(
                 requireProfileId("studentId", studentId),
-                normalizeOptional("semesterId", semesterId))
-                .stream()
-                .map(row -> studentEnrollment(row, schedules(List.of(row))))
+                normalizeOptional("semesterId", semesterId));
+        // One batched schedule read for all rows — the per-row variant turned
+        // every personal timetable/enrollment assistant answer into 1+N
+        // queries (chatbot audit S1).
+        Map<String, List<ScheduleRow>> schedules = schedules(rows);
+        return rows.stream()
+                .map(row -> studentEnrollment(row, schedules))
                 .toList();
     }
 
@@ -161,7 +165,19 @@ public class AcademicEnrollmentReadService {
 
     @Transactional(readOnly = true)
     public TranscriptResponse findStudentTranscript(String studentId) {
-        List<GradeSummary> grades = findStudentGrades(studentId, null);
+        return buildTranscript(findStudentGrades(studentId, null));
+    }
+
+    /**
+     * Transcript built from already-fetched grade rows — the assistant's
+     * personal answers hold the list for their own detail lines, so the
+     * summary used to run the same grade query a second time (audit S2).
+     */
+    public TranscriptResponse findStudentTranscript(String studentId, List<GradeSummary> prefetched) {
+        return buildTranscript(prefetched == null ? List.of() : prefetched);
+    }
+
+    private TranscriptResponse buildTranscript(List<GradeSummary> grades) {
         Map<String, TranscriptAccumulator> bySemester = new LinkedHashMap<>();
         Map<String, GradeSummary> bestAttemptByCourse = new LinkedHashMap<>();
 

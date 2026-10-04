@@ -21,13 +21,17 @@ interface CouncilDefenseWorkspaceProps {
   topics: ThesisTopic[];
   lecturers: Lecturer[];
   councilScores: Record<string, ThesisCouncilScore[]>;
+  /** Keys whose score list failed to load — distinct from an empty list. */
+  councilScoreErrors: Record<string, boolean>;
   topicSupervisors: Record<string, string[]>;
   topicReports: Record<string, ThesisGroupReport | null>;
   draftScores: Record<string, string>;
+  draftComments: Record<string, string>;
   isActionPending: boolean;
   showProfileClaimNotice: boolean;
   profileClaimMissingLabel: string;
   onScoreDraftChange: (key: string, value: string) => void;
+  onCommentDraftChange: (key: string, value: string) => void;
   onSubmitScore: (councilId: string, topicId: string) => void | Promise<void>;
   onFinalizeScore: (councilId: string, topicId: string) => void | Promise<void>;
   onDownloadReport: (
@@ -44,13 +48,16 @@ export default function CouncilDefenseWorkspace({
   topics,
   lecturers,
   councilScores,
+  councilScoreErrors,
   topicSupervisors,
   topicReports,
   draftScores,
+  draftComments,
   isActionPending,
   showProfileClaimNotice,
   profileClaimMissingLabel,
   onScoreDraftChange,
+  onCommentDraftChange,
   onSubmitScore,
   onFinalizeScore,
   onDownloadReport,
@@ -122,18 +129,18 @@ export default function CouncilDefenseWorkspace({
                     const topic = topics.find((t) => t.id === tid);
                     const key = `${council.id}:${tid}`;
                     const scores = councilScores[key] || [];
+                    const scoresFailed = Boolean(councilScoreErrors[key]);
                     const sups = topicSupervisors[tid] || [];
-                    const isSupervisor =
-                      sups.includes(myLecturerId) ||
-                      topic?.createdBy === myLecturerId;
+                    const isSupervisor = sups.includes(myLecturerId);
 
                     const isFinalized = topic?.finalScore != null;
                     // Mirror the backend eligibility rule exactly
-                    // (ThesisCouncilService.eligibleGraderCount): a
-                    // member is ineligible only when a supervisor row
-                    // exists for them. Excluding topic.createdBy here
-                    // made the button enable before the server agreed
-                    // and finalize then failed with SCORES_INCOMPLETE.
+                    // (ThesisCouncilService.eligibleGraderCount +
+                    // requireNotSupervisor): a member is ineligible only
+                    // when a supervisor row exists for them.
+                    // topic.createdBy must not count — the creator can be
+                    // removed as supervisor yet stays required for
+                    // finalize, which would wedge the score count.
                     const eligibleGraderCount = (council.members || []).filter(
                       (m) => !sups.includes(m.lecturerId),
                     ).length;
@@ -155,12 +162,12 @@ export default function CouncilDefenseWorkspace({
                               {topic?.title || tid}
                             </h5>
                             {topic?.description && (
-                              <p className="text-xs text-muted-foreground line-clamp-2">
+                              <p className="text-xs text-muted-foreground line-clamp-2" title={topic.description}>
                                 {topic.description}
                               </p>
                             )}
                             {topicReports[tid] ? (
-                              <div className="pt-1.5 flex items-center gap-2">
+                              <div className="pt-1.5 flex flex-wrap items-center gap-2">
                                 {/* A report is a link, an attached document,
                                     or both (feedback item 7). */}
                                 {topicReports[tid]?.url ? (
@@ -189,11 +196,11 @@ export default function CouncilDefenseWorkspace({
                                     className="inline-flex items-center gap-1.5 rounded-md border border-primary/40 bg-primary/10 px-2.5 py-1 text-xs font-semibold text-primary hover:underline"
                                   >
                                     <FileDown className="h-3.5 w-3.5" />
-                                    <span>{topicReports[tid]?.fileName}</span>
+                                    <span className="max-w-[16rem] truncate" title={topicReports[tid]?.fileName}>{topicReports[tid]?.fileName}</span>
                                   </button>
                                 ) : null}
                                 {topicReports[tid]?.note ? (
-                                  <span className="text-[11px] text-muted-foreground italic truncate max-w-xs">
+                                  <span className="text-[11px] text-muted-foreground italic truncate max-w-xs" title={topicReports[tid]?.note}>
                                     ({topicReports[tid]?.note})
                                   </span>
                                 ) : null}
@@ -209,7 +216,10 @@ export default function CouncilDefenseWorkspace({
                           ) : null}
                         </div>
 
-                        {/* Supervisor Constraint Warning (R8) */}
+                        {/* Supervisor Constraint Warning (R8). The score input
+                            is member-only: governance staff and non-member
+                            lecturers would otherwise see an input the server
+                            rejects with COUNCIL_MEMBER_REQUIRED. */}
                         {isSupervisor ? (
                           <div className="rounded-lg border border-status-warning/40 bg-status-warning/10 p-3 text-xs text-status-warning-foreground flex items-center gap-2">
                             <Shield className="h-4 w-4 shrink-0 text-status-warning" />
@@ -217,9 +227,9 @@ export default function CouncilDefenseWorkspace({
                               {messages.thesis.grading.supervisorCannotGrade}
                             </span>
                           </div>
-                        ) : !isFinalized ? (
+                        ) : !isFinalized && myMembership ? (
                           /* Grading Input for Eligible Council Member */
-                          <div className="flex flex-wrap items-center gap-3 pt-1">
+                          <div className="flex flex-wrap items-end gap-3 pt-1">
                             <label className="text-xs font-medium text-foreground flex items-center gap-2">
                               {messages.thesis.grading.scoreInputLabel}:
                               <Input
@@ -236,6 +246,20 @@ export default function CouncilDefenseWorkspace({
                                 disabled={isActionPending}
                               />
                             </label>
+                            <label className="text-xs font-medium text-foreground flex items-center gap-2 flex-1 min-w-[200px]">
+                              {messages.thesis.grading.commentInputLabel}:
+                              <Input
+                                type="text"
+                                maxLength={1000}
+                                placeholder={messages.thesis.grading.commentPlaceholder}
+                                value={draftComments[key] ?? ''}
+                                onChange={(e) =>
+                                  onCommentDraftChange(key, e.target.value)
+                                }
+                                className="h-8 flex-1 text-xs"
+                                disabled={isActionPending}
+                              />
+                            </label>
                             <Button
                               type="button"
                               size="sm"
@@ -249,7 +273,11 @@ export default function CouncilDefenseWorkspace({
                         ) : null}
 
                         {/* Scores Breakdown */}
-                        {scores.length > 0 && (
+                        {scoresFailed ? (
+                          <p className="rounded-lg border border-status-warning/40 bg-status-warning/10 p-2.5 text-xs text-status-warning-foreground">
+                            {messages.thesis.grading.scoresLoadFailed}
+                          </p>
+                        ) : scores.length > 0 && (
                           <div className="rounded-lg bg-background/60 p-2.5 text-xs space-y-1.5 border border-border/40">
                             <span className="font-semibold text-muted-foreground uppercase text-[10px] tracking-wider">
                               {messages.thesis.grading.scoresListTitle}:
@@ -266,11 +294,17 @@ export default function CouncilDefenseWorkspace({
                                   <span
                                     key={sIdx}
                                     className="inline-flex items-center rounded-md bg-muted px-2 py-1 text-[11px] font-medium text-foreground border border-border/50"
+                                    title={s.comment || undefined}
                                   >
                                     {name}:{' '}
                                     <strong className="ml-1 text-primary">
                                       {s.score}
                                     </strong>
+                                    {s.comment ? (
+                                      <span className="ml-1 italic text-muted-foreground line-clamp-1 max-w-[220px]">
+                                        — {s.comment}
+                                      </span>
+                                    ) : null}
                                   </span>
                                 );
                               })}
@@ -278,8 +312,10 @@ export default function CouncilDefenseWorkspace({
                           </div>
                         )}
 
-                        {/* Chair Finalize Action */}
-                        {isChair && !isFinalized && (
+                        {/* Chair Finalize Action — suppressed while the score
+                            list failed to load so a stale 0-of-N count cannot
+                            invite a doomed finalize request. */}
+                        {isChair && !isFinalized && !scoresFailed && (
                           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-t border-border/40 pt-3">
                             <p className="text-xs text-muted-foreground">
                               {submittedCount >= eligibleGraderCount

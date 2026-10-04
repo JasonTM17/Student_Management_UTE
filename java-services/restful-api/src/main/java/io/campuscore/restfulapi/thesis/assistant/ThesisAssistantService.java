@@ -345,7 +345,10 @@ public class ThesisAssistantService {
             // vocabulary and the V87 faculties-and-majors document answers them.
             "truong", "nganh", "chuyen\\s+nganh", "nganh\\s+dao\\s+tao", "dao\\s+tao",
             "major", "majors", "school",
-            "khoa", "bo\\s+mon", "sinh\\s+vien", "cong", "chuong\\s+trinh", "tien\\s+quyet", "song\\s+hanh",
+            // Bare "cong" once admitted "công thức nấu phở bò" (công thức =
+            // recipe): the syllable only means campus vocabulary inside its
+            // compounds, so the gate takes the compounds, not the fragment.
+            "khoa", "bo\\s+mon", "sinh\\s+vien", "cong\\s+(?:nghe|ty|tac|cu|no)", "chuong\\s+trinh", "tien\\s+quyet", "song\\s+hanh",
             "thi", "hoc\\s+bong", "tot\\s+nghiep", "thuc\\s+tap", "thu\\s+vien", "ky\\s+tuc\\s+xa",
             "tai\\s+khoan", "mat\\s+khau", "nghien\\s+cuu", "phuc\\s+khao", "rut\\s+hoc\\s+phan", "hoc\\s+lai",
             "ren\\s+luyen", "diem\\s+danh", "phong", "giay\\s+xac\\s+nhan",
@@ -359,10 +362,10 @@ public class ThesisAssistantService {
             // Round-2 sweep static-3: course-name vocabulary missing from the
             // gate — "Nhập môn lập trình là gì?" was hijacked into the general
             // fallback while the SPECIALIZED corpus owns a document for it.
-            "lap\s*trinh", "giai\s*thuat", "co\s*so\s*du\s*lieu", "csdl",
-            "ky\s*thuat\s*phan\s*mem", "he\s*dieu\s*hanh", "mang\s*may\s*tinh",
-            "tri\s*tue\s*nhan\s*tao", "kien\s*truc\s*may\s*tinh", "an\s*toan\s*thong\s*tin",
-            "solid", "design\s*pattern", "oop", "tdd", "unit\s*test");
+            "lap\\s*trinh", "giai\\s*thuat", "co\\s*so\\s*du\\s*lieu", "csdl",
+            "ky\\s*thuat\\s*phan\\s*mem", "he\\s*dieu\\s*hanh", "mang\\s*may\\s*tinh",
+            "tri\\s*tue\\s*nhan\\s*tao", "kien\\s*truc\\s*may\\s*tinh", "an\\s*toan\\s*thong\\s*tin",
+            "solid", "design\\s*pattern", "oop", "tdd", "unit\\s*test");
     /**
      * Retrieval is deliberately scoped before the database query.  A generic
      * lexical overlap (for example "thời" or "hôm nay") is not evidence that
@@ -375,6 +378,41 @@ public class ThesisAssistantService {
      * its topic past this pre-gate instead of being refused before search.
      */
     private static final java.util.regex.Pattern PUBLIC_SCOPE_SIGNAL = buildPublicScopeSignal();
+
+    /**
+     * A folded-alias hit is only evidence of campus scope when the raw message
+     * does not carry a conflicting accented reading. Accent folding collapses
+     * unrelated words onto academic keys — "đồ ăn" (food) folds to the same
+     * "do an" as "đồ án" — so a hit is disqualified when the conflict pattern
+     * matches without the rescue (the genuinely accented academic form) also
+     * matching. Conflicts written in folded form are checked against the folded
+     * view; accent-sensitive conflicts must be written accented and only ever
+     * match the raw text.
+     */
+    private record AmbiguousScopeHit(java.util.regex.Pattern conflict, java.util.regex.Pattern rescue) { }
+
+    static final Map<String, AmbiguousScopeHit> AMBIGUOUS_SCOPE_HITS = Map.of(
+            "do an", new AmbiguousScopeHit(
+                    java.util.regex.Pattern.compile("đồ\\s+ăn",
+                            java.util.regex.Pattern.CASE_INSENSITIVE | java.util.regex.Pattern.UNICODE_CASE),
+                    java.util.regex.Pattern.compile("đồ\\s+án",
+                            java.util.regex.Pattern.CASE_INSENSITIVE | java.util.regex.Pattern.UNICODE_CASE)),
+            "ket qua", new AmbiguousScopeHit(
+                    java.util.regex.Pattern.compile("ket\\s+qua\\s+(?:xo\\s+so|so\\s+xo|bong\\s+da|tran\\s+dau)"), null),
+            "bao ve", new AmbiguousScopeHit(
+                    java.util.regex.Pattern.compile("bao\\s+ve\\s+(?:moi\\s+truong|dong\\s+vat|thuc\\s+vat|tre\\s+em|thu\\s+cung|suc\\s+khoe)"), null),
+            "giay to", new AmbiguousScopeHit(
+                    java.util.regex.Pattern.compile("giay\\s+to\\s+(?:xe\\b|o\\s*to|oto|may\\b|nha|dat|tuy\\s+than|ca\\s+nhan)"), null),
+            "canh bao", new AmbiguousScopeHit(
+                    java.util.regex.Pattern.compile("canh\\s+bao\\s+(?:lu\\b|lut|mua|bao\\b|giong|ngap|song\\s+than|thien\\s+tai|chay|dich|dong\\s+dat)"), null),
+            "xep loai", new AmbiguousScopeHit(
+                    java.util.regex.Pattern.compile("xep\\s+loai\\s+(?:phim|sach|truyen|game|khach\\s+san|nha\\s+hang|quan\\s+an|san\\s+pham)"), null),
+            "de tai", new AmbiguousScopeHit(
+                    java.util.regex.Pattern.compile("de\\s+tai\\s+(?:van\\s+hoc|truyen|phim|tho\\b)"), null),
+            // "môi trường" (environment) is not "trường" (school) — the compound
+            // is the only common non-campus reading of the bare signal.
+            "truong", new AmbiguousScopeHit(
+                    java.util.regex.Pattern.compile("moi\\s+truong"), null));
 
     static java.util.regex.Pattern buildPublicScopeSignal() {
         java.util.LinkedHashSet<String> signals = new java.util.LinkedHashSet<>(PUBLIC_SCOPE_TOPICS);
@@ -709,6 +747,17 @@ public class ThesisAssistantService {
      *        the lexical path (round-3 chat-8)
      */
     public ChatResponse groundedFallback(String message, String locale, boolean dbDownAtRequestStart, String scope) {
+        return groundedFallback(message, locale, dbDownAtRequestStart, scope, false);
+    }
+
+    /**
+     * @param remoteNoMatch true when the authoritative remote service answered
+     *        cleanly and simply had no matching document. In that case a local
+     *        miss is an honest "not found" — not an outage — so the copy must
+     *        not claim the knowledge base is unreachable.
+     */
+    public ChatResponse groundedFallback(String message, String locale, boolean dbDownAtRequestStart,
+            String scope, boolean remoteNoMatch) {
         String normalizedLocale = AssistantInputGuard.normalizeLocale(locale);
         // A stopped database fails retrieval slower than every layered timeout
         // (gateway 15s > local budget 5s > Hikari 15s), so the outage must be
@@ -767,7 +816,7 @@ public class ThesisAssistantService {
         if (dbDownAtRequestStart) {
             return knowledgeUnavailableResponse(locale, null);
         }
-        return curatedFallback(normalizedLocale);
+        return remoteNoMatch ? noMatchFallback(normalizedLocale) : curatedFallback(normalizedLocale);
     }
 
     /** Model name marking a lexical fast-path answer from the reviewed curated corpus. */
@@ -801,23 +850,23 @@ public class ThesisAssistantService {
                 .replaceAll("[!.,;:?~\\s]+$", "").trim();
         if (normalized.isEmpty()) return null;
         boolean vi = "vi".equals(AssistantInputGuard.normalizeLocale(locale));
-        boolean matches = (patternOf(CONVERSATIONAL_OPENERS).matcher(normalized).find())
-                || (patternOf(CONVERSATIONAL_IDENTITY).matcher(normalized).find())
-                || (patternOf(CONVERSATIONAL_CAPABILITY).matcher(normalized).find())
-                || (patternOf(CONVERSATIONAL_THANKS).matcher(normalized).find())
-                || (patternOf(CONVERSATIONAL_BYE).matcher(normalized).find());
+        boolean matches = (CONVERSATIONAL_OPENERS_PATTERN.matcher(normalized).find())
+                || (CONVERSATIONAL_IDENTITY_PATTERN.matcher(normalized).find())
+                || (CONVERSATIONAL_CAPABILITY_PATTERN.matcher(normalized).find())
+                || (CONVERSATIONAL_THANKS_PATTERN.matcher(normalized).find())
+                || (CONVERSATIONAL_BYE_PATTERN.matcher(normalized).find());
         if (!matches) return null;
         String text;
-        if (patternOf(CONVERSATIONAL_THANKS).matcher(normalized).find()) {
+        if (CONVERSATIONAL_THANKS_PATTERN.matcher(normalized).find()) {
             text = vi
                     ? "Không có gì ạ! Nếu bạn cần tra cứu thêm về học phần, lịch học, điểm, điểm rèn luyện hay quy chế học vụ, cứ hỏi mình nhé."
                     : "You're welcome! If you need anything else about sections, timetables, grades, conduct scores, or academic regulations, just ask.";
-        } else if (patternOf(CONVERSATIONAL_BYE).matcher(normalized).find()) {
+        } else if (CONVERSATIONAL_BYE_PATTERN.matcher(normalized).find()) {
             text = vi
                     ? "Tạm biệt bạn! Khi nào cần hỗ trợ học vụ, bạn quay lại hỏi mình bất cứ lúc nào nhé."
                     : "Goodbye! Come back any time you need help with academic questions.";
-        } else if (patternOf(CONVERSATIONAL_IDENTITY).matcher(normalized).find()
-                || patternOf(CONVERSATIONAL_CAPABILITY).matcher(normalized).find()) {
+        } else if (CONVERSATIONAL_IDENTITY_PATTERN.matcher(normalized).find()
+                || CONVERSATIONAL_CAPABILITY_PATTERN.matcher(normalized).find()) {
             text = vi
                     ? "Mình là trợ lý AI của Cổng học vụ CampusUTE, được cấu hình chuyên sâu cho dữ liệu của trường và của chính tài khoản bạn.\n\n"
                             + "Mình có thể giúp:\n"
@@ -872,12 +921,72 @@ public class ThesisAssistantService {
      * (owner request 2026-09-30).
      */
     public ChatResponse generalAnswerIfOffTopic(String message, String locale, UUID clientRequestId, String scope) {
+        return generalAnswerIfOffTopic(message, locale, clientRequestId, scope, null);
+    }
+
+    /**
+     * @param ownerId the authenticated caller. Off-topic provider calls skip
+     *        the turn ledger, so they used to skip the daily quota as well —
+     *        an authenticated caller could burn unbounded provider tokens.
+     *        The standalone charge shares the same USER/GLOBAL buckets as the
+     *        ledger dispatch; when a caller is known and quota is enforced,
+     *        the call is paid for or refused.
+     */
+    public ChatResponse generalAnswerIfOffTopic(String message, String locale, UUID clientRequestId, String scope,
+            String ownerId) {
+        return generalAnswerIfOffTopic(message, locale, clientRequestId, scope, ownerId, null);
+    }
+
+    public ChatResponse generalAnswerIfOffTopic(String message, String locale, UUID clientRequestId, String scope,
+            String ownerId, String requestHash) {
         String normalizedLocale = AssistantInputGuard.normalizeLocale(locale);
         String normalized = AssistantInputGuard.normalizeMessage(message);
         if (normalized.isBlank()) return null;
         if (hasPublicScopeSignal(normalized)) return null;
         if ("specialized".equalsIgnoreCase(scope)) return null;
         if (deepSeek == null || !deepSeek.usable()) return null;
+        // Key consumption/conflict applies whenever the ledger is wired —
+        // independent of the quota gate, so quotaEnforced=false does not
+        // silently skip the idempotency contract.
+        if (turns != null && clientRequestId != null && requestHash != null
+                && org.springframework.util.StringUtils.hasText(ownerId)) {
+            // Same key with a different payload conflicts exactly like the
+            // ledgered paths; an identical replay legitimately computes a
+            // fresh answer and pays for the fresh provider call — the same
+            // replay semantics the personal-context path documents.
+            try {
+                enforcePersonalIdempotency(ownerId, clientRequestId, requestHash);
+            } catch (DataAccessException ignored) {
+                // A degraded ledger read must not 500 the call — the
+                // bucket charge below remains the real quota gate.
+            }
+        }
+        java.time.LocalDate chargedDate = null;
+        boolean chargeAttempted = false;
+        if (turns != null && properties != null && properties.quotaEnforced()
+                && org.springframework.util.StringUtils.hasText(ownerId)) {
+            try {
+                chargedDate = turns.chargeStandaloneQuota(ownerId, properties.userDailyQuota(),
+                        properties.globalDailyQuota());
+                chargeAttempted = true;
+            } catch (DataAccessException exception) {
+                // An accounting outage must not block a working provider;
+                // the charge is best-effort and the outage is short-lived.
+                // chargeAttempted stays false so the request is NOT refused
+                // as quota-exceeded — a metering outage is not a denial.
+                org.slf4j.LoggerFactory.getLogger(ThesisAssistantService.class)
+                        .warn("off-topic quota charge failed with {}", exception.getClass().getSimpleName());
+            }
+            if (chargeAttempted && chargedDate == null) {
+                boolean vi = "vi".equals(normalizedLocale);
+                String text = vi
+                        ? "Bạn đã đạt hạn mức câu hỏi trong ngày. Hạn mức sẽ được làm mới sau nửa đêm — bạn quay lại vào ngày mai nhé."
+                        : "You have reached the daily question limit. The quota resets after midnight — please come back tomorrow.";
+                return new ChatResponse(text, MODEL, true, "QUOTA_EXCEEDED", normalizedLocale, List.of(),
+                        UUID.randomUUID(), clientRequestId, null, false, "COMPLETED", null, null,
+                        nextQuotaResetAt());
+            }
+        }
         String generated;
         try {
             generated = provider.complete(new DeepSeekClient.CompletionRequest(
@@ -885,14 +994,45 @@ public class ThesisAssistantService {
                     ignored -> { }).answer();
         } catch (DeepSeekClient.ProviderUnavailableException | DeepSeekClient.ProviderCancelledException
                 | InvalidSegmentException | ProviderOutputRejectedException exception) {
+            // The caller falls through to the ledgered RAG path, which charges
+            // its own quota unit — refund the standalone charge so one user
+            // request is never billed twice. Only a charge that actually
+            // committed is refunded (a failed charge attempt left the buckets
+            // untouched) and the refund targets the charge's own bucket date.
+            if (chargedDate != null) {
+                try {
+                    turns.refundStandaloneQuota(ownerId, chargedDate);
+                } catch (DataAccessException refundFailure) {
+                    // Residual: a metering outage right here leaves the
+                    // standalone +1 in place and the ledgered path still
+                    // charges its own unit — one over-counted request during
+                    // a simultaneous accounting outage is accepted.
+                    org.slf4j.LoggerFactory.getLogger(ThesisAssistantService.class)
+                            .warn("standalone quota refund failed with {}",
+                                    refundFailure.getClass().getSimpleName());
+                }
+            }
             return null;
         }
         generated = normalizeAssistantCopy(generated, normalizedLocale);
+        if (turns != null && clientRequestId != null && requestHash != null
+                && org.springframework.util.StringUtils.hasText(ownerId)) {
+            try {
+                turns.recordStandaloneTurn(ownerId, clientRequestId, requestHash);
+            } catch (DataAccessException ignored) {
+                // The answer is already computed; a key-consumption outage
+                // must not fail it — the next payload on this key just won't
+                // conflict.
+            }
+        }
         if (!AssistantOutputGuard.isSafeForAnswer(generated, normalized)) {
             return new ChatResponse(technicalOutputMessage(normalizedLocale), MODEL, true,
                     "PROVIDER_UNSAFE_OUTPUT", normalizedLocale, List.of());
         }
-        return new ChatResponse(generated, provider.model(), false, "ANSWERED", normalizedLocale, List.of(),
+        // GENERAL_ANSWER, not ANSWERED: the provider replied without any
+        // retrieved context, so the response must not claim reviewed-guidance
+        // provenance (same honest-labeling class as the curated fallback).
+        return new ChatResponse(generated, provider.model(), false, "GENERAL_ANSWER", normalizedLocale, List.of(),
                 UUID.randomUUID(), clientRequestId, null, false, "COMPLETED", null, null);
     }
 
@@ -951,6 +1091,14 @@ public class ThesisAssistantService {
     private static final List<String> CONVERSATIONAL_BYE = List.of(
             "tạm\\s*biệt", "tam\\s*biet", "\\bbye\\b", "\\bgoodbye\\b", "\\bsee\\s+you\\b",
             "\\bbai\\b", "hẹn\\s*gặp\\s*lại");
+
+    // Precompiled once — conversationalAnswer re-ran patternOf() on every
+    // message (~5 Pattern.compile calls per request, audit S8).
+    private static final java.util.regex.Pattern CONVERSATIONAL_OPENERS_PATTERN = patternOf(CONVERSATIONAL_OPENERS);
+    private static final java.util.regex.Pattern CONVERSATIONAL_IDENTITY_PATTERN = patternOf(CONVERSATIONAL_IDENTITY);
+    private static final java.util.regex.Pattern CONVERSATIONAL_CAPABILITY_PATTERN = patternOf(CONVERSATIONAL_CAPABILITY);
+    private static final java.util.regex.Pattern CONVERSATIONAL_THANKS_PATTERN = patternOf(CONVERSATIONAL_THANKS);
+    private static final java.util.regex.Pattern CONVERSATIONAL_BYE_PATTERN = patternOf(CONVERSATIONAL_BYE);
 
     /**
      * Lexical-first fast path (chatbot latency): run the same local retrieval the
@@ -1033,9 +1181,53 @@ public class ThesisAssistantService {
                         false, "ANSWERED", normalizedLocale, primaryCitations(result.citations()));
             }
         }
-        if (top.lexicalScore() < properties.lexicalConfidentScore()) return null;
+        // Aggregate score alone cannot separate a topic hit from generic
+        // morpheme collisions: "công thức nấu phở bò" reached 13 on the IT
+        // services document through "công" (10) + "thức" (3 inside "chính
+        // thức"). A confident match therefore needs term corroboration —
+        // see hasTermCorroboration for the exact rule.
+        if (top.lexicalScore() < properties.lexicalConfidentScore()
+                || !hasTermCorroboration(top, retrievalTerms(normalized))) return null;
         return new ChatResponse(result.answer(), FAST_PATH_MODEL, false, "ANSWERED",
                 normalizedLocale, primaryCitations(result.citations()));
+    }
+
+    /**
+     * Corroboration gate for the curated fast path and the degraded lexical
+     * fallback: the top document must be backed by REAL term overlap, not one
+     * stray morpheme. A term is "strong" when it contributes >= 6 of the
+     * per-term maximum 10 — i.e. it matched as a whole word, not inside
+     * somebody else's compound.
+     *
+     * Corroborated when EITHER:
+     *   - two distinct terms are strong (genuine multi-term topic questions
+     *     like "đăng ký học phần thế nào" clear this trivially), OR
+     *   - a single strong term is intrinsically specific: a multi-word alias
+     *     phrase ("đăng ký"), a canonical acronym ("ci/cd"), or a >= 7-char
+     *     word ("dormitory", "registration") — none of which can be an
+     *     incidental compound fragment the way "công" was inside "Công nghệ".
+     *
+     * Short bare syllables ("công", "hướng", "trường") can only corroborate
+     * in pairs — measured against the live corpus this kills every observed
+     * false positive ("công thức nấu phở" -> IT doc, "xem phim" -> study
+     * duration doc) while genuine campus queries keep the fast path.
+     * Mirrors {@link ThesisAssistantKnowledgeRepository#termContribution} so
+     * the gate cannot drift from the retrieval engine.
+     */
+    private static boolean hasTermCorroboration(
+            ThesisAssistantKnowledgeRepository.KnowledgeDocument document, List<String> terms) {
+        if (document == null || terms == null) return false;
+        int strong = 0;
+        for (String term : terms.stream().filter(term -> term.length() >= 2).distinct().limit(16).toList()) {
+            if (ThesisAssistantKnowledgeRepository.termContribution(
+                    document.title(), document.content(), term) >= 6) {
+                strong++;
+                if (term.indexOf(' ') >= 0 || term.indexOf('/') >= 0 || term.length() >= 7) {
+                    return true;
+                }
+            }
+        }
+        return strong >= 2;
     }
 
     private static ChatResponse withDegraded(ChatResponse response) {
@@ -1066,7 +1258,27 @@ public class ThesisAssistantService {
                         + "• Check sections and timetables on the Course Registration / Schedule pages.\n"
                         + "• Follow the latest updates on the Announcements page.\n\n"
                         + "If the issue persists, please contact the Academic Affairs Office.";
-        return new ChatResponse(text, MODEL, true, "ANSWERED", normalizedLocale, List.of());
+        return new ChatResponse(text, MODEL, true, "NO_MATCH", normalizedLocale, List.of());
+    }
+
+    /**
+     * Honest "no answer in the corpus" reply for the remote-healthy path: the
+     * authoritative service was reachable and simply had no matching document,
+     * so the copy must not claim an outage. degraded=false — nothing failed.
+     */
+    static ChatResponse noMatchFallback(String locale) {
+        String normalizedLocale = AssistantInputGuard.normalizeLocale(locale);
+        boolean vi = "vi".equals(normalizedLocale);
+        String text = vi
+                ? "Mình chưa tìm thấy thông tin phù hợp cho câu hỏi này trong tài liệu học vụ hiện có. Bạn có thể:\n\n"
+                        + "• Diễn đạt lại câu hỏi với từ khóa cụ thể hơn (ví dụ: “điều kiện tốt nghiệp”, “hạn nộp đề cương”).\n"
+                        + "• Xem quy chế và hướng dẫn học vụ ở mục Cẩm nang sinh viên.\n"
+                        + "• Liên hệ Phòng Đào tạo nếu cần hỗ trợ trực tiếp."
+                : "I could not find an answer to that question in the available academic documents. You can:\n\n"
+                        + "• Rephrase the question with more specific keywords.\n"
+                        + "• Browse regulations and guides in the Student Handbook section.\n"
+                        + "• Contact the Academic Affairs Office for direct support.";
+        return new ChatResponse(text, MODEL, false, "NO_MATCH", normalizedLocale, List.of());
     }
 
     /** Pure lexical path used by tests and by safe fallback when persistence is unavailable. */
@@ -1178,8 +1390,22 @@ public class ThesisAssistantService {
         }
     }
 
-    public String recordPersonalTurn(String ownerId, String conversationId, String message,
-            String answer, String locale, String reasonCode, UUID clientRequestId, String requestHash) {
+    /**
+     * Result of {@link #recordPersonalTurn}: the conversation the turn landed
+     * in plus the persisted assistant message id so responses can stamp both —
+     * the stream's done frame needs messageId for feedback to bind.
+     */
+    public record PersonalTurn(String conversationId, String messageId) { }
+
+    /**
+     * Runs under the assistant transaction so a mid-write failure rolls both
+     * message rows back instead of persisting a user question with no answer
+     * while the response reports null ids.
+     */
+    @org.springframework.transaction.annotation.Transactional(
+            transactionManager = AssistantDatabaseConfiguration.TRANSACTION_MANAGER)
+    public PersonalTurn recordPersonalTurn(String ownerId, String conversationId, String message,
+            String answer, String locale, String reasonCode) {
         if (legacyHistory == null) return null;
         // A provided conversationId must exist and belong to the caller (KB-path
         // 404 parity); a conversation-less personal turn is still answered —
@@ -1196,18 +1422,32 @@ public class ThesisAssistantService {
             assistantMessage = legacyHistory.appendMessage(conversation, "ASSISTANT", answer, model, false,
                     reasonCode == null || reasonCode.isBlank() ? "PERSONAL_CONTEXT" : reasonCode);
         }
-        // Round-3 cb3-10: consume the idempotency key like every KB turn so a
-        // personal-vs-personal key reuse conflicts instead of silently passing
-        // — including the conversation-less turns (prod probe found the gap).
-        if (turns != null && clientRequestId != null && requestHash != null) {
-            try {
-                turns.recordCompletedPersonalTurn(ownerId, clientRequestId, requestHash, conversation, assistantMessage);
-            } catch (DataAccessException ignored) {
-                // The turn is already persisted and returned; a ledger outage
-                // must not fail it — the key just stays unconsumed.
-            }
+        return conversation == null ? null
+                : new PersonalTurn(conversation.toString(),
+                        assistantMessage == null ? null : assistantMessage.toString());
+    }
+
+    /**
+     * Consume the idempotency key for a personal-context turn — deliberately
+     * separate from {@link #recordPersonalTurn} so a ledger failure cannot
+     * poison the message transaction (a REQUIRED join marks it rollback-only
+     * even when the caller catches the exception).
+     */
+    public void recordPersonalTurnKey(String ownerId, UUID clientRequestId, String requestHash,
+            PersonalTurn turn) {
+        if (turns == null || clientRequestId == null || requestHash == null) return;
+        UUID conversation = turn == null ? null : parseConversation(turn.conversationId());
+        UUID assistantMessage = turn == null ? null : parseConversation(turn.messageId());
+        try {
+            // Round-3 cb3-10: consume the idempotency key like every KB turn
+            // so a personal-vs-personal key reuse conflicts instead of
+            // silently passing — including the conversation-less turns.
+            turns.recordCompletedPersonalTurn(ownerId, clientRequestId, requestHash,
+                    conversation, assistantMessage);
+        } catch (DataAccessException ignored) {
+            // The turn is already persisted and returned; a ledger outage
+            // must not fail it — the key just stays unconsumed.
         }
-        return conversation == null ? null : conversation.toString();
     }
 
     public List<ThesisAssistantRepository.Message> messages(UUID conversationId, String ownerId) {
@@ -1441,8 +1681,15 @@ public class ThesisAssistantService {
                     || "NO_MATCH".equals(reason) || "QUOTA_EXCEEDED".equals(reason))) {
                 emit(sink, new StreamDelta(0, answer, fallbackSourceIds));
             }
+            // A portal-denial answer ("Cổng học vụ chưa công bố …") means the
+            // provider explicitly said the retrieval did not cover the topic —
+            // attaching those documents as citations would fabricate grounding
+            // the answer itself disclaims (live audit: "CI/CD pipeline là gì"
+            // cited the prerequisite-map catalog row under a not-published
+            // answer).
             List<Citation> terminalCitations = "ANSWERED".equals(reason)
-                    ? lexical.citations() : fallbackCitations;
+                    ? (isPortalDenialAnswer(answer) ? List.of() : lexical.citations())
+                    : fallbackCitations;
             ThesisAssistantTurnRepository.TerminalResult terminal = cancellations == null
                     ? turns.complete(reservation.turnId(), ownerId, reservation.leaseGeneration(), normalized,
                             reason.equals("ANSWERED") ? deepSeek.model() : MODEL, answer, degraded, reason, terminalCitations)
@@ -1503,7 +1750,8 @@ public class ThesisAssistantService {
                     if (AssistantOutputGuard.isSafeForAnswer(generated, lexical.citations().stream()
                             .map(citation -> citation.title() + "\n" + citation.excerpt())
                             .collect(Collectors.joining("\n\n")))) {
-                        response = new ChatResponse(generated, deepSeek.model(), false, "ANSWERED", requestedLocale, lexical.citations());
+                        response = new ChatResponse(generated, deepSeek.model(), false, "ANSWERED", requestedLocale,
+                                isPortalDenialAnswer(generated) ? List.of() : lexical.citations());
                     } else {
                         response = new ChatResponse(technicalOutputMessage(requestedLocale), MODEL, true,
                                 "PROVIDER_UNSAFE_OUTPUT", requestedLocale, fallbackCitations);
@@ -1735,7 +1983,28 @@ public class ThesisAssistantService {
     static boolean hasPublicScopeSignal(String message) {
         if (message == null || message.isBlank()) return false;
         String folded = foldForMatching(message);
-        return PUBLIC_SCOPE_SIGNAL.matcher(folded).find() || COURSE_CODE.matcher(message).find();
+        java.util.regex.Matcher scope = PUBLIC_SCOPE_SIGNAL.matcher(folded);
+        while (scope.find()) {
+            String hit = scope.group().toLowerCase(Locale.ROOT).replaceAll("\\s+", " ").trim();
+            if (!isAmbiguousScopeHit(hit, folded, message)) return true;
+        }
+        return COURSE_CODE.matcher(message).find();
+    }
+
+    /**
+     * True when the matched scope signal is a known ambiguous folded key and the
+     * message carries the conflicting non-academic reading without the accented
+     * academic rescue — e.g. "đồ ăn gì hôm nay" hits "do an" but is a food
+     * question, while "đồ ăn và đồ án" is still admitted by the rescue. An
+     * unaccented query cannot disambiguate and keeps the benefit of the doubt.
+     */
+    static boolean isAmbiguousScopeHit(String foldedHit, String foldedSource, String rawSource) {
+        AmbiguousScopeHit ambiguity = AMBIGUOUS_SCOPE_HITS.get(foldedHit);
+        if (ambiguity == null) return false;
+        boolean conflict = ambiguity.conflict().matcher(foldedSource).find()
+                || ambiguity.conflict().matcher(rawSource).find();
+        return conflict
+                && (ambiguity.rescue() == null || !ambiguity.rescue().matcher(rawSource).find());
     }
 
     /**
@@ -1837,6 +2106,23 @@ public class ThesisAssistantService {
             if (section != null) return section;
         }
         return answerFromDocument(message, document);
+    }
+
+    /**
+     * The academic system prompt instructs the model to answer "Cổng học vụ
+     * chưa công bố …" / "the portal has not published …" when the retrieved
+     * context does not cover the topic. That honest denial must not carry the
+     * retrieval citations — they would present documents the answer disclaims
+     * as its sources. Folding first so the marker is recognized with or
+     * without diacritics.
+     */
+    static boolean isPortalDenialAnswer(String answer) {
+        if (answer == null || answer.isBlank()) return false;
+        String folded = foldForMatching(answer);
+        return folded.contains("chua cong bo")
+                || folded.contains("chua duoc cong bo")
+                || folded.contains("has not published")
+                || folded.contains("not published by the portal");
     }
 
     /**
@@ -1970,6 +2256,23 @@ public class ThesisAssistantService {
         if (result.error()) {
             return new ChatResponse(result.answer(), MODEL, true, "KNOWLEDGE_UNAVAILABLE", AssistantInputGuard.normalizeLocale(locale), List.of());
         }
+        if (!result.documents().isEmpty()) {
+            ThesisAssistantKnowledgeRepository.KnowledgeDocument top = result.documents().get(0);
+            // Catalog rows carry no lexical score (structured authoritative
+            // records — the catalog search already verified term overlap), so
+            // the corroboration gate applies to curated-corpus answers only.
+            // Without it a degraded remote chain still cited the weak top hit
+            // ("công thức nấu phở" -> IT services doc) exactly like the fast
+            // path once did.
+            boolean curated = !"academic-catalog".equals(top.source());
+            int confident = properties != null ? properties.lexicalConfidentScore()
+                    : AssistantProperties.DEFAULT_LEXICAL_CONFIDENT_SCORE;
+            if (curated && (top.lexicalScore() < confident
+                    || !hasTermCorroboration(top, retrievalTerms(normalized)))) {
+                return new ChatResponse(noMatchMessage(normalizedLocale), MODEL, false,
+                        "NO_MATCH", normalizedLocale, List.of());
+            }
+        }
         return new ChatResponse(result.answer(), MODEL, false, result.documents().isEmpty() ? "NO_MATCH" : "ANSWERED", AssistantInputGuard.normalizeLocale(locale), primaryCitations(result.citations()));
     }
 
@@ -2078,7 +2381,8 @@ public class ThesisAssistantService {
         // 16 terms, so base tokens must never crowd the aliases that an
         // unaccented query depends on.
         VIETNAMESE_FOLDED_PHRASE_ALIASES.forEach((foldedPhrase, accentedPhrase) -> {
-            if (foldedPhraseSource.contains(" " + foldedPhrase + " ")) {
+            if (foldedPhraseSource.contains(" " + foldedPhrase + " ")
+                    && !isAmbiguousScopeHit(foldedPhrase, foldedPhraseSource, source)) {
                 expanded.add(accentedPhrase);
             }
         });
@@ -2177,7 +2481,7 @@ public class ThesisAssistantService {
      * local path). Must stay byte-compatible with the outage contract the
      * compose runtime probes and {@code databaseOutageReturnsExplicitDegraded
      * ResponseWithoutCitations} pin: KNOWLEDGE_UNAVAILABLE, degraded, no
-     * citations — not the curated fallback, which carries reasonCode ANSWERED.
+     * citations — not the curated fallback, which carries reasonCode NO_MATCH.
      */
     public static ChatResponse knowledgeUnavailableResponse(String locale, java.util.UUID clientRequestId) {
         String normalizedLocale = AssistantInputGuard.normalizeLocale(locale);

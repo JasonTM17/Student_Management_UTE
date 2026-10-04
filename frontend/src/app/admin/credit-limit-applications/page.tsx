@@ -318,12 +318,12 @@ export default function AdminCreditLimitApplicationsPage() {
             <fieldset className="grid gap-3 sm:grid-cols-2">
               <legend className="mb-2 text-sm font-medium text-foreground">{copy.status}</legend>
               <label className={`flex cursor-pointer items-start gap-3 rounded-xl border p-3 transition ${decision === 'APPROVED' ? 'border-primary bg-primary/[0.06]' : 'border-border/70'}`}>
-                <input type="radio" name="credit-limit-decision" value="APPROVED" checked={decision === 'APPROVED'} onChange={() => setDecision('APPROVED')} className="mt-1 accent-primary" />
-                <span><span className="block font-semibold text-foreground">{copy.approve}</span><span className="mt-1 block text-xs leading-5 text-muted-foreground">{selected.standardLimit} → {selected.requestedLimit} {messages.courseRegistration.creditsUnit}</span></span>
+                <input type="radio" name="credit-limit-decision" value="APPROVED" checked={decision === 'APPROVED'} onChange={() => setDecision('APPROVED')} className="mt-1 accent-primary" aria-label={copy.approve} aria-describedby="credit-limit-approve-hint" />
+                <span><span className="block font-semibold text-foreground">{copy.approve}</span><span id="credit-limit-approve-hint" className="mt-1 block text-xs leading-5 text-muted-foreground">{selected.standardLimit} → {selected.requestedLimit} {messages.courseRegistration.creditsUnit}</span></span>
               </label>
               <label className={`flex cursor-pointer items-start gap-3 rounded-xl border p-3 transition ${decision === 'REJECTED' ? 'border-destructive bg-destructive/[0.05]' : 'border-border/70'}`}>
-                <input type="radio" name="credit-limit-decision" value="REJECTED" checked={decision === 'REJECTED'} onChange={() => setDecision('REJECTED')} className="mt-1 accent-destructive" />
-                <span><span className="block font-semibold text-foreground">{copy.reject}</span><span className="mt-1 block text-xs leading-5 text-muted-foreground">{copy.reviewerNoteHint}</span></span>
+                <input type="radio" name="credit-limit-decision" value="REJECTED" checked={decision === 'REJECTED'} onChange={() => setDecision('REJECTED')} className="mt-1 accent-destructive" aria-label={copy.reject} aria-describedby="credit-limit-reject-hint" />
+                <span><span className="block font-semibold text-foreground">{copy.reject}</span><span id="credit-limit-reject-hint" className="mt-1 block text-xs leading-5 text-muted-foreground">{copy.reviewerNoteHint}</span></span>
               </label>
             </fieldset>
             <div>

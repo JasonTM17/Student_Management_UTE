@@ -142,7 +142,7 @@ export function EditorialArticleMagazine({
         <div className="flex items-center gap-3 text-xs text-muted-foreground">
           <span className="inline-flex items-center gap-1 font-medium">
             <Clock className="h-3.5 w-3.5 text-primary" />
-            <span>{readingTime.displayText}</span>
+            <span>{isVi ? readingTime.displayText : `${readingTime.minutes} min read (${readingTime.wordCount.toLocaleString('en-US')} words)`}</span>
           </span>
           <span>•</span>
           <span className="font-medium">{relativeTime}</span>
@@ -150,7 +150,7 @@ export function EditorialArticleMagazine({
       </div>
 
       {/* 2. Headline */}
-      <h1 className="text-2xl sm:text-3xl lg:text-4xl font-extrabold tracking-tight text-foreground leading-[1.2]">
+      <h1 className="break-words text-2xl sm:text-3xl lg:text-4xl font-extrabold tracking-tight text-foreground leading-[1.2]">
         {announcement.title}
       </h1>
 

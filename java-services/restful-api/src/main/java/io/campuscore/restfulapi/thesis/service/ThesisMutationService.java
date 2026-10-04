@@ -25,8 +25,10 @@ import io.campuscore.restfulapi.thesis.web.ThesisRoundDtos.RoundResponse;
 import io.campuscore.restfulapi.thesis.web.ThesisTopicDtos.TopicResponse;
 import io.campuscore.restfulapi.web.DomainException;
 import java.time.Instant;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import org.springframework.context.annotation.Profile;
 import org.springframework.dao.EmptyResultDataAccessException;
@@ -42,8 +44,8 @@ import org.springframework.transaction.annotation.Transactional;
 @Profile("persistence")
 public class ThesisMutationService {
 
-    private static final int MIN_GROUP_MEMBERS = 3;
-    private static final int MAX_GROUP_MEMBERS = 4;
+    private static final int MIN_GROUP_MEMBERS = 1;
+    private static final int MAX_GROUP_MEMBERS = 3;
 
     private final NamedParameterJdbcTemplate jdbc;
     private final ThesisRegistrationRoundRepository rounds;
@@ -91,6 +93,11 @@ public class ThesisMutationService {
      */
     @Transactional
     public RoundResponse createRound(RoundCreateRequest request) {
+        return createRound(request, null);
+    }
+
+    @Transactional
+    public RoundResponse createRound(RoundCreateRequest request, Jwt actor) {
         requireText(request == null ? null : request.name(), "name");
         requireText(request == null ? null : request.thesisType(), "thesisType");
         RoundType roundType = requireRoundType(request.thesisType());
@@ -116,10 +123,10 @@ public class ThesisMutationService {
         }
         Instant regStart = request.registrationStart();
         Instant regEnd = request.registrationEnd();
-        requireDates(regStart, regEnd);
+        requireDates(regStart, regEnd, "registrationStart", "registrationEnd");
         Instant letStart = request.lecturerSubmitStart();
         Instant letEnd = request.lecturerSubmitEnd();
-        requireDates(letStart, letEnd);
+        requireDates(letStart, letEnd, "lecturerSubmitStart", "lecturerSubmitEnd");
         if (regStart.isBefore(letEnd)) {
             throw invalid("registrationStart must not be before lecturerSubmitEnd");
         }
@@ -158,6 +165,19 @@ public class ThesisMutationService {
                 .addValue("gvpbDeadline", tsOf(request.gvpbDeadline()))
                 .addValue("reportDate", tsOf(request.reportDate()))
                 .addValue("defenseDate", tsOf(request.defenseDate())));
+        Map<String, Object> afterState = new LinkedHashMap<>();
+        afterState.put("name", request.name().trim());
+        afterState.put("thesis_type", roundType.name());
+        afterState.put("lecturer_submit_start", letStart);
+        afterState.put("lecturer_submit_end", letEnd);
+        afterState.put("registration_start", regStart);
+        afterState.put("registration_end", regEnd);
+        afterState.put("proposal_publish_at", request.proposalPublishAt());
+        afterState.put("gvpb_deadline", request.gvpbDeadline());
+        afterState.put("report_date", request.reportDate());
+        afterState.put("defense_date", request.defenseDate());
+        audit.record(subject(actor), null, "THESIS_ROUND_CREATED", "THESIS_ROUND", id.toString(),
+                "Round created (" + roundType.name() + ")", null, afterState);
         return roundReads.get(id);
     }
 
@@ -175,6 +195,11 @@ public class ThesisMutationService {
      */
     @Transactional
     public RoundResponse transitionRound(UUID id, RoundStatus expected, RoundStatus next) {
+        return transitionRound(id, expected, next, null);
+    }
+
+    @Transactional
+    public RoundResponse transitionRound(UUID id, RoundStatus expected, RoundStatus next, Jwt actor) {
         roundReadPort.requireExisting(id);
         int updated = jdbc.update(
                 "UPDATE thesis.thesis_registration_round SET status = :next, updated_at = CURRENT_TIMESTAMP, version = version + 1 WHERE id = :id AND status = :expected",
@@ -182,16 +207,163 @@ public class ThesisMutationService {
         if (updated != 1) {
             throw conflict("ROUND_STATE_CONFLICT", "Round must be in " + expected.name() + " before it can become " + next.name());
         }
+        audit.record(subject(actor), null, "THESIS_ROUND_TRANSITION", "THESIS_ROUND", id.toString(),
+                "Round transitioned " + expected.name() + " -> " + next.name());
         if (next == RoundStatus.PROPOSAL_OPEN) {
-            jdbc.update(
+            // Opening proposals early clamps the authored lecturer window to
+            // now; that silently rewrites the published schedule, so the
+            // adjustment must be traceable in the audit trail.
+            int clamped = jdbc.update(
                     "UPDATE thesis.thesis_registration_round "
                             + "SET lecturer_submit_start = LEAST(lecturer_submit_start, CURRENT_TIMESTAMP) "
                             + "WHERE id = :id AND lecturer_submit_start IS NOT NULL AND lecturer_submit_start > CURRENT_TIMESTAMP",
                     params().addValue("id", id));
+            if (clamped > 0) {
+                audit.record(subject(actor), null, "THESIS_ROUND_SCHEDULE_ADJUSTED", "THESIS_ROUND", id.toString(),
+                        "lecturer_submit_start was moved to now when the proposal phase was opened early");
+            }
         }
         if (next == RoundStatus.REGISTRATION_OPEN) {
             requireLiveRegistrationWindow(id);
         }
+        return roundReads.get(id);
+    }
+
+    /**
+     * Replaces the authored schedule of a round that has not opened
+     * registration yet — operators no longer need direct SQL to fix a mistyped
+     * window. The same type-conditional rules as {@link #createRound} apply and
+     * the change is audited with the previous and new schedule.
+     *
+     * @param id round to amend
+     * @param request full replacement schedule (same shape as createRound)
+     * @param actor caller JWT recorded in the audit row
+     * @return the round after the amendment
+     * @throws DomainException with code ROUND_STATE_CONFLICT once the round has
+     *         passed the proposal phase, or VALIDATION_ERROR for an invalid
+     *         schedule
+     */
+    @Transactional
+    public RoundResponse updateRound(UUID id, RoundCreateRequest request, Jwt actor) {
+        Map<String, Object> current = one(
+                "SELECT name, thesis_type, lecturer_submit_start, lecturer_submit_end, registration_start, "
+                        + "registration_end, proposal_publish_at, gvpb_deadline, report_date, defense_date, status "
+                        + "FROM thesis.thesis_registration_round WHERE id = :id FOR UPDATE",
+                params().addValue("id", id), "ROUND_NOT_FOUND", "Thesis registration round not found");
+        String status = (String) current.get("status");
+        // The brief allows amending the schedule until registration opens;
+        // once students can act on the round its dates are frozen.
+        if (!Set.of(RoundStatus.DRAFT.name(), RoundStatus.PROPOSAL_OPEN.name(),
+                RoundStatus.PROPOSALS_PUBLISHED.name()).contains(status)) {
+            throw conflict("ROUND_STATE_CONFLICT",
+                    "The schedule can only be amended before registration opens");
+        }
+        requireText(request == null ? null : request.name(), "name");
+        requireText(request == null ? null : request.thesisType(), "thesisType");
+        RoundType roundType = requireRoundType(request.thesisType());
+        if (roundType.requiresGvpbDeadline() && request.gvpbDeadline() == null) {
+            throw invalid(roundType + " rounds require a gvpbDeadline");
+        }
+        if (!roundType.requiresGvpbDeadline() && request.gvpbDeadline() != null) {
+            throw invalid(roundType + " rounds must not specify a gvpbDeadline");
+        }
+        if (roundType.requiresCouncilReportDate() && request.reportDate() == null) {
+            throw invalid(roundType + " rounds require a reportDate");
+        }
+        if (!roundType.requiresCouncilReportDate() && request.reportDate() != null) {
+            throw invalid(roundType + " rounds must not specify a reportDate");
+        }
+        if (roundType.requiresDefenseDate() && request.defenseDate() == null) {
+            throw invalid("KLTN rounds require a defenseDate");
+        }
+        if (!roundType.requiresDefenseDate() && request.defenseDate() != null) {
+            throw invalid(roundType + " rounds must not specify a defenseDate");
+        }
+        requireDates(request.registrationStart(), request.registrationEnd(), "registrationStart", "registrationEnd");
+        requireDates(request.lecturerSubmitStart(), request.lecturerSubmitEnd(), "lecturerSubmitStart", "lecturerSubmitEnd");
+        if (request.registrationStart().isBefore(request.lecturerSubmitEnd())) {
+            throw invalid("registrationStart must not be before lecturerSubmitEnd");
+        }
+        if (request.proposalPublishAt() != null && request.proposalPublishAt().isBefore(request.lecturerSubmitEnd())) {
+            throw invalid("proposalPublishAt must not be before lecturerSubmitEnd");
+        }
+        if (request.gvpbDeadline() != null && request.gvpbDeadline().isBefore(request.registrationEnd())) {
+            throw invalid("gvpbDeadline must not be before registrationEnd");
+        }
+        if (request.reportDate() != null && request.gvpbDeadline() != null
+                && request.reportDate().isBefore(request.gvpbDeadline())) {
+            throw invalid("reportDate must not be before gvpbDeadline");
+        }
+        if (request.defenseDate() != null && request.reportDate() != null
+                && request.defenseDate().isBefore(request.reportDate())) {
+            throw invalid("defenseDate must not be before reportDate");
+        }
+        Map<String, Object> beforeState = new LinkedHashMap<>();
+        for (String column : List.of("name", "thesis_type", "lecturer_submit_start", "lecturer_submit_end",
+                "registration_start", "registration_end", "proposal_publish_at", "gvpb_deadline",
+                "report_date", "defense_date")) {
+            beforeState.put(column, current.get(column));
+        }
+        jdbc.update("""
+                UPDATE thesis.thesis_registration_round SET
+                    name = :name, thesis_type = :thesisType,
+                    lecturer_submit_start = :lecturerSubmitStart, lecturer_submit_end = :lecturerSubmitEnd,
+                    registration_start = :registrationStart, registration_end = :registrationEnd,
+                    proposal_publish_at = :proposalPublishAt, gvpb_deadline = :gvpbDeadline,
+                    report_date = :reportDate, defense_date = :defenseDate,
+                    updated_at = CURRENT_TIMESTAMP, version = version + 1
+                WHERE id = :id
+                """, params()
+                .addValue("id", id)
+                .addValue("name", request.name().trim())
+                .addValue("thesisType", roundType.name())
+                .addValue("lecturerSubmitStart", tsOf(request.lecturerSubmitStart()))
+                .addValue("lecturerSubmitEnd", tsOf(request.lecturerSubmitEnd()))
+                .addValue("registrationStart", tsOf(request.registrationStart()))
+                .addValue("registrationEnd", tsOf(request.registrationEnd()))
+                .addValue("proposalPublishAt", tsOf(request.proposalPublishAt()))
+                .addValue("gvpbDeadline", tsOf(request.gvpbDeadline()))
+                .addValue("reportDate", tsOf(request.reportDate()))
+                .addValue("defenseDate", tsOf(request.defenseDate())));
+        Map<String, Object> afterState = new LinkedHashMap<>();
+        afterState.put("name", request.name().trim());
+        afterState.put("thesis_type", roundType.name());
+        afterState.put("lecturer_submit_start", request.lecturerSubmitStart());
+        afterState.put("lecturer_submit_end", request.lecturerSubmitEnd());
+        afterState.put("registration_start", request.registrationStart());
+        afterState.put("registration_end", request.registrationEnd());
+        afterState.put("proposal_publish_at", request.proposalPublishAt());
+        afterState.put("gvpb_deadline", request.gvpbDeadline());
+        afterState.put("report_date", request.reportDate());
+        afterState.put("defense_date", request.defenseDate());
+        audit.record(subject(actor), null, "THESIS_ROUND_UPDATED", "THESIS_ROUND", id.toString(),
+                "Round schedule amended", beforeState, afterState);
+        return roundReads.get(id);
+    }
+
+    /**
+     * Cancels a round that has not published results. Cancelled groups keep
+     * their historical rosters; the one-active-group index releases the
+     * students for a future round.
+     *
+     * @param id round to cancel
+     * @param actor caller JWT recorded in the audit row
+     * @return the round after cancellation
+     * @throws DomainException with code ROUND_STATE_CONFLICT when the round is
+     *         already terminal (RESULTS_PUBLISHED, CLOSED, or CANCELLED)
+     */
+    @Transactional
+    public RoundResponse cancelRound(UUID id, Jwt actor) {
+        roundReadPort.requireExisting(id);
+        int updated = jdbc.update(
+                "UPDATE thesis.thesis_registration_round SET status = 'CANCELLED', updated_at = CURRENT_TIMESTAMP, version = version + 1 "
+                        + "WHERE id = :id AND status NOT IN ('RESULTS_PUBLISHED', 'CLOSED', 'CANCELLED')",
+                params().addValue("id", id));
+        if (updated != 1) {
+            throw conflict("ROUND_STATE_CONFLICT", "A round that already published results cannot be cancelled");
+        }
+        audit.record(subject(actor), null, "THESIS_ROUND_CANCELLED", "THESIS_ROUND", id.toString(),
+                "Round cancelled");
         return roundReads.get(id);
     }
 
@@ -246,7 +418,17 @@ public class ThesisMutationService {
      */
     @Transactional
     public RoundResponse publishResults(UUID id) {
+        return publishResults(id, null);
+    }
+
+    @Transactional
+    public RoundResponse publishResults(UUID id, Jwt actor) {
         roundReadPort.requireExisting(id);
+        // Lock the round row so a concurrent approveGroup cannot commit between
+        // the completeness check below and the guarded status transition.
+        jdbc.queryForObject(
+                "SELECT id FROM thesis.thesis_registration_round WHERE id = :id FOR UPDATE",
+                params().addValue("id", id), UUID.class);
         Integer approved = jdbc.queryForObject(
                 "SELECT COUNT(*) FROM thesis.thesis_group WHERE round_id = :id AND approval_status = 'APPROVED'",
                 params().addValue("id", id), Integer.class);
@@ -261,7 +443,7 @@ public class ThesisMutationService {
             throw conflict("SCORES_INCOMPLETE",
                     "Every approved group must have a finalized score before results are published");
         }
-        return transitionRound(id, RoundStatus.REGISTRATION_CLOSED, RoundStatus.RESULTS_PUBLISHED);
+        return transitionRound(id, RoundStatus.REGISTRATION_CLOSED, RoundStatus.RESULTS_PUBLISHED, actor);
     }
 
     /**
@@ -279,6 +461,9 @@ public class ThesisMutationService {
         requireText(request == null ? null : request.departmentId(), "departmentId");
         requireText(request == null ? null : request.title(), "title");
         requireText(request == null ? null : request.description(), "description");
+        if (request.roundId() == null) {
+            throw invalid("roundId is required");
+        }
         int maxGroups = request.maxGroups() == null ? 1 : request.maxGroups();
         if (maxGroups < 1 || maxGroups > 20) {
             throw invalid("maxGroups must be between 1 and 20");
@@ -423,7 +608,7 @@ public class ThesisMutationService {
      * @param request student id to invite; a blank id takes the external-member path instead
      * @param actor caller JWT; the group leader, a supervisor, or an admin may manage the roster
      * @return the group with the new member listed
-     * @throws DomainException with code GROUP_FULL past four members, GROUP_STATE_CONFLICT once the
+     * @throws DomainException with code GROUP_FULL past three members, GROUP_STATE_CONFLICT once the
      *         supervisor approved the roster, ROUND_CLOSED / REGISTRATION_WINDOW_CLOSED outside the
      *         registration window, and STUDENT_PROFILE_REQUIRED, STUDENT_ALREADY_IN_GROUP, or
      *         STUDENT_ACTIVE_IN_OTHER_GROUP for an unsuitable invitee
@@ -437,7 +622,7 @@ public class ThesisMutationService {
         if (!supervisorPath) {
             requireMutableMembership(group, actor);
         }
-        if (count("SELECT COUNT(*) FROM thesis.thesis_group_member WHERE group_id = :groupId", groupId) >= MAX_GROUP_MEMBERS) {
+        if (count("SELECT COUNT(*) FROM thesis.thesis_group_member WHERE group_id = :groupId", "groupId", groupId) >= MAX_GROUP_MEMBERS) {
             throw conflict("GROUP_FULL", "A thesis group can have at most " + MAX_GROUP_MEMBERS
                     + " members (allowed range: " + MIN_GROUP_MEMBERS + " to " + MAX_GROUP_MEMBERS + ")");
         }
@@ -506,7 +691,7 @@ public class ThesisMutationService {
             throw conflict("LEADER_CANNOT_BE_REMOVED", "The group leader cannot be removed");
         }
         if (group.approvalStatus() == ApprovalStatus.APPROVED) {
-            Integer memberCount = count("SELECT COUNT(*) FROM thesis.thesis_group_member WHERE group_id = :groupId", groupId);
+            Integer memberCount = count("SELECT COUNT(*) FROM thesis.thesis_group_member WHERE group_id = :groupId", "groupId", groupId);
             if (memberCount != null && memberCount <= MIN_GROUP_MEMBERS) {
                 int remaining = memberCount - 1;
                 throw conflict("GROUP_TOO_SMALL", "An approved thesis group must keep " + MIN_GROUP_MEMBERS + " to "
@@ -546,7 +731,10 @@ public class ThesisMutationService {
         if (topicId == null) {
             throw invalid("topicId is required");
         }
-        if (!isAdmin(actor) && group.approvalStatus() == ApprovalStatus.APPROVED && !topicId.equals(group.topicId())) {
+        if (group.approvalStatus() == ApprovalStatus.APPROVED && !topicId.equals(group.topicId())) {
+            // Applies to admins as well: re-pointing an approved group silently
+            // cleared approved_by/at below. An admin must reject the group
+            // first so the downgrade leaves a review trail.
             throw conflict("GROUP_STATE_CONFLICT", "An approved group cannot change its topic");
         }
         Map<String, Object> topic = one("SELECT id, round_id, status, max_groups FROM thesis.thesis_topic WHERE id = :id FOR UPDATE", params().addValue("id", topicId), "TOPIC_NOT_FOUND", "Thesis topic not found");
@@ -558,7 +746,7 @@ public class ThesisMutationService {
         }
         int maxGroups = ((Number) topic.get("max_groups")).intValue();
         boolean alreadyOccupiesSlot = topicId.equals(group.topicId()) && group.approvalStatus() != ApprovalStatus.REJECTED;
-        if (count("SELECT COUNT(*) FROM thesis.thesis_group WHERE topic_id = :topicId AND status <> 'CANCELLED' AND approval_status <> 'REJECTED'", topicId) >= maxGroups && !alreadyOccupiesSlot) {
+        if (count("SELECT COUNT(*) FROM thesis.thesis_group WHERE topic_id = :topicId AND status <> 'CANCELLED' AND approval_status <> 'REJECTED'", "topicId", topicId) >= maxGroups && !alreadyOccupiesSlot) {
             throw conflict("TOPIC_FULL", "This topic has reached its group limit");
         }
         boolean isNewTopic = !topicId.equals(group.topicId());
@@ -623,17 +811,29 @@ public class ThesisMutationService {
      * @return the approved group
      * @throws DomainException with code GROUP_APPROVAL_STATE_CONFLICT unless the group is
      *         submitted with a topic and still pending, GROUP_TOO_SMALL / GROUP_TOO_LARGE for a
-     *         roster outside three to four members, or GROUP_LEADER_INVALID without exactly one
+     *         roster outside one to three members, or GROUP_LEADER_INVALID without exactly one
      *         matching leader
      */
     @Transactional
     public GroupResponse approveGroup(UUID groupId, Jwt actor) {
         GroupRow group = lockGroup(groupId);
         authorizeReviewer(group, actor);
+        // The round row is locked so an approval cannot slip between
+        // publishResults' completeness check and its guarded transition —
+        // a published round must never contain an ungraded approved group.
+        String roundStatus = (String) one(
+                "SELECT status FROM thesis.thesis_registration_round WHERE id = :id FOR UPDATE",
+                params().addValue("id", group.roundId()), "ROUND_NOT_FOUND", "Thesis registration round not found")
+                .get("status");
+        if (!Set.of(RoundStatus.PROPOSALS_PUBLISHED.name(), RoundStatus.REGISTRATION_OPEN.name(),
+                RoundStatus.REGISTRATION_CLOSED.name()).contains(roundStatus)) {
+            throw conflict("GROUP_APPROVAL_STATE_CONFLICT",
+                    "Groups can only be approved while the round is accepting or reviewing registrations");
+        }
         if (group.status() != GroupStatus.SUBMITTED || group.topicId() == null) {
             throw conflict("GROUP_APPROVAL_STATE_CONFLICT", "Only a submitted group with a topic can be approved");
         }
-        Integer memberCount = count("SELECT COUNT(*) FROM thesis.thesis_group_member WHERE group_id = :groupId", groupId);
+        Integer memberCount = count("SELECT COUNT(*) FROM thesis.thesis_group_member WHERE group_id = :groupId", "groupId", groupId);
         if (memberCount == null || memberCount < MIN_GROUP_MEMBERS) {
             int present = memberCount == null ? 0 : memberCount;
             throw conflict("GROUP_TOO_SMALL", "A thesis group needs " + MIN_GROUP_MEMBERS + " to " + MAX_GROUP_MEMBERS
@@ -647,18 +847,23 @@ public class ThesisMutationService {
         }
         Integer leaderCount = count(
                 "SELECT COUNT(*) FROM thesis.thesis_group_member WHERE group_id = :groupId AND is_leader = TRUE",
-                groupId);
+                "groupId", groupId);
         Integer matchingLeader = count(
                 "SELECT COUNT(*) FROM thesis.thesis_group_member gm "
                         + "JOIN thesis.thesis_group g ON g.id = gm.group_id "
                         + "WHERE gm.group_id = :groupId AND gm.is_leader = TRUE AND gm.student_id = g.leader_student_id",
-                groupId);
+                "groupId", groupId);
         if (leaderCount == null || leaderCount != 1 || matchingLeader == null || matchingLeader != 1) {
             throw conflict("GROUP_LEADER_INVALID", "A thesis group must have exactly one matching leader");
         }
         int changed = jdbc.update("UPDATE thesis.thesis_group SET approval_status='APPROVED', approved_by=:actor, approved_at=CURRENT_TIMESTAMP, rejection_reason=NULL, updated_at=CURRENT_TIMESTAMP, version=version+1 WHERE id=:id AND approval_status='PENDING'",
                 params().addValue("id", groupId).addValue("actor", subject(actor)));
         if (changed != 1) throw conflict("GROUP_APPROVAL_STATE_CONFLICT", "Only pending groups can be approved");
+        // Symmetric with THESIS_GROUP_REJECTED below: an approval decides who
+        // proceeds to the defense phase, so the approving actor must be
+        // traceable even though approved_by already stores them on the row.
+        audit.record(subject(actor), null, "THESIS_GROUP_APPROVED", "THESIS_GROUP", groupId.toString(),
+                "Thesis group approved");
         return groups.findById(groupId);
     }
 
@@ -801,16 +1006,9 @@ public class ThesisMutationService {
         String actorId = subject(actor);
         String lecturerId = normalize(actor == null ? null : actor.getClaimAsString("lecturerId"));
 
-        boolean isCreator = (!actorId.isBlank() || !lecturerId.isBlank()) && jdbc.queryForObject(
-                "SELECT COUNT(*) FROM thesis.thesis_topic WHERE id = :topicId AND (created_by = :actorId OR (:lecturerId <> '' AND created_by = :lecturerId))",
-                params().addValue("topicId", group.topicId())
-                        .addValue("actorId", actorId)
-                        .addValue("lecturerId", lecturerId),
-                Integer.class) > 0;
-        if (isCreator) {
-            return;
-        }
-
+        // The reviewer must be a CURRENT supervisor — the topic creator loses
+        // this right when setSupervisors replaces them, otherwise a stale
+        // creator retains approval power over groups they no longer supervise.
         Integer supervisorCount = jdbc.queryForObject(
                 "SELECT COUNT(*) FROM thesis.thesis_topic_supervisor WHERE topic_id = :topicId AND (lecturer_id = :lecturerId OR lecturer_id = :actorId)",
                 params().addValue("topicId", group.topicId())
@@ -1023,21 +1221,10 @@ public class ThesisMutationService {
         }
     }
 
-    private int count(String sql, UUID first, String second) {
-        MapSqlParameterSource parameters = params();
-        if (first != null) {
-            parameters.addValue(sql.contains("group_id") ? "groupId" : sql.contains("round_id") ? "roundId" : "topicId", first);
-        }
-        if (second != null) {
-            parameters.addValue(sql.contains("lecturer_id") ? "lecturerId" : "studentId", second);
-        }
-        Integer result = jdbc.queryForObject(sql, parameters, Integer.class);
+    private int count(String sql, String paramName, UUID value) {
+        Integer result = jdbc.queryForObject(sql,
+                params().addValue(paramName, value), Integer.class);
         return result == null ? 0 : result;
-    }
-
-
-    private int count(String sql, UUID first) {
-        return count(sql, first, null);
     }
 
     private static MapSqlParameterSource params() { return new MapSqlParameterSource(); }
@@ -1045,7 +1232,11 @@ public class ThesisMutationService {
     private static String studentId(Jwt actor) { return normalize(actor == null ? null : actor.getClaimAsString("studentId")); }
     private static String normalize(String value) { return value == null ? "" : value.trim(); }
     private static void requireText(String value, String name) { if (value == null || value.isBlank()) throw invalid(name + " is required"); }
-    private static void requireDates(Instant start, Instant end) { if (start == null || end == null || !end.isAfter(start)) throw invalid("registrationEnd must be after registrationStart"); }
+    private static void requireDates(Instant start, Instant end, String startField, String endField) {
+        if (start == null || end == null || !end.isAfter(start)) {
+            throw invalid(endField + " must be after " + startField);
+        }
+    }
     private static boolean isAdmin(Jwt actor) {
         if (actor == null) {
             return false;

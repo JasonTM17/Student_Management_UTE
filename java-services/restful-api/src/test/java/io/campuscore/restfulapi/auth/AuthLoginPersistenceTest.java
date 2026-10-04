@@ -631,7 +631,8 @@ class AuthLoginPersistenceTest {
                         .content("{\"oldPassword\":\"wrong-" + UUID.randomUUID()
                                 + "\",\"newPassword\":\"" + newSecret + "\"}"))
                 .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.message").value("Invalid old password"));
+                .andExpect(jsonPath("$.code").value("INVALID_OLD_PASSWORD"))
+                .andExpect(jsonPath("$.message").value("Current password is incorrect"));
 
         mvc.perform(post("/api/v1/auth/change-password")
                         .contentType(MediaType.APPLICATION_JSON)

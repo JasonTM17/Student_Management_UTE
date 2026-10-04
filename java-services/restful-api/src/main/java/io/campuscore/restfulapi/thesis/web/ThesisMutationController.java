@@ -75,47 +75,72 @@ public class ThesisMutationController {
     @Operation(summary = "Khởi tạo đợt khóa luận mới", description = "Tạo một đợt đăng ký khóa luận/tiểu luận mới ở trạng thái DRAFT")
     @PostMapping("/rounds")
     @PreAuthorize("hasAnyRole('ADMIN','TRUONG_KHOA','SUPER_ADMIN')")
-    public RoundResponse createRound(@RequestBody RoundCreateRequest request) {
-        return mutations.createRound(request);
+    public RoundResponse createRound(@RequestBody RoundCreateRequest request,
+            @AuthenticationPrincipal Jwt actor) {
+        return mutations.createRound(request, actor);
+    }
+
+    @Operation(summary = "Điều chỉnh lịch của đợt", description = "Cập nhật tên, loại và toàn bộ mốc thời gian của đợt còn ở DRAFT, PROPOSAL_OPEN hoặc PROPOSALS_PUBLISHED")
+    @PutMapping("/rounds/{id}")
+    @PreAuthorize("hasAnyRole('ADMIN','TRUONG_KHOA','SUPER_ADMIN')")
+    public RoundResponse updateRound(
+            @Parameter(description = "Mã UUID của đợt", required = true) @PathVariable UUID id,
+            @RequestBody RoundCreateRequest request,
+            @AuthenticationPrincipal Jwt actor) {
+        return mutations.updateRound(id, request, actor);
+    }
+
+    @Operation(summary = "Hủy đợt đăng ký", description = "Chuyển đợt sang CANCELLED khi chưa công bố kết quả; nhóm giữ nguyên roster lịch sử")
+    @PostMapping("/rounds/{id}/cancel")
+    @PreAuthorize("hasAnyRole('ADMIN','TRUONG_KHOA','SUPER_ADMIN')")
+    public RoundResponse cancelRound(
+            @Parameter(description = "Mã UUID của đợt", required = true) @PathVariable UUID id,
+            @AuthenticationPrincipal Jwt actor) {
+        return mutations.cancelRound(id, actor);
     }
 
     /** Brief phase one: the faculty head opens the lecturer topic-submission window. */
     @Operation(summary = "Mở cổng đề xuất đề tài cho giảng viên", description = "Chuyển trạng thái đợt từ DRAFT sang PROPOSAL_OPEN để giảng viên nộp đề tài")
     @PostMapping("/rounds/{id}/open-proposals")
     @PreAuthorize("hasAnyRole('ADMIN','TRUONG_KHOA','SUPER_ADMIN')")
-    public RoundResponse openProposals(@Parameter(description = "Mã UUID của đợt", required = true) @PathVariable UUID id) {
-        return mutations.transitionRound(id, RoundStatus.DRAFT, RoundStatus.PROPOSAL_OPEN);
+    public RoundResponse openProposals(@Parameter(description = "Mã UUID của đợt", required = true) @PathVariable UUID id,
+            @AuthenticationPrincipal Jwt actor) {
+        return mutations.transitionRound(id, RoundStatus.DRAFT, RoundStatus.PROPOSAL_OPEN, actor);
     }
 
     /** Brief phase one closure: publish the topic catalog to student groups. */
     @Operation(summary = "Công bố danh mục đề tài cho sinh viên", description = "Chuyển đợt sang PROPOSALS_PUBLISHED để sinh viên tìm hiểu danh mục đề tài đã duyệt")
     @PostMapping("/rounds/{id}/publish-proposals")
     @PreAuthorize("hasAnyRole('ADMIN','TRUONG_KHOA','SUPER_ADMIN')")
-    public RoundResponse publishProposals(@Parameter(description = "Mã UUID của đợt", required = true) @PathVariable UUID id) {
-        return mutations.transitionRound(id, RoundStatus.PROPOSAL_OPEN, RoundStatus.PROPOSALS_PUBLISHED);
+    public RoundResponse publishProposals(@Parameter(description = "Mã UUID của đợt", required = true) @PathVariable UUID id,
+            @AuthenticationPrincipal Jwt actor) {
+        return mutations.transitionRound(id, RoundStatus.PROPOSAL_OPEN, RoundStatus.PROPOSALS_PUBLISHED, actor);
     }
 
     /** Brief phase two: student groups may register inside the student window. */
     @Operation(summary = "Mở cổng đăng ký đề tài cho nhóm sinh viên", description = "Chuyển đợt sang REGISTRATION_OPEN để các nhóm sinh viên nộp nguyện vọng đề tài")
     @PostMapping("/rounds/{id}/open-registration")
     @PreAuthorize("hasAnyRole('ADMIN','TRUONG_KHOA','SUPER_ADMIN')")
-    public RoundResponse openRegistration(@Parameter(description = "Mã UUID của đợt", required = true) @PathVariable UUID id) {
-        return mutations.transitionRound(id, RoundStatus.PROPOSALS_PUBLISHED, RoundStatus.REGISTRATION_OPEN);
+    public RoundResponse openRegistration(@Parameter(description = "Mã UUID của đợt", required = true) @PathVariable UUID id,
+            @AuthenticationPrincipal Jwt actor) {
+        return mutations.transitionRound(id, RoundStatus.PROPOSALS_PUBLISHED, RoundStatus.REGISTRATION_OPEN, actor);
     }
 
     @Operation(summary = "Đóng cổng đăng ký đề tài", description = "Chuyển đợt sang REGISTRATION_CLOSED sau khi hết hạn đăng ký")
     @PostMapping("/rounds/{id}/close-registration")
     @PreAuthorize("hasAnyRole('ADMIN','TRUONG_KHOA','SUPER_ADMIN')")
-    public RoundResponse closeRegistration(@Parameter(description = "Mã UUID của đợt", required = true) @PathVariable UUID id) {
-        return mutations.transitionRound(id, RoundStatus.REGISTRATION_OPEN, RoundStatus.REGISTRATION_CLOSED);
+    public RoundResponse closeRegistration(@Parameter(description = "Mã UUID của đợt", required = true) @PathVariable UUID id,
+            @AuthenticationPrincipal Jwt actor) {
+        return mutations.transitionRound(id, RoundStatus.REGISTRATION_OPEN, RoundStatus.REGISTRATION_CLOSED, actor);
     }
 
     /** Brief R9: publish graded results to the students of the round. */
     @Operation(summary = "Công bố điểm và kết quả bảo vệ khóa luận", description = "Chuyển đợt sang RESULTS_PUBLISHED để sinh viên xem điểm đánh giá chính thức")
     @PostMapping("/rounds/{id}/publish-results")
     @PreAuthorize("hasAnyRole('ADMIN','TRUONG_KHOA','SUPER_ADMIN')")
-    public RoundResponse publishResults(@Parameter(description = "Mã UUID của đợt", required = true) @PathVariable UUID id) {
-        return mutations.publishResults(id);
+    public RoundResponse publishResults(@Parameter(description = "Mã UUID của đợt", required = true) @PathVariable UUID id,
+            @AuthenticationPrincipal Jwt actor) {
+        return mutations.publishResults(id, actor);
     }
 
     @PostMapping("/topics")
@@ -166,7 +191,7 @@ public class ThesisMutationController {
     }
 
     @PostMapping("/groups")
-    @PreAuthorize("hasAnyRole('STUDENT','ADMIN','SUPER_ADMIN')")
+    @PreAuthorize("hasAnyRole('STUDENT','ADMIN','TRUONG_KHOA','SUPER_ADMIN')")
     public GroupResponse createGroup(
             @RequestBody GroupCreateRequest request,
             @AuthenticationPrincipal Jwt actor) {
@@ -174,7 +199,7 @@ public class ThesisMutationController {
     }
 
     @PostMapping("/groups/{id}/members")
-    @PreAuthorize("hasAnyRole('STUDENT','LECTURER','ADMIN','SUPER_ADMIN')")
+    @PreAuthorize("hasAnyRole('STUDENT','LECTURER','ADMIN','TRUONG_KHOA','SUPER_ADMIN')")
     public GroupResponse addMember(
             @PathVariable UUID id,
             @RequestBody MemberRequest request,
@@ -183,13 +208,13 @@ public class ThesisMutationController {
     }
 
     @GetMapping("/students/search")
-    @PreAuthorize("hasAnyRole('STUDENT','LECTURER','ADMIN','SUPER_ADMIN')")
+    @PreAuthorize("hasAnyRole('STUDENT','LECTURER','ADMIN','TRUONG_KHOA','SUPER_ADMIN')")
     public List<StudentSearchResponse> searchStudents(@RequestParam String q) {
         return mutations.searchStudents(q);
     }
 
     @DeleteMapping("/groups/{id}/members/{studentId}")
-    @PreAuthorize("hasAnyRole('STUDENT','LECTURER','ADMIN','SUPER_ADMIN')")
+    @PreAuthorize("hasAnyRole('STUDENT','LECTURER','ADMIN','TRUONG_KHOA','SUPER_ADMIN')")
     public GroupResponse removeMember(
             @PathVariable UUID id,
             @PathVariable String studentId,
@@ -198,7 +223,7 @@ public class ThesisMutationController {
     }
 
     @PostMapping("/groups/{id}/topic")
-    @PreAuthorize("hasAnyRole('STUDENT','ADMIN','SUPER_ADMIN')")
+    @PreAuthorize("hasAnyRole('STUDENT','ADMIN','TRUONG_KHOA','SUPER_ADMIN')")
     public GroupResponse assignTopic(
             @PathVariable UUID id,
             @RequestBody TopicAssignmentRequest request,
@@ -207,7 +232,7 @@ public class ThesisMutationController {
     }
 
     @PatchMapping("/groups/{id}/progress")
-    @PreAuthorize("hasAnyRole('STUDENT','ADMIN','SUPER_ADMIN')")
+    @PreAuthorize("hasAnyRole('STUDENT','ADMIN','TRUONG_KHOA','SUPER_ADMIN')")
     public GroupResponse updateProgress(
             @PathVariable UUID id,
             @RequestBody ProgressRequest request,

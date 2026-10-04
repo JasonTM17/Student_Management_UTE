@@ -23,7 +23,7 @@ import {
   LoadingState,
 } from '@/components/ui/state-block';
 import { statusToneClass } from '@/components/ui/status';
-import { cn } from '@/lib/utils';
+import { cn, htmlToPlainText } from '@/lib/utils';
 
 type NotificationItem = {
   id: string;
@@ -234,7 +234,7 @@ export default function NotificationsCenterPage() {
                 type="button"
                 role="tab"
                 aria-selected={selected}
-                aria-controls={`notifications-panel-${tab}`}
+                aria-controls="notifications-panel"
                 tabIndex={selected ? 0 : -1}
                 onClick={() => setFilter(tab)}
                 onKeyDown={(event) => moveFilterFocus(event, tab)}
@@ -274,7 +274,7 @@ export default function NotificationsCenterPage() {
       ) : null}
 
       <div
-        id={`notifications-panel-${filter}`}
+        id="notifications-panel"
         role="tabpanel"
         aria-labelledby={`notifications-tab-${filter}`}
         tabIndex={0}
@@ -302,8 +302,11 @@ export default function NotificationsCenterPage() {
         ) : (
           <div className="divide-y divide-border/70 overflow-hidden rounded-xl border border-border/80 bg-card shadow-xs">
               {visibleItems.map((item) => {
-              const title = item.title || copy.fallbackTitle;
-              const content = item.content || item.message || copy.fallbackContent;
+              // Bodies (and occasionally titles) arrive as authored HTML; this
+              // surface renders plain text, never raw markup.
+              const title = htmlToPlainText(item.title, 300) || copy.fallbackTitle;
+              const content =
+                htmlToPlainText(item.content || item.message, 2000) || copy.fallbackContent;
               const isBusy = busyId === item.id;
 
                 return (
@@ -334,7 +337,7 @@ export default function NotificationsCenterPage() {
                     <div className="min-w-0 flex-1 space-y-2">
                       <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
                         <div className="flex flex-wrap items-center gap-2">
-                          <h2 className="text-base font-semibold text-foreground sm:text-lg">
+                          <h2 className="break-words text-base font-semibold text-foreground sm:text-lg">
                             {title}
                           </h2>
                           {!item.isRead ? (
@@ -350,7 +353,7 @@ export default function NotificationsCenterPage() {
                           {formatDateTime(item.createdAt)}
                         </time>
                       </div>
-                      <p className="whitespace-pre-line text-sm leading-6 text-muted-foreground">
+                      <p className="whitespace-pre-line break-words text-sm leading-6 text-muted-foreground">
                         {content}
                       </p>
                       <div className="flex flex-wrap items-center gap-4 pt-1">

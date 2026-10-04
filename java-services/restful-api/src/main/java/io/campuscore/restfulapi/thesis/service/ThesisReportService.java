@@ -157,11 +157,18 @@ public class ThesisReportService {
                         + "JOIN thesis.thesis_council_topic ct ON ct.council_id = cm.council_id "
                         + "WHERE ct.topic_id = :topicId AND cm.lecturer_id = :lecturerId",
                         params().addValue("topicId", group.topicId()).addValue("lecturerId", actorLecturerId)) > 0;
+        // The assigned counter-reviewer must read the report to grade it —
+        // the assignment may cross departments, so the archive scope cannot
+        // cover this role.
+        boolean gvpbReviewer = lecturer
+                && group.topicId() != null
+                && count("SELECT COUNT(*) FROM thesis.thesis_topic WHERE id = :topicId AND gvpb_lecturer_id = :lecturerId",
+                        params().addValue("topicId", group.topicId()).addValue("lecturerId", actorLecturerId)) > 0;
         boolean sameDepartmentArchive = lecturer
                 && "APPROVED".equals(group.approvalStatus())
                 && !"CANCELLED".equals(group.status())
                 && sameDepartment(group.topicDepartmentId(), actor);
-        if (lecturer && !member && !supervisor && !councilMember && !admin && !sameDepartmentArchive) {
+        if (lecturer && !member && !supervisor && !councilMember && !admin && !gvpbReviewer && !sameDepartmentArchive) {
             // Do not disclose whether a report exists to a lecturer outside the
             // department archive scope.
             throw notFound("REPORT_NOT_FOUND", "The report is not available in your department archive");

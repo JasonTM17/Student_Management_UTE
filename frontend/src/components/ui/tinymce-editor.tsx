@@ -173,6 +173,45 @@ const PASTE_DROP_TAGS = new Set([
   'template', 'svg', 'math', 'canvas', 'video', 'audio', 'source', 'track',
 ]);
 
+/** The only image MIME types whose base64 src the publish sanitizer keeps. */
+const INLINE_IMAGE_MIME_TYPES = new Set([
+  'image/png', 'image/jpeg', 'image/gif', 'image/webp', 'image/bmp',
+]);
+
+/**
+ * src values that survive the publish sanitizer — mirrors the server's
+ * SAFE_IMAGE_URL exactly: anchored base64 payload charset (an invalid payload
+ * like `data:image/png;base64,AAA-BBB` is kept client-side but stripped at
+ * publish — the parity check makes it vanish at insert instead), relative
+ * `./`/`../` paths the reader allowlist permits, and root-relative `/` (but
+ * not protocol-relative `//`). `blob:` is tolerated inside the editor only
+ * because automatic_uploads replaces it with a data: URI after the upload
+ * handler runs; a stray blob: still dies at publish.
+ */
+const INLINE_IMG_SRC_STRIPPED = /[\u0000-\u0020\u00a0\u2028\u2029]/g;
+
+/**
+ * Mirrors AnnouncementHtmlSanitizer: the server strips this control/space set
+ * before matching, so the editor normalizes the same way. Java's `\s` is
+ * ASCII-only — a U+2007-separated base64 payload would otherwise pass the
+ * JS `\s` check and be dropped by the Java check at publish, leaving the
+ * author with an image readers never see.
+ */
+const normalizeInlineImgSrc = (src: string): string =>
+  src.replace(INLINE_IMG_SRC_STRIPPED, '').toLowerCase();
+
+const SAFE_INLINE_IMAGE_SRC =
+  /^(?:https?:|blob:|data:image\/(?:png|jpe?g|gif|webp|bmp);base64,[a-z0-9+/=]+$|\/(?!\/)|\.{1,2}\/)/;
+
+/**
+ * The outbound variant — blob: is tolerated inside the editor because
+ * automatic_uploads replaces it with a data: URI once the upload handler
+ * runs, but an in-flight upload's blob: src dies at publish, so serialized
+ * content must not carry it either.
+ */
+const PUBLISHABLE_INLINE_IMAGE_SRC =
+  /^(?:https?:|data:image\/(?:png|jpe?g|gif|webp|bmp);base64,[a-z0-9+/=]+$|\/(?!\/)|\.{1,2}\/)/;
+
 /** The editor's own callout wrapper classes must survive a copy/paste. */
 const PASTE_KEPT_CLASS = /^academic-callout(-|$)/;
 
@@ -213,6 +252,14 @@ export function cleanForeignPasteTree(root: Element): void {
         continue;
       }
       if (!PASTE_ALLOWED_ATTRS.has(name)) element.removeAttribute(attribute.name);
+    }
+    // An image whose src cannot survive publish (svg/avif data: URIs,
+    // javascript:, protocol-relative //host) renders fine in this editing
+    // session then breaks for every reader. Drop it at insert time so the
+    // author sees it vanish rather than publishing a broken frame.
+    if (tag === 'img'
+        && !SAFE_INLINE_IMAGE_SRC.test(normalizeInlineImgSrc(element.getAttribute('src') ?? ''))) {
+      element.remove();
     }
   }
 }
@@ -457,6 +504,10 @@ export function TinyMceEditor({
   const svgRejected = isVi
     ? 'Không chèn được ảnh SVG: bộ lọc nội dung sẽ loại bỏ nguồn ảnh khi phát hành và người đọc chỉ thấy khung ảnh vỡ. Hãy xuất ra PNG, JPEG, GIF, WEBP hoặc BMP rồi chèn lại.'
     : 'SVG images cannot be inserted: the content filter drops their source when the notice is published, so readers would see a broken image. Export the graphic as PNG, JPEG, GIF, WEBP or BMP and insert it again.';
+
+  const unsupportedImageFormat = isVi
+    ? 'Chỉ chèn được ảnh PNG, JPEG, GIF, WEBP hoặc BMP: định dạng khác (AVIF, HEIC, TIFF…) bị bộ lọc nội dung loại bỏ nguồn ảnh khi phát hành nên người đọc chỉ thấy khung ảnh vỡ.'
+    : 'Only PNG, JPEG, GIF, WEBP or BMP images can be inserted: other formats (AVIF, HEIC, TIFF…) lose their source when the notice is published, so readers would see a broken image.';
 
   // Apply academic template. Insert at the cursor instead of replacing the
   // document: the label says "chèn" and a misclick must not wipe the content
@@ -798,6 +849,9 @@ export function TinyMceEditor({
             image_caption: true,
             image_title: true,
             automatic_uploads: true,
+            // Only the formats the publish sanitizer keeps — AVIF/HEIC/SVG
+            // used to inline happily then lose their src on publish.
+            images_file_types: 'jpg,jpeg,png,gif,webp,bmp',
             file_picker_types: 'image',
             // Pasted screenshots go through the same upload handler instead of
             // being silently dropped (TinyMCE's default rejects data images).
@@ -821,10 +875,12 @@ export function TinyMceEditor({
                 // image alone ~6.8x the entire server budget.
                 const blob = blobInfo.blob();
                 const blobType = String(blob.type || '').toLowerCase();
-                // Checked before the size test: a vector file is never going to
-                // be publishable, however small it is.
-                if (blobType.includes('svg')) {
-                  reject(svgRejected);
+                // Positive allowlist, checked before the size test: AVIF, HEIC,
+                // TIFF, SVG or an empty type all produced a data: URI the
+                // reader sanitizer strips — an image that looked fine to the
+                // author and broke for every reader.
+                if (!INLINE_IMAGE_MIME_TYPES.has(blobType)) {
+                  reject(blobType.includes('svg') ? svgRejected : unsupportedImageFormat);
                   return;
                 }
                 if (blob.size > MAX_INLINE_IMAGE_BYTES) {
@@ -861,11 +917,14 @@ export function TinyMceEditor({
                 input.onchange = function () {
                   const file = (this as HTMLInputElement).files?.[0];
                   if (file) {
-                    if (file.type.toLowerCase().includes('svg')) {
-                      // Same non-blocking toast as the size rejection below: a
+                    if (!INLINE_IMAGE_MIME_TYPES.has(file.type.toLowerCase())) {
+                      // The accept attribute is advisory — "All files" bypasses
+                      // it. Same non-blocking toast as the size rejection: a
                       // payload that cannot be published must never reach the
                       // document.
-                      toast.error(svgRejected);
+                      toast.error(
+                        file.type.toLowerCase().includes('svg') ? svgRejected : unsupportedImageFormat,
+                      );
                       return;
                     }
                     if (file.size > MAX_INLINE_IMAGE_BYTES) {
@@ -943,6 +1002,42 @@ export function TinyMceEditor({
             language: isVi ? 'vi' : undefined,
             language_url: isVi ? '/tinymce/langs/vi.js' : undefined,
             contextmenu: 'link image table',
+            init_instance_callback: (editor: any) => {
+              // The Insert ▸ Image ▸ Source field and internal editor-to-editor
+              // paste skip both guarded insert points and the foreign-paste
+              // cleaner. A parser-level img filter catches them at set/get
+              // time: any src the publish sanitizer would strip drops the node
+              // immediately, so the author sees it vanish instead of shipping
+              // a broken frame. blob: stays — it is the transient src that
+              // automatic_uploads replaces with a data: URI.
+              const dropUnsafeImg = (node: any, pattern: RegExp) => {
+                const src = normalizeInlineImgSrc(String(node.attr('src') ?? ''));
+                if (!pattern.test(src)) {
+                  node.remove();
+                }
+              };
+              editor.parser.addNodeFilter('img', (nodes: any[]) => {
+                nodes.forEach((node: any) => dropUnsafeImg(node, SAFE_INLINE_IMAGE_SRC));
+              });
+              // Editing an existing image's Source in the Image dialog mutates
+              // the DOM node via setAttribs — it never re-enters the parser,
+              // so the parser filter cannot see it. The serializer filter
+              // strips the node at getContent time (published content can
+              // never carry it), and the NodeChange sweep removes the live
+              // element so the author watches it vanish rather than shipping
+              // a frame that breaks for readers.
+              editor.serializer.addNodeFilter('img', (nodes: any[]) => {
+                nodes.forEach((node: any) => dropUnsafeImg(node, PUBLISHABLE_INLINE_IMAGE_SRC));
+              });
+              editor.on('NodeChange', () => {
+                editor.getBody()?.querySelectorAll('img').forEach((img: HTMLImageElement) => {
+                  const src = img.getAttribute('src') ?? '';
+                  if (src && !SAFE_INLINE_IMAGE_SRC.test(normalizeInlineImgSrc(src))) {
+                    img.remove();
+                  }
+                });
+              });
+            },
           }}
           />
         ) : null}

@@ -622,6 +622,70 @@
   color: hsl(var(--muted-foreground));
 }
 
+/* Tailwind Preflight strips default styling from these elements, so authored
+   TinyMCE markup arrived as plain body text: links invisible, lists flat,
+   headings weightless. Restore the semantic presentation readers expect. */
+.rich-html-content a {
+  color: hsl(var(--primary));
+  text-decoration: underline;
+  text-underline-offset: 0.2em;
+  overflow-wrap: anywhere;
+}
+.rich-html-content a:hover {
+  color: hsl(var(--primary) / 0.8);
+}
+.rich-html-content ul,
+.rich-html-content ol {
+  margin: 0.75rem 0;
+  padding-left: 1.5rem;
+}
+.rich-html-content ul {
+  list-style: disc;
+}
+.rich-html-content ol {
+  list-style: decimal;
+}
+.rich-html-content ul ul,
+.rich-html-content ol ul {
+  list-style: circle;
+  margin: 0.25rem 0;
+}
+.rich-html-content li {
+  margin: 0.25rem 0;
+}
+.rich-html-content h1,
+.rich-html-content h2,
+.rich-html-content h3,
+.rich-html-content h4,
+.rich-html-content h5,
+.rich-html-content h6 {
+  font-weight: 600;
+  line-height: 1.3;
+  margin: 1.25rem 0 0.5rem;
+  color: hsl(var(--foreground));
+  overflow-wrap: break-word;
+}
+.rich-html-content h1 { font-size: 1.5rem; }
+.rich-html-content h2 { font-size: 1.35rem; }
+.rich-html-content h3 { font-size: 1.2rem; }
+.rich-html-content h4 { font-size: 1.1rem; }
+.rich-html-content h5 { font-size: 1rem; }
+.rich-html-content h6 { font-size: 0.9rem; text-transform: uppercase; letter-spacing: 0.02em; }
+.rich-html-content dd {
+  margin-left: 1.5rem;
+}
+.rich-html-content hr {
+  margin: 1.5rem 0;
+  border: none;
+  border-top: 1px solid hsl(var(--border));
+}
+/* Wide authored tables would otherwise overflow the reader column. */
+.rich-html-content table {
+  display: block;
+  max-width: 100%;
+  overflow-x: auto;
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,

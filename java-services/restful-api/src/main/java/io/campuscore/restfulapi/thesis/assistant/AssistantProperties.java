@@ -30,12 +30,15 @@ public record AssistantProperties(
      * fast path answers without the remote RAG round-trip. The score is the
      * repository's own ranking expression summed over retrieval terms
      * (title substring 3, content substring 1, title whole-word 4, content
-     * whole-word 2). Ten therefore means at least one retrieval phrase hits
-     * BOTH the title and the content of the top document — the seeded campus
-     * topics ("đăng ký học phần", "học phí", "nghỉ học") clear it by a wide
-     * margin, while an incidental single-term overlap stays below it.
+     * whole-word 2). A single term can contribute at most 10 — so eleven
+     * means at least TWO distinct query terms independently corroborate the
+     * top document. That corroboration gate is what rejects incidental
+     * vocabulary collisions like "công thức nấu phở bò" matching the
+     * "Công nghệ thông tin" document on the bare syllable "công" (10 = old
+     * threshold), while seeded campus topics ("đăng ký học phần", "học phí",
+     * "nghỉ học") still clear it by a wide margin through multiple terms.
      */
-    public static final int DEFAULT_LEXICAL_CONFIDENT_SCORE = 10;
+    public static final int DEFAULT_LEXICAL_CONFIDENT_SCORE = 11;
 
     @ConstructorBinding
     public AssistantProperties {

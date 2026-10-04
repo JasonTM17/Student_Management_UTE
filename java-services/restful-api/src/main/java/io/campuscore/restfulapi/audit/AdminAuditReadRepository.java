@@ -63,8 +63,10 @@ public class AdminAuditReadRepository {
         MapSqlParameterSource parameters = new MapSqlParameterSource()
                 .addValue("limit", effectiveLimit)
                 .addValue("offset", (long) (effectivePage - 1) * effectiveLimit);
-        appendFilter(where, parameters, "\"action\" = :action", "action", action);
-        appendFilter(where, parameters, "\"entityType\" = :entityType", "entityType", entityType);
+        // The UI labels read "contains", so action/entityType match as
+        // case-insensitive substrings; entityId/actorId stay exact.
+        appendContainsFilter(where, parameters, "\"action\" ILIKE :action", "action", action);
+        appendContainsFilter(where, parameters, "\"entityType\" ILIKE :entityType", "entityType", entityType);
         appendFilter(where, parameters, "\"entityId\" = :entityId", "entityId", entityId);
         appendFilter(where, parameters, "\"actorId\" = :actorId", "actorId", actorId);
         String clause = where.length() == 0 ? "" : " WHERE " + where;
@@ -106,6 +108,27 @@ public class AdminAuditReadRepository {
         }
         where.append(predicate);
         parameters.addValue(name, value.trim());
+    }
+
+    private static void appendContainsFilter(
+            StringBuilder where,
+            MapSqlParameterSource parameters,
+            String predicate,
+            String name,
+            String value) {
+        if (value == null || value.isBlank()) {
+            return;
+        }
+        if (where.length() > 0) {
+            where.append(" AND ");
+        }
+        where.append(predicate);
+        // Escape LIKE metacharacters so a typed '%' is literal, not a wildcard.
+        String escaped = value.trim()
+                .replace("\\", "\\\\")
+                .replace("%", "\\%")
+                .replace("_", "\\_");
+        parameters.addValue(name, "%" + escaped + "%");
     }
 
     private static Instant toInstant(Timestamp timestamp) {

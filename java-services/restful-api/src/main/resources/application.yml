@@ -100,17 +100,9 @@ springdoc:
   swagger-ui:
     path: /swagger-ui.html
 
-deepseek:
-  enabled: ${DEEPSEEK_ENABLED:false}
-  api-key: ${DEEPSEEK_API_KEY:}
-  base-url: ${DEEPSEEK_BASE_URL:https://api.deepseek.com}
-  model: ${DEEPSEEK_MODEL:deepseek-v4-flash}
-  timeout-ms: ${DEEPSEEK_TIMEOUT_MS:8000}
-  max-output-tokens: ${DEEPSEEK_MAX_OUTPUT_TOKENS:800}
-  max-response-bytes: ${DEEPSEEK_MAX_RESPONSE_BYTES:512000}
-  max-frame-bytes: ${DEEPSEEK_MAX_FRAME_BYTES:64000}
-  max-concurrent: ${DEEPSEEK_MAX_CONCURRENT:4}
-
+# NOTE: a single deepseek: block lives near the end of this file — a
+# duplicated top-level key silently shadowed these values (last-wins), so the
+# provider timeout/token defaults must only ever be defined once.
 assistant:
   datasource:
     # The Assistant-only connection uses the same PostgreSQL endpoint as the
@@ -147,10 +139,12 @@ assistant:
   # Minimum retrieval score of the TOP document that counts as a confident
   # fast-path match. The score is the repository's own ranking expression
   # summed over retrieval terms (title substring 3, content substring 1,
-  # title whole-word 4, content whole-word 2); 10 = at least one retrieval
-  # phrase hits both the title and the content, which the seeded campus
-  # topics clear with margin. Clamped 0-100.
-  lexical-confident-score: ${ASSISTANT_LEXICAL_CONFIDENT_SCORE:10}
+  # title whole-word 4, content whole-word 2). One term alone can contribute
+  # at most 10, so 11 requires corroboration by a second distinct term —
+  # this is what keeps incidental collisions ("công" in "công thức nấu phở"
+  # hitting "Công nghệ thông tin") off the fast path while seeded campus
+  # topics clear it with margin. Clamped 0-100.
+  lexical-confident-score: ${ASSISTANT_LEXICAL_CONFIDENT_SCORE:11}
   recovery-delay-ms: ${ASSISTANT_RECOVERY_DELAY_MS:30000}
   recovery-initial-delay-ms: ${ASSISTANT_RECOVERY_INITIAL_DELAY_MS:30000}
   rag:

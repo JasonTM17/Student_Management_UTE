@@ -156,6 +156,29 @@ class AnnouncementHtmlSanitizerTest {
         assertEquals(2, result.removedElements());
     }
 
+    @Test
+    void anImageWhoseSrcFailedTheSchemeCheckLeavesNoBrokenFrame() {
+        // The author sees an AVIF/blob image render in the editor; the policy
+        // strips its src at publish. The bare <img> must not survive as a
+        // dead frame — the whole element goes, and the removal is counted so
+        // the write-time mutation stays observable.
+        AnnouncementHtmlSanitizer.SanitizationResult strippedSrc = AnnouncementHtmlSanitizer.sanitize(
+                "<p>Thông báo</p><img src=\"data:image/avif;base64,AAAA\" alt=\"x\"><p>cuối</p>");
+        assertFalse(strippedSrc.html().contains("<img"), strippedSrc.html());
+        assertTrue(strippedSrc.html().contains("Thông báo"), strippedSrc.html());
+        assertEquals(1, strippedSrc.removedElements());
+
+        AnnouncementHtmlSanitizer.SanitizationResult protocolRelative =
+                AnnouncementHtmlSanitizer.sanitize("<img src=\"//evil.example/x.png\">");
+        assertFalse(protocolRelative.html().contains("<img"), protocolRelative.html());
+
+        // A legal image keeps its tag and src untouched.
+        AnnouncementHtmlSanitizer.SanitizationResult kept = AnnouncementHtmlSanitizer.sanitize(
+                "<img src=\"data:image/png;base64,iVBORw0KGgo=\" alt=\"ok\">");
+        assertTrue(kept.html().contains("<img"), kept.html());
+        assertTrue(kept.html().contains("data:image/png;base64,"), kept.html());
+    }
+
     private static Set<String> stringSet(JsonNode arrayNode) {
         List<String> values = new ArrayList<>();
         arrayNode.forEach(node -> values.add(node.asText()));

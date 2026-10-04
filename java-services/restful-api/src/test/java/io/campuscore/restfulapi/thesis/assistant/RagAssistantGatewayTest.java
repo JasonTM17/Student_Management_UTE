@@ -357,6 +357,42 @@ class RagAssistantGatewayTest {
         assertEquals(1, events.stream().filter(ThesisAssistantService.StreamDone.class::isInstance).count());
     }
 
+    @Test
+    void safeRemoteReplaceFramesReachTheClientAndSuppressTheStaleBuffer() throws Exception {
+        startServer(exchange -> {
+            byte[] response = """
+                    event: delta
+                    data: {"sequence":0,"text":"Tín chỉ tối đa là 24","sourceIds":[],"type":"delta"}
+
+                    event: replace
+                    data: {"text":"Tín chỉ tối đa là 20 theo quy chế 2024","sourceIds":[],"reasonCode":"ANSWERED","type":"replace"}
+
+                    event: done
+                    data: {"messageId":null,"reasonCode":"ANSWERED","degraded":false,"terminalStatus":"COMPLETED","type":"done"}
+
+                    """.getBytes(StandardCharsets.UTF_8);
+            exchange.getResponseHeaders().add("Content-Type", "text/event-stream");
+            exchange.sendResponseHeaders(200, response.length);
+            exchange.getResponseBody().write(response);
+            exchange.close();
+        }, "/chat/stream");
+
+        List<ThesisAssistantService.StreamEvent> events = new ArrayList<>();
+        gateway().stream(new ChatRequest("Tín chỉ tối đa?", "vi", UUID.randomUUID(), null), "owner-a", events::add);
+
+        // The replace must cross the wire: without it the bubble keeps the
+        // stale "24" while history replays the corrected "20" answer.
+        ThesisAssistantService.StreamReplace replace = assertInstanceOf(
+                ThesisAssistantService.StreamReplace.class,
+                events.stream().filter(ThesisAssistantService.StreamReplace.class::isInstance)
+                        .findFirst().orElseThrow());
+        assertEquals("Tín chỉ tối đa là 20 theo quy chế 2024", replace.text());
+        // The corrected text was already forwarded, so done must not re-emit
+        // the pre-replace buffer as a second delta.
+        assertTrue(events.stream().noneMatch(event -> event instanceof ThesisAssistantService.StreamDelta delta
+                && delta.text().contains("20")));
+    }
+
     private RagAssistantGateway gateway() {
         return gateway(30_000);
     }

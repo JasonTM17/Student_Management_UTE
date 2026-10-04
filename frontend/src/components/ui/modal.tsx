@@ -126,7 +126,7 @@ export function Modal({
   if (!isOpen) return null;
 
   return (
-    <div className={cn('fixed inset-0 z-50 overflow-y-auto overscroll-contain', printable && 'printable-backdrop')}>
+    <div className={cn('fixed inset-0 z-[60] overflow-y-auto overscroll-contain', printable && 'printable-backdrop')}>
       <div
         className="absolute inset-0 bg-black/55 backdrop-blur-sm print:hidden"
         onClick={dismissible ? onClose : undefined}
@@ -231,7 +231,7 @@ export function ConfirmModal({
             {warning}
           </div>
         ) : null}
-        <div className="flex justify-end gap-2">
+        <div className="flex flex-wrap justify-end gap-2">
           <Button
             type="button"
             variant="outline"

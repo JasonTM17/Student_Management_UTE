@@ -1,6 +1,6 @@
 import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
-import { defaultLocale } from '@/i18n/config';
+import { defaultLocale, isLocale } from '@/i18n/config';
 import {
   isBypassedPath,
   stripLocaleFromPathname,
@@ -28,7 +28,12 @@ export function middleware(request: NextRequest) {
   }
 
   const localeMatch = stripLocaleFromPathname(pathname);
-  const locale = localeMatch.locale ?? defaultLocale;
+  // Unprefixed URLs honor the saved preference: previously they forced the
+  // default locale AND overwrote the request cookie with it, so a reload
+  // silently reverted the visitor to Vietnamese.
+  const cookieLocale = request.cookies.get(LOCALE_COOKIE)?.value;
+  const locale =
+    localeMatch.locale ?? (isLocale(cookieLocale) ? cookieLocale : defaultLocale);
   const strippedPath = localeMatch.pathname;
   const requestHeaders = new Headers(request.headers);
 

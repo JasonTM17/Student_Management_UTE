@@ -29,7 +29,6 @@ import {
   LoadingState,
 } from '@/components/ui/state-block';
 import { statusToneClass } from '@/components/ui/status';
-import { RichContentRenderer } from '@/components/ui/rich-content-renderer';
 import { WorkspaceForbiddenState } from '@/components/ProtectedRoute';
 import { useI18n } from '@/i18n';
 import { useOrderedPosts } from '@/components/providers/SiteAppearanceProvider';
@@ -40,6 +39,7 @@ import {
   announcementPriorityLabel,
   announcementPriorityTone,
   announcementSectionLabel,
+  extractAnnouncementExcerpt,
   formatAnnouncementPublisher,
   formatAnnouncementSemester,
 } from '@/lib/announcement-presentation';
@@ -70,7 +70,7 @@ export default function StudentAnnouncementsPage() {
   const isAdmin = Boolean(
     user?.roles?.some((role) => role === 'ADMIN' || role === 'SUPER_ADMIN'),
   );
-  const { locale, formatDateTime } = useI18n();
+  const { locale, formatDateTime, href } = useI18n();
   const [items, setItems] = useState<AnnouncementRecord[]>([]);
   const orderedItems = useOrderedPosts(items);
   const [isLoading, setIsLoading] = useState(true);
@@ -530,10 +530,13 @@ export default function StudentAnnouncementsPage() {
                       {announcement.title}
                     </h2>
 
-                    {/* Content Preview */}
-                    <div className="line-clamp-2 text-sm leading-relaxed text-muted-foreground prose prose-sm dark:prose-invert max-w-none">
-                      <RichContentRenderer content={announcement.content} />
-                    </div>
+                    {/* Content Preview — a text excerpt, not the full renderer:
+                        a body-leading inline image used to mount its whole
+                        base64 payload into the DOM only to be clipped by the
+                        two-line clamp. */}
+                    <p className="line-clamp-2 text-sm leading-relaxed text-muted-foreground">
+                      {extractAnnouncementExcerpt(announcement.content)}
+                    </p>
 
                     {/* Meta Footer */}
                     <div className="flex flex-wrap items-center justify-between gap-3 pt-2">
@@ -558,7 +561,7 @@ export default function StudentAnnouncementsPage() {
                             size="sm"
                             onClick={(e) => {
                               e.stopPropagation();
-                              router.push(`/admin/editor?editId=${encodeURIComponent(announcement.id)}`);
+                              router.push(href(`/admin/editor?editId=${encodeURIComponent(announcement.id)}`));
                             }}
                             className="h-7 px-2.5 text-[11px] gap-1 bg-blue-50 text-blue-700 border-blue-200 hover:bg-blue-100 dark:bg-blue-950/40 dark:text-blue-300 dark:border-blue-800 font-semibold"
                             title={locale === 'vi' ? 'Chỉnh sửa trong Studio' : 'Edit in Studio'}
@@ -616,7 +619,7 @@ export default function StudentAnnouncementsPage() {
         onSelectAnnouncement={(ann) => setReadingNotice(ann)}
         onEdit={
           isAdmin
-            ? (ann) => router.push(`/dashboard/editor?editId=${encodeURIComponent(ann.id)}`)
+            ? (ann) => router.push(href(`/dashboard/editor?editId=${encodeURIComponent(ann.id)}`))
             : undefined
         }
       />

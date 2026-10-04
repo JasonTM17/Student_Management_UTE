@@ -54,7 +54,9 @@ test('certificate preview never substitutes another student for missing fields',
   assert.doesNotMatch(source, /'Nữ'/);
 
   // Missing session fields render an em-dash (or nothing), never a guess.
-  assert.match(source, /studentId \|\| null/);
+  // The public MSSV comes from the conduct summary's studentCode — the auth
+  // session's studentId is the internal profile id, not the printed MSSV.
+  assert.match(source, /studentCode \|\| null/);
   assert.match(source, /studentName \|\| missing/);
   assert.match(source, /user\?\.dateOfBirth \? formatDate\(user\.dateOfBirth\) : missing/);
   assert.match(source, /genderValue \|\| missing/);

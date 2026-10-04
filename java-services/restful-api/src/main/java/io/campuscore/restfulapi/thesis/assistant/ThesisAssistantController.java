@@ -149,21 +149,26 @@ public class ThesisAssistantController {
             if (targetConversation == null || targetConversation.isBlank()) {
                 targetConversation = assistant.createConversation(owner, personal.locale());
             }
-            String conversationId = assistant.recordPersonalTurn(owner, targetConversation,
-                    request.message(), personal.answer(), personal.locale(), personal.reasonCode(),
-                    request.clientRequestId(),
+            ThesisAssistantService.PersonalTurn recorded = assistant.recordPersonalTurn(owner,
+                    targetConversation,
+                    request.message(), personal.answer(), personal.locale(), personal.reasonCode());
+            assistant.recordPersonalTurnKey(owner, request.clientRequestId(),
                     AssistantInputGuard.canonicalHash(request.message(), personal.locale(),
-                            conversationUuid(request.conversationId())));
-            if (conversationId == null) {
+                            conversationUuid(request.conversationId())),
+                    recorded);
+            if (recorded == null) {
                 return personal;
             }
             return new ChatResponse(personal.answer(), personal.model(), personal.degraded(),
                     personal.reasonCode(), personal.locale(), personal.citations(), personal.requestId(),
                     personal.clientRequestId(), personal.turnId(), personal.replayed(),
-                    personal.terminalStatus(), conversationId, personal.messageId(), personal.resetAt());
-        } catch (DataAccessException exception) {
+                    personal.terminalStatus(), recorded.conversationId(), recorded.messageId(),
+                    personal.resetAt());
+        } catch (DataAccessException | org.springframework.transaction.TransactionException exception) {
             // The answer itself is valid; a history-write outage must not turn
-            // it into a 5xx (same outage contract as the KB path).
+            // it into a 5xx (same outage contract as the KB path). A
+            // commit-time rollback surfaces as TransactionException, not
+            // DataAccessException — both mean "nothing persisted".
             LOG.warn("personal turn persistence skipped with {}", exception.getClass().getSimpleName());
             return personal;
         } catch (DomainException exception) {
@@ -237,12 +242,14 @@ public class ThesisAssistantController {
         // provider answers them directly instead of the KB miss (owner
         // request 2026-09-30). Scope='specialized' skips this: the
         // professional corpus is the right source there (round-2 chat-1).
+        String owner = subject(actor);
         ChatResponse general = assistant.generalAnswerIfOffTopic(request.message(), locale,
-                request.clientRequestId(), request.scope());
+                request.clientRequestId(), request.scope(), owner,
+                AssistantInputGuard.canonicalHash(request.message(), locale,
+                        conversationUuid(request.conversationId())));
         if (general != null) {
             return general;
         }
-        String owner = subject(actor);
         if (remoteRag()) {
             return chatRemoteWithFallback(request, owner, dbDownAtRequestStart);
         }
@@ -255,7 +262,7 @@ public class ThesisAssistantController {
                     request.clientRequestId(), request.scope());
         } catch (DataAccessException exception) {
             // Preserve the outage contract (KNOWLEDGE_UNAVAILABLE, degraded, no
-            // citations) rather than the curated fallback, whose ANSWERED
+            // citations) rather than the curated fallback, whose NO_MATCH
             // reason code would mask the outage from the runtime probes.
             return ThesisAssistantService.knowledgeUnavailableResponse(locale, request.clientRequestId());
         }
@@ -279,13 +286,21 @@ public class ThesisAssistantController {
         }
         try {
             ChatResponse remote = ragGateway.chat(request, owner);
-            if (!"NO_MATCH".equals(remote == null ? null : remote.reasonCode())) {
+            if (remote == null) {
+                // A remote 2xx with an empty body is the one gateway anomaly
+                // that would otherwise return a bare 200. Treat it like a
+                // transient failure: the local grounded fallback answers.
+                return localGroundedFallback(request, dbDownAtRequestStart, true);
+            }
+            if (!"NO_MATCH".equals(remote.reasonCode())) {
                 return remote;
             }
-            return localGroundedFallback(request, dbDownAtRequestStart);
+            // Remote was healthy and honestly had no match: a local miss must
+            // surface "not found", not the knowledge-outage copy.
+            return localGroundedFallback(request, dbDownAtRequestStart, false);
         } catch (DomainException exception) {
             if (isFallbackEligible(exception)) {
-                return localGroundedFallback(request, dbDownAtRequestStart);
+                return localGroundedFallback(request, dbDownAtRequestStart, true);
             }
             throw exception;
         }
@@ -318,10 +333,11 @@ public class ThesisAssistantController {
      * (KNOWLEDGE_UNAVAILABLE) wins over the curated fallback regardless of how
      * long the layered timeouts took.
      */
-    private ChatResponse localGroundedFallback(ChatRequest request, boolean dbDownAtRequestStart) {
+    private ChatResponse localGroundedFallback(ChatRequest request, boolean dbDownAtRequestStart,
+            boolean remoteFailed) {
         try {
             ChatResponse fallback = assistant.groundedFallback(request.message(), request.locale(),
-                    dbDownAtRequestStart, request.scope());
+                    dbDownAtRequestStart, request.scope(), !remoteFailed);
             if (fallback != null) {
                 return fallback;
             }
@@ -336,7 +352,9 @@ public class ThesisAssistantController {
             return ThesisAssistantService.knowledgeUnavailableResponse(
                     AssistantInputGuard.normalizeLocale(request.locale()), request.clientRequestId());
         }
-        return ThesisAssistantService.curatedFallback(AssistantInputGuard.normalizeLocale(request.locale()));
+        return remoteFailed
+                ? ThesisAssistantService.curatedFallback(AssistantInputGuard.normalizeLocale(request.locale()))
+                : ThesisAssistantService.noMatchFallback(AssistantInputGuard.normalizeLocale(request.locale()));
     }
 
     /** Deprecated compatibility alias; clients should use /chat. */
@@ -407,19 +425,27 @@ public class ThesisAssistantController {
             if (conversational != null) {
                 ThesisAssistantService.streamLocalResponse(conversational, request.clientRequestId(), sink);
             } else {
-                ChatResponse personal = personalContext != null && personalContext.handles(request.message())
-                        ? personalContext.answer(request, actor) : null;
-                if (personal != null) {
+                // Match the JSON ordering: enforce idempotency before the
+                // personal DB reads, not after, so a conflicting reused key
+                // is rejected without paying for the lookup.
+                ChatResponse personal = null;
+                if (personalContext != null && personalContext.handles(request.message())) {
                     assistant.enforcePersonalIdempotency(owner, request.clientRequestId(),
                             AssistantInputGuard.canonicalHash(request.message(),
                                     AssistantInputGuard.normalizeLocale(request.locale()),
                                     conversationUuid(request.conversationId())));
+                    personal = personalContext.answer(request, actor);
+                }
+                if (personal != null) {
                     personal = persistPersonalTurn(request, personal, owner);
                     personalContext.stream(personal, request, sink);
                 } else {
                     ChatResponse general = assistant.generalAnswerIfOffTopic(request.message(),
                             AssistantInputGuard.normalizeLocale(request.locale()), request.clientRequestId(),
-                            request.scope());
+                            request.scope(), owner,
+                            AssistantInputGuard.canonicalHash(request.message(),
+                                    AssistantInputGuard.normalizeLocale(request.locale()),
+                                    conversationUuid(request.conversationId())));
                     if (general != null) {
                         ThesisAssistantService.streamLocalResponse(general, request.clientRequestId(), sink);
                     } else if (remoteRag()) {
@@ -651,7 +677,7 @@ public class ThesisAssistantController {
         boolean[] forwarded = { false };
         Consumer<ThesisAssistantService.StreamEvent> intercept = event -> {
             if (event instanceof ThesisAssistantService.StreamDone done && "NO_MATCH".equals(done.reasonCode())) {
-                emitStreamFallback(request, locale, sink, forwarded[0], dbDownAtRequestStart);
+                emitStreamFallback(request, locale, sink, forwarded[0], dbDownAtRequestStart, false);
                 return;
             }
             forwarded[0] = true;
@@ -661,7 +687,7 @@ public class ThesisAssistantController {
             ragGateway.stream(request, owner, intercept);
         } catch (DomainException exception) {
             if (isFallbackEligible(exception)) {
-                emitStreamFallback(request, locale, sink, forwarded[0], dbDownAtRequestStart);
+                emitStreamFallback(request, locale, sink, forwarded[0], dbDownAtRequestStart, true);
                 return;
             }
             throw exception;
@@ -690,8 +716,8 @@ public class ThesisAssistantController {
 
     private void emitStreamFallback(ChatRequest request, String locale,
             Consumer<ThesisAssistantService.StreamEvent> sink, boolean alreadyForwarded,
-            boolean dbDownAtRequestStart) {
-        ChatResponse fallback = localGroundedFallback(request, dbDownAtRequestStart);
+            boolean dbDownAtRequestStart, boolean remoteFailed) {
+        ChatResponse fallback = localGroundedFallback(request, dbDownAtRequestStart, remoteFailed);
         if (!alreadyForwarded) {
             // Nothing crossed the wire yet, so the fallback is a complete stream.
             sink.accept(new ThesisAssistantService.StreamMeta(
@@ -703,14 +729,20 @@ public class ThesisAssistantController {
             fallback.citations().forEach(citation -> sink.accept(
                     new ThesisAssistantService.StreamCitation(citation)));
         } else {
-            // Remote frames already streamed: replace them, never append.
+            // Remote frames already streamed: replace them, never append. The
+            // replace carries the fallback's own reasonCode — an uncited curated
+            // answer must mark the bubble degraded (NO_MATCH), not ANSWERED.
+            // Citations still follow: a bare remote meta frame must not strip
+            // the fallback's sources the way the JSON path keeps them.
             sink.accept(new ThesisAssistantService.StreamReplace(fallback.answer(),
                     fallback.citations().stream().map(ThesisAssistantDtos.Citation::sourceId)
                             .filter(java.util.Objects::nonNull).toList(),
-                    "ANSWERED"));
+                    fallback.reasonCode()));
+            fallback.citations().forEach(citation -> sink.accept(
+                    new ThesisAssistantService.StreamCitation(citation)));
         }
         sink.accept(new ThesisAssistantService.StreamDone(parseMessageId(fallback.messageId()),
-                fallback.reasonCode(), true, "COMPLETED"));
+                fallback.reasonCode(), fallback.degraded(), "COMPLETED"));
     }
 
     private static UUID parseMessageId(String messageId) {

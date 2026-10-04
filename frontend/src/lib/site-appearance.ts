@@ -17,6 +17,8 @@ export type SiteAppearance = {
   updatedAt: string;
   accent: SiteAppearanceAccent;
   hero: {
+    /** Optional hero artwork: a same-site path or a full https:// URL. */
+    image: string;
     en: SiteAppearanceCopy;
     vi: SiteAppearanceCopy;
   };
@@ -37,6 +39,7 @@ export const DEFAULT_SITE_APPEARANCE: SiteAppearance = {
   updatedAt: SITE_APPEARANCE_UNSET_UPDATED_AT,
   accent: 'ute-yellow',
   hero: {
+    image: '',
     en: { eyebrow: '', title: '', description: '' },
     vi: { eyebrow: '', title: '', description: '' },
   },
@@ -47,7 +50,10 @@ const MAX_EYEBROW = 80;
 const MAX_TITLE = 160;
 const MAX_DESCRIPTION = 400;
 const MAX_POST_ORDER = 100;
+const MAX_IMAGE_URL = 500;
 const ID_PATTERN = /^[A-Za-z0-9._:-]{1,80}$/;
+/** Hero artwork must come from this site or a plain https:// image host. */
+const IMAGE_URL_PATTERN = /^(\/[A-Za-z0-9\-._~%!$&'()*+,;=:@/]*|https:\/\/[A-Za-z0-9\-._~%!$&'()*+,;=:@/]+[A-Za-z0-9\-._~%!$&'()*+,;=:@/?#]*)$/;
 
 function clip(value: unknown, max: number): string {
   if (typeof value !== 'string') {
@@ -94,6 +100,11 @@ export function sanitizeSiteAppearance(input: unknown): SiteAppearance {
       : SITE_APPEARANCE_UNSET_UPDATED_AT,
     accent: isSiteAppearanceAccent(record.accent) ? record.accent : 'ute-yellow',
     hero: {
+      image: typeof hero.image === 'string'
+          && hero.image.length <= MAX_IMAGE_URL
+          && IMAGE_URL_PATTERN.test(hero.image)
+        ? hero.image
+        : '',
       en: parseCopy(hero.en),
       vi: parseCopy(hero.vi),
     },

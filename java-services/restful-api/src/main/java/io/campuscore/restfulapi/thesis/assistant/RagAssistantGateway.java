@@ -355,6 +355,11 @@ public class RagAssistantGateway {
                 if (replace.sourceIds() != null) {
                     replace.sourceIds().stream().filter(id -> id != null && !id.isBlank()).forEach(sourceIds::add);
                 }
+                // A safe replace must reach the client: without forwarding it,
+                // the bubble keeps the stale delta text while history replays
+                // the replacement — live view and persisted view diverge.
+                forwardedDelta[0] = true;
+                downstream.accept(replace);
                 return;
             }
             if (event instanceof ThesisAssistantService.StreamCitation citation) {

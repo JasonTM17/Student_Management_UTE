@@ -17,6 +17,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Profile;
 import org.springframework.http.HttpStatus;
@@ -46,22 +47,43 @@ public class ThesisAssistantInternalController {
     private final ThesisAssistantService assistant;
     private final AssistantRagProperties properties;
     private final Executor streamExecutor;
+    private final boolean rejectKnownDefaults;
 
     public ThesisAssistantInternalController(ThesisAssistantService assistant, AssistantRagProperties properties) {
         this(assistant, properties, Runnable::run);
     }
 
+    public ThesisAssistantInternalController(ThesisAssistantService assistant, AssistantRagProperties properties,
+            AssistantStreamExecutor streamExecutor) {
+        this(assistant, properties, streamExecutor::execute, false);
+    }
+
     @Autowired
     public ThesisAssistantInternalController(ThesisAssistantService assistant, AssistantRagProperties properties,
-            @Qualifier("assistantInternalStreamExecutor") AssistantStreamExecutor streamExecutor) {
-        this(assistant, properties, streamExecutor::execute);
+            @Qualifier("assistantInternalStreamExecutor") AssistantStreamExecutor streamExecutor,
+            @Value("${security.jwt.reject-known-defaults:false}") boolean rejectKnownDefaults) {
+        this(assistant, properties, streamExecutor::execute, rejectKnownDefaults);
     }
 
     ThesisAssistantInternalController(ThesisAssistantService assistant, AssistantRagProperties properties,
             Executor streamExecutor) {
+        this(assistant, properties, streamExecutor, false);
+    }
+
+    ThesisAssistantInternalController(ThesisAssistantService assistant, AssistantRagProperties properties,
+            Executor streamExecutor, boolean rejectKnownDefaults) {
         this.assistant = assistant;
         this.properties = properties;
         this.streamExecutor = streamExecutor;
+        this.rejectKnownDefaults = rejectKnownDefaults;
+        // Same loud-warning parity as JwtSecretPolicy: an unrotated compose
+        // default token is tolerated for local dev but never silently.
+        if (!rejectKnownDefaults && properties.tokenIsDevComposeDefault()) {
+            LoggerFactory.getLogger(ThesisAssistantInternalController.class).warn(
+                    "ASSISTANT_RAG_SERVICE_TOKEN is set to the docker-compose development default;"
+                            + " rotate it before exposing this deployment"
+                            + " (security.jwt.reject-known-defaults=true rejects it)");
+        }
     }
 
     @PostMapping("/chat")
@@ -247,12 +269,11 @@ public class ThesisAssistantInternalController {
         if (!properties.serviceMode()) {
             throw new DomainException(HttpStatus.SERVICE_UNAVAILABLE, "RAG_SERVICE_DISABLED", "RAG service mode is disabled");
         }
+        // Committed placeholder tokens are refused inside tokenConfigured();
+        // the compose dev default only fails closed under strict secrets mode,
+        // the same stance JwtSecretPolicy takes for JWT secrets.
         if (!properties.tokenConfigured()
-                // Round-2 sweep static-1: the committed compose default must
-                // fail closed — these endpoints are permitAll + rate-limit
-                // whitelisted, so a known-default token would leave the
-                // LLM-consuming chat open (same stance as JwtSecretPolicy).
-                || "local-rag-service-token-change-me".equals(properties.serviceToken())) {
+                || (rejectKnownDefaults && properties.tokenIsDevComposeDefault())) {
             throw new DomainException(HttpStatus.SERVICE_UNAVAILABLE, "RAG_SERVICE_TOKEN_MISSING",
                     "RAG service token is not configured (the committed default is rejected)");
         }

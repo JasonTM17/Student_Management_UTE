@@ -105,10 +105,18 @@ export default function AdminClassroomsPage() {
     () => [
       { value: 'LECTURE', label: locale === 'vi' ? 'Lớp học lý thuyết' : 'Lecture' },
       { value: 'LAB', label: locale === 'vi' ? 'Phòng thí nghiệm' : 'Lab' },
+      { value: 'WORKSHOP', label: locale === 'vi' ? 'Phòng workshop' : 'Workshop' },
       { value: 'SEMINAR', label: locale === 'vi' ? 'Phòng seminar' : 'Seminar' },
+      { value: 'AUDITORIUM', label: locale === 'vi' ? 'Hội trường' : 'Auditorium' },
       { value: 'OTHER', label: locale === 'vi' ? 'Khác' : 'Other' },
     ],
     [locale],
+  );
+
+  const getClassroomTypeLabel = useCallback(
+    (type: string) =>
+      classroomTypeOptions.find((option) => option.value === type)?.label ?? type,
+    [classroomTypeOptions],
   );
 
   const copy = useMemo(
@@ -422,7 +430,7 @@ export default function AdminClassroomsPage() {
                         <dt className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
                           {copy.headers.type}
                         </dt>
-                        <dd className="mt-1 text-foreground">{room.type}</dd>
+                        <dd className="mt-1 text-foreground">{getClassroomTypeLabel(room.type)}</dd>
                       </div>
                     </dl>
                     <AdminRowActions className="mt-4 border-t border-border/60 pt-3">
@@ -474,7 +482,7 @@ export default function AdminClassroomsPage() {
                           {formatNumber(room.capacity)}
                         </td>
                         <td className="px-2 py-4 text-muted-foreground">
-                          {room.type}
+                          {getClassroomTypeLabel(room.type)}
                         </td>
                         <td className="px-2 py-4">
                           <span className={`inline-flex rounded-md px-2.5 py-1 text-xs font-medium ${statusToneClass(room.isActive ? 'success' : 'neutral')}`}>

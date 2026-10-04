@@ -223,7 +223,8 @@ public class RegistrationController {
             @AuthenticationPrincipal Jwt jwt,
             @Parameter(description = "Mã ghi danh (UUID)", required = true) @PathVariable String id,
             @Parameter(description = "Khóa chống trùng lặp Idempotency") @RequestHeader(value = "Idempotency-Key", required = false) String idempotencyKey) {
-        registration.drop(id, jwt.getClaimAsString("studentId"), jwt.getClaimAsStringList("roles"), idempotencyKey);
+        registration.drop(id, jwt.getClaimAsString("studentId"), jwt.getClaimAsStringList("roles"), idempotencyKey,
+                jwt.getSubject());
         return new DropResponse("Enrollment dropped successfully");
     }
 }

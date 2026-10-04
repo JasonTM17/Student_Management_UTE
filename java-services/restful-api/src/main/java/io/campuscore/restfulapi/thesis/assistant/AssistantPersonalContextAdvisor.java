@@ -70,14 +70,24 @@ public class AssistantPersonalContextAdvisor {
     /** Enrollment statuses that still bind a seat, matching the web portal. */
     private static final Set<String> ACTIVE_ENROLLMENT_STATUSES = Set.of("ENROLLED", "CONFIRMED", "PENDING");
 
+    // Precompiled day detectors — detectRequestedDay ran on every personal
+    // question and recompiled ~7 patterns each call (audit S8).
+    private static final Pattern DAY_1 = Pattern.compile("chủ\\s*nhật|chu\\s*nhat|\\bcn\\b|sunday", Pattern.CASE_INSENSITIVE);
+    private static final Pattern DAY_2 = Pattern.compile("thứ\\s*(?:hai|2)|\\bt2\\b|monday", Pattern.CASE_INSENSITIVE);
+    private static final Pattern DAY_3 = Pattern.compile("thứ\\s*(?:ba|3)|\\bt3\\b|tuesday", Pattern.CASE_INSENSITIVE);
+    private static final Pattern DAY_4 = Pattern.compile("thứ\\s*(?:tư|bốn|4)|\\bt4\\b|wednesday", Pattern.CASE_INSENSITIVE);
+    private static final Pattern DAY_5 = Pattern.compile("thứ\\s*(?:năm|5)|\\bt5\\b|thursday", Pattern.CASE_INSENSITIVE);
+    private static final Pattern DAY_6 = Pattern.compile("thứ\\s*(?:sáu|6)|\\bt6\\b|friday", Pattern.CASE_INSENSITIVE);
+    private static final Pattern DAY_7 = Pattern.compile("thứ\\s*(?:bảy|7)|\\bt7\\b|saturday", Pattern.CASE_INSENSITIVE);
+
     /**
      * Thesis group size requirement. Mirrors the private
      * {@code ThesisMutationService.MIN_GROUP_MEMBERS}/{@code MAX_GROUP_MEMBERS}
-     * (thesis/service/ThesisMutationService.java:44-45) and the same 3–4 band
+     * (thesis/service/ThesisMutationService.java:44-45) and the same 1–3 band
      * the progress read path flags as {@code GROUP_INVALID_MEMBER_COUNT}.
      */
-    private static final int GROUP_MIN_MEMBERS = 3;
-    private static final int GROUP_MAX_MEMBERS = 4;
+    private static final int GROUP_MIN_MEMBERS = 1;
+    private static final int GROUP_MAX_MEMBERS = 3;
 
     private static final Pattern SCHEDULE_INTENT = Pattern.compile(
             "lịch\\s*(?:học|dạy|giảng\\s*dạy|tuần|hôm\\s*nay|ngày\\s*mai|của\\s*tôi|thứ\\s*[2-7]|thứ\\s*(?:hai|ba|tư|bốn|năm|sáu|bảy)|chủ\\s*nhật|t[2-7]|cn)"
@@ -434,7 +444,24 @@ public class AssistantPersonalContextAdvisor {
             Pattern.CASE_INSENSITIVE | Pattern.UNICODE_CASE);
 
     private static boolean isConductIntent(String message) {
-        return StringUtils.hasText(message) && CONDUCT_INTENT.matcher(message).find();
+        if (!StringUtils.hasText(message)) return false;
+        // Normative wording ("Quy định tính điểm rèn luyện như thế nào?",
+        // "thang điểm rèn luyện gồm bao nhiêu mức?", "kỷ luật trừ mấy điểm")
+        // asks the RULE, not the asker's record — the corpus answers it, and
+        // intercepting would either deny the asker a profile they may not
+        // have or serve personal data for a policy question.
+        if (WORDING_POLICY_INTENT.matcher(message).find()
+                || ENROLLMENT_HOWTO_INTENT.matcher(message).find()
+                || Pattern.compile("tiêu\\s*chí|tieu\\s*chi|\\bthang\\b|cách\\s*tính|cach\\s*tinh"
+                                + "|tính\\s*theo|tinh\\s*theo|công\\s*thức|cong\\s*thuc"
+                                + "|(?:mấy|may|bao\\s*nhiêu|bao\\s*nhieu)\\s*(?:loại|mức|loai|muc)"
+                                + "|xếp\\s*loại[^?!.]{0,20}(?:gồm|bao\\s*nhiêu|bao\\s*nhieu|mấy|may)"
+                                + "|kỷ\\s*luật|ky\\s*luat|vi\\s*phạm|vi\\s*pham|nội\\s*quy|noi\\s*quy"
+                                + "|trừ\\s*điểm|tru\\s*diem|trừ\\s*mấy|tru\\s*may",
+                        Pattern.CASE_INSENSITIVE | Pattern.UNICODE_CASE).matcher(message).find()) {
+            return false;
+        }
+        return CONDUCT_INTENT.matcher(message).find();
     }
 
     /** First-person listing of the asker's own current class sections. */
@@ -527,6 +554,20 @@ public class AssistantPersonalContextAdvisor {
     /** "Lớp SE013 học phòng nào, giờ nào?" — a concrete section code plus room/time wording. */
     private static boolean isSectionDetailIntent(String message) {
         if (!StringUtils.hasText(message)) return false;
+        // "Quy định sĩ số phòng học lớp SE013?" is a rule question that happens
+        // to carry a code — keep it on the knowledge path. How-to wording
+        // ("Cách đổi phòng học cho lớp SE013?", "Thủ tục mượn phòng lớp SE013")
+        // likewise asks a procedure, not the section's schedule — the catalog
+        // half of this answer would silently ignore the actual question.
+        if (WORDING_POLICY_INTENT.matcher(message).find()
+                // "thế nào" alone stays eligible — "Lịch của lớp SE015 thế
+                // nào?" asks the schedule, not a procedure. Only explicit
+                // procedure wording re-routes the question to the corpus.
+                || Pattern.compile("cách|cach|làm\\s*sao|lam\\s*sao|hướng\\s*dẫn|huong\\s*dan"
+                                + "|thủ\\s*tục|thu\\s*tuc|làm\\s*thế\\s*nào\\s*để|lam\\s*the\\s*nao\\s*de",
+                        Pattern.CASE_INSENSITIVE | Pattern.UNICODE_CASE).matcher(message).find()) {
+            return false;
+        }
         return SECTION_CODE.matcher(message).find()
                 && SECTION_DETAIL_HINT.matcher(message).find();
     }
@@ -582,13 +623,49 @@ public class AssistantPersonalContextAdvisor {
 
     /** "…đủ 143 tín chỉ tốt nghiệp?" — carries the graduation requirement number in the sentence. */
     private static boolean isGraduationCreditsIntent(String message) {
-        return StringUtils.hasText(message) && GRADUATION_CREDITS_INTENT.matcher(message).find();
+        if (!StringUtils.hasText(message)) return false;
+        // "Theo quy chế cần đủ 143 tín chỉ tốt nghiệp phải không?" asks the
+        // RULE itself — policy/how-to wording stays on the knowledge path even
+        // though the requirement number is present.
+        if (WORDING_POLICY_INTENT.matcher(message).find()
+                || ENROLLMENT_HOWTO_INTENT.matcher(message).find()) {
+            return false;
+        }
+        // Yes/no rule checks and bare requirement restatements ("Sinh viên
+        // cần đủ 130 tín chỉ mới được tốt nghiệp đúng không?") quote the
+        // number without asking about the asker's gap — a personal-credit
+        // answer would report THEIR shortfall to a question that only wants
+        // the rule confirmed. Only first-person or gap wording ("còn thiếu",
+        // "still need") routes to the personal record.
+        if (Pattern.compile("đúng\\s*không|dung\\s*khong|phải\\s*không|phai\\s*khong|có\\s*đúng|co\\s*dung"
+                        + "|right\\??\\s*$|correct\\??\\s*$",
+                Pattern.CASE_INSENSITIVE | Pattern.UNICODE_CASE).matcher(message).find()) {
+            return false;
+        }
+        if (!FIRST_PERSON_PRONOUN.matcher(message).find()
+                && !Pattern.compile("còn\\s*thiếu|con\\s*thieu|còn\\s*bao\\s*nhiêu|con\\s*bao\\s*nhieu"
+                                + "|thiếu|thieu|remaining|still\\s+need|how\\s+many\\s+more",
+                        Pattern.CASE_INSENSITIVE | Pattern.UNICODE_CASE).matcher(message).find()) {
+            return false;
+        }
+        return GRADUATION_CREDITS_INTENT.matcher(message).find();
     }
 
     private static final String[] DAY_LABELS_VI =
             {"", "Chủ Nhật", "Thứ Hai", "Thứ Ba", "Thứ Tư", "Thứ Năm", "Thứ Sáu", "Thứ Bảy"};
     private static final String[] DAY_LABELS_EN =
             {"", "Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"};
+
+    /**
+     * Canonical storage is Sunday=1..Saturday=7. A legacy {@code 0} row is the
+     * JS {@code getDay()} convention (0=Sunday) — the weekly grid already maps
+     * it to Sunday (weekly-grid.ts), so normalizing it to 7 here would answer
+     * Saturday for a day the UI renders as Sunday. Out-of-range values are
+     * clamped so a malformed row cannot throw ArrayIndexOutOfBounds mid-answer.
+     */
+    private static int normalizeDayOfWeek(int dayOfWeek) {
+        return Math.max(1, Math.min(7, dayOfWeek == 0 ? 1 : dayOfWeek));
+    }
 
     private final AcademicEnrollmentReadService enrollments;
     private final AcademicSectionReadService sections;
@@ -723,18 +800,34 @@ public class AssistantPersonalContextAdvisor {
             degraded = true;
         }
         sink.accept(new ThesisAssistantService.StreamMeta(
-                UUID.randomUUID(), request.clientRequestId(), null, null, MODEL, locale));
+                UUID.randomUUID(), request.clientRequestId(), null, uuidOrNull(response == null ? null : response.conversationId()),
+                MODEL, locale));
         sink.accept(new ThesisAssistantService.StreamReplace(answer, List.of(), reasonCode));
-        sink.accept(new ThesisAssistantService.StreamDone(null, reasonCode, degraded, "COMPLETED"));
+        sink.accept(new ThesisAssistantService.StreamDone(uuidOrNull(response == null ? null : response.messageId()),
+                reasonCode, degraded, "COMPLETED"));
+    }
+
+    private static UUID uuidOrNull(String value) {
+        if (value == null || value.isBlank()) {
+            return null;
+        }
+        try {
+            return UUID.fromString(value);
+        } catch (IllegalArgumentException exception) {
+            return null;
+        }
     }
 
     private String composeAnswer(Jwt actor, String locale, String message) {
         if (isThesisPersonalIntent(message)) {
             String lecturerId = claim(actor, "lecturerId");
+            String studentId = claim(actor, "studentId");
+            if (!StringUtils.hasText(lecturerId) && !StringUtils.hasText(studentId)) {
+                return noPersonalContextMessage(locale);
+            }
             if (StringUtils.hasText(lecturerId) && lecturerWorkload != null) {
                 return lecturerThesisAnswer(lecturerId, locale);
             }
-            String studentId = claim(actor, "studentId");
             if (StringUtils.hasText(studentId) && jdbc != null) {
                 return studentThesisAnswer(studentId, locale);
             }
@@ -749,87 +842,95 @@ public class AssistantPersonalContextAdvisor {
         // only catches DataAccessException, so that 403 would escape as an
         // HTTP error for an innocent question.
         if (isLecturerWorkloadIntent(message)) {
-            if (StringUtils.hasText(lecturerId) && lecturerWorkload != null) {
-                // Identity phrasing gets a named roster, not the count
-                // boilerplate the generic supervision answer prints
-                // (audit giang-vien Q5).
-                if (isAdviseeRosterIntent(message) && jdbc != null) {
-                    return adviseeRosterAnswer(lecturerId, locale);
-                }
-                return lecturerThesisAnswer(lecturerId, locale);
+            if (!StringUtils.hasText(lecturerId)) {
+                // Claim missing (a student or admin asking about supervision):
+                // answer honestly rather than letting the corpus fabricate a
+                // workload-shaped reply. A present claim with a missing
+                // service still falls through to RAG as before.
+                return noPersonalContextMessage(locale);
             }
-            return null;
+            if (lecturerWorkload == null) {
+                return null;
+            }
+            // Identity phrasing gets a named roster, not the count
+            // boilerplate the generic supervision answer prints
+            // (audit giang-vien Q5).
+            if (isAdviseeRosterIntent(message) && jdbc != null) {
+                return adviseeRosterAnswer(lecturerId, locale);
+            }
+            return lecturerThesisAnswer(lecturerId, locale);
         }
         if (isLecturerTeachingCreditsIntent(message)) {
-            if (StringUtils.hasText(lecturerId) && sections != null) {
-                return lecturerTeachingCreditsAnswer(lecturerId, locale);
+            if (!StringUtils.hasText(lecturerId)) {
+                return noPersonalContextMessage(locale);
             }
-            return null;
+            return sections == null ? null : lecturerTeachingCreditsAnswer(lecturerId, locale);
         }
         if (isLecturerGradingIntent(message)) {
-            if (StringUtils.hasText(lecturerId) && sections != null) {
-                return lecturerGradingAnswer(lecturerId, locale);
+            if (!StringUtils.hasText(lecturerId)) {
+                return noPersonalContextMessage(locale);
             }
-            return null;
+            return sections == null ? null : lecturerGradingAnswer(lecturerId, locale);
         }
         if (isAttendanceIntent(message)) {
-            if (StringUtils.hasText(lecturerId) && academicAttendance != null) {
-                return lecturerAttendanceAnswer(lecturerId, locale, message);
+            if (!StringUtils.hasText(lecturerId)) {
+                return noPersonalContextMessage(locale);
             }
-            return null;
+            return academicAttendance == null ? null : lecturerAttendanceAnswer(lecturerId, locale, message);
         }
         if (isGraduationCreditsIntent(message)) {
             // The graduation-credit gap is student-owned; without a student
-            // profile the question falls back to the knowledge path.
-            if (StringUtils.hasText(studentId)) {
-                return graduationCreditsAnswer(studentId, locale, message);
+            // profile claim the honest answer beats a corpus guess.
+            if (!StringUtils.hasText(studentId)) {
+                return noPersonalContextMessage(locale);
             }
-            return null;
+            return graduationCreditsAnswer(studentId, locale, message);
         }
         if (isConductIntent(message)) {
-            // Conduct summaries are student-owned; staff questions fall through to RAG policy answers.
-            if (StringUtils.hasText(studentId) && conductService != null) {
-                return conductAnswer(studentId, locale);
+            if (!StringUtils.hasText(studentId)) {
+                return noPersonalContextMessage(locale);
             }
-            return null;
+            return conductService == null ? null : conductAnswer(studentId, locale);
         }
         if (isCreditsRemainingIntent(message)) {
-            // The registration budget is student-owned; without the summary read
-            // path (or a profile) the question falls back to the knowledge path.
-            if (StringUtils.hasText(studentId) && registrationService != null) {
-                return creditsRemainingAnswer(studentId, locale);
+            // The registration budget is student-owned; without a profile
+            // claim the honest answer stands — a missing read path still
+            // falls back to the knowledge path.
+            if (!StringUtils.hasText(studentId)) {
+                return noPersonalContextMessage(locale);
             }
-            return null;
+            return registrationService == null ? null : creditsRemainingAnswer(studentId, locale);
         }
         if (isCreditsAccumulatedIntent(message)) {
             // Accumulated credits are the transcript summary's earned total —
             // best attempt per course — answered from the same read path the
             // transcript page uses (audit ca-nhan Q11: the question fell to
             // the credit-limit regulation instead).
-            if (StringUtils.hasText(studentId)) {
-                return accumulatedCreditsAnswer(studentId, locale);
+            if (!StringUtils.hasText(studentId)) {
+                return noPersonalContextMessage(locale);
             }
-            return null;
+            return accumulatedCreditsAnswer(studentId, locale);
         }
         if (isPendingGradesIntent(message)) {
-            if (StringUtils.hasText(studentId)) {
-                return pendingGradesAnswer(studentId, locale);
+            if (!StringUtils.hasText(studentId)) {
+                return noPersonalContextMessage(locale);
             }
-            return null;
+            return pendingGradesAnswer(studentId, locale);
         }
         if (isSectionDetailIntent(message)) {
             // Section room/time lookups are answered from the student's own
-            // registered sections first, then the published catalog.
-            if (StringUtils.hasText(studentId)) {
-                return sectionDetailAnswer(studentId, locale, message);
-            }
-            return null;
+            // registered sections first, then the published catalog. The
+            // catalog half is public data — a claim-missing actor (admin,
+            // lecturer, unlinked account) still gets it instead of a bare
+            // "no profile" denial.
+            return sectionDetailAnswer(StringUtils.hasText(studentId) ? studentId : null,
+                    locale, message);
         }
         if (isGradesIntent(message)) {
-            if (StringUtils.hasText(studentId)) {
-                return gradesAnswer(studentId, locale, message);
+            if (!StringUtils.hasText(studentId)) {
+                return noPersonalContextMessage(locale);
             }
-            return null;
+            return gradesAnswer(studentId, locale, message);
         }
         // Production audit Q2/Q6: "Hôm nay tôi có lớp (học) không?" reads as an
         // enrollment-list question (lớp + interrogative) but it is a
@@ -850,7 +951,7 @@ public class AssistantPersonalContextAdvisor {
             if (StringUtils.hasText(lecturerId) && sections != null) {
                 return lecturerAnswer(lecturerId, locale, existenceDay);
             }
-            return null;
+            return StringUtils.hasText(lecturerId) ? null : noPersonalContextMessage(locale);
         }
         // A first-person course question can also ask for the timetable:
         // "Tuần này tôi học những môn nào, ở phòng nào?" has no "lịch" noun.
@@ -890,7 +991,9 @@ public class AssistantPersonalContextAdvisor {
         if (StringUtils.hasText(lecturerId)) {
             return lecturerAnswer(lecturerId, locale, requestedDay);
         }
-        return null;
+        // No profile claim at all: answer honestly instead of falling through
+        // to a corpus reply that fabricates a personal-looking schedule.
+        return noPersonalContextMessage(locale);
     }
 
     /**
@@ -919,7 +1022,8 @@ public class AssistantPersonalContextAdvisor {
         // old all-rows accumulation counted retaken courses twice (57 credits / GPA
         // 3.07 vs the portal's 38 / 3.11) and contradicted the transcript page
         // the student sees side by side (production audit ca-nhan Q5, high).
-        TranscriptResponse transcript = enrollments.findStudentTranscript(studentId);
+        // Reuse the grade rows fetched above instead of re-running the query.
+        TranscriptResponse transcript = enrollments.findStudentTranscript(studentId, grades);
         TranscriptSummary cumulative = transcript == null ? null : transcript.summary();
         boolean fromTranscriptSummary = cumulative != null;
         if (cumulative == null) {
@@ -1422,7 +1526,9 @@ public class AssistantPersonalContextAdvisor {
             }
             String name = memberName(row);
             String studentNumber = text(row, "student_number");
-            String label = firstText(name, firstText(studentNumber, text(row, "student_id")));
+            // Never fall back to the raw internal student_id here either:
+            // internal identifiers are not user-facing copy.
+            String label = firstText(name, studentNumber);
             if (!StringUtils.hasText(label)) {
                 continue;
             }
@@ -1483,9 +1589,14 @@ public class AssistantPersonalContextAdvisor {
             return null;
         }
         String code = matcher.group();
-        List<EnrollmentResponse> active = enrollments.findStudentEnrollments(studentId, null).stream()
-                .filter(item -> ACTIVE_ENROLLMENT_STATUSES.contains(item.status()))
-                .toList();
+        // A null studentId (admin/lecturer/unlinked account) skips the
+        // registered-sections lookup; the published catalog below still
+        // answers. A missing enrollments read path does the same.
+        List<EnrollmentResponse> active = (studentId == null || enrollments == null)
+                ? List.of()
+                : enrollments.findStudentEnrollments(studentId, null).stream()
+                        .filter(item -> ACTIVE_ENROLLMENT_STATUSES.contains(item.status()))
+                        .toList();
         List<EnrollmentResponse> currentTerm = currentTermEnrollments(active);
         EnrollmentResponse registered = matchByCode(currentTerm, code)
                 .or(() -> matchByCode(active, code))
@@ -1517,7 +1628,7 @@ public class AssistantPersonalContextAdvisor {
                     .sorted(Comparator.comparingInt(SectionScheduleResponse::dayOfWeek)
                             .thenComparing(SectionScheduleResponse::startTime))
                     .forEach(schedule -> {
-                        int day = schedule.dayOfWeek() == 0 ? 7 : schedule.dayOfWeek();
+                        int day = normalizeDayOfWeek(schedule.dayOfWeek());
                         answer.append("\n• ").append((vi ? DAY_LABELS_VI : DAY_LABELS_EN)[day])
                                 .append(" ").append(schedule.startTime()).append("-").append(schedule.endTime());
                         if (schedule.classroom() != null) {
@@ -1555,7 +1666,11 @@ public class AssistantPersonalContextAdvisor {
                         + " LEFT JOIN academic.\"SectionSchedule\" schedule ON schedule.\"sectionId\" = section.\"id\""
                         + " LEFT JOIN academic.\"Classroom\" classroom ON classroom.\"id\" = schedule.\"classroomId\""
                         + " WHERE section.\"status\" <> 'ARCHIVED'"
-                        + " AND (UPPER(course.\"code\") = :code OR UPPER(section.\"sectionNumber\") IN (:code, :codePrefix))",
+                        // codePrefix needs LIKE: "%" inside an IN list is a
+                        // literal, so "SE401-%" used to match nothing and the
+                        // bot denied existing sections like "SE401-01".
+                        + " AND (UPPER(course.\"code\") = :code OR UPPER(section.\"sectionNumber\") = :code"
+                        + " OR UPPER(section.\"sectionNumber\") LIKE :codePrefix)",
                 new MapSqlParameterSource()
                         .addValue("code", code)
                         .addValue("codePrefix", code + "-%"));
@@ -1574,18 +1689,24 @@ public class AssistantPersonalContextAdvisor {
         if (StringUtils.hasText(courseName)) {
             answer.append(" — ").append(courseName);
         }
+        // Without a student profile there is no registration state to compare
+        // against, so the copy stays neutral about enrollment.
         answer.append(vi
-                ? " có trong danh mục, nhưng bạn chưa đăng ký lớp này.\n\nLịch học được công bố:"
-                : " exists in the catalog, but you are not registered in it.\n\nPublished schedule:");
+                ? (studentId == null
+                        ? " có trong danh mục học phần.\n\nLịch học được công bố:"
+                        : " có trong danh mục, nhưng bạn chưa đăng ký lớp này.\n\nLịch học được công bố:")
+                : (studentId == null
+                        ? " exists in the course catalog.\n\nPublished schedule:"
+                        : " exists in the catalog, but you are not registered in it.\n\nPublished schedule:"));
         boolean hasSchedule = false;
         for (Map<String, Object> row : catalogRows) {
             Object day = row.get("schedule_day");
-            if (day == null) {
+            if (!(day instanceof Number)) {
                 continue;
             }
             hasSchedule = true;
             int dayNumber = ((Number) day).intValue();
-            answer.append("\n• ").append((vi ? DAY_LABELS_VI : DAY_LABELS_EN)[dayNumber == 0 ? 7 : dayNumber])
+            answer.append("\n• ").append((vi ? DAY_LABELS_VI : DAY_LABELS_EN)[normalizeDayOfWeek(dayNumber)])
                     .append(" ").append(text(row, "schedule_start")).append("-").append(text(row, "schedule_end"));
             String room = trimJoin(text(row, "room_building"), text(row, "room_number"));
             if (StringUtils.hasText(room)) {
@@ -1856,7 +1977,7 @@ public class AssistantPersonalContextAdvisor {
         // Same best-attempt-per-course basis as the grades answer and the
         // transcript page: graduation progress must never count a retake
         // twice against the degree total (audit ca-nhan Q5 high finding).
-        TranscriptResponse transcript = enrollments.findStudentTranscript(studentId);
+        TranscriptResponse transcript = enrollments.findStudentTranscript(studentId, grades);
         TranscriptSummary transcriptSummary = transcript == null ? null : transcript.summary();
         int earned;
         if (transcriptSummary != null) {
@@ -1953,6 +2074,9 @@ public class AssistantPersonalContextAdvisor {
             String rejectionReason = text(row, "rejection_reason");
             String leaderStudentId = text(row, "leader_student_id");
             Object finalScore = row.get("final_score");
+            // Scores are only visible after the faculty publishes results; the
+            // chatbot must mirror the portal's pre-publish masking.
+            boolean resultsPublished = "RESULTS_PUBLISHED".equals(text(row, "round_status"));
 
             answer.append("\n• ").append(StringUtils.hasText(roundName) ? roundName : (vi ? "Đợt khóa luận" : "Thesis Round"));
             if (StringUtils.hasText(topicTitle)) {
@@ -2023,7 +2147,7 @@ public class AssistantPersonalContextAdvisor {
                     answer.append(vi ? " — lý do: " : " — reason: ").append(rejectionReason);
                 }
             }
-            if (finalScore != null) {
+            if (finalScore != null && resultsPublished) {
                 answer.append(vi ? "\n  - Điểm tổng kết: " : "\n  - Final score: ").append(finalScore);
             }
             answer.append("\n");
@@ -2230,10 +2354,17 @@ public class AssistantPersonalContextAdvisor {
 
     /**
      * The latest-semester slice of the active enrollments — the same
-     * current-semester selection the personal timetable uses.
+     * current-semester selection the personal timetable uses. The semester is
+     * chosen from FIRM enrollments (ENROLLED/CONFIRMED) when present: a
+     * PENDING next-semester pre-registration otherwise hijacks the selection
+     * and the bot reports next term's timetable as today's (audit C3).
      */
     private static List<EnrollmentResponse> currentTermEnrollments(List<EnrollmentResponse> active) {
-        Instant currentTermStart = active.stream()
+        List<EnrollmentResponse> firm = active.stream()
+                .filter(item -> "ENROLLED".equals(item.status()) || "CONFIRMED".equals(item.status()))
+                .toList();
+        List<EnrollmentResponse> basis = firm.isEmpty() ? active : firm;
+        Instant currentTermStart = basis.stream()
                 .map(item -> item.section() != null && item.section().semester() != null
                         ? item.section().semester().startDate()
                         : null)
@@ -2278,10 +2409,10 @@ public class AssistantPersonalContextAdvisor {
     private String timetableAnswer(List<Slot> slots, String termName, String locale, Integer requestedDay, boolean isLecturer) {
         boolean vi = "vi".equals(locale);
         if (requestedDay != null) {
-            int targetDay = requestedDay == 0 ? 7 : requestedDay;
+            int targetDay = normalizeDayOfWeek(requestedDay);
             String dayLabel = (vi ? DAY_LABELS_VI : DAY_LABELS_EN)[targetDay];
             List<Slot> daySlots = slots.stream()
-                    .filter(s -> (s.dayOfWeek() == 0 ? 7 : s.dayOfWeek()) == targetDay)
+                    .filter(s -> normalizeDayOfWeek(s.dayOfWeek()) == targetDay)
                     .sorted(Comparator.comparing(Slot::startTime))
                     .toList();
 
@@ -2347,7 +2478,7 @@ public class AssistantPersonalContextAdvisor {
                         .comparingInt(Slot::dayOfWeek)
                         .thenComparing(Slot::startTime))
                 .forEach(slot -> {
-                    int day = slot.dayOfWeek() == 0 ? 7 : slot.dayOfWeek();
+                    int day = normalizeDayOfWeek(slot.dayOfWeek());
                     String dayLabel = (vi ? DAY_LABELS_VI : DAY_LABELS_EN)[day];
                     answer.append("\n• ").append(dayLabel)
                             .append(" ").append(slot.startTime()).append("-").append(slot.endTime());
@@ -2378,13 +2509,13 @@ public class AssistantPersonalContextAdvisor {
             return dow == java.time.DayOfWeek.SUNDAY ? 1 : dow.getValue() + 1;
         }
 
-        if (Pattern.compile("thứ\\s*(?:hai|2)|\\bt2\\b|monday", Pattern.CASE_INSENSITIVE).matcher(lower).find()) return 2;
-        if (Pattern.compile("thứ\\s*(?:ba|3)|\\bt3\\b|tuesday", Pattern.CASE_INSENSITIVE).matcher(lower).find()) return 3;
-        if (Pattern.compile("thứ\\s*(?:tư|bốn|4)|\\bt4\\b|wednesday", Pattern.CASE_INSENSITIVE).matcher(lower).find()) return 4;
-        if (Pattern.compile("thứ\\s*(?:năm|5)|\\bt5\\b|thursday", Pattern.CASE_INSENSITIVE).matcher(lower).find()) return 5;
-        if (Pattern.compile("thứ\\s*(?:sáu|6)|\\bt6\\b|friday", Pattern.CASE_INSENSITIVE).matcher(lower).find()) return 6;
-        if (Pattern.compile("thứ\\s*(?:bảy|7)|\\bt7\\b|saturday", Pattern.CASE_INSENSITIVE).matcher(lower).find()) return 7;
-        if (Pattern.compile("chủ\\s*nhật|chu\\s*nhat|\\bcn\\b|sunday", Pattern.CASE_INSENSITIVE).matcher(lower).find()) return 1;
+        if (DAY_2.matcher(lower).find()) return 2;
+        if (DAY_3.matcher(lower).find()) return 3;
+        if (DAY_4.matcher(lower).find()) return 4;
+        if (DAY_5.matcher(lower).find()) return 5;
+        if (DAY_6.matcher(lower).find()) return 6;
+        if (DAY_7.matcher(lower).find()) return 7;
+        if (DAY_1.matcher(lower).find()) return 1;
 
         return null;
     }
@@ -2434,6 +2565,12 @@ public class AssistantPersonalContextAdvisor {
         return "vi".equals(locale)
                 ? "Mình chưa xem được dữ liệu cá nhân của bạn lúc này. Bạn thử lại sau, hoặc mở trang Thời khóa biểu / Bảng điểm để xem trực tiếp nhé."
                 : "I could not read your personal records right now. Please try again later, or check the Schedule / Grades pages directly.";
+    }
+
+    private static String noPersonalContextMessage(String locale) {
+        return "vi".equals(locale)
+                ? "Câu hỏi này cần dữ liệu cá nhân (thời khóa biểu, điểm, nhóm luận văn…), nhưng tài khoản của bạn chưa gắn hồ sơ sinh viên hay giảng viên tương ứng nên mình không tra được. Nếu bạn nghĩ đây là nhầm lẫn, hãy liên hệ Phòng Đào tạo nhé."
+                : "This question needs personal data (timetable, grades, thesis group…), but your account has no matching student or lecturer profile, so I cannot look it up. If you believe this is a mistake, please contact the Academic Affairs Office.";
     }
 
     private static String normalizedLocale(ChatRequest request) {

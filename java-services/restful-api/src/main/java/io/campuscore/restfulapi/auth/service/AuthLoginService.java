@@ -6,6 +6,7 @@ import io.campuscore.restfulapi.auth.web.AuthDtos.AuthUserResponse;
 import io.campuscore.restfulapi.auth.web.AuthDtos.LoginResponse;
 import io.campuscore.restfulapi.auth.web.AuthDtos.UpdateProfileRequest;
 import io.campuscore.restfulapi.exception.AppException;
+import io.campuscore.restfulapi.web.DomainException;
 import io.campuscore.restfulapi.security.AuthPrincipal;
 import io.campuscore.restfulapi.security.AuthTokenService;
 import io.campuscore.restfulapi.security.AuthTokenService.IssuedAccessToken;
@@ -234,7 +235,10 @@ public class AuthLoginService {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "New password must contain at least 8 characters");
         }
         if (!passwordEncoder.matches(oldPassword, user.passwordHash())) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid old password");
+            // A stable code lets the profile form say "current password is
+            // wrong" instead of the generic HTTP_400 validation copy.
+            throw new DomainException(HttpStatus.BAD_REQUEST, "INVALID_OLD_PASSWORD",
+                    "Current password is incorrect");
         }
 
         users.changePassword(user.id(), passwordEncoder.encode(newPassword), clock.instant());

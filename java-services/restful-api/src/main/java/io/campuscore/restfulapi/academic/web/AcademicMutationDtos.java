@@ -20,9 +20,14 @@ public final class AcademicMutationDtos {
     public record GradeUpdateRequest(@NotEmpty List<@Valid GradeUpdate> grades) {
     }
 
+    /**
+     * Both scores null clears the saved draft grade (a mistaken entry must be
+     * removable); one null + one value is rejected in the service because a
+     * half score cannot produce a final mark.
+     */
     public record GradeUpdate(
             @NotBlank String enrollmentId,
-            @NotNull @DecimalMin("0.0") @DecimalMax("10.0") BigDecimal processScore,
-            @NotNull @DecimalMin("0.0") @DecimalMax("10.0") BigDecimal finalExamScore) {
+            @DecimalMin("0.0") @DecimalMax("10.0") BigDecimal processScore,
+            @DecimalMin("0.0") @DecimalMax("10.0") BigDecimal finalExamScore) {
     }
 }

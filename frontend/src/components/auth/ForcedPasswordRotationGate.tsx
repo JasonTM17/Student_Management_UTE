@@ -98,7 +98,7 @@ export function ForcedPasswordRotationGate() {
       <div className="space-y-5">
         <p className="flex items-center gap-2 rounded-lg bg-secondary/40 px-3 py-2 text-xs text-muted-foreground">
           <ShieldCheck className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
-          {user.email}
+          <span className="min-w-0 break-all">{user.email}</span>
         </p>
 
         <form onSubmit={handleSubmit} className="space-y-4" noValidate>

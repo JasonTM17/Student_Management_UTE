@@ -169,6 +169,36 @@ class ThesisAssistantServiceTest {
     }
 
     @Test
+    void ambiguousFoldedPhrasesDoNotAdmitUnrelatedAccentedQueries() {
+        // Accent folding maps "đồ ăn" (food) onto the thesis key "do an" — a
+        // food question used to pass the gate and cite the thesis corpus.
+        assertFalse(ThesisAssistantService.hasPublicScopeSignal("Đồ ăn gì ngon hôm nay?"));
+        assertFalse(ThesisAssistantService.hasPublicScopeSignal("Kết quả xổ số hôm qua là gì?"));
+        assertFalse(ThesisAssistantService.hasPublicScopeSignal("Bảo vệ môi trường cần làm gì?"));
+        assertFalse(ThesisAssistantService.hasPublicScopeSignal("Giấy tờ xe máy gồm những gì?"));
+        assertFalse(ThesisAssistantService.hasPublicScopeSignal("Cảnh báo lũ lụt mới nhất?"));
+        assertFalse(ThesisAssistantService.hasPublicScopeSignal("Xếp loại phim này thế nào?"));
+        // The accented academic forms still pass, and a mixed question that
+        // genuinely mentions the academic term keeps its scope.
+        assertTrue(ThesisAssistantService.hasPublicScopeSignal("Đồ án tốt nghiệp gồm mấy người?"));
+        assertTrue(ThesisAssistantService.hasPublicScopeSignal("Kết quả học tập kỳ này ra chưa?"));
+        assertTrue(ThesisAssistantService.hasPublicScopeSignal("Bảo vệ khóa luận khi nào?"));
+        assertTrue(ThesisAssistantService.hasPublicScopeSignal("Xếp loại tốt nghiệp theo gì?"));
+        assertTrue(ThesisAssistantService.hasPublicScopeSignal("Cảnh báo học vụ là gì?"));
+        // Unaccented input cannot be disambiguated — it keeps the benefit of
+        // the doubt instead of being refused outright.
+        assertTrue(ThesisAssistantService.hasPublicScopeSignal("do an tot nghiep gom may nguoi?"));
+    }
+
+    @Test
+    void ambiguousAliasExpansionDoesNotInjectUnrelatedAcademicTerms() {
+        // Retrieval must not inject "đồ án" into a food question even when the
+        // caller reached the gate through another signal.
+        assertFalse(ThesisAssistantService.retrievalTerms("Đồ ăn gì ngon hôm nay?").contains("đồ án"));
+        assertTrue(ThesisAssistantService.retrievalTerms("Đồ án tốt nghiệp gồm mấy người?").contains("đồ án"));
+    }
+
+    @Test
     void technicalQuestionsAreRejectedBeforeKnowledgeLookup() {
         ThesisAssistantKnowledgeRepository knowledge = mock(ThesisAssistantKnowledgeRepository.class);
 
@@ -245,14 +275,18 @@ class ThesisAssistantServiceTest {
         var unrelated = new ThesisAssistantKnowledgeRepository.KnowledgeDocument(
                 "policy", "policy-deadline", "en", "General policy", "General classes and enrollment deadline information.",
                 "registrar", "POLICY", UUID.randomUUID(), 1);
+        // Real retrieval orders by lexical score per locale; the mocks below
+        // mirror that shape so the corroboration gate sees the same top
+        // document production would.
         var registration = new ThesisAssistantKnowledgeRepository.KnowledgeDocument(
-                "registration", "registration-window-en", "en", "Registration window",
-                "Check the active registration window and the add/drop period before enrolling in a course.",
-                "registrar", "REGISTRATION", UUID.randomUUID(), 1);
+                "registration", "registration-window-en", "en", "Course registration window",
+                "Check the active registration window, enroll in a course or section, "
+                        + "and use the add drop period for changes.",
+                "registrar", "REGISTRATION", null, null, null, UUID.randomUUID(), 1, null, null, null, 40);
         var registrationVietnamese = new ThesisAssistantKnowledgeRepository.KnowledgeDocument(
                 "registration-vi", "registration-window-vi", "vi", "Đăng ký học phần",
                 "Kiểm tra thời hạn đăng ký học phần trước khi chọn lớp.",
-                "registrar", "REGISTRATION", UUID.randomUUID(), 1);
+                "registrar", "REGISTRATION", null, null, null, UUID.randomUUID(), 1, null, null, null, 40);
         var creditLimitVietnamese = new ThesisAssistantKnowledgeRepository.KnowledgeDocument(
                 "credit-limit-vi", "credit-limit-vi", "vi", "Giới hạn tín chỉ",
                 "Quy chế về rút môn học và giới hạn khối lượng học tập: 1. Rút học phần: "
@@ -260,14 +294,22 @@ class ThesisAssistantServiceTest {
                         + "2. Giới hạn tín chỉ: Mỗi học kỳ chính, sinh viên được đăng ký tối thiểu 14 tín chỉ "
                         + "và tối đa 24 tín chỉ (sinh viên có điểm GPA loại Khá, Giỏi có thể làm đơn xin đăng ký "
                         + "tối đa 28 tín chỉ). Học kỳ phụ được đăng ký tối đa 8 đến 10 tín chỉ.",
-                "registrar", "REGISTRATION", UUID.randomUUID(), 1);
+                "registrar", "REGISTRATION", null, null, null, UUID.randomUUID(), 1, null, null, null, 35);
         var incidentalCreditPolicy = new ThesisAssistantKnowledgeRepository.KnowledgeDocument(
                 "incidental-credit", "incidental-credit", "vi", "Điều kiện bảo vệ khóa luận",
                 "Sinh viên phải tích lũy tối thiểu 75% số tín chỉ của chương trình.",
-                "registrar", "POLICY", UUID.randomUUID(), 1);
-        when(knowledge.search(anyString(), anyList(), anyInt()))
-                .thenReturn(List.of(unrelated, registration, registrationVietnamese, creditLimitVietnamese,
-                        incidentalCreditPolicy));
+                "registrar", "POLICY", null, null, null, UUID.randomUUID(), 1, null, null, null, 8);
+        when(knowledge.search(anyString(), anyList(), anyInt())).thenAnswer(invocation -> {
+            String queryLocale = invocation.getArgument(0);
+            List<String> terms = invocation.getArgument(1);
+            if ("vi".equals(queryLocale)) {
+                if (terms.contains("tín chỉ") || terms.contains("tối đa") || terms.contains("giới hạn")) {
+                    return List.of(creditLimitVietnamese, registrationVietnamese, incidentalCreditPolicy);
+                }
+                return List.of(registrationVietnamese, creditLimitVietnamese, incidentalCreditPolicy);
+            }
+            return List.of(registration, unrelated);
+        });
 
         ChatResponse response = new ThesisAssistantService(knowledge)
                 .answer("When can I enroll in classes?", "en");
@@ -733,7 +775,7 @@ class ThesisAssistantServiceTest {
         var document = new ThesisAssistantKnowledgeRepository.KnowledgeDocument(
                 "66666666-6666-6666-6666-666666666666", "dang-ky-de-tai", "vi",
                 "Điều kiện đăng ký đề tài khóa luận", "Tích lũy tối thiểu 110 tín chỉ để đăng ký đề tài.",
-                "handbook");
+                "handbook", "THESIS", null, null, null, null, null, null, null, null, 60);
         when(knowledge.search(anyString(), anyList(), anyInt())).thenReturn(List.of(document));
 
         ChatResponse response = new ThesisAssistantService(knowledge)
@@ -756,7 +798,8 @@ class ThesisAssistantServiceTest {
                 .groundedFallback("asdkjhaskjdh kjahsdkjh?", "vi");
 
         assertTrue(response.degraded());
-        assertEquals("ANSWERED", response.reasonCode());
+        // Uncited curated fallback must not claim it was answered from approved guidance.
+        assertEquals("NO_MATCH", response.reasonCode());
         assertTrue(response.citations().isEmpty());
         String answer = response.answer();
         assertTrue(answer.contains("Phòng Đào tạo"), answer);
@@ -770,6 +813,27 @@ class ThesisAssistantServiceTest {
             if (line.startsWith("• ")) count++;
         }
         return count;
+    }
+
+    @Test
+    void remoteHealthyNoMatchAnswersHonestlyWithoutTheOutageCopy() {
+        // A healthy remote that found nothing must not produce the "could not
+        // connect to the knowledge base" copy — nothing failed, so the answer
+        // is an honest not-found with degraded=false.
+        ThesisAssistantKnowledgeRepository knowledge = mock(ThesisAssistantKnowledgeRepository.class);
+        when(knowledge.search(anyString(), anyList(), anyInt())).thenReturn(List.of());
+
+        ChatResponse response = new ThesisAssistantService(knowledge)
+                .groundedFallback("asdkjhaskjdh kjahsdkjh?", "vi", false, null, true);
+
+        assertEquals("NO_MATCH", response.reasonCode());
+        org.junit.jupiter.api.Assertions.assertFalse(response.degraded(),
+                "a healthy remote's NO_MATCH is not a degraded outage answer");
+        assertTrue(response.citations().isEmpty());
+        assertTrue(response.answer().contains("chưa tìm thấy"), response.answer());
+        org.junit.jupiter.api.Assertions.assertFalse(response.answer().contains("chưa kết nối"),
+                response.answer());
+        assertTrue(response.answer().contains("Phòng Đào tạo"), response.answer());
     }
 
     @Test
@@ -909,7 +973,8 @@ class ThesisAssistantServiceTest {
 
         ChatResponse general = service.generalAnswerIfOffTopic("Con gà có mấy cái chân", "vi", null, null);
         assertNotNull(general);
-        assertEquals("ANSWERED", general.reasonCode());
+        // Uncited provider answer: must not claim reviewed-guidance provenance.
+        assertEquals("GENERAL_ANSWER", general.reasonCode());
         assertEquals("Con gà có 2 chân.", general.answer());
         assertTrue(general.citations().isEmpty());
         assertFalse(general.degraded());

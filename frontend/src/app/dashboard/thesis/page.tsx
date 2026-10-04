@@ -48,6 +48,7 @@ import { ThesisWorkflowStepper } from '@/components/thesis/ThesisWorkflowStepper
 import { ThesisRegulationGuide } from '@/components/thesis/ThesisRegulationGuide';
 import { RoundMilestoneCard } from '@/components/thesis/RoundMilestoneCard';
 import CouncilDefenseWorkspace from '@/features/thesis/components/CouncilDefenseWorkspace';
+import GvpbReviewPanel from '@/features/thesis/components/GvpbReviewPanel';
 import MetricCard, {
   fillCopy,
   formatReportFileSize,
@@ -216,8 +217,16 @@ export default function ThesisPage() {
   const [councils, setCouncils] = useState<ThesisCouncil[]>([]);
   const [lecturerWorkload, setLecturerWorkload] = useState<ThesisLecturerWorkload | null>(null);
   const [councilScores, setCouncilScores] = useState<Record<string, ThesisCouncilScore[]>>({});
+  // Score-list load failures stay distinguishable from a genuinely empty list
+  // ("0 of N graded" would otherwise mask an outage).
+  const [councilScoreErrors, setCouncilScoreErrors] = useState<Record<string, boolean>>({});
   const [draftScores, setDraftScores] = useState<Record<string, string>>({});
+  const [draftComments, setDraftComments] = useState<Record<string, string>>({});
   const [topicSupervisors, setTopicSupervisors] = useState<Record<string, string[]>>({});
+  // GVPB counter-review state keyed by topic id: the reviewer's own row.
+  const [gvpbScores, setGvpbScores] = useState<Record<string, ThesisCouncilScore | null>>({});
+  const [gvpbDraftScores, setGvpbDraftScores] = useState<Record<string, string>>({});
+  const [gvpbDraftComments, setGvpbDraftComments] = useState<Record<string, string>>({});
   const [supervisedReports, setSupervisedReports] = useState<Record<string, ThesisGroupReport | null>>({});
   const [topicReports, setTopicReports] = useState<Record<string, ThesisGroupReport | null>>({});
 
@@ -253,21 +262,30 @@ export default function ThesisPage() {
       const isMemberOrAdmin = isAdmin || c.members?.some((m) => m.lecturerId === myLecturerId);
       const tids = (c as unknown as { topicIds?: string[] }).topicIds || [];
       for (const tid of tids) {
+        const key = `${c.id}:${tid}`;
         try {
-          const [scores, sups, report] = await Promise.all([
-            isMemberOrAdmin ? thesisApi.listScores(c.id, tid).catch(() => []) : Promise.resolve([]),
+          const [scoresResult, sups, report] = await Promise.all([
+            isMemberOrAdmin
+              ? thesisApi.listScores(c.id, tid).then(
+                  (scores) => ({ scores, failed: false }),
+                  () => ({ scores: [] as ThesisCouncilScore[], failed: true }),
+                )
+              : Promise.resolve({ scores: [] as ThesisCouncilScore[], failed: false }),
             thesisApi.listSupervisors(tid).catch(() => []),
             thesisApi.getTopicReport(tid).catch(() => null),
           ]);
-          const key = `${c.id}:${tid}`;
-          setCouncilScores((prev) => ({ ...prev, [key]: scores }));
+          setCouncilScores((prev) => ({ ...prev, [key]: scoresResult.scores }));
+          setCouncilScoreErrors((prev) => ({ ...prev, [key]: scoresResult.failed }));
           setTopicSupervisors((prev) => ({ ...prev, [tid]: sups.map((s) => s.lecturerId) }));
           if (report) {
             setTopicReports((prev) => ({ ...prev, [tid]: report }));
           }
-          const myScore = scores.find((s) => s.lecturerId === myLecturerId);
+          const myScore = scoresResult.scores.find((s) => s.lecturerId === myLecturerId);
           if (myScore != null) {
             setDraftScores((prev) => ({ ...prev, [key]: String(myScore.score) }));
+            if (myScore.comment) {
+              setDraftComments((prev) => ({ ...prev, [key]: myScore.comment ?? '' }));
+            }
           }
         } catch {
           // ignore
@@ -287,11 +305,24 @@ export default function ThesisPage() {
     setActionError('');
     setActionSuccess('');
     try {
-      await thesisApi.submitScore(councilId, topicId, scoreVal, 'DEFENSE');
+      const comment = (draftComments[key] || '').trim();
+      await thesisApi.submitScore(
+        councilId,
+        topicId,
+        scoreVal,
+        'DEFENSE',
+        comment || undefined,
+      );
       setActionSuccess(messages.thesis.grading.scoreSaved);
       toast.success(messages.thesis.grading.scoreSaved);
-      const scores = await thesisApi.listScores(councilId, topicId);
-      setCouncilScores((prev) => ({ ...prev, [key]: scores }));
+      // A refresh outage must not mask the successful submit.
+      const scores = await thesisApi.listScores(councilId, topicId).catch(() => null);
+      if (scores) {
+        setCouncilScores((prev) => ({ ...prev, [key]: scores }));
+        setCouncilScoreErrors((prev) => ({ ...prev, [key]: false }));
+      } else {
+        setCouncilScoreErrors((prev) => ({ ...prev, [key]: true }));
+      }
     } catch (err: unknown) {
       const code = getThesisErrorCode(err);
       if (code === 'SUPERVISOR_CANNOT_GRADE') {
@@ -316,8 +347,13 @@ export default function ThesisPage() {
       setActionSuccess(msg);
       toast.success(msg);
       const key = `${councilId}:${topicId}`;
-      const scores = await thesisApi.listScores(councilId, topicId);
-      setCouncilScores((prev) => ({ ...prev, [key]: scores }));
+      const scores = await thesisApi.listScores(councilId, topicId).catch(() => null);
+      if (scores) {
+        setCouncilScores((prev) => ({ ...prev, [key]: scores }));
+        setCouncilScoreErrors((prev) => ({ ...prev, [key]: false }));
+      } else {
+        setCouncilScoreErrors((prev) => ({ ...prev, [key]: true }));
+      }
       await refreshTopics(selectedRoundId);
     } catch (err: unknown) {
       const code = getThesisErrorCode(err);
@@ -333,6 +369,79 @@ export default function ThesisPage() {
         setActionError(messages.thesis.actionFailed);
         toast.error(messages.thesis.actionFailed);
       }
+    } finally {
+      setIsActionPending(false);
+    }
+  };
+
+  // ---- GVPB counter-review (the assigned reviewer submits score + comment) ----
+
+  const myReviewTopics = useMemo(
+    () =>
+      isSupervisorOrAdmin && myLecturerId
+        ? topics.filter((t) => t.gvpbLecturerId === myLecturerId)
+        : [],
+    [isSupervisorOrAdmin, myLecturerId, topics],
+  );
+
+  // Load the reviewer's own stored score for each assigned topic.
+  useEffect(() => {
+    if (myReviewTopics.length === 0) return;
+    let cancelled = false;
+    void (async () => {
+      for (const t of myReviewTopics) {
+        try {
+          const row = await thesisApi.reviewerScore(t.id);
+          if (cancelled) return;
+          setGvpbScores((prev) => ({ ...prev, [t.id]: row }));
+          if (row) {
+            setGvpbDraftScores((prev) => ({ ...prev, [t.id]: String(row.score) }));
+            if (row.comment) {
+              setGvpbDraftComments((prev) => ({ ...prev, [t.id]: row.comment ?? '' }));
+            }
+          }
+        } catch {
+          // A read failure leaves the form usable; the submit stays the
+          // authoritative path.
+        }
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [myReviewTopics]);
+
+  const handleSubmitReviewerScore = async (topicId: string) => {
+    const scoreVal = parseFloat(gvpbDraftScores[topicId] || '');
+    if (isNaN(scoreVal) || scoreVal < 0 || scoreVal > 10) {
+      setActionError(pageCopy.defenceScoreRange);
+      return;
+    }
+    setIsActionPending(true);
+    setActionError('');
+    setActionSuccess('');
+    try {
+      const comment = (gvpbDraftComments[topicId] || '').trim();
+      const saved = await thesisApi.submitReviewerScore(
+        topicId,
+        scoreVal,
+        comment || undefined,
+      );
+      setGvpbScores((prev) => ({ ...prev, [topicId]: saved }));
+      setActionSuccess(messages.thesis.grading.scoreSaved);
+      toast.success(messages.thesis.grading.scoreSaved);
+    } catch (err: unknown) {
+      const code = getThesisErrorCode(err);
+      const msg =
+        code === 'GVPB_DEADLINE_PASSED'
+          ? messages.thesis.review.deadlinePassed
+          : code === 'SCORE_ALREADY_FINALIZED'
+            ? pageCopy.topicAlreadyFinalised
+            : code === 'SUPERVISOR_CANNOT_GRADE'
+              ? messages.thesis.grading.supervisorCannotGrade
+              : messages.thesis.actionFailed;
+      setActionError(msg);
+      toast.error(msg);
     } finally {
       setIsActionPending(false);
     }
@@ -889,7 +998,7 @@ export default function ThesisPage() {
           addShort: 'Thêm',
           addedShort: 'Đã trong nhóm',
           curriculumLabel: 'CTĐT',
-          groupFull: 'Nhóm đã đủ 4 thành viên, không thể thêm mới.',
+          groupFull: 'Nhóm đã đủ 3 thành viên, không thể thêm mới.',
           studentAlreadyInGroup: 'Sinh viên này đã thuộc một nhóm trong đợt này.',
         } as const)
       : ({
@@ -902,7 +1011,7 @@ export default function ThesisPage() {
           addShort: 'Add',
           addedShort: 'Already in group',
           curriculumLabel: 'Curriculum',
-          groupFull: 'The group already has the maximum of 4 members.',
+          groupFull: 'The group already has the maximum of 3 members.',
           studentAlreadyInGroup: 'This student already belongs to a group in this round.',
         } as const);
 
@@ -1265,8 +1374,16 @@ export default function ThesisPage() {
       if (supervisorIds.length > 0) {
         try {
           await thesisApi.setSupervisors(created.id, supervisorIds);
-        } catch {
-          // The topic itself was created; supervisor assignment can be retried.
+        } catch (caught) {
+          // The topic exists, but a silently dropped supervisor assignment
+          // leaves the topic ungradeable — surface the failure with the
+          // domain code so the lecturer can retry from the topic page.
+          const code = getThesisErrorCode(caught);
+          toast.error(
+            code === 'LECTURER_NOT_FOUND' || code === 'INVALID_SUPERVISOR'
+              ? messages.thesis.supervisorInvalid
+              : messages.thesis.supervisorAssignFailed,
+          );
         }
       }
       if (selectedRoundId !== targetRoundId) {
@@ -1486,8 +1603,8 @@ export default function ThesisPage() {
         </div>
 
         {/* Regulatory Notice R5 */}
-        <div className="mt-3 rounded-lg border border-primary/20 bg-primary/[0.03] p-2.5 text-xs text-muted-foreground flex items-center gap-2">
-          <Info className="h-4 w-4 shrink-0 text-primary" />
+        <div className="mt-3 rounded-lg border border-primary/20 bg-primary/[0.03] p-2.5 text-xs text-muted-foreground flex items-start gap-2">
+          <Info className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
           <span>
             {renderInlineBold(fillCopy(pageCopy.reportRightsNotice, { leader: currentLeaderName }))}
           </span>
@@ -2093,26 +2210,52 @@ export default function ThesisPage() {
                   />
                 </div>
               ) : lecturerTab === 'defense' ? (
-                <CouncilDefenseWorkspace
-                  messages={messages}
-                  councils={visibleCouncils}
-                  myLecturerId={myLecturerId}
-                  topics={topics}
-                  lecturers={lecturers}
-                  councilScores={councilScores}
-                  topicSupervisors={topicSupervisors}
-                  topicReports={topicReports}
-                  draftScores={draftScores}
-                  isActionPending={isActionPending}
-                  showProfileClaimNotice={isLecturer && !isAdmin && !user?.lecturerId}
-                  profileClaimMissingLabel={messages.thesis.councils.profileClaimMissing}
-                  onScoreDraftChange={(key, value) =>
-                    setDraftScores((prev) => ({ ...prev, [key]: value }))
-                  }
-                  onSubmitScore={handleSubmitScore}
-                  onFinalizeScore={handleFinalizeScore}
-                  onDownloadReport={downloadReportArtifact}
-                />
+                <div className="space-y-6">
+                  {/* GVPB counter-review sits outside council membership: the
+                      assigned reviewer is usually not on the council. */}
+                  <GvpbReviewPanel
+                    messages={messages}
+                    reviewTopics={myReviewTopics}
+                    round={selectedRound}
+                    gvpbScores={gvpbScores}
+                    draftScores={gvpbDraftScores}
+                    draftComments={gvpbDraftComments}
+                    isActionPending={isActionPending}
+                    formatDateTime={formatDateTime}
+                    onScoreDraftChange={(topicId, value) =>
+                      setGvpbDraftScores((prev) => ({ ...prev, [topicId]: value }))
+                    }
+                    onCommentDraftChange={(topicId, value) =>
+                      setGvpbDraftComments((prev) => ({ ...prev, [topicId]: value }))
+                    }
+                    onSubmit={handleSubmitReviewerScore}
+                  />
+                  <CouncilDefenseWorkspace
+                    messages={messages}
+                    councils={visibleCouncils}
+                    myLecturerId={myLecturerId}
+                    topics={topics}
+                    lecturers={lecturers}
+                    councilScores={councilScores}
+                    councilScoreErrors={councilScoreErrors}
+                    topicSupervisors={topicSupervisors}
+                    topicReports={topicReports}
+                    draftScores={draftScores}
+                    draftComments={draftComments}
+                    isActionPending={isActionPending}
+                    showProfileClaimNotice={isLecturer && !isAdmin && !user?.lecturerId}
+                    profileClaimMissingLabel={messages.thesis.councils.profileClaimMissing}
+                    onScoreDraftChange={(key, value) =>
+                      setDraftScores((prev) => ({ ...prev, [key]: value }))
+                    }
+                    onCommentDraftChange={(key, value) =>
+                      setDraftComments((prev) => ({ ...prev, [key]: value }))
+                    }
+                    onSubmitScore={handleSubmitScore}
+                    onFinalizeScore={handleFinalizeScore}
+                    onDownloadReport={downloadReportArtifact}
+                  />
+                </div>
               ) : (
                 <ThesisRepositoryWorkspace
                   messages={messages}
@@ -2225,7 +2368,7 @@ export default function ThesisPage() {
                   <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
                     {pageCopy.evaluationCouncil}
                   </p>
-                  <p className="mt-2 text-sm font-bold text-foreground truncate">
+                  <p className="mt-2 text-sm font-bold text-foreground truncate" title={myResultItem?.councilName || pageCopy.councilNameFallback}>
                     {myResultItem?.councilName || pageCopy.councilNameFallback}
                   </p>
                   <p className="mt-1 text-[11px] text-muted-foreground">
@@ -2287,7 +2430,7 @@ export default function ThesisPage() {
                         className="flex flex-col gap-2 rounded-xl border border-border/70 bg-card p-4 sm:flex-row sm:items-center sm:justify-between"
                       >
                         <div className="min-w-0">
-                          <p className="truncate text-sm font-semibold text-foreground">
+                          <p className="truncate text-sm font-semibold text-foreground" title={result.topicTitle}>
                             {result.topicTitle}
                           </p>
                           <p className="text-xs text-muted-foreground">
@@ -2333,7 +2476,11 @@ export default function ThesisPage() {
                 disabled={isActionPending}
                 options={rounds.map((round) => ({
                   value: round.id,
-                  label: `${round.name} (${round.status})`,
+                  label: `${round.name} (${
+                    messages.thesis.status[
+                      round.status as keyof typeof messages.thesis.status
+                    ] ?? round.status
+                  })`,
                 }))}
               />
             </div>
@@ -2676,12 +2823,12 @@ export default function ThesisPage() {
                         className="flex items-center justify-between gap-3 p-3"
                       >
                         <div className="min-w-0 space-y-0.5">
-                          <p className="truncate text-sm font-semibold text-foreground">{fullName}</p>
+                          <p className="truncate text-sm font-semibold text-foreground" title={fullName}>{fullName}</p>
                           <p className="truncate text-xs text-muted-foreground">
                             MSSV: <span className="font-mono">{student.studentNumber}</span>
                           </p>
                           {curriculumLabel ? (
-                            <p className="truncate text-xs text-muted-foreground">
+                            <p className="truncate text-xs text-muted-foreground" title={curriculumLabel}>
                               {memberCopy.curriculumLabel}: {curriculumLabel}
                             </p>
                           ) : null}

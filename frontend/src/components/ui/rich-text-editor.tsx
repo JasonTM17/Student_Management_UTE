@@ -377,7 +377,7 @@ export function RichTextEditor({
       ref={editorContainerRef}
       className={cn(
         'group flex flex-col rounded-lg border border-border/80 bg-background transition-all focus-within:border-primary/70 focus-within:ring-2 focus-within:ring-primary/20',
-        isFullscreen && 'fixed inset-0 z-50 m-0 h-screen w-screen rounded-none border-none p-6 shadow-2xl overflow-y-auto',
+        isFullscreen && 'fixed inset-0 z-[60] m-0 h-screen w-screen rounded-none border-none p-6 shadow-2xl overflow-y-auto',
         disabled && 'opacity-60 pointer-events-none',
         className
       )}
@@ -813,7 +813,7 @@ export function RichTextEditor({
       {/* Link Insertion Dialog */}
       {linkDialogOpen ? (
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 backdrop-blur-sm p-4"
+          className="fixed inset-0 z-[60] flex items-center justify-center bg-background/80 backdrop-blur-sm p-4"
           onClick={(e) => {
             if (e.target === e.currentTarget) setLinkDialogOpen(false);
           }}
@@ -880,7 +880,7 @@ export function RichTextEditor({
       {/* Help / Shortcuts Dialog */}
       {helpDialogOpen ? (
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 backdrop-blur-sm p-4"
+          className="fixed inset-0 z-[60] flex items-center justify-center bg-background/80 backdrop-blur-sm p-4"
           onClick={(e) => {
             if (e.target === e.currentTarget) setHelpDialogOpen(false);
           }}

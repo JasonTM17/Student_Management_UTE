@@ -1,5 +1,7 @@
 package io.campuscore.restfulapi.engagement.service;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
@@ -83,12 +85,28 @@ public final class AnnouncementHtmlSanitizer {
     public static SanitizationResult sanitize(String html) {
         Document parsed = Jsoup.parse(html == null ? "" : html);
         int removed = countRemovedElements(parsed);
-        String clean = Jsoup.clean(
+        Document cleaned = Jsoup.parse(Jsoup.clean(
                 html == null ? "" : html,
                 "",
                 POLICY,
-                new Document.OutputSettings().prettyPrint(false));
+                new Document.OutputSettings().prettyPrint(false)));
+        // An <img> whose src failed the scheme check survives cleaning as a
+        // bare tag — a broken frame for every reader and 0 counted removals.
+        // Drop it (counted) so the stored body carries no dead markup.
+        removed += dropSrclessImages(cleaned);
+        String clean = cleaned.body() == null ? "" : cleaned.body().html();
         return new SanitizationResult(clean, removed);
+    }
+
+    private static int dropSrclessImages(Document document) {
+        List<Element> broken = new ArrayList<>();
+        for (Element image : document.select("img")) {
+            if (image.attr("src").isBlank()) {
+                broken.add(image);
+            }
+        }
+        broken.forEach(Element::remove);
+        return broken.size();
     }
 
     /** Elements the policy removed, so the write-time mutation is observable. */

@@ -1,5 +1,6 @@
 package io.campuscore.restfulapi.thesis.service;
 
+import io.campuscore.restfulapi.audit.AdminAuditRecorder;
 import io.campuscore.restfulapi.thesis.domain.ThesisTopic;
 import io.campuscore.restfulapi.thesis.domain.TopicStatus;
 import io.campuscore.restfulapi.thesis.repository.ThesisTopicRepository;
@@ -27,10 +28,12 @@ public class ThesisSupervisorService {
 
     private final NamedParameterJdbcTemplate jdbc;
     private final ThesisTopicRepository topics;
+    private final AdminAuditRecorder audit;
 
-    public ThesisSupervisorService(NamedParameterJdbcTemplate jdbc, ThesisTopicRepository topics) {
+    public ThesisSupervisorService(NamedParameterJdbcTemplate jdbc, ThesisTopicRepository topics, AdminAuditRecorder audit) {
         this.jdbc = jdbc;
         this.topics = topics;
+        this.audit = audit;
     }
 
     /**
@@ -101,6 +104,17 @@ public class ThesisSupervisorService {
             if (!lecturerExists(lecturerId)) {
                 throw invalid("Unknown or inactive lecturer: " + lecturerId);
             }
+            // A counter-reviewer's independence would be void if they also
+            // supervised the topic; keep the invariant at write time instead of
+            // only rejecting their score submission later.
+            Integer reviewing = jdbc.queryForObject(
+                    "SELECT COUNT(*) FROM thesis.thesis_topic WHERE id = :topicId AND gvpb_lecturer_id = :lecturerId",
+                    new MapSqlParameterSource().addValue("topicId", topicId).addValue("lecturerId", lecturerId),
+                    Integer.class);
+            if (reviewing != null && reviewing > 0) {
+                throw conflict("SUPERVISOR_CANNOT_REVIEW",
+                        "The assigned counter-reviewer cannot supervise this topic");
+            }
             Integer chairCount = jdbc.queryForObject(
                     "SELECT COUNT(*) FROM thesis.thesis_council_topic ct "
                             + "JOIN thesis.thesis_council_member cm ON cm.council_id = ct.council_id "
@@ -138,6 +152,10 @@ public class ThesisSupervisorService {
                             .addValue("lecturerId", lecturerId)
                             .addValue("order", order++));
         }
+        java.util.Map<String, Object> afterState = new java.util.LinkedHashMap<>();
+        afterState.put("supervisorIds", normalized);
+        audit.record(subject(actor), null, "TOPIC_SUPERVISORS_UPDATED", "THESIS_TOPIC", topicId.toString(),
+                "Supervisors set to " + normalized + " for topic " + topicId, null, afterState);
         return list(topicId, actor);
     }
 
@@ -167,7 +185,7 @@ public class ThesisSupervisorService {
     }
 
     private static boolean isStaff(Jwt actor) {
-        return hasRole(actor, "ADMIN") || hasRole(actor, "TRUONG_KHOA");
+        return hasRole(actor, "ADMIN") || hasRole(actor, "TRUONG_KHOA") || hasRole(actor, "SUPER_ADMIN");
     }
 
     private static boolean isOwner(ThesisTopic topic, Jwt actor) {
@@ -187,7 +205,7 @@ public class ThesisSupervisorService {
     }
 
     private void authorize(ThesisTopic topic, Jwt actor) {
-        if (hasRole(actor, "ADMIN") || hasRole(actor, "TRUONG_KHOA")) {
+        if (hasRole(actor, "ADMIN") || hasRole(actor, "TRUONG_KHOA") || hasRole(actor, "SUPER_ADMIN")) {
             return;
         }
         String actorId = subject(actor);

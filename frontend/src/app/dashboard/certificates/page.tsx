@@ -6,7 +6,7 @@ import { useI18n } from '@/i18n';
 import { WorkspaceForbiddenState } from '@/components/ProtectedRoute';
 import { PageHeader, SectionEyebrow } from '@/components/ui/page-header';
 import { EmptyState, LoadingState } from '@/components/ui/state-block';
-import { curriculumApi } from '@/lib/api';
+import { conductApi, curriculumApi } from '@/lib/api';
 import { MyCurriculumResponse } from '@/types/api';
 import { Button } from '@/components/ui/button';
 import {
@@ -74,6 +74,10 @@ export default function CertificatesPage() {
   const [selectedPurpose, setSelectedPurpose] = useState<CertificatePurpose>('MILITARY_DEFERMENT');
   const [customRecipient, setCustomRecipient] = useState<string>('');
   const [curriculumData, setCurriculumData] = useState<MyCurriculumResponse | null>(null);
+  // The office-issued MSSV lives on the student record, not the auth session
+  // (whose `studentId` is the internal profile id, e.g. "student-profile").
+  // Same source the transcript page uses: the conduct summary's studentCode.
+  const [studentCode, setStudentCode] = useState('');
 
   useEffect(() => {
     let active = true;
@@ -91,6 +95,26 @@ export default function CertificatesPage() {
     };
   }, []);
 
+  useEffect(() => {
+    if (!hasAccess) return;
+    let cancelled = false;
+    conductApi
+      .getMyConduct()
+      .then((summary) => {
+        if (cancelled) return;
+        const code = summary?.studentCode?.trim();
+        // The backend stringifies the column, so a missing record arrives as
+        // the literal "null"; treat that as unresolved rather than as an MSSV.
+        if (code && code !== 'null' && code !== 'undefined') setStudentCode(code);
+      })
+      .catch(() => {
+        // Unavailable MSSV stays blank — never falls back to the internal id.
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [hasAccess]);
+
   const activeOption = useMemo(
     () => PURPOSE_OPTIONS.find((p) => p.id === selectedPurpose) || PURPOSE_OPTIONS[0],
     [selectedPurpose]
@@ -106,7 +130,7 @@ export default function CertificatesPage() {
     return null;
   }, [user]);
 
-  const studentId = user?.studentId || null;
+  const studentId = studentCode || null;
 
   const cohort = useMemo(() => {
     if (!studentId) return null;

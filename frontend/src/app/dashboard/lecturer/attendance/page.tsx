@@ -85,6 +85,7 @@ export default function LecturerAttendancePage() {
   // Rows cleared via Reset whose RESET entry has not been saved yet.
   const [resetStudentIds, setResetStudentIds] = useState<Set<string>>(new Set());
   const [sectionSummary, setSectionSummary] = useState<SectionAttendanceSummary | null>(null);
+  const [existingReadFailed, setExistingReadFailed] = useState(false);
 
   // 1. Fetch semesters
   const fetchSemesters = useCallback(async () => {
@@ -125,18 +126,28 @@ export default function LecturerAttendancePage() {
     if (!sectionId) {
       setRoster([]);
       setSectionSummary(null);
+      setExistingReadFailed(false);
       return;
     }
 
     setIsLoadingRoster(true);
     setError('');
+    setExistingReadFailed(false);
 
+    let existingReadFailedNow = false;
     try {
       const [gradesData, existingAttendance, summary] = await Promise.all([
         sectionsApi.getSectionGrades(sectionId),
-        attendanceApi.getSectionAttendance(sectionId, date).catch(() => []),
+        // A failed read must NOT render as "nothing saved yet": defaulting a
+        // full roster to PRESENT and saving would mass-overwrite real
+        // ABSENT/LATE records. Flag it and lock the save instead.
+        attendanceApi.getSectionAttendance(sectionId, date).catch(() => {
+          existingReadFailedNow = true;
+          return [] as Awaited<ReturnType<typeof attendanceApi.getSectionAttendance>>;
+        }),
         attendanceApi.getSectionSummary(sectionId).catch(() => null),
       ]);
+      setExistingReadFailed(existingReadFailedNow);
 
       const attendanceMap = new Map<string, { status: AttendanceStatus; notes: string | null }>();
       for (const record of existingAttendance) {
@@ -236,6 +247,12 @@ export default function LecturerAttendancePage() {
 
   const handleSave = async () => {
     if (!selectedSectionId || roster.length === 0) return;
+    // Belt for the disabled buttons: never overwrite a section whose saved
+    // attendance could not be read back (would mass-reset real records).
+    if (existingReadFailed) {
+      toast.error(copy.existingReadWarning);
+      return;
+    }
 
     const marked = roster
       .filter((row): row is StudentRowState & { status: AttendanceStatus } => row.status !== null)
@@ -477,7 +494,7 @@ export default function LecturerAttendancePage() {
             value={
               sectionSummary
                 ? `${formatNumber(sectionSummary.attendanceRate)}%`
-                : '100%'
+                : '—'
             }
             detail={sectionSummary ? `${sectionSummary.totalSessions} buổi đã học` : undefined}
             icon={<CalendarCheck className="h-5 w-5" aria-hidden="true" />}
@@ -564,7 +581,7 @@ export default function LecturerAttendancePage() {
               <Button
                 size="sm"
                 onClick={handleSave}
-                disabled={isSaving}
+                disabled={isSaving || existingReadFailed}
                 className="bg-primary text-primary-foreground font-semibold"
               >
                 <Save className="mr-1.5 h-4 w-4" />
@@ -572,6 +589,15 @@ export default function LecturerAttendancePage() {
               </Button>
             </div>
           </div>
+
+          {existingReadFailed ? (
+            <div
+              role="alert"
+              className="mb-3 rounded-md border border-amber-300/60 bg-amber-50 px-3 py-2 text-xs font-medium text-amber-900 dark:border-amber-500/40 dark:bg-amber-950/40 dark:text-amber-200"
+            >
+              {copy.existingReadWarning}
+            </div>
+          ) : null}
 
           {/* Roster Table */}
           <div className="overflow-x-auto rounded-lg border">
@@ -683,7 +709,7 @@ export default function LecturerAttendancePage() {
           <div className="flex justify-end pt-2 print:hidden">
             <Button
               onClick={handleSave}
-              disabled={isSaving}
+              disabled={isSaving || existingReadFailed}
               className="bg-primary text-primary-foreground font-semibold px-6"
             >
               <Save className="mr-2 h-4 w-4" />

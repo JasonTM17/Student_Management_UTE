@@ -8,6 +8,8 @@ import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.util.List;
 import java.util.UUID;
+import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Profile;
 import org.springframework.http.HttpStatus;
@@ -35,12 +37,21 @@ public class SupabaseKnowledgeInternalController {
     private final SupabaseKnowledgeAuthorityService authority;
     private final SupabaseKnowledgeSyncService sync;
     private final AssistantRagProperties ragProperties;
+    private final boolean rejectKnownDefaults;
 
     public SupabaseKnowledgeInternalController(SupabaseKnowledgeAuthorityService authority,
-            SupabaseKnowledgeSyncService sync, AssistantRagProperties ragProperties) {
+            SupabaseKnowledgeSyncService sync, AssistantRagProperties ragProperties,
+            @Value("${security.jwt.reject-known-defaults:false}") boolean rejectKnownDefaults) {
         this.authority = authority;
         this.sync = sync;
         this.ragProperties = ragProperties;
+        this.rejectKnownDefaults = rejectKnownDefaults;
+        if (!rejectKnownDefaults && ragProperties.tokenIsDevComposeDefault()) {
+            LoggerFactory.getLogger(SupabaseKnowledgeInternalController.class).warn(
+                    "ASSISTANT_RAG_SERVICE_TOKEN is set to the docker-compose development default;"
+                            + " rotate it before exposing this deployment"
+                            + " (security.jwt.reject-known-defaults=true rejects it)");
+        }
     }
 
     @GetMapping
@@ -127,8 +138,16 @@ public class SupabaseKnowledgeInternalController {
     }
 
     private void verify(String token) {
-        if (!ragProperties.serviceMode() || !ragProperties.tokenConfigured()) {
+        if (!ragProperties.serviceMode()) {
             throw new DomainException(HttpStatus.SERVICE_UNAVAILABLE, "RAG_SERVICE_DISABLED", "RAG service is not configured");
+        }
+        // Placeholder tokens fail inside tokenConfigured(); the compose dev
+        // default fails closed only under strict secrets mode (same flag and
+        // stance as JwtSecretPolicy for JWT secrets).
+        if (!ragProperties.tokenConfigured()
+                || (rejectKnownDefaults && ragProperties.tokenIsDevComposeDefault())) {
+            throw new DomainException(HttpStatus.SERVICE_UNAVAILABLE, "RAG_SERVICE_TOKEN_MISSING",
+                    "RAG service token is not configured (a committed default is rejected)");
         }
         if (token == null || token.isBlank()) {
             throw new DomainException(HttpStatus.FORBIDDEN, "RAG_SERVICE_UNAUTHORIZED", "RAG service token is required");

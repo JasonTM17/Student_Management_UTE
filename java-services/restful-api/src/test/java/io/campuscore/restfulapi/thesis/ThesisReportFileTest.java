@@ -339,14 +339,9 @@ class ThesisReportFileTest {
                 "INSERT INTO thesis.thesis_group_member (id, group_id, round_id, student_id, member_order, is_leader) "
                         + "VALUES (?, ?, ?, 'rf-member-3', 3, FALSE)",
                 UUID.randomUUID(), groupId, roundId);
-        jdbc.update(
-                "INSERT INTO thesis.thesis_group_member (id, group_id, round_id, student_id, member_order, is_leader) "
-                        + "VALUES (?, ?, ?, 'rf-member-4', 4, FALSE)",
-                UUID.randomUUID(), groupId, roundId);
         seedStudent("rf-leader", "rf-user-leader");
         seedStudent("rf-peer", "rf-user-peer");
         seedStudent("rf-member-3", "rf-user-member-3");
-        seedStudent("rf-member-4", "rf-user-member-4");
         return groupId;
     }
 

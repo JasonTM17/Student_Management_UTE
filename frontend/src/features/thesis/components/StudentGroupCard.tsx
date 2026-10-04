@@ -103,7 +103,7 @@ export default function StudentGroupCard({
                     {roleLabel}
                   </span>
                 </div>
-                <h4 className="text-sm font-semibold text-foreground truncate">
+                <h4 className="text-sm font-semibold text-foreground truncate" title={topicTitle ?? undefined}>
                   {topicTitle ?? (
                     // Selection lives in the catalog now, so the empty
                     // state is an actionable link rather than a label.
@@ -117,7 +117,7 @@ export default function StudentGroupCard({
                 </h4>
               </div>
 
-              {canManageMembers && members.length < 4 ? (
+              {canManageMembers && members.length < 3 ? (
                 <Button
                   type="button"
                   size="sm"
@@ -170,9 +170,7 @@ export default function StudentGroupCard({
                   {messages.thesis.memberCount.replace('{count}', String(members.length))}
                 </span>
                 <span className="text-xs text-muted-foreground">
-                  {members.length < 3 && group.approvalStatus !== 'APPROVED' && group.status !== 'CANCELLED'
-                    ? messages.thesis.membersNeededForApproval.replace('{count}', String(3 - members.length))
-                    : members.length >= 4 ? messages.thesis.maxMembersReached : ''}
+                  {members.length >= 3 ? messages.thesis.maxMembersReached : ''}
                 </span>
               </div>
 
@@ -230,6 +228,7 @@ export default function StudentGroupCard({
                         disabled={isActionPending}
                         className="h-8 w-8 p-0 text-muted-foreground hover:text-destructive hover:bg-destructive/10 shrink-0"
                         title={messages.thesis.removeMember}
+                        aria-label={messages.thesis.removeMember}
                       >
                         <Trash2 className="h-4 w-4" />
                       </Button>

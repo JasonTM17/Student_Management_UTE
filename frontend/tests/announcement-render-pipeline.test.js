@@ -374,15 +374,18 @@ test('RT-P3-d an inlined SVG really is unpublishable, so the editor must refuse 
   // Both insert points check the type before any payload is embedded.
   const uploadHandler = source.slice(source.indexOf('images_upload_handler'), source.indexOf('file_picker_callback'));
   const picker = source.slice(source.indexOf('file_picker_callback'), source.indexOf('table_default_attributes'));
-  assert.match(uploadHandler, /if \(blobType\.includes\('svg'\)\) \{\s*\n\s*reject\(svgRejected\);/);
+  // Both insert points run a positive MIME allowlist before any payload is
+  // embedded — the check rejects SVG and every other format the reader
+  // sanitizer would strip (AVIF, HEIC, TIFF, …).
+  assert.match(uploadHandler, /if \(!INLINE_IMAGE_MIME_TYPES\.has\(blobType\)\) \{\s*\n\s*reject\(blobType\.includes\('svg'\) \? svgRejected : unsupportedImageFormat\);/);
   assert.ok(
-    uploadHandler.indexOf('includes(\'svg\')') < uploadHandler.indexOf('resolve(`data:'),
-    'the svg check must run before the payload is resolved into the document',
+    uploadHandler.indexOf('INLINE_IMAGE_MIME_TYPES.has(blobType)') < uploadHandler.indexOf('resolve(`data:'),
+    'the MIME allowlist must run before the payload is resolved into the document',
   );
-  assert.match(picker, /if \(file\.type\.toLowerCase\(\)\.includes\('svg'\)\) \{[\s\S]*?toast\.error\(svgRejected\);/);
+  assert.match(picker, /if \(!INLINE_IMAGE_MIME_TYPES\.has\(file\.type\.toLowerCase\(\)\)\) \{[\s\S]*?toast\.error\(\s*file\.type\.toLowerCase\(\)\.includes\('svg'\) \? svgRejected : unsupportedImageFormat/);
   assert.ok(
-    picker.indexOf("includes('svg')") < picker.indexOf('readAsDataURL'),
-    'the svg check must run before the file is read',
+    picker.indexOf("INLINE_IMAGE_MIME_TYPES.has(file.type") < picker.indexOf('readAsDataURL'),
+    'the MIME allowlist must run before the file is read',
   );
 
   // The rejection is visible and localized, like the size rejection beside it.
@@ -392,7 +395,7 @@ test('RT-P3-d an inlined SVG really is unpublishable, so the editor must refuse 
   assert.match(message[2], /SVG/);
   assert.notEqual(message[1], message[2], 'the two locales must carry different text');
   assert.ok(
-    source.indexOf('toast.error(svgRejected)') !== -1,
+    /toast\.error\([\s\S]*?svgRejected/.test(source.slice(source.indexOf('file_picker_callback'))),
     'the picker path must surface the rejection to the author',
   );
 });

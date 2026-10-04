@@ -3,6 +3,8 @@ package io.campuscore.restfulapi.thesis.assistant;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -88,6 +90,92 @@ class ThesisAssistantTurnLedgerH2Test {
         ThesisAssistantTurnRepository.Reservation replay = turns.reserve(owner, key,
                 AssistantInputGuard.canonicalHash("topic", "en", null), null, "en", "lease-b", 90);
         assertEquals(ThesisAssistantTurnRepository.ReservationStatus.REPLAY, replay.status());
+    }
+
+    @Test
+    void standaloneQuotaChargeSharesTheSameDailyBucketAsDispatch() {
+        // Off-topic general answers legitimately skip the turn ledger, but they
+        // must still spend the same per-user daily budget a grounded call does.
+        String owner = "standalone-quota-" + UUID.randomUUID();
+
+        assertNotNull(turns.chargeStandaloneQuota(owner, 2, 100));
+        assertNotNull(turns.chargeStandaloneQuota(owner, 2, 100));
+        assertNull(turns.chargeStandaloneQuota(owner, 2, 100),
+                "third standalone call on a 2/day budget must be refused");
+        Integer count = jdbc.queryForObject(
+                "SELECT request_count FROM assistant.usage_bucket WHERE owner_id=:owner AND scope='USER'",
+                p("owner", owner), Integer.class);
+        assertEquals(2, count);
+        // The global bucket moved in step with the user charges.
+        Integer global = jdbc.queryForObject(
+                "SELECT request_count FROM assistant.usage_bucket WHERE owner_id='*' AND scope='GLOBAL'",
+                new MapSqlParameterSource(), Integer.class);
+        assertTrue(global != null && global >= 2, "global bucket must count standalone calls too");
+    }
+
+    @Test
+    void standaloneRefundReturnsTheChargeSoAFallthroughIsNotBilledTwice() {
+        // C6: charge → provider fails → caller falls to the ledgered path which
+        // charges its own unit; the refund keeps the request at a single unit.
+        String owner = "standalone-refund-" + UUID.randomUUID();
+
+        java.time.LocalDate chargedDate = turns.chargeStandaloneQuota(owner, 2, 100);
+        assertNotNull(chargedDate);
+        turns.refundStandaloneQuota(owner, chargedDate);
+
+        Integer count = jdbc.queryForObject(
+                "SELECT request_count FROM assistant.usage_bucket WHERE owner_id=:owner AND scope='USER'",
+                p("owner", owner), Integer.class);
+        assertEquals(0, count, "refunded standalone charge must release the user unit");
+        // Refund never drives the count negative on a fresh bucket, and a
+        // refund targeting a date with no committed charge is a no-op (the
+        // phantom-refund vector: a FAILED charge must never decrement).
+        turns.refundStandaloneQuota(owner, chargedDate);
+        assertEquals(0, jdbc.queryForObject(
+                "SELECT request_count FROM assistant.usage_bucket WHERE owner_id=:owner AND scope='USER'",
+                p("owner", owner), Integer.class));
+    }
+
+    @Test
+    void standaloneRefundOnAFailedChargeNeverDrainsTheBucket() {
+        // Wukong N1(a): a charge attempt that rolled back must not refund —
+        // decrementing a bucket the request never charged hands out free
+        // quota (and drags the GLOBAL bucket negative for everyone). A
+        // refused charge also leaves no row the refund could underflow.
+        String owner = "phantom-refund-" + UUID.randomUUID();
+        java.time.LocalDate chargedDate = turns.chargeStandaloneQuota(owner, 1, 100);
+        assertNotNull(chargedDate);
+        assertNull(turns.chargeStandaloneQuota(owner, 1, 100),
+                "a refused charge returns null — the service refunds only non-null dates");
+        // A refund aimed at a date that never saw a charge must not touch
+        // today's bucket (the cross-day drain vector).
+        turns.refundStandaloneQuota(owner, chargedDate.minusDays(1));
+        turns.refundStandaloneQuota(owner, null);
+        Integer count = jdbc.queryForObject(
+                "SELECT request_count FROM assistant.usage_bucket WHERE owner_id=:owner AND scope='USER'",
+                p("owner", owner), Integer.class);
+        assertEquals(Integer.valueOf(1), count,
+                "a refund on the wrong date must not touch the real bucket");
+        turns.refundStandaloneQuota(owner, chargedDate);
+        assertEquals(Integer.valueOf(0), jdbc.queryForObject(
+                "SELECT request_count FROM assistant.usage_bucket WHERE owner_id=:owner AND scope='USER'",
+                p("owner", owner), Integer.class),
+                "a refund on the charge's own date releases the unit");
+    }
+
+    @Test
+    void standaloneTurnRecordConsumesTheIdempotencyKey() {
+        // C6: a successful off-topic answer must consume its clientRequestId so
+        // a later request reusing the key with a different payload conflicts.
+        String owner = "standalone-key-" + UUID.randomUUID();
+        UUID key = UUID.randomUUID();
+        String hash = reservationHash("off-topic", "vi");
+
+        turns.recordStandaloneTurn(owner, key, hash);
+
+        assertEquals(hash, turns.requestHashOf(owner, key));
+        // Different payload on the same key surfaces as a conflict downstream.
+        assertNotEquals(reservationHash("different", "vi"), turns.requestHashOf(owner, key));
     }
 
     @Test

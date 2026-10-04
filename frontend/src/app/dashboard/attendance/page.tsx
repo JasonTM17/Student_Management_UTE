@@ -327,7 +327,7 @@ export default function AttendancePage() {
                         <tr key={row.sectionId} className="transition-colors hover:bg-secondary/30">
                           <td className="px-2 py-3">
                             <span className="block font-medium text-foreground">{row.courseCode}</span>
-                            <span className="block truncate text-muted-foreground">{courseName(row)}</span>
+                            <span className="block truncate text-muted-foreground" title={courseName(row)}>{courseName(row)}</span>
                           </td>
                           <td className="px-2 py-3 text-center tabular-nums text-muted-foreground">
                             {formatNumber(row.total)}
@@ -395,12 +395,12 @@ export default function AttendancePage() {
                           : '—'}
                       </span>
                       <span className="min-w-0 flex-1">
-                        <span className="block truncate text-sm text-foreground">
+                        <span className="block truncate text-sm text-foreground" title={sectionLabel(record)}>
                           {sectionLabel(record)}
                         </span>
                         {record.section?.course
                           ? (
-                            <span className="block truncate text-xs text-muted-foreground">
+                            <span className="block truncate text-xs text-muted-foreground" title={record.section.course.name ?? undefined}>
                               {getLocalizedFlatLabel(
                                 locale,
                                 record.section.course.name ?? '',

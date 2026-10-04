@@ -206,9 +206,15 @@ export default function LecturerGradesPage() {
 
                       <div className="flex flex-wrap gap-3 text-sm text-muted-foreground">
                         <span>{section.credits} {messages.lecturerGrades.labels.credits}</span>
-                        <span>{section.enrolledCount} {messages.lecturerGrades.labels.enrolled}</span>
-                        <span>{section.gradedCount} {messages.lecturerGrades.labels.graded}</span>
-                        <span>{section.publishedCount} {messages.lecturerGrades.labels.published}</span>
+                        {section.enrolledCount === 0 ? (
+                          <span>{messages.lecturerGrades.labels.noEnrollments}</span>
+                        ) : (
+                          <>
+                            <span>{section.enrolledCount} {messages.lecturerGrades.labels.enrolled}</span>
+                            <span>{section.gradedCount} {messages.lecturerGrades.labels.graded}</span>
+                            <span>{section.publishedCount} {messages.lecturerGrades.labels.published}</span>
+                          </>
+                        )}
                       </div>
                     </div>
 

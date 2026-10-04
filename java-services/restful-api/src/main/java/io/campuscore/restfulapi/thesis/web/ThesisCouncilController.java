@@ -6,8 +6,10 @@ import io.campuscore.restfulapi.thesis.service.ThesisCouncilService.ScoreRespons
 import io.campuscore.restfulapi.thesis.service.ThesisCouncilService.StudentResultRow;
 import io.campuscore.restfulapi.thesis.service.ThesisCouncilService.TopicResult;
 import io.campuscore.restfulapi.thesis.web.ThesisCouncilRequestDtos.AddCouncilMemberRequest;
+import io.campuscore.restfulapi.thesis.web.ThesisCouncilRequestDtos.AssignReviewerRequest;
 import io.campuscore.restfulapi.thesis.web.ThesisCouncilRequestDtos.AssignTopicRequest;
 import io.campuscore.restfulapi.thesis.web.ThesisCouncilRequestDtos.CreateCouncilRequest;
+import io.campuscore.restfulapi.thesis.web.ThesisCouncilRequestDtos.ReviewerScoreRequest;
 import io.campuscore.restfulapi.thesis.web.ThesisCouncilRequestDtos.SubmitScoreRequest;
 import jakarta.validation.Valid;
 import java.math.BigDecimal;
@@ -131,7 +133,8 @@ public class ThesisCouncilController {
             @Parameter(description = "Mã UUID của đề tài", required = true) @PathVariable UUID topicId,
             @Valid @RequestBody SubmitScoreRequest request,
             @AuthenticationPrincipal Jwt actor) {
-        return councils.submitScore(councilId, topicId, request.component(), parseScore(request.score()), actor);
+        return councils.submitScore(councilId, topicId, request.component(), parseScore(request.score()),
+                request.comment(), actor);
     }
 
     @Operation(summary = "Danh sách điểm đánh giá của đề tài trong hội đồng", description = "Truy xuất danh sách các điểm thành phần đã chấm cho đề tài")
@@ -163,6 +166,53 @@ public class ThesisCouncilController {
             @Parameter(description = "Mã UUID của đề tài", required = true) @PathVariable UUID topicId,
             @AuthenticationPrincipal Jwt actor) {
         return councils.finalizeScores(councilId, topicId, actor);
+    }
+
+    @Operation(summary = "Phân công giảng viên phản biện (GVPB) cho đề tài", description = "Chỉ định một giảng viên phản biện độc lập chấm điểm đề tài; không được là người hướng dẫn")
+    @ApiResponses({
+        @ApiResponse(responseCode = "200", description = "Phân công phản biện thành công"),
+        @ApiResponse(responseCode = "400", description = "Dữ liệu không hợp lệ"),
+        @ApiResponse(responseCode = "401", description = "Chưa xác thực"),
+        @ApiResponse(responseCode = "403", description = "Không có quyền thực hiện")
+    })
+    @PostMapping("/topics/{id}/reviewer")
+    @PreAuthorize("hasAnyRole('ADMIN','TRUONG_KHOA','SUPER_ADMIN')")
+    public java.util.Map<String, Object> assignReviewer(
+            @Parameter(description = "Mã UUID của đề tài", required = true) @PathVariable UUID id,
+            @Valid @RequestBody AssignReviewerRequest request,
+            @AuthenticationPrincipal Jwt actor) {
+        return councils.assignReviewer(id, request.lecturerId(), actor);
+    }
+
+    @Operation(summary = "Nộp điểm phản biện (GVPB)", description = "Giảng viên phản biện được phân công nộp điểm GVPB trước hạn gvpbDeadline của đợt")
+    @ApiResponses({
+        @ApiResponse(responseCode = "200", description = "Ghi nhận điểm phản biện thành công"),
+        @ApiResponse(responseCode = "400", description = "Điểm số không hợp lệ"),
+        @ApiResponse(responseCode = "401", description = "Chưa xác thực"),
+        @ApiResponse(responseCode = "403", description = "Không phải giảng viên phản biện được phân công")
+    })
+    @PostMapping("/topics/{id}/reviewer-score")
+    @PreAuthorize("hasAnyRole('LECTURER','ADMIN','TRUONG_KHOA','SUPER_ADMIN')")
+    public ScoreResponse submitReviewerScore(
+            @Parameter(description = "Mã UUID của đề tài", required = true) @PathVariable UUID id,
+            @Valid @RequestBody ReviewerScoreRequest request,
+            @AuthenticationPrincipal Jwt actor) {
+        return councils.submitReviewerScore(id, parseScore(request.score()), request.comment(), actor);
+    }
+
+    @Operation(summary = "Điểm phản biện (GVPB) của chính giảng viên", description = "Giảng viên phản biện đọc lại điểm đã nộp cho đề tài; nhân sự quản trị đọc được điểm của phản biện hiện tại")
+    @ApiResponses({
+        @ApiResponse(responseCode = "200", description = "Trả về điểm phản biện đã nộp"),
+        @ApiResponse(responseCode = "401", description = "Chưa xác thực"),
+        @ApiResponse(responseCode = "403", description = "Không phải giảng viên phản biện được phân công"),
+        @ApiResponse(responseCode = "404", description = "Chưa có điểm phản biện")
+    })
+    @GetMapping("/topics/{id}/reviewer-score")
+    @PreAuthorize("hasAnyRole('LECTURER','ADMIN','TRUONG_KHOA','SUPER_ADMIN')")
+    public ScoreResponse reviewerScore(
+            @Parameter(description = "Mã UUID của đề tài", required = true) @PathVariable UUID id,
+            @AuthenticationPrincipal Jwt actor) {
+        return councils.reviewerScore(id, actor);
     }
 
     /** Brief R9: students read their own graded result after publication. */

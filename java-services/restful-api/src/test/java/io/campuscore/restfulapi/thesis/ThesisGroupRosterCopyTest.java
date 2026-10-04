@@ -28,13 +28,10 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.request.RequestPostProcessor;
 
 /**
- * The faculty's ruling is 3 to 4 members per group with exactly one leader, and
- * the enforced constants already say so ({@code MIN_GROUP_MEMBERS = 3},
- * {@code MAX_GROUP_MEMBERS = 4}). The copy did not: the catalogue entry, the
- * capacity refusal and the approval refusal all stated a bare "at least three
- * members" or "at most four members" without the range, and a group below the
- * minimum — created by design, since the creator is the sole initial member —
- * failed with an opaque message that never said how many members were missing.
+ * The faculty spec caps a group at three members ({@code MIN_GROUP_MEMBERS = 1},
+ * {@code MAX_GROUP_MEMBERS = 3}) with exactly one leader. The error copy must
+ * state that range — the catalogue entry, the capacity refusal and the removal
+ * refusal all name it instead of a bare "too small" or "full".
  */
 @SpringBootTest
 @AutoConfigureMockMvc
@@ -65,22 +62,9 @@ class ThesisGroupRosterCopyTest {
     }
 
     @Test
-    void catalogueCopyStatesTheThreeToFourRange() {
-        assertThatMessage(ErrorCode.GROUP_TOO_SMALL, HttpStatus.CONFLICT, "3 to 4");
-        assertThatMessage(ErrorCode.GROUP_FULL, HttpStatus.CONFLICT, "3 to 4");
-    }
-
-    @Test
-    void approvalRefusalNamesTheRangeAndTheMissingMembers() throws Exception {
-        UUID groupId = singleLeaderGroup();
-        // The group is below the minimum by design; the refusal must tell the
-        // student what is missing instead of only that something is.
-        mvc.perform(post("/api/v1/thesis/groups/{id}/approve", groupId).with(adminJwt()))
-                .andExpect(status().isConflict())
-                .andExpect(jsonPath("$.code").value("GROUP_TOO_SMALL"))
-                .andExpect(jsonPath("$.message", containsString("3 to 4")))
-                .andExpect(jsonPath("$.message", containsString("has 1")))
-                .andExpect(jsonPath("$.message", containsString("2 short")));
+    void catalogueCopyStatesTheOneToThreeRange() {
+        assertThatMessage(ErrorCode.GROUP_TOO_SMALL, HttpStatus.CONFLICT, "1 to 3");
+        assertThatMessage(ErrorCode.GROUP_FULL, HttpStatus.CONFLICT, "1 to 3");
     }
 
     @Test
@@ -88,7 +72,7 @@ class ThesisGroupRosterCopyTest {
         UUID roundId = insertLiveRound("gc-capacity-round");
         UUID topicId = insertPublishedTopic(roundId);
         ensureActiveStudent("gc-leader", "gc-user-leader");
-        for (int index = 2; index <= 5; index++) {
+        for (int index = 2; index <= 4; index++) {
             ensureActiveStudent("gc-member-" + index, "gc-user-member-" + index);
         }
         mvc.perform(post("/api/v1/thesis/groups")
@@ -104,7 +88,8 @@ class ThesisGroupRosterCopyTest {
                         .with(studentJwt("gc-leader")))
                 .andExpect(status().isOk());
 
-        for (int index = 2; index <= 4; index++) {
+        // Two members join the leader to reach the three-member cap.
+        for (int index = 2; index <= 3; index++) {
             mvc.perform(post("/api/v1/thesis/groups/{id}/members", groupId)
                             .contentType(MediaType.APPLICATION_JSON)
                             .content("{\"studentId\":\"gc-member-" + index + "\"}")
@@ -113,15 +98,16 @@ class ThesisGroupRosterCopyTest {
         }
         mvc.perform(post("/api/v1/thesis/groups/{id}/members", groupId)
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"studentId\":\"gc-member-5\"}")
+                        .content("{\"studentId\":\"gc-member-4\"}")
                         .with(studentJwt("gc-leader")))
                 .andExpect(status().isConflict())
                 .andExpect(jsonPath("$.code").value("GROUP_FULL"))
-                .andExpect(jsonPath("$.message", containsString("3 to 4")));
+                .andExpect(jsonPath("$.message", containsString("1 to 3")));
     }
 
     @Test
-    void removalRefusalNamesTheRangeAndTheResultingRoster() throws Exception {
+    void removalToTheLeaderAloneIsAllowed() throws Exception {
+        // The floor is one member (the leader): removing the last peer is fine.
         UUID roundId = insertLiveRound("gc-removal-round");
         UUID groupId = UUID.randomUUID();
         jdbc.update(
@@ -134,10 +120,14 @@ class ThesisGroupRosterCopyTest {
 
         mvc.perform(delete("/api/v1/thesis/groups/{id}/members/{studentId}", groupId, "gc-removal-member-3")
                         .with(adminJwt()))
+                .andExpect(status().isOk());
+        mvc.perform(delete("/api/v1/thesis/groups/{id}/members/{studentId}", groupId, "gc-removal-member-2")
+                        .with(adminJwt()))
+                .andExpect(status().isOk());
+        mvc.perform(delete("/api/v1/thesis/groups/{id}/members/{studentId}", groupId, "gc-removal-leader")
+                        .with(adminJwt()))
                 .andExpect(status().isConflict())
-                .andExpect(jsonPath("$.code").value("GROUP_TOO_SMALL"))
-                .andExpect(jsonPath("$.message", containsString("3 to 4")))
-                .andExpect(jsonPath("$.message", containsString("would leave 2")));
+                .andExpect(jsonPath("$.code").value("LEADER_CANNOT_BE_REMOVED"));
     }
 
     // ---------- fixtures ----------
@@ -145,26 +135,6 @@ class ThesisGroupRosterCopyTest {
     private void assertThatMessage(ErrorCode code, HttpStatus expectedStatus, String expectedFragment) {
         assertThat(code.getHttpStatus()).isEqualTo(expectedStatus);
         assertThat(code.getDefaultMessage()).contains(expectedFragment);
-    }
-
-    /** A live round with a lone-leader group carrying a published topic, so approval is the only refusal left. */
-    private UUID singleLeaderGroup() throws Exception {
-        UUID roundId = insertLiveRound("gc-approval-round");
-        UUID topicId = insertPublishedTopic(roundId);
-        ensureActiveStudent("gc-solo-leader", "gc-user-solo-leader");
-        mvc.perform(post("/api/v1/thesis/groups")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"roundId\":\"" + roundId + "\"}")
-                        .with(studentJwt("gc-solo-leader")))
-                .andExpect(status().isOk());
-        UUID groupId = jdbc.queryForObject(
-                "SELECT id FROM thesis.thesis_group WHERE round_id = ?", UUID.class, roundId);
-        mvc.perform(post("/api/v1/thesis/groups/{id}/topic", groupId)
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"topicId\":\"" + topicId + "\"}")
-                        .with(studentJwt("gc-solo-leader")))
-                .andExpect(status().isOk());
-        return groupId;
     }
 
     private UUID insertLiveRound(String name) {

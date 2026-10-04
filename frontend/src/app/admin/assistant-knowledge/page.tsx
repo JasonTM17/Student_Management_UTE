@@ -70,7 +70,7 @@ const blankForm: AssistantKnowledgeRequest = {
   locale: 'both',
   title: '',
   content: '',
-  source: 'CampusCore academic policy',
+  source: 'CampusUTE academic policy',
   domain: 'GENERAL_FAQ',
   priority: 100,
 };
@@ -124,7 +124,7 @@ function CatalogCoverageCard({ coverage, coverageError, vi }: CatalogCoverageCar
       <CardHeader className="pb-3">
         <CardTitle className="flex items-center gap-2">
           <BookOpenCheck className="h-5 w-5 text-primary" aria-hidden="true" />
-          {vi ? 'Phạm vi nội dung CampusCore công khai' : 'Public CampusCore guidance'}
+          {vi ? 'Phạm vi nội dung CampusUTE công khai' : 'Public CampusUTE guidance'}
         </CardTitle>
         <CardDescription>
           {vi
@@ -492,15 +492,14 @@ export default function AdminAssistantKnowledgePage() {
         priority: fullDoc.priority,
       });
     } catch {
-      setForm({
-        slug: document.slug,
-        locale: document.locale === 'vi' || document.locale === 'en' ? document.locale : 'both',
-        title: document.title,
-        content: document.content,
-        source: document.source,
-        domain: (document.domain as AssistantKnowledgeDomain) || 'GENERAL_FAQ',
-        priority: document.priority,
-      });
+      // The list row deliberately carries content '' — opening the editor on
+      // it would show a blank document and a save would clobber the real one.
+      setEditing(null);
+      setFormOpen(false);
+      setError(vi
+        ? 'Không tải được nội dung đầy đủ của tài liệu. Vui lòng thử lại.'
+        : 'Could not load the full document. Please retry.');
+      return;
     }
     setFormOpen(true);
   };
@@ -567,7 +566,7 @@ export default function AdminAssistantKnowledgePage() {
     }
   };
 
-  const frameTitle = vi ? 'Kho kiến thức CampusCore' : 'CampusCore knowledge';
+  const frameTitle = vi ? 'Kho kiến thức CampusUTE' : 'CampusUTE knowledge';
   const frameDescription = vi
     ? 'Quản trị nội dung học vụ công khai cho trợ lý.'
     : 'Manage public campus guidance for the assistant.';

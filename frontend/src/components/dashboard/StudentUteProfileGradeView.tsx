@@ -574,7 +574,7 @@ export function StudentUteProfileGradeView({
               </div>
               <div className="grid grid-cols-1 gap-0.5 sm:grid-cols-4 px-4 py-2.5">
                 <span className="text-muted-foreground font-medium">{card.fieldsEmail}</span>
-                <span className="sm:col-span-3 text-foreground">{user?.email || card.notAvailable}</span>
+                <span className="break-all sm:col-span-3 text-foreground">{user?.email || card.notAvailable}</span>
               </div>
             </div>
           </div>

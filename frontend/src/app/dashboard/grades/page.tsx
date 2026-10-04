@@ -606,7 +606,7 @@ export default function GradesPage() {
                                   <span className="block font-medium text-foreground">
                                     {record.courseCode}
                                   </span>
-                                  <span className="block truncate text-muted-foreground">
+                                  <span className="block truncate text-muted-foreground" title={courseName}>
                                     {courseName}
                                   </span>
                                 </span>

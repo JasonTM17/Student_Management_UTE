@@ -90,7 +90,7 @@ export default function AdminAcademicYearsPage() {
     } catch {
       setError(
         locale === 'vi'
-          ? 'Hiện chưa thể tải niên khóa.'
+          ? 'Hiện chưa thể tải năm học.'
           : 'Academic years could not be loaded.',
       );
     } finally {
@@ -117,18 +117,18 @@ export default function AdminAcademicYearsPage() {
   const copy =
     locale === 'vi'
       ? {
-          loading: 'Đang tải niên khóa',
-          title: 'Niên khóa',
+          loading: 'Đang tải năm học',
+          title: 'Năm học',
           description:
             'Giữ lịch học năm học rõ ràng, dễ tìm và có chủ đích trước khi học kỳ và đợt đăng ký dựa vào đó.',
-          create: 'Tạo niên khóa',
-          searchLabel: 'Tìm niên khóa',
+          create: 'Tạo năm học',
+          searchLabel: 'Tìm năm học',
           searchPlaceholder: 'Tìm theo năm',
-          unavailableTitle: 'Niên khóa chưa sẵn sàng',
-          emptyTitle: 'Không có niên khóa phù hợp',
+          unavailableTitle: 'Năm học chưa sẵn sàng',
+          emptyTitle: 'Không có năm học phù hợp',
           emptyDescription:
-            'Hãy tạo niên khóa mới để kế hoạch học kỳ có một mốc chuẩn rõ ràng.',
-          tableTitle: 'Bản ghi niên khóa',
+            'Hãy tạo năm học mới để kế hoạch học kỳ có một mốc chuẩn rõ ràng.',
+          tableTitle: 'Bản ghi năm học',
           headers: {
             year: 'Năm',
             startDate: 'Ngày bắt đầu',
@@ -138,25 +138,25 @@ export default function AdminAcademicYearsPage() {
           },
           active: 'Đang hoạt động',
           inactive: 'Ngừng hoạt động',
-          deleteTitle: 'Xóa niên khóa',
+          deleteTitle: 'Xóa năm học',
           deleteMessage: (year: number) =>
-            `Xóa niên khóa ${year}? Hành động này sẽ gỡ niên khóa khỏi màn hình quản trị hiện tại.`,
-          deleteConfirm: 'Xóa niên khóa',
-          deleted: 'Đã xóa niên khóa',
-          deleteFailed: 'Hiện chưa thể xóa niên khóa này.',
-          updated: 'Đã cập nhật niên khóa',
-          created: 'Đã tạo niên khóa',
-          saveFailed: 'Hiện chưa thể lưu niên khóa.',
+            `Xóa năm học ${year}? Hành động này sẽ gỡ năm học khỏi màn hình quản trị hiện tại.`,
+          deleteConfirm: 'Xóa năm học',
+          deleted: 'Đã xóa năm học',
+          deleteFailed: 'Hiện chưa thể xóa năm học này.',
+          updated: 'Đã cập nhật năm học',
+          created: 'Đã tạo năm học',
+          saveFailed: 'Hiện chưa thể lưu năm học.',
           endDateBeforeStart: 'Ngày kết thúc phải sau ngày bắt đầu.',
-          editTitle: 'Chỉnh sửa niên khóa',
-          createTitle: 'Tạo niên khóa',
+          editTitle: 'Chỉnh sửa năm học',
+          createTitle: 'Tạo năm học',
           yearLabel: 'Năm',
           startDateLabel: 'Ngày bắt đầu',
           endDateLabel: 'Ngày kết thúc',
           saving: 'Đang lưu...',
           editAction: messages.common.actions.saveChanges,
-          editLabel: (year: number) => `Chỉnh sửa niên khóa ${year}`,
-          deleteLabel: (year: number) => `Xóa niên khóa ${year}`,
+          editLabel: (year: number) => `Chỉnh sửa năm học ${year}`,
+          deleteLabel: (year: number) => `Xóa năm học ${year}`,
         }
       : {
           loading: 'Loading academic years',

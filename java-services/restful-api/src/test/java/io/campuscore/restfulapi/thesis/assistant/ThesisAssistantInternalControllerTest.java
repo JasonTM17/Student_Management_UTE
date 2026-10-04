@@ -177,6 +177,39 @@ class ThesisAssistantInternalControllerTest {
         verify(service).answer("SOLID là gì?", "vi", null, "owner-a", requestId, "specialized");
     }
 
+    @Test
+    void committedDefaultTokensFailClosedUnderStrictModeAndPlaceholdersAlwaysFail() {
+        ThesisAssistantService service = Mockito.mock(ThesisAssistantService.class);
+        ChatRequest request = new ChatRequest("Xin chào", "vi", UUID.randomUUID(), null);
+
+        // Strict secrets mode rejects the compose-shipped dev default.
+        var strict = new ThesisAssistantInternalController(service,
+                new AssistantRagProperties("", AssistantRagProperties.DEV_COMPOSE_DEFAULT_TOKEN, true, 1_000, 30_000),
+                Runnable::run, true);
+        DomainException strictFailure = assertThrows(DomainException.class,
+                () -> strict.chat(request, AssistantRagProperties.DEV_COMPOSE_DEFAULT_TOKEN, "owner-a"));
+        assertEquals("RAG_SERVICE_TOKEN_MISSING", strictFailure.code());
+
+        // The same token keeps working in dev mode (flag off).
+        var devMode = new ThesisAssistantInternalController(service,
+                new AssistantRagProperties("", AssistantRagProperties.DEV_COMPOSE_DEFAULT_TOKEN, true, 1_000, 30_000),
+                Runnable::run, false);
+        ChatResponse expected = new ChatResponse("ok", "curated-lexical-rag", false, "ANSWERED", "vi", List.of());
+        when(service.answer("Xin chào", "vi", null, "owner-a", request.clientRequestId(), (String) null))
+                .thenReturn(expected);
+        assertEquals(expected, devMode.chat(request, AssistantRagProperties.DEV_COMPOSE_DEFAULT_TOKEN, "owner-a"));
+        Mockito.clearInvocations(service);
+
+        // Placeholder tokens are rejected in every mode.
+        var placeholder = new ThesisAssistantInternalController(service,
+                new AssistantRagProperties("", "local-rag-service-token-change-me", true, 1_000, 30_000),
+                Runnable::run, false);
+        DomainException placeholderFailure = assertThrows(DomainException.class,
+                () -> placeholder.chat(request, "local-rag-service-token-change-me", "owner-a"));
+        assertEquals("RAG_SERVICE_TOKEN_MISSING", placeholderFailure.code());
+        verifyNoInteractions(service);
+    }
+
     private ThesisAssistantInternalController controller(ThesisAssistantService service) {
         return new ThesisAssistantInternalController(service,
                 new AssistantRagProperties("", "internal-token", true, 1_000, 30_000));

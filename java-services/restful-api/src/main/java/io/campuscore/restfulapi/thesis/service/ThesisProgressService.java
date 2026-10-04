@@ -106,20 +106,28 @@ public class ThesisProgressService {
          * chain for operators.
          */
         boolean approvedGroup = "APPROVED".equals(approvalStatus)
-                && memberCount >= 3 && memberCount <= 4;
+                && memberCount >= 1 && memberCount <= 3;
         boolean scoreFinalized = finalScore != null
                 && "GRADED".equals(string(row.get("result_status")));
         boolean publishedResult = "RESULTS_PUBLISHED".equals(roundStatus)
                 && approvedGroup
                 && scoreFinalized;
+        // Students must never see a score or council assignment before the
+        // round publishes results — the finalize step is internal evidence only.
+        boolean resultsVisible = "RESULTS_PUBLISHED".equals(roundStatus);
+        BigDecimal visibleFinalScore = resultsVisible ? finalScore : null;
+        Instant visibleFinalizedAt = resultsVisible ? finalScoreFinalizedAt : null;
+        UUID visibleCouncilId = resultsVisible ? councilId : null;
         List<Boolean> evidence = List.of(
                 groupId != null,
                 groupId != null,
                 topicId != null,
                 approvedGroup,
                 reportId != null,
-                councilId != null,
-                scoreFinalized,
+                // Council assignment and finalize are internal evidence: they
+                // stay invisible to the student until results are published.
+                visibleCouncilId != null,
+                resultsVisible && scoreFinalized,
                 publishedResult);
         List<String> completed = new ArrayList<>();
         boolean chainOpen = true;
@@ -146,7 +154,7 @@ public class ThesisProgressService {
             attention = "GROUP_REJECTED";
         } else if ("CANCELLED".equals(groupStatus)) {
             attention = "GROUP_CANCELLED";
-        } else if (memberCount < 3 || memberCount > 4) {
+        } else if (memberCount < 1 || memberCount > 3) {
             attention = "GROUP_INVALID_MEMBER_COUNT";
         } else if (inconsistentLaterEvidence) {
             attention = "PROGRESS_INCONSISTENT";
@@ -173,9 +181,9 @@ public class ThesisProgressService {
                 string(row.get("topic_title")),
                 reportId,
                 instantOf(row.get("report_submitted_at")),
-                councilId,
-                finalScore,
-                finalScoreFinalizedAt,
+                visibleCouncilId,
+                visibleFinalScore,
+                visibleFinalizedAt,
                 groupStatus);
     }
 

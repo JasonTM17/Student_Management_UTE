@@ -854,19 +854,21 @@ export default function RegisterPage() {
                 <h3 className="text-sm font-semibold text-foreground">{copy.applicationTitle}</h3>
                 <p className="mt-1 text-sm leading-6 text-muted-foreground">{copy.applicationDescription}</p>
               </div>
-              <label htmlFor="credit-limit-application-reason" className="block text-sm font-medium text-foreground">
-                {copy.applicationReasonLabel}
-              </label>
-              <Textarea
-                id="credit-limit-application-reason"
-                value={applicationReason}
-                onChange={(event) => setApplicationReason(event.target.value)}
-                placeholder={copy.applicationReasonPlaceholder}
-                minLength={20}
-                maxLength={1000}
-                required
-                hint={`${copy.applicationReasonHint} ${applicationReason.length}/1000`}
-              />
+              <div className="space-y-2">
+                <label htmlFor="credit-limit-application-reason" className="block text-sm font-medium text-foreground">
+                  {copy.applicationReasonLabel}
+                </label>
+                <Textarea
+                  id="credit-limit-application-reason"
+                  value={applicationReason}
+                  onChange={(event) => setApplicationReason(event.target.value)}
+                  placeholder={copy.applicationReasonPlaceholder}
+                  minLength={20}
+                  maxLength={1000}
+                  required
+                  hint={`${copy.applicationReasonHint} ${applicationReason.length}/1000`}
+                />
+              </div>
               <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                 <p className="text-xs leading-5 text-muted-foreground">{copy.applicationOfficeOnly}</p>
                 <Button type="submit" disabled={applicationBusy}>
@@ -1342,7 +1344,7 @@ export default function RegisterPage() {
                               {section ? ` - ${section.sectionNumber}` : ''}
                             </div>
                             {section?.course?.name ? (
-                              <div className="mt-1 truncate text-muted-foreground">{section.course.name}</div>
+                              <div className="mt-1 truncate text-muted-foreground" title={section.course.name}>{section.course.name}</div>
                             ) : null}
                             {section?.course?.credits ? (
                               <div className="mt-1 text-xs text-muted-foreground">

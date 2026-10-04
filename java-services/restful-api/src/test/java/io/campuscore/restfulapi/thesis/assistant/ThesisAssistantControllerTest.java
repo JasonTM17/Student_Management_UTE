@@ -1,6 +1,7 @@
 package io.campuscore.restfulapi.thesis.assistant;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -383,7 +384,7 @@ class ThesisAssistantControllerTest {
                         "RAG service request failed"));
         ThesisAssistantDtos.Citation citation = new ThesisAssistantDtos.Citation(
                 "kb-1", "kb-1", "Cách chọn đề tài khóa luận", "Cẩm nang", "vi", "Chọn đề tài theo chuyên ngành");
-        when(assistant.groundedFallback(anyString(), anyString(), anyBoolean(), any())).thenReturn(new ChatResponse(
+        when(assistant.groundedFallback(anyString(), anyString(), anyBoolean(), any(), anyBoolean())).thenReturn(new ChatResponse(
                 "Câu trả lời từ kho kiến thức nội bộ.", ThesisAssistantService.MODEL, true, "ANSWERED",
                 "vi", List.of(citation)));
 
@@ -408,7 +409,7 @@ class ThesisAssistantControllerTest {
                 "vi", List.of()));
         ThesisAssistantDtos.Citation citation = new ThesisAssistantDtos.Citation(
                 "kb-2", "kb-2", "Đăng ký học phần", "Cẩm nang", "vi", "Các bước đăng ký học phần");
-        when(assistant.groundedFallback(anyString(), anyString(), anyBoolean(), any())).thenReturn(new ChatResponse(
+        when(assistant.groundedFallback(anyString(), anyString(), anyBoolean(), any(), anyBoolean())).thenReturn(new ChatResponse(
                 "Các bước đăng ký học phần...", ThesisAssistantService.MODEL, true, "ANSWERED",
                 "vi", List.of(citation)));
 
@@ -417,6 +418,30 @@ class ThesisAssistantControllerTest {
         assertEquals("ANSWERED", response.reasonCode());
         assertTrue(response.degraded());
         assertEquals("kb-2", response.citations().get(0).sourceId());
+    }
+
+    @Test
+    void remoteHealthyNoMatchAndLocalMissAnswersHonestlyWithoutOutageCopy() {
+        // The remote answered cleanly with NO_MATCH and the local KB also has
+        // nothing: the reply must be an honest "not found" — NOT the degraded
+        // "knowledge base unreachable" copy, because nothing failed.
+        ThesisAssistantService assistant = mock(ThesisAssistantService.class);
+        RagAssistantGateway ragGateway = mock(RagAssistantGateway.class);
+        ThesisAssistantController controller = new ThesisAssistantController(assistant, ragGateway);
+        when(ragGateway.enabled()).thenReturn(true);
+        when(ragGateway.chat(any(), anyString())).thenReturn(new ChatResponse(
+                "Mình chưa tìm thấy hướng dẫn phù hợp.", ThesisAssistantService.MODEL, false, "NO_MATCH",
+                "vi", List.of()));
+        // Local search also empty → groundedFallback returns the honest answer.
+        when(assistant.groundedFallback(anyString(), anyString(), anyBoolean(), any(), anyBoolean()))
+                .thenReturn(ThesisAssistantService.noMatchFallback("vi"));
+
+        ChatResponse response = controller.chat(request("asdkjh asdkjh qwei?"), actor(), new MockHttpServletRequest());
+
+        assertEquals("NO_MATCH", response.reasonCode());
+        assertFalse(response.degraded(), "a healthy remote's no-match is not an outage");
+        assertFalse(response.answer().contains("chưa kết nối"), response.answer());
+        assertTrue(response.answer().contains("chưa tìm thấy"), response.answer());
     }
 
     @Test
@@ -431,7 +456,7 @@ class ThesisAssistantControllerTest {
         when(ragGateway.isTransientFailure(conflict)).thenReturn(false);
 
         assertThrows(DomainException.class, () -> controller.chat(request("Học phí tính thế nào?"), actor(), new MockHttpServletRequest()));
-        verify(assistant, never()).groundedFallback(anyString(), anyString(), anyBoolean());
+        verify(assistant, never()).groundedFallback(anyString(), anyString(), anyBoolean(), any(), anyBoolean());
     }
 
     @Test
@@ -445,7 +470,7 @@ class ThesisAssistantControllerTest {
                         "RAG service request failed"))
                 .when(ragGateway).stream(any(), anyString(), any());
         // Local KB also empty: the curated fallback must still answer.
-        when(assistant.groundedFallback(anyString(), anyString(), anyBoolean(), any()))
+        when(assistant.groundedFallback(anyString(), anyString(), anyBoolean(), any(), anyBoolean()))
                 .thenThrow(new IllegalStateException("knowledge unavailable"));
 
         List<ThesisAssistantService.StreamEvent> events = new ArrayList<>();
@@ -456,8 +481,10 @@ class ThesisAssistantControllerTest {
         assertTrue(events.get(1) instanceof ThesisAssistantService.StreamDelta delta
                 && delta.text().contains("Cẩm nang sinh viên")
                 && delta.text().contains("Phòng Đào tạo"));
+        // The curated fallback is uncited: it must stream as NO_MATCH so the UI
+        // never labels it as answered from approved guidance.
         assertTrue(events.get(2) instanceof ThesisAssistantService.StreamDone done
-                && done.degraded() && "ANSWERED".equals(done.reasonCode()));
+                && done.degraded() && "NO_MATCH".equals(done.reasonCode()));
     }
 
     @Test
@@ -474,7 +501,7 @@ class ThesisAssistantControllerTest {
         }).when(ragGateway).stream(any(), anyString(), any());
         ThesisAssistantDtos.Citation citation = new ThesisAssistantDtos.Citation(
                 "kb-3", "kb-3", "Đăng ký học phần", "Cẩm nang", "vi", "Các bước đăng ký học phần");
-        when(assistant.groundedFallback(anyString(), anyString(), anyBoolean(), any())).thenReturn(new ChatResponse(
+        when(assistant.groundedFallback(anyString(), anyString(), anyBoolean(), any(), anyBoolean())).thenReturn(new ChatResponse(
                 "Các bước đăng ký học phần...", ThesisAssistantService.MODEL, true, "ANSWERED",
                 "vi", List.of(citation)));
 

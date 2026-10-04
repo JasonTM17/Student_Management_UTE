@@ -69,6 +69,7 @@ import {
   announcementLengthViolationMessage,
   findAnnouncementLengthViolation,
 } from '@/lib/announcement-limits';
+import { announcementPriorityLabel } from '@/lib/announcement-presentation';
 import { useUnsavedChangesGuard } from '@/lib/use-unsaved-changes-guard';
 import { replaceCoverBlock, removeCoverBlock } from '@/lib/cover-banner';
 import { WorkspaceForbiddenState } from '@/components/ProtectedRoute';
@@ -1797,7 +1798,7 @@ export default function AcademicEditorPage() {
                                   : 'bg-blue-500/10 text-blue-600 dark:text-blue-300 border border-blue-500/30'
                               )}
                             >
-                              {ann.priority}
+                              {announcementPriorityLabel(ann.priority, locale)}
                             </span>
                           </td>
                           <td className="py-3 px-3 whitespace-nowrap">

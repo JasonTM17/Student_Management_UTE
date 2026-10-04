@@ -118,6 +118,96 @@ class GradePublicationLockTest {
     }
 
     @Test
+    void clearingBothScoresResetsADraftGradeToNotGraded() throws Exception {
+        mvc.perform(put("/api/v1/sections/section-1/grades")
+                        .with(lecturerJwt("lecturer-1"))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"grades":[{"enrollmentId":"enrollment-1","processScore":8.0,"finalExamScore":9.0}]}
+                                """))
+                .andExpect(status().isOk());
+
+        // Clearing both columns is a draft delete: components are removed and
+        // the enrollment returns to NOT_GRADED, not DRAFT-with-nulls.
+        mvc.perform(put("/api/v1/sections/section-1/grades")
+                        .with(lecturerJwt("lecturer-1"))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"grades":[{"enrollmentId":"enrollment-1","processScore":null,"finalExamScore":null}]}
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.message").value("Grades saved as draft"));
+
+        assertEnrollmentGrade("enrollment-1", null, null, "NOT_GRADED");
+        Integer components = jdbc.queryForObject(
+                "SELECT COUNT(*) FROM \"academic\".\"StudentGrade\" WHERE \"enrollmentId\" = 'enrollment-1'",
+                Integer.class);
+        org.assertj.core.api.Assertions.assertThat(components).isZero();
+    }
+
+    @Test
+    void aLoneNullScoreIsRejectedAsPartial() throws Exception {
+        mvc.perform(put("/api/v1/sections/section-1/grades")
+                        .with(lecturerJwt("lecturer-1"))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"grades":[{"enrollmentId":"enrollment-1","processScore":8.0,"finalExamScore":null}]}
+                                """))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("GRADE_PARTIAL_SCORE"));
+    }
+
+    @Test
+    void clearingAPublishedGradeIsStillLocked() throws Exception {
+        mvc.perform(put("/api/v1/sections/section-1/grades")
+                        .with(lecturerJwt("lecturer-1"))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"grades":[{"enrollmentId":"enrollment-1","processScore":8.0,"finalExamScore":9.0}]}
+                                """))
+                .andExpect(status().isOk());
+        mvc.perform(post("/api/v1/sections/section-1/grades/publish")
+                        .with(lecturerJwt("lecturer-1")))
+                .andExpect(status().isOk());
+
+        mvc.perform(put("/api/v1/sections/section-1/grades")
+                        .with(lecturerJwt("lecturer-1"))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"grades":[{"enrollmentId":"enrollment-1","processScore":null,"finalExamScore":null}]}
+                                """))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("GRADES_PUBLISHED_LOCKED"));
+    }
+
+    @Test
+    void anAppealedGradeIsLockedTheSameAsPublished() throws Exception {
+        mvc.perform(put("/api/v1/sections/section-1/grades")
+                        .with(lecturerJwt("lecturer-1"))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"grades":[{"enrollmentId":"enrollment-1","processScore":8.0,"finalExamScore":9.0}]}
+                                """))
+                .andExpect(status().isOk());
+        mvc.perform(post("/api/v1/sections/section-1/grades/publish")
+                        .with(lecturerJwt("lecturer-1")))
+                .andExpect(status().isOk());
+        // A student appeal moves the row to APPEALED — still the official,
+        // student-visible record, so the lecturer mutation must stay locked.
+        jdbc.update("UPDATE \"academic\".\"Enrollment\" SET \"gradeStatus\" = 'APPEALED'"
+                + " WHERE \"id\" = 'enrollment-1'");
+
+        mvc.perform(put("/api/v1/sections/section-1/grades")
+                        .with(lecturerJwt("lecturer-1"))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"grades":[{"enrollmentId":"enrollment-1","processScore":null,"finalExamScore":null}]}
+                                """))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("GRADES_PUBLISHED_LOCKED"));
+    }
+
+    @Test
     void publishCompletesOnlyTheGradeableEnrollments() throws Exception {
         insertEnrollment("enrollment-2-dropped", "DROPPED");
         insertCompleteComponents("enrollment-2-dropped");

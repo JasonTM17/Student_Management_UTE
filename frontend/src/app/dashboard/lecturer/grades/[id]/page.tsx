@@ -74,7 +74,7 @@ export default function SectionGradingPage() {
   const params = useParams<{ id: string }>();
   const router = useRouter();
   const { user, hasAccess, isLoading: authLoading } = useRequireAuth(['LECTURER']);
-  const { locale, formatNumber, messages } = useI18n();
+  const { locale, formatNumber, messages, href } = useI18n();
   const [sectionData, setSectionData] = useState<SectionGrades | null>(null);
   const [grades, setGrades] = useState<Map<string, GradeUpdate>>(new Map());
   const [editedIds, setEditedIds] = useState<Set<string>>(new Set());
@@ -510,11 +510,29 @@ export default function SectionGradingPage() {
     // The backend upserts only the rows it receives, so submit just the
     // enrollments the lecturer actually edited instead of the whole roster.
     const editedRows = sectionData.enrollments.filter((enrollment) => editedIds.has(enrollment.id));
-    const partialRows = editedRows.filter((enrollment) => !hasCompletedGrade(grades.get(enrollment.id)));
-    const updates = editedRows
-      .filter((enrollment) => hasCompletedGrade(grades.get(enrollment.id)))
-      .map((enrollment) => grades.get(enrollment.id))
-      .filter((update): update is GradeUpdate & { processScore: number; finalExamScore: number } => hasCompletedGrade(update));
+    // A row cleared of both scores on an enrollment that already carried a
+    // grade is a delete request, not a half-typed row.
+    const clearedRows = editedRows.filter((enrollment) => {
+      const update = grades.get(enrollment.id);
+      const nowEmpty = !update || (update.processScore === null && update.finalExamScore === null);
+      const hadSaved = enrollment.processScore !== null || enrollment.finalExamScore !== null;
+      return nowEmpty && hadSaved;
+    });
+    const clearedIds = new Set(clearedRows.map((enrollment) => enrollment.id));
+    const partialRows = editedRows.filter(
+      (enrollment) => !clearedIds.has(enrollment.id) && !hasCompletedGrade(grades.get(enrollment.id)),
+    );
+    const updates: GradeUpdate[] = [
+      ...editedRows
+        .filter((enrollment) => hasCompletedGrade(grades.get(enrollment.id)))
+        .map((enrollment) => grades.get(enrollment.id))
+        .filter((update): update is GradeUpdate => hasCompletedGrade(update)),
+      ...clearedRows.map((enrollment) => ({
+        enrollmentId: enrollment.id,
+        processScore: null,
+        finalExamScore: null,
+      })),
+    ];
 
     // An out-of-range entry keeps the previous value in state, so saving now
     // would persist something other than what the lecturer sees on screen.
@@ -719,7 +737,7 @@ export default function SectionGradingPage() {
                 onClick={(event) => {
                   if (!hasChanges) return;
                   event.preventDefault();
-                  requestLeave(() => router.push('/dashboard/lecturer/grades'));
+                  requestLeave(() => router.push(href('/dashboard/lecturer/grades')));
                 }}
               >
                 {copy.backToGrades}

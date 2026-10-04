@@ -318,6 +318,9 @@ public class RegistrationService {
             List<String> roles,
             String idempotencyKey) {
         requireKey(idempotencyKey);
+        if (studentId == null || studentId.isBlank()) {
+            throw problem(HttpStatus.FORBIDDEN, "STUDENT_PROFILE_REQUIRED", "Student profile is required");
+        }
         String hash = sha256("ENROLL|" + sectionId);
         // The registration slip is part of the enrollment contract: it must be
         // produced inside the same transaction, so a renderer failure rolls
@@ -340,9 +343,24 @@ public class RegistrationService {
     }
 
     public void drop(String enrollmentId, String studentId, List<String> roles, String idempotencyKey) {
+        drop(enrollmentId, studentId, roles, idempotencyKey, null);
+    }
+
+    public void drop(String enrollmentId, String studentId, List<String> roles, String idempotencyKey,
+            String actorId) {
         requireKey(idempotencyKey);
+        boolean admin = roles != null && (roles.contains("ADMIN") || roles.contains("SUPER_ADMIN"));
+        if (!admin && (studentId == null || studentId.isBlank())) {
+            throw problem(HttpStatus.FORBIDDEN, "STUDENT_PROFILE_REQUIRED", "Student profile is required");
+        }
         String hash = sha256("DROP|" + enrollmentId);
-        transactions.executeWithoutResult(status -> dropLocked(enrollmentId, studentId, roles, idempotencyKey, hash));
+        // Self-service drops record the student profile id (same convention as
+        // the ENROLL event); privileged drops record the caller's user id (same
+        // convention as ADMIN_DELETE) so an admin who happens to hold a student
+        // profile is not misattributed as the enrollment owner.
+        String resolvedActor = admin ? actorId : studentId;
+        transactions.executeWithoutResult(status -> dropLocked(enrollmentId, studentId, roles, idempotencyKey, hash,
+                resolvedActor));
     }
 
     @Transactional
@@ -565,7 +583,8 @@ public class RegistrationService {
             String studentId,
             List<String> roles,
             String idempotencyKey,
-            String hash) {
+            String hash,
+            String actorId) {
         Map<String, Object> replay = claimIdempotency(studentId == null ? enrollmentId : studentId, idempotencyKey, hash);
         if (replay != null) {
             return;
@@ -595,7 +614,7 @@ public class RegistrationService {
             throw problem(HttpStatus.CONFLICT, "ENROLLMENT_NOT_ACTIVE", "Enrollment changed during the request");
         }
         boolean admin = roles != null && (roles.contains("ADMIN") || roles.contains("SUPER_ADMIN"));
-        if (!admin && !studentId.equals(String.valueOf(enrollment.get("student_id")))) {
+        if (!admin && !java.util.Objects.equals(studentId, String.valueOf(enrollment.get("student_id")))) {
             throw problem(HttpStatus.FORBIDDEN, "ENROLLMENT_FORBIDDEN", "Enrollment does not belong to the current student");
         }
         if (!List.of("ENROLLED", "PENDING").contains(String.valueOf(enrollment.get("status")))) {
@@ -613,6 +632,17 @@ public class RegistrationService {
                 "UPDATE " + SECTION + " SET \"enrolledCount\" = CASE WHEN \"enrolledCount\" > 0 THEN \"enrolledCount\" - 1 ELSE 0 END,"
                         + " \"updatedAt\" = CURRENT_TIMESTAMP WHERE \"id\" = :sectionId",
                 new MapSqlParameterSource("sectionId", enrollment.get("section_id")));
+        jdbc.update(
+                "INSERT INTO " + EVENT
+                        + " (\"id\", \"enrollmentId\", \"studentId\", \"sectionId\", \"action\", \"actorId\", \"requestHash\")"
+                        + " VALUES (:id, :enrollmentId, :studentId, :sectionId, 'DROP', :actorId, :hash)",
+                new MapSqlParameterSource()
+                        .addValue("id", UUID.randomUUID().toString())
+                        .addValue("enrollmentId", enrollmentId)
+                        .addValue("studentId", targetStudentId)
+                        .addValue("sectionId", enrollment.get("section_id"))
+                        .addValue("actorId", actorId == null || actorId.isBlank() ? "system" : actorId)
+                        .addValue("hash", hash));
         completeIdempotency(studentId == null ? enrollmentId : studentId, idempotencyKey, enrollmentId, hash);
     }
 
@@ -1052,7 +1082,9 @@ public class RegistrationService {
     }
 
     private static String displayName(String firstName, String lastName) {
-        String name = ((firstName == null ? "" : firstName.trim()) + " " + (lastName == null ? "" : lastName.trim())).trim();
+        // Vietnamese order: lastName carries the surname + title, firstName the
+        // given name, so "TS. Phạm Thị" + "Ngọc Lan" renders "TS. Phạm Thị Ngọc Lan".
+        String name = ((lastName == null ? "" : lastName.trim()) + " " + (firstName == null ? "" : firstName.trim())).trim();
         return name.isEmpty() ? null : name;
     }
 }

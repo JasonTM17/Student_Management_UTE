@@ -89,7 +89,7 @@ class ThesisAssistantDevOpsRetrievalTest {
                 new ThesisAssistantKnowledgeRepository.KnowledgeDocument(
                         "77777777-7777-7777-7777-777777777777", DEVOPS_SLUG, "en",
                         "DevOps for students: Docker, CI/CD and reproducible runtime environments",
-                        seeded, "office", "SPECIALIZED", (java.util.UUID) null, (Integer) null));
+                        seeded, "office", "SPECIALIZED", null, null, null, null, null, null, null, null, 30));
         // Stand in for the published corpus with the same containment semantics
         // the repository asserts below: LOWER(title/content) LIKE '%term%'.
         when(knowledge.search(eq("en"), anyList(), anyInt())).thenAnswer(invocation -> {

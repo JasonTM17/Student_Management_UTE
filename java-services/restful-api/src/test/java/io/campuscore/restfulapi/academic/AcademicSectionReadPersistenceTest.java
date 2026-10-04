@@ -146,9 +146,9 @@ class AcademicSectionReadPersistenceTest {
         mvc.perform(get("/api/v1/sections/section-1/grades").with(lecturerJwt("lecturer-1")))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.sectionId").value("section-1"))
-                .andExpect(jsonPath("$.lecturerName").value("Lan Lecturer"))
+                .andExpect(jsonPath("$.lecturerName").value("Lecturer Lan"))
                 .andExpect(jsonPath("$.enrollments.length()").value(2))
-                .andExpect(jsonPath("$.enrollments[0].studentName").value("An Student"))
+                .andExpect(jsonPath("$.enrollments[0].studentName").value("Student An"))
                 .andExpect(jsonPath("$.enrollments[0].finalGrade").value(91.50))
                 .andExpect(jsonPath("$.enrollments[1].studentCode").value("S002"))
                 .andExpect(jsonPath("$.enrollments[1].gradeStatus").value("DRAFT"));

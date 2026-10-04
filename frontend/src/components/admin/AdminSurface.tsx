@@ -371,7 +371,7 @@ export function AdminDialogFooter({
   className,
 }: AdminDialogFooterProps) {
   return (
-    <div className={cn('flex justify-end gap-2 pt-2', className)}>
+    <div className={cn('flex flex-wrap justify-end gap-2 pt-2', className)}>
       {children}
     </div>
   );

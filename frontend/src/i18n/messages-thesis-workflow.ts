@@ -72,13 +72,13 @@ export const thesisWorkflowEn = {
       },
       {
         title: 'Student group registers',
-        shortDesc: 'Form a group of 3–4 students & pick a topic',
+        shortDesc: 'Form a group of up to 3 students & pick a topic',
         role: 'Students & supervisors',
         rule: 'Articles R2, R4',
         objective:
           'Students form a research group and register exactly one topic from the published list.',
         actions: [
-          'Each group has 3–4 students and exactly one leader as its representative.',
+          'Each group has at most 3 students and exactly one leader as its representative.',
           'Each student may join only one group for the entire registration round.',
           'Each group registers exactly one topic; the supervisor approves it or rejects it with a reason.',
         ],
@@ -176,7 +176,7 @@ export const thesisWorkflowEn = {
         title: 'Student group rules & approval',
         badge: 'Group structure',
         bullets: [
-          'Work is done in groups, **3–4 students**, with **1 group leader** as the representative.',
+          'Work is done in groups of **up to 3 students**, with **1 group leader** as the representative.',
           'Each student **may join only one group** for the whole round; nobody may be listed in two groups at once.',
           'Each group **registers exactly one topic** from the published list.',
           'After the student submits the request, the supervising lecturer reviews it and **approves** it or **rejects it with a reason**. Once approved, the group formally starts the topic.',
@@ -320,7 +320,7 @@ export const thesisWorkflowEn = {
     reportNotSubmitted: 'Thesis report not submitted yet',
     workspaceTitle: 'Student workbench & research group (Articles R4, R5, R9)',
     workspaceSubtitle:
-      'Faculty of IT regulation: 3–4 students per group (Article R4), only the group leader submits the thesis report (Article R5), and scores are looked up transparently once the council finalises them (Article R9).',
+      'Faculty of IT regulation: at most 3 students per group (Article R4), only the group leader submits the thesis report (Article R5), and scores are looked up transparently once the council finalises them (Article R9).',
     defenceCompleted: 'Defence completed',
     articlesR7R9: 'Articles R7 & R9',
     resultsHeading: 'Thesis evaluation result & score',
@@ -398,13 +398,13 @@ export const thesisWorkflowVi: Widen<typeof thesisWorkflowEn> = {
       },
       {
         title: 'Nhóm SV đăng ký',
-        shortDesc: 'Lập nhóm 3–4 SV & chọn đề tài',
+        shortDesc: 'Lập nhóm tối đa 3 SV & chọn đề tài',
         role: 'Sinh viên & GVHD',
         rule: 'Điều R2, R4',
         objective:
           'Sinh viên thành lập nhóm nghiên cứu và đăng ký đúng 1 đề tài trong danh mục đã công bố.',
         actions: [
-          'Mỗi nhóm có 3–4 sinh viên, có đúng 1 Nhóm trưởng (Leader) đại diện.',
+          'Mỗi nhóm có tối đa 3 sinh viên, có đúng 1 Nhóm trưởng (Leader) đại diện.',
           'Mỗi sinh viên chỉ được tham gia duy nhất 1 nhóm trong toàn bộ đợt đăng ký.',
           'Mỗi nhóm chỉ đăng ký đúng 1 đề tài; Giảng viên hướng dẫn sẽ xét duyệt (Approve) hoặc từ chối (Reject kèm lý do).',
         ],
@@ -502,7 +502,7 @@ export const thesisWorkflowVi: Widen<typeof thesisWorkflowEn> = {
         title: 'Quy định nhóm sinh viên thực hiện & phê duyệt',
         badge: 'Cơ cấu nhóm',
         bullets: [
-          'Thực hiện theo nhóm, **3–4 sinh viên**, có **1 nhóm trưởng (Leader)** đại diện.',
+          'Thực hiện theo nhóm **tối đa 3 sinh viên**, có **1 nhóm trưởng (Leader)** đại diện.',
           'Mỗi sinh viên **chỉ tham gia duy nhất 1 nhóm** trong toàn bộ đợt; không được đứng tên 2 nhóm cùng lúc.',
           'Mỗi nhóm **chỉ đăng ký duy nhất 1 đề tài** từ danh sách đã công bố.',
           'Sau khi sinh viên nộp nguyện vọng, Giảng viên hướng dẫn sẽ xem xét và **phê duyệt (Approve)** hoặc **từ chối (Reject kèm lý do)**. Khi được duyệt, nhóm chính thức thực hiện đề tài.',
@@ -645,7 +645,7 @@ export const thesisWorkflowVi: Widen<typeof thesisWorkflowEn> = {
     reportNotSubmitted: 'Chưa nộp báo cáo luận văn',
     workspaceTitle: 'Bàn Làm Việc Sinh Viên & Nhóm Nghiên Cứu (Điều R4, R5, R9)',
     workspaceSubtitle:
-      'Tuân thủ Quy chế Khoa CNTT: 3–4 SV/nhóm (Điều R4), chỉ Nhóm trưởng nộp báo cáo luận văn (Điều R5), và tra cứu điểm số minh bạch sau khi Hội đồng chốt điểm (Điều R9).',
+      'Tuân thủ Quy chế Khoa CNTT: tối đa 3 SV/nhóm (Điều R4), chỉ Nhóm trưởng nộp báo cáo luận văn (Điều R5), và tra cứu điểm số minh bạch sau khi Hội đồng chốt điểm (Điều R9).',
     defenceCompleted: 'Đã Hoàn Thành Bảo Vệ',
     articlesR7R9: 'Quy chế Điều R7 & Điều R9',
     resultsHeading: 'Kết quả đánh giá & điểm số khóa luận tốt nghiệp',

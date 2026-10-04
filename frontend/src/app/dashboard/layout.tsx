@@ -55,7 +55,7 @@ import { useDocumentTitle } from '@/lib/use-document-title';
 import { Button } from '@/components/ui/button';
 import { useI18n } from '@/i18n';
 import { notificationsApi } from '@/lib/api';
-import { cn } from '@/lib/utils';
+import { cn, htmlToPlainText } from '@/lib/utils';
 import { stripLocaleFromPathname } from '@/i18n/paths';
 import { isDemoUser, loginHref, portalFromPathname } from '@/lib/login-portal';
 
@@ -238,24 +238,8 @@ function resolveNotificationTarget(notification: {
 }
 
 // Notification bodies are authored HTML (the same bodies the reader renders).
-// The bell shows a plain-text preview, so strip markup — figures included —
-// collapse the whitespace, and clamp. Unlike the announcement Sapo helper this
-// keeps punctuation: the bodies carry dates ('20-12-2026') and term codes
-// ('2026-2027') that must not lose their hyphens.
-function notificationPreview(content: string | undefined, maxLength = 160): string {
-  if (!content) {
-    return '';
-  }
-  const text = content
-    .replace(/<figure[\s\S]*?<\/figure>/gi, ' ')
-    .replace(/<[^>]*>/g, ' ')
-    .replace(/\s+/g, ' ')
-    .trim();
-  if (text.length <= maxLength) {
-    return text;
-  }
-  return `${text.slice(0, maxLength).trim()}…`;
-}
+// The bell shows a plain-text preview via the shared htmlToPlainText helper.
+const notificationPreview = htmlToPlainText;
 
 export default function DashboardLayout({
   children,
@@ -1172,8 +1156,9 @@ export default function DashboardLayout({
                                 className="group flex w-full flex-col gap-1 rounded-lg border border-border/70 bg-secondary/40 p-2.5 text-left transition-all duration-150 hover:border-primary/50 hover:bg-secondary/80 hover:shadow-xs active:scale-[0.99] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring cursor-pointer"
                               >
                                 <div className="flex items-start justify-between gap-2">
-                                  <span className="text-xs font-semibold text-foreground group-hover:text-primary transition-colors">
-                                    {notification.title || messages.dashboardShell.notifications.fallbackTitle}
+                                  <span className="min-w-0 break-words text-xs font-semibold text-foreground group-hover:text-primary transition-colors">
+                                    {/* Titles can carry pasted markup too — strip, never render raw tags. */}
+                                    {htmlToPlainText(notification.title, 200) || messages.dashboardShell.notifications.fallbackTitle}
                                   </span>
                                   <ChevronRight className="h-3.5 w-3.5 shrink-0 text-muted-foreground transition-transform duration-150 group-hover:translate-x-0.5 group-hover:text-primary" />
                                 </div>
@@ -1238,8 +1223,8 @@ export default function DashboardLayout({
                     <div className="truncate text-sm font-semibold text-foreground">
                       {fullName}
                     </div>
-                    <div className="truncate text-xs text-muted-foreground flex items-center gap-1">
-                      <span>{user.email}</span>
+                    <div className="text-xs text-muted-foreground flex items-center gap-1">
+                      <span className="min-w-0 truncate">{user.email}</span>
                       {isDemoUser(user) && (
                         <span className="inline-flex items-center gap-1 text-[10px] font-medium text-muted-foreground">
                           <span
@@ -1280,7 +1265,9 @@ export default function DashboardLayout({
                         </p>
                         <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
                           <div className="inline-flex rounded-md bg-secondary px-2.5 py-0.5 text-xs font-medium text-foreground">
-                            {user.roles?.[0] || 'USER'}
+                            {messages.common.roles[
+                              (user.roles?.[0] || 'USER').toUpperCase() as keyof typeof messages.common.roles
+                            ] ?? user.roles?.[0] ?? messages.common.roles.USER}
                           </div>
                           {isDemoUser(user) && (
                             <div className="inline-flex items-center gap-1 rounded-md bg-amber-500/15 border border-amber-500/30 px-2.5 py-0.5 text-[11px] font-medium text-amber-700 dark:text-amber-300">

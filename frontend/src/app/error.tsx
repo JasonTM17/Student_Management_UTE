@@ -46,7 +46,9 @@ export default function ErrorBoundary({
 
   // The i18n provider itself may be the thing that crashed, so the locale
   // comes straight from the persisted cookie instead of React context.
-  const copy = COPY[readLocale()];
+  const locale = readLocale();
+  const copy = COPY[locale];
+  const homeHref = locale === 'en' ? '/en' : '/';
 
   return (
     <div className="min-h-screen flex items-center justify-center p-6 bg-background text-foreground">
@@ -80,7 +82,7 @@ export default function ErrorBoundary({
           </Button>
 
           <Button asChild variant="outline">
-            <Link href="/" className="flex items-center justify-center gap-2">
+            <Link href={homeHref} className="flex items-center justify-center gap-2">
               <Home className="h-4 w-4" />
               {copy.home}
             </Link>

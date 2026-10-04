@@ -12,6 +12,7 @@ import {
   X,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { useI18n } from '@/i18n';
 
 export interface ScheduleDetailData {
   courseCode: string;
@@ -69,6 +70,7 @@ export function ClassScheduleDetailModal({
   locale,
   isLecturer = false,
 }: ClassScheduleDetailModalProps) {
+  const { messages } = useI18n();
   const modalRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -101,7 +103,7 @@ export function ClassScheduleDetailModal({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 p-4 backdrop-blur-sm animate-in fade-in-0"
+      className="fixed inset-0 z-[60] flex items-center justify-center bg-background/80 p-4 backdrop-blur-sm animate-in fade-in-0"
       onClick={onClose}
       role="dialog"
       aria-modal="true"
@@ -124,7 +126,9 @@ export function ClassScheduleDetailModal({
               </span>
               {data.status ? (
                 <span className="rounded-md bg-emerald-500/15 px-2 py-0.5 text-[11px] font-medium text-emerald-700 dark:text-emerald-300">
-                  {data.status}
+                  {messages.common.statuses[
+                    data.status.toUpperCase() as keyof typeof messages.common.statuses
+                  ] ?? data.status}
                 </span>
               ) : null}
             </div>

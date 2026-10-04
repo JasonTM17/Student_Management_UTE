@@ -295,7 +295,8 @@ public class AcademicSectionReadRepository {
     }
 
     private static String displayName(String firstName, String lastName) {
-        return ((firstName == null ? "" : firstName.trim()) + " " + (lastName == null ? "" : lastName.trim())).trim();
+        // Vietnamese order: lastName carries the surname + title, firstName the given name.
+        return ((lastName == null ? "" : lastName.trim()) + " " + (firstName == null ? "" : firstName.trim())).trim();
     }
 
     public record SectionRow(

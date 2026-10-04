@@ -155,6 +155,8 @@ services:
       THESIS_REPORT_STORAGE_PROVIDER: ${THESIS_REPORT_STORAGE_PROVIDER:-local}
       THESIS_REPORT_STORAGE_BUCKET: ${THESIS_REPORT_STORAGE_BUCKET:-thesis-reports}
       THESIS_REPORT_STORAGE_LOCAL_ROOT: /var/lib/campuscore/thesis-reports
+      SUPABASE_URL: ${SUPABASE_URL:-}
+      SUPABASE_SERVICE_ROLE_KEY: ${SUPABASE_SERVICE_ROLE_KEY:-}
       ASSISTANT_MAX_MESSAGE_CHARS: ${ASSISTANT_MAX_MESSAGE_CHARS:-2000}
       ASSISTANT_MAX_CONTEXT_CHARS: ${ASSISTANT_MAX_CONTEXT_CHARS:-6000}
       ASSISTANT_USER_DAILY_QUOTA: ${ASSISTANT_USER_DAILY_QUOTA:-20}
@@ -196,9 +198,13 @@ services:
         # them into the client bundle, which is why a public host must leave the
         # flag false and the passwords empty.
         NEXT_PUBLIC_SHOW_DEMO_CREDENTIALS: ${NEXT_PUBLIC_SHOW_DEMO_CREDENTIALS:-true}
-        NEXT_PUBLIC_DEMO_STUDENT_PASSWORD: ${NEXT_PUBLIC_DEMO_STUDENT_PASSWORD:-}
-        NEXT_PUBLIC_DEMO_LECTURER_PASSWORD: ${NEXT_PUBLIC_DEMO_LECTURER_PASSWORD:-}
-        NEXT_PUBLIC_DEMO_ADMIN_PASSWORD: ${NEXT_PUBLIC_DEMO_ADMIN_PASSWORD:-}
+        # Seeded demo passwords for the local evaluation stack — the quick-fill
+        # panel needs real values or it stays hidden (empty = no panel). The
+        # production image is built with the Dockerfile defaults (flag off,
+        # passwords empty), so this never leaks into a deployed bundle.
+        NEXT_PUBLIC_DEMO_STUDENT_PASSWORD: ${NEXT_PUBLIC_DEMO_STUDENT_PASSWORD:-password123}
+        NEXT_PUBLIC_DEMO_LECTURER_PASSWORD: ${NEXT_PUBLIC_DEMO_LECTURER_PASSWORD:-password123}
+        NEXT_PUBLIC_DEMO_ADMIN_PASSWORD: ${NEXT_PUBLIC_DEMO_ADMIN_PASSWORD:-password123}
     image: student-management-ute-frontend:local
     environment:
       NODE_ENV: production

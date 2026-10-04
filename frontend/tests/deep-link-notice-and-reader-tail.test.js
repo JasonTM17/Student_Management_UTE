@@ -117,11 +117,16 @@ test('the dispatch sheet formats dates through the shared locale helper', () => 
   assert.deepEqual(handBuiltDateParts(DISPATCH), []);
   assert.match(DISPATCH, /formatDate\(dateObj,\s*\{[^}]*day: '2-digit'/);
   // Every date in this sheet comes from the shared formatter: the numeric
-  // signature date and the prose heading each consume a formatDate result, so
-  // no local day/month/year arithmetic may appear anywhere in the file.
+  // signature date consumes formatDate, and the prose heading takes single
+  // day/month/year parts from Intl.DateTimeFormat under the shared BCP-47 tag
+  // — partial formatDate options cannot express them because formatDate
+  // merges year+month+day defaults (the triple-date regression).
   assert.ok((DISPATCH.match(/officialDate/g) ?? []).length >= 2);
-  assert.match(DISPATCH, /formatDate\(dateObj,\s*\{\s*day: 'numeric'/);
-  assert.match(DISPATCH, /formatDate\(dateObj,\s*\{\s*month: 'long'/);
+  assert.doesNotMatch(DISPATCH, /formatDate\(dateObj,\s*\{\s*day: 'numeric'\s*\}/);
+  assert.doesNotMatch(DISPATCH, /formatDate\(dateObj,\s*\{\s*month: 'long'\s*\}/);
+  assert.match(DISPATCH, /Intl\.DateTimeFormat\(localeCodes\[locale\],\s*\{\s*day: 'numeric'\s*\}/);
+  assert.match(DISPATCH, /Intl\.DateTimeFormat\(localeCodes\[locale\],\s*\{\s*month: 'long'\s*\}/);
+  assert.match(DISPATCH, /Intl\.DateTimeFormat\(localeCodes\[locale\],\s*\{\s*year: 'numeric'\s*\}/);
 });
 
 /** Day/month/year arithmetic re-implemented in a component instead of the i18n helper. */

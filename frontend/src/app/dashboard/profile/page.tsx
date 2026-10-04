@@ -375,7 +375,12 @@ export default function ProfilePage() {
   const handlePhotoChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     event.target.value = '';
-    if (!file || !user?.id || !ALLOWED_AVATAR_TYPES.has(file.type)) {
+    if (!file || !user?.id) {
+      return;
+    }
+    if (!ALLOWED_AVATAR_TYPES.has(file.type)) {
+      setProfileError(messages.profile.photoUploadFailed);
+      toast.error(messages.profile.photoUploadFailed);
       return;
     }
 
@@ -396,6 +401,15 @@ export default function ProfilePage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setProfileError('');
+
+    // Client-side mirror of the backend @Pattern rule so a bad number fails
+    // here instead of round-tripping a 400.
+    const phone = formData.phone.trim();
+    if (phone && !/^\+?[0-9][0-9\s()./-]{4,78}$/.test(phone)) {
+      setProfileError(messages.profile.phoneInvalid);
+      return;
+    }
+
     setIsLoading(true);
 
     try {
@@ -451,13 +465,15 @@ export default function ProfilePage() {
         twoFactorPassword: false,
       });
     } catch (error: any) {
-      const message = campusErrorMessage(
-        error,
-        messages.common.campusErrors,
-        messages.profile.passwordUpdateFailed,
+      // The inline error sits directly under the form, so a toast with the
+      // same copy read as a duplicated message.
+      setPasswordError(
+        campusErrorMessage(
+          error,
+          messages.common.campusErrors,
+          messages.profile.passwordUpdateFailed,
+        ),
       );
-      setPasswordError(message);
-      toast.error(message);
     } finally {
       setIsUpdatingPassword(false);
     }
@@ -512,7 +528,7 @@ export default function ProfilePage() {
                       family name first — "Nguyễn Tiến Sơn", not "Tiến Sơn Nguyễn". */}
                   {user?.lastName} {user?.firstName}
                 </div>
-                <div className="text-sm text-muted-foreground">{user?.email}</div>
+                <div className="break-all text-sm text-muted-foreground">{user?.email}</div>
                 <div className="flex flex-wrap items-center gap-2">
                   <input
                     id="profile-photo"
@@ -611,6 +627,7 @@ export default function ProfilePage() {
                   <Input
                     id="profile-phone"
                     type="tel"
+                    inputMode="tel"
                     value={formData.phone}
                     onChange={(e) =>
                       setFormData((current) => ({ ...current, phone: e.target.value }))
@@ -754,9 +771,9 @@ export default function ProfilePage() {
                     : messages.profile.twoFactor.statusDisabled}
                 </span>
               )}
-              <span className="inline-flex items-center gap-1.5 text-xs text-muted-foreground">
-                <Mail className="h-3.5 w-3.5" aria-hidden="true" />
-                {messages.profile.twoFactor.otpEmailLabel}: {user.email}
+              <span className="inline-flex min-w-0 items-center gap-1.5 text-xs text-muted-foreground">
+                <Mail className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                <span className="min-w-0 break-all">{messages.profile.twoFactor.otpEmailLabel}: {user.email}</span>
               </span>
             </div>
 

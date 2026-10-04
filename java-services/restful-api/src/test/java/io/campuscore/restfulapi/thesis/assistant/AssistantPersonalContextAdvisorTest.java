@@ -6,6 +6,7 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
@@ -452,11 +453,17 @@ class AssistantPersonalContextAdvisorTest {
     }
 
     @Test
-    void returnsNullWithoutPersonalClaimsSoTheControllerFallsBackToRag() {
+    void returnsAnHonestNoContextAnswerWithoutPersonalClaims() {
+        // F13: a personal-intent question from an actor with no student/lecturer
+        // claim used to fall through to the corpus and come back as a fabricated
+        // schedule-shaped reply. Now it gets an honest PERSONAL_CONTEXT answer.
         Jwt guest = new Jwt("token", Instant.now(), Instant.now().plusSeconds(600),
                 Map.of("alg", "HS256"), new HashMap<>(Map.of("sub", "someone", "roles", List.of("STUDENT"))));
 
-        assertNull(advisor.answer(chatRequest("vi", "lịch học của tôi?"), guest));
+        ChatResponse response = advisor.answer(chatRequest("vi", "lịch học của tôi?"), guest);
+        assertNotNull(response);
+        assertEquals("PERSONAL_CONTEXT", response.reasonCode());
+        assertTrue(response.answer().contains("chưa gắn hồ sơ"), response.answer());
     }
 
     @Test
@@ -610,6 +617,66 @@ class AssistantPersonalContextAdvisorTest {
         // Code without a room/time question stays off this intent (and off the
         // advisor entirely — no other intent claims "còn chỗ" questions).
         assertFalse(advisor.handles("lớp học phần SE401 còn chỗ trống không"));
+    }
+
+    @Test
+    void normativeQuestionsStayOnTheKnowledgePathEvenWithCodesOrNumbers() {
+        // C7: policy wording next to a personal-intent pattern must not be
+        // intercepted — these ask the RULE, not the asker's own record.
+        assertFalse(advisor.handles("Quy định tính điểm rèn luyện như thế nào?"));
+        assertFalse(advisor.handles("Theo quy chế cần đủ 143 tín chỉ tốt nghiệp phải không?"));
+        assertFalse(advisor.handles("Quy định sĩ số phòng học của lớp SE013 tối đa bao nhiêu?"));
+        // And the personal phrasing of the same topics still routes correctly.
+        assertTrue(advisor.handles("điểm rèn luyện của tôi mấy điểm?"));
+        assertTrue(advisor.handles("Còn thiếu bao nhiêu tín chỉ để đủ 143 tín chỉ tốt nghiệp?"));
+        assertTrue(advisor.handles("Lớp SE013 học phòng nào, giờ nào?"));
+    }
+
+    @Test
+    void wukongN2CounterexamplesStayOnTheKnowledgePath() {
+        // Wukong round-2 falsification: each of these slipped past the policy
+        // gate and was answered with the asker's personal record.
+        assertFalse(advisor.handles("Điểm rèn luyện có bao nhiêu mức xếp loại?"));
+        assertFalse(advisor.handles("Xếp loại rèn luyện gồm bao nhiêu loại?"));
+        assertFalse(advisor.handles("Điểm rèn luyện tính theo thang 100 điểm?"));
+        assertFalse(advisor.handles("Sinh viên bị kỷ luật trừ mấy điểm rèn luyện?"));
+        assertFalse(advisor.handles("Sinh viên cần đủ 130 tín chỉ mới được tốt nghiệp đúng không?"));
+        assertFalse(advisor.handles("Cách đổi phòng học cho lớp SE013-01?"));
+        assertFalse(advisor.handles("Thủ tục mượn phòng cho lớp SE013?"));
+    }
+
+    @Test
+    void sectionDetailServesThePublicCatalogToClaimlessActors() {
+        // C7/Kongming: a section-code question carries public catalog data —
+        // an actor with no student profile gets the published schedule instead
+        // of a bare "no profile" denial.
+        NamedParameterJdbcTemplate jdbc = mock(NamedParameterJdbcTemplate.class);
+        AssistantPersonalContextAdvisor catalogAdvisor = new AssistantPersonalContextAdvisor(
+                enrollmentService, sectionService, null, jdbc, null, null);
+        Map<String, Object> row = new HashMap<>();
+        row.put("section_number", "SE099-01");
+        row.put("course_code", "SE099");
+        row.put("course_name_vi", "Học máy ứng dụng");
+        row.put("schedule_day", 3);
+        row.put("schedule_start", "07:00");
+        row.put("schedule_end", "09:30");
+        row.put("room_building", "B");
+        row.put("room_number", "204");
+        when(jdbc.queryForList(anyString(), any(MapSqlParameterSource.class))).thenReturn(List.of(row));
+        Jwt guest = new Jwt("token", Instant.now(), Instant.now().plusSeconds(600),
+                Map.of("alg", "HS256"), new HashMap<>(Map.of("sub", "admin-1", "roles", List.of("ADMIN"))));
+
+        ChatResponse response = catalogAdvisor.answer(
+                chatRequest("vi", "Lớp SE099 học phòng nào, giờ nào?"), guest);
+
+        assertNotNull(response);
+        String answer = response.answer();
+        assertTrue(answer.contains("có trong danh mục học phần"), answer);
+        assertTrue(answer.contains("Thứ Ba 07:00-09:30"), answer);
+        assertTrue(answer.contains("(phòng B 204)"), answer);
+        assertFalse(answer.contains("chưa gắn hồ sơ"), answer);
+        assertFalse(answer.contains("chưa đăng ký"), answer);
+        org.mockito.Mockito.verifyNoInteractions(enrollmentService);
     }
 
     @Test
@@ -895,10 +962,10 @@ class AssistantPersonalContextAdvisorTest {
 
     /**
      * Objection (1) gate — MANDATORY: a student-actor JWT carries no lecturerId,
-     * so all three lecturer branches must return null (fall back to RAG)
-     * WITHOUT calling any read service. The services throw 403 on a missing
-     * profile claim and answer() only catches DataAccessException, so an
-     * unguarded call would turn the question into an HTTP error.
+     * so all three lecturer branches must answer with the honest no-profile
+     * message WITHOUT calling any read service. The services throw 403 on a
+     * missing profile claim and answer() only catches DataAccessException, so
+     * an unguarded call would turn the question into an HTTP error.
      */
     @Test
     void studentActorNeverTriggersLecturerPersonalBranches() {
@@ -910,12 +977,17 @@ class AssistantPersonalContextAdvisorTest {
                 Map.of("alg", "HS256"), new HashMap<>(Map.of(
                         "sub", "someone", "roles", List.of("STUDENT"), "studentId", "student-profile")));
 
-        assertNull(guardedAdvisor.answer(
-                chatRequest("vi", "Khối lượng hướng dẫn của tôi hiện tại là bao nhiêu?"), studentActor));
-        assertNull(guardedAdvisor.answer(
-                chatRequest("vi", "Điểm học phần tôi phụ trách hiện đã có chưa?"), studentActor));
-        assertNull(guardedAdvisor.answer(
-                chatRequest("vi", "Sinh viên lớp SE401 hôm nay có ai vắng mặt không?"), studentActor));
+        // Claim-missing lecturer intents now answer honestly (F13) — the gate
+        // still fires BEFORE any read service is touched.
+        assertTrue(guardedAdvisor.answer(
+                chatRequest("vi", "Khối lượng hướng dẫn của tôi hiện tại là bao nhiêu?"), studentActor)
+                .answer().contains("chưa gắn hồ sơ"));
+        assertTrue(guardedAdvisor.answer(
+                chatRequest("vi", "Điểm học phần tôi phụ trách hiện đã có chưa?"), studentActor)
+                .answer().contains("chưa gắn hồ sơ"));
+        assertTrue(guardedAdvisor.answer(
+                chatRequest("vi", "Sinh viên lớp SE401 hôm nay có ai vắng mặt không?"), studentActor)
+                .answer().contains("chưa gắn hồ sơ"));
 
         org.mockito.Mockito.verifyNoInteractions(workloadService, sectionService, attendanceService);
     }
@@ -980,9 +1052,11 @@ class AssistantPersonalContextAdvisorTest {
     }
 
     @Test
-    void graduationCreditsWithLecturerActorFallsBackToKnowledge() {
-        assertNull(advisor.answer(
-                chatRequest("vi", "Còn thiếu bao nhiêu tín chỉ để đủ 143 tín chỉ tốt nghiệp?"), jwtLecturer()));
+    void graduationCreditsWithLecturerActorAnswersHonestly() {
+        ChatResponse response = advisor.answer(
+                chatRequest("vi", "Còn thiếu bao nhiêu tín chỉ để đủ 143 tín chỉ tốt nghiệp?"), jwtLecturer());
+        assertNotNull(response);
+        assertTrue(response.answer().contains("chưa gắn hồ sơ"), response.answer());
         org.mockito.Mockito.verifyNoInteractions(enrollmentService);
     }
 
@@ -1081,10 +1155,13 @@ class AssistantPersonalContextAdvisorTest {
         assertTrue(answer.contains("Đề tài A"), answer);
         assertTrue(answer.contains("Số nhóm: 3"), answer);
         assertTrue(answer.contains("1 nhóm đang chờ duyệt"), answer);
-        // A student actor without a lecturer profile still falls back to RAG.
+        // A student actor without a lecturer profile gets the honest
+        // no-context answer, not a corpus reply (F13).
         Jwt studentActor = jwt("studentId", "student-profile");
-        assertNull(workloadAdvisor.answer(
-                chatRequest("vi", "Những nhóm sinh viên nào tôi đang hướng dẫn?"), studentActor));
+        ChatResponse honest = workloadAdvisor.answer(
+                chatRequest("vi", "Những nhóm sinh viên nào tôi đang hướng dẫn?"), studentActor);
+        assertNotNull(honest);
+        assertTrue(honest.answer().contains("chưa gắn hồ sơ"), honest.answer());
     }
 
     // ------------------------------------------------------------------
@@ -1125,8 +1202,8 @@ class AssistantPersonalContextAdvisorTest {
         String answer = response.answer();
         assertTrue(answer.contains("Đợt 1 KLTN 2026-2027"), answer);
         assertTrue(answer.contains("Hệ thống gợi ý học tập"), answer);
-        // Headcount vs the 3–4 requirement, computed from the real member rows.
-        assertTrue(answer.contains("Nhóm: 3 thành viên (yêu cầu 3-4)"), answer);
+        // Headcount vs the 1–3 requirement, computed from the real member rows.
+        assertTrue(answer.contains("Nhóm: 3 thành viên (yêu cầu 1-3)"), answer);
         assertTrue(answer.contains("đủ số lượng theo yêu cầu"), answer);
         // The asker is the group leader per leader_student_id / is_leader.
         assertTrue(answer.contains("Vai trò của bạn: Nhóm trưởng"), answer);
@@ -1140,7 +1217,7 @@ class AssistantPersonalContextAdvisorTest {
     }
 
     @Test
-    void thesisGroupBelowMinimumStatesTheShortfallAndPlainMembership() {
+    void thesisGroupOfTwoMeetsTheOneToThreeRequirementAndStatesPlainMembership() {
         NamedParameterJdbcTemplate jdbc = mock(NamedParameterJdbcTemplate.class);
         AssistantPersonalContextAdvisor thesisAdvisor = new AssistantPersonalContextAdvisor(
                 enrollmentService, sectionService, null, jdbc, null, null);
@@ -1152,7 +1229,7 @@ class AssistantPersonalContextAdvisorTest {
         groupRow.put("rejection_reason", null);
         groupRow.put("topic_title", "Nền tảng quản lý thư viện");
         groupRow.put("round_name", "Đợt 1 KLTN 2026-2027");
-        // The asker is a plain member; only two of the required three exist.
+        // The asker is a plain member; two members satisfy the 1–3 rule.
         Map<String, Object> leader = thesisMemberRow("g2", "student-leader", true, 1, "Phạm", "Dũng");
         Map<String, Object> asker = thesisMemberRow("g2", "student-profile", false, 2, "Hoàng", "Mai");
         when(jdbc.queryForList(anyString(), any(MapSqlParameterSource.class)))
@@ -1164,8 +1241,8 @@ class AssistantPersonalContextAdvisorTest {
                 chatRequest("vi", "Nhóm luận văn của tôi là nhóm nào, có những ai?"), jwtStudent());
 
         String answer = response.answer();
-        assertTrue(answer.contains("Nhóm: 2 thành viên (yêu cầu 3-4)"), answer);
-        assertTrue(answer.contains("còn thiếu 1 so với tối thiểu 3"), answer);
+        assertTrue(answer.contains("Nhóm: 2 thành viên (yêu cầu 1-3)"), answer);
+        assertTrue(answer.contains("đủ số lượng theo yêu cầu"), answer);
         assertTrue(answer.contains("Vai trò của bạn: Thành viên"), answer);
         assertFalse(answer.contains("Vai trò của bạn: Nhóm trưởng"), answer);
         assertTrue(answer.contains("Phạm Dũng (nhóm trưởng)"), answer);
@@ -1280,7 +1357,7 @@ class AssistantPersonalContextAdvisorTest {
                 gradeRow("g1", "SE401", 3, "B", "sem-2", "HK2 2025-2026"),
                 gradeRow("g2", "SE401", 3, "A", "sem-2", "HK2 2025-2026"),
                 gradeRow("g3", "SE407", 3, "B+", "sem-1", "HK1 2025-2026")));
-        when(enrollmentService.findStudentTranscript("student-profile")).thenReturn(
+        when(enrollmentService.findStudentTranscript(eq("student-profile"), anyList())).thenReturn(
                 new AcademicEnrollmentReadDtos.TranscriptResponse(
                         new AcademicEnrollmentReadDtos.TranscriptSummary(
                                 new java.math.BigDecimal("3.17"), 6, 6,

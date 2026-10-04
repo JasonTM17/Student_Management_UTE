@@ -80,7 +80,12 @@ public class AcademicMutationService {
     }
 
     public void drop(String enrollmentId, String studentId, List<String> roles, String idempotencyKey) {
-        registration.drop(enrollmentId, studentId, roles, idempotencyKey);
+        drop(enrollmentId, studentId, roles, idempotencyKey, null);
+    }
+
+    public void drop(String enrollmentId, String studentId, List<String> roles, String idempotencyKey,
+            String actorId) {
+        registration.drop(enrollmentId, studentId, roles, idempotencyKey, actorId);
     }
 
     /** Compatibility entry point; hard deletes without a known actor record no audit trail. */
@@ -252,31 +257,45 @@ public class AcademicMutationService {
                 throw problem(HttpStatus.CONFLICT, "ENROLLMENT_NOT_GRADEABLE",
                         "Enrollment status '" + enrollment.get("status") + "' cannot receive grades");
             }
-            if ("PUBLISHED".equals(enrollment.get("grade_status"))) {
-                // Published grades are the official record: an API replay must
-                // not silently flip them back to draft.
+            if ("PUBLISHED".equals(enrollment.get("grade_status"))
+                    || "APPEALED".equals(enrollment.get("grade_status"))) {
+                // Published and appealed grades are the student-visible official
+                // record: an API replay must not silently flip them back to draft.
                 throw problem(HttpStatus.CONFLICT, "GRADES_PUBLISHED_LOCKED",
                         "Published grades can no longer be edited");
             }
-            requireScoreRange(grade.processScore(), "processScore");
-            requireScoreRange(grade.finalExamScore(), "finalExamScore");
-            BigDecimal total = calculateFinalGrade(grade.processScore(), grade.finalExamScore());
+            // Both-null clears a mistakenly saved draft: the batch DELETE below
+            // removes the component rows and the enrollment update restores the
+            // untouched NOT_GRADED state. A lone null cannot average, so it 400s.
+            boolean cleared = grade.processScore() == null && grade.finalExamScore() == null;
+            if (!cleared && (grade.processScore() == null || grade.finalExamScore() == null)) {
+                throw problem(HttpStatus.BAD_REQUEST, "GRADE_PARTIAL_SCORE",
+                        "Both processScore and finalExamScore are required, or both must be null to clear the grade");
+            }
+            if (!cleared) {
+                requireScoreRange(grade.processScore(), "processScore");
+                requireScoreRange(grade.finalExamScore(), "finalExamScore");
+            }
+            BigDecimal total = cleared ? null : calculateFinalGrade(grade.processScore(), grade.finalExamScore());
 
-            componentBatch.add(new MapSqlParameterSource()
-                    .addValue("id", UUID.randomUUID().toString())
-                    .addValue("enrollmentId", grade.enrollmentId())
-                    .addValue("gradeItemId", processItemId)
-                    .addValue("score", grade.processScore()));
+            if (!cleared) {
+                componentBatch.add(new MapSqlParameterSource()
+                        .addValue("id", UUID.randomUUID().toString())
+                        .addValue("enrollmentId", grade.enrollmentId())
+                        .addValue("gradeItemId", processItemId)
+                        .addValue("score", grade.processScore()));
 
-            componentBatch.add(new MapSqlParameterSource()
-                    .addValue("id", UUID.randomUUID().toString())
-                    .addValue("enrollmentId", grade.enrollmentId())
-                    .addValue("gradeItemId", finalItemId)
-                    .addValue("score", grade.finalExamScore()));
+                componentBatch.add(new MapSqlParameterSource()
+                        .addValue("id", UUID.randomUUID().toString())
+                        .addValue("enrollmentId", grade.enrollmentId())
+                        .addValue("gradeItemId", finalItemId)
+                        .addValue("score", grade.finalExamScore()));
+            }
 
             enrollmentBatch.add(new MapSqlParameterSource()
-                    .addValue("finalGrade", total)
-                    .addValue("letterGrade", letterGrade(total))
+                    .addValue("finalGrade", cleared ? null : total)
+                    .addValue("letterGrade", cleared ? null : letterGrade(total))
+                    .addValue("gradeStatus", cleared ? "NOT_GRADED" : "DRAFT")
                     .addValue("id", grade.enrollmentId()));
         }
 
@@ -293,10 +312,11 @@ public class AcademicMutationService {
                         + " VALUES (:id, :enrollmentId, :gradeItemId, :score)",
                 componentBatch.toArray(new MapSqlParameterSource[0]));
 
-        // Batch update enrollment final grades and draft status
+        // Batch update enrollment final grades and status — cleared rows carry
+        // NOT_GRADED in the batch so the statement must read the parameter.
         jdbc.batchUpdate(
                 "UPDATE " + ENROLLMENT + " SET \"finalGrade\" = :finalGrade, \"letterGrade\" = :letterGrade,"
-                        + " \"gradeStatus\" = 'DRAFT', \"updatedAt\" = CURRENT_TIMESTAMP WHERE \"id\" = :id",
+                        + " \"gradeStatus\" = :gradeStatus, \"updatedAt\" = CURRENT_TIMESTAMP WHERE \"id\" = :id",
                 enrollmentBatch.toArray(new MapSqlParameterSource[0]));
 
         if (admin && actorId != null && !actorId.isBlank()) {

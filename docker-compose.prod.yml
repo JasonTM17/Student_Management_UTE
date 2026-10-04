@@ -125,6 +125,18 @@ services:
       FLYWAY_ENABLED: "false"
       MAIL_ENABLED: "false"
       DEEPSEEK_ENABLED: "false"
+      # Thesis report uploads. The local provider writes under
+      # /var/lib/campuscore/thesis-reports, which is a named volume below
+      # because the container root filesystem is read-only. Set
+      # THESIS_REPORT_STORAGE_PROVIDER=supabase plus SUPABASE_URL and a raw
+      # SUPABASE_SERVICE_ROLE_KEY environment value only on an environment
+      # that deliberately stores reports off-box.
+      THESIS_REPORT_STORAGE_PROVIDER: ${THESIS_REPORT_STORAGE_PROVIDER:-local}
+      THESIS_REPORT_STORAGE_BUCKET: ${THESIS_REPORT_STORAGE_BUCKET:-thesis-reports}
+      THESIS_REPORT_STORAGE_LOCAL_ROOT: /var/lib/campuscore/thesis-reports
+      THESIS_REPORT_STORAGE_TIMEOUT_MS: ${THESIS_REPORT_STORAGE_TIMEOUT_MS:-10000}
+      SUPABASE_URL: ${SUPABASE_URL:-}
+      SUPABASE_SERVICE_ROLE_KEY: ${SUPABASE_SERVICE_ROLE_KEY:-}
       ASSISTANT_MAX_MESSAGE_CHARS: ${ASSISTANT_MAX_MESSAGE_CHARS:-2000}
       ASSISTANT_MAX_CONTEXT_CHARS: ${ASSISTANT_MAX_CONTEXT_CHARS:-6000}
       ASSISTANT_USER_DAILY_QUOTA: ${ASSISTANT_USER_DAILY_QUOTA:-20}
@@ -136,6 +148,7 @@ services:
       - ./ops/secrets/jwt_refresh_secret:/run/secrets/jwt_refresh_secret:ro
       - ./ops/secrets/readiness_key:/run/secrets/readiness_key:ro
       - ./ops/secrets/rag_service_token:/run/secrets/rag_service_token:ro
+      - campuscore_production_thesis_report_storage:/var/lib/campuscore/thesis-reports
     ports: !override []
     networks: [app, data]
     depends_on: !override
@@ -246,6 +259,7 @@ networks:
 
 volumes:
   campuscore_production_postgres_data:
+  campuscore_production_thesis_report_storage:
   campuscore_caddy_data:
   campuscore_caddy_config:
   campuscore_caddy_logs:

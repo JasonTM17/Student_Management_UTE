@@ -176,7 +176,7 @@ export const EDITOR_SEED_HTML = {
 export const EDITOR_SEED_MARKDOWN = `# ĐỀ CƯƠNG HỌC PHẦN & TÀI LIỆU HƯỚNG DẪN
 
 > [!NOTE]
-> Tài liệu này được soạn thảo trực tiếp trên **Trình soạn thảo học vụ CampusCore**. Hỗ trợ bảng biểu, công thức, mã nguồn và hộp cảnh báo chuẩn institutional.
+> Tài liệu này được soạn thảo trực tiếp trên **Trình soạn thảo học vụ CampusUTE**. Hỗ trợ bảng biểu, công thức, mã nguồn và hộp cảnh báo chuẩn institutional.
 
 ### 1. Mục tiêu và Chuẩn đầu ra (CLO)
 - [ ] Nắm vững kiến trúc hệ thống và nguyên lý thiết kế cơ sở dữ liệu phân tán.

@@ -9,6 +9,7 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
+import org.jsoup.Jsoup;
 import org.springframework.context.annotation.Profile;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
@@ -78,7 +79,10 @@ public class AnnouncementStudentNotifier {
         }
         Instant now = Instant.now(clock);
         String title = capCodePoints(TITLE_PREFIX + nullToEmpty(announcement.title()), TITLE_CODE_POINTS);
-        String message = capCodePoints(nullToEmpty(announcement.content()), MESSAGE_CODE_POINTS);
+        // The body is sanitized HTML; capping it raw could end mid-tag
+        // (an announcement opening with an inline image previewed as a literal
+        // "<img src=\"data:…" fragment). Strip tags to text first.
+        String message = capCodePoints(toPlainText(announcement.content()), MESSAGE_CODE_POINTS);
         List<CreateNotificationCommand> commands = new ArrayList<>(userIds.size());
         for (String userId : userIds) {
             commands.add(new CreateNotificationCommand(
@@ -95,6 +99,24 @@ public class AnnouncementStudentNotifier {
 
     private static String nullToEmpty(String value) {
         return value == null ? "" : value;
+    }
+
+    private static final java.util.regex.Pattern DECODED_TAG_RUN =
+            java.util.regex.Pattern.compile("<[a-zA-Z/!][^>]*>|<[a-zA-Z/!][^>]*$");
+
+    private static String toPlainText(String html) {
+        // Jsoup's text() decodes entities (&amp; → &, &nbsp; → space) and
+        // handles malformed markup a regex cannot — a ">" inside a quoted
+        // attribute or an unterminated "<..." tail on legacy pre-sanitizer
+        // rows would otherwise leak literal markup into the preview.
+        String text = Jsoup.parse(nullToEmpty(html)).text();
+        // Decoding also resurrects markup-shaped text: "&lt;img …&gt;" stored
+        // as escaped text, or legacy <textarea>/<title> RCDATA bodies, decodes
+        // back into a literal "<img …>" in the preview. Strip runs that start
+        // like a tag ("<" + letter/'!'/'/') while keeping natural "a < b" text.
+        return DECODED_TAG_RUN.matcher(text).replaceAll(" ")
+                .replaceAll("\\s+", " ")
+                .trim();
     }
 
     /** Truncates by code points so Vietnamese diacritics are never split. */

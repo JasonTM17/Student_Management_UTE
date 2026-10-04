@@ -60,7 +60,7 @@ public class TwoFactorService {
     static final String CODE_CODE_INVALID = "TWO_FACTOR_CODE_INVALID";
     static final String CODE_CODE_LOCKED = "TWO_FACTOR_CODE_LOCKED";
 
-    private static final String MAIL_SUBJECT = "[CampusCore] Mã xác thực hai yếu tố";
+    private static final String MAIL_SUBJECT = "[CampusUTE] Mã xác thực hai yếu tố";
     private static final String MAIL_TEMPLATE = "two-factor-code";
 
     /** Mirrors AuthUserRepository's table constant; the repository has no delete-others API. */

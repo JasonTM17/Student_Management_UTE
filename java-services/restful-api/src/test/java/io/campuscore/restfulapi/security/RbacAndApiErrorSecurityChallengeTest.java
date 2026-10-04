@@ -380,7 +380,8 @@ class RbacAndApiErrorSecurityChallengeTest {
 
         private ThesisTopicRepository topicRepo = mock(ThesisTopicRepository.class);
         private ThesisRoundReadPort roundPort = mock(ThesisRoundReadPort.class);
-        private ThesisTopicService topicService = new ThesisTopicService(topicRepo, roundPort);
+        private ThesisTopicService topicService = new ThesisTopicService(topicRepo, roundPort,
+                mock(org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate.class));
 
         private ThesisTopic createTopic(String id, String owner, TopicStatus status) {
             ThesisTopic t = new ThesisTopic(ROUND_ID, "IT", "Topic " + id, "Desc", 3, owner);

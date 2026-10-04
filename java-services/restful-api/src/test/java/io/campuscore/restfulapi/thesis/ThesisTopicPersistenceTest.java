@@ -283,8 +283,7 @@ class ThesisTopicPersistenceTest {
                 .andExpect(jsonPath("$.members[1].contact").value("member2@campuscore.edu"))
                 .andExpect(jsonPath("$.members[1].isExternal").value(false));
         addMember(groupId, "test-member-3").andExpect(status().isOk());
-        addMember(groupId, "test-member-4").andExpect(status().isOk());
-        addMember(groupId, "test-member-5")
+        addMember(groupId, "test-member-4")
                 .andExpect(status().isConflict())
                 .andExpect(jsonPath("$.code").value("GROUP_FULL"));
 

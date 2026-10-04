@@ -83,6 +83,64 @@ class ThesisAssistantLexicalFastPathTest {
     }
 
     @Test
+    void singleTermCeilingScoreEscalatesInsteadOfAnswering() {
+        // Live bug: "công thức nấu phở bò" matched the "Công nghệ thông tin"
+        // document solely through the bare syllable "công" — one term can
+        // contribute at most 10 (3+1+4+2), which used to equal the gate.
+        // Confident fast-path matches must corroborate with a second term.
+        ThesisAssistantKnowledgeRepository knowledge = mock(ThesisAssistantKnowledgeRepository.class);
+        when(knowledge.search(anyString(), anyList(), anyInt())).thenReturn(List.of(
+                document("it-services", "Dịch vụ Công nghệ thông tin, Email sinh viên",
+                        "Tài khoản email, mạng Wi-Fi công cộng và hỗ trợ công nghệ.", "POLICY", 10)));
+
+        assertNull(service(knowledge, DEFAULTS).lexicalFastPath("Công thức nấu phở bò?", "vi", null));
+    }
+
+    @Test
+    void aggregateScoreAboveThresholdStillEscalatesWithASingleShortStrongTerm() {
+        // The live "công thức nấu phở bò" shape: one bare syllable ("lịch")
+        // whole-word-matches the holiday doc while the question's real topic
+        // ("thi nấu phở") hits nothing. Aggregate 13 clears the confident
+        // score — only the corroboration gate catches the compound fragment.
+        ThesisAssistantKnowledgeRepository knowledge = mock(ThesisAssistantKnowledgeRepository.class);
+        when(knowledge.search(anyString(), anyList(), anyInt())).thenReturn(List.of(
+                document("holiday-schedule", "Lịch nghỉ lễ chính thức",
+                        "Lịch nghỉ lễ chính thức trong năm học.", "POLICY", 13)));
+
+        assertNull(service(knowledge, DEFAULTS).lexicalFastPath("Lịch thi nấu phở?", "vi", null));
+    }
+
+    @Test
+    void twoGenuineWholeWordHitsStillAnswerOnTheFastPath() {
+        ThesisAssistantKnowledgeRepository knowledge = mock(ThesisAssistantKnowledgeRepository.class);
+        when(knowledge.search(anyString(), anyList(), anyInt())).thenReturn(List.of(
+                document("exam-schedule", "Lịch thi cuối kỳ và các kỳ thi",
+                        "Sinh viên xem lịch thi trên cổng thông tin.", "POLICY", 30)));
+
+        ChatResponse fast = service(knowledge, DEFAULTS)
+                .lexicalFastPath("Lịch thi khi nào?", "vi", null);
+
+        assertEquals("ANSWERED", fast.reasonCode());
+        assertEquals(ThesisAssistantService.FAST_PATH_MODEL, fast.model());
+    }
+
+    @Test
+    void singleSpecificTermCorroboratesAlone() {
+        // "dormitory" is a 9-char whole-word title hit — intrinsically
+        // specific, unlike the "công"-inside-"Công nghệ" fragment. One such
+        // term is corroboration enough for the fast path.
+        ThesisAssistantKnowledgeRepository knowledge = mock(ThesisAssistantKnowledgeRepository.class);
+        when(knowledge.search(anyString(), anyList(), anyInt())).thenReturn(List.of(
+                document("dormitory", "Dormitory and on-campus housing",
+                        "Dormitory registration opens per semester on the portal.", "POLICY", 13)));
+
+        ChatResponse fast = service(knowledge, DEFAULTS)
+                .lexicalFastPath("dormitory registration", "en", null);
+
+        assertEquals("ANSWERED", fast.reasonCode());
+    }
+
+    @Test
     void emptyLexicalWindowEscalates() {
         ThesisAssistantKnowledgeRepository knowledge = mock(ThesisAssistantKnowledgeRepository.class);
         when(knowledge.search(anyString(), anyList(), anyInt())).thenReturn(List.of());

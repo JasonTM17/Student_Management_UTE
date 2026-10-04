@@ -47,6 +47,9 @@ public class ThesisTopic {
     @Column(name = "result_status", length = 32)
     private String resultStatus;
 
+    @Column(name = "gvpb_lecturer_id", length = 120)
+    private String gvpbLecturerId;
+
     @Version
     private long version;
 
@@ -152,5 +155,9 @@ public class ThesisTopic {
 
     public String getResultStatus() {
         return resultStatus;
+    }
+
+    public String getGvpbLecturerId() {
+        return gvpbLecturerId;
     }
 }

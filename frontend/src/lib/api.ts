@@ -571,7 +571,9 @@ export const sectionsApi = {
 
   updateSectionGrades: async (
     sectionId: string,
-    grades: { enrollmentId: string; processScore: number; finalExamScore: number }[],
+    // null+null clears a saved draft grade; partial nulls are rejected by the
+    // backend, and published grades stay locked.
+    grades: { enrollmentId: string; processScore: number | null; finalExamScore: number | null }[],
   ): Promise<{ message: string }> => {
     const response = await api.put<{ message: string }>(
       `/sections/${sectionId}/grades`,

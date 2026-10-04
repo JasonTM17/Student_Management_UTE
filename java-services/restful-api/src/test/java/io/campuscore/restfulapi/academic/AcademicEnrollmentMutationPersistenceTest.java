@@ -16,6 +16,7 @@ import java.time.LocalDateTime;
 import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.Callable;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
@@ -912,6 +913,67 @@ class AcademicEnrollmentMutationPersistenceTest {
                         String.class,
                         enrollmentId))
                 .isEqualTo("DROPPED");
+        // The admin actor is the JWT subject (no student profile claim), the
+        // event still points at the enrollment owner.
+        assertThat(jdbc.queryForObject(
+                        "SELECT \"actorId\" FROM \"academic\".\"EnrollmentEvent\""
+                                + " WHERE \"enrollmentId\" = ? AND \"action\" = 'DROP'",
+                        String.class,
+                        enrollmentId))
+                .isEqualTo("admin-user");
+    }
+
+    @Test
+    void dropWritesEnrollmentEventForStudentCaller() throws Exception {
+        MvcResult enrolled = mvc.perform(post("/api/v1/me/enrollments")
+                        .with(studentJwt("student-user-1", "student-1"))
+                        .header("Idempotency-Key", "self-drop-enroll-1")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"sectionId\":\"section-open\"}"))
+                .andExpect(status().isOk())
+                .andReturn();
+        String enrollmentId = objectMapper.readTree(enrolled.getResponse().getContentAsString()).get("id").asText();
+
+        mvc.perform(post("/api/v1/enrollments/" + enrollmentId + "/drop")
+                        .with(studentJwt("student-user-1", "student-1"))
+                        .header("Idempotency-Key", "self-drop-1"))
+                .andExpect(status().isOk());
+
+        Map<String, Object> event = jdbc.queryForMap(
+                "SELECT \"action\", \"actorId\", \"studentId\", \"sectionId\", \"requestHash\""
+                        + " FROM \"academic\".\"EnrollmentEvent\""
+                        + " WHERE \"enrollmentId\" = ? AND \"action\" = 'DROP'",
+                enrollmentId);
+        assertThat(event.get("actorId")).isEqualTo("student-1");
+        assertThat(event.get("studentId")).isEqualTo("student-1");
+        assertThat(event.get("sectionId")).isEqualTo("section-open");
+        assertThat(event.get("requestHash")).isNotNull();
+    }
+
+    @Test
+    void dropAndEnrollRejectCallerWithoutStudentProfile() throws Exception {
+        MvcResult enrolled = mvc.perform(post("/api/v1/me/enrollments")
+                        .with(studentJwt("student-user-1", "student-1"))
+                        .header("Idempotency-Key", "orphan-drop-enroll-1")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"sectionId\":\"section-open\"}"))
+                .andExpect(status().isOk())
+                .andReturn();
+        String enrollmentId = objectMapper.readTree(enrolled.getResponse().getContentAsString()).get("id").asText();
+
+        mvc.perform(post("/api/v1/me/enrollments")
+                        .with(studentJwtWithoutProfile())
+                        .header("Idempotency-Key", "orphan-enroll-1")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"sectionId\":\"section-open\"}"))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("STUDENT_PROFILE_REQUIRED"));
+
+        mvc.perform(post("/api/v1/enrollments/" + enrollmentId + "/drop")
+                        .with(studentJwtWithoutProfile())
+                        .header("Idempotency-Key", "orphan-drop-1"))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("STUDENT_PROFILE_REQUIRED"));
     }
 
     /**

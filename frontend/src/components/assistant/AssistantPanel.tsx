@@ -46,8 +46,13 @@ export { TRANSIENT_TERMINAL_CODES };
 export function AssistantPanel() {
   const { locale, messages, href } = useI18n();
   const router = useRouter();
-  const { isLecturer } = useAuth();
-  const academicSuggestions = isLecturer ? messages.assistant.lecturerSuggestions : messages.assistant.suggestions;
+  const { isLecturer, isAdmin, isSuperAdmin } = useAuth();
+  const academicSuggestions =
+    isAdmin || isSuperAdmin
+      ? messages.assistant.adminSuggestions
+      : isLecturer
+        ? messages.assistant.lecturerSuggestions
+        : messages.assistant.suggestions;
   const { confirm, confirmationDialog } = useConfirmationDialog();
   // Portal header/sidebar entries stay mounted when the dialog opens. The
   // floating duplicate covers mobile timetable rows and the chat composer,
@@ -146,12 +151,14 @@ export function AssistantPanel() {
       );
     const rawDomain = lastGrounded?.citations?.[0]?.domain?.toUpperCase();
     const domain = rawDomain === 'ANNOUNCEMENTS' ? 'ANNOUNCEMENT' : rawDomain;
-    const byDomain = (isLecturer ? messages.assistant.lecturerFollowUpsByDomain : messages.assistant.followUpsByDomain) as Record<
+    const byDomain = (isLecturer && !(isAdmin || isSuperAdmin)
+      ? messages.assistant.lecturerFollowUpsByDomain
+      : messages.assistant.followUpsByDomain) as Record<
       string,
       readonly string[]
     >;
     return (domain && byDomain[domain]) || academicSuggestions;
-  }, [state.messages, isSending, messages, mode, isLecturer, academicSuggestions]);
+  }, [state.messages, isSending, messages, mode, isLecturer, isAdmin, isSuperAdmin, academicSuggestions]);
 
   const latestSettledAssistant = [...state.messages]
     .reverse()

@@ -279,7 +279,7 @@ export function HomeNewsSection() {
               <h3 className="text-lg font-bold text-foreground flex items-center gap-2">
                 <Sparkles className="h-4 w-4 text-primary" />
                 <span>{isVi ? 'Phóng sự & Chuyên đề Khác' : 'Special Feature Stories'}</span>
-                <span className="text-xs font-normal text-muted-foreground">({galleryGrid.length} bài viết)</span>
+                <span className="text-xs font-normal text-muted-foreground">({isVi ? `${galleryGrid.length} bài viết` : `${galleryGrid.length} articles`})</span>
               </h3>
             </div>
 

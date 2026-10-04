@@ -72,9 +72,9 @@ export function LanguageToggle({
               isActive
                 ? inverse
                   ? 'bg-white text-slate-950 font-bold shadow-xs'
-                  : // Dark mode keeps a LIGHT active chip: the previous
-                    // dark-on-dark pairing made the selected locale unreadable.
-                    'bg-white text-primary font-bold shadow-xs dark:bg-primary dark:text-primary-foreground'
+                  : // bg-primary in BOTH themes: bg-white on the near-white
+                    // card container left the active locale invisible.
+                    'bg-primary text-primary-foreground font-bold shadow-xs'
                 : inverse
                   ? 'text-white/80 hover:text-white hover:bg-white/10'
                   : 'text-muted-foreground hover:text-foreground hover:bg-muted/50',

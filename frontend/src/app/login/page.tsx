@@ -298,7 +298,7 @@ export default function LoginPage() {
 
         {demoCredentials ? (
         <div className="rounded-xl border border-primary/25 bg-primary/5 p-3.5 text-xs space-y-2.5 shadow-xs">
-          <div className="flex items-center justify-between">
+          <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
             <span className="font-semibold text-foreground flex items-center gap-1.5">
               <span className="h-2 w-2 rounded-full bg-primary animate-pulse" />
               {locale === 'vi' ? 'Tài khoản demo để trải nghiệm:' : 'Demo account to experience the system:'}
@@ -313,14 +313,14 @@ export default function LoginPage() {
                 setEmail(demoCredentials.email);
                 setPassword(demoCredentials.password);
               }}
-              className="inline-flex min-h-8 items-center text-primary hover:underline font-semibold text-xs gap-1 cursor-pointer"
+              className="inline-flex min-h-8 shrink-0 items-center text-primary hover:underline font-semibold text-xs gap-1 cursor-pointer"
             >
               <ArrowRight className="h-3.5 w-3.5" />
               {locale === 'vi' ? 'Điền nhanh' : 'Quick fill'}
             </button>
           </div>
-          <div className="text-muted-foreground flex items-center justify-between">
-            <code className="font-semibold text-foreground/90">{demoCredentials.email}</code>
+          <div className="text-muted-foreground flex items-center justify-between gap-2">
+            <code className="min-w-0 truncate font-semibold text-foreground/90" title={demoCredentials.email}>{demoCredentials.email}</code>
             <span className="text-[11px] bg-secondary px-2 py-0.5 rounded text-foreground font-mono font-medium">
               {demoCredentials.password}
             </span>
@@ -503,10 +503,10 @@ export default function LoginPage() {
           aria-describedby={formError ? 'login-error' : undefined}
         >
           <div className="space-y-2">
-            <div className="flex items-center justify-between">
+            <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
               <label
                 htmlFor="email"
-                className="text-sm font-medium text-foreground"
+                className="shrink-0 text-sm font-medium text-foreground"
               >
                 {messages.login.emailLabel}
               </label>
@@ -530,20 +530,12 @@ export default function LoginPage() {
           </div>
 
           <div className="space-y-2">
-            <div className="flex items-center justify-between gap-4">
-              <label
-                htmlFor="password"
-                className="text-sm font-medium text-foreground"
-              >
-                {messages.login.passwordLabel}
-              </label>
-              <span className="text-xs text-muted-foreground">
-                {locale === 'vi'
-                  ? 'Quên mật khẩu? Liên hệ '
-                  : 'Forgot your password? Contact '}
-                {portalCopy.officeSupport}.
-              </span>
-            </div>
+            <label
+              htmlFor="password"
+              className="text-sm font-medium text-foreground"
+            >
+              {messages.login.passwordLabel}
+            </label>
             <Input
               id="password"
               type={showPassword ? 'text' : 'password'}
@@ -570,6 +562,14 @@ export default function LoginPage() {
                 </button>
               }
             />
+            {portal === 'admin' ? null : (
+              <p className="text-xs leading-5 text-muted-foreground">
+                {locale === 'vi'
+                  ? 'Quên mật khẩu? Liên hệ '
+                  : 'Forgot your password? Contact '}
+                {portalCopy.officeSupport}.
+              </p>
+            )}
           </div>
 
           {/*

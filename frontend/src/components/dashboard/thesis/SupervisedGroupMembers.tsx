@@ -36,7 +36,7 @@ export function SupervisedGroupMembers({ group, roundOpen = true, onChanged }: S
   const [isPending, setIsPending] = useState(false);
   const [error, setError] = useState('');
 
-  const isFull = group.memberStudentIds.length >= 4;
+  const isFull = group.memberStudentIds.length >= 3;
   const members: ThesisGroupMember[] = group.members ?? [];
 
   const run = async (action: () => Promise<ThesisGroup>) => {
@@ -123,7 +123,7 @@ export function SupervisedGroupMembers({ group, roundOpen = true, onChanged }: S
         <UserPlus className="h-3.5 w-3.5" />
         {messages.thesis.manageMembers}
         <span className="font-normal text-muted-foreground">
-          ({formatNumber(group.memberStudentIds.length)}/4)
+          ({formatNumber(group.memberStudentIds.length)}/3)
         </span>
       </button>
 
@@ -135,7 +135,7 @@ export function SupervisedGroupMembers({ group, roundOpen = true, onChanged }: S
                 key={member.studentId}
                 className="flex items-center justify-between gap-2 rounded-md bg-secondary/40 px-2.5 py-1.5"
               >
-                <span className="min-w-0 truncate text-xs text-foreground">
+                <span className="min-w-0 truncate text-xs text-foreground" title={member.displayName || member.studentNumber || member.studentId}>
                   {member.displayName || member.studentNumber || member.studentId}
                   {member.studentNumber ? (
                     <span className="ml-1.5 font-mono text-[11px] text-muted-foreground">
@@ -214,7 +214,7 @@ export function SupervisedGroupMembers({ group, roundOpen = true, onChanged }: S
                 <ul className="space-y-1">
                   {results.slice(0, 5).map((student) => (
                     <li key={student.studentId} className="flex items-center justify-between gap-2">
-                      <span className="min-w-0 truncate text-xs text-muted-foreground">
+                      <span className="min-w-0 truncate text-xs text-muted-foreground" title={[student.lastName, student.firstName].filter(Boolean).join(' ').trim() || student.studentNumber}>
                         {[student.lastName, student.firstName].filter(Boolean).join(' ').trim() || student.studentNumber}
                         {student.studentNumber ? (
                           <span className="ml-1.5 font-mono text-[11px]">{student.studentNumber}</span>

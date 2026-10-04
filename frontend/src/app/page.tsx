@@ -127,6 +127,18 @@ export default function HomePage() {
 
       <main id="main-content" tabIndex={-1}>
         <section className="mx-auto grid max-w-[1280px] items-stretch gap-10 px-4 py-10 sm:px-6 lg:grid-cols-[1.15fr_0.85fr] lg:px-12 lg:py-14">
+          {appearance.hero.image ? (
+            // Remote hero art is admin-configured, so the host list cannot be
+            // pinned in next.config — a plain <img> avoids a whitelist that
+            // could never cover the admin's choice.
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={appearance.hero.image}
+              alt=""
+              loading="eager"
+              className="col-span-full h-56 w-full rounded-2xl border border-border/60 object-cover shadow-sm sm:h-72 lg:h-80"
+            />
+          ) : null}
           <div className="flex flex-col justify-center space-y-6 border-l-4 border-[var(--portal-chrome-accent)] pl-6">
             <div className="flex items-center gap-3.5">
               <div className="relative h-14 w-11 shrink-0">

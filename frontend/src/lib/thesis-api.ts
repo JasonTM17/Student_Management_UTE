@@ -161,6 +161,7 @@ export interface ThesisCouncilScore {
   lecturerId?: string;
   score: number;
   component?: string | null;
+  comment?: string | null;
 }
 
 export interface ThesisFinalScore {
@@ -170,12 +171,18 @@ export interface ThesisFinalScore {
   finalizedAt?: string | null;
 }
 
+export interface ThesisScoreComment {
+  component: string;
+  comment: string;
+}
+
 export interface ThesisRoundResult {
   groupId: string;
   topicTitle: string;
   finalScore: number;
   councilName: string;
   leaderStudentId: string;
+  comments?: ThesisScoreComment[];
 }
 
 export interface ThesisSupervisedTopic {
@@ -229,6 +236,7 @@ export interface ThesisTopic {
   createdBy: string;
   finalScore?: number | null;
   resultStatus?: string | null;
+  gvpbLecturerId?: string | null;
 }
 
 export interface ThesisGroupMember {
@@ -486,6 +494,73 @@ export const thesisApi = {
   publishResults: async (roundId: string): Promise<ThesisRound> => {
     const response = await api.post<ThesisRound>(
       '/thesis/rounds/' + roundId + '/publish-results',
+    );
+    return response.data;
+  },
+
+  /** Amends the schedule of a round still in DRAFT/PROPOSAL_OPEN/PROPOSALS_PUBLISHED (same body as createRound). */
+  updateRound: async (
+    roundId: string,
+    data: {
+      name: string;
+      thesisType: string;
+      registrationStart: string;
+      registrationEnd: string;
+      lecturerSubmitStart: string;
+      lecturerSubmitEnd: string;
+      proposalPublishAt?: string;
+      gvpbDeadline?: string;
+      reportDate?: string;
+      defenseDate?: string;
+    },
+  ): Promise<ThesisRound> => {
+    const response = await api.put<ThesisRound>('/thesis/rounds/' + roundId, data);
+    return response.data;
+  },
+
+  cancelRound: async (roundId: string): Promise<ThesisRound> => {
+    const response = await api.post<ThesisRound>(
+      '/thesis/rounds/' + roundId + '/cancel',
+    );
+    return response.data;
+  },
+
+  /** Assigns the GVPB counter-reviewer of a topic (governance only). */
+  assignReviewer: async (
+    topicId: string,
+    lecturerId: string,
+  ): Promise<{ gvpb_lecturer_id?: string }> => {
+    const response = await api.post<{ gvpb_lecturer_id?: string }>(
+      '/thesis/topics/' + topicId + '/reviewer',
+      { lecturerId },
+    );
+    return response.data;
+  },
+
+  /** Reads the reviewer's own submitted GVPB score (404 → caller maps to null). */
+  reviewerScore: async (topicId: string): Promise<ThesisCouncilScore | null> => {
+    try {
+      const response = await api.get<ThesisCouncilScore>(
+        '/thesis/topics/' + topicId + '/reviewer-score',
+      );
+      return response.data;
+    } catch (err) {
+      const code = (err as { response?: { data?: { code?: string } } } | undefined)
+        ?.response?.data?.code;
+      if (code === 'REVIEW_SCORE_NOT_FOUND') return null;
+      throw err;
+    }
+  },
+
+  /** The assigned counter-reviewer's score submission, bound by gvpbDeadline. */
+  submitReviewerScore: async (
+    topicId: string,
+    score: number,
+    comment?: string,
+  ): Promise<ThesisCouncilScore> => {
+    const response = await api.post<ThesisCouncilScore>(
+      '/thesis/topics/' + topicId + '/reviewer-score',
+      { score, ...(comment ? { comment } : {}) },
     );
     return response.data;
   },
@@ -752,8 +827,8 @@ export const thesisApi = {
     councilId: string,
     lecturerId: string,
     memberRole: ThesisCouncilMemberRole,
-  ): Promise<ThesisCouncilMember> => {
-    const response = await api.post<ThesisCouncilMember>(
+  ): Promise<ThesisCouncil> => {
+    const response = await api.post<ThesisCouncil>(
       '/thesis/councils/' + councilId + '/members',
       { lecturerId, memberRole },
     );
@@ -779,10 +854,11 @@ export const thesisApi = {
     topicId: string,
     score: number,
     component?: string,
+    comment?: string,
   ): Promise<ThesisCouncilScore> => {
     const response = await api.post<ThesisCouncilScore>(
       '/thesis/councils/' + councilId + '/topics/' + topicId + '/scores',
-      { score, ...(component ? { component } : {}) },
+      { score, ...(component ? { component } : {}), ...(comment ? { comment } : {}) },
     );
     return response.data;
   },

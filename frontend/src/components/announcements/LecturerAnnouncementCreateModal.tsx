@@ -400,9 +400,9 @@ export function LecturerAnnouncementCreateModal({
               {isVi ? 'Đối tượng nhận thông báo' : 'Target Audience'}
             </label>
             <div className="flex items-center gap-2 rounded-md border border-border/80 bg-secondary/20 px-3 py-2 text-sm text-foreground">
-              <GraduationCap className="h-4 w-4 text-primary" />
-              <span className="font-medium">{isVi ? 'Sinh viên các lớp học phần' : 'Students'}</span>
-              <span className="ml-auto rounded-md bg-primary/10 px-2 py-0.5 text-[11px] font-semibold text-primary">
+              <GraduationCap className="h-4 w-4 shrink-0 text-primary" />
+              <span className="min-w-0 font-medium">{isVi ? 'Sinh viên các lớp học phần' : 'Students'}</span>
+              <span className="ml-auto shrink-0 rounded-md bg-primary/10 px-2 py-0.5 text-[11px] font-semibold text-primary">
                 STUDENT
               </span>
             </div>
@@ -411,10 +411,11 @@ export function LecturerAnnouncementCreateModal({
 
         {/* Title */}
         <div className="space-y-1.5">
-          <label className="text-xs font-semibold text-foreground">
+          <label htmlFor="lecturer-announcement-title" className="text-xs font-semibold text-foreground">
             {isVi ? 'Tiêu đề thông báo *' : 'Notice Title *'}
           </label>
           <Input
+            id="lecturer-announcement-title"
             value={title}
             onChange={(e) => setTitle(e.target.value)}
             placeholder={isVi ? 'Nhập tiêu đề thông báo...' : 'Enter notice title...'}
@@ -424,7 +425,7 @@ export function LecturerAnnouncementCreateModal({
 
         {/* Editorial Cover Image Preset Tray */}
         <div className="space-y-2 rounded-lg border border-border/70 bg-secondary/15 p-3">
-          <div className="flex items-center justify-between">
+          <div className="flex flex-wrap items-center justify-between gap-2">
             <span className="text-xs font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
               <ImageIcon className="h-3.5 w-3.5 text-primary" />
               {isVi ? 'Ảnh bìa học thuật (Bộ sưu tập HCMUTE):' : 'Editorial Cover Image (HCMUTE Collection):'}
@@ -433,7 +434,7 @@ export function LecturerAnnouncementCreateModal({
               <button
                 type="button"
                 onClick={handleRemoveBanner}
-                className="text-[11px] font-medium text-destructive hover:underline flex items-center gap-1 cursor-pointer"
+                className="shrink-0 text-[11px] font-medium text-destructive hover:underline flex items-center gap-1 cursor-pointer"
               >
                 <X className="h-3 w-3" />
                 {isVi ? 'Gỡ ảnh bìa' : 'Remove Cover'}
@@ -471,7 +472,7 @@ export function LecturerAnnouncementCreateModal({
                     ) : null}
                   </div>
                   <div className="p-1.5 bg-card">
-                    <p className="text-[11px] font-semibold text-foreground truncate">{bannerTitle}</p>
+                    <p className="text-[11px] font-semibold text-foreground truncate" title={bannerTitle}>{bannerTitle}</p>
                     <span className="text-[9px] text-muted-foreground">{bannerTag}</span>
                   </div>
                 </button>
@@ -482,11 +483,11 @@ export function LecturerAnnouncementCreateModal({
 
         {/* Mode Toggle Bar: Visual (TinyMCE) vs Code vs Preview */}
         <div className="space-y-1.5">
-          <div className="flex items-center justify-between">
+          <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2">
             <label className="text-xs font-semibold text-foreground">
               {isVi ? 'Nội dung thông báo * (Hỗ trợ TinyMCE trực quan & HTML)' : 'Notice Content * (TinyMCE WYSIWYG & HTML)'}
             </label>
-            <div className="flex items-center gap-1 rounded-md border border-border/80 bg-background p-0.5 text-xs">
+            <div className="flex items-center gap-1 rounded-md border border-border/80 bg-background p-0.5 text-xs [&_button]:whitespace-nowrap">
               <button
                 type="button"
                 onClick={() => setEditorMode('visual')}

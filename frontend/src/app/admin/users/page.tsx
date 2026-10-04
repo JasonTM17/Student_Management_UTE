@@ -173,6 +173,7 @@ export default function AdminUsersPage() {
   const [formError, setFormError] = useState('');
   // One-time office-issued credential shown exactly once after create/reset.
   const [issuedCredential, setIssuedCredential] = useState<{ email: string; secret: string } | null>(null);
+  const [resettingUserId, setResettingUserId] = useState<string | null>(null);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
 
   // 2-Column form data covering both general account & role-specific academic profiles
@@ -343,6 +344,10 @@ export default function AdminUsersPage() {
           issuedSecretNote:
             'Bạn không cần nhập mật khẩu khởi tạo. Sau khi tạo, hệ thống sinh một mật khẩu tạm thời dùng một lần và người dùng phải đổi ngay khi đăng nhập đầu tiên.',
           resetAction: 'Cấp lại mật khẩu tạm thời',
+          resetTitle: 'Cấp lại mật khẩu tạm thời',
+          resetMessage: (firstName: string, lastName: string) =>
+            `Cấp lại mật khẩu tạm thời cho ${lastName} ${firstName}? Mật khẩu hiện tại sẽ vô hiệu và mọi phiên đăng nhập của người dùng bị đăng xuất.`,
+          resetConfirm: 'Cấp lại mật khẩu',
           resetSuccess: 'Đã cấp lại mật khẩu tạm thời và đăng xuất mọi phiên của người dùng.',
           resetFailed: 'Hiện chưa thể cấp lại mật khẩu cho người dùng này.',
           credentialTitle: 'Mật khẩu tạm thời dùng một lần',
@@ -488,6 +493,10 @@ export default function AdminUsersPage() {
           issuedSecretNote:
             'You do not choose the start credential. After creation the system generates a one-time temporary password that the user must rotate at first sign-in.',
           resetAction: 'Re-issue temporary credential',
+          resetTitle: 'Re-issue temporary credential',
+          resetMessage: (firstName: string, lastName: string) =>
+            `Re-issue a temporary credential for ${lastName} ${firstName}? The current password is invalidated and every session signs out.`,
+          resetConfirm: 'Re-issue credential',
           resetSuccess: 'Issued a new temporary credential and signed the user out everywhere.',
           resetFailed: 'Could not re-issue a credential for this user.',
           credentialTitle: 'One-time temporary credential',
@@ -666,6 +675,22 @@ export default function AdminUsersPage() {
   };
 
   const handleResetCredential = async (userRecord: UserRecord) => {
+    if (resettingUserId) {
+      return;
+    }
+
+    const shouldReset = await confirm({
+      title: copy.resetTitle,
+      message: copy.resetMessage(userRecord.firstName, userRecord.lastName),
+      confirmText: copy.resetConfirm,
+      variant: 'destructive',
+    });
+
+    if (!shouldReset) {
+      return;
+    }
+
+    setResettingUserId(userRecord.id);
     try {
       const result = await usersApi.resetPassword(userRecord.id);
       if (result.temporaryPassword) {
@@ -675,6 +700,8 @@ export default function AdminUsersPage() {
       await fetchUsers();
     } catch {
       toast.error(copy.resetFailed);
+    } finally {
+      setResettingUserId(null);
     }
   };
 
@@ -1031,10 +1058,39 @@ export default function AdminUsersPage() {
                     <span>{formatDate(record.createdAt)}</span>
                   </div>
                   <AdminRowActions>
-                    <Button size="sm" variant="outline" onClick={() => openEdit(record)}>
-                      <Pencil className="mr-1.5 h-3.5 w-3.5" />
-                      {copy.editRecord}
-                    </Button>
+                    {(() => {
+                      const isSelf = Boolean(user && (user.id === record.id || user.email === record.email));
+                      const isPrivilegedTarget = isRecordAdministrator(record);
+                      const canManageTarget = isSuperAdmin || !isPrivilegedTarget;
+                      return (
+                        <>
+                          <Button size="sm" variant="outline" onClick={() => openEdit(record)} disabled={!canManageTarget}>
+                            <Pencil className="mr-1.5 h-3.5 w-3.5" />
+                            {copy.editRecord}
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => void handleResetCredential(record)}
+                            disabled={isSelf || !canManageTarget || resettingUserId === record.id}
+                            title={copy.resetAction}
+                          >
+                            <KeyRound className="mr-1.5 h-3.5 w-3.5" />
+                            {copy.resetAction}
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="text-destructive hover:bg-destructive/10 hover:text-destructive disabled:opacity-40 disabled:cursor-not-allowed"
+                            onClick={() => void handleDelete(record)}
+                            disabled={isSelf || !canManageTarget}
+                            title={copy.deleteUserLabel(record.firstName, record.lastName)}
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </Button>
+                        </>
+                      );
+                    })()}
                   </AdminRowActions>
                 </article>
               ))}
@@ -1115,7 +1171,7 @@ export default function AdminUsersPage() {
                                     size="icon"
                                     variant="ghost"
                                     onClick={() => void handleResetCredential(record)}
-                                    disabled={isSelf || !canManageTarget}
+                                    disabled={isSelf || !canManageTarget || resettingUserId === record.id}
                                     title={copy.resetAction}
                                   >
                                     <KeyRound className="h-4 w-4" />

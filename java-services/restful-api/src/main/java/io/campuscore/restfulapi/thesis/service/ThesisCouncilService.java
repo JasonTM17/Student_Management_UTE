@@ -1,6 +1,8 @@
 package io.campuscore.restfulapi.thesis.service;
 
 import io.campuscore.restfulapi.audit.AdminAuditRecorder;
+import io.campuscore.restfulapi.thesis.domain.RoundStatus;
+import io.campuscore.restfulapi.thesis.domain.TopicStatus;
 import io.campuscore.restfulapi.web.DomainException;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
@@ -33,6 +35,7 @@ public class ThesisCouncilService {
     private static final int MIN_COUNCIL_SIZE = 3;
     private static final int MAX_COUNCIL_SIZE = 5;
     private static final String SCORE_COMPONENT = "DEFENSE";
+    private static final String GVPB_COMPONENT = "GVPB";
 
     private final NamedParameterJdbcTemplate jdbc;
     private final AdminAuditRecorder audit;
@@ -75,6 +78,8 @@ public class ThesisCouncilService {
                         + "VALUES (:id, :roundId, :name, 'ACTIVE', :createdBy)",
                 params().addValue("id", id).addValue("roundId", roundId)
                         .addValue("name", name.trim()).addValue("createdBy", subject(actor)));
+        audit.record(subject(actor), null, "COUNCIL_CREATED", "THESIS_COUNCIL", id.toString(),
+                "Defense council created: " + name.trim());
         return getCouncil(id);
     }
 
@@ -131,6 +136,8 @@ public class ThesisCouncilService {
                         + "VALUES (:id, :councilId, :lecturerId, :role)",
                 params().addValue("id", UUID.randomUUID()).addValue("councilId", councilId)
                         .addValue("lecturerId", lecturerId).addValue("role", role));
+        audit.record(subject(actor), null, "COUNCIL_MEMBER_ADDED", "THESIS_COUNCIL", councilId.toString(),
+                "Lecturer " + lecturerId + " seated as " + role);
         return getCouncil(councilId);
     }
 
@@ -174,6 +181,8 @@ public class ThesisCouncilService {
                 params().addValue("councilId", councilId).addValue("lecturerId", lecturerId)) != 1) {
             throw notFound("COUNCIL_MEMBER_NOT_FOUND", "Council member not found");
         }
+        audit.record(subject(actor), null, "COUNCIL_MEMBER_REMOVED", "THESIS_COUNCIL", councilId.toString(),
+                "Lecturer " + lecturerId + " removed from the council");
         return getCouncil(councilId);
     }
 
@@ -207,8 +216,12 @@ public class ThesisCouncilService {
                     "A council needs three to five members including one chair and one secretary before it can grade topics");
         }
         Map<String, Object> topic = one(
-                "SELECT id, round_id, final_score FROM thesis.thesis_topic WHERE id = :topicId",
+                "SELECT id, round_id, status, final_score FROM thesis.thesis_topic WHERE id = :topicId",
                 params().addValue("topicId", topicId), "TOPIC_NOT_FOUND", "Thesis topic not found");
+        if (!"PUBLISHED".equals(topic.get("status")) && !"APPROVED".equals(topic.get("status"))) {
+            throw conflict("TOPIC_NOT_PUBLISHED",
+                    "Only a published topic can be assigned to a defense council");
+        }
         if (!councilRound(councilId).equals(topic.get("round_id"))) {
             throw conflict("TOPIC_ROUND_MISMATCH", "Topic belongs to another registration round");
         }
@@ -235,6 +248,8 @@ public class ThesisCouncilService {
                         + "VALUES (:id, :councilId, :topicId, :assignedBy)",
                 params().addValue("id", UUID.randomUUID()).addValue("councilId", councilId)
                         .addValue("topicId", topicId).addValue("assignedBy", subject(actor)));
+        audit.record(subject(actor), null, "COUNCIL_TOPIC_ASSIGNED", "THESIS_COUNCIL", councilId.toString(),
+                "Topic " + topicId + " assigned for defense");
         return getCouncil(councilId);
     }
 
@@ -356,6 +371,17 @@ public class ThesisCouncilService {
      */
     @Transactional
     public ScoreResponse submitScore(UUID councilId, UUID topicId, String component, BigDecimal score, Jwt actor) {
+        return submitScore(councilId, topicId, component, score, null, actor);
+    }
+
+    /**
+     * Records one council member's defense score together with an optional
+     * written evaluation comment (max 1000 characters, visible to students
+     * only after the round publishes results).
+     */
+    @Transactional
+    public ScoreResponse submitScore(UUID councilId, UUID topicId, String component, BigDecimal score,
+            String comment, Jwt actor) {
         String lecturerId = requireCouncilLecturer(councilId, actor);
         // Membership edits lock Council. Share that lock before the final
         // permission check and first score, so a removal cannot pass its
@@ -385,36 +411,238 @@ public class ThesisCouncilService {
         }
         // K16: the row is overwritten DELETE-then-INSERT, so the outgoing value
         // only exists here — capture it for the audit trail before the delete.
-        BigDecimal previousScore = jdbc.query(
-                "SELECT score FROM thesis.thesis_topic_score WHERE topic_id = :topicId "
+        Map<String, Object> previousRow = jdbc.query(
+                "SELECT score, comment FROM thesis.thesis_topic_score WHERE topic_id = :topicId "
                         + "AND lecturer_id = :lecturerId AND component = :component",
                 params().addValue("topicId", topicId).addValue("lecturerId", lecturerId)
                         .addValue("component", resolvedComponent),
-                (rs, ignored) -> rs.getBigDecimal("score")).stream().findFirst().orElse(null);
+                (rs, ignored) -> {
+                    Map<String, Object> row = new LinkedHashMap<>();
+                    row.put("score", rs.getBigDecimal("score"));
+                    row.put("comment", rs.getString("comment"));
+                    return row;
+                }).stream().findFirst().orElse(null);
         jdbc.update(
                 "DELETE FROM thesis.thesis_topic_score WHERE topic_id = :topicId AND lecturer_id = :lecturerId AND component = :component",
                 params().addValue("topicId", topicId).addValue("lecturerId", lecturerId)
                         .addValue("component", resolvedComponent));
+        String trimmedComment = comment == null ? null : comment.trim();
+        if (trimmedComment != null && trimmedComment.isEmpty()) {
+            trimmedComment = null;
+        }
+        if (trimmedComment != null && trimmedComment.length() > 1000) {
+            throw invalid("comment must contain at most 1000 characters");
+        }
         jdbc.update(
-                "INSERT INTO thesis.thesis_topic_score (id, topic_id, council_id, lecturer_id, component, score) "
-                        + "VALUES (:id, :topicId, :councilId, :lecturerId, :component, :score)",
+                "INSERT INTO thesis.thesis_topic_score (id, topic_id, council_id, lecturer_id, component, score, comment) "
+                        + "VALUES (:id, :topicId, :councilId, :lecturerId, :component, :score, :comment)",
                 params().addValue("id", UUID.randomUUID()).addValue("topicId", topicId)
                         .addValue("councilId", councilId).addValue("lecturerId", lecturerId)
-                        .addValue("component", resolvedComponent).addValue("score", score));
+                        .addValue("component", resolvedComponent).addValue("score", score)
+                        .addValue("comment", trimmedComment));
         Map<String, Object> beforeState = new LinkedHashMap<>();
         beforeState.put("component", resolvedComponent);
         beforeState.put("lecturerId", lecturerId);
-        beforeState.put("score", previousScore);
+        beforeState.put("score", previousRow == null ? null : previousRow.get("score"));
+        beforeState.put("comment", previousRow == null ? null : previousRow.get("comment"));
         Map<String, Object> afterState = new LinkedHashMap<>();
         afterState.put("component", resolvedComponent);
         afterState.put("lecturerId", lecturerId);
         afterState.put("score", score);
+        afterState.put("comment", trimmedComment);
         audit.record(subject(actor), null, "COUNCIL_SCORE_SUBMITTED", "THESIS_TOPIC", topicId.toString(),
-                previousScore == null
+                previousRow == null
                         ? "Defense score " + score + " recorded for topic " + topicId
-                        : "Defense score for topic " + topicId + " changed from " + previousScore + " to " + score,
+                        : "Defense score for topic " + topicId + " changed from " + previousRow.get("score") + " to " + score,
                 beforeState, afterState);
-        return new ScoreResponse(topicId, lecturerId, resolvedComponent, score);
+        return new ScoreResponse(topicId, lecturerId, resolvedComponent, score, trimmedComment);
+    }
+
+    /**
+     * Assigns the GVPB counter-reviewer of one topic (brief: exactly one
+     * reviewer per defended topic, independent of the defense council).
+     *
+     * @param topicId topic being reviewed
+     * @param lecturerId active lecturer who will counter-review; must not be a
+     *        supervisor of the topic and the assignment freezes once the
+     *        reviewer submitted a score or the chair finalized
+     * @param actor caller JWT; a faculty head or admin is required
+     * @return the assigned reviewer identity
+     * @throws DomainException with code VALIDATION_ERROR for an unknown lecturer,
+     *         SUPERVISOR_CANNOT_REVIEW when the lecturer supervises the topic,
+     *         GVPB_SCORE_SUBMITTED once a reviewer score exists, or
+     *         SCORE_ALREADY_FINALIZED for a graded topic
+     */
+    @Transactional
+    public Map<String, Object> assignReviewer(UUID topicId, String lecturerId, Jwt actor) {
+        requireGovernanceRole(actor, "Only a faculty head or admin can assign the counter-reviewer");
+        requireText(lecturerId, "lecturerId");
+        Map<String, Object> topic = one(
+                "SELECT t.id, t.status, t.final_score, t.gvpb_lecturer_id, r.gvpb_deadline, r.status AS round_status "
+                        + "FROM thesis.thesis_topic t "
+                        + "JOIN thesis.thesis_registration_round r ON r.id = t.round_id "
+                        + "WHERE t.id = :topicId FOR UPDATE OF t",
+                params().addValue("topicId", topicId), "TOPIC_NOT_FOUND", "Thesis topic not found");
+        if (RoundStatus.CANCELLED.name().equals(topic.get("round_status"))
+                || RoundStatus.RESULTS_PUBLISHED.name().equals(topic.get("round_status"))) {
+            throw conflict("ROUND_STATE_CONFLICT", "The round no longer accepts a counter-reviewer assignment");
+        }
+        if (!TopicStatus.PUBLISHED.name().equals(topic.get("status"))
+                && !TopicStatus.APPROVED.name().equals(topic.get("status"))) {
+            throw conflict("TOPIC_NOT_PUBLISHED", "Only published topics can be assigned a counter-reviewer");
+        }
+        if (topic.get("final_score") != null) {
+            throw conflict("SCORE_ALREADY_FINALIZED", "A finalized topic cannot change its counter-reviewer");
+        }
+        if (topic.get("gvpb_deadline") == null) {
+            throw invalid("This round's thesis type has no counter-review phase");
+        }
+        if (!lecturerExists(lecturerId)) {
+            throw invalid("Unknown or inactive lecturer: " + lecturerId);
+        }
+        Integer supervising = count(
+                "SELECT COUNT(*) FROM thesis.thesis_topic_supervisor WHERE topic_id = :topicId AND lecturer_id = :lecturerId",
+                params().addValue("topicId", topicId).addValue("lecturerId", lecturerId));
+        if (supervising != null && supervising > 0) {
+            throw conflict("SUPERVISOR_CANNOT_REVIEW",
+                    "A topic supervisor cannot be its counter-reviewer");
+        }
+        String previousReviewer = (String) topic.get("gvpb_lecturer_id");
+        if (previousReviewer != null && !previousReviewer.equals(lecturerId)) {
+            Integer scored = count(
+                    "SELECT COUNT(*) FROM thesis.thesis_topic_score WHERE topic_id = :topicId AND component = :component",
+                    params().addValue("topicId", topicId).addValue("component", GVPB_COMPONENT));
+            if (scored != null && scored > 0) {
+                throw conflict("GVPB_SCORE_SUBMITTED",
+                        "The counter-reviewer already submitted a score; the assignment is frozen");
+            }
+        }
+        jdbc.update(
+                "UPDATE thesis.thesis_topic SET gvpb_lecturer_id = :lecturerId, updated_at = CURRENT_TIMESTAMP, version = version + 1 WHERE id = :topicId",
+                params().addValue("lecturerId", lecturerId).addValue("topicId", topicId));
+        Map<String, Object> beforeState = new LinkedHashMap<>();
+        beforeState.put("gvpb_lecturer_id", previousReviewer);
+        Map<String, Object> afterState = new LinkedHashMap<>();
+        afterState.put("gvpb_lecturer_id", lecturerId);
+        audit.record(subject(actor), null, "GVPB_ASSIGNED", "THESIS_TOPIC", topicId.toString(),
+                "Counter-reviewer assigned to topic " + topicId, beforeState, afterState);
+        return afterState;
+    }
+
+    /**
+     * Records the GVPB counter-review score for a topic, before the round's
+     * {@code gvpb_deadline} when the round type declares one.
+     *
+     * @param topicId topic being counter-reviewed
+     * @param score score between 0 and 10 inclusive
+     * @param comment optional written evaluation (max 1000 characters)
+     * @param actor caller JWT of the assigned counter-reviewer
+     * @return the stored score row
+     * @throws DomainException with code REVIEWER_REQUIRED when the caller is
+     *         not the assigned reviewer, GVPB_DEADLINE_PASSED after the round
+     *         deadline, SUPERVISOR_CANNOT_GRADE for a supervisor (supervisors
+     *         are re-checked because they can change after assignment), or
+     *         SCORE_ALREADY_FINALIZED once the chair closed the topic
+     */
+    @Transactional
+    public ScoreResponse submitReviewerScore(UUID topicId, BigDecimal score, String comment, Jwt actor) {
+        String lecturerId = normalize(actor == null ? null : actor.getClaimAsString("lecturerId"));
+        if (!StringUtils.hasText(lecturerId)) {
+            throw new DomainException(HttpStatus.FORBIDDEN, "LECTURER_PROFILE_REQUIRED",
+                    "An active lecturer profile is required to submit a counter-review score");
+        }
+        Map<String, Object> topic = one(
+                "SELECT t.id, t.round_id, t.status, t.final_score, t.gvpb_lecturer_id, r.gvpb_deadline, r.status AS round_status "
+                        + "FROM thesis.thesis_topic t "
+                        + "JOIN thesis.thesis_registration_round r ON r.id = t.round_id "
+                        + "WHERE t.id = :topicId FOR UPDATE OF t",
+                params().addValue("topicId", topicId), "TOPIC_NOT_FOUND", "Thesis topic not found");
+        if (RoundStatus.CANCELLED.name().equals(topic.get("round_status"))
+                || RoundStatus.RESULTS_PUBLISHED.name().equals(topic.get("round_status"))) {
+            throw conflict("ROUND_STATE_CONFLICT", "The round no longer accepts counter-review scores");
+        }
+        if (!lecturerId.equals(topic.get("gvpb_lecturer_id"))) {
+            throw new DomainException(HttpStatus.FORBIDDEN, "REVIEWER_REQUIRED",
+                    "Only the assigned counter-reviewer can submit the GVPB score");
+        }
+        if (!TopicStatus.PUBLISHED.name().equals(topic.get("status"))
+                && !TopicStatus.APPROVED.name().equals(topic.get("status"))) {
+            throw conflict("TOPIC_NOT_PUBLISHED", "Only published topics can receive a counter-review score");
+        }
+        if (topic.get("final_score") != null) {
+            throw conflict("SCORE_ALREADY_FINALIZED", "The topic score has been finalized by the chair");
+        }
+        requireNotSupervisor(topicId, lecturerId);
+        Instant deadline = instantOf(topic.get("gvpb_deadline"));
+        if (deadline != null && Instant.now().isAfter(deadline)) {
+            throw conflict("GVPB_DEADLINE_PASSED",
+                    "The counter-review deadline for this round has passed");
+        }
+        if (score == null || score.doubleValue() < 0 || score.doubleValue() > 10) {
+            throw invalid("score must be between 0 and 10");
+        }
+        String trimmedComment = comment == null ? null : comment.trim();
+        if (trimmedComment != null && trimmedComment.isEmpty()) {
+            trimmedComment = null;
+        }
+        if (trimmedComment != null && trimmedComment.length() > 1000) {
+            throw invalid("comment must contain at most 1000 characters");
+        }
+        Map<String, Object> previousRow = jdbc.query(
+                "SELECT score, comment FROM thesis.thesis_topic_score WHERE topic_id = :topicId AND component = :component",
+                params().addValue("topicId", topicId).addValue("component", GVPB_COMPONENT),
+                (rs, ignored) -> {
+                    Map<String, Object> row = new LinkedHashMap<>();
+                    row.put("score", rs.getBigDecimal("score"));
+                    row.put("comment", rs.getString("comment"));
+                    return row;
+                }).stream().findFirst().orElse(null);
+        jdbc.update(
+                "DELETE FROM thesis.thesis_topic_score WHERE topic_id = :topicId AND component = :component",
+                params().addValue("topicId", topicId).addValue("component", GVPB_COMPONENT));
+        jdbc.update(
+                "INSERT INTO thesis.thesis_topic_score (id, topic_id, council_id, lecturer_id, component, score, comment) "
+                        + "VALUES (:id, :topicId, NULL, :lecturerId, :component, :score, :comment)",
+                params().addValue("id", UUID.randomUUID()).addValue("topicId", topicId)
+                        .addValue("lecturerId", lecturerId).addValue("component", GVPB_COMPONENT)
+                        .addValue("score", score).addValue("comment", trimmedComment));
+        audit.record(subject(actor), null, "GVPB_SCORE_SUBMITTED", "THESIS_TOPIC", topicId.toString(),
+                previousRow == null
+                        ? "Counter-review score " + score + " recorded for topic " + topicId
+                        : "Counter-review score for topic " + topicId + " changed from " + previousRow.get("score") + " to " + score);
+        return new ScoreResponse(topicId, lecturerId, GVPB_COMPONENT, score, trimmedComment);
+    }
+
+    /**
+     * Reads the GVPB counter-review score of a topic. The assigned reviewer
+     * reads their own row; governance staff read the row of whichever reviewer
+     * is currently assigned. Other callers are rejected so a plain council
+     * member cannot probe counter-review state.
+     */
+    @Transactional(readOnly = true)
+    public ScoreResponse reviewerScore(UUID topicId, Jwt actor) {
+        String lecturerId = normalize(actor == null ? null : actor.getClaimAsString("lecturerId"));
+        boolean governance = isCouncilGovernanceStaff(actor);
+        Map<String, Object> topic = one(
+                "SELECT gvpb_lecturer_id FROM thesis.thesis_topic WHERE id = :topicId",
+                params().addValue("topicId", topicId), "TOPIC_NOT_FOUND", "Thesis topic not found");
+        String assigned = (String) topic.get("gvpb_lecturer_id");
+        if (!governance && (lecturerId == null || !lecturerId.equals(assigned))) {
+            throw new DomainException(HttpStatus.FORBIDDEN, "REVIEWER_REQUIRED",
+                    "Only the assigned counter-reviewer can read the GVPB score");
+        }
+        if (assigned == null) {
+            throw new DomainException(HttpStatus.NOT_FOUND, "REVIEW_SCORE_NOT_FOUND",
+                    "No counter-reviewer is assigned to this topic");
+        }
+        return jdbc.query(
+                "SELECT score, comment FROM thesis.thesis_topic_score WHERE topic_id = :topicId AND component = :component",
+                params().addValue("topicId", topicId).addValue("component", GVPB_COMPONENT),
+                (rs, ignored) -> new ScoreResponse(topicId, assigned, GVPB_COMPONENT,
+                        rs.getBigDecimal("score"), rs.getString("comment")))
+                .stream().findFirst()
+                .orElseThrow(() -> new DomainException(HttpStatus.NOT_FOUND, "REVIEW_SCORE_NOT_FOUND",
+                        "The counter-reviewer has not submitted a score yet"));
     }
 
     /**
@@ -434,13 +662,13 @@ public class ThesisCouncilService {
             throw conflict("TOPIC_NOT_ASSIGNED", "This council has not been assigned the topic");
         }
         return jdbc.query(
-                "SELECT lecturer_id, component, score FROM thesis.thesis_topic_score "
+                "SELECT lecturer_id, component, score, comment FROM thesis.thesis_topic_score "
                         + "WHERE council_id = :councilId AND topic_id = :topicId AND component = :component "
                         + "ORDER BY graded_at",
                 params().addValue("councilId", councilId).addValue("topicId", topicId)
                         .addValue("component", SCORE_COMPONENT),
                 (rs, ignored) -> new ScoreResponse(topicId, rs.getString("lecturer_id"),
-                        rs.getString("component"), rs.getBigDecimal("score")));
+                        rs.getString("component"), rs.getBigDecimal("score"), rs.getString("comment")));
     }
 
     /**
@@ -533,7 +761,7 @@ public class ThesisCouncilService {
             throw conflict("RESULTS_NOT_PUBLISHED", "Results for this round have not been published yet");
         }
         return jdbc.query(
-                "SELECT t.title, t.final_score, t.final_score_finalized_at, g.id AS group_id, g.leader_student_id, c.name AS council_name "
+                "SELECT t.id AS topic_id, t.title, t.final_score, t.final_score_finalized_at, g.id AS group_id, g.leader_student_id, c.name AS council_name "
                         + "FROM thesis.thesis_group_member m "
                         + "JOIN thesis.thesis_group g ON g.id = m.group_id "
                         + "JOIN thesis.thesis_topic t ON t.id = g.topic_id "
@@ -541,12 +769,29 @@ public class ThesisCouncilService {
                         + "LEFT JOIN thesis.thesis_council c ON c.id = ct.council_id "
                         + "WHERE m.student_id = :studentId AND g.round_id = :roundId AND g.approval_status = 'APPROVED'",
                 params().addValue("studentId", studentId).addValue("roundId", roundId),
-                (rs, ignored) -> new StudentResultRow(
-                        UUID.fromString(rs.getString("group_id")),
-                        rs.getString("title"),
-                        rs.getBigDecimal("final_score"),
-                        rs.getString("council_name"),
-                        rs.getString("leader_student_id")));
+                (rs, ignored) -> {
+                    UUID topicId = UUID.fromString(rs.getString("topic_id"));
+                    return new StudentResultRow(
+                            UUID.fromString(rs.getString("group_id")),
+                            rs.getString("title"),
+                            rs.getBigDecimal("final_score"),
+                            rs.getString("council_name"),
+                            rs.getString("leader_student_id"),
+                            evaluationComments(topicId));
+                });
+    }
+
+    /**
+     * Evaluation comments attached to a topic's score rows, in grading order.
+     * Callers only reach this after the round published results, so reviewer
+     * remarks never leak to students early.
+     */
+    private List<ScoreComment> evaluationComments(UUID topicId) {
+        return jdbc.query(
+                "SELECT component, comment FROM thesis.thesis_topic_score "
+                        + "WHERE topic_id = :topicId AND comment IS NOT NULL ORDER BY graded_at",
+                params().addValue("topicId", topicId),
+                (rs, ignored) -> new ScoreComment(rs.getString("component"), rs.getString("comment")));
     }
 
     // ---------- helpers ----------
@@ -732,6 +977,22 @@ public class ThesisCouncilService {
         return value == null ? "" : value.trim();
     }
 
+    private static Instant instantOf(Object value) {
+        if (value == null) {
+            return null;
+        }
+        if (value instanceof java.sql.Timestamp timestamp) {
+            return timestamp.toInstant();
+        }
+        if (value instanceof java.time.OffsetDateTime offset) {
+            return offset.toInstant();
+        }
+        if (value instanceof Instant instant) {
+            return instant;
+        }
+        return null;
+    }
+
     private static void requireText(String value, String name) {
         if (value == null || value.isBlank()) throw invalid(name + " is required");
     }
@@ -758,7 +1019,7 @@ public class ThesisCouncilService {
             List<CouncilMember> members,
             List<UUID> topicIds) { }
 
-    public record ScoreResponse(UUID topicId, String lecturerId, String component, BigDecimal score) { }
+    public record ScoreResponse(UUID topicId, String lecturerId, String component, BigDecimal score, String comment) { }
 
     public record TopicResult(UUID topicId, BigDecimal finalScore, String finalizedBy, Instant finalizedAt, String status) { }
 
@@ -767,5 +1028,8 @@ public class ThesisCouncilService {
             String topicTitle,
             BigDecimal finalScore,
             String councilName,
-            String leaderStudentId) { }
+            String leaderStudentId,
+            List<ScoreComment> comments) { }
+
+    public record ScoreComment(String component, String comment) { }
 }

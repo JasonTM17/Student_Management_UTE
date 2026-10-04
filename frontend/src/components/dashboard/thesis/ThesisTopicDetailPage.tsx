@@ -37,9 +37,13 @@ export default function ThesisTopicDetailPage() {
   const groupTopicId = myGroup?.topicId ?? null;
   const alreadyChosen = Boolean(groupTopicId) && groupTopicId === topicId;
   // The backend assigns topics only while registration is open (assignTopic
-  // rejects PROPOSALS_PUBLISHED), so the affordance must match exactly.
+  // rejects PROPOSALS_PUBLISHED), so the affordance must match exactly. A
+  // cancelled group cannot pick — the backend answers 409, so the button is
+  // replaced by an explanatory note instead of firing a doomed request.
   const roundAllowsChoice = workspace.selectedRound?.status === 'REGISTRATION_OPEN';
-  const canChoose = isStudent && Boolean(myGroup) && !alreadyChosen && roundAllowsChoice;
+  const groupCancelled = myGroup?.status === 'CANCELLED';
+  const canChoose =
+    isStudent && Boolean(myGroup) && !groupCancelled && !alreadyChosen && roundAllowsChoice;
 
   const chooseThisTopic = async () => {
     if (!myGroup) return;
@@ -199,6 +203,10 @@ export default function ThesisTopicDetailPage() {
                 </Button>
                 {actionError ? <p className="text-sm text-destructive">{actionError}</p> : null}
               </div>
+            ) : isStudent && groupCancelled ? (
+              <p className="rounded-lg border border-border/70 bg-muted/40 px-3 py-2 text-sm text-muted-foreground">
+                {messages.thesis.progressGroupCancelled}
+              </p>
             ) : null}
           </CardContent>
         </Card>

@@ -267,14 +267,14 @@ export function AnnouncementEditModal({
     >
       <form onSubmit={handleFormSubmit} className="space-y-4">
         {validationError ? (
-          <div className="flex items-center gap-2 rounded-lg border border-destructive/30 bg-destructive/5 px-4 py-2.5 text-xs font-medium text-destructive">
-            <AlertCircle className="h-4 w-4 shrink-0" />
+          <div className="flex items-start gap-2 rounded-lg border border-destructive/30 bg-destructive/5 px-4 py-2.5 text-xs font-medium text-destructive">
+            <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
             <span>{validationError}</span>
           </div>
         ) : null}
 
         {/* Header Notice Banner */}
-        <div className="flex items-center justify-between rounded-lg border border-border/70 bg-muted/40 px-3.5 py-2 text-xs">
+        <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-border/70 bg-muted/40 px-3.5 py-2 text-xs">
           <div className="flex items-center gap-2">
             <span className="font-semibold text-foreground">
               {isVi ? 'Mã văn bản:' : 'Notice ID:'}
@@ -283,7 +283,7 @@ export function AnnouncementEditModal({
               {announcement.id.slice(0, 12)}...
             </code>
           </div>
-          <div className="text-[11px] text-muted-foreground">
+          <div className="min-w-0 text-right text-[11px] text-muted-foreground">
             {isVi ? 'Ban hành bởi:' : 'Published by:'}{' '}
             <span className="font-medium text-foreground">
               {publishedBy || (isVi ? 'Phòng Đào tạo' : 'Office of Academic Affairs')}
@@ -293,10 +293,11 @@ export function AnnouncementEditModal({
 
         {/* Title Input */}
         <div>
-          <label className="mb-1 block text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+          <label htmlFor="announcement-edit-title" className="mb-1 block text-xs font-semibold uppercase tracking-wider text-muted-foreground">
             {isVi ? 'Tiêu đề thông báo / công văn' : 'Document Title'} <span className="text-destructive">*</span>
           </label>
           <Input
+            id="announcement-edit-title"
             value={title}
             onChange={(e) => setTitle(e.target.value)}
             placeholder={isVi ? 'Nhập tiêu đề công văn chính thức...' : 'Enter official document title...'}
@@ -350,7 +351,7 @@ export function AnnouncementEditModal({
 
         {/* Editorial Cover Image Preset Tray */}
         <div className="space-y-2 rounded-lg border border-border/70 bg-secondary/15 p-3">
-          <div className="flex items-center justify-between">
+          <div className="flex flex-wrap items-center justify-between gap-2">
             <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
               <ImageIcon className="h-3.5 w-3.5 text-primary" />
               {isVi ? 'Ảnh bìa học thuật (Bộ sưu tập HCMUTE):' : 'Editorial Cover Image (HCMUTE Collection):'}
@@ -359,7 +360,7 @@ export function AnnouncementEditModal({
               <button
                 type="button"
                 onClick={handleRemoveBanner}
-                className="text-[11px] font-medium text-destructive hover:underline flex items-center gap-1 cursor-pointer"
+                className="shrink-0 text-[11px] font-medium text-destructive hover:underline flex items-center gap-1 cursor-pointer"
               >
                 <X className="h-3 w-3" />
                 {isVi ? 'Gỡ ảnh bìa' : 'Remove Cover'}
@@ -397,7 +398,7 @@ export function AnnouncementEditModal({
                     ) : null}
                   </div>
                   <div className="p-1.5 bg-card">
-                    <p className="text-[11px] font-semibold text-foreground truncate">{bannerTitle}</p>
+                    <p className="text-[11px] font-semibold text-foreground truncate" title={bannerTitle}>{bannerTitle}</p>
                     <span className="text-[9px] text-muted-foreground">{bannerTag}</span>
                   </div>
                 </button>
@@ -408,11 +409,11 @@ export function AnnouncementEditModal({
 
         {/* Content Area with 3-Mode Toggle: Visual (TinyMCE) vs Code vs Preview */}
         <div className="space-y-1.5">
-          <div className="flex items-center justify-between">
+          <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2">
             <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
               {isVi ? 'Nội dung công văn / văn bản' : 'Document Content'} <span className="text-destructive">*</span>
             </label>
-            <div className="flex items-center gap-1 rounded-md border border-border/80 bg-background p-0.5 text-xs">
+            <div className="flex items-center gap-1 rounded-md border border-border/80 bg-background p-0.5 text-xs [&_button]:whitespace-nowrap">
               <button
                 type="button"
                 onClick={() => setEditorMode('visual')}

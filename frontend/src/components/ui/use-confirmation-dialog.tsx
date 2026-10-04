@@ -25,6 +25,7 @@ export function useConfirmationDialog() {
 
   const confirm = React.useCallback((nextOptions: ConfirmationOptions) => {
     return new Promise<boolean>((resolve) => {
+      resolverRef.current?.(false);
       resolverRef.current = resolve;
       setOptions(nextOptions);
     });

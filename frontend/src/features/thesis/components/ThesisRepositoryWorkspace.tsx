@@ -172,7 +172,7 @@ export default function ThesisRepositoryWorkspace({
                           {report.topicTitle || report.title || pageCopy.thesisDocumentLabel}
                         </h4>
                         {report.topicDescription && (
-                          <p className="text-xs text-muted-foreground line-clamp-2">
+                          <p className="text-xs text-muted-foreground line-clamp-2" title={report.topicDescription}>
                             {report.topicDescription}
                           </p>
                         )}
@@ -275,9 +275,9 @@ export default function ThesisRepositoryWorkspace({
                             onClick={() => void onDownloadReport(report)}
                             className="gap-2 border-primary/30 hover:bg-primary/10 hover:border-primary font-semibold text-xs"
                           >
-                            <FileDown className="h-4 w-4 text-primary" />
-                            <span>{report.fileName}</span>
-                            <span className="text-muted-foreground text-[11px] font-normal">
+                            <FileDown className="h-4 w-4 shrink-0 text-primary" />
+                            <span className="max-w-[16rem] truncate" title={report.fileName}>{report.fileName}</span>
+                            <span className="shrink-0 text-muted-foreground text-[11px] font-normal">
                               ({[report.fileType, formatReportFileSize(report.fileSize, locale)].filter(Boolean).join(' · ')})
                             </span>
                           </Button>

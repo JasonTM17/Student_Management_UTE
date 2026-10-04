@@ -51,7 +51,25 @@ public final class ThesisCouncilRequestDtos {
             @Pattern(
                     regexp = "-?\\d+(\\.\\d+)?([eE][+-]?\\d+)?",
                     message = "score must be numeric")
-            String score) {
+            String score,
+            @Size(max = 1000, message = "comment must contain at most 1000 characters")
+            String comment) {
+    }
+
+    /** GVPB counter-reviewer assignment payload for a topic. */
+    public record AssignReviewerRequest(
+            @NotBlank(message = "lecturerId is required")
+            String lecturerId) {
+    }
+
+    /** GVPB counter-review score payload; the range is enforced by the service. */
+    public record ReviewerScoreRequest(
+            @Pattern(
+                    regexp = "-?\\d+(\\.\\d+)?([eE][+-]?\\d+)?",
+                    message = "score must be numeric")
+            String score,
+            @Size(max = 1000, message = "comment must contain at most 1000 characters")
+            String comment) {
     }
 
     private static final String UUID_PATTERN =

@@ -299,14 +299,28 @@ test('admin assistant-knowledge integration uses RichTextEditor with academic pl
   assert.match(page, /minHeight="240px"/);
 });
 
-test('student and lecturer feeds render rich announcements via RichContentRenderer', () => {
-  for (const relativePath of [
-    'src/app/dashboard/announcements/page.tsx',
-    'src/app/dashboard/lecturer/announcements/page.tsx',
+test('student feed shows excerpts; lecturer feed and reader modal render rich announcements', () => {
+  // Feed cards used to drop the full rich HTML (including base64 <img>
+  // payloads) into a line-clamped block — the student feed now renders a
+  // plain-text excerpt there, and the reader modal is where the full rich
+  // document (images included) renders.
+  const studentFeed = read('src/app/dashboard/announcements/page.tsx');
+  assert.match(studentFeed, /extractAnnouncementExcerpt\(announcement\.content/);
+  assert.doesNotMatch(studentFeed,
+    /<RichContentRenderer content=\{announcement\.content\} \/>/,
+    'the clamped feed card must not render raw rich HTML');
+
+  const lecturerFeed = read('src/app/dashboard/lecturer/announcements/page.tsx');
+  assert.match(lecturerFeed, /import \{ RichContentRenderer \} from '@\/components\/ui\/rich-content-renderer'/);
+  assert.match(lecturerFeed, /<RichContentRenderer content=\{announcement\.content\} \/>/);
+
+  for (const layout of [
+    'src/components/announcements/reader/layouts/EditorialArticleMagazine.tsx',
+    'src/components/announcements/reader/layouts/AdministrativeDispatchSheet.tsx',
   ]) {
-    const page = read(relativePath);
-    assert.match(page, /import \{ RichContentRenderer \} from '@\/components\/ui\/rich-content-renderer'/);
-    assert.match(page, /<RichContentRenderer content=\{announcement\.content\} \/>/);
+    const page = read(layout);
+    assert.match(page, /<RichContentRenderer content=\{(bodyContent|announcement\.content)\} \/>/,
+      `${layout} must render the full rich document`);
   }
 });
 

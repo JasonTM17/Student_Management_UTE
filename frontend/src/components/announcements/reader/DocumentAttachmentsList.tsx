@@ -134,7 +134,7 @@ export function DocumentAttachmentsList({
                 {getIcon(file.type)}
               </div>
               <div className="overflow-hidden">
-                <p className="line-clamp-1 text-xs font-semibold text-foreground group-hover:text-primary transition-colors">
+                <p className="line-clamp-1 text-xs font-semibold text-foreground group-hover:text-primary transition-colors" title={file.name}>
                   {file.name}
                 </p>
                 <div className="flex items-center gap-2 pt-0.5 text-[11px] text-muted-foreground">

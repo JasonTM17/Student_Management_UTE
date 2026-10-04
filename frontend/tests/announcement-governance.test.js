@@ -103,10 +103,15 @@ test('dual-domain announcement reader coordinates editorial magazine and officia
   assert.match(magazine, /RichContentRenderer/);
   assert.match(magazine, /DocumentAttachmentsList/);
   assert.match(magazine, /TableOfContents/);
-  assert.match(dispatch, /ShieldCheck/);
-  assert.match(dispatch, /eSealOrg/);
+  // Sign-off must stay grounded in record data: the issuing unit comes from
+  // publishedBy via formatAnnouncementPublisher plus an electronic-publish
+  // hint. A fabricated signatory name or a fake "digitally verified" seal
+  // (ShieldCheck / eSealOrg) must never come back — audit finding 1.
+  assert.match(dispatch, /formatAnnouncementPublisher/);
+  assert.match(dispatch, /signOffHint/);
+  assert.doesNotMatch(dispatch, /ShieldCheck/);
+  assert.doesNotMatch(dispatch, /eSealOrg/);
   assert.match(dispatch, /reader-theme-\$\{preferences\.theme\}/);
-  assert.match(dispatch, /const isReaderDark = preferences\.theme === 'dark'/);
   assert.doesNotMatch(dispatch, /dark:bg-red-950\/40/);
   assert.match(magazine, /reader-theme-\$\{preferences\.theme\}/);
   assert.match(globals, /\.reader-theme-light/);

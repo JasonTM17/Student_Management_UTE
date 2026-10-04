@@ -64,7 +64,7 @@ class ThesisAssistantCsdlRetrievalTest {
                 new ThesisAssistantKnowledgeRepository.KnowledgeDocument(
                         "88888888-8888-8888-8888-888888888888", CSDL_SLUG, "vi",
                         "Thiết kế cơ sở dữ liệu quan hệ và tối ưu truy vấn SQL",
-                        seeded, "office", "SPECIALIZED", (java.util.UUID) null, (Integer) null));
+                        seeded, "office", "SPECIALIZED", null, null, null, null, null, null, null, null, 30));
         // Same containment semantics as the repository's LIKE predicates.
         when(knowledge.search(eq("vi"), anyList(), anyInt())).thenAnswer(invocation -> {
             List<String> terms = invocation.getArgument(1);

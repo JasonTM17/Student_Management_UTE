@@ -406,7 +406,8 @@ public class AcademicReadRepository {
                         + " cl.\"type\", cl.\"isActive\", cl.\"createdAt\", cl.\"updatedAt\""
                         + " FROM \"academic\".\"Classroom\" cl"
                         + searchWhere(parameters, search,
-                                likeTerms("cl.\"building\"", "cl.\"roomNumber\""))
+                                likeTerms("cl.\"building\"", "cl.\"roomNumber\"",
+                                        "cl.\"building\" || ' ' || cl.\"roomNumber\""))
                         + " ORDER BY cl.\"building\" ASC, cl.\"roomNumber\" ASC LIMIT :limit OFFSET :offset",
                 parameters,
                 CLASSROOM_ROW_MAPPER);
@@ -417,7 +418,8 @@ public class AcademicReadRepository {
         Long count = jdbc.queryForObject(
                 "SELECT COUNT(*) FROM \"academic\".\"Classroom\" cl"
                         + searchWhere(parameters, search,
-                                likeTerms("cl.\"building\"", "cl.\"roomNumber\"")),
+                                likeTerms("cl.\"building\"", "cl.\"roomNumber\"",
+                                        "cl.\"building\" || ' ' || cl.\"roomNumber\"")),
                 parameters,
                 Long.class);
         return Objects.requireNonNullElse(count, 0L);
