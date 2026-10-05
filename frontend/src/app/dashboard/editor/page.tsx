@@ -585,9 +585,6 @@ export default function AcademicEditorPage() {
     // unsaved, which invites the double click that used to re-run the whole
     // PUT chain. One run at a time, and both triggers reflect it.
     if (isSavingNoticeOrder) return;
-    // The order save carries the full appearance object; without a successful
-    // mount fetch it would write DEFAULT_SITE_APPEARANCE over live settings.
-    if (!appearanceReady) return;
     setIsSavingNoticeOrder(true);
     try {
       // Merge onto the freshest remote appearance so a stale mount-time copy
@@ -1683,7 +1680,7 @@ export default function AcademicEditorPage() {
                       variant="default"
                       size="sm"
                       onClick={handleSaveNoticeOrder}
-                      disabled={isSavingNoticeOrder || !appearanceReady}
+                      disabled={isSavingNoticeOrder}
                       className="h-8 gap-1.5 text-xs font-semibold bg-blue-600 hover:bg-blue-700 text-white shadow-xs animate-pulse disabled:animate-none"
                     >
                       {isSavingNoticeOrder ? (
@@ -1729,7 +1726,7 @@ export default function AcademicEditorPage() {
                   type="button"
                   size="sm"
                   onClick={handleSaveNoticeOrder}
-                  disabled={isSavingNoticeOrder || !appearanceReady}
+                  disabled={isSavingNoticeOrder}
                   className="h-7 px-3 text-xs bg-blue-600 hover:bg-blue-700 text-white font-semibold shrink-0 shadow-xs"
                 >
                   <Save className="h-3.5 w-3.5 mr-1" />

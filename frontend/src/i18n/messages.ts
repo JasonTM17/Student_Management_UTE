@@ -3945,7 +3945,7 @@ export const vi: I18nMessages = {
       lecturerSchedule: 'Theo dõi lớp được giao, phòng học và khung giờ lên lớp.',
       lecturerGrades:
         'Xem hàng chờ chấm điểm, lọc theo học kỳ và đẩy các lớp học phần sẵn sàng sang bước công bố.',
-      lecturerAttendance: 'Điểm danh buổi học và xuất báo cáo chuyên cần cho các lớp của bạn.',
+      lecturerAttendance: 'Điểm danh buổi học và xuất bảng chuyên cần cho các lớp của bạn.',
       lecturerAnnouncements:
         'Chia sẻ cập nhật với sinh viên trong các lớp của bạn.',
       lecturerMail:
@@ -4583,7 +4583,7 @@ export const vi: I18nMessages = {
     noRound: 'Chưa có đợt đăng ký đề tài nào.',
     loading: 'Đang tải phân hệ khóa luận tốt nghiệp',
     loadFailed: 'Hiện chưa thể tải dữ liệu luận văn.',
-    secondaryLoadFailed: 'Một số thông tin phụ chưa tải được — tên giảng viên hướng dẫn hoặc liên kết báo cáo có thể đang thiếu.',
+    secondaryLoadFailed: 'Một số thông tin phụ chưa tải được — tên giảng viên hướng dẫn hoặc liên kết tài liệu có thể đang thiếu.',
     retry: 'Thử tải lại phân hệ khóa luận',
     roundStatus: 'Trạng thái đợt',
     registrationWindow: 'Cửa sổ đăng ký',

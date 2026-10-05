@@ -98,13 +98,15 @@ test('grade score inputs use canonical 50-50 components and derive the letter gr
 test('student grade views never invent component scores and lecturer notices expose four templates', () => {
   const gradesPage = read('src/app/dashboard/grades/page.tsx');
   const detailModal = read('src/components/dashboard/GradeDetailModal.tsx');
-  const notices = read('src/app/dashboard/lecturer/announcements/page.tsx');
+  // The four lecturer notice presets live in the shared message catalog and are
+  // rendered by LecturerAnnouncementCreateModal's preset picker (PRESETS).
+  const templates = read('src/i18n/messages.ts');
 
   assert.doesNotMatch(gradesPage, /getComponentScores/);
   assert.doesNotMatch(detailModal, /2 \* finalScore|finalScore - 0\.2/);
   assert.match(detailModal, /Điểm quá trình \(ĐQT - 50%\)/);
   for (const label of ['Nghỉ học & Học bù', 'Nhắc nhở nộp bài tập lớn/đồ án', 'Lịch thi & Kiểm tra', 'Thông báo lớp học phần']) {
-    assert.match(notices, new RegExp(label.replace(/[&/]/g, '\\$&')));
+    assert.match(templates, new RegExp(label.replace(/[&/]/g, '\\$&')));
   }
 });
 
@@ -144,10 +146,13 @@ test('feedback polish: registration groups classes, filters browse-first, and ke
   assert.match(page, /matchesSectionSearch/);
   assert.match(page, /curriculumFilter/);
   assert.match(page, /aria-pressed/);
-  // Sections are grouped by course with expandable section rows.
+  // Sections are grouped by course with expandable section rows. The two-column
+  // catalog/rail split starts at xl so the registered rail stays readable (a
+  // 3/12 rail at 1024-1280 collapsed cards to ~180px).
   assert.match(page, /courseGroups/);
-  assert.match(page, /lg:col-span-9/);
-  assert.match(page, /lg:col-span-3/);
+  assert.match(page, /xl:col-span-8/);
+  assert.match(page, /xl:col-span-4/);
+  assert.doesNotMatch(page, /lg:col-span-[39]/);
   assert.match(page, /registered\.map\(\(item\) =>/);
   assert.match(page, /onClick=\{\(\) => void drop\(item\)\}/);
   assert.match(messages, /searchLabel/);
