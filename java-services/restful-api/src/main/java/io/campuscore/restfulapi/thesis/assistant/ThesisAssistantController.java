@@ -264,6 +264,16 @@ public class ThesisAssistantController {
         // this inside chatRemoteWithFallback, but the single-service
         // deployment (prod runs the local pipeline) used to pay the full
         // provider call for questions the curated corpus answers directly.
+        //
+        // Deliberate contract: the fast-path answer is NOT persisted — no
+        // turn-ledger reserve, no conversation/message row, messageId=null,
+        // and a reused clientRequestId is not conflict-checked. Identical to
+        // what remote-mode requests already experienced (the probe ran before
+        // the gateway there too) and to the local-grounded fallback contract.
+        // Zero database writes is the point — it is what makes the answer
+        // cheap even when the datasource is far away. Quota is unaffected:
+        // turns.dispatch only charges synthesisRequired && provider-usable
+        // answers, so lexical answers were always free.
         ChatResponse fastPath = lexicalFastPathOrNull(request);
         if (fastPath != null) {
             return fastPath;

@@ -89,21 +89,29 @@ public class ThesisAssistantKnowledgeRepository {
     }
 
     private final NamedParameterJdbcTemplate jdbc;
+    private final AssistantRlsTransactionRunner transactions;
     private final boolean allowLegacyFallback;
     private final boolean snapshotCacheEnabled;
-    private final long snapshotCacheTtlMs;
+    private final long snapshotCacheTtlNanos;
 
     public ThesisAssistantKnowledgeRepository(
             @org.springframework.beans.factory.annotation.Qualifier(AssistantDatabaseConfiguration.JDBC_TEMPLATE)
             NamedParameterJdbcTemplate jdbc) {
-        this(jdbc, false, true, DEFAULT_SNAPSHOT_TTL_MS);
+        this(jdbc, false, true, DEFAULT_SNAPSHOT_TTL_MS, null);
     }
 
     public ThesisAssistantKnowledgeRepository(
             @org.springframework.beans.factory.annotation.Qualifier(AssistantDatabaseConfiguration.JDBC_TEMPLATE)
             NamedParameterJdbcTemplate jdbc,
             @Value("${assistant.legacy-retrieval-fallback:false}") boolean allowLegacyFallback) {
-        this(jdbc, allowLegacyFallback, true, DEFAULT_SNAPSHOT_TTL_MS);
+        this(jdbc, allowLegacyFallback, true, DEFAULT_SNAPSHOT_TTL_MS, null);
+    }
+
+    public ThesisAssistantKnowledgeRepository(
+            @org.springframework.beans.factory.annotation.Qualifier(AssistantDatabaseConfiguration.JDBC_TEMPLATE)
+            NamedParameterJdbcTemplate jdbc,
+            boolean allowLegacyFallback, boolean snapshotCacheEnabled, long snapshotCacheTtlMs) {
+        this(jdbc, allowLegacyFallback, snapshotCacheEnabled, snapshotCacheTtlMs, null);
     }
 
     @Autowired
@@ -112,11 +120,14 @@ public class ThesisAssistantKnowledgeRepository {
             NamedParameterJdbcTemplate jdbc,
             @Value("${assistant.legacy-retrieval-fallback:false}") boolean allowLegacyFallback,
             @Value("${assistant.knowledge.snapshot-cache.enabled:true}") boolean snapshotCacheEnabled,
-            @Value("${assistant.knowledge.snapshot-cache.ttl-ms:" + DEFAULT_SNAPSHOT_TTL_MS + "}") long snapshotCacheTtlMs) {
+            @Value("${assistant.knowledge.snapshot-cache.ttl-ms:" + DEFAULT_SNAPSHOT_TTL_MS + "}") long snapshotCacheTtlMs,
+            AssistantRlsTransactionRunner transactions) {
         this.jdbc = jdbc;
         this.allowLegacyFallback = allowLegacyFallback;
         this.snapshotCacheEnabled = snapshotCacheEnabled;
-        this.snapshotCacheTtlMs = Math.max(1_000L, snapshotCacheTtlMs);
+        this.snapshotCacheTtlNanos = java.util.concurrent.TimeUnit.MILLISECONDS
+                .toNanos(Math.max(1_000L, snapshotCacheTtlMs));
+        this.transactions = transactions;
     }
 
     /**
@@ -134,12 +145,15 @@ public class ThesisAssistantKnowledgeRepository {
      * runtime projection or a database outage must never wedge search on the
      * cache.
      */
+    private static final org.slf4j.Logger LOG =
+            org.slf4j.LoggerFactory.getLogger(ThesisAssistantKnowledgeRepository.class);
     private static final long DEFAULT_SNAPSHOT_TTL_MS = 30_000L;
-    private static final long SNAPSHOT_FAILURE_BACKOFF_MS = 5_000L;
+    private static final long SNAPSHOT_FAILURE_BACKOFF_NANOS =
+            java.util.concurrent.TimeUnit.MILLISECONDS.toNanos(5_000L);
 
     private volatile List<SnapshotRow> snapshotCache;
-    private volatile long snapshotLoadedAtMs;
-    private volatile long snapshotFailureAtMs;
+    private volatile long snapshotLoadedAtNanos;
+    private volatile long snapshotFailureAtNanos;
 
     record SnapshotRow(KnowledgeDocument document, int priority, Instant publishedAt) { }
 
@@ -181,38 +195,50 @@ public class ThesisAssistantKnowledgeRepository {
         return published == null ? Instant.EPOCH : published.toInstant();
     }
 
-    /** A fresh snapshot, or {@code null} when the cache must not be used. */
+    /**
+     * A fresh snapshot, or {@code null} when the cache must not be used. The
+     * load runs on a suspended REQUIRES_NEW transaction: on Postgres a failed
+     * statement aborts the whole transaction (25P02), so an in-tx probe would
+     * poison the caller's transaction and defeat the in-request SQL fallback
+     * below — isolation keeps the failure contained.
+     */
     private List<SnapshotRow> publishedSnapshot() {
-        long now = System.currentTimeMillis();
+        long now = System.nanoTime();
         List<SnapshotRow> cached = snapshotCache;
-        if (cached != null && now - snapshotLoadedAtMs < snapshotCacheTtlMs) {
+        if (cached != null && now - snapshotLoadedAtNanos < snapshotCacheTtlNanos) {
             return cached;
         }
-        if (cached == null && now - snapshotFailureAtMs < SNAPSHOT_FAILURE_BACKOFF_MS) {
-            // A recent load failure backs off briefly instead of serialising
-            // every search on a JDBC call that just failed — the SQL path
-            // below still runs, so correctness does not depend on the cache.
-            return null;
+        if (now - snapshotFailureAtNanos < SNAPSHOT_FAILURE_BACKOFF_NANOS) {
+            // Back off regardless of cache state: a persistently failing load
+            // must not serialise every search on a doomed round-trip. Serving
+            // the still-resident (stale) snapshot when present is strictly
+            // better availability than a hard degrade.
+            return cached;
         }
         synchronized (this) {
-            now = System.currentTimeMillis();
-            if (snapshotCache != null && now - snapshotLoadedAtMs < snapshotCacheTtlMs) {
+            now = System.nanoTime();
+            if (snapshotCache != null && now - snapshotLoadedAtNanos < snapshotCacheTtlNanos) {
                 return snapshotCache;
             }
-            if (snapshotCache == null && now - snapshotFailureAtMs < SNAPSHOT_FAILURE_BACKOFF_MS) {
-                return null;
+            if (now - snapshotFailureAtNanos < SNAPSHOT_FAILURE_BACKOFF_NANOS) {
+                return snapshotCache;
             }
             try {
-                List<SnapshotRow> loaded = loadPublishedSnapshot();
+                List<SnapshotRow> loaded = transactions == null
+                        ? loadPublishedSnapshot()
+                        : transactions.executeIsolatedUnchecked(
+                                AssistantRlsBoundary.Access.AUTO, this::loadPublishedSnapshot);
                 snapshotCache = loaded;
-                snapshotLoadedAtMs = now;
+                snapshotLoadedAtNanos = System.nanoTime();
                 return loaded;
             } catch (RuntimeException failure) {
-                // A mapping or SQL defect must degrade to the plain query —
-                // wedging every search behind a broken cache is worse than
-                // paying the round-trip.
-                snapshotFailureAtMs = now;
-                return null;
+                LOG.warn("assistant knowledge snapshot load failed; falling back to per-request SQL: {}",
+                        failure.toString());
+                snapshotFailureAtNanos = now;
+                // Stale-while-error: a cached copy that just expired is a
+                // better answer than no cache at all — publish cadence is
+                // minutes-to-days, so bounded staleness is safe.
+                return snapshotCache;
             }
         }
     }
@@ -241,6 +267,12 @@ public class ThesisAssistantKnowledgeRepository {
             boolean anyMatch = false;
             int score = 0;
             for (String term : usableTerms) {
+                // retrievalTerms output is literal text — a raw caller passing
+                // LIKE metacharacters would diverge from the SQL predicate, so
+                // they are dropped rather than reinterpreted.
+                if (term.indexOf('%') >= 0 || term.indexOf('_') >= 0 || term.indexOf('\\') >= 0) {
+                    continue;
+                }
                 if (title.contains(term) || content.contains(term)) {
                     anyMatch = true;
                     score += termContribution(document.title(), document.content(), term);

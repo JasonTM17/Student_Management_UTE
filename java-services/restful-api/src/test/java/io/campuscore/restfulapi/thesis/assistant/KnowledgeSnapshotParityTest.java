@@ -98,4 +98,53 @@ class KnowledgeSnapshotParityTest {
                 org.mockito.ArgumentMatchers.any(org.springframework.jdbc.core.namedparam.MapSqlParameterSource.class),
                 org.mockito.ArgumentMatchers.<org.springframework.jdbc.core.RowMapper<KnowledgeDocument>>any());
     }
+
+    @Test
+    @DisplayName("with a transaction runner the snapshot load runs on a suspended transaction")
+    void snapshotLoadUsesIsolatedTransaction() {
+        org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate jdbc =
+                org.mockito.Mockito.mock(org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate.class);
+        // REQUIRES_NEW isolation: a failed statement inside the load must not
+        // poison the caller's transaction — on Postgres it would abort with
+        // 25P02 and defeat the in-request SQL fallback entirely. The runner is
+        // final, so the propagation flag itself is what this pin captures.
+        org.springframework.transaction.PlatformTransactionManager txManager =
+                org.mockito.Mockito.mock(org.springframework.transaction.PlatformTransactionManager.class);
+        org.mockito.Mockito.when(txManager.getTransaction(org.mockito.ArgumentMatchers.any()))
+                .thenReturn(new org.springframework.transaction.support.SimpleTransactionStatus());
+        AssistantRlsTransactionRunner transactions =
+                new AssistantRlsTransactionRunner(txManager, jdbc, true);
+        ThesisAssistantKnowledgeRepository repository = new ThesisAssistantKnowledgeRepository(
+                jdbc, false, true, 30_000L, transactions);
+
+        repository.search("vi", List.of("giấy"), 5);
+
+        org.mockito.ArgumentCaptor<org.springframework.transaction.TransactionDefinition> definition =
+                org.mockito.ArgumentCaptor.forClass(org.springframework.transaction.TransactionDefinition.class);
+        org.mockito.Mockito.verify(txManager).getTransaction(definition.capture());
+        assertEquals(org.springframework.transaction.TransactionDefinition.PROPAGATION_REQUIRES_NEW,
+                definition.getValue().getPropagationBehavior(),
+                "the snapshot load must run on a suspended transaction so a failure cannot abort the caller's tx");
+    }
+
+    @Test
+    @DisplayName("a failed snapshot load backs off instead of re-probing every request")
+    void snapshotFailureBackoffPreventsThunderingHerd() {
+        org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate jdbc =
+                org.mockito.Mockito.mock(org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate.class);
+        org.mockito.Mockito.when(jdbc.query(org.mockito.ArgumentMatchers.anyString(),
+                        org.mockito.ArgumentMatchers.<org.springframework.jdbc.core.RowMapper<Object>>any()))
+                .thenThrow(new org.springframework.dao.DataAccessResourceFailureException("db down"));
+        ThesisAssistantKnowledgeRepository repository = new ThesisAssistantKnowledgeRepository(
+                jdbc, false, true, 30_000L);
+
+        repository.search("vi", List.of("giấy"), 5);
+        repository.search("vi", List.of("giấy"), 5);
+        repository.search("vi", List.of("giấy"), 5);
+
+        // The probe ran once; the 5s failure backoff swallowed the rest.
+        org.mockito.Mockito.verify(jdbc, org.mockito.Mockito.times(1)).query(
+                org.mockito.ArgumentMatchers.anyString(),
+                org.mockito.ArgumentMatchers.<org.springframework.jdbc.core.RowMapper<Object>>any());
+    }
 }

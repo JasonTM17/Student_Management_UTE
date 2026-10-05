@@ -18,17 +18,44 @@ public final class AssistantRlsTransactionRunner {
     }
 
     private final TransactionTemplate transaction;
+    private final TransactionTemplate isolatedTransaction;
     private final NamedParameterJdbcTemplate jdbc;
     private final boolean testMode;
 
     public AssistantRlsTransactionRunner(PlatformTransactionManager transactionManager,
             NamedParameterJdbcTemplate jdbc, boolean testMode) {
         this.transaction = new TransactionTemplate(transactionManager);
+        this.isolatedTransaction = new TransactionTemplate(transactionManager);
+        // REQUIRES_NEW suspends the caller's transaction so a statement error
+        // inside isolated work cannot poison the caller's transaction — on
+        // Postgres a failed statement aborts the whole tx (25P02), which would
+        // otherwise defeat an in-request "degrade to SQL" fallback.
+        this.isolatedTransaction.setPropagationBehavior(
+                org.springframework.transaction.TransactionDefinition.PROPAGATION_REQUIRES_NEW);
         this.jdbc = jdbc;
         this.testMode = testMode;
     }
 
     public <T> T execute(Access access, Work<T> work) throws Throwable {
+        return executeOn(transaction, access, work);
+    }
+
+    /**
+     * Same as {@link #execute} but on a suspended, independent transaction.
+     * Use for work whose failure must not abort the caller's transaction —
+     * e.g. a cache-population probe that falls back to an in-tx query.
+     */
+    public <T> T executeIsolatedUnchecked(Access access, Supplier<T> work) {
+        try {
+            return executeOn(isolatedTransaction, access, work::get);
+        } catch (RuntimeException | Error failure) {
+            throw failure;
+        } catch (Throwable failure) {
+            throw new IllegalStateException("Assistant transaction failed", failure);
+        }
+    }
+
+    private <T> T executeOn(TransactionTemplate template, Access access, Work<T> work) throws Throwable {
         AssistantRlsContext.Identity active = AssistantRlsContext.current();
         AssistantRlsContext.Identity identity;
         if (testMode) {
@@ -41,12 +68,12 @@ public final class AssistantRlsTransactionRunner {
         }
 
         if (testMode) {
-            return executeTransaction(identity, work);
+            return executeTransaction(template, identity, work);
         }
         try {
             return AssistantRlsContext.withIdentity(identity, () -> {
                 try {
-                    return executeTransaction(identity, work);
+                    return executeTransaction(template, identity, work);
                 } catch (Throwable failure) {
                     throw new AssistantInvocationFailure(failure);
                 }
@@ -66,10 +93,11 @@ public final class AssistantRlsTransactionRunner {
         }
     }
 
-    private <T> T executeTransaction(AssistantRlsContext.Identity identity, Work<T> work) throws Throwable {
+    private <T> T executeTransaction(TransactionTemplate template,
+            AssistantRlsContext.Identity identity, Work<T> work) throws Throwable {
         Outcome<T> outcome;
         try {
-            outcome = transaction.execute(status -> {
+            outcome = template.execute(status -> {
                 if (!testMode) {
                     if (identity == null) {
                         throw new IllegalStateException("Assistant database context is missing");
