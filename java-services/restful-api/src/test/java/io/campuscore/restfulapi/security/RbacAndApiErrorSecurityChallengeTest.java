@@ -21,6 +21,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import io.campuscore.restfulapi.mail.repository.MailRecipientScopeRepository;
+import io.campuscore.restfulapi.mail.repository.MailRecipientScopeRepository.ScopedRecipient;
 import io.campuscore.restfulapi.mail.service.EmailService;
 import io.campuscore.restfulapi.thesis.domain.ApprovalStatus;
 import io.campuscore.restfulapi.thesis.domain.GroupStatus;
@@ -130,6 +132,9 @@ class RbacAndApiErrorSecurityChallengeTest {
     private EmailService emailService;
 
     @MockitoBean
+    private MailRecipientScopeRepository recipientScope;
+
+    @MockitoBean
     private ThesisGroupReadService groupReadService;
 
     // --- Helpers for JWT Principals ---
@@ -151,6 +156,7 @@ class RbacAndApiErrorSecurityChallengeTest {
     private RequestPostProcessor lecturerJwt() {
         return jwt().jwt(token -> token
                         .subject("challenger-lecturer")
+                        .claim("lecturerId", "challenger-lecturer-id")
                         .claim("roles", List.of("LECTURER")))
                 .authorities(new SimpleGrantedAuthority("ROLE_LECTURER"));
     }
@@ -323,6 +329,13 @@ class RbacAndApiErrorSecurityChallengeTest {
                     .andExpect(jsonPath("$.code").value("ACCESS_DENIED"));
 
             verify(emailService, never()).sendTestEmail(any(), any(), any());
+
+            // Lecturer sends are bound to students of their own sections; the
+            // scope repository resolves the recipient for these fixtures.
+            when(recipientScope.findScopedRecipient(eq("challenger-lecturer-id"), eq("student@campuscore.edu")))
+                    .thenReturn(new ScopedRecipient("student@campuscore.edu", "Student A", "SV9999"));
+            when(recipientScope.findScopedRecipient(eq("challenger-lecturer-id"), eq("SV9999")))
+                    .thenReturn(new ScopedRecipient("student@campuscore.edu", "Student A", "SV9999"));
 
             mvc.perform(post("/api/v1/mail/notice")
                             .with(lecturerJwt())

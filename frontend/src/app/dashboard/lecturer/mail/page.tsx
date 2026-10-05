@@ -232,7 +232,8 @@ function StudentFields({
   issueText: (issue: MailFieldIssue) => string | undefined;
 }) {
   return (
-    <div className="grid gap-4 sm:grid-cols-3">
+    <div className="space-y-2">
+      <div className="grid gap-4 sm:grid-cols-3">
       <Field label={copy.fields.email} required htmlFor="student-email">
         <Input
           id="student-email"
@@ -264,6 +265,8 @@ function StudentFields({
           onChange={(event) => onChange({ studentId: event.target.value })}
         />
       </Field>
+      </div>
+      <p className="text-xs text-muted-foreground">{copy.fields.recipientScopeHint}</p>
     </div>
   );
 }
@@ -483,7 +486,7 @@ export default function LecturerMailComposePage() {
       return;
     }
     const recipient = (
-      template === 'notice' ? notice.to : template === 'registration' ? registration.to : gradeAlert.to
+      template === 'notice' ? notice.to : template === 'registration' ? registration.studentId : gradeAlert.studentId
     ).trim();
     const confirmed = await confirm({
       title: copy.confirmTitle,
@@ -641,6 +644,7 @@ export default function LecturerMailComposePage() {
                       />
                     </Field>
                   </div>
+                  <p className="text-xs text-muted-foreground">{copy.fields.recipientScopeHint}</p>
                   <div className="grid gap-4 sm:grid-cols-2">
                     <Field label={copy.fields.category} htmlFor="mail-category">
                       <Select

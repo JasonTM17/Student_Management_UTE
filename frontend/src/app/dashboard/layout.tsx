@@ -393,6 +393,10 @@ export default function DashboardLayout({
         title: messages.dashboardShell.menu.conduct,
         description: messages.dashboardShell.routeDescriptions.conduct,
       },
+      '/dashboard/attendance': {
+        title: messages.dashboardShell.menu.attendance,
+        description: messages.dashboardShell.routeDescriptions.attendance,
+      },
       '/dashboard/thesis': {
         title: messages.dashboardShell.menu.thesis,
         description: messages.dashboardShell.routeDescriptions.thesis,
@@ -436,6 +440,10 @@ export default function DashboardLayout({
       '/dashboard/lecturer/grades': {
         title: messages.dashboardShell.menu.gradeManagement,
         description: messages.dashboardShell.routeDescriptions.lecturerGrades,
+      },
+      '/dashboard/lecturer/attendance': {
+        title: messages.dashboardShell.menu.attendance,
+        description: messages.dashboardShell.routeDescriptions.lecturerAttendance,
       },
       '/dashboard/lecturer/announcements': {
         title: messages.dashboardShell.menu.announcements,
@@ -667,9 +675,9 @@ export default function DashboardLayout({
       return pageMetadata[pathname];
     }
 
-    const matchingItem = dashboardMenuItems.find(
-      (item) => pathname === item.href || pathname.startsWith(`${item.href}/`),
-    );
+    const matchingItem = dashboardMenuItems
+      .filter((item) => pathname === item.href || pathname.startsWith(`${item.href}/`))
+      .sort((a, b) => b.href.length - a.href.length)[0];
     if (matchingItem) {
       return {
         title: menuLabels[matchingItem.labelKey as keyof typeof menuLabels],

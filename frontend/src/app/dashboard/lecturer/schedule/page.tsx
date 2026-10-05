@@ -112,8 +112,13 @@ export default function LecturerSchedulePage() {
   const [selectedDayTab, setSelectedDayTab] = useState<number>(todayDow);
 
   const fetchSemesters = useCallback(async () => {
-    const response = await semestersApi.getAll();
-    setSemesters(response.data ?? []);
+    try {
+      const response = await semestersApi.getAll();
+      setSemesters(response.data ?? []);
+    } catch {
+      // Non-fatal: the filter falls back to "all semesters" and the schedule
+      // fetch below still reports its own error state.
+    }
   }, []);
 
   const fetchSchedule = useCallback(async () => {

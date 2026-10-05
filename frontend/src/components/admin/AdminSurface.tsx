@@ -186,11 +186,12 @@ export function AdminTableScroll({
   children,
   className,
 }: AdminTableScrollProps) {
+  const { messages } = useI18n();
   return (
     <div
       tabIndex={0}
       role="region"
-      aria-label="Data table"
+      aria-label={messages.common.states.dataTable}
       className={cn(
         'min-w-0 max-w-full overflow-x-auto overscroll-x-contain focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring rounded-xl',
         className,
@@ -218,10 +219,13 @@ export function AdminPaginationFooter({
   totalPages,
   onPrevious,
   onNext,
-  previousLabel = 'Previous',
-  nextLabel = 'Next',
+  previousLabel,
+  nextLabel,
   className,
 }: AdminPaginationFooterProps) {
+  const { messages } = useI18n();
+  const resolvedPrevious = previousLabel ?? messages.common.states.goToPreviousPage;
+  const resolvedNext = nextLabel ?? messages.common.states.goToNextPage;
   if (totalPages <= 1) {
     return null;
   }
@@ -241,7 +245,7 @@ export function AdminPaginationFooter({
           disabled={page === 1}
           onClick={onPrevious}
         >
-          {previousLabel}
+          {resolvedPrevious}
         </Button>
         <Button
           size="sm"
@@ -249,7 +253,7 @@ export function AdminPaginationFooter({
           disabled={page === totalPages}
           onClick={onNext}
         >
-          {nextLabel}
+          {resolvedNext}
         </Button>
       </div>
     </div>

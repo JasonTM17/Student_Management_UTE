@@ -695,6 +695,7 @@ export default function LecturerAttendancePage() {
                           value={row.notes}
                           onChange={(e) => handleNotesChange(row.studentId, e.target.value)}
                           placeholder={copy.notesPlaceholder}
+                          aria-label={`${copy.notesPlaceholder} — ${row.studentName}`}
                           className="h-8 text-xs print:hidden"
                         />
                       </td>

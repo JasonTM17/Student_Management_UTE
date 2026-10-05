@@ -281,6 +281,7 @@ function scoreRowValid(score10: number | string): boolean {
 export type MailErrorKind =
   | 'rateLimit'
   | 'deliveryFailed'
+  | 'outOfScope'
   | 'validation'
   | 'network'
   | 'unknown';
@@ -296,6 +297,8 @@ interface MailErrorLike {
 /**
  * Maps a dispatch failure onto a stable copy key.
  * - 429 or RATE_LIMIT_EXCEEDED: the 5-emails/hour quota is exhausted.
+ * - 403 MAIL_RECIPIENT_OUT_OF_SCOPE: a lecturer may only mail students of
+ *   their own sections.
  * - 502 or MAIL_DELIVERY_FAILED: SMTP gateway rejected the message.
  * - 400: bean-validation rejected a field.
  * - no response: the network call itself failed.
@@ -315,6 +318,9 @@ export function classifyMailError(error: unknown): MailErrorKind {
 
   if (status === 429 || backendCode === 'RATE_LIMIT_EXCEEDED') {
     return 'rateLimit';
+  }
+  if (backendCode === 'MAIL_RECIPIENT_OUT_OF_SCOPE' || backendCode === 'MAIL_SCOPE_FORBIDDEN') {
+    return 'outOfScope';
   }
   if (status === 502 || backendCode === 'MAIL_DELIVERY_FAILED') {
     return 'deliveryFailed';

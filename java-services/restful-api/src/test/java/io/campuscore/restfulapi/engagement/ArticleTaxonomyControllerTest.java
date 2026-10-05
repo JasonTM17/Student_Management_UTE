@@ -118,23 +118,25 @@ class ArticleTaxonomyControllerTest {
     }
 
     @Test
-    @DisplayName("getAttachments filters by announcementId when provided")
+    @DisplayName("getAttachments filters by announcementId and only exposes public rows")
     void getAttachmentsFiltersByAnnouncement() {
         ArticleAttachment attachment = new ArticleAttachment();
         attachment.setId("att-1");
         attachment.setAnnouncementId("ann-1");
         attachment.setFileName("thong_bao.pdf");
 
-        when(attachmentRepository.findByAnnouncementId("ann-1"))
+        // Regression: the scoped feed must use the public-only query so
+        // non-public attachments cannot be enumerated by article id.
+        when(attachmentRepository.findByAnnouncementIdAndIsPublicTrue("ann-1"))
                 .thenReturn(List.of(attachment));
         when(attachmentRepository.findByIsPublicTrue())
                 .thenReturn(List.of(attachment));
 
-        List<ArticleAttachment> filtered = controller.getAttachments("ann-1");
+        List<AttachmentDto> filtered = controller.getAttachments("ann-1");
         assertEquals(1, filtered.size());
-        assertEquals("thong_bao.pdf", filtered.get(0).getFileName());
+        assertEquals("thong_bao.pdf", filtered.get(0).fileName());
 
-        List<ArticleAttachment> allPublic = controller.getAttachments(null);
+        List<AttachmentDto> allPublic = controller.getAttachments(null);
         assertEquals(1, allPublic.size());
     }
 

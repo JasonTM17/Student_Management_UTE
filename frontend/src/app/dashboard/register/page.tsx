@@ -965,9 +965,9 @@ export default function RegisterPage() {
             />
           ) : null}
 
-          <div className="grid min-w-0 grid-cols-1 gap-6 lg:grid-cols-12">
+          <div className="grid min-w-0 grid-cols-1 gap-6 xl:grid-cols-12">
             {/* Left column: search + catalog lead; the credit-limit card follows on mobile. */}
-            <div className="flex min-w-0 flex-col gap-6 lg:col-span-9">
+            <div className="flex min-w-0 flex-col gap-6 xl:col-span-8">
               <Card className="order-1 min-w-0 overflow-hidden">
                 <CardContent className="space-y-3 p-4">
                   <label className="block min-w-0 space-y-2">
@@ -1250,14 +1250,21 @@ export default function RegisterPage() {
               {policyCard}
             </div>
 
-            {/* Right rail: live summary, warnings, and the weekly preview. */}
-            <Card className="order-first min-w-0 lg:col-span-3 lg:order-none">
+            {/* Right rail: live summary, warnings, and the weekly preview.
+                Sticky on desktop so the registered list + timetable stay
+                visible while the catalog scrolls. */}
+            <Card className="order-first min-w-0 self-start xl:sticky xl:top-[calc(var(--portal-header-height)+0.75rem)] xl:col-span-4 xl:order-none xl:max-h-[calc(100dvh-var(--portal-header-height)-1.5rem)] xl:overflow-y-auto">
               <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0 pb-3">
                 <CardTitle>{copy.enrolledRail}</CardTitle>
-                <span className="rounded-md bg-primary/10 px-2.5 py-0.5 text-xs font-semibold text-primary">
-                  {formatNumber(totalRegisteredCredits)} / {creditLimit === null ? copy.creditLimitUnavailable : formatNumber(creditLimit)}{' '}
-                  {copy.creditsUnit}
-                </span>
+                <div className="flex items-center gap-1.5">
+                  <span className="rounded-md bg-secondary px-2.5 py-0.5 text-xs font-semibold text-muted-foreground">
+                    {copy.groupSectionCount.replace('{count}', formatNumber(registered.length))}
+                  </span>
+                  <span className="rounded-md bg-primary/10 px-2.5 py-0.5 text-xs font-semibold text-primary">
+                    {formatNumber(totalRegisteredCredits)} / {creditLimit === null ? copy.creditLimitUnavailable : formatNumber(creditLimit)}{' '}
+                    {copy.creditsUnit}
+                  </span>
+                </div>
               </CardHeader>
               <CardContent className="space-y-3">
                 <div className="space-y-2 rounded-lg border border-border/70 bg-secondary/30 p-3">
@@ -1330,33 +1337,57 @@ export default function RegisterPage() {
                 {registered.length === 0 ? (
                   <p className="text-sm text-muted-foreground">{copy.railEmpty}</p>
                 ) : (
-                  registered.map((item) => {
+                  <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-1">
+                    {registered.map((item) => {
                     const section = item.section;
+                    // Optimistic/pending rows can lack the joined section —
+                    // fall back to the catalog entry so the badge still shows
+                    // the human-readable class code instead of a UUID.
+                    const catalogSection = sectionsById.get(item.sectionId);
+                    // Catalog and enrollment schedules carry the room under
+                    // different shapes (room vs classroom.roomNumber) —
+                    // normalize so pending rows still render their slots.
+                    const schedules = (section?.schedules ?? catalogSection?.schedules ?? []) as Array<{
+                      dayOfWeek: number;
+                      startTime: string;
+                      endTime: string;
+                      room?: string | null;
+                      classroom?: { roomNumber?: string } | null;
+                    }>;
+                    const courseName = section?.course?.name ?? catalogSection?.courseName ?? '';
+                    const courseCredits = section?.course?.credits ?? catalogSection?.credits;
                     return (
+                      // Intentionally a <div>, not <article>: the register/drop
+                      // e2e locators filter catalog <article> rows by section
+                      // code text, and a rail article carrying the same code
+                      // would collide with them.
                       <div
                         key={item.id}
-                        className="rounded-md border border-border/70 p-3 text-sm transition-colors hover:border-primary/30"
+                        className="space-y-2.5 rounded-lg border border-border/70 bg-card p-3 shadow-sm transition-colors hover:border-primary/40"
                       >
                         <div className="flex items-start justify-between gap-2">
-                          <div className="min-w-0">
-                            <div className="font-semibold text-foreground">
-                              {section?.course?.code ?? item.sectionId}
-                              {section ? ` - ${section.sectionNumber}` : ''}
-                            </div>
-                            {section?.course?.name ? (
-                              <div className="mt-1 truncate text-muted-foreground" title={section.course.name}>{section.course.name}</div>
-                            ) : null}
-                            {section?.course?.credits ? (
-                              <div className="mt-1 text-xs text-muted-foreground">
-                                {formatNumber(section.course.credits)} {copy.creditsUnit}
-                              </div>
-                            ) : null}
+                          <div className="flex min-w-0 flex-wrap items-center gap-1.5">
+                            <span className="rounded-md bg-primary/10 px-1.5 py-0.5 font-mono text-[11px] font-bold tracking-tight text-primary">
+                              {sectionLabel(
+                                section ?? catalogSection,
+                                item.sectionId,
+                              )}
+                            </span>
+                            <span
+                              className={`rounded-md border px-1.5 py-0.5 text-[11px] font-semibold ${
+                                item.status === 'PENDING'
+                                  ? 'border-status-warning/40 bg-status-warning/12 text-status-warning-foreground'
+                                  : 'border-primary/30 bg-primary/10 text-primary'
+                              }`}
+                            >
+                              {item.status === 'PENDING' ? copy.pendingLabel : copy.registered}
+                            </span>
                           </div>
                           <Button
                             type="button"
-                            variant="destructive"
+                            variant="ghost"
                             size="icon"
-                            className="h-8 w-8 shrink-0"
+                            className="h-8 w-8 shrink-0 text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
                             aria-label={copy.drop}
                             title={copy.drop}
                             onClick={() => void drop(item)}
@@ -1365,9 +1396,49 @@ export default function RegisterPage() {
                             <Trash2 className="h-4 w-4" aria-hidden="true" />
                           </Button>
                         </div>
+                        {courseName ? (
+                          <p
+                            className="text-sm font-semibold leading-5 text-foreground line-clamp-2"
+                            title={courseName}
+                          >
+                            {courseName}
+                          </p>
+                        ) : null}
+                        <div className="flex flex-wrap items-center gap-1.5">
+                          {schedules.length === 0 ? (
+                            <span className="rounded-md border border-dashed border-border bg-secondary/40 px-2 py-0.5 text-[11px] italic text-muted-foreground">
+                              {copy.scheduleNone}
+                            </span>
+                          ) : (
+                            schedules.map((schedule, index) => (
+                              <span
+                                key={`${item.id}-schedule-${index}`}
+                                className="inline-flex flex-wrap items-center gap-1 rounded-md bg-secondary/60 px-2 py-0.5 text-[11px] text-foreground"
+                              >
+                                <span className="font-bold text-primary">
+                                  {shortDayLabel(locale, schedule.dayOfWeek)}
+                                </span>
+                                <span className="tabular-nums">
+                                  {schedule.startTime}–{schedule.endTime}
+                                </span>
+                                {(schedule.room ?? schedule.classroom?.roomNumber) ? (
+                                  <span className="text-muted-foreground">
+                                    · {copy.scheduleChipRoom.replace('{room}', schedule.room ?? schedule.classroom?.roomNumber ?? '')}
+                                  </span>
+                                ) : null}
+                              </span>
+                            ))
+                          )}
+                        </div>
+                        {courseCredits ? (
+                          <p className="text-xs font-medium text-muted-foreground">
+                            {formatNumber(courseCredits)} {copy.creditsUnit}
+                          </p>
+                        ) : null}
                       </div>
                     );
-                  })
+                    })}
+                  </div>
                 )}
 
                 {(() => {

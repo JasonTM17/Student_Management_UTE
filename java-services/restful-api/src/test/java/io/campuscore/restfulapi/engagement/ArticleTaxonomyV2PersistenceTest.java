@@ -287,16 +287,18 @@ class ArticleTaxonomyV2PersistenceTest {
     @Test
     @DisplayName("v2 attachments page public rows and drop checksum, access flag, and audit column")
     void v2AttachmentsHideInternalFields() throws Exception {
+        // Regression: an article-scoped query must not enumerate non-public
+        // attachments — only the public row of ann-1 may be served.
         mvc.perform(get("/api/v1/article-taxonomy/v2/attachments")
                         .with(portalUser())
                         .queryParam("announcementId", "ann-1"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data.length()").value(2))
+                .andExpect(jsonPath("$.data.length()").value(1))
                 .andExpect(jsonPath("$.data[0].fileName").value("att-1.pdf"))
                 .andExpect(jsonPath("$.data[0].downloadCount").value(7))
                 .andExpect(jsonPath("$.data[0].checksumSha256").doesNotExist())
                 .andExpect(jsonPath("$.data[0].createdAt").doesNotExist())
-                .andExpect(jsonPath("$.meta.total").value(2));
+                .andExpect(jsonPath("$.meta.total").value(1));
 
         // Without an article filter only public rows are served, and the page stays bounded.
         mvc.perform(get("/api/v1/article-taxonomy/v2/attachments")

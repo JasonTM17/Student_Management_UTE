@@ -223,6 +223,11 @@ export default function AcademicEditorPage() {
   const [heroDescription, setHeroDescription] = useState('Hệ thống quản lý học vụ số tập trung dành cho Sinh viên, Giảng viên và Cán bộ Quản trị.');
   const [heroAccent, setHeroAccent] = useState<SiteAppearanceAccent>('ute-yellow');
   const [isSavingHero, setIsSavingHero] = useState(false);
+  // The publish button must stay disabled until a real fetch hydrates the
+  // fields — otherwise a failed load would push the built-in defaults over
+  // the live site configuration.
+  const [appearanceReady, setAppearanceReady] = useState(false);
+  const [appearanceLoadFailed, setAppearanceLoadFailed] = useState(false);
 
   // Copy text definitions
   const copy = useMemo(
@@ -260,6 +265,7 @@ export default function AcademicEditorPage() {
             copiedToast: 'Đã sao chép nội dung vào bộ nhớ tạm',
             savedToast: 'Đã lưu bản nháp vào trình duyệt',
             draftSaveFailed: 'Không thể lưu bản nháp (bộ nhớ trình duyệt đầy). Hãy xuất file trước khi tiếp tục.',
+            copyFailed: 'Không thể sao chép vào bộ nhớ tạm',
             newDocConfirm: 'Bạn có chắc chắn muốn làm mới toàn bộ nội dung tài liệu?',
             savedAt: 'Lưu gần nhất',
             statsTitle: 'Thống kê tài liệu',
@@ -301,6 +307,7 @@ export default function AcademicEditorPage() {
             copiedToast: 'Content copied to clipboard',
             savedToast: 'Draft saved to browser storage',
             draftSaveFailed: 'Could not save the draft (browser storage is full). Export the file before continuing.',
+            copyFailed: 'Could not copy to clipboard',
             newDocConfirm: 'Reset and create a new document?',
             savedAt: 'Last saved',
             statsTitle: 'Document Statistics',
@@ -373,16 +380,29 @@ export default function AcademicEditorPage() {
 
   // Load site appearance for Hero control tab
   useEffect(() => {
+    let cancelled = false;
+    setAppearanceReady(false);
+    setAppearanceLoadFailed(false);
     fetchSiteAppearance()
       .then((data) => {
+        if (cancelled) return;
         setSiteAppearance(data);
         const heroData = data.hero[locale] || data.hero.vi;
         if (heroData.eyebrow) setHeroEyebrow(heroData.eyebrow);
         if (heroData.title) setHeroTitle(heroData.title);
         if (heroData.description) setHeroDescription(heroData.description);
         if (data.accent) setHeroAccent(data.accent);
+        setAppearanceReady(true);
       })
-      .catch(() => {});
+      .catch(() => {
+        if (!cancelled) {
+          setAppearanceReady(false);
+          setAppearanceLoadFailed(true);
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
   }, [locale]);
 
   const handleSwitchEditorType = (type: 'tinymce' | 'markdown') => {
@@ -427,9 +447,9 @@ export default function AcademicEditorPage() {
       toast.success(copy.copiedToast);
       setTimeout(() => setCopied(false), 2000);
     } catch {
-      toast.error('Could not copy to clipboard');
+      toast.error(copy.copyFailed);
     }
-  }, [content, copy.copiedToast]);
+  }, [content, copy.copiedToast, copy.copyFailed]);
 
   const handleDownload = useCallback(() => {
     const isHtml = editorType === 'tinymce';
@@ -565,14 +585,20 @@ export default function AcademicEditorPage() {
     // unsaved, which invites the double click that used to re-run the whole
     // PUT chain. One run at a time, and both triggers reflect it.
     if (isSavingNoticeOrder) return;
+    // The order save carries the full appearance object; without a successful
+    // mount fetch it would write DEFAULT_SITE_APPEARANCE over live settings.
+    if (!appearanceReady) return;
     setIsSavingNoticeOrder(true);
     try {
+      // Merge onto the freshest remote appearance so a stale mount-time copy
+      // (or another admin's concurrent edit) is not clobbered by this PUT.
+      const fresh = await fetchSiteAppearance();
       const newOrder = publishedNotices.map((n) => n.id);
       const updated: SiteAppearance = {
-        ...siteAppearance,
+        ...fresh,
         // Only the loaded notices are reordered here; applying the order to that
         // subset keeps pins set for announcements outside this batch.
-        postOrder: applyPageOrder(siteAppearance.postOrder, newOrder),
+        postOrder: applyPageOrder(fresh.postOrder, newOrder),
       };
       const saved = await saveSiteAppearance(updated);
       broadcastSiteAppearance(updated);
@@ -893,7 +919,7 @@ export default function AcademicEditorPage() {
         content,
         ...(priorityKnown ? { priority } : {}),
         ...(audienceKnown ? audienceFor(targetRole) : {}),
-        reason: 'Cập nhật nội dung văn bản học vụ',
+        reason: isVi ? 'Cập nhật nội dung văn bản học vụ' : 'Update academic notice content',
         expectedVersion: editingVersion,
       });
 
@@ -1144,11 +1170,22 @@ export default function AcademicEditorPage() {
                 </div>
               </div>
 
-              <div className="flex justify-end pt-2">
+              <div className="flex items-center justify-end gap-3 pt-2">
+                {!appearanceReady && (
+                  <p className="text-xs text-muted-foreground">
+                    {appearanceLoadFailed
+                      ? isVi
+                        ? 'Chưa tải được cấu hình hiện tại — nạp lại trang để xuất bản.'
+                        : 'Current appearance could not be loaded — reload the page to publish.'
+                      : isVi
+                        ? 'Đang tải cấu hình hiện tại…'
+                        : 'Loading current appearance…'}
+                  </p>
+                )}
                 <Button
                   type="button"
                   onClick={handlePublishHero}
-                  disabled={isSavingHero}
+                  disabled={isSavingHero || !appearanceReady}
                   className="gap-2 bg-primary text-primary-foreground font-semibold px-6 shadow-sm"
                 >
                   <Save className="h-4 w-4" />
@@ -1646,7 +1683,7 @@ export default function AcademicEditorPage() {
                       variant="default"
                       size="sm"
                       onClick={handleSaveNoticeOrder}
-                      disabled={isSavingNoticeOrder}
+                      disabled={isSavingNoticeOrder || !appearanceReady}
                       className="h-8 gap-1.5 text-xs font-semibold bg-blue-600 hover:bg-blue-700 text-white shadow-xs animate-pulse disabled:animate-none"
                     >
                       {isSavingNoticeOrder ? (
@@ -1692,7 +1729,7 @@ export default function AcademicEditorPage() {
                   type="button"
                   size="sm"
                   onClick={handleSaveNoticeOrder}
-                  disabled={isSavingNoticeOrder}
+                  disabled={isSavingNoticeOrder || !appearanceReady}
                   className="h-7 px-3 text-xs bg-blue-600 hover:bg-blue-700 text-white font-semibold shrink-0 shadow-xs"
                 >
                   <Save className="h-3.5 w-3.5 mr-1" />

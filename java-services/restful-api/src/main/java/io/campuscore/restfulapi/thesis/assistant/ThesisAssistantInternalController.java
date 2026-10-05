@@ -288,7 +288,10 @@ public class ThesisAssistantInternalController {
     }
 
     private static String owner(String value) {
-        if (value == null || value.isBlank()) {
+        // Opaque identifier bound to VARCHAR(120) owner columns; reject values
+        // that would silently break the RLS match or fail late inside the
+        // transaction.
+        if (value == null || value.isBlank() || value.length() > 120) {
             throw new DomainException(HttpStatus.UNAUTHORIZED, "UNAUTHENTICATED", "Assistant owner is required");
         }
         return value;

@@ -111,8 +111,13 @@ export default function TranscriptPage() {
   const loadGeneration = useRef(0);
 
   const fetchSemesters = useCallback(async () => {
-    const response = await semestersApi.getAll();
-    setSemesters(response.data ?? []);
+    try {
+      const response = await semestersApi.getAll();
+      setSemesters(response.data ?? []);
+    } catch {
+      // Non-fatal: the semester filter stays on "all" while the transcript
+      // fetch below still reports its own error state.
+    }
   }, []);
 
   const fetchTranscript = useCallback(async () => {

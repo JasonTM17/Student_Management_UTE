@@ -332,6 +332,7 @@ function renderInline(text: string): React.ReactNode[] {
 // Code Block with Copy
 function CodeBlock({ code, language }: { code: string; language?: string }) {
   const [copied, setCopied] = useState(false);
+  const [copyFailed, setCopyFailed] = useState(false);
   const { locale } = useI18n();
   const vi = locale === 'vi';
 
@@ -339,8 +340,14 @@ function CodeBlock({ code, language }: { code: string; language?: string }) {
     if (navigator?.clipboard?.writeText) {
       navigator.clipboard.writeText(code).then(() => {
         setCopied(true);
+        setCopyFailed(false);
         setTimeout(() => setCopied(false), 2000);
-      }).catch(() => {});
+      }).catch(() => {
+        // A rejected write used to leave the button dead — flash a failure
+        // state so the click is acknowledged.
+        setCopyFailed(true);
+        setTimeout(() => setCopyFailed(false), 2000);
+      });
     }
   };
 
@@ -358,6 +365,11 @@ function CodeBlock({ code, language }: { code: string; language?: string }) {
             <>
               <Check className="h-3.5 w-3.5 text-status-success-foreground" />
               <span className="text-status-success-foreground">{vi ? 'Đã chép' : 'Copied'}</span>
+            </>
+          ) : copyFailed ? (
+            <>
+              <Copy className="h-3.5 w-3.5" />
+              <span className="text-destructive">{vi ? 'Chưa chép được' : 'Copy failed'}</span>
             </>
           ) : (
             <>

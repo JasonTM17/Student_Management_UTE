@@ -144,6 +144,9 @@ export default function ThesisPage() {
   // Scoped load failure for the lecturer workload: without it the member
   // panel silently disappears.
   const [workloadError, setWorkloadError] = useState('');
+  // Secondary panels (supervisor names, supervised report links) must surface
+  // a failed fetch instead of silently rendering as empty.
+  const [secondaryDataError, setSecondaryDataError] = useState(false);
   const [actionSuccess, setActionSuccess] = useState('');
 
   // Propose topic state
@@ -828,7 +831,9 @@ export default function ThesisPage() {
       if (g.approvalStatus === 'APPROVED' && !supervisedReports[g.id]) {
         void thesisApi.getReport(g.id)
           .then((rep) => setSupervisedReports((prev) => ({ ...prev, [g.id]: rep })))
-          .catch(() => {});
+          .catch(() => {
+            setSecondaryDataError(true);
+          });
       }
     }
   }, [isSupervisorOrAdmin, supervisedGroups, supervisedReports]);
@@ -905,7 +910,11 @@ export default function ThesisPage() {
           setCurrentTopicSupervisors(sups);
         }
       })
-      .catch(() => {});
+      .catch(() => {
+        if (!cancelled) {
+          setSecondaryDataError(true);
+        }
+      });
     return () => {
       cancelled = true;
     };
@@ -2044,6 +2053,14 @@ export default function ThesisPage() {
               className="rounded-xl border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm text-amber-700 dark:text-amber-400 shadow-xs"
             >
               {workloadError}
+            </div>
+          ) : null}
+          {secondaryDataError ? (
+            <div
+              role="status"
+              className="rounded-xl border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm text-amber-700 dark:text-amber-400 shadow-xs"
+            >
+              {messages.thesis.secondaryLoadFailed}
             </div>
           ) : null}
           {actionError ? (

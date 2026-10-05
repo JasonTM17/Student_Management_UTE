@@ -97,8 +97,13 @@ export default function GradesPage() {
   const loadGeneration = useRef(0);
 
   const fetchSemesters = useCallback(async () => {
-    const response = await semestersApi.getAll();
-    setSemesters(response.data ?? []);
+    try {
+      const response = await semestersApi.getAll();
+      setSemesters(response.data ?? []);
+    } catch {
+      // Non-fatal: the semester filter stays on "all" while the grades fetch
+      // below still reports its own error state.
+    }
   }, []);
 
   const fetchGrades = useCallback(async () => {

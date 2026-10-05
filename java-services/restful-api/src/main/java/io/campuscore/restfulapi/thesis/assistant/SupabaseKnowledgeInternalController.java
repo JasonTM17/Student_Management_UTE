@@ -160,7 +160,10 @@ public class SupabaseKnowledgeInternalController {
     }
 
     private static String owner(String actor) {
-        if (actor == null || actor.isBlank()) {
+        // Opaque identifier bound to VARCHAR(120) owner columns; reject values
+        // that would silently break the RLS match or fail late inside the
+        // transaction.
+        if (actor == null || actor.isBlank() || actor.length() > 120) {
             throw new DomainException(HttpStatus.UNAUTHORIZED, "UNAUTHENTICATED", "Assistant owner is required");
         }
         return actor;

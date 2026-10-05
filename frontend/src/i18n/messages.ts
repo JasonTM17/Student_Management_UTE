@@ -36,6 +36,7 @@ export const en = {
       closeModal: 'Close modal',
       goToPreviousPage: 'Go to previous page',
       goToNextPage: 'Go to next page',
+      dataTable: 'Data table',
       searchPlaceholder: 'Search...',
       export: 'Export',
       noDataFound: 'No data found',
@@ -633,6 +634,7 @@ export const en = {
     full: 'Full',
     register: 'Register',
     registered: 'Registered',
+    pendingLabel: 'Pending',
     drop: 'Drop course',
     emptyTitle: 'No matching sections',
     emptyDescription: 'Try another semester or search term.',
@@ -1318,6 +1320,7 @@ export const en = {
       grades: 'Review published grades and current academic standing.',
       transcript: 'View cumulative academic history and semester outcomes.',
       conduct: 'Track conduct score, 5 evaluation criteria, and extracurricular activities.',
+      attendance: 'Review presence rate and attendance records per class section.',
       certificates: 'Generate and print official student verification certificates.',
       announcements: 'Read campus-wide updates and shared notices.',
       notifications:
@@ -1327,6 +1330,7 @@ export const en = {
       lecturerSchedule: 'Track assigned sections, rooms, and meeting windows.',
       lecturerGrades:
         'Review grading queues, filter by term, and move publish-ready sections forward.',
+      lecturerAttendance: 'Mark session attendance and export presence reports for your sections.',
       lecturerAnnouncements:
         'Share updates with the students connected to your sections.',
       lecturerMail:
@@ -1400,6 +1404,7 @@ export const en = {
     errors: {
       rateLimit: 'Rate limit exceeded: this account can send 5 emails per hour. Try again later.',
       deliveryFailed: 'Could not send — check the SMTP configuration and try again.',
+      outOfScope: 'You can only send email to students enrolled in your own classes.',
       validation: 'Some fields were rejected. Review the highlighted values and try again.',
       network: 'Network error. Check your connection and try again.',
       unknown: 'The email could not be sent right now. Try again in a moment.',
@@ -1407,6 +1412,7 @@ export const en = {
     fields: {
       email: 'Recipient email',
       emailPlaceholder: 'ten.sinhvien@student.ute.edu.vn',
+      recipientScopeHint: 'Lecturers can only email students enrolled in their own classes — the system verifies this on send.',
       recipientName: 'Recipient name',
       recipientNamePlaceholder: 'Nguyen Van A',
       category: 'Notice category',
@@ -1963,6 +1969,7 @@ export const en = {
     noRound: 'No thesis registration round is available yet.',
     loading: 'Loading thesis area',
     loadFailed: 'Thesis data could not be loaded right now.',
+    secondaryLoadFailed: 'Some secondary details could not be loaded — supervisor names or report links may be missing.',
     retry: 'Retry thesis area',
     roundStatus: 'Round status',
     registrationWindow: 'Registration window',
@@ -2648,6 +2655,7 @@ export const vi: I18nMessages = {
       closeModal: 'Đóng hộp thoại',
       goToPreviousPage: 'Trang trước',
       goToNextPage: 'Trang sau',
+      dataTable: 'Bảng dữ liệu',
       searchPlaceholder: 'Tìm kiếm...',
       export: 'Xuất dữ liệu',
       noDataFound: 'Không có dữ liệu',
@@ -3245,6 +3253,7 @@ export const vi: I18nMessages = {
     full: 'Đã đầy',
     register: 'Đăng ký',
     registered: 'Đã đăng ký',
+    pendingLabel: 'Chờ xác nhận',
     drop: 'Hủy đăng ký',
     emptyTitle: 'Chưa có lớp học phần phù hợp',
     emptyDescription: 'Thử đổi học kỳ hoặc từ khóa tìm kiếm.',
@@ -3926,6 +3935,7 @@ export const vi: I18nMessages = {
       grades: 'Xem điểm đã công bố và trạng thái học tập hiện tại.',
       transcript: 'Xem lịch sử học tập tích lũy và kết quả theo học kỳ.',
       conduct: 'Theo dõi điểm rèn luyện, 5 tiêu chí đánh giá và hoạt động phong trào UTE.',
+      attendance: 'Xem tỷ lệ chuyên cần và bản ghi điểm danh theo từng lớp học phần.',
       certificates: 'Tạo và in giấy xác nhận sinh viên điện tử phục vụ các thủ tục hành chính.',
       announcements: 'Đọc các cập nhật dùng chung của nhà trường.',
       notifications:
@@ -3935,6 +3945,7 @@ export const vi: I18nMessages = {
       lecturerSchedule: 'Theo dõi lớp được giao, phòng học và khung giờ lên lớp.',
       lecturerGrades:
         'Xem hàng chờ chấm điểm, lọc theo học kỳ và đẩy các lớp học phần sẵn sàng sang bước công bố.',
+      lecturerAttendance: 'Điểm danh buổi học và xuất báo cáo chuyên cần cho các lớp của bạn.',
       lecturerAnnouncements:
         'Chia sẻ cập nhật với sinh viên trong các lớp của bạn.',
       lecturerMail:
@@ -4008,6 +4019,7 @@ export const vi: I18nMessages = {
     errors: {
       rateLimit: 'Vượt hạn mức 5 email/giờ. Vui lòng thử lại sau.',
       deliveryFailed: 'Không gửi được — kiểm tra cấu hình SMTP rồi thử lại.',
+      outOfScope: 'Bạn chỉ có thể gửi email cho sinh viên thuộc các lớp mình phụ trách.',
       validation: 'Một số trường không hợp lệ. Kiểm tra lại các giá trị được đánh dấu rồi thử lại.',
       network: 'Lỗi mạng. Kiểm tra kết nối rồi thử lại.',
       unknown: 'Hiện chưa gửi được email. Vui lòng thử lại sau.',
@@ -4015,6 +4027,7 @@ export const vi: I18nMessages = {
     fields: {
       email: 'Email người nhận',
       emailPlaceholder: 'ten.sinhvien@student.ute.edu.vn',
+      recipientScopeHint: 'Giảng viên chỉ gửi được cho sinh viên thuộc các lớp mình phụ trách — hệ thống tự kiểm tra khi gửi.',
       recipientName: 'Tên người nhận',
       recipientNamePlaceholder: 'Nguyễn Văn A',
       category: 'Phân loại thông báo',
@@ -4570,6 +4583,7 @@ export const vi: I18nMessages = {
     noRound: 'Chưa có đợt đăng ký đề tài nào.',
     loading: 'Đang tải phân hệ khóa luận tốt nghiệp',
     loadFailed: 'Hiện chưa thể tải dữ liệu luận văn.',
+    secondaryLoadFailed: 'Một số thông tin phụ chưa tải được — tên giảng viên hướng dẫn hoặc liên kết báo cáo có thể đang thiếu.',
     retry: 'Thử tải lại phân hệ khóa luận',
     roundStatus: 'Trạng thái đợt',
     registrationWindow: 'Cửa sổ đăng ký',

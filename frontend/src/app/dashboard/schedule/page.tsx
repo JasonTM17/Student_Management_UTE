@@ -132,15 +132,21 @@ export default function SchedulePage() {
           ? 'Hiện chưa thể tải bộ lọc thời khóa biểu.'
           : 'Schedule filters could not be loaded.',
       );
+    } finally {
+      // Always settle: when semesters were already loaded the enrollments
+      // effect does not re-run, so this is the only place that can clear
+      // the spinner on that path.
       setIsLoading(false);
     }
   }, [fetchSemesters, locale]);
+
+  const [retryTick, setRetryTick] = useState(0);
 
   useEffect(() => {
     if (hasAccess) {
       void loadData();
     }
-  }, [hasAccess, loadData]);
+  }, [hasAccess, loadData, retryTick]);
 
   useEffect(() => {
     if (!hasAccess || !semestersLoaded) {
@@ -174,7 +180,7 @@ export default function SchedulePage() {
     return () => {
       cancelled = true;
     };
-  }, [fetchEnrollments, hasAccess, locale, selectedSemester, semestersLoaded]);
+  }, [fetchEnrollments, hasAccess, locale, selectedSemester, semestersLoaded, retryTick]);
 
   /** Projects active enrollments into sorted weekday meeting cards for the selected term. */
   const agenda = useMemo(() => {
@@ -466,7 +472,7 @@ export default function SchedulePage() {
         <ErrorState
           title={copy.unavailableTitle}
           description={error}
-          onRetry={() => void loadData()}
+          onRetry={() => setRetryTick((t) => t + 1)}
         />
       ) : isLoading ? (
         <LoadingState label={copy.loading} />

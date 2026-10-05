@@ -50,13 +50,6 @@ type LecturerNoticeCategory =
   | 'EXAM_GRADES'
   | 'RESEARCH_SYLLABUS';
 
-const noticeTemplates = [
-  { label: 'Nghỉ học & Học bù', title: 'Thông báo nghỉ học và lịch học bù', content: 'Lớp học phần nghỉ buổi học theo lịch. Buổi học bù được tổ chức vào: ' },
-  { label: 'Nhắc nhở nộp bài tập lớn/đồ án', title: 'Nhắc thời hạn nộp bài tập lớn/đồ án', content: 'Sinh viên hoàn thành và nộp bài trước thời hạn: ' },
-  { label: 'Lịch thi & Kiểm tra', title: 'Thông báo lịch thi/kiểm tra', content: 'Lịch thi/kiểm tra của lớp học phần: ' },
-  { label: 'Thông báo lớp học phần', title: 'Thông báo lớp học phần', content: 'Nội dung thông báo: ' },
-] as const;
-
 export default function LecturerAnnouncementsPage() {
   const { user, hasAccess, isLoading: authLoading, isForbidden } = useRequireAuth(['LECTURER']);
   const { locale, formatDateTime } = useI18n();
@@ -69,6 +62,7 @@ export default function LecturerAnnouncementsPage() {
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
+  const [loadMoreError, setLoadMoreError] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState<LecturerNoticeCategory>('ALL');
   const [searchQuery, setSearchQuery] = useState('');
   const [readingNotice, setReadingNotice] = useState<AnnouncementRecord | null>(null);
@@ -102,6 +96,7 @@ export default function LecturerAnnouncementsPage() {
           filterResearch: 'NCKH & Đề cương',
           loadMore: 'Tải thêm thông báo',
           loadingMore: 'Đang tải thêm…',
+          loadMoreFailed: 'Chưa tải thêm được — nhấn lại để thử.',
         }
       : {
           eyebrow: 'Lecturer area',
@@ -129,6 +124,7 @@ export default function LecturerAnnouncementsPage() {
           filterResearch: 'Research & Syllabus',
           loadMore: 'Load more notices',
           loadingMore: 'Loading more…',
+          loadMoreFailed: 'Could not load more — press again to retry.',
         };
 
   const fetchFeed = useCallback(async (nextPage = 1) => {
@@ -137,6 +133,7 @@ export default function LecturerAnnouncementsPage() {
       setError('');
     } else {
       setIsLoadingMore(true);
+      setLoadMoreError(false);
     }
 
     try {
@@ -150,6 +147,8 @@ export default function LecturerAnnouncementsPage() {
     } catch {
       if (nextPage === 1) {
         setError(copy.loadFailed);
+      } else {
+        setLoadMoreError(true);
       }
     } finally {
       if (nextPage === 1) {
@@ -293,6 +292,7 @@ export default function LecturerAnnouncementsPage() {
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             placeholder={copy.searchPlaceholder}
+            aria-label={copy.searchPlaceholder}
             className="h-9 rounded-lg pl-9 text-xs"
           />
         </div>
@@ -406,7 +406,7 @@ export default function LecturerAnnouncementsPage() {
 
       {/* Load more: notices past the first page stay reachable. */}
       {!error && !isLoading && page < totalPages ? (
-        <div className="flex justify-center">
+        <div className="flex flex-col items-center gap-2">
           <Button
             type="button"
             variant="outline"
@@ -419,6 +419,9 @@ export default function LecturerAnnouncementsPage() {
             />
             {isLoadingMore ? copy.loadingMore : copy.loadMore}
           </Button>
+          {loadMoreError ? (
+            <p className="text-xs text-destructive" role="alert">{copy.loadMoreFailed}</p>
+          ) : null}
         </div>
       ) : null}
 

@@ -83,6 +83,7 @@ export default function StudentAnnouncementsPage() {
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
+  const [loadMoreError, setLoadMoreError] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState<NoticeCategory>('ALL');
   const [searchQuery, setSearchQuery] = useState('');
   const [viewMode, setViewMode] = useState<ViewMode>('magazine');
@@ -120,6 +121,7 @@ export default function StudentAnnouncementsPage() {
           viewDispatch: 'Dạng Công văn',
           loadMore: 'Tải thêm thông báo',
           loadingMore: 'Đang tải thêm…',
+          loadMoreFailed: 'Chưa tải thêm được — nhấn lại để thử.',
         }
       : {
           eyebrow: 'HCMUTE • ACADEMIC AFFAIRS DEPARTMENT',
@@ -151,6 +153,7 @@ export default function StudentAnnouncementsPage() {
           viewDispatch: 'Official Dispatches',
           loadMore: 'Load more notices',
           loadingMore: 'Loading more…',
+          loadMoreFailed: 'Could not load more — press again to retry.',
         };
 
   const fetchFeed = useCallback(async (nextPage = 1) => {
@@ -159,6 +162,7 @@ export default function StudentAnnouncementsPage() {
       setError('');
     } else {
       setIsLoadingMore(true);
+      setLoadMoreError(false);
     }
 
     try {
@@ -177,6 +181,8 @@ export default function StudentAnnouncementsPage() {
         // notices: surface the real error and let the student retry.
         setItems([]);
         setError(copy.loadFailed);
+      } else {
+        setLoadMoreError(true);
       }
     } finally {
       if (nextPage === 1) {
@@ -593,7 +599,7 @@ export default function StudentAnnouncementsPage() {
 
       {/* Load more: notices past the first page stay reachable. */}
       {!error && !isLoading && page < totalPages ? (
-        <div className="flex justify-center">
+        <div className="flex flex-col items-center gap-2">
           <Button
             type="button"
             variant="outline"
@@ -607,6 +613,9 @@ export default function StudentAnnouncementsPage() {
             />
             {isLoadingMore ? copy.loadingMore : copy.loadMore}
           </Button>
+          {loadMoreError ? (
+            <p className="text-xs text-destructive" role="alert">{copy.loadMoreFailed}</p>
+          ) : null}
         </div>
       ) : null}
 

@@ -1,14 +1,18 @@
 package io.campuscore.restfulapi.mail;
 
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import java.util.List;
+import io.campuscore.restfulapi.mail.repository.MailRecipientScopeRepository;
+import io.campuscore.restfulapi.mail.repository.MailRecipientScopeRepository.ScopedRecipient;
 import io.campuscore.restfulapi.mail.service.EmailService;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -54,6 +58,9 @@ class MailEndpointSecurityTest {
     @MockitoBean
     private EmailService emailService;
 
+    @MockitoBean
+    private MailRecipientScopeRepository recipientScope;
+
     @Test
     void anonymousSendIsRejected() throws Exception {
         mvc.perform(post("/api/v1/mail/grade-alert")
@@ -88,12 +95,29 @@ class MailEndpointSecurityTest {
                 .andExpect(status().isForbidden());
         verify(emailService, never()).sendTestEmail(any(), any(), any());
 
+        // The lecturer scopes the alert to a student of their own sections;
+        // the service resolves the recipient from enrolment records.
+        when(recipientScope.findScopedRecipient(eq("mail-lecturer-id"), eq("SV1234")))
+                .thenReturn(new ScopedRecipient("sv@campuscore.edu", "Nguyen Van A", "SV1234"));
         mvc.perform(post("/api/v1/mail/grade-alert")
                         .with(lecturerJwt())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(VALID_GRADE_ALERT))
                 .andExpect(status().isOk());
         verify(emailService).sendGradeAlert(any());
+    }
+
+    @Test
+    void lecturerCannotSendToAddressOutsideTheirSections() throws Exception {
+        // Abuse case pinned at the boundary: an arbitrary recipient address
+        // never reaches the mail service for a lecturer caller.
+        when(recipientScope.findScopedRecipient(eq("mail-lecturer-id"), any())).thenReturn(null);
+        mvc.perform(post("/api/v1/mail/grade-alert")
+                        .with(lecturerJwt())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(VALID_GRADE_ALERT))
+                .andExpect(status().isForbidden());
+        verify(emailService, never()).sendGradeAlert(any());
     }
 
     @Test
@@ -129,6 +153,7 @@ class MailEndpointSecurityTest {
     private RequestPostProcessor lecturerJwt() {
         return jwt().jwt(token -> token
                         .subject("mail-lecturer-user")
+                        .claim("lecturerId", "mail-lecturer-id")
                         .claim("roles", List.of("LECTURER")))
                 .authorities(new SimpleGrantedAuthority("ROLE_LECTURER"));
     }

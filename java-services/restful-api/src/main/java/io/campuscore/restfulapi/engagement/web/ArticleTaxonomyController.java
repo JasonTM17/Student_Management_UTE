@@ -180,20 +180,21 @@ public class ArticleTaxonomyController {
      * article is given; prefer {@link #getAttachmentsV2(String, int, int)}.
      *
      * @param announcementId optional article id that scopes the attachments to one article
-     * @return every matching attachment, including audit columns and the internal checksum
+     * @return every matching public attachment projected onto the reader-facing DTO (no audit columns or checksum)
      */
     @Operation(summary = "Lấy danh mục tệp đính kèm văn bản", description = "Truy xuất danh sách tài liệu, quyết định, biểu mẫu công khai đính kèm bài viết")
     @ApiResponses({
         @ApiResponse(responseCode = "200", description = "Truy xuất danh sách tài liệu đính kèm thành công")
     })
     @GetMapping("/article-attachments")
-    public List<ArticleAttachment> getAttachments(
+    public List<ArticleTaxonomyDtos.AttachmentDto> getAttachments(
             @Parameter(description = "Mã bài viết/thông báo để lọc tệp đính kèm (tùy chọn)")
             @RequestParam(required = false) String announcementId) {
-        if (announcementId != null && !announcementId.isBlank()) {
-            return attachmentRepository.findByAnnouncementId(announcementId);
-        }
-        return attachmentRepository.findByIsPublicTrue();
+        List<ArticleAttachment> rows = (announcementId != null && !announcementId.isBlank())
+                ? attachmentRepository.findByAnnouncementIdAndIsPublicTrue(announcementId)
+                : attachmentRepository.findByIsPublicTrue();
+        // Same projection as v2: checksum, access flag, and audit columns stay server-side.
+        return rows.stream().map(ArticleTaxonomyDtos.AttachmentDto::from).toList();
     }
 
     /**
@@ -330,7 +331,7 @@ public class ArticleTaxonomyController {
         PageRequest pageRequest = pageRequest(page, limit, "createdAt");
         Page<ArticleAttachment> result = announcementId == null || announcementId.isBlank()
                 ? attachmentRepository.findByIsPublicTrue(pageRequest)
-                : attachmentRepository.findByAnnouncementId(announcementId, pageRequest);
+                : attachmentRepository.findByAnnouncementIdAndIsPublicTrue(announcementId, pageRequest);
         return new AttachmentListResponse(
                 result.map(AttachmentDto::from).getContent(),
                 pageMeta(result));
