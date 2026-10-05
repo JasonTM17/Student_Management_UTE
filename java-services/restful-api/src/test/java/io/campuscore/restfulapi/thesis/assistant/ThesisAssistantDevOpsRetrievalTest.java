@@ -120,7 +120,7 @@ class ThesisAssistantDevOpsRetrievalTest {
     @DisplayName("the emitted query scores whole-word hits above substring hits")
     void emittedQueryPrefersWordBoundaryMatches() {
         NamedParameterJdbcTemplate jdbc = mock(NamedParameterJdbcTemplate.class);
-        ThesisAssistantKnowledgeRepository knowledge = new ThesisAssistantKnowledgeRepository(jdbc);
+        ThesisAssistantKnowledgeRepository knowledge = new ThesisAssistantKnowledgeRepository(jdbc, false, false, 30_000L);
 
         knowledge.search("en", ThesisAssistantService.retrievalTerms(CI_CD_QUESTION), 5);
 

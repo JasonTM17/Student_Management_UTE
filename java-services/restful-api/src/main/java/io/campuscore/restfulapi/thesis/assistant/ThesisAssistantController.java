@@ -259,6 +259,15 @@ public class ThesisAssistantController {
         if (general != null) {
             return general;
         }
+        // Lexical-first fast path (chatbot latency): a confident local KB
+        // match answers before ANY provider/RAG round-trip — remote mode had
+        // this inside chatRemoteWithFallback, but the single-service
+        // deployment (prod runs the local pipeline) used to pay the full
+        // provider call for questions the curated corpus answers directly.
+        ChatResponse fastPath = lexicalFastPathOrNull(request);
+        if (fastPath != null) {
+            return fastPath;
+        }
         if (remoteRag()) {
             return chatRemoteWithFallback(request, owner, dbDownAtRequestStart);
         }
@@ -289,10 +298,9 @@ public class ThesisAssistantController {
      * lexical window reaches remote RAG.
      */
     private ChatResponse chatRemoteWithFallback(ChatRequest request, String owner, boolean dbDownAtRequestStart) {
-        ChatResponse fastPath = lexicalFastPathOrNull(request);
-        if (fastPath != null) {
-            return fastPath;
-        }
+        // The caller already ran lexicalFastPathOrNull — reaching here means
+        // the local window was weak or empty, so the remote chain starts at
+        // the gateway instead of paying a second retrieval.
         try {
             ChatResponse remote = ragGateway.chat(request, owner);
             if (remote == null) {
@@ -457,11 +465,20 @@ public class ThesisAssistantController {
                                     conversationUuid(request.conversationId())));
                     if (general != null) {
                         ThesisAssistantService.streamLocalResponse(general, request.clientRequestId(), sink);
-                    } else if (remoteRag()) {
-                        streamRemoteWithFallback(request, owner, sink, dbDownAtRequestStart);
                     } else {
-                        assistant.stream(request.message(), request.locale(), request.conversationId(), owner,
-                                request.clientRequestId(), sink, request.scope());
+                        // Same fast-path ordering as the JSON route: a
+                        // confident curated match streams instantly in BOTH
+                        // modes instead of waiting on the provider chain.
+                        ChatResponse fastPath = lexicalFastPathOrNull(request);
+                        if (fastPath != null) {
+                            emitLexicalFastPath(fastPath, request,
+                                    AssistantInputGuard.normalizeLocale(request.locale()), sink);
+                        } else if (remoteRag()) {
+                            streamRemoteWithFallback(request, owner, sink, dbDownAtRequestStart);
+                        } else {
+                            assistant.stream(request.message(), request.locale(), request.conversationId(), owner,
+                                    request.clientRequestId(), sink, request.scope());
+                        }
                     }
                 }
             }
@@ -678,11 +695,8 @@ public class ThesisAssistantController {
     private void streamRemoteWithFallback(ChatRequest request, String owner,
             Consumer<ThesisAssistantService.StreamEvent> sink, boolean dbDownAtRequestStart) {
         String locale = AssistantInputGuard.normalizeLocale(request.locale());
-        ChatResponse fastPath = lexicalFastPathOrNull(request);
-        if (fastPath != null) {
-            emitLexicalFastPath(fastPath, request, locale, sink);
-            return;
-        }
+        // The caller ran the lexical fast path before choosing this branch —
+        // a second retrieval here would only add a DB round-trip.
         boolean[] forwarded = { false };
         Consumer<ThesisAssistantService.StreamEvent> intercept = event -> {
             if (event instanceof ThesisAssistantService.StreamDone done && "NO_MATCH".equals(done.reasonCode())) {
@@ -709,7 +723,7 @@ public class ThesisAssistantController {
      * done closes non-degraded. No turn is persisted — identical to the
      * existing local-grounded fallback contract the clients already render.
      */
-    private void emitLexicalFastPath(ChatResponse fastPath, ChatRequest request, String locale,
+    void emitLexicalFastPath(ChatResponse fastPath, ChatRequest request, String locale,
             Consumer<ThesisAssistantService.StreamEvent> sink) {
         sink.accept(new ThesisAssistantService.StreamMeta(
                 UUID.randomUUID(), request.clientRequestId(), null, null,

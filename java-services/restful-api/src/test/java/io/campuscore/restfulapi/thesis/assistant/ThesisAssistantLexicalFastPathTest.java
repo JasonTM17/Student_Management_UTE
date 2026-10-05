@@ -308,8 +308,10 @@ class ThesisAssistantLexicalFastPathTest {
                 "Các bước đăng ký học phần...", ThesisAssistantService.FAST_PATH_MODEL, false,
                 "ANSWERED", "vi", List.of(citation)));
 
+        ChatRequest request = request("Đăng ký học phần thế nào?");
+        ChatResponse fastPath = assistant.lexicalFastPath(request.message(), request.locale(), request.scope());
         List<StreamEvent> events = new ArrayList<>();
-        controller.streamRemoteWithFallback(request("Đăng ký học phần thế nào?"), "owner-fast", events::add, new MockHttpServletRequest());
+        controller.emitLexicalFastPath(fastPath, request, "vi", events::add);
 
         assertEquals(4, events.size());
         assertTrue(events.get(0) instanceof StreamMeta meta

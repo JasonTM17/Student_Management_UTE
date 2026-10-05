@@ -119,6 +119,16 @@ assistant:
     # sql keeps the course/local authoring compatibility path; production REST
     # uses remote and private rag-service uses supabase.
     authority-mode: ${ASSISTANT_KNOWLEDGE_AUTHORITY_MODE:sql}
+    # In-memory snapshot of the active release's PUBLIC corpus. Retrieval
+    # (including the fast-path confidence probe) replays the SQL WHERE/ORDER BY
+    # over this copy instead of paying a database round-trip per request —
+    # on a remote datasource that trip dominates fast-path latency. The corpus
+    # is shared (RLS is scope-scoped, never owner-scoped), so one snapshot is
+    # safe for every caller. A republished release propagates within ttl-ms;
+    # a failed load backs off briefly and every search falls back to SQL.
+    snapshot-cache:
+      enabled: ${ASSISTANT_KNOWLEDGE_SNAPSHOT_CACHE:true}
+      ttl-ms: ${ASSISTANT_KNOWLEDGE_SNAPSHOT_TTL_MS:30000}
   max-context-chars: ${ASSISTANT_MAX_CONTEXT_CHARS:6000}
   max-message-chars: ${ASSISTANT_MAX_MESSAGE_CHARS:2000}
   user-daily-quota: ${ASSISTANT_USER_DAILY_QUOTA:20}

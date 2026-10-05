@@ -90,20 +90,181 @@ public class ThesisAssistantKnowledgeRepository {
 
     private final NamedParameterJdbcTemplate jdbc;
     private final boolean allowLegacyFallback;
+    private final boolean snapshotCacheEnabled;
+    private final long snapshotCacheTtlMs;
 
     public ThesisAssistantKnowledgeRepository(
             @org.springframework.beans.factory.annotation.Qualifier(AssistantDatabaseConfiguration.JDBC_TEMPLATE)
             NamedParameterJdbcTemplate jdbc) {
-        this(jdbc, false);
+        this(jdbc, false, true, DEFAULT_SNAPSHOT_TTL_MS);
+    }
+
+    public ThesisAssistantKnowledgeRepository(
+            @org.springframework.beans.factory.annotation.Qualifier(AssistantDatabaseConfiguration.JDBC_TEMPLATE)
+            NamedParameterJdbcTemplate jdbc,
+            @Value("${assistant.legacy-retrieval-fallback:false}") boolean allowLegacyFallback) {
+        this(jdbc, allowLegacyFallback, true, DEFAULT_SNAPSHOT_TTL_MS);
     }
 
     @Autowired
     public ThesisAssistantKnowledgeRepository(
             @org.springframework.beans.factory.annotation.Qualifier(AssistantDatabaseConfiguration.JDBC_TEMPLATE)
             NamedParameterJdbcTemplate jdbc,
-            @Value("${assistant.legacy-retrieval-fallback:false}") boolean allowLegacyFallback) {
+            @Value("${assistant.legacy-retrieval-fallback:false}") boolean allowLegacyFallback,
+            @Value("${assistant.knowledge.snapshot-cache.enabled:true}") boolean snapshotCacheEnabled,
+            @Value("${assistant.knowledge.snapshot-cache.ttl-ms:" + DEFAULT_SNAPSHOT_TTL_MS + "}") long snapshotCacheTtlMs) {
         this.jdbc = jdbc;
         this.allowLegacyFallback = allowLegacyFallback;
+        this.snapshotCacheEnabled = snapshotCacheEnabled;
+        this.snapshotCacheTtlMs = Math.max(1_000L, snapshotCacheTtlMs);
+    }
+
+    /**
+     * In-memory snapshot of the active release's PUBLIC corpus. The published
+     * corpus is shared across every caller (the RLS policy on
+     * knowledge_runtime_document is scope-scoped, never owner-scoped), so one
+     * TTL-bounded copy is a faithful substitute for per-request SQL scoring —
+     * on a remote database each {@link #search} call otherwise costs a full
+     * network round-trip before the fast path can even decide.
+     *
+     * <p>Staleness bound: a republished release propagates within
+     * {@code assistant.knowledge.snapshot-cache.ttl-ms} (default
+     * {@value #DEFAULT_SNAPSHOT_TTL_MS} ms). The load failure path returns
+     * {@code null} so callers degrade to the unchanged SQL query — a missing
+     * runtime projection or a database outage must never wedge search on the
+     * cache.
+     */
+    private static final long DEFAULT_SNAPSHOT_TTL_MS = 30_000L;
+    private static final long SNAPSHOT_FAILURE_BACKOFF_MS = 5_000L;
+
+    private volatile List<SnapshotRow> snapshotCache;
+    private volatile long snapshotLoadedAtMs;
+    private volatile long snapshotFailureAtMs;
+
+    record SnapshotRow(KnowledgeDocument document, int priority, Instant publishedAt) { }
+
+    /**
+     * Loads every PUBLIC + active document of the active published release in
+     * one round-trip. priority/published_at ride along so the in-memory
+     * ordering below is byte-for-byte the SQL ORDER BY.
+     */
+    private List<SnapshotRow> loadPublishedSnapshot() {
+        String sql = "SELECT p.source_id AS id, p.slug, p.locale, p.title, p.content, p.source, p.domain, "
+                + "p.revision_id, p.version AS revision_version, rel.id AS release_id, "
+                + "rel.corpus_version, rel.corpus_hash, p.priority, p.published_at "
+                + "FROM assistant.knowledge_runtime_state s "
+                + "JOIN assistant.knowledge_release rel ON rel.id = s.active_release_id AND rel.status = 'PUBLISHED' "
+                + "JOIN assistant.knowledge_runtime_document p ON p.release_id = rel.id "
+                + "WHERE s.singleton = TRUE AND p.active = TRUE AND p.visibility = 'PUBLIC'";
+        return jdbc.query(sql, (resultSet, rowNumber) -> new SnapshotRow(
+                new KnowledgeDocument(
+                        resultSet.getString("id"),
+                        resultSet.getString("slug"),
+                        resultSet.getString("locale"),
+                        resultSet.getString("title"),
+                        resultSet.getString("content"),
+                        resultSet.getString("source"),
+                        resultSet.getString("domain"),
+                        null, null, null,
+                        resultSet.getObject("revision_id", UUID.class),
+                        resultSet.getInt("revision_version"),
+                        resultSet.getString("corpus_version"),
+                        resultSet.getString("corpus_hash"),
+                        resultSet.getObject("release_id", UUID.class),
+                        0),
+                resultSet.getInt("priority"),
+                publishedInstant(resultSet)));
+    }
+
+    private static Instant publishedInstant(ResultSet resultSet) throws SQLException {
+        java.sql.Timestamp published = resultSet.getTimestamp("published_at");
+        return published == null ? Instant.EPOCH : published.toInstant();
+    }
+
+    /** A fresh snapshot, or {@code null} when the cache must not be used. */
+    private List<SnapshotRow> publishedSnapshot() {
+        long now = System.currentTimeMillis();
+        List<SnapshotRow> cached = snapshotCache;
+        if (cached != null && now - snapshotLoadedAtMs < snapshotCacheTtlMs) {
+            return cached;
+        }
+        if (cached == null && now - snapshotFailureAtMs < SNAPSHOT_FAILURE_BACKOFF_MS) {
+            // A recent load failure backs off briefly instead of serialising
+            // every search on a JDBC call that just failed — the SQL path
+            // below still runs, so correctness does not depend on the cache.
+            return null;
+        }
+        synchronized (this) {
+            now = System.currentTimeMillis();
+            if (snapshotCache != null && now - snapshotLoadedAtMs < snapshotCacheTtlMs) {
+                return snapshotCache;
+            }
+            if (snapshotCache == null && now - snapshotFailureAtMs < SNAPSHOT_FAILURE_BACKOFF_MS) {
+                return null;
+            }
+            try {
+                List<SnapshotRow> loaded = loadPublishedSnapshot();
+                snapshotCache = loaded;
+                snapshotLoadedAtMs = now;
+                return loaded;
+            } catch (RuntimeException failure) {
+                // A mapping or SQL defect must degrade to the plain query —
+                // wedging every search behind a broken cache is worse than
+                // paying the round-trip.
+                snapshotFailureAtMs = now;
+                return null;
+            }
+        }
+    }
+
+    /**
+     * Replays {@link #search}'s WHERE/ORDER BY over the snapshot. The term
+     * predicate is a per-term substring OR over lowered title+content (the
+     * SQL's {@code LOWER(..) LIKE %term%}), and the score is the same
+     * {@link #termContribution} expression the SQL CASE sums — the fast-path
+     * confidence gate therefore sees identical numbers either way.
+     */
+    static List<KnowledgeDocument> searchSnapshot(List<SnapshotRow> snapshot, String locale,
+            List<String> usableTerms, int limit, boolean specializedScope) {
+        record Scored(SnapshotRow row, int score) { }
+        List<Scored> scored = new ArrayList<>();
+        for (SnapshotRow row : snapshot) {
+            KnowledgeDocument document = row.document();
+            if (specializedScope != "SPECIALIZED".equalsIgnoreCase(document.domain())) {
+                continue;
+            }
+            if (!locale.equalsIgnoreCase(document.locale()) && !"both".equalsIgnoreCase(document.locale())) {
+                continue;
+            }
+            String title = document.title() == null ? "" : document.title().toLowerCase(java.util.Locale.ROOT);
+            String content = document.content() == null ? "" : document.content().toLowerCase(java.util.Locale.ROOT);
+            boolean anyMatch = false;
+            int score = 0;
+            for (String term : usableTerms) {
+                if (title.contains(term) || content.contains(term)) {
+                    anyMatch = true;
+                    score += termContribution(document.title(), document.content(), term);
+                }
+            }
+            if (anyMatch) {
+                scored.add(new Scored(row, score));
+            }
+        }
+        scored.sort(java.util.Comparator
+                .<Scored>comparingInt(s -> locale.equalsIgnoreCase(s.row().document().locale()) ? 0 : 1)
+                .thenComparing(java.util.Comparator.<Scored>comparingInt(s -> s.score()).reversed())
+                .thenComparingInt(s -> s.row().priority())
+                .thenComparing((Scored s) -> s.row().publishedAt(), java.util.Comparator.reverseOrder())
+                .thenComparing(s -> s.row().document().slug()));
+        List<KnowledgeDocument> result = new ArrayList<>(Math.min(limit, scored.size()));
+        for (Scored entry : scored.stream().limit(limit).toList()) {
+            KnowledgeDocument d = entry.row().document();
+            result.add(new KnowledgeDocument(d.id(), d.slug(), d.locale(), d.title(), d.content(), d.source(),
+                    d.domain(), d.catalogEntityType(), d.catalogEntityId(), d.catalogUpdatedAt(),
+                    d.revisionId(), d.revisionVersion(), d.corpusVersion(), d.corpusHash(), d.releaseId(),
+                    entry.score()));
+        }
+        return result;
     }
 
     public List<KnowledgeDocument> search(String locale, List<String> terms, int limit) {
@@ -134,6 +295,13 @@ public class ThesisAssistantKnowledgeRepository {
             return List.of();
         }
         boolean specializedScope = "specialized".equalsIgnoreCase(scope);
+
+        if (snapshotCacheEnabled) {
+            List<SnapshotRow> snapshot = publishedSnapshot();
+            if (snapshot != null) {
+                return searchSnapshot(snapshot, locale, usableTerms, limit, specializedScope);
+            }
+        }
 
         MapSqlParameterSource params = new MapSqlParameterSource()
                 .addValue("locale", locale)
