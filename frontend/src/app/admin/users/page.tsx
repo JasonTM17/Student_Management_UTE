@@ -1219,14 +1219,14 @@ export default function AdminUsersPage() {
           {/* Quick role switcher inside modal if creating new */}
           {!editingUser && (
             <div className="rounded-xl border border-border/80 bg-secondary/20 p-3">
-              <div className="flex items-center justify-between">
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                 <div>
                   <span className="text-xs font-semibold text-foreground">{copy.createAudienceLabel}</span>
                   <p className="text-xs text-muted-foreground">
                     {copy.createAudienceHint}
                   </p>
                 </div>
-                <div className="flex items-center gap-1.5 rounded-lg border border-border bg-background p-1">
+                <div className="flex items-center gap-1.5 self-stretch rounded-lg border border-border bg-background p-1 sm:self-auto [&>button]:flex-1 [&>button]:justify-center sm:[&>button]:flex-none">
                   <RoleTabButton
                     className="rounded-md font-semibold"
                     inactiveClassName="bg-transparent text-muted-foreground hover:bg-transparent hover:text-foreground"

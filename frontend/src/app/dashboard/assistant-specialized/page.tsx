@@ -80,6 +80,18 @@ export default function AssistantSpecializedPage() {
       node.scrollHeight - node.scrollTop - node.clientHeight > 48;
   };
 
+  // F07: past ~8s escalate the thinking copy so a slow answer reads as live
+  // progress, not a stall.
+  const [slowResponse, setSlowResponse] = useState(false);
+  useEffect(() => {
+    if (!isSending) {
+      setSlowResponse(false);
+      return;
+    }
+    const timer = window.setTimeout(() => setSlowResponse(true), 8000);
+    return () => window.clearTimeout(timer);
+  }, [isSending]);
+
   const errorLabel = state.error === 'offline'
     ? messages.assistant.offline
     : state.error === 'turn-in-progress'
@@ -99,7 +111,11 @@ export default function AssistantSpecializedPage() {
 
   return (
     <div className="mx-auto flex w-full max-w-5xl flex-col px-4 py-4">
-      <div className="flex h-[calc(100dvh-11rem)] min-h-[320px] flex-col overflow-hidden rounded-xl border border-border/70 bg-card shadow-xs md:h-[calc(100dvh-9.5rem)]">
+      {/* F03: below ~24rem viewport height (landscape phones) the in-flow
+          card math can't clear BOTH the sticky header and the fixed bottom
+          nav, so the card docks between them — same contract as the floating
+          panel's mobile sheet, which already owns the full screen there. */}
+      <div className="flex h-[calc(100dvh-11rem)] min-h-[min(320px,calc(100dvh-11rem))] flex-col overflow-hidden rounded-xl border border-border/70 bg-card shadow-xs md:h-[calc(100dvh-9.5rem)] md:min-h-[320px] [@media(max-height:24rem)_and_(max-width:47.9375rem)]:fixed [@media(max-height:24rem)_and_(max-width:47.9375rem)]:inset-x-3 [@media(max-height:24rem)_and_(max-width:47.9375rem)]:bottom-[4.75rem] [@media(max-height:24rem)_and_(max-width:47.9375rem)]:top-[4.25rem] [@media(max-height:24rem)_and_(max-width:47.9375rem)]:z-40 [@media(max-height:24rem)_and_(max-width:47.9375rem)]:h-auto [@media(max-height:24rem)_and_(max-width:47.9375rem)]:min-h-0">
         <header className="flex items-center gap-3 border-b border-border/70 bg-[var(--portal-sidebar-strong)] px-4 py-3 text-[var(--portal-sidebar-text)]">
           <span className="flex h-9 w-9 items-center justify-center rounded-md bg-[var(--portal-yellow)]/15 text-[var(--portal-chrome-accent)]">
             <AssistantMascot className="h-5 w-5" />
@@ -163,7 +179,7 @@ export default function AssistantSpecializedPage() {
                 className="h-3.5 w-3.5 animate-spin motion-reduce:animate-none text-primary"
                 aria-hidden="true"
               />
-              <span>{messages.assistant.thinking}</span>
+              <span>{slowResponse ? messages.assistant.stillWorking : messages.assistant.thinking}</span>
             </div>
           ) : null}
 

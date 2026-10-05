@@ -29,8 +29,39 @@ public final class AssistantOutputGuard {
     private static final Pattern INTERNAL_ENDPOINT = Pattern.compile(
             "(?i)(?:https?://[^\\s)]+/api/v\\d(?:/|\\b)|(?<![\\p{L}\\p{N}_])/api/v\\d(?:/|\\b)|\\b(?:localhost|127\\.0\\.0\\.1)\\s*:\\s*\\d{2,5})");
 
+    /**
+     * Scope-aware split of {@link #INTERNAL_ENDPOINT}, mirroring the client
+     * copy guard. A host-bearing URL or explicit host:port is live
+     * infrastructure — banned in every scope. A bare {@code /api/vN} path is
+     * ambiguous: in academic answers it still signals an internal leak, but
+     * the specialized corpus legitimately teaches REST endpoint shapes in its
+     * lessons, so the remote-RAG stream must not blank them there.
+     * Sensitive segments stay banned in every scope so a specialized answer
+     * cannot walk a learner into admin/internal routes.
+     */
+    private static final Pattern INTERNAL_ENDPOINT_HOST = Pattern.compile(
+            "(?i)(?:https?://[^\\s)]+/api/v\\d(?:/|\\b)|\\b(?:localhost|127\\.0\\.0\\.1)\\s*:\\s*\\d{2,5})");
+
+    private static final Pattern INTERNAL_API_PATH = Pattern.compile(
+            "(?i)(?<![\\p{L}\\p{N}_])/api/v\\d(?:/|\\b)");
+
+    private static final Pattern INTERNAL_API_PATH_SENSITIVE = Pattern.compile(
+            "(?i)(?<![\\p{L}\\p{N}_])/api/v\\d/(?:(?:admin|assistant|internal|system|actuator|manage|debug|users?|auth|mail|thesis)[\\w-]*|me)(?:/|\\b)");
+
     private static final Pattern INTERNAL_DETAIL = Pattern.compile(
             "(?i)\\b(?:system\\s+prompt|developer\\s+message|retrieved\\s+context|api\\s+endpoint(?:s)?|curl\\s+commands?|docker\\s+compose(?:\\s+instructions?)?|stack\\s+trace|traceback|deepseek(?:[- ]v?\\d+)?|provider\\s+(?:error|response|model)|api\\s+key|jwt\\s+secret|bearer\\s+token|v4\\s+flash)\\b");
+
+    /**
+     * Split of {@link #INTERNAL_DETAIL} mirroring the client guard. The SECRET
+     * half names the machinery — banned in every scope. The TECH half is
+     * phrasing the specialized corpus legitimately TEACHES (Docker Compose,
+     * pipelines), so a scope-aware boundary skips it there.
+     */
+    private static final Pattern INTERNAL_DETAIL_SECRET = Pattern.compile(
+            "(?i)\\b(?:system\\s+prompt|developer\\s+message|stack\\s+trace|traceback|deepseek(?:[- ]v?\\d+)?|provider\\s+(?:error|response|model)|api\\s+key|jwt\\s+secret|bearer\\s+token|v4\\s+flash)\\b");
+
+    private static final Pattern INTERNAL_DETAIL_TECH = Pattern.compile(
+            "(?i)\\b(?:retrieved\\s+context|api\\s+endpoints?|curl\\s+commands?|docker\\s+compose(?:\\s+instructions?)?)\\b");
 
     private static final Pattern STACK_TRACE = Pattern.compile(
             "(?i)(?:exception\\s+in\\s+thread|traceback\\s*\\(most\\s+recent\\s+call\\s+last\\)|\\bat\\s+[\\w.$]+\\([^\\n)]*:\\d+[:)]|caused\\s+by:)" );
@@ -50,6 +81,36 @@ public final class AssistantOutputGuard {
                 && !SQL_COMMAND.matcher(normalized).find()
                 && !INTERNAL_ENDPOINT.matcher(normalized).find()
                 && !INTERNAL_DETAIL.matcher(normalized).find()
+                && !STACK_TRACE.matcher(normalized).find();
+    }
+
+    /**
+     * Scope-aware boundary for assistant output with no approved context —
+     * the remote-RAG sink has no corpus excerpt to quote against, so it uses
+     * scope instead. {@code specialized} keeps secrets, stack traces and
+     * host-bound/sensitive endpoints blocked but allows the command-style and
+     * bare-endpoint examples its corpus teaches; every other scope is the
+     * strict {@link #isSafe(String)} boundary.
+     *
+     * <p>Note on authority: {@code scope} is self-asserted by the caller (the
+     * request body carries it), not a privilege boundary — the specialized
+     * surface is a student-facing feature. What stays banned under it is the
+     * machinery tier (secrets, provider/model markers, stack traces, host-bound
+     * URLs, sensitive route segments); what relaxes is phrasing the curated
+     * corpus publishes. A remote service that bypasses its own
+     * {@link #isSafeForAnswer} check is still held by those hard blocks here.
+     */
+    public static boolean isSafeForScope(String value, String scope) {
+        if (value == null || value.isBlank()) {
+            return true;
+        }
+        if (!"specialized".equalsIgnoreCase(scope)) {
+            return isSafe(value);
+        }
+        String normalized = normalize(value);
+        return !INTERNAL_ENDPOINT_HOST.matcher(normalized).find()
+                && !INTERNAL_API_PATH_SENSITIVE.matcher(normalized).find()
+                && !INTERNAL_DETAIL_SECRET.matcher(normalized).find()
                 && !STACK_TRACE.matcher(normalized).find();
     }
 

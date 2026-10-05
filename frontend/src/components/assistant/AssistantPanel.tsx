@@ -414,6 +414,18 @@ export function AssistantPanel() {
     }
   }, [state.messages, isSending]);
 
+  // F07: past ~8s the static "thinking" label reads as a stall — escalate the
+  // copy so a slow provider still signals live progress.
+  const [slowResponse, setSlowResponse] = useState(false);
+  useEffect(() => {
+    if (!isSending) {
+      setSlowResponse(false);
+      return;
+    }
+    const timer = window.setTimeout(() => setSlowResponse(true), 8000);
+    return () => window.clearTimeout(timer);
+  }, [isSending]);
+
   const handleLogScroll = () => {
     const node = logRef.current;
     if (!node) return;
@@ -744,7 +756,7 @@ export function AssistantPanel() {
                     className="h-3.5 w-3.5 animate-spin motion-reduce:animate-none text-primary"
                     aria-hidden="true"
                   />
-                  <span>{messages.assistant.thinking}</span>
+                  <span>{slowResponse ? messages.assistant.stillWorking : messages.assistant.thinking}</span>
                 </div>
               ) : null}
 

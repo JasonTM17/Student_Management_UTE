@@ -59,4 +59,35 @@ class AssistantOutputGuardTest {
         assertFalse(AssistantOutputGuard.isSafeForAnswer(
                 "```bash\ndocker compose up\n```", approvedContext));
     }
+
+    /**
+     * The scope-aware boundary used by RagAssistantGateway for remote-RAG
+     * answers: 'specialized' keeps the approved corpus's technical phrasing
+     * (docker compose, REST endpoint shapes) while host-bound URLs, sensitive
+     * route segments, secrets and stack traces stay banned. 'academic' and an
+     * absent scope keep the strict isSafe() set. Mirrors the client guard in
+     * assistant-output-guard.ts.
+     */
+    @Test
+    void specializedScopeKeepsCorpusTechnicalPhrasingButBlocksMachinery() {
+        String specializedLesson = "Bạn có thể dùng GitHub Actions, và chạy lệnh docker compose up -d --build khi push. "
+                + "REST API trả về GET /api/v1/announcements cho danh sách thông báo.";
+
+        assertTrue(AssistantOutputGuard.isSafeForScope(specializedLesson, "specialized"));
+        assertFalse(AssistantOutputGuard.isSafeForScope(specializedLesson, "academic"));
+        assertFalse(AssistantOutputGuard.isSafeForScope(specializedLesson, null));
+
+        List<String> bannedInEveryScope = List.of(
+                "Gọi https://api.campuscore.internal/api/v1/announcements trực tiếp.",
+                "Endpoint nội bộ là /api/v1/assistant/chat.",
+                "Endpoint nội bộ là /api/v1/thesis/assistant/chat.",
+                "Cấu hình nằm trong /api/v1/admin/users.",
+                "Mở /api/v1/mail để gửi thư.",
+                "Lấy bearer token từ response trước.",
+                "Chi tiết trong retrieved context và system prompt.",
+                "Exception in thread \"main\" at io.campuscore.X(X.java:1)");
+        for (String output : bannedInEveryScope) {
+            assertFalse(AssistantOutputGuard.isSafeForScope(output, "specialized"), output);
+        }
+    }
 }

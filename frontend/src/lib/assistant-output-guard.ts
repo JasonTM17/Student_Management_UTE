@@ -12,7 +12,19 @@ const CODE_FENCE = /```|~~~\s*(?:\w+)?(?:\n|$)/;
 const SHELL_COMMAND = /(?:^|\n)\s*(?:[-•*]\s*)?(?:[$>#]\s*)?(?:curl|wget|invoke-webrequest|iwr|docker(?:\s+compose)?|docker-compose|npm|pnpm|yarn|bun|npx|mvnw?|gradlew?|git|kubectl|helm|psql|mysql|redis-cli|python3?|node|powershell|pwsh|bash|sh)\b/im;
 const INLINE_COMMAND = /\b(?:curl|wget|invoke-webrequest|docker(?:\s+compose)?|docker-compose|kubectl|psql|mysql|redis-cli)\s+(?:https?:\/\/|[/-]|(?:compose|run|up|down|build|command|commands|example|instructions?)\b)/i;
 const SQL_COMMAND = /(?:^|\n)\s*(?:select|insert|update|delete|drop|alter|create)\s+(?:from|into|table|database|schema|index|view|users?|assistant|chat|\*)/im;
-const INTERNAL_ENDPOINT = /(?:https?:\/\/[^\s)]+\/api\/v\d(?:\/|\b)|(?<![\p{L}\p{N}_])\/api\/v\d(?:\/|\b)|\b(?:localhost|127\.0\.0\.1)\s*:\s*\d{2,5})/iu;
+/**
+ * Endpoint checks split by realism. A host-bearing URL or an explicit
+ * host:port is live infrastructure — banned in every scope. A bare
+ * `/api/vN` path is ambiguous: in academic answers it still signals an
+ * internal leak, but the specialized corpus legitimately teaches REST
+ * endpoint shapes in lessons (F02 — a DevOps/REST lesson was replaced
+ * wholesale by the refusal copy just for containing `/api/v1/...`).
+ * Sensitive segments stay banned in every scope so a specialized answer
+ * cannot walk a learner into admin/internal routes.
+ */
+const INTERNAL_ENDPOINT_HOST = /(?:https?:\/\/[^\s)]+\/api\/v\d(?:\/|\b)|\b(?:localhost|127\.0\.0\.1)\s*:\s*\d{2,5})/iu;
+const INTERNAL_API_PATH = /(?<![\p{L}\p{N}_])\/api\/v\d(?:\/|\b)/iu;
+const INTERNAL_API_PATH_SENSITIVE = /(?<![\p{L}\p{N}_])\/api\/v\d\/(?:(?:admin|assistant|internal|system|actuator|manage|debug|users?|auth|mail|thesis)[\w-]*|me)(?:\/|\b)/iu;
 /**
  * Leak markers that stay banned in EVERY scope: they name the machinery, never
  * a lesson. The technical-phrasing half below is separate because the
@@ -271,16 +283,20 @@ export function isAssistantOutputSafe(
 ): boolean {
   if (!value?.trim()) return true;
   const normalized = normalizeAssistantOutput(value);
-  if (INTERNAL_ENDPOINT.test(normalized)
+  if (INTERNAL_ENDPOINT_HOST.test(normalized)
+      || INTERNAL_API_PATH_SENSITIVE.test(normalized)
       || INTERNAL_DETAIL_SECRET.test(normalized)
       || STACK_TRACE.test(normalized)) {
     return false;
   }
   // Round-5: the specialized corpus teaches command-style content; its answers
   // were replaced wholesale by the technical-refusal copy ("Docker compose up"
-  // in a DevOps lesson tripped INLINE_COMMAND/INTERNAL_DETAIL_TECH).
+  // in a DevOps lesson tripped INLINE_COMMAND/INTERNAL_DETAIL_TECH). Bare
+  // /api/vN path examples stay allowed there too — only host-bound and
+  // sensitive internal endpoints above remain hard-blocked.
   if (scope === 'specialized') return true;
-  return !CODE_FENCE.test(normalized)
+  return !INTERNAL_API_PATH.test(normalized)
+    && !CODE_FENCE.test(normalized)
     && !SHELL_COMMAND.test(normalized)
     && !INLINE_COMMAND.test(normalized)
     && !SQL_COMMAND.test(normalized)

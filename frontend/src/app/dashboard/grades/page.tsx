@@ -407,7 +407,12 @@ export default function GradesPage() {
               <h2 className="text-sm font-semibold text-foreground">
                 {messages.studentDashboard.gradesVisuals.progressStripTitle}
               </h2>
-              <div className="mt-3 flex snap-x gap-3 overflow-x-auto pb-2">
+              <div
+                className="mt-3 flex snap-x gap-3 overflow-x-auto pb-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                role="region"
+                aria-label={messages.studentDashboard.gradesVisuals.progressStripAriaLabel}
+                tabIndex={0}
+              >
                 {progressCards.map((card) => {
                   const cardName = getLocalizedFlatLabel(
                     locale,
@@ -479,8 +484,8 @@ export default function GradesPage() {
                       const openLabel = copy.openBreakdown(record.courseCode, courseName);
 
                       return (
+                        <div key={`${record.id}-mobile`} role="listitem">
                         <button
-                          key={`${record.id}-mobile`}
                           type="button"
                           onClick={() => setSelectedRecord(record)}
                           className="group w-full rounded-lg border border-border/70 bg-card p-4 text-left shadow-sm transition-[background-color,border-color,box-shadow] duration-150 hover:border-primary/40 hover:bg-secondary/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
@@ -565,10 +570,16 @@ export default function GradesPage() {
                             </div>
                           </dl>
                         </button>
+                        </div>
                       );
                     })}
                   </div>
-                  <div className="hidden overflow-x-auto md:block">
+                  <div
+                    className="hidden overflow-x-auto focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring md:block"
+                    role="region"
+                    aria-label={semesterName}
+                    tabIndex={0}
+                  >
                     <table className="w-full min-w-[840px] text-sm">
                       <thead>
                         <tr className="border-b border-border/70 text-left text-muted-foreground">

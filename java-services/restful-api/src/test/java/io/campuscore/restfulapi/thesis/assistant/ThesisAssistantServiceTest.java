@@ -354,6 +354,95 @@ class ThesisAssistantServiceTest {
     }
 
     @Test
+    void certificateQueriesScopeRetrievalToCertificateDocuments() {
+        // F01 regression: "xin giấy xác nhận sinh viên" cited the card-reissue
+        // document whose title packs xác nhận/thủ tục/sinh viên.
+        assertTrue(ThesisAssistantService.isCertificateQuery(
+                "Tôi xin giấy xác nhận sinh viên ở đâu và thủ tục như thế nào?"));
+        assertTrue(ThesisAssistantService.isCertificateQuery("giay xac nhan sinh vien o dau"));
+        assertTrue(ThesisAssistantService.isCertificateQuery("Xin giấy chứng nhận hoàn thành chương trình"));
+        assertTrue(ThesisAssistantService.isCertificateQuery("Where do I get an enrollment certificate?"));
+        assertTrue(ThesisAssistantService.isCertificateQuery("How do I request a student verification letter?"));
+        // Proof-of-enrollment phrasing carries registration vocabulary too;
+        // the certificate branch must still claim the question (Kongming R4:
+        // the registration branch used to absorb it first).
+        assertTrue(ThesisAssistantService.isCertificateQuery(
+                "Xin giấy xác nhận đã đăng ký học phần kỳ này"));
+        // A certificate mentioned as supporting paperwork keeps the owning
+        // topic's document — card loss, exam deferral, dormitory, insurance.
+        assertTrue(!ThesisAssistantService.isCertificateQuery("Mất thẻ sinh viên thì phải làm sao?"));
+        assertTrue(!ThesisAssistantService.isCertificateQuery("Mất thẻ thì xin giấy xác nhận ở đâu để đi thi?"));
+        assertTrue(!ThesisAssistantService.isCertificateQuery("Đơn hoãn thi có cần giấy xác nhận y tế không?"));
+        assertTrue(!ThesisAssistantService.isCertificateQuery("Xin giấy xác nhận ở ký túc xá"));
+        assertTrue(!ThesisAssistantService.isCertificateQuery("Giấy xác nhận BHYT lấy ở đâu?"));
+        assertTrue(!ThesisAssistantService.isCertificateQuery("Where do I get a certificate for my lost student card?"));
+        assertTrue(!ThesisAssistantService.isCertificateQuery("Lịch thi học kỳ này thế nào?"));
+
+        var card = new ThesisAssistantKnowledgeRepository.KnowledgeDocument(
+                "card", "faq-student-card-vi", "vi", "Thẻ sinh viên: xác nhận thủ tục cấp lại",
+                "Mất hoặc hỏng thẻ sinh viên: nộp đơn cấp lại kèm giấy xác nhận tại Phòng CTSV.",
+                "registrar", "GENERAL_FAQ", null, null, null, UUID.randomUUID(), 1, null, null, null, 18);
+        var certificate = new ThesisAssistantKnowledgeRepository.KnowledgeDocument(
+                "certificate", "faq-student-certificates-vi", "vi",
+                "Giấy xác nhận sinh viên: bản in trên cổng và bản có dấu của trường",
+                "Sinh viên tải giấy xác nhận bản nháp trên cổng; bản có dấu xin tại Phòng Đào tạo.",
+                "registrar", "GENERAL_FAQ", null, null, null, UUID.randomUUID(), 1, null, null, null, 15);
+        assertTrue(ThesisAssistantService.isCertificateDocument(certificate));
+        assertTrue(!ThesisAssistantService.isCertificateDocument(card),
+                "card title mentions xác nhận but is about the card, not certificates");
+
+        ThesisAssistantKnowledgeRepository knowledge = mock(ThesisAssistantKnowledgeRepository.class);
+        // The card document deliberately ranks first, mirroring the live
+        // lexical scores (card 80 vs certificate 73) that produced F01.
+        when(knowledge.search(anyString(), anyList(), anyInt()))
+                .thenReturn(List.of(card, certificate));
+
+        ChatResponse response = new ThesisAssistantService(knowledge)
+                .answer("Tôi xin giấy xác nhận sinh viên ở đâu và thủ tục như thế nào?", "vi");
+
+        assertTrue(!response.citations().isEmpty());
+        assertTrue(response.citations().stream()
+                .allMatch(citation -> citation.slug().contains("certificates")),
+                "certificate questions must never cite the card document");
+        assertTrue(response.answer().contains("giấy xác nhận"));
+        assertTrue(!response.answer().contains("cấp lại"),
+                "the card-reissue procedure must not leak into a certificate answer");
+
+        ThesisAssistantKnowledgeRepository missing = mock(ThesisAssistantKnowledgeRepository.class);
+        when(missing.search(anyString(), anyList(), anyInt())).thenReturn(List.of(card));
+        ChatResponse noMatch = new ThesisAssistantService(missing)
+                .answer("Xin giấy xác nhận sinh viên", "vi");
+        assertEquals("NO_MATCH", noMatch.reasonCode(),
+                "no certificate document means an honest NO_MATCH, not the card answer");
+        assertTrue(noMatch.citations().isEmpty());
+    }
+
+    @Test
+    void joinedTwoTopicQuestionsSkipTheSingleTopicFastPath() {
+        // F04: the fast path answers one topic only; a question joining two
+        // families must escalate so the provider composes both parts.
+        assertTrue(ThesisAssistantService.isMultiIntentQuery(
+                "Tuần này có lịch gì, và xem điểm ở đâu?"));
+        assertTrue(ThesisAssistantService.isMultiIntentQuery(
+                "Lịch thi kỳ này và học phí còn nợ bao nhiêu?"));
+        assertTrue(ThesisAssistantService.isMultiIntentQuery(
+                "When can I register for courses, and where are my grades?"));
+        assertTrue(ThesisAssistantService.isMultiIntentQuery(
+                "Đăng ký học phần mở khi nào; còn lịch thi thì sao?"));
+        // One family, however many joiners, stays a single-topic question.
+        assertTrue(!ThesisAssistantService.isMultiIntentQuery("Lịch học tuần này thế nào?"));
+        assertTrue(!ThesisAssistantService.isMultiIntentQuery("Xem điểm và GPA ở đâu?"));
+        assertTrue(!ThesisAssistantService.isMultiIntentQuery("Đăng ký học phần khi nào mở?"));
+        assertTrue(!ThesisAssistantService.isMultiIntentQuery("Thủ tục xin giấy xác nhận?"));
+        // Two families inside ONE request with only a trailing "?" is still a
+        // single intent — the punctuation joins nothing (Kongming R4 pin: this
+        // exact phrasing used to skip family scoping and cite "Học kỳ phụ").
+        assertTrue(!ThesisAssistantService.isMultiIntentQuery(
+                "Xin giấy xác nhận đã đăng ký học phần kỳ này lấy ở đâu?"));
+        assertTrue(!ThesisAssistantService.isMultiIntentQuery(""));
+    }
+
+    @Test
     void legacyUnsafeKnowledgeIsFilteredBeforeLexicalFallback() {
         ThesisAssistantKnowledgeRepository knowledge = mock(ThesisAssistantKnowledgeRepository.class);
         when(knowledge.search(anyString(), anyList(), anyInt())).thenReturn(List.of(

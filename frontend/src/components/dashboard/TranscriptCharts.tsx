@@ -137,27 +137,32 @@ function ChartDataTable({
   rows: Array<[string, string, string]>;
 }) {
   return (
-    <table className="sr-only">
-      <caption>{caption}</caption>
-      <thead>
-        <tr>
-          {columns.map((column) => (
-            <th key={column} scope="col">
-              {column}
-            </th>
-          ))}
-        </tr>
-      </thead>
-      <tbody>
-        {rows.map((row, index) => (
-          <tr key={`${row[0]}-${row[1]}-${index}`}>
-            <th scope="row">{row[0]}</th>
-            <td>{row[1]}</td>
-            <td>{row[2]}</td>
+    // sr-only on a table element does not reliably clip — table intrinsic
+    // layout can still push the document wider than the viewport (audit F06).
+    // Wrap it: the div honours the 1px clip box regardless of table width.
+    <div className="sr-only">
+      <table>
+        <caption>{caption}</caption>
+        <thead>
+          <tr>
+            {columns.map((column) => (
+              <th key={column} scope="col">
+                {column}
+              </th>
+            ))}
           </tr>
-        ))}
-      </tbody>
-    </table>
+        </thead>
+        <tbody>
+          {rows.map((row, index) => (
+            <tr key={`${row[0]}-${row[1]}-${index}`}>
+              <th scope="row">{row[0]}</th>
+              <td>{row[1]}</td>
+              <td>{row[2]}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
   );
 }
 
@@ -242,7 +247,10 @@ export function GpaTrendChart({
   return (
     <div className="space-y-3">
       <div className={CHART_HEIGHT_CLASS} role="img" aria-label={ariaLabel}>
-        <Line data={{ labels, datasets }} options={options} plugins={[valueLabelsPlugin]} />
+        {/* aria-hidden on the canvas: it is an implicit img without a name
+            (axe role-img-alt); the wrapper carries the label and the data
+            table below carries the values. */}
+        <Line data={{ labels, datasets }} options={options} plugins={[valueLabelsPlugin]} aria-hidden="true" />
       </div>
       <ChartDataTable
         caption={ariaLabel}
@@ -327,7 +335,7 @@ export function TenScaleTrendChart({
   return (
     <div className="space-y-3">
       <div className={CHART_HEIGHT_CLASS} role="img" aria-label={ariaLabel}>
-        <Line data={data} options={options} plugins={[valueLabelsPlugin]} />
+        <Line data={data} options={options} plugins={[valueLabelsPlugin]} aria-hidden="true" />
       </div>
       <ChartDataTable
         caption={ariaLabel}
@@ -418,7 +426,7 @@ export function GradeDistributionChart({
   return (
     <div className="space-y-3">
       <div className="h-56" role="img" aria-label={ariaLabel}>
-        <Bar data={data} options={options} plugins={[countLabelsPlugin]} className={cn('[&>*]:!bg-transparent')} />
+        <Bar data={data} options={options} plugins={[countLabelsPlugin]} className={cn('[&>*]:!bg-transparent')} aria-hidden="true" />
       </div>
       <ChartDataTable
         caption={ariaLabel}

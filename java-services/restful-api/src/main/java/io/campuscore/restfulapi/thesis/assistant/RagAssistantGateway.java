@@ -85,7 +85,8 @@ public class RagAssistantGateway {
     public ChatResponse chat(ChatRequest request, String ownerId) {
         ChatResponse response = exchangeJson("POST", "/chat", Map.of(), Map.of(), request, ownerId,
                 new TypeReference<ChatResponse>() { }).data();
-        return guardResponse(response, request == null ? "vi" : request.locale());
+        return guardResponse(response, request == null ? "vi" : request.locale(),
+                request == null ? null : request.scope());
     }
 
     public ChatResponse complete(ChatRequest request, String ownerId) {
@@ -145,7 +146,9 @@ public class RagAssistantGateway {
                         throw problem(response.statusCode(), new String(body.readAllBytes(), StandardCharsets.UTF_8));
                     }
                     try (BufferedReader reader = new BufferedReader(new InputStreamReader(body, StandardCharsets.UTF_8))) {
-                        boolean terminal = parseStream(reader, guardedSink(sink, request == null ? "vi" : request.locale()));
+                        boolean terminal = parseStream(reader, guardedSink(sink,
+                                request == null ? "vi" : request.locale(),
+                                request == null ? null : request.scope()));
                         if (!terminal && deadlineExpired.get()) {
                             throw unavailable("RAG_SERVICE_UNAVAILABLE", "RAG service request failed");
                         }
@@ -299,7 +302,7 @@ public class RagAssistantGateway {
      * the local service guard.
      */
     private static Consumer<ThesisAssistantService.StreamEvent> guardedSink(
-            Consumer<ThesisAssistantService.StreamEvent> downstream, String locale) {
+            Consumer<ThesisAssistantService.StreamEvent> downstream, String locale, String scope) {
         if (downstream == null) {
             return ignored -> { };
         }
@@ -317,7 +320,7 @@ public class RagAssistantGateway {
                 if (blocked[0]) return;
                 String text = delta.text() == null ? "" : delta.text();
                 String candidate = answer + text;
-                if (!AssistantOutputGuard.isSafe(candidate)) {
+                if (!AssistantOutputGuard.isSafeForScope(candidate, scope)) {
                     blocked[0] = true;
                     answer.setLength(0);
                     downstream.accept(new ThesisAssistantService.StreamReplace(
@@ -341,7 +344,7 @@ public class RagAssistantGateway {
             if (event instanceof ThesisAssistantService.StreamReplace replace) {
                 if (blocked[0]) return;
                 String text = replace.text() == null ? "" : replace.text();
-                if (!AssistantOutputGuard.isSafe(text)) {
+                if (!AssistantOutputGuard.isSafeForScope(text, scope)) {
                     blocked[0] = true;
                     answer.setLength(0);
                     downstream.accept(new ThesisAssistantService.StreamReplace(
@@ -365,7 +368,7 @@ public class RagAssistantGateway {
             if (event instanceof ThesisAssistantService.StreamCitation citation) {
                 ThesisAssistantDtos.Citation normalizedCitation = ThesisAssistantService.normalizeCitation(
                         citation.citation(), normalizedLocale);
-                if (!blocked[0] && safeCitation(normalizedCitation)) {
+                if (!blocked[0] && safeCitation(normalizedCitation, scope)) {
                     citations.add(new ThesisAssistantService.StreamCitation(normalizedCitation));
                 }
                 return;
@@ -395,16 +398,16 @@ public class RagAssistantGateway {
         };
     }
 
-    private static ChatResponse guardResponse(ChatResponse response, String locale) {
+    private static ChatResponse guardResponse(ChatResponse response, String locale, String scope) {
         if (response == null) return null;
         String normalizedLocale = AssistantInputGuard.normalizeLocale(locale);
-        boolean unsafeAnswer = !AssistantOutputGuard.isSafe(response.answer());
+        boolean unsafeAnswer = !AssistantOutputGuard.isSafeForScope(response.answer(), scope);
         String normalizedAnswer = ThesisAssistantService.normalizeAssistantCopy(response.answer(), normalizedLocale);
         boolean noMatch = "NO_MATCH".equals(response.reasonCode());
         List<io.campuscore.restfulapi.thesis.assistant.ThesisAssistantDtos.Citation> citations =
                 response.citations() == null ? List.of() : response.citations().stream()
                         .map(citation -> ThesisAssistantService.normalizeCitation(citation, normalizedLocale))
-                        .filter(RagAssistantGateway::safeCitation).toList();
+                        .filter(citation -> safeCitation(citation, scope)).toList();
         if (unsafeAnswer || noMatch) citations = List.of();
         boolean unchanged = !unsafeAnswer
                 && java.util.Objects.equals(normalizedAnswer, response.answer())
@@ -422,11 +425,11 @@ public class RagAssistantGateway {
                 response.conversationId(), response.messageId());
     }
 
-    private static boolean safeCitation(ThesisAssistantDtos.Citation citation) {
+    private static boolean safeCitation(ThesisAssistantDtos.Citation citation, String scope) {
         return citation != null
-                && AssistantOutputGuard.isSafe(citation.title())
-                && AssistantOutputGuard.isSafe(citation.excerpt())
-                && AssistantOutputGuard.isSafe(citation.source());
+                && AssistantOutputGuard.isSafeForScope(citation.title(), scope)
+                && AssistantOutputGuard.isSafeForScope(citation.excerpt(), scope)
+                && AssistantOutputGuard.isSafeForScope(citation.source(), scope);
     }
 
     private boolean emit(String eventName, String payload, Consumer<ThesisAssistantService.StreamEvent> sink) throws IOException {

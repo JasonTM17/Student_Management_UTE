@@ -738,8 +738,8 @@ export default function TranscriptPage() {
                     aria-label={copy.headers.course}
                   >
                     {semester.records.map((record) => (
+                      <div key={`${record.id}-mobile`} role="listitem">
                       <article
-                        key={`${record.id}-mobile`}
                         role="button"
                         tabIndex={0}
                         onClick={() => setSelectedRecord(record)}
@@ -822,9 +822,15 @@ export default function TranscriptPage() {
                           </div>
                         </dl>
                       </article>
+                      </div>
                     ))}
                   </div>
-                  <div className="hidden overflow-x-auto md:block">
+                  <div
+                    className="hidden overflow-x-auto focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring md:block"
+                    role="region"
+                    aria-label={copy.headers.course}
+                    tabIndex={0}
+                  >
                     <table className="w-full min-w-[840px] text-sm">
                       <thead>
                         <tr className="border-b border-border/70 text-left text-muted-foreground">
@@ -1005,7 +1011,12 @@ export default function TranscriptPage() {
                         </div>
                       ))}
                     </div>
-                    <div className="hidden overflow-x-auto md:block">
+                    <div
+                      className="hidden overflow-x-auto focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring md:block"
+                      role="region"
+                      aria-label={copy.programHeaders.course}
+                      tabIndex={0}
+                    >
                       <table className="w-full text-sm">
                         <thead>
                           <tr className="border-b border-border/70 text-left text-muted-foreground">

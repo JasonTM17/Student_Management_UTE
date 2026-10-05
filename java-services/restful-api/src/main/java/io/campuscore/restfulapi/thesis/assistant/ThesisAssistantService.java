@@ -432,6 +432,55 @@ public class ThesisAssistantService {
             "(?i)(?:\\b(?:credit|credits)\\b|\\b(?:tin\\s+chi)\\b)");
     private static final java.util.regex.Pattern CREDIT_LIMIT_SIGNAL = java.util.regex.Pattern.compile(
             "(?i)(?:\\b(?:cap|maximum|minimum|limit|limits|quota|workload)\\b|\\b(?:han\\s+muc|toi\\s+(?:da|thieu)|gioi\\s+han|khoi\\s+luong)\\b)");
+    /**
+     * Certificate-intent vocabulary ("xin giấy xác nhận sinh viên", "enrollment
+     * certificate"). It collides with the student-card document — that title
+     * packs "xác nhận / thủ tục / sinh viên" and outranked the certificate
+     * document on a certificate question (responsive audit F01).
+     */
+    private static final java.util.regex.Pattern CERTIFICATE_SIGNAL = java.util.regex.Pattern.compile(
+            "(?i)(?:\\b(?:certificate|certification|certified\\s+copy|enrollment\\s+(?:verification|certificate|letter)|verification\\s+letter|proof\\s+of\\s+(?:enrollment|enrolment|student\\s+status))\\b"
+                    + "|\\b(?:giay\\s+xac\\s+nhan|giay\\s+chung\\s+nhan|chung\\s+thuc|xac\\s+nhan\\s+sinh\\s+vien)\\b)");
+    /**
+     * A certificate mentioned as supporting paperwork inside another topic does
+     * not make the question a certificate request: exam deferral ("giấy xác
+     * nhận y tế"), dormitory confirmation, insurance and card reissue all keep
+     * their own documents.
+     */
+    private static final java.util.regex.Pattern CERTIFICATE_TOPIC_VETO = java.util.regex.Pattern.compile(
+            "(?i)(?:\\b(?:thi|du\\s+thi|hoan\\s+thi|vang\\s+thi|thi\\s+bu|ky\\s+thi|giam\\s+thi|phong\\s+thi|exam|exams|midterm|finals?)\\b"
+                    + "|\\b(?:ky\\s+tuc\\s+xa|ktx|noi\\s+tru|dormitory|dorm)\\b"
+                    + "|\\b(?:bao\\s+hiem|bhyt|insurance)\\b"
+                    + "|\\bthe(?:\\s+sinh\\s+vien|\\s+thu\\s+vien)?\\s+(?:bi\\s+)?(?:mat|hong|het\\s+han|cap\\s+lai|lam\\s+lai)\\b"
+                    + "|\\b(?:mat|lam\\s+mat|hong|cap\\s+lai|lam\\s+lai)\\s+the\\b"
+                    + "|\\b(?:lost|stolen|damaged|reissue|reissued|replace|replacement|expired)\\s+(?:the\\s+)?(?:student\\s+|library\\s+)?card\\b"
+                    + "|\\b(?:student|library)\\s+card\\s+(?:is\\s+)?(?:lost|stolen|damaged|expired)\\b"
+                    + "|\\bcard\\s+(?:reissue|replacement|renewal)\\b)");
+    /** Title-level topic marker a certificate document must carry. */
+    private static final java.util.regex.Pattern CERTIFICATE_TITLE = java.util.regex.Pattern.compile(
+            "(?i)(?:\\bcertificates?\\b|\\bcertification\\b|\\bgiay\\s+xac\\s+nhan\\b|\\bgiay\\s+chung\\s+nhan\\b|\\bgiay\\s+to\\b|\\bchung\\s+thuc\\b)");
+    // F04 multi-intent families: the lexical fast path is single-topic by
+    // design, so a question that clearly joins two topic families ("lịch tuần
+    // này, và xem điểm ở đâu?") must skip it — the provider composes both
+    // parts; a joined two-topic fast-path answer silently drops one intent.
+    private static final java.util.regex.Pattern INTENT_SCHEDULE = java.util.regex.Pattern.compile(
+            "(?i)\\b(?:lich\\s+hoc|thoi\\s+khoa\\s+bieu|tkb|tiet\\s+hoc|buoi\\s+hoc|lich\\s+trong"
+                    + "|co\\s+lich|lich\\s+tuan|lich\\s+hom\\s+nay|lich\\s+ngay\\s+mai"
+                    + "|schedule|timetable|class\\s+schedule|classes?\\s+this\\s+week)\\b");
+    private static final java.util.regex.Pattern INTENT_EXAM = java.util.regex.Pattern.compile(
+            "(?i)\\b(?:lich\\s+thi|ky\\s+thi|thi\\s+cuoi\\s+ky|thi\\s+giua\\s+ky|phong\\s+thi|exam(?:\\s+schedule)?s?|midterm|finals?)\\b");
+    private static final java.util.regex.Pattern INTENT_GRADES = java.util.regex.Pattern.compile(
+            "(?i)\\b(?:diem(?:\\s+so|\\s+thi|\\s+tong\\s+ket)?|gpa|bang\\s+diem|grades?|scores?|transcript)\\b");
+    private static final java.util.regex.Pattern INTENT_FEES = java.util.regex.Pattern.compile(
+            "(?i)\\b(?:hoc\\s+phi|tuition|fees?|cong\\s+no|mien\\s+giam\\s+hoc\\s+phi|biet\\s+phi)\\b");
+    /**
+     * A real joiner — mid-string punctuation or a conjunction — separates the
+     * intents. A trailing "?"/"!" separates nothing, so the mark must be
+     * followed by more content to count ("lịch gì, và điểm?" joins at the
+     * comma; a lone trailing "?" on a one-topic question does not).
+     */
+    private static final java.util.regex.Pattern MULTI_INTENT_JOINER = java.util.regex.Pattern.compile(
+            "(?i)(?:[,;!?](?=\\s*\\S)|\\b(?:va|còn|con|cung|and|also|ngoai\\s+ra|dong\\s+thoi)\\b)");
     /** Section labels let a scoped answer omit adjacent policy material from the same source. */
     private static final java.util.regex.Pattern CREDIT_LIMIT_SECTION = java.util.regex.Pattern.compile(
             "(?iu)\\b(?:giới\\s+hạn\\s+(?:tín\\s+chỉ|khối\\s+lượng)|credit\\s+(?:limits?|workload))\\s*[:\\-]");
@@ -1177,6 +1226,9 @@ public class ThesisAssistantService {
         // The remote gateway enforces its own limit; an oversized message is
         // that path's contract, not the local retrieval's.
         if (normalized.length() > properties.maxMessageChars()) return null;
+        // F04: a joined two-topic question needs composition — escalate to the
+        // provider instead of answering whichever family scores higher.
+        if (isMultiIntentQuery(normalized)) return null;
         String normalizedLocale = AssistantInputGuard.normalizeLocale(locale);
         LexicalResult result;
         // The retrieval runs off the servlet thread, but the knowledge search
@@ -1842,7 +1894,8 @@ public class ThesisAssistantService {
         // filter runs. A noisy top-five window could otherwise hide the one
         // authoritative credit-limit document behind broad "học kỳ" matches.
         int topK = topK();
-        int retrievalLimit = isCreditLimitQuery(message) || isPrerequisiteQuery(message) ? topK * 2 : topK;
+        int retrievalLimit = isCreditLimitQuery(message) || isPrerequisiteQuery(message)
+                || isCertificateQuery(message) ? topK * 2 : topK;
         try {
             // Unscoped retrieval keeps the historical three-argument call so the
             // published contract (and its tests) stays byte-identical; only the
@@ -1885,8 +1938,27 @@ public class ThesisAssistantService {
         // documents into this list downstream, and Stream.toList() yields an
         // immutable one (UnsupportedOperationException at addDocuments).
         documents = new ArrayList<>(documents.stream().filter(document -> containsAnyTerm(document, terms))
-                .limit(isPrerequisiteQuery(message) ? topK * 2 : topK).toList());
-        if (isCreditLimitQuery(message)) {
+                .limit(isPrerequisiteQuery(message) || isCertificateQuery(message) ? topK * 2 : topK).toList());
+        // A joined two-family question ("đăng ký học phần, và xin giấy xác
+        // nhận") needs grounding from BOTH sides; scoping to one family strips
+        // the other half's citations, while skipping scoping entirely lets an
+        // off-topic document win the ranking. Union the detected families that
+        // have a document predicate; questions joining only predicate-less
+        // families (schedule, grades…) keep the unfiltered window.
+        boolean multiIntent = isMultiIntentQuery(message);
+        if (multiIntent) {
+            List<ThesisAssistantKnowledgeRepository.KnowledgeDocument> familyDocuments = documents.stream()
+                    .filter(document ->
+                            (isCertificateQuery(message) && isCertificateDocument(document))
+                            || (isCourseRegistrationQuery(message)
+                                    && "REGISTRATION".equalsIgnoreCase(safe(document.domain())))
+                            || (isCreditLimitQuery(message) && isCreditLimitDocument(document))
+                            || (isPrerequisiteQuery(message) && isPrerequisiteMapDocument(document)))
+                    .toList();
+            if (!familyDocuments.isEmpty()) {
+                documents = familyDocuments;
+            }
+        } else if (isCreditLimitQuery(message)) {
             documents = documents.stream()
                     .filter(ThesisAssistantService::isCreditLimitDocument)
                     .toList();
@@ -1943,6 +2015,15 @@ public class ThesisAssistantService {
             if (!prerequisiteDocuments.isEmpty()) {
                 documents = prerequisiteDocuments;
             }
+        } else if (isCertificateQuery(message)) {
+            // F01: "xin giấy xác nhận sinh viên" lost to the card-reissue
+            // document whose title happens to pack "xác nhận / thủ tục /
+            // sinh viên". A certificate question must cite the certificate
+            // document (title-level topic), or honestly report NO_MATCH —
+            // never answer the wrong document.
+            documents = documents.stream()
+                    .filter(ThesisAssistantService::isCertificateDocument)
+                    .toList();
         } else if (isCourseRegistrationQuery(message)) {
             List<ThesisAssistantKnowledgeRepository.KnowledgeDocument> registrationDocuments = documents.stream()
                     .filter(document -> "REGISTRATION".equalsIgnoreCase(safe(document.domain())))
@@ -2068,6 +2149,53 @@ public class ThesisAssistantService {
         if (message == null || message.isBlank()) return false;
         String folded = foldForMatching(message);
         return CREDIT_SIGNAL.matcher(folded).find() && CREDIT_LIMIT_SIGNAL.matcher(folded).find();
+    }
+
+    /**
+     * A request for a student certificate/verification document. Card-loss
+     * phrasing is excluded — "mất thẻ sinh viên thì xin giấy xác nhận ở đâu"
+     * still asks about the card procedure, and the exam/deferral documents own
+     * any question where the certificate is supporting paperwork ("giấy xác
+     * nhận y tế kèm đơn hoãn thi"). Everything else about certificates must
+     * cite the certificate document, never the card one.
+     */
+    static boolean isCertificateQuery(String message) {
+        if (message == null || message.isBlank()) return false;
+        String folded = foldForMatching(message);
+        return CERTIFICATE_SIGNAL.matcher(folded).find()
+                && !CERTIFICATE_TOPIC_VETO.matcher(folded).find();
+    }
+
+    /**
+     * The certificate topic must be visible in the document title, not just
+     * mentioned incidentally — the card-reissue document quotes "giấy xác
+     * nhận" inside its procedure text but is ABOUT the card. An empty filtered
+     * window degrades to NO_MATCH rather than a wrong-topic citation.
+     */
+    static boolean isCertificateDocument(ThesisAssistantKnowledgeRepository.KnowledgeDocument document) {
+        if (document == null) return false;
+        return CERTIFICATE_TITLE.matcher(foldForMatching(safe(document.title()))).find();
+    }
+
+    /**
+     * Two distinct topic families joined by a real connector ("tuần này có
+     * lịch gì, và xem điểm ở đâu?"). Family counting alone stays precise —
+     * "điểm và GPA" is one family, "mở bảng điểm xem điểm" is one family —
+     * and the joiner requirement keeps single-topic questions like "lịch học
+     * kỳ này" from being treated as compound.
+     */
+    static boolean isMultiIntentQuery(String message) {
+        if (message == null || message.isBlank()) return false;
+        String folded = foldForMatching(message);
+        int families = 0;
+        if (INTENT_SCHEDULE.matcher(folded).find()) families++;
+        if (INTENT_EXAM.matcher(folded).find()) families++;
+        if (INTENT_GRADES.matcher(folded).find()) families++;
+        if (INTENT_FEES.matcher(folded).find()) families++;
+        if (isCourseRegistrationQuery(message)) families++;
+        if (isCertificateQuery(message)) families++;
+        if (families < 2) return false;
+        return MULTI_INTENT_JOINER.matcher(folded).find();
     }
 
     /**
