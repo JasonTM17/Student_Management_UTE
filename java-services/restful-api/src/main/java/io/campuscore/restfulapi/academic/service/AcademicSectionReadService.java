@@ -165,6 +165,11 @@ public class AcademicSectionReadService {
                 coalesce(row.departmentNameEn(), row.departmentName()),
                 coalesce(row.departmentNameVi(), row.departmentName()),
                 row.sectionStatus(),
+                row.semesterId(),
+                row.semesterName(),
+                coalesce(row.semesterNameEn(), row.semesterName()),
+                coalesce(row.semesterNameVi(), row.semesterName()),
+                row.semesterStartDate(),
                 schedules.stream().map(AcademicSectionReadService::schedule).toList());
     }
 

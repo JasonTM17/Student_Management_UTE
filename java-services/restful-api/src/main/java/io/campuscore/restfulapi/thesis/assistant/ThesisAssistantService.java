@@ -846,7 +846,11 @@ public class ThesisAssistantService {
 
     static ChatResponse conversationalAnswer(String message, String locale, java.util.UUID clientRequestId) {
         if (message == null || message.isBlank()) return null;
-        String normalized = message.toLowerCase(java.util.Locale.ROOT)
+        // Wukong round-9 F8: normalize like the other tiers — NFD and
+        // invisible-separator input used to skip the openers entirely and
+        // fall to the provider path ("cảm\u200Bơn", NFD "xin chào").
+        String normalized = AssistantInputGuard.normalizeMessage(message)
+                .toLowerCase(java.util.Locale.ROOT)
                 .replaceAll("[!.,;:?~\\s]+$", "").trim();
         if (normalized.isEmpty()) return null;
         boolean vi = "vi".equals(AssistantInputGuard.normalizeLocale(locale));
@@ -856,6 +860,17 @@ public class ThesisAssistantService {
                 || (CONVERSATIONAL_THANKS_PATTERN.matcher(normalized).find())
                 || (CONVERSATIONAL_BYE_PATTERN.matcher(normalized).find());
         if (!matches) return null;
+        // Coverage check (Wukong round-7 A8): the tier must apply only when
+        // the WHOLE message is conversational. "Cảm ơn, lịch học của tôi" and
+        // "Thanks, what is my schedule?" open with a thanks token and used to
+        // return the boilerplate, hijacking the real question — remove every
+        // conversational span plus polite filler and require that nothing but
+        // punctuation survives.
+        String residue = CONVERSATIONAL_ANY_PATTERN.matcher(normalized).replaceAll(" ");
+        residue = CONVERSATIONAL_FILLER.matcher(residue).replaceAll(" ");
+        // \p{S} joins the residue strip: "hi 👋" / "chào 😊" are genuine
+        // small talk and no emoji is academic content (Wukong round-8 L1).
+        if (!residue.replaceAll("[\\s\\p{P}\\p{S}]+", "").isEmpty()) return null;
         String text;
         if (CONVERSATIONAL_THANKS_PATTERN.matcher(normalized).find()) {
             text = vi
@@ -1089,8 +1104,12 @@ public class ThesisAssistantService {
             "\\bthx\\b", "\\bty\\b", "\\bot çok\\b", "\\bhiểu\\s*rồi\\b", "\\bok\\s*cảm\\s*ơn\\b");
 
     private static final List<String> CONVERSATIONAL_BYE = List.of(
+            // "bai" (bye transliteration) was dropped: it collides with the
+            // real academic noun "bài" (assignment/test paper) — "bai cua
+            // toi" used to get whole-message coverage via the filler words
+            // and return the goodbye boilerplate (Wukong round-8 M6).
             "tạm\\s*biệt", "tam\\s*biet", "\\bbye\\b", "\\bgoodbye\\b", "\\bsee\\s+you\\b",
-            "\\bbai\\b", "hẹn\\s*gặp\\s*lại");
+            "hẹn\\s*gặp\\s*lại", "hen\\s*gap\\s*lai");
 
     // Precompiled once — conversationalAnswer re-ran patternOf() on every
     // message (~5 Pattern.compile calls per request, audit S8).
@@ -1099,6 +1118,32 @@ public class ThesisAssistantService {
     private static final java.util.regex.Pattern CONVERSATIONAL_CAPABILITY_PATTERN = patternOf(CONVERSATIONAL_CAPABILITY);
     private static final java.util.regex.Pattern CONVERSATIONAL_THANKS_PATTERN = patternOf(CONVERSATIONAL_THANKS);
     private static final java.util.regex.Pattern CONVERSATIONAL_BYE_PATTERN = patternOf(CONVERSATIONAL_BYE);
+
+    /** Every conversational alternative in one pattern — the coverage check strips all of them at once. */
+    private static final java.util.regex.Pattern CONVERSATIONAL_ANY_PATTERN = patternOf(
+            java.util.stream.Stream.of(CONVERSATIONAL_OPENERS, CONVERSATIONAL_IDENTITY,
+                            CONVERSATIONAL_CAPABILITY, CONVERSATIONAL_THANKS, CONVERSATIONAL_BYE)
+                    .flatMap(List::stream).toList());
+
+    /**
+     * Politeness/vocative padding that may surround a conversational token
+     * without making the message a real question ("cảm ơn bạn nhé", "ok
+     * cảm ơn", "Bạn là ai vậy?"). Deliberately excludes every content word —
+     * anything left after stripping makes the message a real query, not
+     * small talk.
+     */
+    private static final java.util.regex.Pattern CONVERSATIONAL_FILLER = java.util.regex.Pattern.compile(
+            "\\b(?:bạn|ban|mình|minh|tôi|toi|em|anh|chị|chi|cô|thầy|ad|admin|bot|bác|bac"
+                    + "|ơi|oi|ạ|a|nhé|nhe|nha|nhỉ|nhi|nhiều|nhieu|lắm|lam|rồi|roi|đi|vậy|vay"
+                    + "|thôi|luôn|đấy|đó|hén|hen|được|duoc|cho|của|cua|nữa|nua|vui|lòng|long|mến|men"
+                    + "|ok|okay|okie|pls|please|me|my|you|your|dear|friend|friends|sis|bro|guys"
+                    // Wukong round-9 F9: Vietnamese intensifiers — "cảm ơn
+                    // rất nhiều / quá / vô cùng" left residue and missed the
+                    // tier.
+                    + "|rất|rat|quá|qua|vô\\s*cùng|vo\\s*cung"
+                    + "|with|so|very|much|lot|lots|for|help)\\b",
+            java.util.regex.Pattern.CASE_INSENSITIVE | java.util.regex.Pattern.UNICODE_CASE
+                    | java.util.regex.Pattern.UNICODE_CHARACTER_CLASS);
 
     /**
      * Lexical-first fast path (chatbot latency): run the same local retrieval the

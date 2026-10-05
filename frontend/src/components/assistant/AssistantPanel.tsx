@@ -54,12 +54,21 @@ export function AssistantPanel() {
         ? messages.assistant.lecturerSuggestions
         : messages.assistant.suggestions;
   const { confirm, confirmationDialog } = useConfirmationDialog();
-  // Portal header/sidebar entries stay mounted when the dialog opens. The
-  // floating duplicate covers mobile timetable rows and the chat composer,
-  // and cannot restore focus because opening the dialog unmounts its trigger.
+  // Two surfaces keep the header/sidebar entry instead of the floating
+  // bubble: /admin/* mounts this panel inside AdminFrame, whose header
+  // already carries the assistant button — a floating duplicate would cover
+  // admin tables and pagination; /dashboard/assistant-specialized is itself
+  // a full-page assistant workspace, so the bubble would cover its composer.
+  // On the remaining dashboard routes the launcher is the primary entry
+  // point users expect; closing the panel restores focus to it via
+  // floatingLauncherRef even when the header trigger is unmounted.
   const visiblePathname = usePathname();
   const pathname = stripLocaleFromPathname(visiblePathname ?? '/').pathname;
-  const suppressLauncher = pathname.startsWith('/dashboard') || pathname.startsWith('/admin');
+  const suppressLauncher =
+    pathname === '/admin' ||
+    pathname.startsWith('/admin/') ||
+    pathname === '/dashboard/assistant-specialized' ||
+    pathname.startsWith('/dashboard/assistant-specialized/');
   const [open, setOpen] = useState(false);
   // Assistant retrieval scope. The academic launcher opens the default corpus;
   // the specialized launcher (Trợ lý chuyên sâu) narrows retrieval to the
@@ -197,6 +206,18 @@ export function AssistantPanel() {
     window.addEventListener('open-campus-assistant', handleOpen);
     return () => window.removeEventListener('open-campus-assistant', handleOpen);
   }, []);
+
+  // The specialized workspace is itself a full-page assistant — an open
+  // drawer carried over from another route would cover its composer. Same
+  // boundary-aware match as the suppression check above: a broad
+  // startsWith would also fire on a sibling like
+  // "/dashboard/assistant-specialized-archive".
+  useEffect(() => {
+    if (pathname === '/dashboard/assistant-specialized'
+        || pathname.startsWith('/dashboard/assistant-specialized/')) {
+      setOpen(false);
+    }
+  }, [pathname]);
 
   useEffect(() => {
     const media = window.matchMedia('(max-width: 767px)');

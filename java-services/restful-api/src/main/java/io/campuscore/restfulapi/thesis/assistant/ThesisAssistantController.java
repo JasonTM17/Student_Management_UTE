@@ -224,9 +224,18 @@ public class ThesisAssistantController {
         if (personalContext != null && personalContext.handles(request.message())) {
             // Round-3 cb3-10: a reused clientRequestId with a different payload
             // conflicts exactly like the KB path instead of being answered.
-            assistant.enforcePersonalIdempotency(subject(actor), request.clientRequestId(),
-                    AssistantInputGuard.canonicalHash(request.message(), locale,
-                            conversationUuid(request.conversationId())));
+            try {
+                assistant.enforcePersonalIdempotency(subject(actor), request.clientRequestId(),
+                        AssistantInputGuard.canonicalHash(request.message(), locale,
+                                conversationUuid(request.conversationId())));
+            } catch (DataAccessException | org.springframework.transaction.TransactionException exception) {
+                // The idempotency ledger read is down — the SSE path surfaces
+                // the same outage as an ASSISTANT_UNAVAILABLE frame instead of
+                // a bare 500, so JSON answers with the structured retryable
+                // contract too (Kongming F3).
+                throw new DomainException(HttpStatus.SERVICE_UNAVAILABLE, "ASSISTANT_UNAVAILABLE",
+                        "Assistant is temporarily unavailable; please retry");
+            }
             ChatResponse personal = personalContext.answer(request, actor);
             if (personal != null) {
                 // Round-3 chat-7: an intercepted personal answer used to skip
@@ -421,7 +430,7 @@ public class ThesisAssistantController {
             // Same conversational tier as the JSON path: openers answer
             // locally, never fall through to a knowledge miss.
             ChatResponse conversational = ThesisAssistantService.conversationalAnswer(request.message(),
-                    AssistantInputGuard.normalizeLocale(request.locale()));
+                    AssistantInputGuard.normalizeLocale(request.locale()), request.clientRequestId());
             if (conversational != null) {
                 ThesisAssistantService.streamLocalResponse(conversational, request.clientRequestId(), sink);
             } else {

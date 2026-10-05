@@ -73,8 +73,9 @@ test('assistant reducer owns streaming, citations, degraded, and retry states', 
 
 test('assistant panel opens from dashboard entries and restores focus to its trigger', () => {
   const source = fs.readFileSync(path.join(root, 'src/components/assistant/AssistantPanel.tsx'), 'utf8');
-  // The desktop floating launcher was removed so its pill no longer covers
-  // table content; the header and sidebar launchers remain the entry points.
+  // The floating launcher renders without the legacy "campus-mark" pill
+  // attribute that used to cover table content; the header and sidebar
+  // launchers remain additional entry points.
   assert.doesNotMatch(source, /data-assistant-launcher="campus-mark"/);
   assert.match(source, /open-campus-assistant/);
   assert.match(source, /triggerRef\.current = document\.activeElement/);
@@ -82,6 +83,24 @@ test('assistant panel opens from dashboard entries and restores focus to its tri
   // that focus reaches that attached button rather than the detached trigger.
   assert.match(source, /trigger\?\.isConnected \? trigger : floatingLauncherRef\.current/);
   assert.match(source, /\)\?\.focus\(\)/);
+});
+
+test('floating launcher suppression is boundary-aware and dashboard-scoped', () => {
+  const source = fs.readFileSync(path.join(root, 'src/components/assistant/AssistantPanel.tsx'), 'utf8');
+  // The launcher is the primary assistant entry on /dashboard routes, so a
+  // broad startsWith suppression (the regression that hid it everywhere)
+  // must not come back. Suppression is limited to AdminFrame routes (the
+  // admin header carries its own entry) and the specialized workspace.
+  assert.doesNotMatch(source, /startsWith\('\/dashboard'\)/);
+  assert.match(source, /pathname === '\/admin'/);
+  assert.match(source, /startsWith\('\/admin\/'\)/);
+  assert.match(source, /pathname === '\/dashboard\/assistant-specialized'/);
+  assert.match(source, /startsWith\('\/dashboard\/assistant-specialized\/'\)/);
+  // Boundary-aware matching also guards sibling routes such as
+  // "/dashboard/assistant-specialized-archive" from accidental suppression:
+  // every prefix check must include the trailing slash, never a bare prefix.
+  assert.doesNotMatch(source, /startsWith\('\/dashboard\/assistant-specialized'\)/);
+  assert.doesNotMatch(source, /startsWith\('\/admin'\)/);
 });
 
 test('quick suggestions create user turns while retries remain explicit', () => {

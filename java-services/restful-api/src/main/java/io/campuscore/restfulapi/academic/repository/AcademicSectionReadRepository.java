@@ -87,7 +87,11 @@ public class AcademicSectionReadRepository {
             semesterFilter = " AND section.\"semesterId\" = :semesterId";
         }
         return jdbc.query(gradingSelect()
-                        + " WHERE section.\"lecturerId\" = :lecturerId" + semesterFilter
+                        // Cancelled sections are not grading workload — the
+                        // assistant scope already drops them, and the list
+                        // would otherwise show a cancelled class as pending.
+                        + " WHERE section.\"lecturerId\" = :lecturerId"
+                        + " AND section.\"status\" <> 'CANCELLED'" + semesterFilter
                         + " GROUP BY " + gradingGroupBy()
                         + " ORDER BY semester.\"startDate\" DESC, section.\"sectionNumber\" ASC",
                 parameters,

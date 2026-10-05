@@ -30,6 +30,7 @@ import io.campuscore.restfulapi.academic.web.AcademicSectionReadDtos.LecturerSch
 import io.campuscore.restfulapi.thesis.assistant.ThesisAssistantDtos.ChatRequest;
 import io.campuscore.restfulapi.thesis.assistant.ThesisAssistantDtos.ChatResponse;
 import io.campuscore.restfulapi.thesis.service.ThesisLecturerWorkloadService;
+import java.text.Normalizer;
 import java.time.Instant;
 import java.util.HashMap;
 import java.util.List;
@@ -105,6 +106,514 @@ class AssistantPersonalContextAdvisorTest {
         assertFalse(advisor.handles("Cho tôi xem các đề tài khóa trước để tham khảo"));
         assertFalse(advisor.handles("Đề tài khóa trước đạt điểm xuất sắc của khoa CNTT"));
         assertFalse(advisor.handles("Kho lưu trữ đề tài khóa luận của trường"));
+    }
+
+    @Test
+    void enrollmentListIntentMatchesTheUiSuggestionChipPhrasing() {
+        // The first student suggestion chip sends the bare phrase "Lớp tôi
+        // đang học" — no interrogative and no "đăng ký" word. It must still
+        // resolve to the asker's own enrollment list instead of falling to
+        // the general path, which previously produced a fabricated "the
+        // portal has not published per-student class info" answer.
+        assertTrue(advisor.handles("Lớp tôi đang học"));
+        assertTrue(advisor.handles("các lớp tôi đang học kỳ này"));
+        assertTrue(advisor.handles("môn mình đang học"));
+        assertTrue(advisor.handles("những học phần em đang theo học"));
+        assertTrue(advisor.handles("tôi đang học những lớp nào"));
+        assertTrue(advisor.handles("các môn của tôi"));
+        assertTrue(advisor.handles("my classes"));
+        assertTrue(advisor.handles("my current courses"));
+        assertTrue(advisor.handles("which classes am I taking"));
+        assertTrue(advisor.handles("classes I'm taking this semester"));
+
+        // The lecturer suggestion chips share the class-list intent shape:
+        // they route to the lecturer teaching answer instead of dying at the
+        // general path.
+        assertTrue(advisor.handles("Các lớp tôi giảng dạy"));
+        assertTrue(advisor.handles("môn mình dạy kỳ này"));
+        assertTrue(advisor.handles("classes I teach"));
+        assertTrue(advisor.handles("Which sections do I teach?"));
+
+        // Existing enrollment-list phrasings keep matching.
+        assertTrue(advisor.handles("Tôi đã đăng ký những môn nào?"));
+
+        // Non-personal or policy/how-to phrasing must stay on the knowledge
+        // path: no first-person gate, or an explicit how-to/policy intent.
+        assertFalse(advisor.handles("lớp đang học gì hôm nay"));
+        assertFalse(advisor.handles("cách đăng ký học phần"));
+        assertFalse(advisor.handles("điều kiện đăng ký lớp học phần"));
+
+        // Wukong counterexamples: a first-person TOKEN elsewhere in the
+        // message must not impersonate the possessor inside the phrase —
+        // "toi" from "tối nay", a vocative "em", or a policy question built
+        // like the progressive branch.
+        assertFalse(advisor.handles("Toi nay lop dang hoc may gio?"));
+        assertFalse(advisor.handles("Em oi, lop dang hoc co bi nghi khong?"));
+        assertFalse(advisor.handles("Chính sách cho phép em đang học tối đa mấy môn?"));
+        assertFalse(advisor.handles("Theo quy chế em đang học được bao nhiêu môn mỗi kỳ?"));
+
+        // Wukong re-verify: third-person subjects wearing a first-person
+        // token — a possessive pronoun inside the span is position, not
+        // ownership, and the verb-first order must bind the possessor
+        // immediately before "đang".
+        assertFalse(advisor.handles("Lớp em ấy đang học có khó không?"));
+        assertFalse(advisor.handles("Bạn tôi đang học lớp này có khó không?"));
+        assertFalse(advisor.handles("Toi nay dang hoc mon gi?"));
+        assertFalse(advisor.handles("Em oi, dang hoc mon nay co kho khong?"));
+        assertFalse(advisor.handles("Anh ấy đang học lớp nào? Tôi cũng muốn biết."));
+
+        // Wukong round-2: the veto must be construction-level, not a token
+        // list — possessive insertion ("bạn của tôi"), uncovered relations
+        // ("em tôi"), standalone third-person subjects ("nó đang học"),
+        // uncovered false-friends ("tối qua"), and third-person phrasings
+        // entering through OTHER intent doors (day timetable, grades).
+        assertFalse(advisor.handles("Bạn của tôi đang học môn này có khó không?"));
+        assertFalse(advisor.handles("Em tôi đang học lớp này có khó không?"));
+        assertFalse(advisor.handles("Nó đang học lớp nào? Tôi cũng muốn biết."));
+        // "toi qua" is genuinely ambiguous — "tôi qua" (I passed) vs "tối
+        // qua" (last night). The false-friend arm keeps "qua" only under the
+        // accented tối|tới, so unaccented input resolves to the pronoun and
+        // serves the asker's OWN rows (fail-soft, same contract as "ba
+        // tôi"/"con tôi"); the accented twin still vetoes below.
+        assertTrue(advisor.handles("Toi qua lop dang hoc mon gi?"));
+        assertFalse(advisor.handles("Tối qua lớp đang học môn gì?"));
+        assertFalse(advisor.handles("Thứ 3 lớp em ấy đang học môn gì?"));
+        assertFalse(advisor.handles("Điểm của em ấy thế nào?"));
+
+        // Wukong round-3: without UNICODE_CHARACTER_CLASS the \b anchors used
+        // ASCII \w, so accented finals (đó/sẽ/có/ông/đứa) were dead code and
+        // "em/ba" matched mid-word inside xem/bang/điem. These pins exercise
+        // the accented spellings users actually type, uncovered relations,
+        // pronoun-free "của X" possesses, and English third-person.
+        assertFalse(advisor.handles("Nó sẽ học lop nao? Toi cung muon biet."));
+        assertFalse(advisor.handles("Bạn đó dang hoc mon gi? Toi muon biet."));
+        assertFalse(advisor.handles("Ông ấy dang hoc mon gi? Toi muon biet."));
+        assertFalse(advisor.handles("Chú tôi đang học lớp này? Tôi muốn biết."));
+        assertFalse(advisor.handles("Sinh vien ay dang hoc lop nao?"));
+        assertFalse(advisor.handles("Lịch học của thầy"));
+        assertFalse(advisor.handles("thời khóa biểu của giảng viên"));
+        assertFalse(advisor.handles("his schedule"));
+        assertFalse(advisor.handles("my friend's classes"));
+        assertFalse(advisor.handles("Nó hoc lop nao?"));
+
+        // The same repair must NOT veto real first-person phrasings whose
+        // tokens merely resemble relation/pronoun substrings.
+        assertTrue(advisor.handles("cho em xem lich hoc"));
+        assertTrue(advisor.handles("bang diem cua toi"));
+        assertTrue(advisor.handles("bay gio toi dang hoc mon gi?"));
+
+        // Wukong round-4 (FALSIFIED -> repaired): surviving impersonation
+        // holes and over-blocks in the token-list construction.
+        // (a) "của X" missed most non-self kinship and bare pronouns.
+        assertFalse(advisor.handles("Lịch học của mẹ"));
+        assertFalse(advisor.handles("Thời khóa biểu của chồng"));
+        assertFalse(advisor.handles("lịch học của nó"));
+        assertFalse(advisor.handles("điểm của họ"));
+        // (b) pronoun BEFORE the relation — the gap rule only looked
+        // relation -> pronoun.
+        assertFalse(advisor.handles("Cho tôi xem bảng điểm của mẹ"));
+        assertFalse(advisor.handles("Cho tôi xem GPA của nó"));
+        // (c) bare relation + verb subjects — rule E only knew pronouns.
+        // Wukong round-9 F3: bare "bạn" is OUT of arm E — addressing the bot
+        // it is the second person, and keeping it vetoed real request frames
+        // ("bạn có thể cho tôi xem điểm"). The residual reading ("bạn" =
+        // a friend) serves the asker's own rows with honest labels — the
+        // accepted fail-soft miss; "bạn tôi/thân/của bạn" still veto below.
+        assertTrue(advisor.handles("Bạn đang học lớp nào? Tôi muốn biết."));
+        assertFalse(advisor.handles("Giảng viên đang dạy môn gì? Cho tôi xem."));
+        assertFalse(advisor.handles("Sinh vien dang hoc mon gi? Toi muon biet."));
+        assertFalse(advisor.handles("Tôi muốn biết mẹ đang dạy môn nào."));
+        // (d) verb whitelist missed đi/mới — subject->verb adjacency only.
+        assertFalse(advisor.handles("Nó đi học lớp nào? Tôi muốn biết."));
+        assertFalse(advisor.handles("Nó mới đăng ký lớp nào? Tôi muốn xem."));
+        // (e) unaccented compound kinship: qualifier broke strict-C.
+        assertFalse(advisor.handles("Ban than toi dang hoc lop nao?"));
+        assertFalse(advisor.handles("Chi gai toi dang hoc mon gi?"));
+        assertFalse(advisor.handles("Nguoi yeu toi dang hoc mon gi?"));
+        assertFalse(advisor.handles("Co giao toi dang day mon gi?"));
+        assertFalse(advisor.handles("Ong xa toi dang day mon gi?"));
+        assertFalse(advisor.handles("Me ke toi dang hoc mon gi?"));
+        assertFalse(advisor.handles("Giao vien toi dang day mon gi?"));
+        // (f) unaccented compound + demonstrative.
+        assertFalse(advisor.handles("Sinh vien ay dang hoc lop nao? Toi muon biet."));
+        // (g) possessive spans wider than the 12-char cap.
+        assertFalse(advisor.handles("Bạn thân thiết của tôi đang học lớp nào?"));
+        assertFalse(advisor.handles("Giáo viên chủ nhiệm tôi đang dạy môn gì?"));
+        // (h) EN relations outside friend/family.
+        assertFalse(advisor.handles("my professor's schedule"));
+        assertFalse(advisor.handles("my teacher's timetable"));
+
+        // Round-4 over-blocks that must now pass through to the personal
+        // path: vocative address, the "anh em" collective, comma-separated
+        // vocatives, the day/dạy demonstrative collision, and the counter-
+        // word "con số".
+        assertTrue(advisor.handles("anh ơi cho em xem điểm của em"));
+        assertTrue(advisor.handles("chị ơi cho em xem lịch học"));
+        assertTrue(advisor.handles("bạn ơi, tôi đang học lớp nào"));
+        assertTrue(advisor.handles("thầy ơi em muốn xem bảng điểm"));
+        assertTrue(advisor.handles("em ơi cho em xem điểm của em"));
+        assertTrue(advisor.handles("Cac mon em day"));
+        assertTrue(advisor.handles("Cho anh em xem lịch học"));
+        assertTrue(advisor.handles("Con số của tôi đang học lớp nào"));
+        assertTrue(advisor.handles("mẹ, tôi đang học lớp nào"));
+        assertTrue(advisor.handles("mẹ ơi, tôi đang học lớp nào"));
+
+        // Kongming round-4: homograph collisions — "ba" is also "thứ ba"
+        // (Tuesday) and the numeral 3; "con toi" is unaccented "còn tôi".
+        // Both were dropped from the veto because the miss is fail-soft
+        // (the advisor only ever serves the ASKER's own rows).
+        assertTrue(advisor.handles("thứ ba tôi có lớp không?"));
+        assertTrue(advisor.handles("lịch thứ ba của tôi"));
+        assertTrue(advisor.handles("ba môn tôi đang học"));
+        assertTrue(advisor.handles("con toi con lai bao nhieu tin chi"));
+        // The collective "anh em" must still lose to an explicit possessor.
+        assertFalse(advisor.handles("anh em tôi đang học lớp nào"));
+        assertFalse(advisor.handles("chị em tôi đang học lớp nào"));
+        // Fail-soft residual (documented trade-off): bare "ba tôi"/"con tôi"
+        // kinship now serves the asker's own rows instead of vetoing.
+        assertTrue(advisor.handles("ba tôi đang học lớp nào"));
+        assertTrue(advisor.handles("con tôi đang học lớp nào"));
+        // A concrete section code keeps the public-catalog door open even
+        // when a "của X" possessive names a person.
+        assertTrue(advisor.handles("lịch của lớp SE013 của thầy"));
+        // Vocative self-reference frames: the comma break already stops the
+        // relation→pronoun gap — "Cho em hỏi, em đang học" is the asker.
+        assertTrue(advisor.handles("Cho em hỏi, em đang học môn nào?"));
+        // Strip-then-check keeps a REAL pronoun outside the false-friend
+        // span ("tối nay" is not a day word, so this answers the list).
+        assertTrue(advisor.handles("Tối nay tôi có lớp gì?"));
+
+        // Wukong round-5 (FALSIFIED -> repaired): E-subject homographs —
+        // unaccented di/ma/cha/bo/mo are far more often the common words
+        // đi/mà/chả/bỏ/mở than kinship, and vetoed the asker's own
+        // questions. Same homograph policy as ba/con (miss is fail-soft).
+        assertTrue(advisor.handles("em di hoc lop nao"));
+        assertTrue(advisor.handles("em cha hoc mon nao"));
+        assertTrue(advisor.handles("bo mon nay toi con hoc mon nao"));
+        assertTrue(advisor.handles("truong mo dang ky mon nao cho toi"));
+        // "X mà tôi V" is a relative clause — "ma" must NOT veto (it was
+        // deliberately kept out of the strict-adjacency arm as well).
+        assertTrue(advisor.handles("lop ma toi dang hoc mon gi"));
+        // Collective "anh em minh" = we — the strip removes the span
+        // before the bare "em" can pair with "mình".
+        assertTrue(advisor.handles("anh em minh dang hoc lop nao"));
+        assertTrue(advisor.handles("anh em mình đang học lớp nào"));
+        // But the explicit possessor still wins: "anh em tôi" = my siblings.
+        assertFalse(advisor.handles("anh em tôi đang học lớp nào"));
+        // "giáo" compounds are coursework nouns, not teachers — the veto
+        // must stay off while a genuine personal intent still fires.
+        assertTrue(advisor.handles("giáo trình tôi đang học môn nào"));
+        assertTrue(advisor.handles("giao an toi dang soan mon nao"));
+        // ...while real teacher references keep the veto.
+        assertFalse(advisor.handles("giáo viên tôi đang dạy môn gì"));
+        assertFalse(advisor.handles("cô giáo tôi đang dạy môn gì"));
+        // Round-5 impersonation escapes that must now veto: negation
+        // first-word, "người yêu/bạn bè" compound subjects, possessive
+        // spans over the old 15-char cap, and "của X" gaps.
+        assertFalse(advisor.handles("me khong hoc lop nao, toi muon biet"));
+        assertFalse(advisor.handles("nguoi yeu dang hoc lop nao, toi muon biet"));
+        assertFalse(advisor.handles("ban be dang hoc lop nao, toi muon biet"));
+        assertFalse(advisor.handles("bạn thân thiết nhất của tôi đang học lớp nào"));
+        assertFalse(advisor.handles("bang diem cua be toi"));
+        assertFalse(advisor.handles("diem cua thim toi"));
+        assertFalse(advisor.handles("lich hoc cua gia dinh toi"));
+        assertFalse(advisor.handles("lich hoc cua truong toi"));
+        assertFalse(advisor.handles("my kid's grades"));
+        assertFalse(advisor.handles("my partner's schedule"));
+        assertFalse(advisor.handles("my child's classes"));
+        // Fail-soft residual: "ma toi" (my mom, unaccented) escapes because
+        // "mà tôi" is a real self construction — serves the asker's own
+        // rows, same documented trade-off as "ba tôi"/"con tôi".
+        assertTrue(advisor.handles("ma toi dang hoc lop nao"));
+        // Strict-adjacency unaccented kinship: "dì/cậu/mợ tôi" veto while
+        // their verb homographs cannot produce this word order.
+        assertFalse(advisor.handles("di toi dang day mon gi"));
+        assertFalse(advisor.handles("cau toi dang hoc lop nao"));
+        // "đưa tôi" (give me) is a self request — "dua" stays out.
+        assertTrue(advisor.handles("dua toi xem lich hoc"));
+        // Unicode normalization: a decomposed (NFD) message must route
+        // identically to its precomposed form — IMEs and paste paths can
+        // deliver either.
+        assertTrue(advisor.handles(
+                Normalizer.normalize("Lớp tôi đang học", Normalizer.Form.NFD)));
+        assertTrue(advisor.handles(
+                Normalizer.normalize("Tối nay tôi có lớp gì?", Normalizer.Form.NFD)));
+        assertFalse(advisor.handles(
+                Normalizer.normalize("Lịch học của mẹ", Normalizer.Form.NFD)));
+        // Kongming review pins — unaccented coverage gaps and false-friend
+        // collisions fixed on the same snapshot.
+        // "chị em mình" unaccented twin is the same collective "we".
+        assertTrue(advisor.handles("chi em minh dang hoc lop nao"));
+        // Unaccented day-first schedule phrasings ("thứ/hôm nay … có lớp").
+        assertTrue(advisor.handles("thu 2 toi co lop khong"));
+        assertTrue(advisor.handles("hom nay toi co lop khong"));
+        // "tôi dạy" / "tôi qua" are real first-person phrases — the bare
+        // "toi" false-friend arm must not strip them.
+        assertTrue(advisor.handles("toi day mon gi"));
+        assertTrue(advisor.handles("toi qua duoc mon nao"));
+        assertTrue(advisor.handles("cac mon toi day"));
+        // "em … em" self-echo ("cho em hỏi, em đang học") — the second "em"
+        // is the asker, not a sibling.
+        assertTrue(advisor.handles("cho em hoi em dang hoc lop nao"));
+        // Controls: the real third-person and time-word cases still veto.
+        assertFalse(advisor.handles("em toi dang hoc lop nao"));
+        assertFalse(advisor.handles("Toi nay lop dang hoc may gio?"));
+        assertFalse(advisor.handles("tối nay lớp đang học mấy giờ"));
+        // "thi lại" (retake exam) is a public exam topic even when
+        // unaccented — the enrollment door must stay shut.
+        assertFalse(advisor.handles("thi lai mon nao cua toi"));
+        // Section/group letters are not vocative particles: "sinh viên A"
+        // must keep the "của sinh viên" third-person veto armed (live probe
+        // found the bare-a/à vocative strip silenced it).
+        assertFalse(advisor.handles("Lịch học của sinh viên A"));
+        assertFalse(advisor.handles("Điểm của lớp trưởng A"));
+        // Lecturer grading-status phrasing stays on the knowledge path
+        // today (documented residual — never wired to the personal path).
+        assertFalse(advisor.handles("Sinh viên nào chưa có điểm?"));
+
+        // Wukong round-6 (FALSIFIED -> repaired), second pass:
+        // Collective forms beyond "anh em mình" — "anh em bon/chung minh"
+        // and "anh chị em minh" all mean "we"; the strip leaves the real
+        // pronoun, so the asker's own list still answers.
+        assertTrue(advisor.handles("anh em bon minh dang hoc lop nao"));
+        assertTrue(advisor.handles("anh em chung minh dang hoc lop nao"));
+        assertTrue(advisor.handles("anh chị em minh dang hoc lop nao"));
+        assertTrue(advisor.handles("chi em tui minh dang hoc lop nao"));
+        // "X có biết" is the politeness frame "do you know" — the question
+        // still asks about the asker ("bạn có biết TÔI đang học lớp nào").
+        assertTrue(advisor.handles("ban co biet toi dang hoc lop nao"));
+        assertTrue(advisor.handles("bạn có biết tôi đang học lớp nào"));
+        // Dropped E-subject homographs: "đường đi học" (the road to
+        // school), "hạn đăng ký" (the deadline), "câu nào" (which
+        // sentence), "đưa tôi" (hand me) are not kinship subjects.
+        assertTrue(advisor.handles("duong di hoc xa, thu 2 toi co mon gi"));
+        // "hạn đăng ký" asks WHEN registration closes — a public calendar
+        // question, not the asker's class list ("hạn mức" stays personal).
+        assertFalse(advisor.handles("han dang ky mon nao cho toi"));
+        assertFalse(advisor.handles("deadline đăng ký môn của tôi"));
+        // Opinion/advice questions revived by the unicode \b fix must not
+        // answer with the asker's registrations — "which subject is
+        // hardest / easiest to pass" is general advice (F5).
+        assertFalse(advisor.handles("cho tôi hỏi môn gì khó nhất"));
+        assertFalse(advisor.handles("môn nào dễ qua"));
+        assertFalse(advisor.handles("học phần nào nên học"));
+        assertFalse(advisor.handles("môn gì dễ đậu nhất"));
+        // ...while a personal list phrasing that merely LOOKS near the
+        // opinion shape stays personal.
+        assertTrue(advisor.handles("cho em hỏi em đang học môn gì"));
+
+        // Wukong round-7 (FALSIFIED -> repaired):
+        // The deadline guard's bare "han" matched inside "học phAn",
+        // "thÁNg", "hẰNg" — ordinary enrollment phrasing died at the
+        // knowledge path. Context wording keeps "hạn đăng ký" public.
+        assertTrue(advisor.handles("toi dang hoc phan nao"));
+        assertTrue(advisor.handles("tháng này tôi học môn gì"));
+        assertTrue(advisor.handles("hang ngay toi co mon gi"));
+        assertTrue(advisor.handles("hạn mức đăng ký còn lại của tôi"));
+        // Politeness frames beyond "ơi/ạ/có biết" — request verbs
+        // (giúp/cho/hãy), vocative "à", collective "hai đứa/bọn em/
+        // tụi em mình" — all still ask about the asker.
+        assertTrue(advisor.handles("anh em oi minh dang hoc lop nao"));
+        assertTrue(advisor.handles("em mình đang học lớp nào"));
+        assertTrue(advisor.handles("hai đứa mình đang học lớp nào"));
+        assertTrue(advisor.handles("bọn em mình đang học lớp nào"));
+        assertTrue(advisor.handles("tụi em mình đang học lớp nào"));
+        assertTrue(advisor.handles("anh à cho em xem bảng điểm"));
+        assertTrue(advisor.handles("chị giúp em xem bảng điểm"));
+        assertTrue(advisor.handles("anh giúp em xem lịch học"));
+        assertTrue(advisor.handles("bạn cho tôi xem lịch học"));
+        assertTrue(advisor.handles("em giúp tôi xem lịch học"));
+        assertTrue(advisor.handles("cho em xem tôi đang học môn gì"));
+        // Own-noun English possessives keep "my" — "my class's schedule"
+        // is the asker's own timetable, never a third person.
+        assertTrue(advisor.handles("my class's schedule"));
+        // Conversational-opener phrasing keeps its personal route — the
+        // advisor claims it, and the service tier no longer hijacks it.
+        assertTrue(advisor.handles("Cảm ơn, lịch học của tôi"));
+        assertTrue(advisor.handles("Thanks, what is my schedule?"));
+        // Third-person escapes closed: relation vocative "cô tôi", staff
+        // roles after "của", Southern "ảnh/bả", demonstrative "thằng đó",
+        // the zero-width-joined "của\u200Bmẹ", the curly-apostrophe
+        // "Nam’s", and the partner-possessive all still veto.
+        assertFalse(advisor.handles("lịch học của cô tôi"));
+        assertFalse(advisor.handles("điểm của gia sư"));
+        assertFalse(advisor.handles("lịch học của trợ giảng"));
+        assertFalse(advisor.handles("điểm của cố vấn"));
+        assertFalse(advisor.handles("lịch học của hiệu trưởng"));
+        assertFalse(advisor.handles("lịch học của ảnh"));
+        assertFalse(advisor.handles("điểm của bả"));
+        assertFalse(advisor.handles("lịch học của thằng đó"));
+        assertFalse(advisor.handles("điểm của cụ ấy"));
+        assertFalse(advisor.handles("lịch học của\u200Bmẹ"));
+        assertFalse(advisor.handles("Nam’s schedule"));
+        assertFalse(advisor.handles("my partner's schedule"));
+
+        // Wukong round-8 (FALSIFIED -> repaired):
+        // M1 — the "em <kinship>" family: em gái/em trai/em họ/em út/em
+        // ruột/em chồng/em vợ/em này are unambiguous non-self relations,
+        // but bare "em" filled the first-person pronoun slot in the intent
+        // arms and served the asker's own rows for "little sister's class".
+        assertFalse(advisor.handles("lớp em gái đang học"));
+        assertFalse(advisor.handles("môn em trai đang học"));
+        assertFalse(advisor.handles("học phần em họ đang học"));
+        assertFalse(advisor.handles("lớp em út đang học"));
+        assertFalse(advisor.handles("lớp em này đang học"));
+        assertFalse(advisor.handles("lịch học của em họ"));
+        assertFalse(advisor.handles("thời khóa biểu của em út"));
+        assertFalse(advisor.handles("điểm của em họ"));
+        assertFalse(advisor.handles("bảng điểm của em út"));
+        assertFalse(advisor.handles("đề tài của em họ"));
+        assertFalse(advisor.handles("luận văn của em ruột"));
+        // M2 — uncovered possessive relations + collective prefixes; the
+        // pronoun-free schedule intent made arm-F the sole guard.
+        assertFalse(advisor.handles("lịch học của đàn anh"));
+        assertFalse(advisor.handles("tkb của chủ nhiệm"));
+        assertFalse(advisor.handles("lịch dạy của sư phụ"));
+        assertFalse(advisor.handles("lịch học của nhóm trưởng"));
+        assertFalse(advisor.handles("tkb cua truong nhom"));
+        assertFalse(advisor.handles("lịch học của tổ trưởng"));
+        assertFalse(advisor.handles("lịch của bọn chúng"));
+        assertFalse(advisor.handles("lịch học của hai đứa"));
+        assertFalse(advisor.handles("lịch của cả nhà"));
+        assertFalse(advisor.handles("lịch học của ai đó"));
+        // M3 — arm-E subject/verb gaps: accented thím/cụ/bé/thằng,
+        // two-word kinship, and start/direction verbs.
+        assertFalse(advisor.handles("thím đang dạy môn gì, tôi muốn biết"));
+        assertFalse(advisor.handles("bà ngoại đang dạy môn gì? tôi muốn biết"));
+        assertFalse(advisor.handles("mẹ bắt đầu học môn nào? tôi muốn biết"));
+        assertFalse(advisor.handles("em gái đang học lớp nào"));
+        assertFalse(advisor.handles("con trai tôi đang học gì"));
+        assertFalse(advisor.handles("ông nội vào lớp nào"));
+        // M4 — unaccented/in-law "con" compounds read the trailing pronoun
+        // as the possessive.
+        assertFalse(advisor.handles("lớp con gai toi dang hoc"));
+        assertFalse(advisor.handles("lớp con de toi dang hoc"));
+        assertFalse(advisor.handles("điểm của con gai toi"));
+        assertFalse(advisor.handles("lớp con dâu tôi đang học"));
+        // M5 — Zl/Zp/Cc/filler separators glued the possessive exactly like
+        // ZWSP did: "của\u2028mẹ" (U+2028 soft break) defeated arm-F.
+        assertFalse(advisor.handles("lịch học của\u2028mẹ"));
+        assertFalse(advisor.handles("lịch học của\u2029mẹ"));
+        // L4 — non-ASCII apostrophes beyond U+0027/U+2019.
+        assertFalse(advisor.handles("Nam\u02BCs schedule"));
+        assertFalse(advisor.handles("Nam\u2032s schedule"));
+        // L7 — Southern compound vocatives address the assistant, not a
+        // third party.
+        assertTrue(advisor.handles("chú em ơi tôi đang học môn gì"));
+        assertTrue(advisor.handles("cô em oi cho em xem bang diem"));
+        // Round-8 repaired over-blocks must stay personal.
+        assertTrue(advisor.handles("bai toi dang hoc mon nao"));
+        assertTrue(advisor.handles("Học kỳ 1 năm 2025 tôi học môn gì?"));
+
+        // ---- Wukong round-9 pins ----
+        // F1 — unaccented "thu N" day tokens must route (and parse a day —
+        // exercised end-to-end by the "thu 3" answer pin below).
+        assertTrue(advisor.handles("thu 3 toi co lop gi"));
+        assertTrue(advisor.handles("thu nam toi day mon gi"));
+        // F2 — "của tháng" (of the month) is not a person.
+        assertTrue(advisor.handles("lich hoc cua thang nay"));
+        // Round-9 self-find: under CASE_INSENSITIVE|UNICODE_CASE, \p{Lu}
+        // also matched lowercase, so the named-person arm vetoed EVERY
+        // noun after "của" — objects, time words, "của môn/kỳ". The
+        // (?-i:…) scope restores real uppercase matching; these objects
+        // must keep routing to the asker's own data.
+        assertTrue(advisor.handles("lich hoc cua mon toi dang hoc"));
+        assertTrue(advisor.handles("lich hoc cua ky nay"));
+        assertTrue(advisor.handles("lịch học của tháng này"));
+        // …while a mid-sentence CapitalizedName still names a person.
+        assertFalse(advisor.handles("diem cua Nam the nao"));
+        // F3 — "bạn có (thể) …" request frames address the bot; the modal
+        // chain strips cleanly now and bare "bạn" no longer vets.
+        assertTrue(advisor.handles("Bạn có thể cho tôi xem điểm của tôi không?"));
+        assertTrue(advisor.handles("Bạn có lịch học của tôi không?"));
+        assertTrue(advisor.handles("Bạn có điểm của tôi không?"));
+        assertTrue(advisor.handles("Bạn có thể cho tôi xem lịch học"));
+        assertTrue(advisor.handles("bạn có biết tôi đang học lớp nào"));
+        // F4 — F-only roles and institutions now veto as subjects/possessives.
+        assertFalse(advisor.handles("Đồng nghiệp tôi đang học lớp nào"));
+        assertFalse(advisor.handles("Trợ giảng tôi đang dạy môn nào"));
+        assertFalse(advisor.handles("Sếp tôi đang học môn gì"));
+        assertFalse(advisor.handles("đồng nghiệp đang dạy môn nào"));
+        assertFalse(advisor.handles("Lịch học của Nam"));
+        assertFalse(advisor.handles("Điểm rèn luyện của Nam"));
+        assertFalse(advisor.handles("lịch dạy của khoa"));
+        assertFalse(advisor.handles("lịch học của phòng đào tạo"));
+        // F5 — policy wording must not open the schedule door.
+        assertFalse(advisor.handles("Quy định về lịch học kỳ này thế nào?"));
+        assertFalse(advisor.handles("Theo quy chế, tiết học tối đa mấy buổi?"));
+        // F6 — advice word order: pronoun bridge and verb-first forms.
+        assertFalse(advisor.handles("tôi nên học môn nào"));
+        assertFalse(advisor.handles("môn nào tôi nên học"));
+        assertFalse(advisor.handles("em nên đăng ký môn nào"));
+        // F7 — bare "exam" must not veto grade phrasings.
+        assertTrue(advisor.handles("what are my exam scores"));
+        assertTrue(advisor.handles("show my exam grades"));
+        // F10 — colloquial self pronouns.
+        assertTrue(advisor.handles("tớ đang học lớp nào"));
+        assertTrue(advisor.handles("tui dang hoc lop nao"));
+        assertTrue(advisor.handles("mến đang học lớp nào"));
+        // "cháu" stays the documented fail-soft residual: it is the ordinary
+        // third-person noun, so the self-reading misses (knowledge path).
+        assertFalse(advisor.handles("cháu đang học lớp nào"));
+        // F12 — pronoun-stem contractions are not possessives.
+        assertTrue(advisor.handles("let's check my grades"));
+
+        // ---- Wukong round-10 pins ----
+        // F1 — a CapitalizedName spelled like a first-person pronoun still
+        // names ANOTHER person: the exemption only protects lowercase-typed
+        // pronouns, so "của Minh"/"của Em" veto to the knowledge path
+        // instead of serving the asker's own transcript.
+        assertFalse(advisor.handles("diem cua Minh"));
+        assertFalse(advisor.handles("lich hoc cua Minh"));
+        assertFalse(advisor.handles("lich hoc cua Em"));
+        // "của em <Name>" is the idiomatic sibling-naming frame — the bare
+        // "em" exemption used to swallow the following name token.
+        assertFalse(advisor.handles("diem cua em Lan"));
+        assertFalse(advisor.handles("lich hoc cua em Hung"));
+        // Wukong round-11 follow-up: the relation+name frame generalizes —
+        // "của anh Tuấn"/"của chị Lan"/"của thầy Hùng"/"của bạn Minh" also
+        // name someone else, not the asker.
+        assertFalse(advisor.handles("lich hoc cua anh Tuan"));
+        assertFalse(advisor.handles("lich hoc cua chi Lan"));
+        assertFalse(advisor.handles("lich hoc cua thay Hung"));
+        assertFalse(advisor.handles("lich hoc cua ban Minh"));
+        assertFalse(advisor.handles("lịch học của cô Hồng"));
+        // …while genuine lowercase self-references keep resolving personal.
+        assertTrue(advisor.handles("diem cua minh"));
+        assertTrue(advisor.handles("lich hoc cua em"));
+        assertTrue(advisor.handles("điểm của mình"));
+    }
+
+    @Test
+    void dayQualifiedClassPhrasingAnswersTheDayTimetableNotTheWholeList() {
+        when(enrollmentService.findStudentEnrollments("student-profile", null)).thenReturn(List.of(
+                enrollment("SE401", "Lập trình Java nâng cao", "Advanced Java", CURRENT_TERM_START,
+                        List.of(new SectionScheduleResponse("s1", 3, "07:00", "09:30",
+                                new ClassroomSummary("c1", "A", "101")))),
+                enrollment("SE403", "Cấu trúc dữ liệu và giải thuật", "Data Structures", CURRENT_TERM_START,
+                        List.of(new SectionScheduleResponse("s2", 5, "09:45", "11:45",
+                                new ClassroomSummary("c2", "A", "103"))))));
+
+        ChatResponse response = advisor.answer(
+                chatRequest("vi", "Thứ 3 lớp tôi đang học"), jwtStudent());
+
+        assertNotNull(response);
+        String answer = response.answer();
+        assertTrue(answer.contains("Lịch học Thứ Ba"), answer);
+        assertTrue(answer.contains("SE401"), answer);
+        assertFalse(answer.contains("SE403"), "day-qualified phrasing must keep its day filter");
+
+        // Wukong round-9 F1: the unaccented twin "thu 3" passed the intent
+        // gate but parsed no day, answering the whole list — it must keep
+        // the same day filter.
+        ChatResponse unaccented = advisor.answer(
+                chatRequest("vi", "thu 3 toi co lop gi"), jwtStudent());
+        assertNotNull(unaccented);
+        String unaccentedAnswer = unaccented.answer();
+        assertTrue(unaccentedAnswer.contains("Thứ Ba"), unaccentedAnswer);
+        assertTrue(unaccentedAnswer.contains("SE401"), unaccentedAnswer);
+        assertFalse(unaccentedAnswer.contains("SE403"),
+                "unaccented 'thu N' must keep the same day filter");
     }
 
     @Test
@@ -211,12 +720,17 @@ class AssistantPersonalContextAdvisorTest {
                         List.of(new SectionScheduleResponse("s1", 2, "07:00", "09:30",
                                 new ClassroomSummary("c1", "A", "101"))))));
 
-        ChatRequest request = chatRequest("vi", "Lịch học của tôi tuần này?");
+        UUID clientRequestId = UUID.randomUUID();
+        ChatRequest request = new ChatRequest("Lịch học của tôi tuần này?", "vi", clientRequestId, null);
         ChatResponse response = advisor.answer(request, jwtStudent());
         List<ThesisAssistantService.StreamEvent> events = new ArrayList<>();
 
         advisor.stream(response, request, events::add);
 
+        // Kongming F10: JSON/SSE parity — the streamed meta must echo the
+        // clientRequestId exactly like the JSON response does.
+        assertTrue(events.stream().anyMatch(event -> event instanceof ThesisAssistantService.StreamMeta meta
+                && clientRequestId.equals(meta.clientRequestId())));
         assertTrue(events.stream().anyMatch(event -> event instanceof ThesisAssistantService.StreamReplace replace
                 && replace.text().equals(response.answer())
                 && "PERSONAL_CONTEXT".equals(replace.reasonCode())));
@@ -507,7 +1021,7 @@ class AssistantPersonalContextAdvisorTest {
         when(sectionService.findLecturerSchedule("lecturer-profile", null)).thenReturn(List.of(
                 new LecturerScheduleResponse("id1", "sec1", "SE402-01", "SE402", "Phát triển ứng dụng web",
                         "Web Application Development", "Phát triển ứng dụng web", 3, 35, 13, "CNTT", "CNTT", "CNTT",
-                        "OPEN", List.of(new io.campuscore.restfulapi.academic.web.AcademicSectionReadDtos
+                        "OPEN", "sem-hk2", "Học kỳ 2 năm học 2025-2026", "Semester 2, 2025-2026", "Học kỳ 2 năm học 2025-2026", CURRENT_TERM_START, List.of(new io.campuscore.restfulapi.academic.web.AcademicSectionReadDtos
                                 .SectionScheduleResponse("s1", 5, "13:00", "15:30", "A", "102",
                                 new io.campuscore.restfulapi.academic.web.AcademicSectionReadDtos
                                         .ClassroomSummary("c1", "A", "102"))))));
@@ -521,11 +1035,122 @@ class AssistantPersonalContextAdvisorTest {
     }
 
     @Test
+    void lecturerScheduleScopesToTheNamedAndNewestSemester() {
+        // Kongming F1: the schedule/credits answers used to mix every
+        // semester under a "kỳ này" label. A named semester filters to it;
+        // a bare question takes the newest semester and names it honestly.
+        when(sectionService.findLecturerSchedule("lecturer-profile", null)).thenReturn(List.of(
+                lecturerSection("sec-hk1", "SE301", "Cơ sở dữ liệu", 3,
+                        "sem-hk1", "Học kỳ 1 năm học 2025-2026", OLD_TERM_START),
+                lecturerSection("sec-hk2", "SE402", "Phát triển ứng dụng web", 3)));
+
+        ChatResponse named = advisor.answer(
+                chatRequest("vi", "Học kỳ 1 năm học 2025-2026 tôi giảng dạy những lớp nào?"), jwtLecturer());
+        assertNotNull(named);
+        assertTrue(named.answer().contains("SE301"), named.answer());
+        assertFalse(named.answer().contains("SE402"), named.answer());
+
+        ChatResponse bare = advisor.answer(
+                chatRequest("vi", "lịch dạy của tôi tuần này?"), jwtLecturer());
+        assertNotNull(bare);
+        assertTrue(bare.answer().contains("SE402"), bare.answer());
+        assertFalse(bare.answer().contains("SE301"), "unnamed question must take the newest semester only");
+        assertTrue(bare.answer().contains("Học kỳ 2 năm học 2025-2026"),
+                "the label must name the semester the rows belong to");
+
+        ChatResponse credits = advisor.answer(
+                chatRequest("vi", "Học kỳ 1 năm học 2025-2026 tôi dạy bao nhiêu tín chỉ?"), jwtLecturer());
+        assertNotNull(credits);
+        assertTrue(credits.answer().contains("Học kỳ 1 năm học 2025-2026"), credits.answer());
+        assertTrue(credits.answer().contains("SE301"), credits.answer());
+        assertFalse(credits.answer().contains("SE402"), credits.answer());
+    }
+
+    @Test
+    void lecturerDayQualifiedAnswerDisclosesTheScopedSemester() {
+        // Kongming F1: the day-qualified lecturer header used to drop the
+        // termName the full-list branch carries — the common phrasing
+        // ("thứ 5 tôi dạy môn nào?") lost the scope disclosure.
+        when(sectionService.findLecturerSchedule("lecturer-profile", null)).thenReturn(List.of(
+                lecturerSection("sec-hk2", "SE402", "Phát triển ứng dụng web", 3)));
+
+        ChatResponse response = advisor.answer(
+                chatRequest("vi", "thứ 2 tôi dạy môn nào?"), jwtLecturer());
+
+        assertNotNull(response);
+        assertTrue(response.answer().contains("Học kỳ 2 năm học 2025-2026"), response.answer());
+    }
+
+    @Test
+    void cancelledSectionsDoNotCountTowardTheNewestSemesterScope() {
+        // Kongming F3: a CANCELLED newest-semester row used to win the
+        // "newest" computation and present a cancelled section as the
+        // current teaching load.
+        when(sectionService.findLecturerSchedule("lecturer-profile", null)).thenReturn(List.of(
+                lecturerSection("sec-hk1", "SE301", "Cơ sở dữ liệu", 3,
+                        "sem-hk1", "Học kỳ 1 năm học 2025-2026", OLD_TERM_START),
+                cancelledLecturerSection("sec-cancelled", "SE999", "Môn đã hủy", 3,
+                        "sem-hk2", "Học kỳ 2 năm học 2025-2026", CURRENT_TERM_START)));
+
+        ChatResponse response = advisor.answer(
+                chatRequest("vi", "lịch dạy của tôi tuần này?"), jwtLecturer());
+
+        assertNotNull(response);
+        assertTrue(response.answer().contains("SE301"), response.answer());
+        assertFalse(response.answer().contains("SE999"), "CANCELLED rows must leave the scope entirely");
+    }
+
+    @Test
+    void studentNamedSemesterPlusDayAnswersTheNamedTerm() {
+        // Kongming F2: a named semester + day question used to answer the
+        // CURRENT term's day instead of the named term's.
+        when(enrollmentService.findStudentEnrollments("student-profile", null)).thenReturn(List.of(
+                enrollmentWithSemester("SE301", "Cơ sở dữ liệu", "sem-hk1",
+                        "Học kỳ 1 năm học 2025-2026", OLD_TERM_START,
+                        List.of(new SectionScheduleResponse("s-old", 3, "07:00", "09:30",
+                                new ClassroomSummary("c-old", "A", "101")))),
+                enrollment("SE402", "Phát triển ứng dụng web", "Web Dev", CURRENT_TERM_START,
+                        List.of(new SectionScheduleResponse("s-new", 3, "13:00", "15:30",
+                                new ClassroomSummary("c-new", "B", "202"))))));
+
+        ChatResponse named = advisor.answer(
+                chatRequest("vi", "Học kỳ 1 năm học 2025-2026 thứ 3 tôi học môn gì?"), jwtStudent());
+        assertNotNull(named);
+        assertTrue(named.answer().contains("SE301"), named.answer());
+        assertFalse(named.answer().contains("SE402"), "named semester must not leak the current term");
+
+        ChatResponse miss = advisor.answer(
+                chatRequest("vi", "Học kỳ 3 năm học 2024-2025 thứ 3 tôi học môn gì?"), jwtStudent());
+        assertNotNull(miss);
+        assertTrue(miss.answer().contains("không tìm thấy"), miss.answer());
+        assertFalse(miss.answer().contains("SE301"), "named miss must not fall back to another term");
+    }
+
+    @Test
+    void existenceDayTeachingPhrasingPrefersTheLecturerTimetable() {
+        // "thứ 2 tôi có lớp dạy không?" — a dual-profile user asking
+        // about TEACHING must not get the student timetable (Wukong A7).
+        when(sectionService.findLecturerSchedule("lecturer-profile", null)).thenReturn(List.of(
+                lecturerSection("sec1", "SE402", "Phát triển ứng dụng web", 3)));
+        when(enrollmentService.findStudentEnrollments("student-profile", null)).thenReturn(List.of(
+                enrollment("SE401", "Lập trình Java nâng cao", "Advanced Java", CURRENT_TERM_START,
+                        List.of(new SectionScheduleResponse("s1", 2, "07:00", "09:30",
+                                new ClassroomSummary("c1", "A", "101"))))));
+
+        ChatResponse response = advisor.answer(
+                chatRequest("vi", "thứ 2 tôi có lớp dạy không?"), jwtDualProfile());
+        assertNotNull(response);
+        assertTrue(response.answer().contains("giảng dạy"), response.answer());
+        assertTrue(response.answer().contains("SE402"), response.answer());
+        assertFalse(response.answer().contains("SE401"), "student timetable must not answer a teaching question");
+    }
+
+    @Test
     void composesLecturerTeachingTimetable() {
         when(sectionService.findLecturerSchedule("lecturer-profile", null)).thenReturn(List.of(
                 new LecturerScheduleResponse("id1", "sec1", "SE402-01", "SE402", "Phát triển ứng dụng web",
                         "Web Application Development", "Phát triển ứng dụng web", 3, 35, 13, "CNTT", "CNTT", "CNTT",
-                        "OPEN", List.of(new io.campuscore.restfulapi.academic.web.AcademicSectionReadDtos
+                        "OPEN", "sem-hk2", "Học kỳ 2 năm học 2025-2026", "Semester 2, 2025-2026", "Học kỳ 2 năm học 2025-2026", CURRENT_TERM_START, List.of(new io.campuscore.restfulapi.academic.web.AcademicSectionReadDtos
                                 .SectionScheduleResponse("s1", 5, "13:00", "15:30", "A", "102",
                                 new io.campuscore.restfulapi.academic.web.AcademicSectionReadDtos
                                         .ClassroomSummary("c1", "A", "102"))))));
@@ -547,6 +1172,10 @@ class AssistantPersonalContextAdvisorTest {
         assertTrue(advisor.handles("con lai bao nhieu tin chi"));
         assertTrue(advisor.handles("còn thiếu mấy tín chỉ"));
         assertTrue(advisor.handles("hạn mức tín chỉ của tôi"));
+        // "đăng ký" phrasing of the same personal budget question — observed
+        // falling to the KB path while the "tín chỉ" twin answered correctly.
+        assertTrue(advisor.handles("hạn mức đăng ký còn lại của tôi"));
+        assertTrue(advisor.handles("han muc dang ky con lai"));
         assertTrue(advisor.handles("how many credits do I have left?"));
         // Policy wording still stays on the knowledge path.
         assertFalse(advisor.handles("Quy trình xin nâng hạn mức tín chỉ?"));
@@ -812,7 +1441,7 @@ class AssistantPersonalContextAdvisorTest {
         when(sectionService.findLecturerSchedule("lecturer-profile", null)).thenReturn(List.of(
                 new LecturerScheduleResponse("id1", "sec1", "SE402-01", "SE402", "Phát triển ứng dụng web",
                         "Web Application Development", "Phát triển ứng dụng web", 3, 35, 13, "CNTT", "CNTT", "CNTT",
-                        "OPEN", List.of(new io.campuscore.restfulapi.academic.web.AcademicSectionReadDtos
+                        "OPEN", "sem-hk2", "Học kỳ 2 năm học 2025-2026", "Semester 2, 2025-2026", "Học kỳ 2 năm học 2025-2026", CURRENT_TERM_START, List.of(new io.campuscore.restfulapi.academic.web.AcademicSectionReadDtos
                                 .SectionScheduleResponse("s1", 5, "13:00", "15:30", "A", "102",
                                 new io.campuscore.restfulapi.academic.web.AcademicSectionReadDtos
                                         .ClassroomSummary("c1", "A", "102"))))));
@@ -858,7 +1487,9 @@ class AssistantPersonalContextAdvisorTest {
 
     @Test
     void answersLecturerGradingStatusFromAssignedSections() {
-        when(sectionService.findLecturerGradingSections("lecturer-profile", null)).thenReturn(List.of(
+        when(sectionService.findLecturerSchedule("lecturer-profile", null)).thenReturn(List.of(
+                lecturerSection("sec1", "SE402", "Phát triển ứng dụng web", 3)));
+        when(sectionService.findLecturerGradingSections("lecturer-profile", "sem-hk2")).thenReturn(List.of(
                 new LecturerGradingSectionResponse("id1", "sec1", "SE402-01", "SE402",
                         "Phát triển ứng dụng web", "Web Application Development", "Phát triển ứng dụng web",
                         3, "CNTT", "CNTT", "CNTT",
@@ -877,14 +1508,55 @@ class AssistantPersonalContextAdvisorTest {
     }
 
     @Test
-    void answersLecturerGradingWithoutAssignmentHonestly() {
-        when(sectionService.findLecturerGradingSections("lecturer-profile", null)).thenReturn(List.of());
+    void lecturerGradingFollowsTheSharedSemesterScope() {
+        // Kongming F1: the grading list used to span every semester — the
+        // repository is now asked for the scoped (newest) semester, and a
+        // named semester resolves to its own id.
+        when(sectionService.findLecturerSchedule("lecturer-profile", null)).thenReturn(List.of(
+                lecturerSection("sec-hk1", "SE301", "Cơ sở dữ liệu", 3,
+                        "sem-hk1", "Học kỳ 1 năm học 2025-2026", OLD_TERM_START),
+                lecturerSection("sec-hk2", "SE402", "Phát triển ứng dụng web", 3)));
+        when(sectionService.findLecturerGradingSections("lecturer-profile", "sem-hk2")).thenReturn(List.of(
+                new LecturerGradingSectionResponse("id2", "sec-hk2", "SE402-01", "SE402",
+                        "Phát triển ứng dụng web", "Web Application Development", "Phát triển ứng dụng web",
+                        3, "CNTT", "CNTT", "CNTT",
+                        "HK2 2025-2026", "HK2 2025-2026", "HK2 2025-2026", "HK2 2025-2026",
+                        35L, 20L, 12L, "PARTIAL", true)));
 
+        ChatResponse newest = advisor.answer(
+                chatRequest("vi", "Điểm học phần tôi phụ trách hiện đã có chưa?"), jwtLecturer());
+        assertNotNull(newest);
+        assertTrue(newest.answer().contains("SE402"), newest.answer());
+        org.mockito.Mockito.verify(sectionService)
+                .findLecturerGradingSections("lecturer-profile", "sem-hk2");
+
+        when(sectionService.findLecturerGradingSections("lecturer-profile", "sem-hk1")).thenReturn(List.of(
+                new LecturerGradingSectionResponse("id1", "sec-hk1", "SE301-01", "SE301",
+                        "Cơ sở dữ liệu", "Databases", "Cơ sở dữ liệu",
+                        3, "CNTT", "CNTT", "CNTT",
+                        "HK1 2025-2026", "HK1 2025-2026", "HK1 2025-2026", "HK1 2025-2026",
+                        30L, 30L, 30L, "PUBLISHED", false)));
+        ChatResponse named = advisor.answer(
+                chatRequest("vi", "Học kỳ 1 năm học 2025-2026 điểm học phần tôi phụ trách đã có chưa?"), jwtLecturer());
+        assertNotNull(named);
+        assertTrue(named.answer().contains("SE301"), named.answer());
+        org.mockito.Mockito.verify(sectionService)
+                .findLecturerGradingSections("lecturer-profile", "sem-hk1");
+    }
+
+    @Test
+    void answersLecturerGradingWithoutAssignmentHonestly() {
+        // Wukong round-10 F2: a lecturer with NO sections must not fall back
+        // to an unscoped grading query — the empty scope is the honest
+        // "nothing assigned" answer, and the repository is never called.
         ChatResponse response = advisor.answer(
                 chatRequest("vi", "Điểm học phần tôi phụ trách hiện đã có chưa?"), jwtLecturer());
 
         assertNotNull(response);
         assertTrue(response.answer().contains("chưa được phân công nhập điểm"), response.answer());
+        org.mockito.Mockito.verify(sectionService, org.mockito.Mockito.never())
+                .findLecturerGradingSections(org.mockito.ArgumentMatchers.anyString(),
+                        org.mockito.ArgumentMatchers.nullable(String.class));
     }
 
     @Test
@@ -895,7 +1567,7 @@ class AssistantPersonalContextAdvisorTest {
         when(sectionService.findLecturerSchedule("lecturer-profile", null)).thenReturn(List.of(
                 new LecturerScheduleResponse("id1", "sec-401", "SE401-01", "SE401",
                         "Lập trình Java nâng cao", "Advanced Java", "Lập trình Java nâng cao",
-                        3, 45, 40, "CNTT", "CNTT", "CNTT", "OPEN", List.of())));
+                        3, 45, 40, "CNTT", "CNTT", "CNTT", "OPEN", "sem-hk2", "Học kỳ 2 năm học 2025-2026", "Semester 2, 2025-2026", "Học kỳ 2 năm học 2025-2026", CURRENT_TERM_START, List.of())));
         when(attendanceService.findLecturerAttendance(eq("lecturer-profile"), eq("sec-401"), anyString()))
                 .thenReturn(List.of(new AcademicAttendanceReadDtos.AttendanceResponse(
                         "att1", "student-1", "sec-401", Instant.now(), "ABSENT", "Không lý do", Instant.now(),
@@ -925,7 +1597,7 @@ class AssistantPersonalContextAdvisorTest {
         when(sectionService.findLecturerSchedule("lecturer-profile", null)).thenReturn(List.of(
                 new LecturerScheduleResponse("id1", "sec-401", "SE401-01", "SE401",
                         "Lập trình Java nâng cao", "Advanced Java", "Lập trình Java nâng cao",
-                        3, 45, 40, "CNTT", "CNTT", "CNTT", "OPEN", List.of())));
+                        3, 45, 40, "CNTT", "CNTT", "CNTT", "OPEN", "sem-hk2", "Học kỳ 2 năm học 2025-2026", "Semester 2, 2025-2026", "Học kỳ 2 năm học 2025-2026", CURRENT_TERM_START, List.of())));
         when(attendanceService.findLecturerAttendance(eq("lecturer-profile"), eq("sec-401"), anyString()))
                 .thenReturn(List.of(attendanceRow("PRESENT")));
 
@@ -948,7 +1620,7 @@ class AssistantPersonalContextAdvisorTest {
         when(sectionService.findLecturerSchedule("lecturer-profile", null)).thenReturn(List.of(
                 new LecturerScheduleResponse("id1", "sec-401", "SE401-01", "SE401",
                         "Lập trình Java nâng cao", "Advanced Java", "Lập trình Java nâng cao",
-                        3, 45, 40, "CNTT", "CNTT", "CNTT", "OPEN", List.of())));
+                        3, 45, 40, "CNTT", "CNTT", "CNTT", "OPEN", "sem-hk2", "Học kỳ 2 năm học 2025-2026", "Semester 2, 2025-2026", "Học kỳ 2 năm học 2025-2026", CURRENT_TERM_START, List.of())));
 
         ChatResponse response = attendanceAdvisor.answer(
                 chatRequest("vi", "Sinh viên lớp SE999 hôm nay có ai vắng mặt không?"), jwtLecturer());
@@ -1097,7 +1769,7 @@ class AssistantPersonalContextAdvisorTest {
         when(sectionService.findLecturerSchedule("lecturer-profile", null)).thenReturn(List.of(
                 new LecturerScheduleResponse("id1", "sec1", "SE402-01", "SE402", "Phát triển ứng dụng web",
                         "Web Application Development", "Phát triển ứng dụng web", 3, 35, 13, "CNTT", "CNTT", "CNTT",
-                        "OPEN", List.of(new io.campuscore.restfulapi.academic.web.AcademicSectionReadDtos
+                        "OPEN", "sem-hk2", "Học kỳ 2 năm học 2025-2026", "Semester 2, 2025-2026", "Học kỳ 2 năm học 2025-2026", CURRENT_TERM_START, List.of(new io.campuscore.restfulapi.academic.web.AcademicSectionReadDtos
                                 .SectionScheduleResponse("s1", 5, "13:00", "15:30", "A", "102",
                                 new io.campuscore.restfulapi.academic.web.AcademicSectionReadDtos
                                         .ClassroomSummary("c1", "A", "102"))))));
@@ -1552,8 +2224,16 @@ class AssistantPersonalContextAdvisorTest {
 
     private static LecturerScheduleResponse lecturerSection(
             String sectionId, String courseCode, String title, int credits) {
+        return lecturerSection(sectionId, courseCode, title, credits,
+                "sem-hk2", "Học kỳ 2 năm học 2025-2026", CURRENT_TERM_START);
+    }
+
+    private static LecturerScheduleResponse lecturerSection(
+            String sectionId, String courseCode, String title, int credits,
+            String semesterId, String semesterName, Instant semesterStart) {
         return new LecturerScheduleResponse("id-" + sectionId, sectionId, sectionId + "-01", courseCode,
                 title, title, title, credits, 40, 12, "CNTT", "ICT", "CNTT", "OPEN",
+                semesterId, semesterName, semesterName, semesterName, semesterStart,
                 List.of(new io.campuscore.restfulapi.academic.web.AcademicSectionReadDtos
                         .SectionScheduleResponse("sch-" + sectionId, 2, "07:00", "09:30", "A", "101",
                         new io.campuscore.restfulapi.academic.web.AcademicSectionReadDtos
@@ -1570,6 +2250,22 @@ class AssistantPersonalContextAdvisorTest {
 
     private static Jwt jwtLecturer() {
         return jwt("lecturerId", "lecturer-profile");
+    }
+
+    /**
+     * Kongming round-4: a dual-profile JWT carries BOTH claims — the
+     * teaching-list hint must win over the studentId branch so a
+     * student+lecturer never gets an enrollment list for a teaching
+     * question, and must also win over the named-semester transcript
+     * branch ("Học kỳ 1 ... tôi giảng dạy những lớp nào?").
+     */
+    private static Jwt jwtDualProfile() {
+        Map<String, Object> claims = new HashMap<>();
+        claims.put("sub", "owner-user");
+        claims.put("roles", List.of("STUDENT", "LECTURER"));
+        claims.put("studentId", "student-profile");
+        claims.put("lecturerId", "lecturer-profile");
+        return new Jwt("token", Instant.now(), Instant.now().plusSeconds(600), Map.of("alg", "HS256"), claims);
     }
 
     private static Jwt jwt(String claim, String value) {
@@ -1622,6 +2318,49 @@ class AssistantPersonalContextAdvisorTest {
                 null);
     }
 
+    private static EnrollmentResponse enrollmentWithSemester(
+            String code, String name, String semesterId, String semesterName, Instant termStart,
+            List<SectionScheduleResponse> schedules) {
+        return new EnrollmentResponse(
+                "enr-" + code,
+                "student-profile",
+                "section-" + code,
+                semesterId,
+                "ENROLLED",
+                termStart,
+                null,
+                "DRAFT",
+                null,
+                null,
+                termStart,
+                termStart,
+                null,
+                new SectionSummary(
+                        "section-" + code,
+                        code + "-01",
+                        new CourseSummary("course-" + code, code, name, name, name, 3),
+                        new SemesterSummary(semesterId, semesterName, semesterName, semesterName, termStart),
+                        null,
+                        45,
+                        10,
+                        "OPEN",
+                        schedules),
+                null);
+    }
+
+    private static LecturerScheduleResponse cancelledLecturerSection(
+            String sectionId, String courseCode, String title, int credits,
+            String semesterId, String semesterName, Instant semesterStart) {
+        LecturerScheduleResponse open = lecturerSection(
+                sectionId, courseCode, title, credits, semesterId, semesterName, semesterStart);
+        return new LecturerScheduleResponse(open.id(), open.sectionId(), open.sectionNumber(),
+                open.courseCode(), open.courseName(), open.courseNameEn(), open.courseNameVi(),
+                open.credits(), open.capacity(), open.enrolledCount(), open.departmentName(),
+                open.departmentNameEn(), open.departmentNameVi(), "CANCELLED",
+                open.semesterId(), open.semesterName(), open.semesterNameEn(), open.semesterNameVi(),
+                open.semesterStartDate(), open.schedules());
+    }
+
     /**
      * Round-3 chat fixes (cb3-2..cb3-6): natural EN phrasings and the
      * named-semester VI question used to fall to the KB path, where the model
@@ -1640,5 +2379,31 @@ class AssistantPersonalContextAdvisorTest {
         assertTrue(advisor.handles("What is my GPA for semester 2 2025-2026?"));
         // Requirement wording is a policy question, not a registration listing.
         assertFalse(advisor.handles("What courses do I need to graduate?"));
+    }
+
+    @Test
+    void dualProfileTeachingQuestionAnswersFromLecturerSchedule() {
+        // Kongming round-4: the advertised dual-profile ordering was
+        // unexercised — every jwt() fixture set exactly one claim. A
+        // student+lecturer asking a teaching question must get the
+        // teaching schedule, including when a semester is named (the
+        // named-semester branch used to steal it first).
+        when(sectionService.findLecturerSchedule("lecturer-profile", null)).thenReturn(List.of(
+                lecturerSection("sec-dual", "SE402", "Cơ sở dữ liệu", 3,
+                        "sem-hk1", "Học kỳ 1 năm học 2025-2026", OLD_TERM_START)));
+
+        ChatResponse response = advisor.answer(
+                chatRequest("vi", "Các lớp tôi giảng dạy"), jwtDualProfile());
+        assertNotNull(response);
+        assertEquals("PERSONAL_CONTEXT", response.reasonCode());
+        assertTrue(response.answer().contains("SE402"), response.answer());
+        assertFalse(response.answer().contains("đăng ký"), response.answer());
+
+        ChatResponse named = advisor.answer(
+                chatRequest("vi", "Học kỳ 1 năm học 2025-2026 tôi giảng dạy những lớp nào?"),
+                jwtDualProfile());
+        assertNotNull(named);
+        assertEquals("PERSONAL_CONTEXT", named.reasonCode());
+        assertTrue(named.answer().contains("SE402"), named.answer());
     }
 }

@@ -96,6 +96,11 @@ public final class AcademicSectionReadDtos {
             String departmentNameEn,
             String departmentNameVi,
             String status,
+            String semesterId,
+            String semesterName,
+            String semesterNameEn,
+            String semesterNameVi,
+            java.time.Instant semesterStartDate,
             List<SectionScheduleResponse> schedules) {
     }
 

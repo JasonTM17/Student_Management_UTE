@@ -336,6 +336,11 @@ export interface LecturerSection {
   departmentNameEn?: string;
   departmentNameVi?: string;
   status: 'OPEN' | 'CLOSED' | 'CANCELLED';
+  semesterId?: string;
+  semesterName?: string;
+  semesterNameEn?: string;
+  semesterNameVi?: string;
+  semesterStartDate?: string;
   schedules: {
     id: string;
     dayOfWeek: number;

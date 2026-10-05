@@ -79,6 +79,14 @@ class AcademicSectionReadPersistenceTest {
                 .andExpect(jsonPath("$[0].sectionId").value("section-1"))
                 .andExpect(jsonPath("$[0].courseCode").value("CS101"))
                 .andExpect(jsonPath("$[0].enrolledCount").value(2))
+                // The semester wire fields carry the chatbot's semester
+                // scoping — if the SELECT ever drops them the advisor's
+                // newest/named filter silently degrades (Kongming F9).
+                .andExpect(jsonPath("$[0].semesterId").value("semester-1"))
+                .andExpect(jsonPath("$[0].semesterName").isNotEmpty())
+                .andExpect(jsonPath("$[0].semesterNameEn").isNotEmpty())
+                .andExpect(jsonPath("$[0].semesterNameVi").isNotEmpty())
+                .andExpect(jsonPath("$[0].semesterStartDate").isNotEmpty())
                 .andExpect(jsonPath("$[0].schedules[0].dayOfWeek").value(2))
                 .andExpect(jsonPath("$[0].schedules[0].startTime").value("08:00"))
                 .andExpect(jsonPath("$[0].schedules[1].dayOfWeek").value(4))
@@ -131,6 +139,21 @@ class AcademicSectionReadPersistenceTest {
                 .andExpect(jsonPath("$.enrollments.length()").value(3))
                 .andExpect(jsonPath("$.enrollments[2].studentCode").value("S003"))
                 .andExpect(jsonPath("$.enrollments[2].enrollmentStatus").value("ENROLLED"));
+    }
+
+    @Test
+    void lecturerGradingDropsCancelledSectionsFromTheScopedSemester() throws Exception {
+        // Wukong round-10 F2: a cancelled section is not grading workload —
+        // the assistant scope already excludes it, and the list must agree
+        // instead of showing a dead class as pending grade entry.
+        jdbc.update("UPDATE \"academic\".\"Section\" SET \"status\" = 'CANCELLED' WHERE \"id\" = 'section-2'");
+
+        mvc.perform(get("/api/v1/sections/my/grading")
+                        .queryParam("semesterId", "semester-1")
+                        .with(lecturerJwt("lecturer-1")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(1))
+                .andExpect(jsonPath("$[0].sectionId").value("section-1"));
     }
 
     @Test
