@@ -96,6 +96,8 @@ export function reasonLabel(
           ? messages.assistant.blockedLabel
           : message.reasonCode === 'PERSONAL_CONTEXT'
             ? messages.assistant.personalContext
+            : message.reasonCode === 'PRIVACY_REFUSAL'
+              ? messages.assistant.privacyRefusal
             : message.reasonCode === 'LOCAL_ASSIST'
               ? messages.assistant.localAssist
               : message.reasonCode === 'PROVIDER_TRUNCATED'

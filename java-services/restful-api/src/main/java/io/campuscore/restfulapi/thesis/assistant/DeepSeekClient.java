@@ -457,7 +457,14 @@ public class DeepSeekClient implements AssistantCompletionProvider {
                 // Docker/CI-CD study content and retrieval had already found
                 // the right document. In-scope corpus topics must be answered;
                 // only a genuinely absent topic gets the not-published line.
-                + "When the provided context covers the topic — including DevOps, Docker, CI/CD and software-engineering study content — answer from it; only when it is genuinely absent, say the portal has not published that detail and suggest the responsible office.";
+                + "When the provided context covers the topic — including DevOps, Docker, CI/CD and software-engineering study content — answer from it; only when it is genuinely absent, say the portal has not published that detail and suggest the responsible office. "
+                // Joined questions ("phúc khảo điểm thế nào, và lịch thi cuối
+                // kỳ khi nào?") must not silently drop their second intent —
+                // the retrieval window now guarantees per-family documents,
+                // so composing every part is what the grounding is for. The
+                // never-invent rules stay dominant: a part without grounding
+                // gets the honest not-published line, not fabrication.
+                + "If the question asks about more than one topic, answer every part briefly; ground each part in the matching context section, and say clearly which part the portal has not published if any is missing.";
     }
 
     /**

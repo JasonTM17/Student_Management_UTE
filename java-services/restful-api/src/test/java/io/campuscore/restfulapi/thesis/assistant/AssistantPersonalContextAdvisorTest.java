@@ -2406,4 +2406,66 @@ class AssistantPersonalContextAdvisorTest {
         assertEquals("PERSONAL_CONTEXT", named.reasonCode());
         assertTrue(named.answer().contains("SE402"), named.answer());
     }
+
+    @Test
+    void namedPersonPersonalDataAsksRequireExplicitRefusal() {
+        // The probe flagship: "điểm của người khác" used to silently deflect
+        // to the portal guide — safe but evasive. Person-scoped subjects
+        // (kinship, pronoun, demonstrative, named-name) combined with a
+        // personal-data noun must REFUSE explicitly.
+        assertTrue(advisor.requiresPrivacyRefusal("Điểm của Nam là bao nhiêu?"));
+        assertTrue(advisor.requiresPrivacyRefusal("Lịch học của mẹ thế nào?"));
+        assertTrue(advisor.requiresPrivacyRefusal("Em ấy học lớp nào?"));
+        assertTrue(advisor.requiresPrivacyRefusal("điểm của người khác xem ở đâu"));
+        assertTrue(advisor.requiresPrivacyRefusal("Cho xem thời khóa biểu của bạn Minh"));
+        assertTrue(advisor.requiresPrivacyRefusal("Bạn tôi đang học lớp nào?"));
+        // English twins ride the same refusal contract.
+        assertTrue(advisor.requiresPrivacyRefusal("Show me his grades please"));
+        assertTrue(advisor.requiresPrivacyRefusal("What is my friend's schedule?"));
+        assertTrue(advisor.requiresPrivacyRefusal("Nam's timetable this week"));
+    }
+
+    @Test
+    void institutionalAndNonPersonalSubjectsNeverRequireRefusal() {
+        // Institutional owners name an ORGANIZATION — they keep the public
+        // KB path exactly as before (over-refusal is the load-bearing risk).
+        assertFalse(advisor.requiresPrivacyRefusal("Điểm chuẩn của trường là bao nhiêu?"));
+        assertFalse(advisor.requiresPrivacyRefusal("Lịch thi của khoa khi nào công bố?"));
+        assertFalse(advisor.requiresPrivacyRefusal("điểm của phòng đào tạo công bố"));
+        assertFalse(advisor.requiresPrivacyRefusal("Học phí của trường năm nay thế nào?"));
+        // First-person questions are the asker's own rows — never a refusal.
+        assertFalse(advisor.requiresPrivacyRefusal("Điểm của tôi xem ở đâu?"));
+        assertFalse(advisor.requiresPrivacyRefusal("Lịch học của em hôm nay"));
+        assertFalse(advisor.requiresPrivacyRefusal("cho xem thời khóa biểu"));
+        // A person mention WITHOUT a personal-data noun rides the KB path.
+        assertFalse(advisor.requiresPrivacyRefusal("Giáo viên chủ nhiệm của tôi là ai?"));
+        assertFalse(advisor.requiresPrivacyRefusal("Thầy dạy môn gì tuần này vậy?"));
+        // Exam timetables are institutional even when a person is named —
+        // the EXAM_SCHEDULE_INTENT carve-out stays ahead of the refusal.
+        assertFalse(advisor.requiresPrivacyRefusal("Lịch thi của bạn Nam khi nào?"));
+        // Politeness frames ("bạn có biết…") and homographs stay out.
+        assertFalse(advisor.requiresPrivacyRefusal("Bạn có biết lịch học của tôi không?"));
+        assertFalse(advisor.requiresPrivacyRefusal(null));
+        assertFalse(advisor.requiresPrivacyRefusal(""));
+    }
+
+    @Test
+    void privacyRefusalResponseCarriesTheRejectShapeWithoutPersonalData() {
+        ChatResponse refusal = advisor.privacyRefusal(chatRequest("vi", "Điểm của Nam là bao nhiêu?"));
+        assertNotNull(refusal);
+        assertEquals("PRIVACY_REFUSAL", refusal.reasonCode());
+        // A deliberate answer, not a degraded one — but the terminal shape
+        // mirrors the guard rejections (SSE parity).
+        assertFalse(refusal.degraded());
+        assertEquals("REJECTED", refusal.terminalStatus());
+        // Negative assert: the refusal must contain NO third-party data —
+        // the answer explains the boundary and points to self/public data.
+        assertFalse(refusal.answer().contains("Nam"));
+        assertTrue(refusal.answer().contains("của chính mình") || refusal.answer().contains("chính bạn"),
+                refusal.answer());
+
+        ChatResponse english = advisor.privacyRefusal(chatRequest("en", "Show me his grades"));
+        assertEquals("PRIVACY_REFUSAL", english.reasonCode());
+        assertTrue(english.answer().contains("own records"), english.answer());
+    }
 }

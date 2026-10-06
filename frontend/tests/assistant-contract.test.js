@@ -180,6 +180,20 @@ test('assistant guard blocks end the turn locally without a JSON replay', () => 
   assert.match(messagesComponentSource, /messages\.assistant\.unavailable/);
 });
 
+test('assistant privacy-refusal code renders a dedicated localized label', () => {
+  const messagesComponentSource = fs.readFileSync(
+    path.join(root, 'src/components/assistant/AssistantMessages.tsx'),
+    'utf8',
+  );
+  const messagesSource = fs.readFileSync(path.join(root, 'src/i18n/messages.ts'), 'utf8');
+  // PRIVACY_REFUSAL is a deliberate refusal, not a blocked/guard outcome —
+  // it must not collapse into the generic blockedLabel or localAssist copy.
+  assert.match(messagesComponentSource, /message\.reasonCode === 'PRIVACY_REFUSAL'/);
+  assert.match(messagesComponentSource, /messages\.assistant\.privacyRefusal/);
+  assert.match(messagesSource, /privacyRefusal: 'Không chia sẻ dữ liệu cá nhân của người khác'/);
+  assert.match(messagesSource, /privacyRefusal: 'Private data of another person is not shared'/);
+});
+
 test('assistant stop-race and quota-retry regressions stay guarded', () => {
   const hookSource = fs.readFileSync(path.join(root, 'src/components/assistant/useAssistantStream.ts'), 'utf8');
   // A Stop click after the final done frame must not overwrite the answer.

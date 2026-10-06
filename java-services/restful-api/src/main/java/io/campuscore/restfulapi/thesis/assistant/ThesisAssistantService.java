@@ -1947,16 +1947,35 @@ public class ThesisAssistantService {
         // families (schedule, grades…) keep the unfiltered window.
         boolean multiIntent = isMultiIntentQuery(message);
         if (multiIntent) {
-            List<ThesisAssistantKnowledgeRepository.KnowledgeDocument> familyDocuments = documents.stream()
-                    .filter(document ->
-                            (isCertificateQuery(message) && isCertificateDocument(document))
-                            || (isCourseRegistrationQuery(message)
-                                    && "REGISTRATION".equalsIgnoreCase(safe(document.domain())))
-                            || (isCreditLimitQuery(message) && isCreditLimitDocument(document))
-                            || (isPrerequisiteQuery(message) && isPrerequisiteMapDocument(document)))
-                    .toList();
-            if (!familyDocuments.isEmpty()) {
-                documents = familyDocuments;
+            // Per-family representation: each DETECTED family contributes its
+            // best-ranked document ahead of the rest, so a joined question
+            // ("phúc khảo điểm thế nào, và lịch thi cuối kỳ khi nào?") grounds
+            // BOTH halves inside PROMPT_DOCUMENT_LIMIT. The old union dropped
+            // every non-matching document and had no predicate for the
+            // exam/grades/fees families, so the second intent could be
+            // crowded out of the prompt window entirely. Families without a
+            // predicate keep their retrieval share through the backfill.
+            String folded = foldForMatching(message);
+            List<java.util.function.Predicate<ThesisAssistantKnowledgeRepository.KnowledgeDocument>> familyPredicates =
+                    new ArrayList<>();
+            if (isCertificateQuery(message)) familyPredicates.add(ThesisAssistantService::isCertificateDocument);
+            if (isCourseRegistrationQuery(message)) familyPredicates.add(
+                    document -> "REGISTRATION".equalsIgnoreCase(safe(document.domain())));
+            if (isCreditLimitQuery(message)) familyPredicates.add(ThesisAssistantService::isCreditLimitDocument);
+            if (isPrerequisiteQuery(message)) familyPredicates.add(ThesisAssistantService::isPrerequisiteMapDocument);
+            if (INTENT_EXAM.matcher(folded).find()) familyPredicates.add(ThesisAssistantService::isExamDocument);
+            if (INTENT_GRADES.matcher(folded).find()) familyPredicates.add(ThesisAssistantService::isGradesDocument);
+            if (INTENT_FEES.matcher(folded).find()) familyPredicates.add(ThesisAssistantService::isFeesDocument);
+            List<ThesisAssistantKnowledgeRepository.KnowledgeDocument> ordered = new ArrayList<>();
+            for (java.util.function.Predicate<ThesisAssistantKnowledgeRepository.KnowledgeDocument> predicate
+                    : familyPredicates) {
+                documents.stream().filter(predicate).findFirst().ifPresent(ordered::add);
+            }
+            if (!ordered.isEmpty()) {
+                for (ThesisAssistantKnowledgeRepository.KnowledgeDocument document : documents) {
+                    if (!ordered.contains(document)) ordered.add(document);
+                }
+                documents = ordered;
             }
         } else if (isCreditLimitQuery(message)) {
             documents = documents.stream()
@@ -2175,6 +2194,28 @@ public class ThesisAssistantService {
     static boolean isCertificateDocument(ThesisAssistantKnowledgeRepository.KnowledgeDocument document) {
         if (document == null) return false;
         return CERTIFICATE_TITLE.matcher(foldForMatching(safe(document.title()))).find();
+    }
+
+    /** Exam-family KB documents: the V87 exam schedule plus the exam rules. */
+    static boolean isExamDocument(ThesisAssistantKnowledgeRepository.KnowledgeDocument document) {
+        if (document == null) return false;
+        String slug = safe(document.slug());
+        return slug.startsWith("campus-exam-schedule") || slug.startsWith("exam-regulations")
+                || slug.startsWith("exam-deferral") || slug.startsWith("lich-thi-");
+    }
+
+    /** Grades-family KB documents, including the phúc khảo/appeals procedure. */
+    static boolean isGradesDocument(ThesisAssistantKnowledgeRepository.KnowledgeDocument document) {
+        if (document == null) return false;
+        String slug = safe(document.slug());
+        return slug.startsWith("grades-transcript") || slug.startsWith("grade-f-retake")
+                || slug.startsWith("gpa-letter-conversion") || slug.startsWith("academic-appeals")
+                || slug.startsWith("curriculum-gpa-weighting");
+    }
+
+    /** Fees-family KB documents (tuition/công nợ policy). */
+    static boolean isFeesDocument(ThesisAssistantKnowledgeRepository.KnowledgeDocument document) {
+        return document != null && safe(document.slug()).startsWith("campus-tuition");
     }
 
     /**

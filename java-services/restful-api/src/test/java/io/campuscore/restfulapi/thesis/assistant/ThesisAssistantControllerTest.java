@@ -517,6 +517,34 @@ class ThesisAssistantControllerTest {
                 && "NO_MATCH".equals(done.reasonCode())));
     }
 
+    @Test
+    void namedPersonPersonalDataAskRefusesExplicitlyWithoutLedgerCharge() {
+        ThesisAssistantService assistant = mock(ThesisAssistantService.class);
+        AssistantPersonalContextAdvisor personalContext = mock(AssistantPersonalContextAdvisor.class);
+        AssistantRlsState state = new AssistantRlsState();
+        state.markVerified("Assistant RLS runtime role, policies and isolation boundary verified");
+        ThesisAssistantController controller =
+                new ThesisAssistantController(assistant, null, personalContext, state);
+        when(personalContext.requiresPrivacyRefusal("Điểm của Nam là bao nhiêu?")).thenReturn(true);
+        ChatResponse refusal = new ChatResponse(
+                "Mình không thể chia sẻ dữ liệu cá nhân của người khác.",
+                ThesisAssistantService.MODEL, false, "PRIVACY_REFUSAL", "vi", List.of(),
+                UUID.randomUUID(), null, null, false, "REJECTED", null, null, null);
+        when(personalContext.privacyRefusal(any())).thenReturn(refusal);
+
+        ChatResponse response = controller.chat(
+                request("Điểm của Nam là bao nhiêu?"), actor(), new MockHttpServletRequest());
+
+        assertEquals("PRIVACY_REFUSAL", response.reasonCode());
+        assertEquals("REJECTED", response.terminalStatus());
+        assertFalse(response.degraded());
+        // Same contract as the guard rejections: no ledger turn, no
+        // idempotency charge, and the personal handles() gate never runs.
+        verify(personalContext, never()).handles(anyString());
+        verify(personalContext, never()).answer(any(), any());
+        verifyNoInteractions(assistant);
+    }
+
     private static ChatRequest request(String message) {
         return new ChatRequest(message, "vi", UUID.randomUUID(), null);
     }

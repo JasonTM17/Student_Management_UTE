@@ -2434,6 +2434,7 @@ export const en = {
     sensitiveBlocked:
       'Please do not enter email addresses, phone numbers, student IDs, or secrets into the assistant.',
     personalContext: 'Answered from your personal academic records',
+    privacyRefusal: 'Private data of another person is not shared',
     localAssist: 'Direct reply from the assistant',
     localOnlyNotice:
       'Privacy note: personal lookups are shown only in this session and are not saved to conversation history.',
@@ -5068,6 +5069,7 @@ export const vi: I18nMessages = {
     sensitiveBlocked:
       'Vui lòng không nhập email, số điện thoại, mã sinh viên hoặc thông tin bí mật vào trợ lý.',
     personalContext: 'Trả lời từ dữ liệu học vụ cá nhân của bạn',
+    privacyRefusal: 'Không chia sẻ dữ liệu cá nhân của người khác',
     localAssist: 'Trả lời trực tiếp từ trợ lý',
     localOnlyNotice:
       'Lưu ý riêng tư: dữ liệu cá nhân chỉ hiển thị trong phiên này và không được lưu vào lịch sử hội thoại.',

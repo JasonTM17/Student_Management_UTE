@@ -221,6 +221,15 @@ public class ThesisAssistantController {
         if (conversational != null) {
             return conversational;
         }
+        // Named/related person's personal-data ask — refuse explicitly before
+        // the personal gate: handles() would either veto to a silent KB
+        // deflection or, for no-pronoun intents ("lịch học của Nam"), serve
+        // the ASKER's own rows under the wrong subject. Same early-return
+        // contract as the guard rejections: no ledger turn, no idempotency
+        // charge — a refused ask is not a billable turn.
+        if (personalContext != null && personalContext.requiresPrivacyRefusal(request.message())) {
+            return personalContext.privacyRefusal(request);
+        }
         if (personalContext != null && personalContext.handles(request.message())) {
             // Round-3 cb3-10: a reused clientRequestId with a different payload
             // conflicts exactly like the KB path instead of being answered.
@@ -456,7 +465,14 @@ public class ThesisAssistantController {
                 // personal DB reads, not after, so a conflicting reused key
                 // is rejected without paying for the lookup.
                 ChatResponse personal = null;
-                if (personalContext != null && personalContext.handles(request.message())) {
+                // Same privacy-refusal ordering as the JSON route: a named
+                // person's personal-data ask refuses before the personal gate,
+                // and like the guard rejections it is not persisted or charged.
+                boolean privacyRefusal = personalContext != null
+                        && personalContext.requiresPrivacyRefusal(request.message());
+                if (privacyRefusal) {
+                    personal = personalContext.privacyRefusal(request);
+                } else if (personalContext != null && personalContext.handles(request.message())) {
                     assistant.enforcePersonalIdempotency(owner, request.clientRequestId(),
                             AssistantInputGuard.canonicalHash(request.message(),
                                     AssistantInputGuard.normalizeLocale(request.locale()),
@@ -464,7 +480,9 @@ public class ThesisAssistantController {
                     personal = personalContext.answer(request, actor);
                 }
                 if (personal != null) {
-                    personal = persistPersonalTurn(request, personal, owner);
+                    if (!privacyRefusal) {
+                        personal = persistPersonalTurn(request, personal, owner);
+                    }
                     personalContext.stream(personal, request, sink);
                 } else {
                     ChatResponse general = assistant.generalAnswerIfOffTopic(request.message(),

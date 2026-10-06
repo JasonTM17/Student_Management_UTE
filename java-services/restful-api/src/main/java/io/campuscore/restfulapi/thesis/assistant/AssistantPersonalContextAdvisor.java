@@ -66,6 +66,7 @@ public class AssistantPersonalContextAdvisor {
     private static final String MODEL = "campuscore-personal-context";
     private static final String REASON_CODE = "PERSONAL_CONTEXT";
     private static final String UNAVAILABLE_REASON_CODE = "PERSONAL_CONTEXT_UNAVAILABLE";
+    private static final String PRIVACY_REFUSAL_REASON_CODE = "PRIVACY_REFUSAL";
     private static final Logger LOG = LoggerFactory.getLogger(AssistantPersonalContextAdvisor.class);
 
     /** Enrollment statuses that still bind a seat, matching the web portal. */
@@ -884,6 +885,91 @@ public class AssistantPersonalContextAdvisor {
     }
 
     /**
+     * Institutional owners in possessive position ("điểm chuẩn của trường",
+     * "lịch thi của khoa", "điểm của phòng đào tạo") name an ORGANIZATION,
+     * not a person — they stay on the public KB path. The privacy-refusal
+     * check scrubs these spans before re-running the third-person detector
+     * so a genuine person elsewhere in the message still refuses normally.
+     * Bare "nhà" stays OUT (a person's household, not an org); the explicit
+     * "nhà trường" compound covers the institutional reading.
+     */
+    private static final Pattern INSTITUTIONAL_POSSESSIVE = Pattern.compile(
+            "\\b(?:của|cua)\\s+(?:(?:các|mấy|những|bọn|cac|may|nhung|bon)\\s+)?"
+                    + "(?:trường|truong|khoa|phòng\\s+(?:đào\\s*tạo|dao\\s*tao)"
+                    + "|phong\\s+(?:dao\\s*tao)|ban\\s+giám\\s+hiệu|ban\\s+giam\\s+hieu"
+                    + "|nhà\\s+trường|nha\\s+truong|đại\\s+học|dai\\s+hoc|học\\s+viện|hoc\\s+vien"
+                    + "|sở\\s+(?:giáo\\s+dục|giao\\s+duc)|so\\s+(?:giao\\s+duc)"
+                    + "|bộ\\s+(?:giáo\\s+dục|giao\\s+duc)|bo\\s+(?:giao\\s+duc)|hcmute|ute)\\b",
+            Pattern.CASE_INSENSITIVE | Pattern.UNICODE_CASE | Pattern.UNICODE_CHARACTER_CLASS);
+
+    /**
+     * Personal-data family signal for the refusal check: the nouns that name
+     * a person's private academic records (schedule, grades, conduct,
+     * attendance, credits, enrollment, thesis, transcript). Fees/học phí
+     * stay out — tuition policy is institutional, and a relative's fee
+     * balance asks still answer correctly through the generic KB path.
+     */
+    private static final Pattern PERSONAL_DATA_NOUN = Pattern.compile(
+            "\\b(?:điểm|diem|gpa|học\\s*bạ|hoc\\s*ba|hạnh\\s*kiểm|hanh\\s*kiem"
+                    + "|rèn\\s*luyện|ren\\s*luyen|điểm\\s*danh|diem\\s*danh|chuyên\\s*cần|chuyen\\s*can"
+                    + "|lịch\\s*học|lich\\s*hoc|thời\\s*khóa\\s*biểu|thoi\\s*khoa\\s*bieu"
+                    + "|tín\\s*chỉ|tin\\s*chi|luận\\s*văn|luan\\s*van|đề\\s*tài|de\\s*tai"
+                    + "|khóa\\s*luận|khoa\\s*luan|kết\\s*quả\\s*học|ket\\s*qua\\s*hoc|tiến\\s*độ|tien\\s*do"
+                    + "|môn\\s*(?:đang\\s*|dang\\s*)?học|mon\\s*(?:dang\\s*)?hoc"
+                    + "|lớp\\s*(?:đang\\s*|dang\\s*)?học|lop\\s*(?:dang\\s*)?hoc"
+                    + "|học\\s*lớp|hoc\\s*lop|học\\s*môn|hoc\\s*mon"
+                    + "|đăng\\s*ký\\s*(?:môn|lớp|học)|dang\\s*ky\\s*(?:mon|lop|hoc)"
+                    + "|grades?|scores?|transcript|schedules?|timetable|credits?"
+                    + "|conduct|attendance|thesis|enrollments?|enrolments?)\\b",
+            Pattern.CASE_INSENSITIVE | Pattern.UNICODE_CASE | Pattern.UNICODE_CHARACTER_CLASS);
+
+    /**
+     * A named/related person's personal-data ask ("điểm của Nam", "lịch học
+     * của mẹ", "em ấy học lớp nào", "his grades") must REFUSE explicitly —
+     * silently deflecting to the KB reads as evasive, while serving the
+     * asker's own rows answers the wrong subject. Person-scoped only:
+     * institutional owners ("điểm chuẩn của trường", "lịch thi của khoa")
+     * keep the public knowledge path, and questions without a personal-data
+     * noun ("giáo viên chủ nhiệm của tôi là ai") fall through normally.
+     */
+    public boolean requiresPrivacyRefusal(String message) {
+        message = nfc(message);
+        if (message == null) return false;
+        // Exam timetables are institutional data — "lịch thi của bạn X" is a
+        // public-KB question even though it names a person (the same
+        // carve-out handles() applies before the third-person veto).
+        if (EXAM_SCHEDULE_INTENT.matcher(message).find()) return false;
+        // A named section's public catalog data stays public.
+        if (isSectionDetailIntent(message)) return false;
+        // Without a personal-data noun the person mention rides a KB or
+        // general question — refusing would be over-broad.
+        if (!PERSONAL_DATA_NOUN.matcher(message).find()) return false;
+        String scrubbed = INSTITUTIONAL_POSSESSIVE.matcher(message).replaceAll(" ");
+        return hasThirdPersonSubject(scrubbed);
+    }
+
+    /**
+     * The explicit refusal answer, on the same early-return contract as the
+     * input guard: no ledger turn, no idempotency charge — a refused ask is
+     * not a billable turn. {@code terminalStatus="REJECTED"} mirrors the
+     * guard-rejection shape while {@code degraded=false} records a
+     * deliberate answer, not a degraded one.
+     */
+    public ChatResponse privacyRefusal(ChatRequest request) {
+        String locale = normalizedLocale(request);
+        return new ChatResponse(privacyRefusalMessage(locale), MODEL, false,
+                PRIVACY_REFUSAL_REASON_CODE, locale, List.of(), UUID.randomUUID(),
+                request != null ? request.clientRequestId() : null, null, false,
+                "REJECTED", null, null, null);
+    }
+
+    static String privacyRefusalMessage(String locale) {
+        return "vi".equals(locale)
+                ? "Mình không thể chia sẻ lịch học, điểm số, hay dữ liệu cá nhân của người khác — mỗi tài khoản chỉ xem được dữ liệu của chính mình. Bạn có thể hỏi về thông tin học vụ công khai của trường, hoặc dữ liệu học tập của chính bạn nhé."
+                : "I can't share someone else's schedule, grades, or personal data — each account can only view its own records. Ask me about the university's public academic information, or your own data instead.";
+    }
+
+    /**
      * In unaccented Vietnamese, "toi" is both "tôi" (I) and "tối/tới" — "tối
      * nay", "tới giờ". When the token precedes a time word it cannot be the
      * pronoun, so the enrollment-list intent vetoes it (Wukong re-verify:
@@ -1615,8 +1701,13 @@ public class AssistantPersonalContextAdvisor {
                 UUID.randomUUID(), request.clientRequestId(), null, uuidOrNull(response == null ? null : response.conversationId()),
                 MODEL, locale));
         sink.accept(new ThesisAssistantService.StreamReplace(answer, List.of(), reasonCode));
+        // terminalStatus rides the response so a privacy refusal streams the
+        // same "REJECTED" shape the JSON route returns — ordinary personal
+        // answers carry null and keep the existing "COMPLETED".
+        String terminalStatus = response != null && StringUtils.hasText(response.terminalStatus())
+                ? response.terminalStatus() : "COMPLETED";
         sink.accept(new ThesisAssistantService.StreamDone(uuidOrNull(response == null ? null : response.messageId()),
-                reasonCode, degraded, "COMPLETED"));
+                reasonCode, degraded, terminalStatus));
     }
 
     private static UUID uuidOrNull(String value) {

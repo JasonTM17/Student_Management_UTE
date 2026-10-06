@@ -7,6 +7,7 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.anyLong;
@@ -1002,6 +1003,89 @@ class ThesisAssistantServiceTest {
         assertEquals(3, captured.get(0).sourceIds().size());
         assertEquals(3, captured.get(0).context().split("(?m)^### ", -1).length - 1);
         assertEquals(3, response.citations().size());
+    }
+
+    @Test
+    void joinedQuestionGroundsEveryDetectedFamilyInsideThePromptLimit() {
+        // Phase-8: "Phúc khảo điểm thế nào, và lịch thi cuối kỳ khi nào?"
+        // detects the grades + exam families, but the exam/grades predicates
+        // did not exist — generic docs crowded the second family out of the
+        // top-3 prompt window and the provider answered only the first
+        // intent. Each detected family now contributes its best document
+        // ahead of the rest.
+        ThesisAssistantKnowledgeRepository knowledge = mock(ThesisAssistantKnowledgeRepository.class);
+        DeepSeekClient provider = mock(DeepSeekClient.class);
+        ThesisAssistantRepository history = mock(ThesisAssistantRepository.class);
+        ThesisAssistantTurnRepository turns = mock(ThesisAssistantTurnRepository.class);
+        ThesisAssistantCatalogRepository catalog = mock(ThesisAssistantCatalogRepository.class);
+        List<ThesisAssistantKnowledgeRepository.KnowledgeDocument> documents = new ArrayList<>();
+        // Three generic decoys outrank both family docs — without per-family
+        // representation the prompt window carries decoys only.
+        for (int index = 1; index <= 3; index++) {
+            documents.add(new ThesisAssistantKnowledgeRepository.KnowledgeDocument(
+                    "00000000-0000-0000-0000-00000000001" + index, "portal-guide-" + index, "vi",
+                    "Hướng dẫn cổng " + index, "Phúc khảo điểm lịch thi hướng dẫn " + index, "office"));
+        }
+        var appeals = new ThesisAssistantKnowledgeRepository.KnowledgeDocument(
+                "00000000-0000-0000-0000-000000000021", "academic-appeals-and-re-evaluation-vi", "vi",
+                "Quy trình khiếu nại và phúc khảo điểm thi học phần",
+                "Quy trình phúc khảo điểm thi chi tiết", "office");
+        var examSchedule = new ThesisAssistantKnowledgeRepository.KnowledgeDocument(
+                "00000000-0000-0000-0000-000000000022", "campus-exam-schedule-vi", "vi",
+                "Lịch thi cuối kỳ", "Lịch thi kết thúc học phần được công bố", "office");
+        documents.add(appeals);
+        documents.add(examSchedule);
+        when(knowledge.search(anyString(), anyList(), anyInt())).thenReturn(documents);
+        when(catalog.search(anyString(), anyList(), anyInt())).thenReturn(List.of());
+        when(provider.model()).thenReturn("deepseek-v4-flash");
+
+        UUID request = UUID.randomUUID();
+        UUID turn = UUID.randomUUID();
+        UUID conversation = UUID.randomUUID();
+        UUID message = UUID.randomUUID();
+        when(turns.reserve(anyString(), eq(request), anyString(), isNull(), eq("vi"), anyString(), anyInt(),
+                any(java.util.function.Consumer.class)))
+                .thenReturn(new ThesisAssistantTurnRepository.Reservation(
+                        ThesisAssistantTurnRepository.ReservationStatus.NEW, turn, conversation, 1L, true, null, null, false));
+        when(turns.markSnapshotReady(eq(turn), anyString(), eq(1L), anyString(),
+                any(java.util.function.Consumer.class))).thenReturn(true);
+        when(turns.dispatch(eq(turn), anyString(), eq(1L), anyInt(), anyInt(),
+                any(java.util.function.Consumer.class)))
+                .thenReturn(new ThesisAssistantTurnRepository.DispatchDecision(true, true, "DISPATCHED"));
+        when(turns.complete(eq(turn), anyString(), eq(1L), anyString(), anyString(),
+                anyString(), anyBoolean(), anyString(), anyList(), any(java.util.function.Consumer.class)))
+                .thenAnswer(invocation -> new ThesisAssistantTurnRepository.TerminalResult(
+                        conversation, message, invocation.getArgument(5, String.class), "deepseek-v4-flash", false,
+                        invocation.getArgument(7, String.class), invocation.getArgument(8, List.class),
+                        false, "COMPLETED"));
+        List<AssistantCompletionProvider.CompletionRequest> captured = new ArrayList<>();
+        doAnswer(invocation -> {
+            captured.add(invocation.getArgument(0));
+            @SuppressWarnings("unchecked")
+            java.util.function.Consumer<ProviderSegment> sink = invocation.getArgument(1);
+            sink.accept(new ProviderSegment(0, "Both parts answered", List.of()));
+            return new CompletionResult("Both parts answered", List.of(), "stop");
+        }).when(provider).complete(any(AssistantCompletionProvider.CompletionRequest.class),
+                any(java.util.function.Consumer.class), any(java.util.function.BooleanSupplier.class));
+
+        ThesisAssistantService service = new ThesisAssistantService(knowledge, provider, history, turns, catalog,
+                new AssistantCancellationRegistry(),
+                new DeepSeekProperties(true, "fixture", "https://api.deepseek.com", "deepseek-v4-flash", 8000, 800),
+                new AssistantProperties(6000, 2000, 20, 200, 90, true));
+
+        ChatResponse response = service.answer(
+                "Phúc khảo điểm thế nào, và lịch thi cuối kỳ khi nào?", "vi", null,
+                "owner-multi", request);
+
+        assertEquals(1, captured.size());
+        String context = captured.get(0).context();
+        // Both detected families must be inside the prompt window — the exam
+        // doc survived the crowd-out even though it ranked last.
+        assertTrue(context.contains("phúc khảo điểm thi học phần"), context);
+        assertTrue(context.contains("Lịch thi cuối kỳ"), context);
+        assertTrue(captured.get(0).sourceIds().contains("00000000-0000-0000-0000-000000000021"));
+        assertTrue(captured.get(0).sourceIds().contains("00000000-0000-0000-0000-000000000022"));
+        assertNotNull(response);
     }
 
     /**
