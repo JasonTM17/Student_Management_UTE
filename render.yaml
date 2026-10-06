@@ -45,12 +45,11 @@ services:
       # DEMO_ACCOUNTS_ROLES (see DemoAccountGate) to e.g. "STUDENT".
       - key: DEMO_ACCOUNTS_ENABLED
         value: "true"
-      # Owner decision (2026-09-30): unlimited registration credit for the
-      # demo — every account's effective limit becomes this value, bypassing
-      # the 28-credit standard and the raise-application flow. Set to "0" to
-      # restore the standard/approved behaviour.
+      # Owner decision (2026-10-05): enforce the real cap — 28 credits
+      # standard per round, raised to 30 only by an approved credit-limit
+      # application. Set >0 only for an explicit unlimited demo.
       - key: REGISTRATION_CREDIT_LIMIT_OVERRIDE
-        value: "999"
+        value: "0"
       # Owner decision (round-4 format sweep): the 20/day default burned through
       # in one demo session, and a QUOTA_EXCEEDED answer degrades to the
       # deterministic document fallback. 100/day keeps full LLM answers flowing
