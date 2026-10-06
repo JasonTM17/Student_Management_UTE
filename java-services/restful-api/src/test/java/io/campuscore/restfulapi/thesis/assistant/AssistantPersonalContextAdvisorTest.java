@@ -2468,4 +2468,47 @@ class AssistantPersonalContextAdvisorTest {
         assertEquals("PRIVACY_REFUSAL", english.reasonCode());
         assertTrue(english.answer().contains("own records"), english.answer());
     }
+
+    @Test
+    void privacyRefusalCoversUnaccentedAndSynonymousPersonalNouns() {
+        // The noun gate must not depend on a single spelling: "điem"
+        // (GRADES_INTENT's hybrid form), the "khoá" schedule variant, the
+        // thesis abbreviations, and English plurals all carry the same ask.
+        assertTrue(advisor.requiresPrivacyRefusal("điem cua Nam bao nhieu"));
+        assertTrue(advisor.requiresPrivacyRefusal("Cho xem thời khoá biểu của bạn Minh"));
+        assertTrue(advisor.requiresPrivacyRefusal("tkb của em trai tôi"));
+        assertTrue(advisor.requiresPrivacyRefusal("đồ án của Nam thế nào"));
+        assertTrue(advisor.requiresPrivacyRefusal("kltn của mẹ duyệt chưa"));
+        // EN plural nouns refuse when the person arm fires; "his transcripts"
+        // stays a documented fail-soft gap — the his/her/their arm lists no
+        // transcript noun and THIRD_PERSON_SUBJECT is not refusal-editable.
+        assertTrue(advisor.requiresPrivacyRefusal("transcripts của Nam"));
+        assertTrue(advisor.requiresPrivacyRefusal("my friend's timetables this term"));
+        // Thesis-committee nouns refuse only for a person subject; the
+        // institutional owner keeps the public path.
+        assertTrue(advisor.requiresPrivacyRefusal("hội đồng của thầy Hùng"));
+        assertTrue(advisor.requiresPrivacyRefusal("tiểu luận của Nam"));
+        assertFalse(advisor.requiresPrivacyRefusal("hội đồng của trường"));
+    }
+
+    @Test
+    void privacyRefusalStreamsMetaReplaceDoneWithRejectedTerminalStatus() {
+        // SSE parity pin: the refusal rides personalContext.stream(), whose
+        // terminalStatus passthrough must emit done(REJECTED) exactly like
+        // the JSON route returns.
+        ChatRequest request = chatRequest("vi", "Điểm của Nam là bao nhiêu?");
+        ChatResponse refusal = advisor.privacyRefusal(request);
+        List<ThesisAssistantService.StreamEvent> events = new ArrayList<>();
+
+        advisor.stream(refusal, request, events::add);
+
+        assertTrue(events.stream().anyMatch(event -> event instanceof ThesisAssistantService.StreamMeta meta
+                && request.clientRequestId().equals(meta.clientRequestId())));
+        assertTrue(events.stream().anyMatch(event -> event instanceof ThesisAssistantService.StreamReplace replace
+                && "PRIVACY_REFUSAL".equals(replace.reasonCode())
+                && replace.text().equals(refusal.answer())));
+        assertTrue(events.stream().anyMatch(event -> event instanceof ThesisAssistantService.StreamDone done
+                && "PRIVACY_REFUSAL".equals(done.reasonCode())
+                && "REJECTED".equals(done.terminalStatus())));
+    }
 }

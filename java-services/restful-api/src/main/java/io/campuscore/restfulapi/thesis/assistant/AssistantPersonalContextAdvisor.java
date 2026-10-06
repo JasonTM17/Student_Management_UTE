@@ -910,16 +910,17 @@ public class AssistantPersonalContextAdvisor {
      * balance asks still answer correctly through the generic KB path.
      */
     private static final Pattern PERSONAL_DATA_NOUN = Pattern.compile(
-            "\\b(?:điểm|diem|gpa|học\\s*bạ|hoc\\s*ba|hạnh\\s*kiểm|hanh\\s*kiem"
+            "\\b(?:điểm|diem|điem|gpa|học\\s*bạ|hoc\\s*ba|hạnh\\s*kiểm|hanh\\s*kiem"
                     + "|rèn\\s*luyện|ren\\s*luyen|điểm\\s*danh|diem\\s*danh|chuyên\\s*cần|chuyen\\s*can"
-                    + "|lịch\\s*học|lich\\s*hoc|thời\\s*khóa\\s*biểu|thoi\\s*khoa\\s*bieu"
+                    + "|lịch\\s*học|lich\\s*hoc|thời\\s*(?:khóa|khoá|khoa)\\s*biểu|thoi\\s*khoa\\s*bieu|tkb"
                     + "|tín\\s*chỉ|tin\\s*chi|luận\\s*văn|luan\\s*van|đề\\s*tài|de\\s*tai"
                     + "|khóa\\s*luận|khoa\\s*luan|kết\\s*quả\\s*học|ket\\s*qua\\s*hoc|tiến\\s*độ|tien\\s*do"
+                    + "|đồ\\s*án|do\\s*an|tiểu\\s*luận|tieu\\s*luan|kltn|hội\\s*đồng|hoi\\s*dong"
                     + "|môn\\s*(?:đang\\s*|dang\\s*)?học|mon\\s*(?:dang\\s*)?hoc"
                     + "|lớp\\s*(?:đang\\s*|dang\\s*)?học|lop\\s*(?:dang\\s*)?hoc"
                     + "|học\\s*lớp|hoc\\s*lop|học\\s*môn|hoc\\s*mon"
                     + "|đăng\\s*ký\\s*(?:môn|lớp|học)|dang\\s*ky\\s*(?:mon|lop|hoc)"
-                    + "|grades?|scores?|transcript|schedules?|timetable|credits?"
+                    + "|grades?|scores?|transcripts?|schedules?|timetables?|credits?"
                     + "|conduct|attendance|thesis|enrollments?|enrolments?)\\b",
             Pattern.CASE_INSENSITIVE | Pattern.UNICODE_CASE | Pattern.UNICODE_CHARACTER_CLASS);
 

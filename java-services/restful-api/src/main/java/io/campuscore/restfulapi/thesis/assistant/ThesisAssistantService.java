@@ -1944,7 +1944,7 @@ public class ThesisAssistantService {
         // the other half's citations, while skipping scoping entirely lets an
         // off-topic document win the ranking. Union the detected families that
         // have a document predicate; questions joining only predicate-less
-        // families (schedule, grades…) keep the unfiltered window.
+        // families keep the unfiltered window.
         boolean multiIntent = isMultiIntentQuery(message);
         if (multiIntent) {
             // Per-family representation: each DETECTED family contributes its
@@ -1969,7 +1969,9 @@ public class ThesisAssistantService {
             List<ThesisAssistantKnowledgeRepository.KnowledgeDocument> ordered = new ArrayList<>();
             for (java.util.function.Predicate<ThesisAssistantKnowledgeRepository.KnowledgeDocument> predicate
                     : familyPredicates) {
-                documents.stream().filter(predicate).findFirst().ifPresent(ordered::add);
+                documents.stream().filter(predicate).findFirst().ifPresent(document -> {
+                    if (!ordered.contains(document)) ordered.add(document);
+                });
             }
             if (!ordered.isEmpty()) {
                 for (ThesisAssistantKnowledgeRepository.KnowledgeDocument document : documents) {
