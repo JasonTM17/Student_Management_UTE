@@ -8,7 +8,6 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import io.campuscore.restfulapi.thesis.assistant.AssistantRlsBoundary.Access;
 import io.campuscore.restfulapi.web.DomainException;
-import java.sql.Timestamp;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;

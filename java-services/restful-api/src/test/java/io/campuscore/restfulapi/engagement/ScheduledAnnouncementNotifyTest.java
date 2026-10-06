@@ -28,7 +28,10 @@ import org.mockito.InOrder;
 /** Marker contract for the scheduled-announcement notification refire (V104). */
 class ScheduledAnnouncementNotifyTest {
 
-    private static final Instant NOW = Instant.parse("2026-10-07T00:00:00Z");
+    // Wall-clock-relative base: the service and job compare publishAt against
+    // Instant.now() at call time, so a fixed epoch would silently flip these
+    // fixtures' due/not-due meaning once the calendar passes it.
+    private static final Instant NOW = Instant.now();
 
     @Test
     void createStampsNotifiedOnlyWhenVisibleNow() throws Exception {
@@ -119,6 +122,7 @@ class ScheduledAnnouncementNotifyTest {
 
         verify(notifier, never()).fanOutToActiveStudents(any());
         verify(announcements, never()).clearNotifiedAt(any());
+        verify(announcements, never()).clearNotifiedAt(any(), any());
     }
 
     @Test
