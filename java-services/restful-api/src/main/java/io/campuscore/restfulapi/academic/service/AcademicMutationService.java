@@ -4,6 +4,7 @@ import io.campuscore.restfulapi.academic.registration.RegistrationService;
 import io.campuscore.restfulapi.academic.web.AcademicEnrollmentReadDtos.EnrollmentResponse;
 import io.campuscore.restfulapi.academic.web.AcademicMutationDtos.GradeUpdate;
 import io.campuscore.restfulapi.audit.AdminAuditRecorder;
+import io.campuscore.restfulapi.engagement.service.GradePublishNotifier;
 import io.campuscore.restfulapi.web.DomainException;
 import java.sql.Timestamp;
 import java.math.BigDecimal;
@@ -16,6 +17,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import org.springframework.context.annotation.Profile;
+import org.springframework.dao.DataAccessException;
 import org.springframework.dao.EmptyResultDataAccessException;
 import org.springframework.http.HttpStatus;
 import org.springframework.jdbc.core.namedparam.MapSqlParameterSource;
@@ -45,21 +47,37 @@ public class AcademicMutationService {
      */
     private static final List<String> GRADEABLE_STATUSES = List.of("ENROLLED", "CONFIRMED", "COMPLETED");
 
+    private static final org.slf4j.Logger log =
+            org.slf4j.LoggerFactory.getLogger(AcademicMutationService.class);
+
     private final NamedParameterJdbcTemplate jdbc;
     private final AcademicEnrollmentReadService reads;
     private final RegistrationService registration;
     private final AdminAuditRecorder audit;
+    private final GradePublishNotifier gradeNotifier;
     private final boolean postgres;
 
+    /** Compatibility constructor for tests that only exercise limit/publish math. */
     public AcademicMutationService(
             NamedParameterJdbcTemplate jdbc,
             AcademicEnrollmentReadService reads,
             RegistrationService registration,
             AdminAuditRecorder audit) {
+        this(jdbc, reads, registration, audit, null);
+    }
+
+    @org.springframework.beans.factory.annotation.Autowired
+    public AcademicMutationService(
+            NamedParameterJdbcTemplate jdbc,
+            AcademicEnrollmentReadService reads,
+            RegistrationService registration,
+            AdminAuditRecorder audit,
+            GradePublishNotifier gradeNotifier) {
         this.jdbc = jdbc;
         this.reads = reads;
         this.registration = registration;
         this.audit = audit;
+        this.gradeNotifier = gradeNotifier;
         this.postgres = databaseIsPostgres(jdbc);
     }
 
@@ -367,6 +385,13 @@ public class AcademicMutationService {
                     : "All students require process and final exam scores before publishing";
             throw problem(HttpStatus.CONFLICT, "GRADE_COMPONENTS_INCOMPLETE", detail);
         }
+        // The audience is captured before the UPDATE: the notifier runs in a
+        // separate transaction (REQUIRES_NEW) that cannot see the pending
+        // write, and re-deriving the set by gradeStatus afterwards would
+        // over-notify on any publish that races a second publish of the same
+        // section.
+        List<String> audience = publishAudience(sectionId);
+        String sectionLabel = sectionLabel(sectionId);
         int updated = jdbc.update(
                 "UPDATE " + ENROLLMENT + " SET \"gradeStatus\" = 'PUBLISHED', \"status\" = 'COMPLETED',"
                         + " \"updatedAt\" = CURRENT_TIMESTAMP WHERE \"sectionId\" = :sectionId"
@@ -384,6 +409,48 @@ public class AcademicMutationService {
             audit.record(actorId, null, "GRADE_PUBLISH_BY_ADMIN", "SECTION", sectionId,
                     "Admin " + actorId + " published official grades for section " + sectionId
                             + " (" + updated + " enrollment(s))");
+        }
+        if (gradeNotifier != null && !audience.isEmpty()) {
+            try {
+                gradeNotifier.fanOutToSection(sectionLabel, audience);
+            } catch (RuntimeException exception) {
+                log.warn("Grade publish notification fan-out failed for section {}", sectionId, exception);
+            }
+        }
+    }
+
+    /** Auth user ids of enrollments matching the exact publish predicate. */
+    private List<String> publishAudience(String sectionId) {
+        try {
+            return jdbc.queryForList(
+                "SELECT DISTINCT student.\"userId\" FROM " + ENROLLMENT + " e"
+                        + " JOIN " + STUDENT + " student ON student.\"id\" = e.\"studentId\""
+                        + " WHERE e.\"sectionId\" = :sectionId"
+                        + " AND e.\"status\" IN (:gradeableStatuses)"
+                        + " AND e.\"finalGrade\" IS NOT NULL AND e.\"letterGrade\" IS NOT NULL"
+                        + " AND student.\"userId\" IS NOT NULL",
+                new MapSqlParameterSource("sectionId", sectionId)
+                        .addValue("gradeableStatuses", GRADEABLE_STATUSES),
+                String.class);
+        } catch (DataAccessException exception) {
+            // Fixtures or deployments without the Student/notification join
+            // tables must still publish grades; the fan-out just has no
+            // audience to reach.
+            return List.of();
+        }
+    }
+
+    private String sectionLabel(String sectionId) {
+        try {
+            return jdbc.queryForObject(
+                    "SELECT course.\"code\" || ' · Section ' || section.\"sectionNumber\""
+                            + " FROM " + SECTION + " section"
+                            + " JOIN " + COURSE + " course ON course.\"id\" = section.\"courseId\""
+                            + " WHERE section.\"id\" = :sectionId",
+                    new MapSqlParameterSource("sectionId", sectionId),
+                    String.class);
+        } catch (DataAccessException exception) {
+            return sectionId;
         }
     }
 

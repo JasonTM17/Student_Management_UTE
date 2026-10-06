@@ -118,6 +118,12 @@ public class AnnouncementWriteService {
         try {
             int sent = studentNotifier.fanOutToActiveStudents(created);
             LOGGER.info("Announcement {} fanned out to {} active students", created.id(), sent);
+            if (created.publishAt() == null || !created.publishAt().isAfter(Instant.now(clock))) {
+                // The marker is only stamped on the non-throwing path: a
+                // failed fan-out keeps notifiedAt NULL so
+                // ScheduledAnnouncementNotifyJob retries the send.
+                announcements.markNotified(created.id(), Instant.now(clock));
+            }
         } catch (RuntimeException exception) {
             LOGGER.warn(
                     "Announcement {} was created but the student notification fan-out failed: {}",
@@ -195,6 +201,15 @@ public class AnnouncementWriteService {
                 expectedVersion));
         if (changed != 1) {
             throw conflict("ANNOUNCEMENT_VERSION_CONFLICT", "Announcement was changed by another administrator");
+        }
+        if (request.has("publishAt") && request.publishAt() != null
+                && request.publishAt().isAfter(now)) {
+            // Re-scheduling into the future re-arms the notification marker:
+            // ScheduledAnnouncementNotifyJob refires when the new publish
+            // time arrives. A publishAt moved to the past with a NULL marker
+            // is picked up on the next tick; one already stamped stays
+            // stamped (students were already notified once).
+            announcements.clearNotifiedAt(id);
         }
         AnnouncementResponse after = requireAnnouncement(id);
         int sanitizedElements = contentPatch == null ? 0 : contentPatch.removedElements();

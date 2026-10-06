@@ -1,5 +1,6 @@
 package io.campuscore.restfulapi.academic.service;
 
+import io.campuscore.restfulapi.audit.AdminAuditRecorder;
 import io.campuscore.restfulapi.web.DomainException;
 import java.time.Instant;
 import java.util.LinkedHashMap;
@@ -9,9 +10,12 @@ import java.util.Set;
 import java.util.UUID;
 import org.springframework.context.annotation.Profile;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.dao.EmptyResultDataAccessException;
 import org.springframework.http.HttpStatus;
 import org.springframework.jdbc.core.namedparam.MapSqlParameterSource;
 import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
+import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -35,9 +39,11 @@ public class AdminCatalogMutationService {
             Set.of("DRAFT", "OPEN", "REGISTRATION_OPEN", "ADD_DROP_OPEN", "ACTIVE", "IN_PROGRESS", "CLOSED");
 
     private final NamedParameterJdbcTemplate jdbc;
+    private final AdminAuditRecorder audit;
 
     public AdminCatalogMutationService(NamedParameterJdbcTemplate jdbc) {
         this.jdbc = jdbc;
+        this.audit = new AdminAuditRecorder(jdbc);
     }
 
     @Transactional
@@ -56,7 +62,7 @@ public class AdminCatalogMutationService {
                         + " (\"id\", \"name\", \"nameEn\", \"nameVi\", \"code\", \"description\", \"descriptionEn\", \"descriptionVi\", \"facultyId\")"
                         + " VALUES (:id, :name, :nameEn, :nameVi, :code, :description, :descriptionEn, :descriptionVi, :facultyId)",
                 params(input, id).addValue("facultyId", facultyId));
-        return get(DEPARTMENT, id);
+        return created(DEPARTMENT, id);
     }
 
     @Transactional
@@ -76,7 +82,7 @@ public class AdminCatalogMutationService {
                         .addValue("startDate", startDate)
                         .addValue("endDate", endDate)
                         .addValue("isCurrent", Boolean.parseBoolean(text(input, "isCurrent", "false"))));
-        return get(ACADEMIC_YEAR, id);
+        return created(ACADEMIC_YEAR, id);
     }
 
     @Transactional
@@ -99,7 +105,7 @@ public class AdminCatalogMutationService {
                 params(input, id)
                         .addValue("credits", credits)
                         .addValue("departmentId", departmentId));
-        return get(COURSE, id);
+        return created(COURSE, id);
     }
 
     @Transactional
@@ -127,7 +133,7 @@ public class AdminCatalogMutationService {
                         .addValue("capacity", capacity)
                         .addValue("type", type)
                         .addValue("isActive", isActive));
-        return get(CLASSROOM, id);
+        return created(CLASSROOM, id);
     }
 
     @Transactional
@@ -177,7 +183,7 @@ public class AdminCatalogMutationService {
                         .addValue("registrationStart", input.get("registrationStart"))
                         .addValue("registrationEnd", input.get("registrationEnd"))
                         .addValue("status", status));
-        return get(SEMESTER, id);
+        return created(SEMESTER, id);
     }
 
     @Transactional
@@ -213,11 +219,12 @@ public class AdminCatalogMutationService {
         if (input.containsKey("schedules")) {
             replaceSectionSchedules(id, input.get("schedules"));
         }
-        return get(SECTION, id);
+        return created(SECTION, id);
     }
 
     @Transactional
     public Map<String, Object> update(String table, String id, Map<String, Object> input) {
+        Map<String, Object> before = rowOrNull(table, id);
         Map<String, String> columns = allowedColumns(table);
         // Update runs the same invariants as create: without them a course
         // could gain 999 credits or a section a five-digit capacity through a
@@ -291,11 +298,16 @@ public class AdminCatalogMutationService {
                 assertNoSectionConflicts(id);
             }
         }
-        return get(table, id);
+        Map<String, Object> after = get(table, id);
+        audit.record(actor(), null, "UPDATED", entityType(table), id,
+                entityType(table) + " " + id + " updated by " + actorLabel(),
+                before, after);
+        return after;
     }
 
     @Transactional
     public void delete(String table, String id) {
+        Map<String, Object> before = rowOrNull(table, id);
         try {
             int deleted = jdbc.update("DELETE FROM " + table + " WHERE \"id\" = :id", new MapSqlParameterSource("id", id));
             if (deleted == 0) {
@@ -304,6 +316,42 @@ public class AdminCatalogMutationService {
         } catch (DataIntegrityViolationException exception) {
             throw problem(HttpStatus.CONFLICT, "RESOURCE_IN_USE", "Resource is still referenced by another record");
         }
+        audit.recordDeletion(actor(), null, entityType(table), id, before);
+    }
+
+    /** Returns the persisted row and records the create on the shared audit trail. */
+    private Map<String, Object> created(String table, String id) {
+        Map<String, Object> row = get(table, id);
+        audit.record(actor(), null, "CREATED", entityType(table), id,
+                entityType(table) + " " + id + " created by " + actorLabel(),
+                null, row);
+        return row;
+    }
+
+    private Map<String, Object> rowOrNull(String table, String id) {
+        try {
+            return get(table, id);
+        } catch (EmptyResultDataAccessException exception) {
+            return null;
+        }
+    }
+
+    /** Maps a qualified table literal like "academic"."Department" to its simple entity name. */
+    private static String entityType(String table) {
+        String stripped = table.replace("\"", "");
+        return stripped.substring(stripped.lastIndexOf('.') + 1);
+    }
+
+    private static String actor() {
+        var authentication = SecurityContextHolder.getContext().getAuthentication();
+        return authentication != null && authentication.getPrincipal() instanceof Jwt jwt
+                ? jwt.getSubject()
+                : null;
+    }
+
+    private static String actorLabel() {
+        String actor = actor();
+        return actor == null || actor.isBlank() ? "an automated actor" : actor;
     }
 
     private Map<String, Object> get(String table, String id) {

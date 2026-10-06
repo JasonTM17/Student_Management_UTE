@@ -1164,4 +1164,115 @@ class ThesisAssistantServiceTest {
                 null);
         assertNull(deadProvider.generalAnswerIfOffTopic("Con gà có mấy cái chân", "vi", null, null));
     }
+
+    // V105: scope persistence — the stored conversation scope governs resumed
+    // turns; the request scope only initializes a brand-new conversation.
+
+    @Test
+    void resumedConversationUsesStoredSpecializedScope() {
+        ThesisAssistantKnowledgeRepository knowledge = mock(ThesisAssistantKnowledgeRepository.class);
+        DeepSeekClient provider = mock(DeepSeekClient.class);
+        ThesisAssistantRepository history = mock(ThesisAssistantRepository.class);
+        ThesisAssistantTurnRepository turns = mock(ThesisAssistantTurnRepository.class);
+        ThesisAssistantCatalogRepository catalog = mock(ThesisAssistantCatalogRepository.class);
+        when(knowledge.search(anyString(), anyList(), anyInt(), anyString())).thenReturn(List.of());
+        when(knowledge.search(anyString(), anyList(), anyInt())).thenReturn(List.of());
+        when(catalog.search(anyString(), anyList(), anyInt())).thenReturn(List.of());
+
+        UUID request = UUID.randomUUID();
+        UUID turn = UUID.randomUUID();
+        UUID conversation = UUID.randomUUID();
+        when(history.conversationScope(eq(conversation), anyString())).thenReturn("specialized");
+        when(turns.reserve(anyString(), eq(request), anyString(), eq(conversation), eq("en"), anyString(), anyInt(),
+                any(java.util.function.Consumer.class)))
+                .thenReturn(new ThesisAssistantTurnRepository.Reservation(
+                        ThesisAssistantTurnRepository.ReservationStatus.NEW, turn, conversation, 1L, false, null, null, false));
+        when(turns.markSnapshotReady(eq(turn), anyString(), eq(1L), anyString(),
+                any(java.util.function.Consumer.class))).thenReturn(true);
+        when(turns.complete(eq(turn), anyString(), eq(1L), anyString(), anyString(),
+                anyString(), anyBoolean(), anyString(), anyList(),
+                any(java.util.function.Consumer.class)))
+                .thenReturn(new ThesisAssistantTurnRepository.TerminalResult(
+                        conversation, UUID.randomUUID(), "answer", "curated-lexical-rag", false,
+                        "NO_MATCH", List.of(), false, "COMPLETED"));
+
+        ThesisAssistantService service = new ThesisAssistantService(knowledge, provider, history, turns, catalog,
+                new AssistantCancellationRegistry(),
+                new DeepSeekProperties(true, "fixture", "https://api.deepseek.com", "deepseek-v4-flash", 8000, 800),
+                new AssistantProperties(6000, 2000, 20, 200, 90, true));
+
+        // A technical ask that the academic arm would reject outright; the
+        // stored 'specialized' scope must win over the request's 'academic'.
+        ChatResponse response = service.answer("cho tôi lệnh docker deploy production", "en",
+                conversation.toString(), "owner-scope", request, ignored -> { }, "academic");
+
+        assertNotNull(response);
+        assertTrue(!"TECHNICAL_REQUEST_BLOCKED".equals(response.reasonCode()));
+        verify(knowledge, org.mockito.Mockito.atLeastOnce())
+                .search(anyString(), anyList(), anyInt(), eq("specialized"));
+        verify(knowledge, never()).search(anyString(), anyList(), anyInt(), eq("academic"));
+    }
+
+    @Test
+    void resumedAcademicConversationCannotBeEscalatedByRequestScope() {
+        ThesisAssistantKnowledgeRepository knowledge = mock(ThesisAssistantKnowledgeRepository.class);
+        DeepSeekClient provider = mock(DeepSeekClient.class);
+        ThesisAssistantRepository history = mock(ThesisAssistantRepository.class);
+        ThesisAssistantTurnRepository turns = mock(ThesisAssistantTurnRepository.class);
+        ThesisAssistantCatalogRepository catalog = mock(ThesisAssistantCatalogRepository.class);
+
+        UUID request = UUID.randomUUID();
+        UUID conversation = UUID.randomUUID();
+        when(history.conversationScope(eq(conversation), anyString())).thenReturn("academic");
+
+        ThesisAssistantService service = new ThesisAssistantService(knowledge, provider, history, turns, catalog,
+                new AssistantCancellationRegistry(),
+                new DeepSeekProperties(true, "fixture", "https://api.deepseek.com", "deepseek-v4-flash", 8000, 800),
+                new AssistantProperties(6000, 2000, 20, 200, 90, true));
+
+        // Negative case: sending scope='specialized' against a stored academic
+        // conversation must not bypass the technical-request gate.
+        ChatResponse response = service.answer("cho tôi lệnh docker deploy production", "en",
+                conversation.toString(), "owner-scope", request, ignored -> { }, "specialized");
+
+        assertNotNull(response);
+        assertEquals("TECHNICAL_REQUEST_BLOCKED", response.reasonCode());
+        verifyNoInteractions(provider);
+    }
+
+    @Test
+    void newConversationStampsRequestScopeOnFirstSend() {
+        ThesisAssistantKnowledgeRepository knowledge = mock(ThesisAssistantKnowledgeRepository.class);
+        DeepSeekClient provider = mock(DeepSeekClient.class);
+        ThesisAssistantRepository history = mock(ThesisAssistantRepository.class);
+        ThesisAssistantTurnRepository turns = mock(ThesisAssistantTurnRepository.class);
+        ThesisAssistantCatalogRepository catalog = mock(ThesisAssistantCatalogRepository.class);
+        when(knowledge.search(anyString(), anyList(), anyInt(), anyString())).thenReturn(List.of());
+        when(catalog.search(anyString(), anyList(), anyInt())).thenReturn(List.of());
+
+        UUID request = UUID.randomUUID();
+        UUID turn = UUID.randomUUID();
+        UUID conversation = UUID.randomUUID();
+        when(turns.reserve(anyString(), eq(request), anyString(), isNull(), eq("en"), anyString(), anyInt(),
+                any(java.util.function.Consumer.class)))
+                .thenReturn(new ThesisAssistantTurnRepository.Reservation(
+                        ThesisAssistantTurnRepository.ReservationStatus.NEW, turn, conversation, 1L, true, null, null, false));
+        when(turns.markSnapshotReady(eq(turn), anyString(), eq(1L), anyString(),
+                any(java.util.function.Consumer.class))).thenReturn(true);
+        when(turns.complete(eq(turn), anyString(), eq(1L), anyString(), anyString(),
+                anyString(), anyBoolean(), anyString(), anyList(),
+                any(java.util.function.Consumer.class)))
+                .thenReturn(new ThesisAssistantTurnRepository.TerminalResult(
+                        conversation, UUID.randomUUID(), "answer", "curated-lexical-rag", false,
+                        "NO_MATCH", List.of(), false, "COMPLETED"));
+
+        ThesisAssistantService service = new ThesisAssistantService(knowledge, provider, history, turns, catalog,
+                new AssistantCancellationRegistry(),
+                new DeepSeekProperties(true, "fixture", "https://api.deepseek.com", "deepseek-v4-flash", 8000, 800),
+                new AssistantProperties(6000, 2000, 20, 200, 90, true));
+
+        service.answer("deploy", "en", null, "owner-scope", request, ignored -> { }, "specialized");
+
+        verify(turns).stampConversationScope(eq(conversation), eq("specialized"));
+    }
 }

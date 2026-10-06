@@ -3,6 +3,7 @@ package io.campuscore.restfulapi.academic;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -749,6 +750,21 @@ class AdminCatalogMutationPersistenceTest {
     }
 
     private void createTables() {
+        jdbc.execute("CREATE SCHEMA IF NOT EXISTS \"campuscore_audit\"");
+        jdbc.execute("""
+                CREATE TABLE IF NOT EXISTS "campuscore_audit"."AdminAudit" (
+                    "id" VARCHAR(120) PRIMARY KEY,
+                    "actorId" VARCHAR(120),
+                    "actorLabel" VARCHAR(240),
+                    "action" VARCHAR(60) NOT NULL,
+                    "entityType" VARCHAR(60) NOT NULL,
+                    "entityId" VARCHAR(120),
+                    "summary" VARCHAR(500),
+                    "beforeState" CLOB,
+                    "afterState" CLOB,
+                    "createdAt" TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP
+                )
+                """);
         jdbc.execute("""
                 CREATE TABLE IF NOT EXISTS "academic"."AcademicYear" (
                     "id" VARCHAR(120) PRIMARY KEY,
@@ -840,6 +856,7 @@ class AdminCatalogMutationPersistenceTest {
     }
 
     private void clearTables() {
+        jdbc.update("DELETE FROM \"campuscore_audit\".\"AdminAudit\"");
         jdbc.update("DELETE FROM \"academic\".\"SectionSchedule\"");
         jdbc.update("DELETE FROM \"academic\".\"Section\"");
         jdbc.update("DELETE FROM \"academic\".\"Lecturer\"");
@@ -920,6 +937,52 @@ class AdminCatalogMutationPersistenceTest {
                         + " (\"id\", \"sectionId\", \"classroomId\", \"dayOfWeek\", \"startTime\", \"endTime\")"
                         + " VALUES (?, ?, ?, ?, ?, ?)",
                 id, sectionId, classroomId, dayOfWeek, startTime, endTime);
+    }
+
+    @Test
+    void catalogCreateUpdateAndDeleteWriteAuditRows() throws Exception {
+        mvc.perform(post("/api/v1/classrooms")
+                        .with(adminJwt())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "id": "room-audit",
+                                  "building": "Audit Hall",
+                                  "roomNumber": "A-1",
+                                  "capacity": 40
+                                }
+                                """))
+                .andExpect(status().isOk());
+        mvc.perform(put("/api/v1/classrooms/room-audit")
+                        .with(adminJwt())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "roomNumber": "A-2"
+                                }
+                                """))
+                .andExpect(status().isOk());
+        mvc.perform(delete("/api/v1/classrooms/room-audit")
+                        .with(adminJwt()))
+                .andExpect(status().isOk());
+
+        assertThat(jdbc.queryForList(
+                "SELECT \"action\", \"entityType\", \"entityId\", \"actorId\", \"beforeState\", \"afterState\""
+                        + " FROM \"campuscore_audit\".\"AdminAudit\""
+                        + " WHERE \"entityType\" = 'Classroom' AND \"entityId\" = 'room-audit'"
+                        + " ORDER BY \"createdAt\", \"action\""))
+                .satisfies(rows -> {
+                    assertThat(rows).hasSize(3);
+                    assertThat(rows).extracting(row -> row.get("action"))
+                            .containsExactlyInAnyOrder("CREATED", "UPDATED", "DELETED");
+                    assertThat(rows).allSatisfy(row ->
+                            assertThat(row.get("actorId")).isEqualTo("admin-user"));
+                    Map<String, Object> updated = rows.stream()
+                            .filter(row -> "UPDATED".equals(row.get("action")))
+                            .findFirst().orElseThrow();
+                    assertThat((String) updated.get("beforeState")).contains("A-1");
+                    assertThat((String) updated.get("afterState")).contains("A-2");
+                });
     }
 
     private List<Map<String, Object>> scheduleRows(String sectionId) {

@@ -1450,13 +1450,27 @@ public class ThesisAssistantService {
     }
 
     public ThesisAssistantRepository.ConversationPage conversationPage(String ownerId, Integer limit, String cursor) {
+        return conversationPage(ownerId, limit, cursor, null);
+    }
+
+    public ThesisAssistantRepository.ConversationPage conversationPage(String ownerId, Integer limit, String cursor, String scope) {
         if (legacyHistory == null) return new ThesisAssistantRepository.ConversationPage(List.of(), null);
-        return legacyHistory.conversations(ownerId, limit == null ? 20 : limit, cursor);
+        return legacyHistory.conversations(ownerId, limit == null ? 20 : limit, cursor, scope);
     }
 
     public String createConversation(String ownerId, String locale) {
+        return createConversation(ownerId, locale, null);
+    }
+
+    public String createConversation(String ownerId, String locale, String scope) {
         if (legacyHistory == null || properties == null) throw problem(503, "ASSISTANT_UNAVAILABLE", "Assistant persistence is unavailable");
-        return legacyHistory.ensureConversation(ownerId, null, AssistantInputGuard.normalizeLocale(locale), properties.retentionDays()).toString();
+        UUID id = legacyHistory.ensureConversation(ownerId, null, AssistantInputGuard.normalizeLocale(locale), properties.retentionDays());
+        // V105: an explicitly created specialized conversation must be stamped
+        // now — reserve() only stamps rows it creates itself.
+        if ("specialized".equalsIgnoreCase(scope) && turns != null) {
+            turns.stampConversationScope(id, scope);
+        }
+        return id.toString();
     }
 
     /**
@@ -1594,17 +1608,25 @@ public class ThesisAssistantService {
         }
         String normalized = guard.normalizedMessage();
         String normalizedLocale = AssistantInputGuard.normalizeLocale(locale);
+        UUID requestedConversation = parseConversation(conversationId);
+        // V105: the corpus is pinned to the conversation, not the request. A
+        // conversation created under scope='specialized' keeps retrieving from
+        // the specialized corpus even when a surface (e.g. the academic panel
+        // history) resumes it without repeating the scope.
+        String storedScope = requestedConversation != null && legacyHistory != null
+                ? legacyHistory.conversationScope(requestedConversation, ownerId)
+                : null;
+        String effectiveScope = storedScope != null && !storedScope.isBlank() ? storedScope : scope;
         // Round-3 chat-8: same scope rule as the controller — the specialized
         // scope serves the curated DevOps/REST corpus, so its requests must
         // not be re-blocked here after the controller already passed them.
-        if (!"specialized".equalsIgnoreCase(scope) && AssistantInputGuard.isTechnicalRequest(normalized)) {
+        if (!"specialized".equalsIgnoreCase(effectiveScope) && AssistantInputGuard.isTechnicalRequest(normalized)) {
             emit(sink, new StreamError("TECHNICAL_REQUEST_BLOCKED", false));
             return new ChatResponse(technicalOutputMessage(normalizedLocale), MODEL, true,
                     "TECHNICAL_REQUEST_BLOCKED", normalizedLocale,
                     List.of(), requestId, clientRequestId, null, false, "REJECTED", null, null);
         }
-        UUID requestedConversation = parseConversation(conversationId);
-        LexicalResult lexical = retrieve(normalized, normalizedLocale, scope);
+        LexicalResult lexical = retrieve(normalized, normalizedLocale, effectiveScope);
         if (lexical.error()) {
             emit(sink, new StreamError("KNOWLEDGE_UNAVAILABLE", true));
             return new ChatResponse(lexical.answer(), MODEL, true, "KNOWLEDGE_UNAVAILABLE", normalizedLocale,
@@ -1636,6 +1658,9 @@ public class ThesisAssistantService {
         }
         if (reservation.status() == ThesisAssistantTurnRepository.ReservationStatus.AMBIGUOUS) {
             throw problem(409, "FAILED_AMBIGUOUS", "The provider outcome is ambiguous; automatic redispatch is disabled");
+        }
+        if (reservation.createdConversation() && turns != null) {
+            turns.stampConversationScope(reservation.conversationId(), scope);
         }
         boolean snapshotReady = cancellations == null
                 ? turns.markSnapshotReady(reservation.turnId(), ownerId, reservation.leaseGeneration(), lexical.snapshotHash())

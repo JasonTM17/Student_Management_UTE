@@ -64,7 +64,7 @@ public class CreditLimitApplicationService {
     @org.springframework.beans.factory.annotation.Autowired
     public CreditLimitApplicationService(
             NamedParameterJdbcTemplate jdbc,
-            @org.springframework.beans.factory.annotation.Value("${assistant.demo.credit-limit-override:0}") int limitOverride,
+            @org.springframework.beans.factory.annotation.Value("${app.demo.credit-limit-override:0}") int limitOverride,
             AdminAuditRecorder audit) {
         this.jdbc = jdbc;
         this.limitOverride = Math.max(0, limitOverride);

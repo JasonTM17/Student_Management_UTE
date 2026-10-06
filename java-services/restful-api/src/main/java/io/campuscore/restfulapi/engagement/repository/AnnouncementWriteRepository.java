@@ -137,6 +137,59 @@ public class AnnouncementWriteRepository {
                         .addValue("id", id, Types.VARCHAR));
     }
 
+    /**
+     * Stamps the row as notification-attempted. Conditional on
+     * {@code "notifiedAt" IS NULL} so a delayed job and a concurrent create
+     * cannot double-stamp — and therefore cannot double-send.
+     */
+    public int markNotified(String id, Instant at) {
+        return jdbc.update(
+                "UPDATE " + TABLE + " SET \"notifiedAt\" = :at"
+                        + " WHERE \"id\" = :id AND \"notifiedAt\" IS NULL",
+                new MapSqlParameterSource()
+                        .addValue("at", OffsetDateTime.ofInstant(at, ZoneOffset.UTC),
+                                Types.TIMESTAMP_WITH_TIMEZONE)
+                        .addValue("id", id, Types.VARCHAR));
+    }
+
+    /** Clears the marker so the due-notification job re-fires at the new publishAt. */
+    public void clearNotifiedAt(String id) {
+        jdbc.update(
+                "UPDATE " + TABLE + " SET \"notifiedAt\" = NULL WHERE \"id\" = :id",
+                new MapSqlParameterSource("id", id));
+    }
+
+    /**
+     * Scheduled announcements whose publishAt has passed without a completed
+     * fan-out. Archived and already-expired rows are excluded (expired rows
+     * never become visible, so notifying would point students at nothing).
+     */
+    public List<AnnouncementResponse> findDueForNotification(Instant now, int limit) {
+        return jdbc.query(
+                "SELECT " + SELECT_COLUMNS + " FROM " + TABLE
+                        + " WHERE \"notifiedAt\" IS NULL AND \"publishAt\" IS NOT NULL"
+                        + " AND \"publishAt\" <= :now"
+                        + " AND (\"expiresAt\" IS NULL OR \"expiresAt\" > :now)"
+                        + " AND \"archivedAt\" IS NULL"
+                        + " ORDER BY \"publishAt\" LIMIT :limit",
+                new MapSqlParameterSource()
+                        .addValue("now", OffsetDateTime.ofInstant(now, ZoneOffset.UTC),
+                                Types.TIMESTAMP_WITH_TIMEZONE)
+                        .addValue("limit", limit, Types.INTEGER),
+                AnnouncementWriteRepository::mapRow);
+    }
+
+    /** Retires rows whose expiry passed while they were still waiting to publish. */
+    public int markExpiredAsNotified(Instant now) {
+        return jdbc.update(
+                "UPDATE " + TABLE + " SET \"notifiedAt\" = :now"
+                        + " WHERE \"notifiedAt\" IS NULL AND \"expiresAt\" IS NOT NULL"
+                        + " AND \"expiresAt\" <= :now",
+                new MapSqlParameterSource()
+                        .addValue("now", OffsetDateTime.ofInstant(now, ZoneOffset.UTC),
+                                Types.TIMESTAMP_WITH_TIMEZONE));
+    }
+
     public int restore(TransitionCommand command) {
         return transition(command, false);
     }

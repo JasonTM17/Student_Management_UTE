@@ -147,7 +147,7 @@ public class ThesisAssistantController {
             // every personal turn lands in history and consumes its key.
             String targetConversation = request.conversationId();
             if (targetConversation == null || targetConversation.isBlank()) {
-                targetConversation = assistant.createConversation(owner, personal.locale());
+                targetConversation = assistant.createConversation(owner, personal.locale(), request.scope());
             }
             ThesisAssistantService.PersonalTurn recorded = assistant.recordPersonalTurn(owner,
                     targetConversation,
@@ -628,6 +628,7 @@ public class ThesisAssistantController {
             @AuthenticationPrincipal Jwt actor,
             @Parameter(description = "Giới hạn số bản ghi") @RequestParam(required = false) Integer limit,
             @Parameter(description = "Con trỏ phân trang cursor") @RequestParam(required = false) String cursor,
+            @Parameter(description = "Corpus scope filter (academic/specialized)") @RequestParam(required = false) String scope,
             HttpServletResponse response) {
         String owner = subject(actor);
         if (remoteRag()) {
@@ -636,7 +637,7 @@ public class ThesisAssistantController {
             if (page.nextCursor() != null) response.setHeader("X-Next-Cursor", page.nextCursor());
             return page.data();
         }
-        ThesisAssistantRepository.ConversationPage page = assistant.conversationPage(owner, limit, cursor);
+        ThesisAssistantRepository.ConversationPage page = assistant.conversationPage(owner, limit, cursor, scope);
         if (page.nextCursor() != null) response.setHeader("X-Next-Cursor", page.nextCursor());
         return page.data();
     }
@@ -653,11 +654,15 @@ public class ThesisAssistantController {
         if (locale != null && !locale.isBlank() && !locale.equals("vi") && !locale.equals("en")) {
             throw new DomainException(HttpStatus.BAD_REQUEST, "INVALID_LOCALE", "locale must be en or vi");
         }
+        String scope = request == null ? null : request.scope();
+        if (scope != null && !scope.isBlank() && !"academic".equalsIgnoreCase(scope) && !"specialized".equalsIgnoreCase(scope)) {
+            throw new DomainException(HttpStatus.BAD_REQUEST, "INVALID_SCOPE", "scope must be academic or specialized");
+        }
         String owner = subject(actor);
         if (remoteRag()) {
             return ragGateway.createConversation(request, owner);
         }
-        String id = assistant.createConversation(owner, locale);
+        String id = assistant.createConversation(owner, locale, scope);
         return new ConversationCreated(id, locale == null || locale.isBlank() ? "vi" : locale);
     }
 
@@ -854,6 +859,6 @@ public class ThesisAssistantController {
     }
     public record CancelResponse(UUID clientRequestId, String status) { }
     public record FeedbackResponse(UUID messageId, String rating, String reason, boolean removed) { }
-    public record CreateConversationRequest(String locale) { }
+    public record CreateConversationRequest(String locale, String scope) { }
     public record ConversationCreated(String id, String locale) { }
 }

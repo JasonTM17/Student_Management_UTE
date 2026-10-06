@@ -111,6 +111,18 @@ public class ThesisAssistantTurnRepository {
         return new Reservation(ReservationStatus.NEW, turnId, conversationId, 1L, createdConversation, null, null, false);
     }
 
+    /**
+     * Stamps the corpus scope chosen at first send (V105). The reserve INSERT
+     * keeps its hardened signature and default 'academic'; the service stamps
+     * the real request scope immediately afterwards, before the turn's first
+     * dispatch. Unknown values normalize to 'academic'.
+     */
+    public void stampConversationScope(UUID conversationId, String scope) {
+        jdbc.update("UPDATE assistant.chat_conversation SET scope=:scope WHERE id=:id",
+                p().addValue("scope", "specialized".equalsIgnoreCase(scope) ? "specialized" : "academic")
+                        .addValue("id", conversationId));
+    }
+
     @Transactional(transactionManager = AssistantDatabaseConfiguration.TRANSACTION_MANAGER)
     public boolean markSnapshotReady(UUID turnId, String ownerId, long generation, String snapshotHash) {
         return markSnapshotReady(turnId, ownerId, generation, snapshotHash, ignored -> { });

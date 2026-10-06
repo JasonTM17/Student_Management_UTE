@@ -162,22 +162,51 @@ public class ThesisAssistantRepository {
     }
 
     public ConversationPage conversations(String ownerId, int requestedLimit, String cursor) {
+        return conversations(ownerId, requestedLimit, cursor, null);
+    }
+
+    /**
+     * V105: scope-filtered variant — each surface (academic panel, specialized
+     * page) only lists conversations created under its own corpus so history
+     * cannot bleed between corpora.
+     */
+    public ConversationPage conversations(String ownerId, int requestedLimit, String cursor, String scope) {
         int limit = Math.max(1, Math.min(requestedLimit <= 0 ? 20 : requestedLimit, 50));
         Cursor boundary = decodeCursor(cursor);
         String predicate = boundary == null ? "" : " AND (updated_at < :cursorTime OR (updated_at=:cursorTime AND id < :cursorId))";
         MapSqlParameterSource params = p().addValue("owner", ownerId).addValue("limit", limit + 1);
         if (boundary != null) params.addValue("cursorTime", Timestamp.from(boundary.instant())).addValue("cursorId", boundary.id());
+        if (scope != null && !scope.isBlank()) {
+            predicate += " AND scope=:scope";
+            params.addValue("scope", "specialized".equalsIgnoreCase(scope) ? "specialized" : "academic");
+        }
         // Round-3 cb3-9: PENDING joins the list — a conversation created
         // explicitly via POST /conversations but never messaged was invisible
         // here (an orphan the owner could not see or delete from the list).
         // Crash residue between a ledger reserve and its first append shows up
         // honestly as an empty conversation; retention still expires it.
-        List<Conversation> rows = jdbc.query("SELECT id,title,locale,created_at,updated_at,owner_id FROM assistant.chat_conversation WHERE owner_id=:owner AND state IN ('ACTIVE','PENDING') AND expires_at>CURRENT_TIMESTAMP" + predicate + " ORDER BY updated_at DESC,id DESC LIMIT :limit",
-                params, (rs, row) -> new Conversation(rs.getObject("id", UUID.class), rs.getString("title"), rs.getString("locale"), rs.getTimestamp("created_at").toInstant(), rs.getTimestamp("updated_at").toInstant(), rs.getString("owner_id")));
+        List<Conversation> rows = jdbc.query("SELECT id,title,locale,created_at,updated_at,owner_id,scope FROM assistant.chat_conversation WHERE owner_id=:owner AND state IN ('ACTIVE','PENDING') AND expires_at>CURRENT_TIMESTAMP" + predicate + " ORDER BY updated_at DESC,id DESC LIMIT :limit",
+                params, (rs, row) -> new Conversation(rs.getObject("id", UUID.class), rs.getString("title"), rs.getString("locale"), rs.getTimestamp("created_at").toInstant(), rs.getTimestamp("updated_at").toInstant(), rs.getString("owner_id"), rs.getString("scope")));
         boolean more = rows.size() > limit;
         if (more) rows = new ArrayList<>(rows.subList(0, limit));
         String next = more && !rows.isEmpty() ? encodeCursor(rows.get(rows.size() - 1).updatedAt(), rows.get(rows.size() - 1).id()) : null;
         return new ConversationPage(List.copyOf(rows), next);
+    }
+
+    /**
+     * Stored corpus scope of a conversation, owner-scoped. A null return means
+     * the row is absent or predates the V105 column — the caller falls back to
+     * the request scope, exactly like a first-turn send.
+     */
+    public String conversationScope(UUID conversationId, String ownerId) {
+        try {
+            return jdbc.queryForObject(
+                    "SELECT scope FROM assistant.chat_conversation WHERE id=:id AND owner_id=:owner",
+                    p().addValue("id", conversationId).addValue("owner", ownerId),
+                    String.class);
+        } catch (org.springframework.dao.DataAccessException exception) {
+            return null;
+        }
     }
 
     public void requireOwnedConversation(UUID conversationId, String ownerId) {
@@ -240,8 +269,9 @@ public class ThesisAssistantRepository {
     private static UUID parseUuid(String value) { try { return value == null || value.isBlank() ? null : UUID.fromString(value); } catch (IllegalArgumentException ignored) { return null; } }
     private static Integer nullableInt(ResultSet rs, String column) throws SQLException { int value = rs.getInt(column); return rs.wasNull() ? null : value; }
 
-    public record Conversation(UUID id, String title, String locale, Instant createdAt, Instant updatedAt, @com.fasterxml.jackson.annotation.JsonIgnore String ownerId) {
-        public Conversation(UUID id, String title, String locale, Instant createdAt, Instant updatedAt) { this(id, title, locale, createdAt, updatedAt, null); }
+    public record Conversation(UUID id, String title, String locale, Instant createdAt, Instant updatedAt, @com.fasterxml.jackson.annotation.JsonIgnore String ownerId, String scope) {
+        public Conversation(UUID id, String title, String locale, Instant createdAt, Instant updatedAt) { this(id, title, locale, createdAt, updatedAt, null, "academic"); }
+        public Conversation(UUID id, String title, String locale, Instant createdAt, Instant updatedAt, String ownerId) { this(id, title, locale, createdAt, updatedAt, ownerId, "academic"); }
     }
     public record Message(UUID id, String role, String content, String model, boolean degraded, String reasonCode, Instant createdAt, List<ThesisAssistantDtos.Citation> citations, String feedback) {
         public Message(UUID id, String role, String content, String model, boolean degraded, String reasonCode, Instant createdAt, List<ThesisAssistantDtos.Citation> citations) {

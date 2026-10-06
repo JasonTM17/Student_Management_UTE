@@ -10,6 +10,7 @@ import io.campuscore.restfulapi.audit.AdminAuditRecorder;
 import io.campuscore.restfulapi.web.DomainException;
 import java.math.BigDecimal;
 import java.util.List;
+import java.util.Map;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.HttpStatus;
@@ -44,6 +45,28 @@ class AcademicAdminAuditPersistenceTest {
         jdbc.execute("CREATE SCHEMA IF NOT EXISTS \"academic\"");
         jdbc.execute("CREATE SCHEMA IF NOT EXISTS \"campuscore_auth\"");
         jdbc.execute("CREATE SCHEMA IF NOT EXISTS \"campuscore_audit\"");
+        jdbc.execute("CREATE SCHEMA IF NOT EXISTS notifications");
+
+        jdbc.execute("""
+            CREATE TABLE notifications.notification (
+                id VARCHAR(64) PRIMARY KEY,
+                user_id VARCHAR(64) NOT NULL,
+                title VARCHAR(240) NOT NULL,
+                message VARCHAR(2000) NOT NULL,
+                type VARCHAR(16) NOT NULL,
+                link VARCHAR(240),
+                is_read BOOLEAN DEFAULT FALSE,
+                read_at TIMESTAMP,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        """);
+        jdbc.execute("""
+            CREATE TABLE "academic"."Student" (
+                "id" VARCHAR(64) PRIMARY KEY,
+                "userId" VARCHAR(64)
+            )
+        """);
 
         jdbc.execute("""
             CREATE TABLE "academic"."Section" (
@@ -122,13 +145,18 @@ class AcademicAdminAuditPersistenceTest {
                 namedJdbc,
                 mock(io.campuscore.restfulapi.academic.service.AcademicEnrollmentReadService.class),
                 mock(RegistrationService.class),
-                new AdminAuditRecorder(namedJdbc));
+                new AdminAuditRecorder(namedJdbc),
+                new io.campuscore.restfulapi.engagement.service.GradePublishNotifier(
+                        new io.campuscore.restfulapi.notification.repository.NotificationWriteRepository(namedJdbc)));
     }
 
     private void seedEnrollment(String enrollmentId, String status, String gradeStatus) {
         jdbc.update("INSERT INTO \"academic\".\"Section\" (\"id\", \"semesterId\", \"lecturerId\", \"status\")"
                         + " SELECT 'sec-audit', 'sem-01', 'lec-01', 'OPEN'"
                         + " WHERE NOT EXISTS (SELECT 1 FROM \"academic\".\"Section\" WHERE \"id\" = 'sec-audit')");
+        jdbc.update("INSERT INTO \"academic\".\"Student\" (\"id\", \"userId\")"
+                        + " SELECT 'stu-9', 'usr-9'"
+                        + " WHERE NOT EXISTS (SELECT 1 FROM \"academic\".\"Student\" WHERE \"id\" = 'stu-9')");
         jdbc.update("INSERT INTO \"academic\".\"Enrollment\""
                         + " (\"id\", \"studentId\", \"sectionId\", \"semesterId\", \"status\", \"gradeStatus\")"
                         + " VALUES (?, 'stu-9', 'sec-audit', 'sem-01', ?, ?)",
@@ -192,6 +220,22 @@ class AcademicAdminAuditPersistenceTest {
                 List.of(new GradeUpdate("enr-grade-2", new BigDecimal("7"), new BigDecimal("7"))));
         service.publishGrades("sec-audit", "lec-01", false, "lec-01");
         assertThat(auditCount("GRADE_PUBLISH_BY_ADMIN")).isEqualTo(1);
+    }
+
+    @Test
+    void publishGradesNotifiesTheEnrolledStudentsUserInbox() {
+        seedEnrollment("enr-notify-1", "ENROLLED", "DRAFT");
+        service.updateGrades("sec-audit", "lec-01", false, "lec-01",
+                List.of(new GradeUpdate("enr-notify-1", new BigDecimal("8"), new BigDecimal("8"))));
+
+        service.publishGrades("sec-audit", "lec-01", false, "lec-01");
+
+        List<Map<String, Object>> rows = jdbc.queryForList(
+                "SELECT user_id, title, link, type FROM notifications.notification WHERE user_id = 'usr-9'");
+        assertThat(rows).hasSize(1);
+        assertThat(rows.get(0).get("link")).isEqualTo("/dashboard/transcript");
+        assertThat(rows.get(0).get("type")).isEqualTo("SUCCESS");
+        assertThat((String) rows.get(0).get("title")).startsWith("[Grades]");
     }
 
     @Test
