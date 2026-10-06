@@ -284,7 +284,7 @@ export default function HomePage() {
                   <li key={item.label}>
                     <LocalizedLink
                       href={item.href}
-                      className="inline-flex min-h-11 items-center text-sm text-portal-sidebar-muted transition-colors duration-150 hover:text-portal-sidebar-text hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-portal-yellow focus-visible:ring-offset-2 focus-visible:ring-offset-portal-sidebar"
+                      className="inline-flex min-h-11 items-center text-sm text-portal-sidebar-muted transition-colors duration-150 hover:text-portal-sidebar-text hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-portal-chrome-accent focus-visible:ring-offset-2 focus-visible:ring-offset-portal-sidebar"
                     >
                       {item.label}
                     </LocalizedLink>
@@ -301,7 +301,7 @@ export default function HomePage() {
                   <li key={item.label}>
                     <LocalizedLink
                       href={item.href}
-                      className="inline-flex min-h-11 items-center text-sm text-portal-sidebar-muted transition-colors duration-150 hover:text-portal-sidebar-text hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-portal-yellow focus-visible:ring-offset-2 focus-visible:ring-offset-portal-sidebar"
+                      className="inline-flex min-h-11 items-center text-sm text-portal-sidebar-muted transition-colors duration-150 hover:text-portal-sidebar-text hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-portal-chrome-accent focus-visible:ring-offset-2 focus-visible:ring-offset-portal-sidebar"
                     >
                       {item.label}
                     </LocalizedLink>

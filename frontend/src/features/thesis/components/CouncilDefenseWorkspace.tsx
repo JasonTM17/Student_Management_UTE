@@ -12,7 +12,7 @@ import {
   type ThesisGroupReport,
   type ThesisTopic,
 } from '@/lib/thesis-api';
-import { fillCopy } from '@/features/thesis/components/MetricCard';
+import { fillCopy } from '@/features/thesis/components/thesis-helpers';
 
 interface CouncilDefenseWorkspaceProps {
   messages: I18nMessages;

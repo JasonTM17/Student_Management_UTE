@@ -274,6 +274,15 @@ test('alpha modifiers stay inside the Tailwind opacity scale', () => {
   assert.deepEqual(offenders, []);
 });
 
+test('portalVar keeps the <alpha-value> hook so /N modifiers emit CSS', () => {
+  // portal-* colors are complete-color CSS vars; without the `<alpha-value>`
+  // substitution every `bg-portal-*/N` modifier silently drops to the bare var
+  // (the same silent-no-op bug class as the /12 pill bug). Pin the mechanism.
+  const config = read('tailwind.config.ts');
+  assert.match(config, /<alpha-value>/);
+  assert.match(config, /portalVar/);
+});
+
 test('shared states and notification tabs preserve keyboard and feedback semantics', () => {
   const states = read('src/components/ui/state-block.tsx');
   const notifications = read('src/components/dashboard/NotificationsCenterPage.tsx');

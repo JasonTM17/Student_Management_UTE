@@ -19,7 +19,7 @@ import { StatusBadge } from '@/components/thesis/StatusBadge';
 import type { I18nMessages } from '@/i18n/messages';
 import type { Locale } from '@/i18n/config';
 import { type ThesisRepositoryReport } from '@/lib/thesis-api';
-import { fillCopy, formatReportFileSize } from '@/features/thesis/components/MetricCard';
+import { fillCopy, formatReportFileSize } from '@/features/thesis/components/thesis-helpers';
 
 interface ThesisRepositoryWorkspaceProps {
   messages: I18nMessages;

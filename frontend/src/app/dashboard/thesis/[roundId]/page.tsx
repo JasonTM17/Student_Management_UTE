@@ -12,7 +12,8 @@ import { EmptyState, ErrorState, LoadingState } from '@/components/ui/state-bloc
 import { PageHeader, SectionEyebrow } from '@/components/ui/page-header';
 import { LocalizedLink } from '@/components/LocalizedLink';
 import { StatusBadge } from '@/components/thesis/StatusBadge';
-import { metricToneClass, type StatusTone } from '@/components/ui/status';
+import { WorkspaceMetricCard } from '@/components/dashboard/WorkspaceSurface';
+import { metricToneClass } from '@/components/ui/status';
 import { useRequireAuth } from '@/context/AuthContext';
 import { WorkspaceForbiddenState } from '@/components/ProtectedRoute';
 import { useI18n } from '@/i18n';
@@ -110,9 +111,9 @@ export default function ThesisRoundDetailPage() {
       />
 
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <MetricCard label={messages.thesis.roundStatus} value={statusLabel(round.status)} icon={<CalendarDays className="h-5 w-5" />} tone="warning" />
-        <MetricCard label={messages.thesis.topics} value={topics.length} icon={<FileStack className="h-5 w-5" />} tone="info" />
-        <MetricCard label={messages.thesis.groups} value={groups.length} icon={<UsersRound className="h-5 w-5" />} tone="success" />
+        <WorkspaceMetricCard label={messages.thesis.roundStatus} value={statusLabel(round.status)} icon={<CalendarDays className="h-5 w-5" />} toneClassName={metricToneClass('warning')} />
+        <WorkspaceMetricCard label={messages.thesis.topics} value={topics.length} icon={<FileStack className="h-5 w-5" />} toneClassName={metricToneClass('info')} />
+        <WorkspaceMetricCard label={messages.thesis.groups} value={groups.length} icon={<UsersRound className="h-5 w-5" />} toneClassName={metricToneClass('success')} />
       </div>
 
       <div className="grid gap-6 xl:grid-cols-2">
@@ -176,29 +177,5 @@ export default function ThesisRoundDetailPage() {
       </div>
 
     </div>
-  );
-}
-
-function MetricCard({
-  label,
-  value,
-  icon,
-  tone,
-}: {
-  label: string;
-  value: string | number;
-  icon: React.ReactNode;
-  tone: StatusTone;
-}) {
-  return (
-    <Card variant="elevated">
-      <CardContent className="flex items-start justify-between gap-4 pt-6">
-        <div className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-lg ${metricToneClass(tone)}`}>{icon}</div>
-        <div className="min-w-0 text-right">
-          <div className="break-words text-2xl font-semibold tracking-tight text-foreground">{value}</div>
-          <div className="mt-1 text-sm text-muted-foreground">{label}</div>
-        </div>
-      </CardContent>
-    </Card>
   );
 }

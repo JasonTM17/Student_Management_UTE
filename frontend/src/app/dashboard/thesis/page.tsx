@@ -53,7 +53,7 @@ import {
   fillCopy,
   formatReportFileSize,
   renderInlineBold,
-} from '@/features/thesis/components/MetricCard';
+} from '@/features/thesis/components/thesis-helpers';
 import { WorkspaceMetricCard } from '@/components/dashboard/WorkspaceSurface';
 import { metricToneClass } from '@/components/ui/status';
 import StudentGroupCard, {

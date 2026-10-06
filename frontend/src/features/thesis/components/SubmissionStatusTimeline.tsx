@@ -4,7 +4,7 @@ import { CircleDashed, MessageSquareText, Send, UploadCloud } from 'lucide-react
 import type { LucideIcon } from 'lucide-react';
 import type { StatusTone } from '@/components/ui/status';
 import { cn } from '@/lib/utils';
-import { formatReportFileSize, fillCopy } from '@/features/thesis/components/MetricCard';
+import { formatReportFileSize, fillCopy } from '@/features/thesis/components/thesis-helpers';
 import type { ThesisGroupReport } from '@/lib/thesis-api';
 
 /**

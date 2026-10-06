@@ -81,7 +81,9 @@ test('no source file uses the fill token as a foreground or hairline', () => {
         if (/^\s*\*/.test(line)) return;
         // Both the legacy arbitrary form `text-[var(--portal-yellow)]` and the
         // first-class utility `text-portal-yellow` are the same violation.
-        for (const match of code.matchAll(/(text|border)-(?:\[var\(--portal-yellow\)\]|portal-yellow)(?![\w-])/g)) {
+        // `ring`/`outline` are foreground/hairline roles too: a portal-yellow
+        // ring on the navy chrome is a ~1.3:1 invisible focus indicator.
+        for (const match of code.matchAll(/(text|border(-[trblxyse])?|ring|outline)-(?:\[var\(--portal-yellow\)\]|portal-yellow)(?![\w-])/g)) {
           offenders.push(`${relative}:${index + 1} -> ${match[0]}`);
         }
       });
@@ -106,12 +108,15 @@ test('the eyebrow rule resolves to the chrome accent, not the fill', () => {
 
 test('the guillotine guard can actually fail', () => {
   // A guard that cannot fail is not a guard.
+  const re = /(text|border|ring|outline)-(?:\[var\(--portal-yellow\)\]|portal-yellow)(?![\w-])/g;
   const fixture = 'className="text-[var(--portal-yellow)]"';
-  assert.equal([...fixture.matchAll(/(text|border)-(?:\[var\(--portal-yellow\)\]|portal-yellow)(?![\w-])/g)].length, 1);
+  assert.equal([...fixture.matchAll(re)].length, 1);
   const fixture2 = 'className="border-portal-yellow"';
-  assert.equal([...fixture2.matchAll(/(text|border)-(?:\[var\(--portal-yellow\)\]|portal-yellow)(?![\w-])/g)].length, 1);
-  const fine = 'className="text-portal-chrome-accent bg-portal-yellow/10"';
-  assert.equal([...fine.matchAll(/(text|border)-(?:\[var\(--portal-yellow\)\]|portal-yellow)(?![\w-])/g)].length, 0);
+  assert.equal([...fixture2.matchAll(re)].length, 1);
+  const fixture3 = 'className="focus-visible:ring-portal-yellow"';
+  assert.equal([...fixture3.matchAll(re)].length, 1);
+  const fine = 'className="text-portal-chrome-accent bg-portal-yellow/10 ring-portal-chrome-accent"';
+  assert.equal([...fine.matchAll(re)].length, 0);
   const ink = 'className="text-portal-yellow-ink"';
-  assert.equal([...ink.matchAll(/(text|border)-(?:\[var\(--portal-yellow\)\]|portal-yellow)(?![\w-])/g)].length, 0);
+  assert.equal([...ink.matchAll(re)].length, 0);
 });

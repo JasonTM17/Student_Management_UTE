@@ -17,7 +17,7 @@ import { LocalizedLink } from '@/components/LocalizedLink';
 import { StatusBadge } from '@/components/thesis/StatusBadge';
 import type { I18nMessages } from '@/i18n/messages';
 import { type ThesisGroup, type ThesisGroupMember } from '@/lib/thesis-api';
-import { renderInlineBold } from '@/features/thesis/components/MetricCard';
+import { renderInlineBold } from '@/features/thesis/components/thesis-helpers';
 
 /** A roster row with its display label resolved by the page (never invented here). */
 export interface StudentGroupMemberRow extends ThesisGroupMember {
