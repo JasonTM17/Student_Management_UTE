@@ -178,8 +178,17 @@ export default function AdminAuditTrailPage() {
                     <Fragment key={entry.id}>
                       <tr
                         key={entry.id}
-                        className="cursor-pointer border-t border-border/60 hover:bg-muted/40"
+                        className="cursor-pointer border-t border-border/60 hover:bg-muted/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-chrome-accent focus-visible:ring-inset"
+                        tabIndex={0}
+                        aria-expanded={expanded === entry.id}
+                        aria-controls={`audit-detail-${entry.id}`}
                         onClick={() => setExpanded((current) => (current === entry.id ? null : entry.id))}
+                        onKeyDown={(event) => {
+                          if (event.key === 'Enter' || event.key === ' ') {
+                            event.preventDefault();
+                            setExpanded((current) => (current === entry.id ? null : entry.id));
+                          }
+                        }}
                       >
                         <td className="whitespace-nowrap px-3 py-2 text-muted-foreground">
                           {formatDateTime(entry.createdAt)}
@@ -212,7 +221,7 @@ export default function AdminAuditTrailPage() {
                         </td>
                       </tr>
                       {expanded === entry.id ? (
-                        <tr className="border-t border-border/40 bg-muted/20">
+                        <tr id={`audit-detail-${entry.id}`} className="border-t border-border/40 bg-muted/20">
                           <td colSpan={6} className="px-4 py-3">
                             <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                               {copy.detailTitle}

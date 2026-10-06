@@ -80,8 +80,18 @@ function apiErrorCode(error: unknown): string | undefined {
   return typeof code === 'string' ? code : undefined;
 }
 
+function apiErrorRetryAfter(error: unknown): number | undefined {
+  const value = error as {
+    response?: { headers?: Record<string, unknown> };
+  };
+  const raw = value.response?.headers?.['retry-after'];
+  const seconds = typeof raw === 'string' ? Number(raw) : Number.NaN;
+  return Number.isFinite(seconds) && seconds >= 0 ? Math.ceil(seconds) : undefined;
+}
+
 type AssistantFailureKind =
   | 'quota'
+  | 'rate-limited'
   | 'unauthorized'
   | 'forbidden'
   | 'offline'
@@ -91,6 +101,7 @@ type AssistantFailureKind =
 interface AssistantFailure {
   kind: AssistantFailureKind;
   retryable: boolean;
+  retryAfterSeconds?: number;
 }
 
 function classifyAssistantFailure(error: unknown): AssistantFailure {
@@ -100,7 +111,20 @@ function classifyAssistantFailure(error: unknown): AssistantFailure {
   }
 
   const status = apiErrorStatus(error);
-  if (status === 429) return { kind: 'quota', retryable: false };
+  if (status === 429) {
+    // Two 429 sources must not share one label: the per-window rate limiter
+    // (RATE_LIMIT_EXCEEDED + Retry-After) clears in seconds, while the daily
+    // assistant quota carries a resetAt horizon. The old blanket 'quota'
+    // classification showed "try again tomorrow" for a seconds-long wait.
+    if (apiErrorCode(error) === 'RATE_LIMIT_EXCEEDED') {
+      return {
+        kind: 'rate-limited',
+        retryable: true,
+        retryAfterSeconds: apiErrorRetryAfter(error),
+      };
+    }
+    return { kind: 'quota', retryable: false };
+  }
   if (status === 401) return { kind: 'unauthorized', retryable: false };
   if (status === 403) return { kind: 'forbidden', retryable: false };
 
@@ -194,6 +218,7 @@ export function useAssistantStream({
             messageId: event.messageId,
             reasonCode: event.reasonCode,
             degraded: event.degraded,
+            resetAt: event.resetAt,
           },
         });
       } else if (event.type === 'error') {
@@ -525,8 +550,12 @@ export function useAssistantStream({
           // reconciliation 4xx responses are not retried just because the
           // original stream failed transiently.
           if (!terminalFailure) {
-            const kind =
-              reconciliationFailure.kind === 'turn-in-progress'
+            const rateLimited = [streamFailure, reconciliationFailure].find(
+              (failure) => failure.kind === 'rate-limited',
+            );
+            const kind = rateLimited
+              ? 'rate-limited'
+              : reconciliationFailure.kind === 'turn-in-progress'
                 ? 'turn-in-progress'
                 : streamFailure.kind === 'offline' || reconciliationFailure.kind === 'offline'
                   ? 'offline'
@@ -534,6 +563,7 @@ export function useAssistantStream({
             dispatch({
               type: 'stream-failed',
               kind,
+              retryAfterSeconds: rateLimited?.retryAfterSeconds,
             });
             // The result may have committed even though both the stream and
             // reconciliation request failed. Keep the same idempotency key so

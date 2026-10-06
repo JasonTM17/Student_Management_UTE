@@ -26,6 +26,23 @@ export interface GradeDistributionBucket {
   count: number;
 }
 
+/**
+ * Locale-facing strings for series names, tooltips, and the screen-reader
+ * data tables rendered under each chart. Callers must supply both locales'
+ * values — the component deliberately has no Vietnamese defaults.
+ */
+export interface TranscriptChartLabels {
+  semesterGpa: string;
+  cumulativeGpa: string;
+  tenScaleAvg: string;
+  coursesUnit: string;
+  courseCount: string;
+  colTerm: string;
+  colSeries: string;
+  colValue: string;
+  colGrade: string;
+}
+
 ChartJS.register(
   CategoryScale,
   LinearScale,
@@ -173,12 +190,14 @@ export function GpaTrendChart({
   mode = 'semester',
   selectedLabel,
   ariaLabel,
+  chartLabels,
 }: {
   points: GpaTrendPoint[];
   cumulativePoints?: GpaTrendPoint[];
   mode?: 'semester' | 'cumulative' | 'both';
   selectedLabel?: string;
   ariaLabel: string;
+  chartLabels: TranscriptChartLabels;
 }) {
   const activePoints = mode === 'cumulative' && cumulativePoints?.length ? cumulativePoints : points;
   const labels = activePoints.map((point) => point.label);
@@ -197,7 +216,7 @@ export function GpaTrendChart({
   const datasets: ChartData<'line'>['datasets'] = [];
   if (showSemester) {
     datasets.push({
-      label: 'GPA Học kỳ',
+      label: chartLabels.semesterGpa,
       data: points.map((point) => point.gpa),
       borderColor: SEMESTER_COLOR,
       backgroundColor: SEMESTER_COLOR,
@@ -215,7 +234,7 @@ export function GpaTrendChart({
   }
   if (showCumulative) {
     datasets.push({
-      label: 'GPA Tích lũy (Tổng hợp)',
+      label: chartLabels.cumulativeGpa,
       data: (cumulativePoints ?? []).map((point) => point.gpa),
       borderColor: CUMULATIVE_COLOR,
       backgroundColor: CUMULATIVE_COLOR,
@@ -254,7 +273,7 @@ export function GpaTrendChart({
       </div>
       <ChartDataTable
         caption={ariaLabel}
-        columns={['Kỳ', 'Chuỗi dữ liệu', 'Giá trị']}
+        columns={[chartLabels.colTerm, chartLabels.colSeries, chartLabels.colValue]}
         rows={datasets.flatMap((dataset) =>
           dataset.data.map((value, index) => [
             fullLabels[index] ?? labels[index] ?? '',
@@ -293,9 +312,11 @@ function isSelected(point: GpaTrendPoint, selectedLabel?: string) {
 export function TenScaleTrendChart({
   points,
   ariaLabel,
+  chartLabels,
 }: {
   points: GpaTrendPoint[];
   ariaLabel: string;
+  chartLabels: TranscriptChartLabels;
 }) {
   const labels = points.map((point) => point.label);
   const fullLabels = points.map((point) => point.fullLabel);
@@ -317,7 +338,7 @@ export function TenScaleTrendChart({
     labels,
     datasets: [
       {
-        label: 'ĐTB hệ 10',
+        label: chartLabels.tenScaleAvg,
         data: points.map((point) => point.gpa),
         borderColor: TEN_SCALE_COLOR,
         backgroundColor: TEN_SCALE_COLOR,
@@ -339,10 +360,10 @@ export function TenScaleTrendChart({
       </div>
       <ChartDataTable
         caption={ariaLabel}
-        columns={['Kỳ', 'Chuỗi dữ liệu', 'Giá trị']}
+        columns={[chartLabels.colTerm, chartLabels.colSeries, chartLabels.colValue]}
         rows={points.map((point, index) => [
           fullLabels[index] ?? labels[index] ?? '',
-          'ĐTB hệ 10',
+          chartLabels.tenScaleAvg,
           `${Number(point.gpa).toFixed(1)}/10`,
         ] as [string, string, string])}
       />
@@ -376,9 +397,11 @@ const countLabelsPlugin = {
 export function GradeDistributionChart({
   buckets,
   ariaLabel,
+  chartLabels,
 }: {
   buckets: GradeDistributionBucket[];
   ariaLabel: string;
+  chartLabels: TranscriptChartLabels;
 }) {
   const max = buckets.reduce((acc, bucket) => Math.max(acc, bucket.count), 0);
   const options: ChartOptions<'bar'> = {
@@ -390,7 +413,7 @@ export function GradeDistributionChart({
         backgroundColor: 'rgba(15, 23, 42, 0.92)',
         padding: 10,
         cornerRadius: 8,
-        callbacks: { label: (item) => `${item.parsed.y} học phần` },
+        callbacks: { label: (item) => `${item.parsed.y} ${chartLabels.coursesUnit}` },
       },
     },
     scales: {
@@ -413,7 +436,7 @@ export function GradeDistributionChart({
     labels: buckets.map((bucket) => bucket.letter),
     datasets: [
       {
-        label: 'Số học phần',
+        label: chartLabels.courseCount,
         data: buckets.map((bucket) => bucket.count),
         backgroundColor: 'rgba(37, 99, 235, 0.78)',
         hoverBackgroundColor: '#2563eb',
@@ -430,10 +453,10 @@ export function GradeDistributionChart({
       </div>
       <ChartDataTable
         caption={ariaLabel}
-        columns={['Xếp loại', 'Chuỗi dữ liệu', 'Số học phần']}
+        columns={[chartLabels.colGrade, chartLabels.colSeries, chartLabels.courseCount]}
         rows={buckets.map((bucket) => [
           bucket.letter,
-          'Số học phần',
+          chartLabels.courseCount,
           String(bucket.count),
         ] as [string, string, string])}
       />

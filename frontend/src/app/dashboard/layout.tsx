@@ -147,10 +147,6 @@ const lecturerMenuSections: readonly DashboardMenuSectionConfig[] = [
   },
 ] as const;
 
-// Retained admin-restricted editor route for direct navigation and test contracts:
-// { href: '/dashboard/editor', icon: FileEdit, labelKey: 'editor' }
-const _adminRestrictedEditorRoute = { href: '/dashboard/editor', icon: FileEdit, labelKey: 'editor' } as const;
-
 const dashboardMenuItems = [...studentMenuSections, ...lecturerMenuSections].flatMap(
   (section) => section.items,
 );
@@ -1155,10 +1151,6 @@ export default function DashboardLayout({
                                       );
                                       toast.error(
                                         messages.dashboardShell.notifications.updateFailed,
-                                      );
-                                      console.error(
-                                        'Failed to mark notification as read:',
-                                        error,
                                       );
                                     });
                                 }}

@@ -123,6 +123,11 @@ export const thesisWorkflowEn = {
     open: 'Open the 9 regulation articles',
     indexTitle: 'Article index',
     footer: 'Administrative and academic standards applied automatically across the CampusUTE system.',
+    councilBannerEyebrow: 'HCMUTE Academic Council Guidelines',
+    councilBannerBody:
+      'Official process and assessment standards for the graduation thesis under the HCMUTE full-time university training framework.',
+    councilBannerAlt: 'HCMUTE Thesis Defense Hall',
+    councilBannerCaption: 'Thesis Assessment Council',
     rules: [
       {
         number: 'Article R1',
@@ -449,6 +454,11 @@ export const thesisWorkflowVi: Widen<typeof thesisWorkflowEn> = {
     open: 'Mở xem 9 điều quy chế',
     indexTitle: 'Danh Mục Điều Khoản',
     footer: 'Quy chuẩn hành chính & học thuật được áp dụng tự động trong toàn bộ hệ thống CampusUTE.',
+    councilBannerEyebrow: 'Hướng dẫn Hội đồng Học thuật HCMUTE',
+    councilBannerBody:
+      'Quy chuẩn quy trình thực hiện và đánh giá khóa luận tốt nghiệp theo chuẩn chất lượng đào tạo đại học chính quy HCMUTE.',
+    councilBannerAlt: 'Hội trường bảo vệ khóa luận HCMUTE',
+    councilBannerCaption: 'Hội đồng Đánh giá Khóa luận',
     rules: [
       {
         number: 'Điều R1',

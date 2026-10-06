@@ -496,8 +496,8 @@ export default function SchedulePage() {
             </div>
             <div className="text-sm font-extrabold text-foreground">
               {locale === 'vi'
-                ? 'PHÒNG ĐÀO TẠO — HỆ THỐNG QUẢN LÝ ĐÀO TẠO CAMPUSCORE'
-                : 'ACADEMIC AFFAIRS OFFICE — CAMPUSCORE SYSTEM'}
+                ? 'PHÒNG ĐÀO TẠO — HỆ THỐNG QUẢN LÝ ĐÀO TẠO CAMPUSUTE'
+                : 'ACADEMIC AFFAIRS OFFICE — CAMPUSUTE SYSTEM'}
             </div>
             <h1 className="text-xl font-black text-primary mt-2 uppercase tracking-wide">
               {locale === 'vi' ? 'THỜI KHÓA BIỂU HỌC KỲ' : 'OFFICIAL SEMESTER TIMETABLE'}

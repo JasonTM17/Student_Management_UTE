@@ -339,6 +339,17 @@ export default function TranscriptPage() {
           statusInProgress: 'Đang học',
           statusNotStarted: 'Chưa hoàn tất',
           yearSemesterLabel: (year: number, semester: number) => `Năm ${year} · HK ${semester}`,
+          chartLabels: {
+            semesterGpa: 'GPA Học kỳ',
+            cumulativeGpa: 'GPA Tích lũy (Tổng hợp)',
+            tenScaleAvg: 'ĐTB hệ 10',
+            coursesUnit: 'học phần',
+            courseCount: 'Số học phần',
+            colTerm: 'Kỳ',
+            colSeries: 'Chuỗi dữ liệu',
+            colValue: 'Giá trị',
+            colGrade: 'Xếp loại',
+          },
           programHeaders: {
             course: 'Môn học',
             credits: 'Tín chỉ',
@@ -395,6 +406,17 @@ export default function TranscriptPage() {
           statusInProgress: 'In progress',
           statusNotStarted: 'Not completed',
           yearSemesterLabel: (year: number, semester: number) => `Year ${year} · Semester ${semester}`,
+          chartLabels: {
+            semesterGpa: 'Semester GPA',
+            cumulativeGpa: 'Cumulative GPA (overall)',
+            tenScaleAvg: '10-scale average',
+            coursesUnit: 'courses',
+            courseCount: 'Courses',
+            colTerm: 'Term',
+            colSeries: 'Series',
+            colValue: 'Value',
+            colGrade: 'Grade',
+          },
           programHeaders: {
             course: 'Course',
             credits: 'Credits',
@@ -666,6 +688,7 @@ export default function TranscriptPage() {
                   mode={gpaMode}
                   selectedLabel={selectedSemester ? selectedSemesterName : undefined}
                   ariaLabel={copy.gpaTrend}
+                  chartLabels={copy.chartLabels}
                 />
               </CardContent>
             </Card>
@@ -681,6 +704,7 @@ export default function TranscriptPage() {
                   <TenScaleTrendChart
                     points={tenScaleTrendPoints}
                     ariaLabel={`${copy.gpaTrend} — ${copy.avgTenScale}`}
+                    chartLabels={copy.chartLabels}
                   />
                 </CardContent>
               </Card>
@@ -693,6 +717,7 @@ export default function TranscriptPage() {
                 <GradeDistributionChart
                   buckets={gradeDistribution}
                   ariaLabel={copy.distribution}
+                  chartLabels={copy.chartLabels}
                 />
               </CardContent>
             </Card>

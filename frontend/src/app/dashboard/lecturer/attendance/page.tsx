@@ -516,7 +516,7 @@ export default function LecturerAttendancePage() {
         <LoadingState label={copy.loadingRoster} />
       ) : error ? (
         <ErrorState
-          title="Không thể tải danh sách điểm danh"
+          title={copy.rosterLoadError}
           description={error}
           onRetry={() => void fetchRosterAndAttendance(selectedSectionId, selectedDate)}
         />
@@ -527,7 +527,7 @@ export default function LecturerAttendancePage() {
           description={copy.noStudentsDescription}
         />
       ) : (
-        <WorkspacePanel title="Bảng điểm danh lớp học phần" className="space-y-4 p-4 sm:p-6">
+        <WorkspacePanel title={copy.sheetTitle} className="space-y-4 p-4 sm:p-6">
           {/* Printable Official Institutional Header */}
           <div className="hidden print:block mb-6 border-b-2 border-primary/40 pb-4 text-center">
             <div className="text-xs uppercase font-bold tracking-wider text-muted-foreground">

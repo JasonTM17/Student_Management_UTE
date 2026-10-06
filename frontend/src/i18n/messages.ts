@@ -1774,8 +1774,12 @@ export const en = {
     removeBanner: 'Remove Banner',
     heroCardTitle: 'Homepage Hero Banner & University Identity',
     heroEyebrowLabel: 'University Name / Eyebrow Badge',
+    heroEyebrowDefault: 'HO CHI MINH CITY UNIVERSITY OF TECHNOLOGY AND ENGINEERING',
     heroTitleLabel: 'Hero Title',
+    heroTitleDefault: 'Online Academic & Student Affairs Portal',
     heroDescriptionLabel: 'Hero Description',
+    heroDescriptionDefault:
+      'A unified digital academic system for Students, Lecturers, and Administrators.',
     heroAccentLabel: 'Accent Theme',
     heroLivePreview: 'Homepage Live Preview:',
     heroPublishing: 'Publishing...',
@@ -2362,6 +2366,7 @@ export const en = {
       'Graduation requirements',
     ],
     lecturerSuggestions: ['My teaching schedule this week', 'Which sections do I teach?', 'Where do I enter and publish grades?', 'Thesis supervision rules'],
+    facultyHeadSuggestions: ['How do I approve thesis topics for my faculty?', 'Where do I review my faculty’s teaching schedule?', 'How are class sections assigned to lecturers?', 'Where is the faculty audit trail?'],
     adminSuggestions: ['How do I publish an announcement?', 'Where do I manage registration rounds?', 'How are thesis rounds configured?', 'Where is the audit trail?'],
     lecturerFollowUpsByDomain: {
       THESIS: ['Thesis supervision rules', 'Reviewer responsibilities', 'Defense council scoring rules'],
@@ -2407,6 +2412,9 @@ export const en = {
       'Responding… the composer is locked until this answer finishes. Press Stop to unlock.',
     retry: 'Retry',
     quotaExceeded: 'Daily assistant limit reached. Try again tomorrow or continue with the cited guidance.',
+    quotaResetsAt: 'Limit resets at {time}.',
+    rateLimited: 'Too many requests — please wait {seconds} seconds and retry.',
+    rateLimitedGeneric: 'Too many requests — please wait a moment and retry.',
     blockedLabel: 'Blocked request',
     blocked:
       'Your question was blocked because it asks the assistant to ignore its instructions. Ask about public campus topics instead.',
@@ -2629,6 +2637,8 @@ export const en = {
     printDepartment: 'FACULTY OF INFORMATION TECHNOLOGY — CAMPUSUTE',
     printReportTitle: 'CLASS SECTION ATTENDANCE ROSTER',
     printInstructorSignature: 'Instructor signature (Full name)',
+    rosterLoadError: 'Could not load the attendance roster',
+    sheetTitle: 'Class section attendance sheet',
   },
 } as const;
 
@@ -4410,8 +4420,12 @@ export const vi: I18nMessages = {
     removeBanner: 'Gỡ ảnh bìa',
     heroCardTitle: 'Cấu Hình Banner & Tên Trường Trên Trang Chủ',
     heroEyebrowLabel: 'Tên trường / Nhãn Eyebrow (Hiển thị đầu trang chủ)',
+    heroEyebrowDefault: 'ĐẠI HỌC CÔNG NGHỆ KỸ THUẬT THÀNH PHỐ HỒ CHÍ MINH',
     heroTitleLabel: 'Tiêu đề chính (Hero Title)',
+    heroTitleDefault: 'Cổng Thông Tin Đào Tạo & Học Vụ Trực Tuyến',
     heroDescriptionLabel: 'Đoạn giới thiệu (Hero Description)',
+    heroDescriptionDefault:
+      'Hệ thống quản lý học vụ số tập trung dành cho Sinh viên, Giảng viên và Cán bộ Quản trị.',
     heroAccentLabel: 'Màu sắc điểm nhấn (Accent Theme)',
     heroLivePreview: 'Xem trước giao diện Banner Trang chủ:',
     heroPublishing: 'Đang xuất bản...',
@@ -4997,6 +5011,7 @@ export const vi: I18nMessages = {
       'Điều kiện tốt nghiệp',
     ],
     lecturerSuggestions: ['Lịch giảng dạy tuần này', 'Các lớp tôi giảng dạy', 'Nhập và công bố điểm ở đâu?', 'Quy định hướng dẫn khóa luận'],
+    facultyHeadSuggestions: ['Duyệt đề tài khóa luận của khoa ở đâu?', 'Xem lịch giảng dạy của khoa ở đâu?', 'Phân công giảng viên cho lớp học phần thế nào?', 'Xem nhật ký kiểm toán của khoa ở đâu?'],
     adminSuggestions: ['Đăng thông báo mới ở đâu?', 'Quản lý đợt đăng ký học phần thế nào?', 'Đợt khóa luận được cấu hình ra sao?', 'Xem nhật ký kiểm toán ở đâu?'],
     lecturerFollowUpsByDomain: {
       THESIS: ['Quy định hướng dẫn khóa luận', 'Trách nhiệm giảng viên phản biện', 'Quy định chấm điểm hội đồng bảo vệ'],
@@ -5042,6 +5057,9 @@ export const vi: I18nMessages = {
       'Đang trả lời… ô nhập tạm khóa cho đến khi câu trả lời xong. Nhấn Dừng để mở khóa.',
     retry: 'Thử lại',
     quotaExceeded: 'Bạn đã chạm giới hạn trợ lý trong ngày. Hãy thử lại vào ngày mai hoặc tiếp tục với hướng dẫn có trích dẫn.',
+    quotaResetsAt: 'Giới hạn sẽ được làm mới lúc {time}.',
+    rateLimited: 'Bạn đã gửi quá nhiều yêu cầu — vui lòng đợi {seconds} giây rồi thử lại.',
+    rateLimitedGeneric: 'Bạn đã gửi quá nhiều yêu cầu — vui lòng đợi một lát rồi thử lại.',
     blockedLabel: 'Câu hỏi đã bị chặn',
     blocked:
       'Câu hỏi của bạn đã bị chặn vì yêu cầu trợ lý bỏ qua hướng dẫn hệ thống. Hãy hỏi về các thông tin công khai của trường.',
@@ -5260,10 +5278,12 @@ export const vi: I18nMessages = {
     exportCsvSuccess: 'Đã xuất bảng điểm danh dạng CSV thành công.',
     exportCsvEmpty: 'Không có dữ liệu điểm danh sinh viên để xuất.',
     printRoster: 'In bảng điểm danh',
-    printOfficialHeader: 'TRƯỜNG ĐẠI HỌC SƯ PHẠM KỸ THUẬT TP. HỒ CHÍ MINH',
+    printOfficialHeader: 'TRƯỜNG ĐẠI HỌC CÔNG NGHỆ KỸ THUẬT TP. HỒ CHÍ MINH',
     printDepartment: 'KHOA CÔNG NGHỆ THÔNG TIN — HỆ THỐNG CAMPUSUTE',
     printReportTitle: 'BẢNG ĐIỂM DANH LỚP HỌC PHẦN',
     printInstructorSignature: 'Giảng viên phụ trách (Ký và ghi rõ họ tên)',
+    rosterLoadError: 'Không thể tải danh sách điểm danh',
+    sheetTitle: 'Bảng điểm danh lớp học phần',
   },
 };
 

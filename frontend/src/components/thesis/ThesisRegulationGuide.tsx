@@ -116,22 +116,22 @@ export function ThesisRegulationGuide() {
             <div className="grid grid-cols-1 sm:grid-cols-12 items-center">
               <div className="p-4 sm:col-span-8 space-y-1.5">
                 <span className="text-[11px] font-bold uppercase tracking-wider text-primary">
-                  HCMUTE Academic Council Guidelines
+                  {copy.councilBannerEyebrow}
                 </span>
                 <p className="text-xs text-muted-foreground leading-relaxed">
-                  Quy chuẩn quy trình thực hiện và đánh giá khóa luận tốt nghiệp theo chuẩn chất lượng đào tạo đại học chính quy HCMUTE.
+                  {copy.councilBannerBody}
                 </p>
               </div>
               <div className="relative h-28 sm:h-full sm:col-span-4 min-h-[90px] overflow-hidden border-t sm:border-t-0 sm:border-l border-border/60">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img
                   src="/images/banners/thesis_defense_hall.jpg"
-                  alt="HCMUTE Thesis Defense Hall"
+                  alt={copy.councilBannerAlt}
                   className="h-full w-full object-cover object-center"
                 />
                 <div className="absolute inset-0 bg-gradient-to-t from-black/50 via-transparent to-transparent" />
                 <div className="absolute bottom-1.5 left-2 rounded-md bg-background/85 px-1.5 py-0.5 text-[11px] font-bold text-foreground backdrop-blur-xs">
-                  Hội đồng Đánh giá Khóa luận
+                  {copy.councilBannerCaption}
                 </div>
               </div>
             </div>

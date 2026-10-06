@@ -333,6 +333,17 @@ export function AssistantMessages({
                           {reasonLabel(message, messages)}
                         </span>
                       )}
+                      {message.reasonCode === 'QUOTA_EXCEEDED' && message.resetAt ? (
+                        <span className="text-[10px] text-muted-foreground">
+                          {messages.assistant.quotaResetsAt.replace(
+                            '{time}',
+                            new Date(message.resetAt).toLocaleTimeString(
+                              undefined,
+                              { hour: '2-digit', minute: '2-digit' },
+                            ),
+                          )}
+                        </span>
+                      ) : null}
                     </div>
                   )}
 
@@ -383,6 +394,7 @@ export function AssistantMessages({
                               <p className="text-[11px] text-muted-foreground">
                                 {[
                                   citationDomainLabel(citation, messages),
+                                  citation.source,
                                   citation.locale?.toUpperCase(),
                                 ]
                                   .filter(Boolean)

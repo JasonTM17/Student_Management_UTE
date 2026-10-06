@@ -51,7 +51,10 @@ export function extractAttachmentsFromContent(content: string | null | undefined
       name,
       url,
       type,
-      size: 'Tài liệu số',
+      // No byte size is knowable from a markdown link — the render site
+      // supplies the localized "digital document" fallback instead of a
+      // hardcoded Vietnamese label leaking into the English UI.
+      size: undefined,
     });
   }
 
@@ -146,7 +149,7 @@ export function DocumentAttachmentsList({
                   >
                     {file.type || 'DOC'}
                   </span>
-                  {file.size && <span>{file.size}</span>}
+                  <span>{file.size ?? (isVi ? 'Tài liệu số' : 'Digital document')}</span>
                 </div>
               </div>
             </div>

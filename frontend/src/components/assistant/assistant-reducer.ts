@@ -15,6 +15,8 @@ export interface ChatMessage {
    * retry affordance on it. See AssistantPanel's documented exclusion list.
    */
   terminalFence?: boolean;
+  /** ISO instant when a quota-limited turn resets, echoed from the server. */
+  resetAt?: string;
   model?: string;
   pending?: boolean;
   feedback?: 'UP' | 'DOWN';
@@ -41,6 +43,7 @@ export interface AssistantFeedbackSelection {
 export type AssistantError =
   | 'unavailable'
   | 'quota'
+  | 'rate-limited'
   | 'offline'
   | 'unauthorized'
   | 'forbidden'
@@ -65,6 +68,8 @@ export interface AssistantState {
   conversationId?: string;
   model?: string;
   error?: AssistantError;
+  /** Server-supplied Retry-After hint for the rate-limited error state. */
+  retryAfterSeconds?: number;
 }
 
 export type AssistantReplyPatch = {
@@ -74,6 +79,7 @@ export type AssistantReplyPatch = {
   degraded?: boolean;
   reasonCode?: string;
   terminalFence?: boolean;
+  resetAt?: string | null;
   locale?: 'en' | 'vi';
   citations?: AssistantCitation[];
   messageId?: string | null;
@@ -92,7 +98,11 @@ export type AssistantAction =
   | { type: 'citation'; citation: AssistantCitation }
   | { type: 'complete'; reply: AssistantReplyPatch }
   | { type: 'error'; kind?: AssistantState['error'] }
-  | { type: 'stream-failed'; kind?: AssistantState['error'] }
+  | {
+      type: 'stream-failed';
+      kind?: AssistantState['error'];
+      retryAfterSeconds?: number;
+    }
   | { type: 'feedback-start'; messageId: string }
   | {
       type: 'feedback-saved' | 'feedback-failed';
@@ -234,6 +244,7 @@ export function assistantReducer(
         degraded: action.reply.degraded ?? current.degraded,
         reasonCode: action.reply.reasonCode ?? current.reasonCode,
         terminalFence: action.reply.terminalFence ?? current.terminalFence,
+        resetAt: action.reply.resetAt ?? current.resetAt,
         model: action.reply.model ?? current.model,
         pending: false,
         id: action.reply.messageId ?? current.id,
@@ -254,17 +265,26 @@ export function assistantReducer(
       if (state.error === 'unauthorized' && (action.kind ?? 'unavailable') !== 'unauthorized') {
         return state;
       }
-      return { ...state, error: action.kind ?? 'unavailable' };
+      return {
+        ...state,
+        error: action.kind ?? 'unavailable',
+        retryAfterSeconds: undefined,
+      };
     case 'stream-failed': {
       const last = state.messages[state.messages.length - 1];
       const messages =
         last?.role === 'assistant' && last.pending
           ? state.messages.slice(0, -1)
           : state.messages;
-      return { ...state, messages, error: action.kind ?? 'unavailable' };
+      return {
+        ...state,
+        messages,
+        error: action.kind ?? 'unavailable',
+        retryAfterSeconds: action.retryAfterSeconds,
+      };
     }
     case 'clear-error':
-      return { ...state, error: undefined };
+      return { ...state, error: undefined, retryAfterSeconds: undefined };
     case 'feedback-start': {
       const messages = state.messages.map((message) =>
         message.id === action.messageId

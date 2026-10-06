@@ -1113,7 +1113,7 @@ test('assistant history paginates with the server cursor', () => {
 
   const panelSource = fs.readFileSync(path.join(root, 'src/components/assistant/AssistantPanel.tsx'), 'utf8');
   assert.match(panelSource, /historyCursor/);
-  assert.match(panelSource, /listConversationsPage\(\{\s*limit: 20,\s*cursor: historyCursor,\s*\}\)/);
+  assert.match(panelSource, /listConversationsPage\(\{\s*limit: 20,\s*cursor: historyCursor,\s*scope: mode === 'specialized' \? 'specialized' : 'academic',\s*\}\)/);
   assert.match(panelSource, /onLoadMore=\{\(\) => void loadMoreHistory\(\)\}/);
   assert.match(panelSource, /historyStatus !== 'idle'/);
 

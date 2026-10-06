@@ -1,4 +1,5 @@
 import api, { API_BASE_URL, createRequestId, refreshSessionSingleFlight } from '@/lib/api';
+import type { AssistantScope } from '@/lib/assistant-output-guard';
 import { CANCEL_REQUEST_TIMEOUT_MS } from '@/lib/assistant-stream-helpers';
 import {
   createAssistantSseParser,
@@ -319,6 +320,8 @@ export interface AssistantReply {
   turnId?: string;
   replayed?: boolean;
   terminalStatus?: string;
+  /** ISO instant when a QUOTA_EXCEEDED turn's daily budget refills. */
+  resetAt?: string | null;
 }
 
 export interface AssistantConversation {
@@ -327,6 +330,7 @@ export interface AssistantConversation {
   locale: 'en' | 'vi';
   createdAt?: string;
   updatedAt?: string;
+  scope?: AssistantScope;
 }
 
 export interface AssistantMessage {
@@ -433,6 +437,7 @@ export type AssistantStreamEvent =
       messageId?: string;
       reasonCode?: AssistantReply['reasonCode'] | string;
       degraded?: boolean;
+      resetAt?: string | null;
     }
   | { type: 'error'; code?: string; retryable?: boolean };
 
@@ -1132,6 +1137,7 @@ export const thesisApi = {
   listConversations: async (params?: {
     limit?: number;
     cursor?: string;
+    scope?: AssistantScope;
   }): Promise<AssistantConversation[]> => {
     const response = await api.get<AssistantConversation[]>(
       '/assistant/conversations',
@@ -1143,6 +1149,7 @@ export const thesisApi = {
   listConversationsPage: async (params?: {
     limit?: number;
     cursor?: string;
+    scope?: AssistantScope;
   }): Promise<{ items: AssistantConversation[]; nextCursor?: string }> => {
     const response = await api.get<AssistantConversation[]>(
       '/assistant/conversations',
@@ -1170,10 +1177,11 @@ export const thesisApi = {
 
   createConversation: async (
     locale: 'en' | 'vi',
+    scope?: AssistantScope,
   ): Promise<AssistantConversation> => {
     const response = await api.post<AssistantConversation>(
       '/assistant/conversations',
-      { locale },
+      { locale, scope },
     );
     return response.data;
   },

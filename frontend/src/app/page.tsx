@@ -131,10 +131,14 @@ export default function HomePage() {
             // Remote hero art is admin-configured, so the host list cannot be
             // pinned in next.config — a plain <img> avoids a whitelist that
             // could never cover the admin's choice.
+            // Deliberate empty alt: the banner is decorative ambience and the
+            // localized hero title renders immediately below it, so an alt
+            // would only repeat the same name a screen reader already hears.
             // eslint-disable-next-line @next/next/no-img-element
             <img
               src={appearance.hero.image}
               alt=""
+              role="presentation"
               loading="eager"
               className="col-span-full h-56 w-full rounded-2xl border border-border/60 object-cover shadow-sm sm:h-72 lg:h-80"
             />

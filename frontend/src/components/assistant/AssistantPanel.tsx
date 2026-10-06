@@ -46,13 +46,15 @@ export { TRANSIENT_TERMINAL_CODES };
 export function AssistantPanel() {
   const { locale, messages, href } = useI18n();
   const router = useRouter();
-  const { isLecturer, isAdmin, isSuperAdmin } = useAuth();
+  const { isLecturer, isFacultyHead, isAdmin, isSuperAdmin } = useAuth();
   const academicSuggestions =
     isAdmin || isSuperAdmin
       ? messages.assistant.adminSuggestions
-      : isLecturer
-        ? messages.assistant.lecturerSuggestions
-        : messages.assistant.suggestions;
+      : isFacultyHead
+        ? messages.assistant.facultyHeadSuggestions
+        : isLecturer
+          ? messages.assistant.lecturerSuggestions
+          : messages.assistant.suggestions;
   const { confirm, confirmationDialog } = useConfirmationDialog();
   // Two surfaces keep the header/sidebar entry instead of the floating
   // bubble: /admin/* mounts this panel inside AdminFrame, whose header
@@ -325,7 +327,10 @@ export function AssistantPanel() {
     if (historyStatus === 'loading') return;
     setHistoryStatus('loading');
     void thesisApi
-      .listConversationsPage({ limit: 20 })
+      .listConversationsPage({
+        limit: 20,
+        scope: mode === 'specialized' ? 'specialized' : 'academic',
+      })
       .then(({ items, nextCursor }) => {
         setHistory(items);
         setHistoryCursor(nextCursor);
@@ -333,7 +338,7 @@ export function AssistantPanel() {
         historyFetchedRef.current = true;
       })
       .catch(() => setHistoryStatus('error'));
-  }, [historyStatus]);
+  }, [historyStatus, mode]);
 
   const loadMoreHistory = useCallback(async () => {
     if (!historyCursor || loadingMoreHistory) return;
@@ -342,6 +347,7 @@ export function AssistantPanel() {
       const { items, nextCursor } = await thesisApi.listConversationsPage({
         limit: 20,
         cursor: historyCursor,
+        scope: mode === 'specialized' ? 'specialized' : 'academic',
       });
       setHistory((current) => [...current, ...items]);
       setHistoryCursor(nextCursor);
@@ -350,7 +356,7 @@ export function AssistantPanel() {
     } finally {
       setLoadingMoreHistory(false);
     }
-  }, [historyCursor, loadingMoreHistory]);
+  }, [historyCursor, loadingMoreHistory, mode]);
 
   const loadMoreMessages = useCallback(async () => {
     if (!state.conversationId || !messageCursor || loadingMoreMessages) return;
@@ -481,7 +487,10 @@ export function AssistantPanel() {
       return;
     }
     try {
-      const conversation = await thesisApi.createConversation(locale);
+      const conversation = await thesisApi.createConversation(
+        locale,
+        mode === 'specialized' ? 'specialized' : 'academic',
+      );
       selectedHistoryRef.current = true;
       resetConversation(conversation.id);
       setMessageCursor(undefined);
@@ -528,6 +537,13 @@ export function AssistantPanel() {
   const errorLabel =
     state.error === 'quota'
       ? messages.assistant.quotaExceeded
+      : state.error === 'rate-limited'
+        ? state.retryAfterSeconds != null
+          ? messages.assistant.rateLimited.replace(
+              '{seconds}',
+              String(state.retryAfterSeconds),
+            )
+          : messages.assistant.rateLimitedGeneric
       : state.error === 'offline'
         ? messages.assistant.offline
         : state.error === 'unauthorized'

@@ -218,9 +218,9 @@ export default function AcademicEditorPage() {
 
   // Site Appearance (Hero / Banner control)
   const [siteAppearance, setSiteAppearance] = useState<SiteAppearance>(DEFAULT_SITE_APPEARANCE);
-  const [heroEyebrow, setHeroEyebrow] = useState('ĐẠI HỌC CÔNG NGHỆ KỸ THUẬT THÀNH PHỐ HỒ CHÍ MINH');
-  const [heroTitle, setHeroTitle] = useState('Cổng Thông Tin Đào Tạo & Học Vụ Trực Tuyến');
-  const [heroDescription, setHeroDescription] = useState('Hệ thống quản lý học vụ số tập trung dành cho Sinh viên, Giảng viên và Cán bộ Quản trị.');
+  const [heroEyebrow, setHeroEyebrow] = useState(() => editorCopy.heroEyebrowDefault);
+  const [heroTitle, setHeroTitle] = useState(() => editorCopy.heroTitleDefault);
+  const [heroDescription, setHeroDescription] = useState(() => editorCopy.heroDescriptionDefault);
   const [heroAccent, setHeroAccent] = useState<SiteAppearanceAccent>('ute-yellow');
   const [isSavingHero, setIsSavingHero] = useState(false);
   // The publish button must stay disabled until a real fetch hydrates the
@@ -1093,34 +1093,37 @@ export default function AcademicEditorPage() {
             </CardHeader>
             <CardContent className="space-y-5">
               <div>
-                <label className="mb-1 block text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                <label htmlFor="hero-eyebrow-input" className="mb-1 block text-xs font-semibold uppercase tracking-wider text-muted-foreground">
                   {editorCopy.heroEyebrowLabel}
                 </label>
                 <Input
+                  id="hero-eyebrow-input"
                   value={heroEyebrow}
                   onChange={(e) => setHeroEyebrow(e.target.value)}
-                  placeholder="ĐẠI HỌC CÔNG NGHỆ KỸ THUẬT THÀNH PHỐ HỒ CHÍ MINH"
+                  placeholder={editorCopy.heroEyebrowDefault}
                   className="font-bold text-primary"
                 />
               </div>
 
               <div>
-                <label className="mb-1 block text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                <label htmlFor="hero-title-input" className="mb-1 block text-xs font-semibold uppercase tracking-wider text-muted-foreground">
                   {editorCopy.heroTitleLabel}
                 </label>
                 <Input
+                  id="hero-title-input"
                   value={heroTitle}
                   onChange={(e) => setHeroTitle(e.target.value)}
-                  placeholder="Cổng Thông Tin Đào Tạo & Học Vụ Trực Tuyến"
+                  placeholder={editorCopy.heroTitleDefault}
                   className="font-semibold"
                 />
               </div>
 
               <div>
-                <label className="mb-1 block text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                <label htmlFor="hero-description-input" className="mb-1 block text-xs font-semibold uppercase tracking-wider text-muted-foreground">
                   {editorCopy.heroDescriptionLabel}
                 </label>
                 <Textarea
+                  id="hero-description-input"
                   value={heroDescription}
                   onChange={(e) => setHeroDescription(e.target.value)}
                   rows={3}
@@ -1129,14 +1132,18 @@ export default function AcademicEditorPage() {
               </div>
 
               <div>
-                <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                <p
+                  id="hero-accent-label"
+                  className="mb-1.5 text-xs font-semibold uppercase tracking-wider text-muted-foreground"
+                >
                   {editorCopy.heroAccentLabel}
-                </label>
-                <div className="flex flex-wrap gap-3">
+                </p>
+                <div className="flex flex-wrap gap-3" role="group" aria-labelledby="hero-accent-label">
                   {SITE_APPEARANCE_ACCENTS.map((accent) => (
                     <button
                       key={accent}
                       type="button"
+                      aria-pressed={heroAccent === accent}
                       onClick={() => setHeroAccent(accent)}
                       className={`flex items-center gap-2 rounded-lg border px-3 py-2 text-xs font-semibold transition-all ${
                         heroAccent === accent
@@ -1158,9 +1165,11 @@ export default function AcademicEditorPage() {
                 </div>
                 <div className="border-l-4 border-portal-chrome-accent pl-5 py-2 space-y-2">
                   <SectionEyebrow>{heroEyebrow}</SectionEyebrow>
-                  <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-foreground">
+                  {/* Preview mirrors the published hero markup visually but is
+                      not the document's heading — PageHeader owns the real h1. */}
+                  <p className="text-2xl sm:text-3xl font-bold tracking-tight text-foreground">
                     {heroTitle}
-                  </h1>
+                  </p>
                   <p className="text-sm text-foreground/80 max-w-xl">
                     {heroDescription}
                   </p>
@@ -1222,10 +1231,11 @@ export default function AcademicEditorPage() {
               {/* Row 1: Document Metadata Configuration (Full-Width Responsive Grid) */}
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-12 items-end">
                 <div className="sm:col-span-2 lg:col-span-6">
-                  <label className="mb-1.5 block text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground whitespace-nowrap">
+                  <label htmlFor="editor-doc-title" className="mb-1.5 block text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground whitespace-nowrap">
                     {copy.docTitleLabel}
                   </label>
                   <Input
+                    id="editor-doc-title"
                     value={title}
                     onChange={(e) => setTitle(e.target.value)}
                     placeholder={copy.docTitlePlaceholder}
@@ -1233,9 +1243,9 @@ export default function AcademicEditorPage() {
                   />
                 </div>
                 <div className="sm:col-span-1 lg:col-span-3">
-                  <label className="mb-1.5 block text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground whitespace-nowrap">
+                  <p className="mb-1.5 text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground whitespace-nowrap">
                     {copy.priorityLabel}
-                  </label>
+                  </p>
                   <Select
                     aria-label={copy.priorityLabel}
                     value={editingId && !priorityKnown ? '' : priority}
@@ -1251,9 +1261,9 @@ export default function AcademicEditorPage() {
                   />
                 </div>
                 <div className="sm:col-span-1 lg:col-span-3">
-                  <label className="mb-1.5 block text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground whitespace-nowrap">
+                  <p className="mb-1.5 text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground whitespace-nowrap">
                     {copy.targetRoleLabel}
-                  </label>
+                  </p>
                   <Select
                     aria-label={copy.targetRoleLabel}
                     value={editingId && !audienceKnown ? '' : targetRole}
