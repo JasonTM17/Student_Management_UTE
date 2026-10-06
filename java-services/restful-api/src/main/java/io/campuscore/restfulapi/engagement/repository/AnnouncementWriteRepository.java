@@ -138,14 +138,18 @@ public class AnnouncementWriteRepository {
     }
 
     /**
-     * Stamps the row as notification-attempted. Conditional on
-     * {@code "notifiedAt" IS NULL} so a delayed job and a concurrent create
-     * cannot double-stamp — and therefore cannot double-send.
+     * Atomically claims the row for notification. Conditional on
+     * {@code "notifiedAt" IS NULL} so exactly one worker wins the claim and a
+     * competing tick cannot double-send. The claim also re-verifies due-ness
+     * and visibility: a reschedule-to-future or archive landing between the
+     * due-scan and the claim returns 0 rows and the send is skipped.
      */
     public int markNotified(String id, Instant at) {
         return jdbc.update(
                 "UPDATE " + TABLE + " SET \"notifiedAt\" = :at"
-                        + " WHERE \"id\" = :id AND \"notifiedAt\" IS NULL",
+                        + " WHERE \"id\" = :id AND \"notifiedAt\" IS NULL"
+                        + " AND (\"publishAt\" IS NULL OR \"publishAt\" <= :at)"
+                        + " AND \"archivedAt\" IS NULL",
                 new MapSqlParameterSource()
                         .addValue("at", OffsetDateTime.ofInstant(at, ZoneOffset.UTC),
                                 Types.TIMESTAMP_WITH_TIMEZONE)
@@ -160,15 +164,17 @@ public class AnnouncementWriteRepository {
     }
 
     /**
-     * Scheduled announcements whose publishAt has passed without a completed
-     * fan-out. Archived and already-expired rows are excluded (expired rows
-     * never become visible, so notifying would point students at nothing).
+     * Announcements that are visible without a completed fan-out: scheduled
+     * rows whose publishAt has passed, plus immediate rows
+     * ({@code publishAt IS NULL}) whose create-path notification failed.
+     * Archived and already-expired rows are excluded (expired rows never
+     * become visible, so notifying would point students at nothing).
      */
     public List<AnnouncementResponse> findDueForNotification(Instant now, int limit) {
         return jdbc.query(
                 "SELECT " + SELECT_COLUMNS + " FROM " + TABLE
-                        + " WHERE \"notifiedAt\" IS NULL AND \"publishAt\" IS NOT NULL"
-                        + " AND \"publishAt\" <= :now"
+                        + " WHERE \"notifiedAt\" IS NULL"
+                        + " AND (\"publishAt\" IS NULL OR \"publishAt\" <= :now)"
                         + " AND (\"expiresAt\" IS NULL OR \"expiresAt\" > :now)"
                         + " AND \"archivedAt\" IS NULL"
                         + " ORDER BY \"publishAt\" LIMIT :limit",

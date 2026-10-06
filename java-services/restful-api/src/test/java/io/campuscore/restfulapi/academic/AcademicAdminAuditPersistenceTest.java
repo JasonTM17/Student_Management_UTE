@@ -1,6 +1,7 @@
 package io.campuscore.restfulapi.academic;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.mock;
 
 import io.campuscore.restfulapi.academic.registration.RegistrationService;
@@ -220,6 +221,33 @@ class AcademicAdminAuditPersistenceTest {
                 List.of(new GradeUpdate("enr-grade-2", new BigDecimal("7"), new BigDecimal("7"))));
         service.publishGrades("sec-audit", "lec-01", false, "lec-01");
         assertThat(auditCount("GRADE_PUBLISH_BY_ADMIN")).isEqualTo(1);
+    }
+
+    @Test
+    void republishConflictsAndDoesNotRetouchOrRenotifyPublishedRows() {
+        // Kongming C2: a repeat publish of a fully-published section used to
+        // re-update the same enrollments (status COMPLETED stayed eligible)
+        // and fan out a second inbox notification to every student.
+        seedEnrollment("enr-pub-1", "ENROLLED", "DRAFT");
+        service.updateGrades("sec-audit", "lec-01", false, "lec-01",
+                List.of(new GradeUpdate("enr-pub-1", new BigDecimal("8"), new BigDecimal("8"))));
+        service.publishGrades("sec-audit", "lec-01", false, "lec-01");
+        assertThat(jdbc.queryForObject(
+                "SELECT COUNT(*) FROM notifications.notification WHERE user_id = 'usr-9'",
+                Integer.class)).isEqualTo(1);
+        java.sql.Timestamp publishedAt = jdbc.queryForObject(
+                "SELECT \"updatedAt\" FROM \"academic\".\"Enrollment\" WHERE \"id\" = 'enr-pub-1'",
+                java.sql.Timestamp.class);
+
+        assertThatThrownBy(() -> service.publishGrades("sec-audit", "lec-01", false, "lec-01"))
+                .isInstanceOf(DomainException.class)
+                .extracting("code").isEqualTo("GRADES_EMPTY");
+        assertThat(jdbc.queryForObject(
+                "SELECT COUNT(*) FROM notifications.notification WHERE user_id = 'usr-9'",
+                Integer.class)).isEqualTo(1);
+        assertThat(jdbc.queryForObject(
+                "SELECT \"updatedAt\" FROM \"academic\".\"Enrollment\" WHERE \"id\" = 'enr-pub-1'",
+                java.sql.Timestamp.class)).isEqualTo(publishedAt);
     }
 
     @Test

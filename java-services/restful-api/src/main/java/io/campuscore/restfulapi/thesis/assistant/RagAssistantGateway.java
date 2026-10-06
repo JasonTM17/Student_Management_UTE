@@ -108,7 +108,18 @@ public class RagAssistantGateway {
     }
 
     public RemotePage<List<ThesisAssistantRepository.Conversation>> conversations(String ownerId, Integer limit, String cursor) {
-        return exchangeJson("GET", "/conversations", Map.of(), query(limit, cursor), null, ownerId,
+        return conversations(ownerId, limit, cursor, null);
+    }
+
+    /**
+     * V105: forwards the scope filter so remote-RAG deployments return the
+     * same corpus-pinned history as the local path — without it, both
+     * panels would list mixed-scope conversations.
+     */
+    public RemotePage<List<ThesisAssistantRepository.Conversation>> conversations(String ownerId, Integer limit,
+            String cursor, String scope) {
+        Map<String, String> seed = scope != null && !scope.isBlank() ? Map.of("scope", scope) : Map.of();
+        return exchangeJson("GET", "/conversations", Map.of(), query(limit, cursor, seed), null, ownerId,
                 new TypeReference<List<ThesisAssistantRepository.Conversation>>() { });
     }
 

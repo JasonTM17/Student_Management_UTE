@@ -1432,3 +1432,17 @@ test('mobile assistant sheet keeps the dynamic-viewport keyboard fix pinned', ()
   assert.match(panelSource, /md:h-\[min\(42rem,calc\(100dvh-2rem\)\)\]/, 'desktop floating card pin must stay');
   assert.doesNotMatch(panelSource, /className="relative flex h-full flex-col/, 'bare h-full without a dvh fallback must not return');
 });
+
+test('stream-path errors carry the error envelope so 429 rate-limit is not misread as quota', () => {
+  // Kongming C3: streamChat used to throw a bare Error with only .status, so
+  // useAssistantStream's classifier could never see RATE_LIMIT_EXCEEDED or
+  // Retry-After on the SSE path — every 429 surfaced as daily-quota. The
+  // thrown error must keep the axios-shaped response (data.code + headers).
+  const apiSource = fs.readFileSync(path.join(root, 'src/lib/thesis-api.ts'), 'utf8');
+  const hookSource = fs.readFileSync(path.join(root, 'src/components/assistant/useAssistantStream.ts'), 'utf8');
+  assert.match(apiSource, /response\.json\(\)\.catch/);
+  assert.match(apiSource, /headers\.get\('retry-after'\)/);
+  assert.match(apiSource, /'retry-after': retryAfter/);
+  assert.match(hookSource, /apiErrorCode\(error\) === 'RATE_LIMIT_EXCEEDED'/);
+  assert.match(hookSource, /apiErrorRetryAfter\(error\)/);
+});

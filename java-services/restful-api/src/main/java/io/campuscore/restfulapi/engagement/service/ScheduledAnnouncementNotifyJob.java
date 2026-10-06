@@ -24,10 +24,11 @@ import org.springframework.stereotype.Component;
  * <p>Each tick picks up rows where {@code notifiedAt IS NULL} and
  * {@code publishAt <= now} (same visibility semantics as the read side:
  * archived and expired rows are excluded, expired rows are retired by
- * {@code markExpiredAsNotified}). A row whose fan-out throws keeps its NULL
- * marker and is retried on the next tick, so a transient notification outage
- * self-heals instead of being lost. Runs on the persistence profile only;
- * property {@code engagement.announcement-notify.enabled=false} disables it.
+ * {@code markExpiredAsNotified}). Each row is claimed atomically before the
+ * fan-out so concurrent workers cannot double-send; a fan-out that throws
+ * re-arms the marker so a transient outage retries on the next tick. Runs on
+ * the persistence profile only; property
+ * {@code engagement.announcement-notify.enabled=false} disables it.
  */
 @Component
 @Profile("persistence")
@@ -62,12 +63,23 @@ public class ScheduledAnnouncementNotifyJob {
             List<AnnouncementResponse> due =
                     announcements.findDueForNotification(Instant.now(clock), BATCH_LIMIT);
             for (AnnouncementResponse announcement : due) {
+                // Claim-before-send: the conditional UPDATE is the only atomic
+                // inter-worker gate, so it must run before the fan-out, not
+                // after. A competing worker (or a late reschedule/archive)
+                // flips the claim to 0 rows and this send never happens.
+                if (announcements.markNotified(announcement.id(), Instant.now(clock)) == 0) {
+                    continue;
+                }
                 try {
                     int sent = notifier.fanOutToActiveStudents(announcement);
-                    announcements.markNotified(announcement.id(), Instant.now(clock));
                     log.info("Scheduled announcement {} fanned out to {} students",
                             announcement.id(), sent);
                 } catch (RuntimeException exception) {
+                    // Re-arm so a transient outage retries next tick instead
+                    // of consuming the marker. Residual risk: a JVM crash
+                    // between claim and send leaves the row stamped — the
+                    // operator can clear "notifiedAt" to force a refire.
+                    announcements.clearNotifiedAt(announcement.id());
                     log.warn("Scheduled announcement {} fan-out failed; will retry next tick: {}",
                             announcement.id(), exception.getMessage());
                 }

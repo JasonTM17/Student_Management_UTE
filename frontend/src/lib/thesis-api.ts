@@ -1077,10 +1077,30 @@ export const thesisApi = {
         }
       }
       if (!response.ok) {
+        // Shape the error like an axios failure (status + data.code +
+        // retry-after header) so useAssistantStream's classifier can tell a
+        // seconds-long rate-limit window apart from the daily quota. Without
+        // this, a stream-path 429 always surfaced as 'quota'.
+        const body = (await response.json().catch(() => undefined)) as
+          | { code?: string }
+          | undefined;
+        const retryAfter = response.headers.get('retry-after');
         const error = new Error(
           `assistant stream failed (${response.status})`,
-        ) as Error & { status?: number };
+        ) as Error & {
+          status?: number;
+          response?: {
+            status: number;
+            data?: { code?: string };
+            headers?: Record<string, string>;
+          };
+        };
         error.status = response.status;
+        error.response = {
+          status: response.status,
+          data: body,
+          headers: retryAfter ? { 'retry-after': retryAfter } : undefined,
+        };
         throw error;
       }
       if (!response.body) throw new Error('assistant stream has no body');

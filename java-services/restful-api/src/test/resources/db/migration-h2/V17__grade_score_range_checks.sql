@@ -25,6 +25,12 @@ CREATE TABLE IF NOT EXISTS academic."Enrollment" (
     "updatedAt" TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
+-- Persistence fixtures own a leaner Enrollment/StudentGrade shape and may have
+-- created the tables first in the shared in-memory database; add the columns
+-- the checks reference instead of assuming this migration's CREATE won.
+ALTER TABLE academic."StudentGrade" ADD COLUMN IF NOT EXISTS "score" DECIMAL(5, 2);
+ALTER TABLE academic."Enrollment" ADD COLUMN IF NOT EXISTS "finalGrade" DECIMAL(5, 2);
+
 ALTER TABLE academic."StudentGrade"
     ADD CONSTRAINT academic_student_grade_score_range
     CHECK ("score" IS NULL OR "score" BETWEEN 0 AND 10);

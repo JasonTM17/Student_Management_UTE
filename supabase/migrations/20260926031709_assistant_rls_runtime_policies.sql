@@ -46,6 +46,8 @@ BEGIN
                'chat_citation.campuscore_assistant_citation_owner_read',
                'chat_citation.campuscore_assistant_citation_owner_insert',
                'chat_message_feedback.campuscore_assistant_feedback_owner',
+               'chat_message_feedback.campuscore_assistant_feedback_admin_read',
+               'chat_message.campuscore_assistant_message_admin_read',
                'chat_turn_ledger.campuscore_assistant_turn_owner',
                'chat_turn_ledger.campuscore_assistant_turn_retention_read',
                'chat_turn_ledger.campuscore_assistant_turn_retention_update',
@@ -117,7 +119,7 @@ REVOKE ALL ON ALL FUNCTIONS IN SCHEMA assistant FROM campuscore_assistant_runtim
 GRANT USAGE ON SCHEMA assistant TO campuscore_assistant_runtime;
 
 GRANT SELECT, INSERT, DELETE ON assistant.chat_conversation TO campuscore_assistant_runtime;
-GRANT UPDATE (title, state, updated_at, expires_at) ON assistant.chat_conversation TO campuscore_assistant_runtime;
+GRANT UPDATE (title, state, updated_at, expires_at, scope) ON assistant.chat_conversation TO campuscore_assistant_runtime;
 GRANT SELECT, INSERT ON assistant.chat_message TO campuscore_assistant_runtime;
 GRANT SELECT, INSERT ON assistant.chat_citation TO campuscore_assistant_runtime;
 GRANT SELECT, INSERT, UPDATE, DELETE ON assistant.chat_message_feedback TO campuscore_assistant_runtime;
@@ -669,4 +671,21 @@ CREATE POLICY campuscore_assistant_runtime_state_projection_update ON assistant.
                AND r.source = 'SUPABASE'
                AND r.status = 'PUBLISHED'
         )
+    );
+
+-- Governed cross-owner reads for the admin feedback console (V106 parity).
+DROP POLICY IF EXISTS campuscore_assistant_feedback_admin_read ON assistant.chat_message_feedback;
+CREATE POLICY campuscore_assistant_feedback_admin_read ON assistant.chat_message_feedback
+    FOR SELECT TO campuscore_assistant_runtime
+    USING (
+        current_setting('app.assistant.scope', true) = 'ADMIN_GOVERNANCE'
+        AND current_setting('app.assistant.admin', true) = 'true'
+    );
+
+DROP POLICY IF EXISTS campuscore_assistant_message_admin_read ON assistant.chat_message;
+CREATE POLICY campuscore_assistant_message_admin_read ON assistant.chat_message
+    FOR SELECT TO campuscore_assistant_runtime
+    USING (
+        current_setting('app.assistant.scope', true) = 'ADMIN_GOVERNANCE'
+        AND current_setting('app.assistant.admin', true) = 'true'
     );

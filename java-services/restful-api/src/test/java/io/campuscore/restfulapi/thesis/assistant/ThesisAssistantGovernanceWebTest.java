@@ -160,6 +160,52 @@ class ThesisAssistantGovernanceWebTest {
                 .andExpect(content().string(containsString("\"type\":\"done\"")));
     }
 
+    @Test
+    void feedbackAdminSummaryAggregatesAcrossOwnersButStudentsAreForbidden() throws Exception {
+        mvc.perform(get("/api/v1/admin/assistant/feedback")
+                        .with(jwt().jwt(token -> token.subject("student-a"))
+                                .authorities(new SimpleGrantedAuthority("ROLE_STUDENT"))))
+                .andExpect(status().isForbidden());
+
+        UUID conversation = UUID.randomUUID();
+        UUID turn = UUID.randomUUID();
+        UUID question = UUID.randomUUID();
+        UUID answer = UUID.randomUUID();
+        var params = new org.springframework.jdbc.core.namedparam.MapSqlParameterSource();
+        jdbc.update("INSERT INTO assistant.chat_conversation(id,owner_id,locale,state,expires_at)"
+                        + " VALUES (:id,:owner,'en','ACTIVE',CURRENT_TIMESTAMP+30)",
+                new org.springframework.jdbc.core.namedparam.MapSqlParameterSource()
+                        .addValue("id", conversation).addValue("owner", "feedback-owner-a"));
+        try {
+            jdbc.update("INSERT INTO assistant.chat_message(id,conversation_id,turn_id,role,content,model,degraded,reason_code)"
+                            + " VALUES (:id,:conversation,:turn,'USER','seeded question','-',FALSE,'-')",
+                    params.addValue("id", question).addValue("conversation", conversation).addValue("turn", turn));
+            jdbc.update("INSERT INTO assistant.chat_message(id,conversation_id,turn_id,role,content,model,degraded,reason_code)"
+                            + " VALUES (:id,:conversation,:turn,'ASSISTANT','seeded answer','m',FALSE,'ANSWERED')",
+                    params.addValue("id", answer));
+            jdbc.update("INSERT INTO assistant.chat_message_feedback(message_id,owner_id,rating,reason)"
+                            + " VALUES (:message,:owner,'UP','HELPFUL')",
+                    params.addValue("message", answer).addValue("owner", "feedback-owner-a"));
+            jdbc.update("INSERT INTO assistant.chat_message_feedback(message_id,owner_id,rating,reason)"
+                            + " VALUES (:message,:owner,'DOWN','INCORRECT')",
+                    params.addValue("owner", "feedback-owner-b"));
+
+            // Two distinct owners' rows land in one admin summary — the
+            // ADMIN_GOVERNANCE policy set is what makes the cross-owner read
+            // possible on a FORCE-RLS datasource. Filter by the seeded
+            // message id because other tests may share the fixture database.
+            mvc.perform(get("/api/v1/admin/assistant/feedback").with(admin("admin-a")))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.totals.total", org.hamcrest.Matchers.greaterThanOrEqualTo(2)))
+                    .andExpect(jsonPath("$.recent[?(@.messageId=='" + answer + "')].rating",
+                            org.hamcrest.Matchers.containsInAnyOrder("UP", "DOWN")))
+                    .andExpect(jsonPath("$.recent[?(@.messageId=='" + answer + "')].questionPreview",
+                            org.hamcrest.Matchers.everyItem(org.hamcrest.Matchers.is("seeded question"))));
+        } finally {
+            jdbc.update("DELETE FROM assistant.chat_conversation WHERE id=:id", params);
+        }
+    }
+
     private static RequestPostProcessor admin(String subject) {
         return jwt().jwt(token -> token.subject(subject))
                 .authorities(new SimpleGrantedAuthority("ROLE_ADMIN"));

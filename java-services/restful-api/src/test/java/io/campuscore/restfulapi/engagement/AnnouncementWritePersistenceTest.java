@@ -60,6 +60,27 @@ class AnnouncementWritePersistenceTest {
     @BeforeEach
     void prepareWriteFixture() {
         jdbc.execute("CREATE SCHEMA IF NOT EXISTS \"engagement\"");
+        // The account-state gate consults the issuing table on every business
+        // request and fails closed when the store is unreadable, so this
+        // fixture must own a readable (empty) auth user table — same contract
+        // as AnnouncementReadPersistenceTest.
+        jdbc.execute("CREATE SCHEMA IF NOT EXISTS \"campuscore_auth\"");
+        jdbc.execute("""
+                CREATE TABLE IF NOT EXISTS "campuscore_auth"."User" (
+                    "id" VARCHAR(120) PRIMARY KEY,
+                    "email" VARCHAR(320) NOT NULL,
+                    "password" VARCHAR(200),
+                    "firstName" VARCHAR(120),
+                    "lastName" VARCHAR(120),
+                    "status" VARCHAR(40) NOT NULL DEFAULT 'ACTIVE',
+                    "mustChangePassword" BOOLEAN NOT NULL DEFAULT FALSE,
+                    "isSuperAdmin" BOOLEAN,
+                    "failedLoginAttempts" INTEGER,
+                    "createdAt" TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    "updatedAt" TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+                """);
+        jdbc.execute("DELETE FROM \"campuscore_auth\".\"User\"");
         // The feed endpoint this class asserts against consults the enrollment
         // table for section-scoped notices.
         jdbc.execute("CREATE SCHEMA IF NOT EXISTS academic");
@@ -106,7 +127,8 @@ class AnnouncementWritePersistenceTest {
                     "version" INTEGER NOT NULL DEFAULT 0,
                     "archivedAt" TIMESTAMP WITH TIME ZONE,
                     "archivedBy" VARCHAR(120),
-                    "displayOrder" INTEGER
+                    "displayOrder" INTEGER,
+                    "notifiedAt" TIMESTAMP WITH TIME ZONE
                 )
                 """);
         jdbc.execute("""
@@ -729,6 +751,36 @@ class AnnouncementWritePersistenceTest {
                         .claim("lastName", lastName)
                         .claim("roles", List.of("ADMIN")))
                 .authorities(new SimpleGrantedAuthority("ROLE_ADMIN"));
+    }
+
+    @Test
+    void dueNotificationPickupCoversImmediateRowsAndClaimRejectsRescheduled() {
+        // Kongming C1: an immediate announcement (publishAt NULL) whose
+        // create-path fan-out failed keeps notifiedAt NULL — the refire job
+        // must still pick it up. Kongming C4: a reschedule-to-future landing
+        // between the due-scan and the stamp must reject the claim so the
+        // marker survives for the real refire.
+        seedAnnouncement();
+        Instant now = Instant.parse("2026-10-07T00:00:00Z");
+
+        List<AnnouncementResponse> due = announcements.findDueForNotification(now, 50);
+        assertTrue(due.stream().anyMatch(row -> row.id().equals("existing-announcement")));
+
+        // Atomic single-claim: exactly one markNotified wins — the second
+        // concurrent claim returns 0 and its send is skipped.
+        assertEquals(1, announcements.markNotified("existing-announcement", now));
+        assertEquals(0, announcements.markNotified("existing-announcement", now));
+
+        // A reschedule-to-future clears the marker via clearNotifiedAt; the
+        // next claim against a stale `now` is still rejected by the claim's
+        // own publishAt predicate.
+        jdbc.update(
+                "UPDATE \"engagement\".\"Announcement\" SET \"publishAt\" = ? WHERE \"id\" = ?",
+                offsetDateTime(now.plusSeconds(3600)), "existing-announcement");
+        announcements.clearNotifiedAt("existing-announcement");
+        assertEquals(0, announcements.markNotified("existing-announcement", now));
+        assertTrue(announcements.findDueForNotification(now, 50).stream()
+                .noneMatch(row -> row.id().equals("existing-announcement")));
     }
 
     private void seedAnnouncement() {

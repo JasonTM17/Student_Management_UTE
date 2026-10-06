@@ -1458,6 +1458,15 @@ public class ThesisAssistantService {
         return legacyHistory.conversations(ownerId, limit == null ? 20 : limit, cursor, scope);
     }
 
+    /**
+     * Owner-scoped stored-scope lookup for controller early-path routing.
+     * Null when the row is missing, foreign, or the ledger is unreadable —
+     * the caller falls back to the request scope like a first-turn send.
+     */
+    public String conversationScope(UUID conversationId, String ownerId) {
+        return legacyHistory == null ? null : legacyHistory.conversationScope(conversationId, ownerId);
+    }
+
     public String createConversation(String ownerId, String locale) {
         return createConversation(ownerId, locale, null);
     }

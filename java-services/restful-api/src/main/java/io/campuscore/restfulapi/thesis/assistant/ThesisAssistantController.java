@@ -130,6 +130,29 @@ public class ThesisAssistantController {
     }
 
     /**
+     * V105: the corpus scope is pinned to the conversation row, not the
+     * request. A specialized conversation resumed by a surface that does not
+     * repeat {@code scope='specialized'} must still route through the
+     * specialized corpus — including every early return ahead of the ledger
+     * path, which otherwise ran under {@code request.scope()} and could
+     * answer a specialized conversation from the academic corpus (or vice
+     * versa). The lookup is owner-scoped and fail-soft: a missing/foreign
+     * row or an unreadable ledger returns the request unchanged, exactly
+     * like a first-turn send.
+     */
+    private ChatRequest scopedRequest(ChatRequest request, String owner) {
+        UUID conversation = conversationUuid(request.conversationId());
+        String stored = conversation != null && assistant != null
+                ? assistant.conversationScope(conversation, owner)
+                : null;
+        if (stored == null || stored.isBlank() || stored.equalsIgnoreCase(request.scope())) {
+            return request;
+        }
+        return new ChatRequest(request.message(), request.locale(), request.clientRequestId(),
+                request.conversationId(), stored);
+    }
+
+    /**
      * Round-3 chat-7: persists an intercepted PERSONAL_CONTEXT turn into the
      * requested conversation so the history endpoint shows it, and returns the
      * response with the conversation id stamped. An unknown or foreign
@@ -198,6 +221,12 @@ public class ThesisAssistantController {
                 httpRequest.getAttribute(DatabaseAvailabilityTracker.REQUEST_ATTRIBUTE));
         AssistantInputGuard.GuardResult guard = AssistantInputGuard.inspect(request.message());
         String locale = AssistantInputGuard.normalizeLocale(request.locale());
+        String owner = subject(actor);
+        // V105: pin every scope-dependent early path below to the stored
+        // conversation scope — the ledger path already does this in
+        // execute(), but the fast-path/off-topic/remote returns ran on
+        // request.scope() and could cross corpora on a resumed conversation.
+        ChatRequest scopedRequest = scopedRequest(request, owner);
         if (!guard.allowed()) {
             return new ChatResponse(ThesisAssistantService.guardMessage(guard.reasonCode(), locale),
                     ThesisAssistantService.MODEL, true, guard.reasonCode(), locale, List.of(),
@@ -208,7 +237,7 @@ public class ThesisAssistantController {
         // its routing — "Docker compose để chạy dự án" was blocked with zero
         // citations before the scope was ever consulted. Privacy (inspect)
         // and injection gates above still apply in every scope.
-        if (!request.isSpecializedScope() && AssistantInputGuard.isTechnicalRequest(guard.normalizedMessage())) {
+        if (!scopedRequest.isSpecializedScope() && AssistantInputGuard.isTechnicalRequest(guard.normalizedMessage())) {
             return new ChatResponse(ThesisAssistantService.technicalOutputMessage(locale),
                     ThesisAssistantService.MODEL, true, "TECHNICAL_REQUEST_BLOCKED", locale, List.of(),
                     UUID.randomUUID(), request.clientRequestId(), null, false, "REJECTED", null, null);
@@ -260,9 +289,8 @@ public class ThesisAssistantController {
         // provider answers them directly instead of the KB miss (owner
         // request 2026-09-30). Scope='specialized' skips this: the
         // professional corpus is the right source there (round-2 chat-1).
-        String owner = subject(actor);
         ChatResponse general = assistant.generalAnswerIfOffTopic(request.message(), locale,
-                request.clientRequestId(), request.scope(), owner,
+                request.clientRequestId(), scopedRequest.scope(), owner,
                 AssistantInputGuard.canonicalHash(request.message(), locale,
                         conversationUuid(request.conversationId())));
         if (general != null) {
@@ -283,12 +311,12 @@ public class ThesisAssistantController {
         // cheap even when the datasource is far away. Quota is unaffected:
         // turns.dispatch only charges synthesisRequired && provider-usable
         // answers, so lexical answers were always free.
-        ChatResponse fastPath = lexicalFastPathOrNull(request);
+        ChatResponse fastPath = lexicalFastPathOrNull(scopedRequest);
         if (fastPath != null) {
             return fastPath;
         }
         if (remoteRag()) {
-            return chatRemoteWithFallback(request, owner, dbDownAtRequestStart);
+            return chatRemoteWithFallback(scopedRequest, owner, dbDownAtRequestStart);
         }
         // The local path touches the turn ledger (reserve/complete) outside the
         // service's own DomainException guard: a ledger outage used to escape
@@ -296,7 +324,7 @@ public class ThesisAssistantController {
         // a 200 with no persistence, never a 5xx, so it is honoured here too.
         try {
             return assistant.answer(request.message(), request.locale(), request.conversationId(), owner,
-                    request.clientRequestId(), request.scope());
+                    request.clientRequestId(), scopedRequest.scope());
         } catch (DataAccessException exception) {
             // Preserve the outage contract (KNOWLEDGE_UNAVAILABLE, degraded, no
             // citations) rather than the curated fallback, whose NO_MATCH
@@ -430,7 +458,10 @@ public class ThesisAssistantController {
             emitter.complete();
             return emitter;
         }
-        if (AssistantInputGuard.isTechnicalRequest(guard.normalizedMessage()) && !request.isSpecializedScope()) {
+        // V105: same pinning as the JSON route — early paths below must use
+        // the stored conversation scope, not the request's.
+        ChatRequest scopedRequest = scopedRequest(request, owner);
+        if (AssistantInputGuard.isTechnicalRequest(guard.normalizedMessage()) && !scopedRequest.isSpecializedScope()) {
             sendError(emitter, "TECHNICAL_REQUEST_BLOCKED", false);
             emitter.complete();
             return emitter;
@@ -487,7 +518,7 @@ public class ThesisAssistantController {
                 } else {
                     ChatResponse general = assistant.generalAnswerIfOffTopic(request.message(),
                             AssistantInputGuard.normalizeLocale(request.locale()), request.clientRequestId(),
-                            request.scope(), owner,
+                            scopedRequest.scope(), owner,
                             AssistantInputGuard.canonicalHash(request.message(),
                                     AssistantInputGuard.normalizeLocale(request.locale()),
                                     conversationUuid(request.conversationId())));
@@ -497,15 +528,15 @@ public class ThesisAssistantController {
                         // Same fast-path ordering as the JSON route: a
                         // confident curated match streams instantly in BOTH
                         // modes instead of waiting on the provider chain.
-                        ChatResponse fastPath = lexicalFastPathOrNull(request);
+                        ChatResponse fastPath = lexicalFastPathOrNull(scopedRequest);
                         if (fastPath != null) {
-                            emitLexicalFastPath(fastPath, request,
+                            emitLexicalFastPath(fastPath, scopedRequest,
                                     AssistantInputGuard.normalizeLocale(request.locale()), sink);
                         } else if (remoteRag()) {
-                            streamRemoteWithFallback(request, owner, sink, dbDownAtRequestStart);
+                            streamRemoteWithFallback(scopedRequest, owner, sink, dbDownAtRequestStart);
                         } else {
                             assistant.stream(request.message(), request.locale(), request.conversationId(), owner,
-                                    request.clientRequestId(), sink, request.scope());
+                                    request.clientRequestId(), sink, scopedRequest.scope());
                         }
                     }
                 }
@@ -633,7 +664,7 @@ public class ThesisAssistantController {
         String owner = subject(actor);
         if (remoteRag()) {
             RagAssistantGateway.RemotePage<List<ThesisAssistantRepository.Conversation>> page =
-                    ragGateway.conversations(owner, limit, cursor);
+                    ragGateway.conversations(owner, limit, cursor, scope);
             if (page.nextCursor() != null) response.setHeader("X-Next-Cursor", page.nextCursor());
             return page.data();
         }

@@ -126,7 +126,7 @@ class AssistantRlsPostgresIT {
         assertEquals(0L, ((Number) role.get("memberships")).longValue());
         assertEquals(13L, ((Number) role.get("rls_tables")).longValue());
         assertEquals(13L, ((Number) role.get("forced_rls_tables")).longValue());
-        assertEquals(45L, ((Number) role.get("policy_count")).longValue());
+        assertEquals(47L, ((Number) role.get("policy_count")).longValue());
         assertEquals("", role.get("owner_setting"));
         assertEquals("", role.get("scope_setting"));
         assertEquals("", role.get("admin_setting"));
@@ -282,6 +282,40 @@ class AssistantRlsPostgresIT {
         assertThrows(DataAccessException.class, () -> system(Access.KNOWLEDGE_PROJECTION,
                 () -> assistantJdbc.update("UPDATE assistant.knowledge_release SET status='ARCHIVED' WHERE id=:id",
                         Map.of("id", olderRelease))));
+    }
+
+    @Test
+    void runtimeRoleCanStampConversationScopeWithinItsOwnerRow() throws Throwable {
+        // Regression for the V106 grant: column-level UPDATE on
+        // chat_conversation omits `scope` in the original V84 grant list, so the
+        // provisioned runtime role answered `permission denied for column scope`
+        // whenever a first turn stamped the conversation scope.
+        assertEquals(1, asUser(ownerA, "ROLE_STUDENT", () -> assistantJdbc.update(
+                "UPDATE assistant.chat_conversation SET scope='specialized' WHERE id=:id AND owner_id=:owner",
+                Map.of("id", conversationA, "owner", ownerA))));
+        assertEquals("specialized", asUser(ownerA, "ROLE_STUDENT", () -> assistantJdbc.queryForObject(
+                "SELECT scope FROM assistant.chat_conversation WHERE id=:id",
+                Map.of("id", conversationA), String.class)));
+        assertEquals(0, asUser(ownerA, "ROLE_STUDENT", () -> assistantJdbc.update(
+                "UPDATE assistant.chat_conversation SET scope='academic' WHERE id=:id",
+                Map.of("id", conversationB))));
+    }
+
+    @Test
+    void adminGovernanceReadsFeedbackAcrossOwnersButCannotWriteIt() throws Throwable {
+        String adminOwner = "assistant-rls-admin-" + UUID.randomUUID();
+        // The *_admin_read policies deliberately carry no owner predicate — the
+        // feedback console must aggregate across owners. User scope still sees
+        // only its own rows, and the admin policies grant SELECT only.
+        assertEquals(2, asAdmin(adminOwner, () -> count("SELECT COUNT(*) FROM assistant.chat_message_feedback")));
+        assertEquals(2, asAdmin(adminOwner, () -> count("SELECT COUNT(*) FROM assistant.chat_message")));
+        assertEquals(1, asUser(ownerA, "ROLE_STUDENT", () -> count("SELECT COUNT(*) FROM assistant.chat_message_feedback")));
+        assertEquals(0, asAdmin(adminOwner, () -> assistantJdbc.update(
+                "UPDATE assistant.chat_message_feedback SET rating='DOWN' WHERE owner_id=:owner",
+                Map.of("owner", ownerA))));
+        assertThrows(IllegalStateException.class, () -> asUser(ownerA, "ROLE_STUDENT",
+                () -> transactions.execute(Access.ADMIN_GOVERNANCE,
+                        () -> count("SELECT COUNT(*) FROM assistant.chat_message_feedback"))));
     }
 
     @Test

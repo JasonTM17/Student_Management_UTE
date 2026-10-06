@@ -65,6 +65,8 @@ public class AssistantRlsRuntimeVerifier implements SmartInitializingSingleton {
                      JOIN pg_class c ON c.oid=t.tgrelid
                      JOIN pg_namespace n ON n.oid=c.relnamespace
                     WHERE n.nspname='assistant' AND NOT t.tgisinternal) AS assistant_triggers,
+                   has_column_privilege(r.oid, 'assistant.chat_conversation'::regclass, 'scope', 'UPDATE')
+                       AS can_update_conversation_scope,
                    (SELECT count(*)
                       FROM pg_roles a
                      WHERE a.rolname = ANY (ARRAY['anon','authenticated','service_role','authenticator'])
@@ -135,7 +137,7 @@ public class AssistantRlsRuntimeVerifier implements SmartInitializingSingleton {
                     || result.getLong("forced_rls_tables") != 13
                     || result.getLong("assistant_tables") != 13
                     || result.getLong("policy_tables") != 13
-                    || result.getLong("policy_count") != 45
+                    || result.getLong("policy_count") != 47
                     || result.getLong("policies_for_other_roles") != 0
                     || result.getLong("role_memberships") != 0
                     || result.getLong("role_context_defaults") != 0
@@ -145,6 +147,7 @@ public class AssistantRlsRuntimeVerifier implements SmartInitializingSingleton {
                     || result.getLong("unreviewed_relations") != 0
                     || result.getLong("assistant_routines") != 0
                     || result.getLong("assistant_triggers") != 0
+                    || !result.getBoolean("can_update_conversation_scope")
                     || result.getLong("api_roles_with_access") != 0
                     || result.getInt("server_version_num") < 150000) {
                 String reason = "Assistant RLS runtime database role or policy verification failed";

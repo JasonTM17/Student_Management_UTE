@@ -333,7 +333,8 @@ export function AssistantMessages({
                           {reasonLabel(message, messages)}
                         </span>
                       )}
-                      {message.reasonCode === 'QUOTA_EXCEEDED' && message.resetAt ? (
+                      {message.reasonCode === 'QUOTA_EXCEEDED' && message.resetAt
+                        && !Number.isNaN(new Date(message.resetAt).getTime()) ? (
                         <span className="text-[10px] text-muted-foreground">
                           {messages.assistant.quotaResetsAt.replace(
                             '{time}',

@@ -91,7 +91,8 @@ class AnnouncementStudentFanoutPersistenceTest {
                     "version" INTEGER NOT NULL DEFAULT 0,
                     "archivedAt" TIMESTAMP WITH TIME ZONE,
                     "archivedBy" VARCHAR(120),
-                    "displayOrder" INTEGER
+                    "displayOrder" INTEGER,
+                    "notifiedAt" TIMESTAMP WITH TIME ZONE
                 )
                 """);
         jdbc.execute("""

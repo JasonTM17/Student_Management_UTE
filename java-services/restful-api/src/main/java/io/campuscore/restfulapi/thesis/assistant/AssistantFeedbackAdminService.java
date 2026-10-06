@@ -5,6 +5,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.context.annotation.Profile;
 import org.springframework.jdbc.core.namedparam.MapSqlParameterSource;
 import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
@@ -17,9 +18,15 @@ import org.springframework.stereotype.Service;
  * invisible. The admin response deliberately carries no {@code owner_id} —
  * reviewers need message quality, not the identity of the student who rated —
  * and question/answer bodies are capped to a preview length.
+ *
+ * <p>Runs on the Assistant datasource inside an {@code ADMIN_GOVERNANCE}
+ * boundary: the V106 {@code *_admin_read} policies grant that scope a
+ * cross-owner SELECT while writes remain owner-scoped. Using the primary
+ * datasource here would silently return zero rows under FORCE RLS.
  */
 @Service
 @Profile("persistence")
+@AssistantRlsBoundary(access = AssistantRlsBoundary.Access.ADMIN_GOVERNANCE)
 public class AssistantFeedbackAdminService {
 
     static final int MAX_PREVIEW_CODE_POINTS = 280;
@@ -28,7 +35,8 @@ public class AssistantFeedbackAdminService {
 
     private final NamedParameterJdbcTemplate jdbc;
 
-    public AssistantFeedbackAdminService(NamedParameterJdbcTemplate jdbc) {
+    public AssistantFeedbackAdminService(
+            @Qualifier(AssistantDatabaseConfiguration.JDBC_TEMPLATE) NamedParameterJdbcTemplate jdbc) {
         this.jdbc = jdbc;
     }
 

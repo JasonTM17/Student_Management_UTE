@@ -115,16 +115,23 @@ public class AnnouncementWriteService {
      * roll back the announcement that was just published.
      */
     private void notifyActiveStudents(AnnouncementResponse created) {
+        boolean dueNow = created.publishAt() == null
+                || !created.publishAt().isAfter(Instant.now(clock));
+        if (dueNow) {
+            // Claim before send, same contract as the scheduled job: a tick
+            // landing between this commit and the fan-out sees the marker
+            // and skips, so an immediate announcement can never double-send.
+            announcements.markNotified(created.id(), Instant.now(clock));
+        }
         try {
             int sent = studentNotifier.fanOutToActiveStudents(created);
             LOGGER.info("Announcement {} fanned out to {} active students", created.id(), sent);
-            if (created.publishAt() == null || !created.publishAt().isAfter(Instant.now(clock))) {
-                // The marker is only stamped on the non-throwing path: a
-                // failed fan-out keeps notifiedAt NULL so
-                // ScheduledAnnouncementNotifyJob retries the send.
-                announcements.markNotified(created.id(), Instant.now(clock));
-            }
         } catch (RuntimeException exception) {
+            if (dueNow) {
+                // Re-arm the marker so ScheduledAnnouncementNotifyJob retries
+                // the send instead of a transient outage silently dropping it.
+                announcements.clearNotifiedAt(created.id());
+            }
             LOGGER.warn(
                     "Announcement {} was created but the student notification fan-out failed: {}",
                     created.id(),

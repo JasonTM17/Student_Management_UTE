@@ -55,7 +55,7 @@ class ScheduledAnnouncementNotifyTest {
     }
 
     @Test
-    void failedFanOutLeavesMarkerNullSoTheJobRetries() throws Exception {
+    void failedFanOutReArmsTheClaimSoTheJobRetries() throws Exception {
         AnnouncementWriteRepository announcements = mock(AnnouncementWriteRepository.class);
         AnnouncementStudentNotifier notifier = mock(AnnouncementStudentNotifier.class);
         AnnouncementWriteService service = service(announcements, notifier);
@@ -64,7 +64,12 @@ class ScheduledAnnouncementNotifyTest {
 
         service.create("admin-1", "Admin", List.of("ADMIN"), null, createRequest(null));
 
-        verify(announcements, never()).markNotified(any(), any());
+        // Claim-before-send: the create path stamps first so a concurrent tick
+        // skips the row, then re-arms on failure so the job retries the send.
+        InOrder order = inOrder(notifier, announcements);
+        order.verify(announcements).markNotified(eq("notice-1"), any());
+        order.verify(notifier).fanOutToActiveStudents(any());
+        order.verify(announcements).clearNotifiedAt("notice-1");
     }
 
     @Test
@@ -92,26 +97,46 @@ class ScheduledAnnouncementNotifyTest {
         ScheduledAnnouncementNotifyJob job = new ScheduledAnnouncementNotifyJob(announcements, notifier);
         when(announcements.findDueForNotification(any(), anyInt()))
                 .thenReturn(List.of(announcement(NOW.minusSeconds(60))));
+        when(announcements.markNotified(eq("notice-1"), any())).thenReturn(1);
 
         job.refireDueAnnouncements();
 
         InOrder order = inOrder(notifier, announcements);
-        order.verify(notifier).fanOutToActiveStudents(any());
         order.verify(announcements).markNotified(eq("notice-1"), any());
+        order.verify(notifier).fanOutToActiveStudents(any());
     }
 
     @Test
-    void jobSkipsStampWhenFanOutThrowsSoRowRetriesNextTick() {
+    void jobSkipsFanOutWhenClaimIsLostToAnotherWorker() {
         AnnouncementWriteRepository announcements = mock(AnnouncementWriteRepository.class);
         AnnouncementStudentNotifier notifier = mock(AnnouncementStudentNotifier.class);
         ScheduledAnnouncementNotifyJob job = new ScheduledAnnouncementNotifyJob(announcements, notifier);
         when(announcements.findDueForNotification(any(), anyInt()))
                 .thenReturn(List.of(announcement(NOW.minusSeconds(60))));
+        when(announcements.markNotified(eq("notice-1"), any())).thenReturn(0);
+
+        job.refireDueAnnouncements();
+
+        verify(notifier, never()).fanOutToActiveStudents(any());
+        verify(announcements, never()).clearNotifiedAt(any());
+    }
+
+    @Test
+    void jobReArmsMarkerWhenFanOutThrowsSoRowRetriesNextTick() {
+        AnnouncementWriteRepository announcements = mock(AnnouncementWriteRepository.class);
+        AnnouncementStudentNotifier notifier = mock(AnnouncementStudentNotifier.class);
+        ScheduledAnnouncementNotifyJob job = new ScheduledAnnouncementNotifyJob(announcements, notifier);
+        when(announcements.findDueForNotification(any(), anyInt()))
+                .thenReturn(List.of(announcement(NOW.minusSeconds(60))));
+        when(announcements.markNotified(eq("notice-1"), any())).thenReturn(1);
         when(notifier.fanOutToActiveStudents(any())).thenThrow(new RuntimeException("inbox down"));
 
         job.refireDueAnnouncements();
 
-        verify(announcements, never()).markNotified(any(), any());
+        InOrder order = inOrder(notifier, announcements);
+        order.verify(announcements).markNotified(eq("notice-1"), any());
+        order.verify(notifier).fanOutToActiveStudents(any());
+        order.verify(announcements).clearNotifiedAt("notice-1");
     }
 
     private static AnnouncementWriteService service(

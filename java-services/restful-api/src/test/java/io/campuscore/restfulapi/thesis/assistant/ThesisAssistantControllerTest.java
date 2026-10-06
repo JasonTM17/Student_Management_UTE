@@ -9,6 +9,7 @@ import static org.mockito.ArgumentMatchers.any;
 import org.springframework.mock.web.MockHttpServletRequest;
 import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -543,6 +544,63 @@ class ThesisAssistantControllerTest {
         verify(personalContext, never()).handles(anyString());
         verify(personalContext, never()).answer(any(), any());
         verifyNoInteractions(assistant);
+    }
+
+    @Test
+    void storedSpecializedScopePinsEarlyPathRoutingOnResumedConversation() throws Exception {
+        // Kongming C5: the stored conversation scope must pin every early
+        // path — a technical ask resumed under scope='academic' into a
+        // specialized conversation must skip the academic-only
+        // TECHNICAL_REQUEST_BLOCKED gate and reach the ledger path with the
+        // specialized corpus.
+        ThesisAssistantService assistant = mock(ThesisAssistantService.class);
+        var controller = new ThesisAssistantController(assistant, null, null, null, Runnable::run);
+        var mvc = MockMvcBuilders.standaloneSetup(controller)
+                .setCustomArgumentResolvers(new AuthenticationPrincipalArgumentResolver()).build();
+        SecurityContextHolder.getContext().setAuthentication(new JwtAuthenticationToken(
+                actor(), List.of(new SimpleGrantedAuthority("ROLE_STUDENT"))));
+        String conversationId = UUID.randomUUID().toString();
+        when(assistant.conversationScope(UUID.fromString(conversationId), "owner-a"))
+                .thenReturn("specialized");
+        try {
+            var result = mvc.perform(post("/api/v1/assistant/chat")
+                    .contentType("application/json")
+                    .content("{\"message\":\"Docker compose để chạy dự án\",\"locale\":\"vi\",\"clientRequestId\":\""
+                            + UUID.randomUUID() + "\",\"conversationId\":\"" + conversationId
+                            + "\",\"scope\":\"academic\"}"))
+                    .andReturn();
+            assertEquals(200, result.getResponse().getStatus());
+            verify(assistant).answer(anyString(), anyString(), any(), eq("owner-a"), any(), eq("specialized"));
+        } finally {
+            SecurityContextHolder.clearContext();
+        }
+    }
+
+    @Test
+    void requestScopeStillRoutesWhenConversationHasNoStoredScope() throws Exception {
+        // Counterpart: without a stored scope the request scope wins — the
+        // same technical ask under scope='academic' is blocked before the
+        // ledger path.
+        ThesisAssistantService assistant = mock(ThesisAssistantService.class);
+        var controller = new ThesisAssistantController(assistant, null, null, null, Runnable::run);
+        var mvc = MockMvcBuilders.standaloneSetup(controller)
+                .setCustomArgumentResolvers(new AuthenticationPrincipalArgumentResolver()).build();
+        SecurityContextHolder.getContext().setAuthentication(new JwtAuthenticationToken(
+                actor(), List.of(new SimpleGrantedAuthority("ROLE_STUDENT"))));
+        String conversationId = UUID.randomUUID().toString();
+        try {
+            var result = mvc.perform(post("/api/v1/assistant/chat")
+                    .contentType("application/json")
+                    .content("{\"message\":\"Docker compose để chạy dự án\",\"locale\":\"vi\",\"clientRequestId\":\""
+                            + UUID.randomUUID() + "\",\"conversationId\":\"" + conversationId
+                            + "\",\"scope\":\"academic\"}"))
+                    .andReturn();
+            assertEquals(200, result.getResponse().getStatus());
+            assertTrue(result.getResponse().getContentAsString().contains("TECHNICAL_REQUEST_BLOCKED"));
+            verify(assistant, never()).answer(anyString(), anyString(), any(), anyString(), any(), anyString());
+        } finally {
+            SecurityContextHolder.clearContext();
+        }
     }
 
     private static ChatRequest request(String message) {

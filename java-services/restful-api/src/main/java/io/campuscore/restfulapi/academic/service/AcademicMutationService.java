@@ -396,6 +396,10 @@ public class AcademicMutationService {
                 "UPDATE " + ENROLLMENT + " SET \"gradeStatus\" = 'PUBLISHED', \"status\" = 'COMPLETED',"
                         + " \"updatedAt\" = CURRENT_TIMESTAMP WHERE \"sectionId\" = :sectionId"
                         + " AND \"status\" IN (:gradeableStatuses)"
+                        // A repeat publish must not re-touch or re-notify rows
+                        // already published; IS DISTINCT FROM keeps NULL-gradeStatus
+                        // pre-publish rows eligible.
+                        + " AND \"gradeStatus\" IS DISTINCT FROM 'PUBLISHED'"
                         + " AND \"finalGrade\" IS NOT NULL AND \"letterGrade\" IS NOT NULL",
                 new MapSqlParameterSource("sectionId", sectionId)
                         .addValue("gradeableStatuses", GRADEABLE_STATUSES));
@@ -427,6 +431,7 @@ public class AcademicMutationService {
                         + " JOIN " + STUDENT + " student ON student.\"id\" = e.\"studentId\""
                         + " WHERE e.\"sectionId\" = :sectionId"
                         + " AND e.\"status\" IN (:gradeableStatuses)"
+                        + " AND e.\"gradeStatus\" IS DISTINCT FROM 'PUBLISHED'"
                         + " AND e.\"finalGrade\" IS NOT NULL AND e.\"letterGrade\" IS NOT NULL"
                         + " AND student.\"userId\" IS NOT NULL",
                 new MapSqlParameterSource("sectionId", sectionId)
