@@ -89,7 +89,10 @@
     --portal-sidebar-width: 16.5rem;
     --portal-sidebar-collapsed: 4.5rem;
     --portal-header-height: 3.75rem;
-    --content-max: 80rem;
+    /* Single source for portal content width: both shells cap at 90rem
+       (1440px). DESIGN.md previously documented 1280px — updated to match
+       the rendered reality audited in Phase 6. */
+    --content-max: 90rem;
     --space-section: clamp(3.5rem, 7vw, 7rem);
     --focus-width: 0.1875rem;
   }

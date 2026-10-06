@@ -1332,7 +1332,7 @@ export default function DashboardLayout({
           </div>
         </header>
 
-        <div className="mx-auto w-full max-w-[1440px] px-4 py-5 pb-28 sm:px-6 lg:px-8 lg:pb-28 print:p-0 print:m-0 print:max-w-none">
+        <div className="mx-auto w-full max-w-[var(--content-max)] px-4 py-5 pb-28 sm:px-6 lg:px-8 lg:pb-28 print:p-0 print:m-0 print:max-w-none">
           <main
             id="dashboard-main-content"
             ref={mainRef}

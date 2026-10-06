@@ -6,8 +6,9 @@ tokens and screen atlas live in [`.stitch/DESIGN.md`](./.stitch/DESIGN.md).
 The implementation contract is intentionally short: use Be Vietnam Pro with a
 blue-first academic palette, 4px spacing rhythm, 4–8px utility radii, white
 content surfaces on a cool near-white canvas, low-contrast borders, and clear
-focus states. Desktop uses a fixed sidebar and a 1280px content cap; mobile
-uses a 16px gutter, stacked content, and bottom navigation for frequent actions.
+focus states. Desktop uses a fixed sidebar and a 1440px content cap
+(`--content-max` in `globals.css`); mobile uses a 16px gutter, stacked
+content, and bottom navigation for frequent actions.
 
 ## Token map (Stitch hex → CSS variables)
 
