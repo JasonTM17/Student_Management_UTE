@@ -651,12 +651,12 @@ export default function SchedulePage() {
                     >
                       <span>{dayName}</span>
                       {isToday ? (
-                        <span className="rounded bg-background/20 px-1 text-[9px] font-extrabold uppercase">
+                        <span className="rounded bg-background/20 px-1 text-[10px] font-extrabold uppercase">
                           {copy.today}
                         </span>
                       ) : null}
                       <span
-                        className={`rounded-md px-1.5 py-0.5 text-[10px] ${
+                        className={`rounded-md px-1.5 py-0.5 text-[11px] ${
                           isSelected ? 'bg-primary-foreground/20' : 'bg-secondary text-muted-foreground'
                         }`}
                       >
@@ -804,7 +804,7 @@ export default function SchedulePage() {
                           </span>
                           {statusLabel ? (
                             <span
-                              className={`shrink-0 rounded-md px-2 py-0.5 text-[10px] font-bold ${statusToneClass(statusTone)}`}
+                              className={`shrink-0 rounded-md px-2 py-0.5 text-[11px] font-bold ${statusToneClass(statusTone)}`}
                             >
                               {statusLabel}
                             </span>
@@ -812,7 +812,7 @@ export default function SchedulePage() {
                         </div>
                         <div className="mt-1.5 flex items-center justify-between gap-2">
                           <span className="font-mono font-bold">{item.courseCode}</span>
-                          <span className="rounded bg-background/60 px-1.5 py-0.5 text-[10px]">
+                          <span className="rounded bg-background/60 px-1.5 py-0.5 text-[11px]">
                             {copy.sectionPrefix} {item.sectionNumber}
                           </span>
                         </div>
@@ -893,7 +893,7 @@ export default function SchedulePage() {
                             </td>
                             <td className="py-3 px-4 text-center font-bold text-foreground">{item.credits ?? '—'}</td>
                             <td className="py-3 px-4 text-center">
-                              <span className="rounded bg-secondary px-2 py-0.5 font-semibold text-[10px] text-foreground">
+                              <span className="rounded bg-secondary px-2 py-0.5 font-semibold text-[11px] text-foreground">
                                 {item.sectionNumber}
                               </span>
                             </td>

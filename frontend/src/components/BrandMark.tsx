@@ -65,7 +65,7 @@ export function BrandMark({
           <span translate="no" className="truncate">
             {title}
           </span>
-          <span className="shrink-0 rounded-[4px] bg-[var(--portal-yellow)] px-1 py-0.5 text-[10px] font-extrabold uppercase tracking-wide text-[var(--portal-yellow-ink)] shadow-xs ring-1 ring-black/5">
+          <span className="shrink-0 rounded-[4px] bg-[var(--portal-yellow)] px-1 py-0.5 text-[11px] font-extrabold uppercase tracking-wide text-[var(--portal-yellow-ink)] shadow-xs ring-1 ring-black/5">
             HCMUTE
           </span>
         </div>

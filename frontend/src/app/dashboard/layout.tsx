@@ -874,11 +874,11 @@ export default function DashboardLayout({
                     {/* Institutional brand gold (accent-independent): the role chip
                         and demo marker keep the warm gold identity on the navy
                         chrome even when the site accent is a cool tone. */}
-                    <span className="inline-flex items-center rounded-md border border-[var(--portal-brand-gold)]/40 bg-[var(--portal-brand-gold)]/15 px-2.5 py-0.5 text-[11px] font-semibold uppercase tracking-wider text-[var(--portal-sidebar-text)] shadow-xs">
+                    <span className="inline-flex items-center rounded-md border border-[var(--portal-brand-gold)]/40 bg-[var(--portal-brand-gold)]/15 px-2.5 py-0.5 text-xs font-semibold uppercase tracking-wider text-[var(--portal-sidebar-text)] shadow-xs">
                       {roleLabel}
                     </span>
                     {isDemoUser(user) && (
-                      <span className="inline-flex items-center gap-1 rounded-md border border-[var(--portal-brand-gold)]/35 bg-[var(--portal-brand-gold)]/12 px-2 py-0.5 text-[10px] font-medium text-[var(--portal-sidebar-text)]">
+                      <span className="inline-flex items-center gap-1 rounded-md border border-[var(--portal-brand-gold)]/35 bg-[var(--portal-brand-gold)]/12 px-2 py-0.5 text-[11px] font-medium text-[var(--portal-sidebar-text)]">
                         <span className="h-1.5 w-1.5 rounded-full bg-[var(--portal-brand-gold)] shadow-xs" />
                         {locale === 'vi' ? 'TK Demo trải nghiệm' : 'Demo account'}
                       </span>
@@ -1234,7 +1234,7 @@ export default function DashboardLayout({
                     <div className="text-xs text-muted-foreground flex items-center gap-1">
                       <span className="min-w-0 truncate">{user.email}</span>
                       {isDemoUser(user) && (
-                        <span className="inline-flex items-center gap-1 text-[10px] font-medium text-muted-foreground">
+                        <span className="inline-flex items-center gap-1 text-[11px] font-medium text-muted-foreground">
                           <span
                             className="h-1.5 w-1.5 rounded-full bg-[var(--portal-brand-gold)]"
                             aria-hidden="true"
@@ -1370,12 +1370,12 @@ export default function DashboardLayout({
                     <item.icon className="h-5 w-5 shrink-0" aria-hidden="true" />
                     <span
                       title={messages.dashboardShell.controls.bottomNav.menu}
-                      className="w-full max-w-full truncate text-center text-[10px] leading-4"
+                      className="w-full max-w-full truncate text-center text-[11px] leading-4"
                     >
                       {messages.dashboardShell.controls.bottomNav.menu}
                     </span>
                     {unreadCount > 0 ? (
-                      <span className="absolute right-1 top-1 min-w-4 rounded-md bg-primary px-1 text-center text-[10px] font-semibold leading-4 text-primary-foreground">
+                      <span className="absolute right-1 top-1 min-w-4 rounded-md bg-primary px-1 text-center text-[11px] font-semibold leading-4 text-primary-foreground">
                         {unreadCount > 99 ? '99+' : unreadCount}
                       </span>
                     ) : null}
@@ -1409,7 +1409,7 @@ export default function DashboardLayout({
                   <item.icon className="h-5 w-5 shrink-0" aria-hidden="true" />
                   <span
                     title={itemLabel}
-                    className="w-full max-w-full truncate text-center text-[10px] leading-4"
+                    className="w-full max-w-full truncate text-center text-[11px] leading-4"
                   >
                     {itemLabel}
                   </span>
@@ -1426,7 +1426,7 @@ export default function DashboardLayout({
               <AssistantMascot className="h-5 w-5 shrink-0" />
               <span
                 title={messages.assistant.slotLabel}
-                className="w-full max-w-full truncate text-center text-[10px] leading-4"
+                className="w-full max-w-full truncate text-center text-[11px] leading-4"
               >
                 {messages.assistant.slotLabel}
               </span>

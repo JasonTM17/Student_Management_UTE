@@ -927,7 +927,10 @@ export default function RegisterPage() {
                 <CalendarClock className="h-5 w-5" aria-hidden="true" />
               </span>
               <span className="min-w-0">
-                <span className="block truncate text-sm font-bold text-foreground">
+                <span
+                  className="block truncate text-sm font-bold text-foreground"
+                  title={currentRound?.name}
+                >
                   {currentRound?.name}
                 </span>
                 <span className="block text-xs text-muted-foreground">
@@ -996,7 +999,7 @@ export default function RegisterPage() {
                             : filter === 'ELECTIVE'
                               ? copy.filterElective
                               : copy.filterOutside}
-                        <span className="rounded-full bg-secondary px-1.5 text-[10px] font-bold text-muted-foreground">
+                        <span className="rounded-full bg-secondary px-1.5 text-[11px] font-bold text-muted-foreground">
                           {formatNumber(curriculumCounts.get(filter) ?? 0)}
                         </span>
                       </button>
@@ -1009,7 +1012,7 @@ export default function RegisterPage() {
                       onClick={() => setSeatsOnly((value) => !value)}
                     >
                       {copy.filterSeats}
-                      <span className="rounded-full bg-secondary px-1.5 text-[10px] font-bold text-muted-foreground">
+                      <span className="rounded-full bg-secondary px-1.5 text-[11px] font-bold text-muted-foreground">
                         {formatNumber(seatsCount)}
                       </span>
                     </button>
@@ -1020,7 +1023,7 @@ export default function RegisterPage() {
                       onClick={() => setNoConflictOnly((value) => !value)}
                     >
                       {copy.filterNoConflict}
-                      <span className="rounded-full bg-secondary px-1.5 text-[10px] font-bold text-muted-foreground">
+                      <span className="rounded-full bg-secondary px-1.5 text-[11px] font-bold text-muted-foreground">
                         {formatNumber(noConflictCount)}
                       </span>
                     </button>
@@ -1080,7 +1083,10 @@ export default function RegisterPage() {
                                 aria-hidden="true"
                               />
                               <span className="min-w-0">
-                                <span className="block truncate text-sm font-bold text-foreground">
+                                <span
+                                  className="block text-sm font-bold text-foreground line-clamp-2"
+                                  title={`${group.courseCode} — ${group.courseName}`}
+                                >
                                   {group.courseCode} — {group.courseName}
                                 </span>
                                 <span className="block text-xs text-muted-foreground">
@@ -1254,13 +1260,13 @@ export default function RegisterPage() {
                 Sticky on desktop so the registered list + timetable stay
                 visible while the catalog scrolls. */}
             <Card className="order-first min-w-0 self-start xl:sticky xl:top-[calc(var(--portal-header-height)+0.75rem)] xl:col-span-4 xl:order-none xl:max-h-[calc(100dvh-var(--portal-header-height)-1.5rem)] xl:overflow-y-auto">
-              <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0 pb-3">
-                <CardTitle>{copy.enrolledRail}</CardTitle>
-                <div className="flex items-center gap-1.5">
-                  <span className="rounded-md bg-secondary px-2.5 py-0.5 text-xs font-semibold text-muted-foreground">
+              <CardHeader className="flex flex-wrap items-center gap-x-2 gap-y-1.5 space-y-0 pb-3">
+                <CardTitle className="mr-auto whitespace-nowrap">{copy.enrolledRail}</CardTitle>
+                <div className="flex shrink-0 items-center gap-1.5">
+                  <span className="whitespace-nowrap rounded-md bg-secondary px-2.5 py-0.5 text-xs font-semibold text-muted-foreground">
                     {copy.groupSectionCount.replace('{count}', formatNumber(registered.length))}
                   </span>
-                  <span className="rounded-md bg-primary/10 px-2.5 py-0.5 text-xs font-semibold text-primary">
+                  <span className="whitespace-nowrap rounded-md bg-primary/10 px-2.5 py-0.5 text-xs font-semibold text-primary">
                     {formatNumber(totalRegisteredCredits)} / {creditLimit === null ? copy.creditLimitUnavailable : formatNumber(creditLimit)}{' '}
                     {copy.creditsUnit}
                   </span>
@@ -1301,20 +1307,26 @@ export default function RegisterPage() {
                       <div className="h-2 w-full overflow-hidden rounded-full bg-secondary">
                         <div
                           className={`h-full transition-all duration-300 ${
-                            totalRegisteredCredits >= creditLimit ? 'bg-status-warning' : 'bg-primary'
+                            totalRegisteredCredits > creditLimit
+                              ? 'bg-status-danger'
+                              : totalRegisteredCredits === creditLimit
+                                ? 'bg-status-warning'
+                                : 'bg-primary'
                           }`}
                           style={{
                             width: `${Math.min(100, (totalRegisteredCredits / creditLimit) * 100)}%`,
                           }}
                         />
                       </div>
-                      <p className="text-[11px] text-muted-foreground">
-                        {totalRegisteredCredits >= creditLimit
-                          ? copy.creditLimitReached.replace('{limit}', formatNumber(creditLimit))
-                          : copy.creditLimitRemaining.replace(
-                              '{count}',
-                              formatNumber(creditLimit - totalRegisteredCredits),
-                            )}
+                      <p className={`text-[11px] ${totalRegisteredCredits > creditLimit ? 'font-semibold text-status-danger-foreground' : 'text-muted-foreground'}`}>
+                        {totalRegisteredCredits > creditLimit
+                          ? copy.creditLimitExceeded.replace('{limit}', formatNumber(creditLimit))
+                          : totalRegisteredCredits === creditLimit
+                            ? copy.creditLimitReached.replace('{limit}', formatNumber(creditLimit))
+                            : copy.creditLimitRemaining.replace(
+                                '{count}',
+                                formatNumber(creditLimit - totalRegisteredCredits),
+                              )}
                       </p>
                     </>
                   )}
@@ -1406,14 +1418,14 @@ export default function RegisterPage() {
                         ) : null}
                         <div className="flex flex-wrap items-center gap-1.5">
                           {schedules.length === 0 ? (
-                            <span className="rounded-md border border-dashed border-border bg-secondary/40 px-2 py-0.5 text-[11px] italic text-muted-foreground">
+                            <span className="rounded-md border border-dashed border-border bg-secondary/40 px-2 py-0.5 text-xs italic text-muted-foreground">
                               {copy.scheduleNone}
                             </span>
                           ) : (
                             schedules.map((schedule, index) => (
                               <span
                                 key={`${item.id}-schedule-${index}`}
-                                className="inline-flex flex-wrap items-center gap-1 rounded-md bg-secondary/60 px-2 py-0.5 text-[11px] text-foreground"
+                                className="inline-flex flex-wrap items-center gap-1 rounded-md bg-secondary/60 px-2 py-0.5 text-xs text-foreground"
                               >
                                 <span className="font-bold text-primary">
                                   {shortDayLabel(locale, schedule.dayOfWeek)}
@@ -1464,7 +1476,7 @@ export default function RegisterPage() {
                         {copy.railWarningsTitle}
                       </p>
                       {warnings.map((warning) => (
-                        <p key={warning} className="text-[11px] leading-4 text-status-warning-foreground">
+                        <p key={warning} className="text-xs leading-4 text-status-warning-foreground">
                           {warning}
                         </p>
                       ))}
@@ -1493,7 +1505,7 @@ export default function RegisterPage() {
                     highlightedIds={new Set<string>(previewTimetable.map((item) => item.id ?? ''))}
                     conflictIds={previewConflictIds}
                   />
-                  <div className="flex flex-wrap items-center gap-x-3 gap-y-1 pt-1 text-[10px] text-muted-foreground">
+                  <div className="flex flex-wrap items-center gap-x-3 gap-y-1 pt-1 text-[11px] text-muted-foreground">
                     <span className="inline-flex items-center gap-1">
                       <span className="h-2.5 w-2.5 rounded-sm border border-primary/40 bg-primary/10" aria-hidden="true" />
                       {copy.legendRegistered}
