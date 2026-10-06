@@ -231,7 +231,10 @@ export function AssistantMessages({
             }));
 
         return (
-          <div key={message.id} className="space-y-2">
+          <div
+            key={message.id}
+            className="space-y-2 motion-safe:animate-in motion-safe:fade-in motion-safe:slide-in-from-bottom-2 motion-safe:duration-300"
+          >
             <div
               className={cn(
                 'flex items-start gap-2.5',
@@ -272,7 +275,7 @@ export function AssistantMessages({
                   className={cn(
                     'relative px-3.5 py-2.5 text-sm leading-6 shadow-xs transition-shadow break-words [overflow-wrap:anywhere]',
                     isUser
-                      ? 'rounded-2xl rounded-tr-xs bg-primary text-primary-foreground font-medium'
+                      ? 'rounded-2xl rounded-tr-xs bg-gradient-to-br from-primary via-[#004eab] to-[#005fcf] text-primary-foreground font-medium'
                       : 'rounded-2xl rounded-tl-xs border border-border/80 bg-card text-foreground',
                   )}
                 >
@@ -504,7 +507,7 @@ export function AssistantMessages({
                           type="button"
                           disabled={message.feedbackPending}
                           onClick={() => onFeedback(message.id, 'DOWN', reason)}
-                          className="min-h-11 rounded-md border border-border/80 bg-background px-3 py-2 text-[11px] text-muted-foreground transition-colors hover:border-destructive/50 hover:text-destructive"
+                          className="min-h-11 rounded-full border border-border/80 bg-background px-3.5 py-2 text-[11px] text-muted-foreground transition-colors hover:border-destructive/50 hover:text-destructive"
                         >
                           {messages.assistant.feedbackReasons[reason]}
                         </button>
@@ -537,7 +540,7 @@ export function AssistantMessages({
                       type="button"
                       onClick={() => onFollowUp(suggestion)}
                       disabled={followUpsDisabled}
-                      className="min-h-11 rounded-md border border-primary/20 bg-primary/5 px-3 py-2 text-[11px] font-medium text-primary transition-colors hover:border-primary/40 hover:bg-primary/10"
+                      className="min-h-11 rounded-full border border-primary/20 bg-primary/5 px-3.5 py-2 text-[11px] font-medium text-primary transition-all hover:-translate-y-px hover:border-primary/40 hover:bg-primary/10 hover:shadow-xs motion-reduce:transform-none motion-reduce:transition-none"
                     >
                       {suggestion}
                     </button>

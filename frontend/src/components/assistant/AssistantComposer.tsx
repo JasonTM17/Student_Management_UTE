@@ -105,7 +105,7 @@ export function AssistantComposer({
           <Button
             type="submit"
             size="icon"
-            className="min-h-11 min-w-11 rounded-xl"
+            className="min-h-11 min-w-11 rounded-xl bg-gradient-to-br from-primary via-[#004eab] to-[#005fcf] shadow-sm transition-transform hover:scale-105 active:scale-95 motion-reduce:transform-none motion-reduce:transition-none"
             disabled={!input.trim() || authLocked}
             aria-label={messages.assistant.send}
           >

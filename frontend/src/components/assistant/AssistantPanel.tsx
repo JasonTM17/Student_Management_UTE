@@ -684,7 +684,7 @@ export function AssistantPanel() {
                 aria-live={isSending ? 'off' : 'polite'}
                 aria-relevant="additions text"
                 aria-busy={isSending}
-                className="absolute inset-0 space-y-3 overflow-y-auto bg-background px-3.5 py-3.5 pb-20 md:pb-4"
+                className="absolute inset-0 space-y-3 overflow-y-auto bg-background px-3.5 py-3.5 pb-20 md:pb-4 bg-[radial-gradient(120%_55%_at_50%_0%,rgba(0,94,202,0.055),transparent)] dark:bg-[radial-gradient(120%_55%_at_50%_0%,rgba(96,165,250,0.07),transparent)]"
               >
               {messageCursor && state.messages.length > 0 ? (
                 <div className="flex justify-center">
@@ -703,7 +703,14 @@ export function AssistantPanel() {
                 </div>
               ) : null}
               {state.messages.length === 0 ? (
-                <div className="flex min-h-44 flex-col items-center justify-center gap-3 text-center p-3">
+                <div className="flex min-h-44 flex-col items-center justify-center gap-3.5 text-center p-3 motion-safe:animate-in motion-safe:fade-in motion-safe:duration-300">
+                  <div className="relative flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-primary via-[#004eab] to-[#005fcf] text-white shadow-[0_10px_24px_rgba(0,35,90,0.25)] ring-1 ring-white/20">
+                    <AssistantMascot className="h-7 w-7" variant="detailed" />
+                    <span
+                      className="absolute -right-1 -top-1 inline-flex h-3.5 w-3.5 rounded-full bg-[var(--portal-yellow)] ring-2 ring-background shadow-xs"
+                      aria-hidden="true"
+                    />
+                  </div>
                   <div className="space-y-1">
                     <p className="text-sm font-semibold text-foreground">
                       {messages.assistant.greeting}
@@ -724,7 +731,7 @@ export function AssistantPanel() {
                         type="button"
                         onClick={() => void sendMessage(undefined, suggestion)}
                         disabled={isSending || authRequired}
-                        className="min-h-11 rounded-md border border-primary/20 bg-primary/5 px-3 py-2 text-[11px] font-medium text-primary transition-colors hover:border-primary/40 hover:bg-primary/10"
+                        className="min-h-11 rounded-full border border-primary/20 bg-primary/5 px-3.5 py-2 text-[11px] font-medium text-primary transition-all hover:-translate-y-px hover:border-primary/40 hover:bg-primary/10 hover:shadow-xs motion-reduce:transform-none motion-reduce:transition-none"
                       >
                         {suggestion}
                       </button>
