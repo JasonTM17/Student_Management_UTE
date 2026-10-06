@@ -164,6 +164,22 @@ public class AnnouncementWriteRepository {
     }
 
     /**
+     * Claim-scoped re-arm for a failed fan-out: clears only markers stamped at
+     * or before {@code claimedAt}. A competitor that claims the row after our
+     * claim holds a strictly later stamp, so a late failure can never erase a
+     * marker it did not win.
+     */
+    public void clearNotifiedAt(String id, Instant claimedAt) {
+        jdbc.update(
+                "UPDATE " + TABLE + " SET \"notifiedAt\" = NULL WHERE \"id\" = :id"
+                        + " AND \"notifiedAt\" <= :claimedAt",
+                new MapSqlParameterSource()
+                        .addValue("id", id, Types.VARCHAR)
+                        .addValue("claimedAt", OffsetDateTime.ofInstant(claimedAt, ZoneOffset.UTC),
+                                Types.TIMESTAMP_WITH_TIMEZONE));
+    }
+
+    /**
      * Announcements that are visible without a completed fan-out: scheduled
      * rows whose publishAt has passed, plus immediate rows
      * ({@code publishAt IS NULL}) whose create-path notification failed.
@@ -177,7 +193,10 @@ public class AnnouncementWriteRepository {
                         + " AND (\"publishAt\" IS NULL OR \"publishAt\" <= :now)"
                         + " AND (\"expiresAt\" IS NULL OR \"expiresAt\" > :now)"
                         + " AND \"archivedAt\" IS NULL"
-                        + " ORDER BY \"publishAt\" LIMIT :limit",
+                        // Immediate announcements (publishAt NULL) are failed
+                        // create-path fan-outs — drain them ahead of merely
+                        // scheduled rows inside each batch.
+                        + " ORDER BY \"publishAt\" NULLS FIRST LIMIT :limit",
                 new MapSqlParameterSource()
                         .addValue("now", OffsetDateTime.ofInstant(now, ZoneOffset.UTC),
                                 Types.TIMESTAMP_WITH_TIMEZONE)

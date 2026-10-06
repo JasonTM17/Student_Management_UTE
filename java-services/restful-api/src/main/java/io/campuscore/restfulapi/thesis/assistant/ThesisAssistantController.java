@@ -570,7 +570,10 @@ public class ThesisAssistantController {
             // giving up, let a deterministic fast-path question through on the
             // servlet thread: it never touches the provider, so answering it
             // under saturation is strictly better than ASSISTANT_UNAVAILABLE.
-            ChatResponse fastPath = lexicalFastPathOrNull(request);
+            // The probe must run under the stored conversation scope — a
+            // resumed specialized conversation with a bare request scope
+            // would otherwise answer from the academic corpus under load.
+            ChatResponse fastPath = lexicalFastPathOrNull(scopedRequest);
             if (fastPath != null) {
                 emitLexicalFastPath(fastPath, request,
                         AssistantInputGuard.normalizeLocale(request.locale()), sink);

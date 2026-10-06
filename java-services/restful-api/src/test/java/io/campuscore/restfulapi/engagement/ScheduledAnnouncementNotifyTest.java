@@ -69,7 +69,7 @@ class ScheduledAnnouncementNotifyTest {
         InOrder order = inOrder(notifier, announcements);
         order.verify(announcements).markNotified(eq("notice-1"), any());
         order.verify(notifier).fanOutToActiveStudents(any());
-        order.verify(announcements).clearNotifiedAt("notice-1");
+        order.verify(announcements).clearNotifiedAt(eq("notice-1"), any(Instant.class));
     }
 
     @Test
@@ -136,7 +136,7 @@ class ScheduledAnnouncementNotifyTest {
         InOrder order = inOrder(notifier, announcements);
         order.verify(announcements).markNotified(eq("notice-1"), any());
         order.verify(notifier).fanOutToActiveStudents(any());
-        order.verify(announcements).clearNotifiedAt("notice-1");
+        order.verify(announcements).clearNotifiedAt(eq("notice-1"), any(Instant.class));
     }
 
     private static AnnouncementWriteService service(

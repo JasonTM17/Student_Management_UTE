@@ -67,7 +67,8 @@ public class ScheduledAnnouncementNotifyJob {
                 // inter-worker gate, so it must run before the fan-out, not
                 // after. A competing worker (or a late reschedule/archive)
                 // flips the claim to 0 rows and this send never happens.
-                if (announcements.markNotified(announcement.id(), Instant.now(clock)) == 0) {
+                Instant claimedAt = Instant.now(clock);
+                if (announcements.markNotified(announcement.id(), claimedAt) == 0) {
                     continue;
                 }
                 try {
@@ -76,10 +77,12 @@ public class ScheduledAnnouncementNotifyJob {
                             announcement.id(), sent);
                 } catch (RuntimeException exception) {
                     // Re-arm so a transient outage retries next tick instead
-                    // of consuming the marker. Residual risk: a JVM crash
-                    // between claim and send leaves the row stamped — the
-                    // operator can clear "notifiedAt" to force a refire.
-                    announcements.clearNotifiedAt(announcement.id());
+                    // of consuming the marker. The re-arm is claim-scoped: a
+                    // competitor that stamped a later marker keeps it.
+                    // Residual risk: a JVM crash between claim and send
+                    // leaves the row stamped — the operator can clear
+                    // "notifiedAt" to force a refire.
+                    announcements.clearNotifiedAt(announcement.id(), claimedAt);
                     log.warn("Scheduled announcement {} fan-out failed; will retry next tick: {}",
                             announcement.id(), exception.getMessage());
                 }

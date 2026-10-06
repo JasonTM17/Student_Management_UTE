@@ -199,13 +199,13 @@ class AssistantRlsPostgresIT {
     @Test
     void internalRagOwnerScopeIsEstablishedOnlyAfterServiceTokenValidation() throws Throwable {
         assertThrows(DomainException.class, () -> internalController.conversations(
-                "invalid-token", ownerA, null, null, new MockHttpServletResponse()));
-        var aRows = internalController.conversations(INTERNAL_TOKEN, ownerA, null, null, new MockHttpServletResponse());
-        var bRows = internalController.conversations(INTERNAL_TOKEN, ownerB, null, null, new MockHttpServletResponse());
+                "invalid-token", ownerA, null, null, null, new MockHttpServletResponse()));
+        var aRows = internalController.conversations(INTERNAL_TOKEN, ownerA, null, null, null, new MockHttpServletResponse());
+        var bRows = internalController.conversations(INTERNAL_TOKEN, ownerB, null, null, null, new MockHttpServletResponse());
         assertEquals(List.of(conversationA), aRows.stream().map(ThesisAssistantRepository.Conversation::id).toList());
         assertEquals(List.of(conversationB), bRows.stream().map(ThesisAssistantRepository.Conversation::id).toList());
         assertThrows(DomainException.class, () -> internalController.conversations(
-                INTERNAL_TOKEN, " ", null, null, new MockHttpServletResponse()));
+                INTERNAL_TOKEN, " ", null, null, null, new MockHttpServletResponse()));
         assertEquals(0, count("SELECT COUNT(*) FROM assistant.chat_conversation"));
     }
 

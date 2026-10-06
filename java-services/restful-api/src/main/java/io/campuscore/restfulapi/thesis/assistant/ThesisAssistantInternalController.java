@@ -213,11 +213,12 @@ public class ThesisAssistantInternalController {
             @RequestHeader(name = "X-Assistant-Owner", required = false) String owner,
             @RequestParam(required = false) Integer limit,
             @RequestParam(required = false) String cursor,
+            @RequestParam(required = false) String scope,
             jakarta.servlet.http.HttpServletResponse response) {
         verify(token);
         String ownerId = owner(owner);
         ThesisAssistantRepository.ConversationPage page = AssistantRlsContext.withInternalOwner(ownerId,
-                () -> assistant.conversationPage(ownerId, limit, cursor));
+                () -> assistant.conversationPage(ownerId, limit, cursor, scope));
         if (page.nextCursor() != null) response.setHeader("X-Next-Cursor", page.nextCursor());
         return page.data();
     }
@@ -231,9 +232,18 @@ public class ThesisAssistantInternalController {
         if (locale != null && !locale.isBlank() && !locale.equals("vi") && !locale.equals("en")) {
             throw new DomainException(HttpStatus.BAD_REQUEST, "INVALID_LOCALE", "locale must be en or vi");
         }
+        // Mirror the public controller's INVALID_SCOPE gate: the gateway
+        // forwards CreateConversationRequest{locale, scope} and a specialized
+        // conversation pinned 'academic' here would poison every resumed turn.
+        String scope = request == null ? null : request.scope();
+        if (scope != null && !scope.isBlank() && !"academic".equalsIgnoreCase(scope)
+                && !"specialized".equalsIgnoreCase(scope)) {
+            throw new DomainException(HttpStatus.BAD_REQUEST, "INVALID_SCOPE",
+                    "scope must be academic or specialized");
+        }
         String ownerId = owner(owner);
         String id = AssistantRlsContext.withInternalOwner(ownerId,
-                () -> assistant.createConversation(ownerId, locale));
+                () -> assistant.createConversation(ownerId, locale, scope));
         return new ConversationCreated(id, locale == null || locale.isBlank() ? "vi" : locale);
     }
 
@@ -326,6 +336,6 @@ public class ThesisAssistantInternalController {
     }
     public record CancelResponse(UUID clientRequestId, String status) { }
     public record FeedbackResponse(UUID messageId, String rating, String reason, boolean removed) { }
-    public record CreateConversationRequest(String locale) { }
+    public record CreateConversationRequest(String locale, String scope) { }
     public record ConversationCreated(String id, String locale) { }
 }
