@@ -43,7 +43,7 @@ export function AuthShell({
     <div
       className={cn(
         'marketing-shell min-h-screen bg-background',
-        isAdmin && 'bg-[var(--portal-canvas)]',
+        isAdmin && 'bg-portal-canvas',
       )}
       data-login-portal={portal}
     >
@@ -59,7 +59,7 @@ export function AuthShell({
         <section
           className={cn(
             'portal-sidebar relative hidden overflow-hidden border-r border-white/10 lg:flex',
-            isAdmin && 'bg-[var(--portal-sidebar-strong)]',
+            isAdmin && 'bg-portal-sidebar-strong',
           )}
         >
           <div className="flex w-full items-center px-10 py-12 xl:px-16">
@@ -74,15 +74,15 @@ export function AuthShell({
                       : messages.authShell.desktopSubtitle
                 }
                 markClassName="border-0 bg-white p-1 shadow-xs"
-                titleClassName="text-[var(--portal-sidebar-text)]"
-                subtitleClassName="text-[var(--portal-sidebar-muted)]"
+                titleClassName="text-portal-sidebar-text"
+                subtitleClassName="text-portal-sidebar-muted"
               />
-              <div className="space-y-4 border-l-4 border-[var(--portal-chrome-accent)] pl-6">
+              <div className="space-y-4 border-l-4 border-portal-chrome-accent pl-6">
                 <SectionEyebrow className="portal-menu-label-accent">{eyebrow}</SectionEyebrow>
-                <h1 className="max-w-lg text-4xl font-semibold leading-[1.18] text-[var(--portal-sidebar-text)] xl:text-[2.75rem]">
+                <h1 className="max-w-lg text-4xl font-semibold leading-[1.18] text-portal-sidebar-text xl:text-[2.75rem]">
                   {title}
                 </h1>
-                <p className="max-w-lg text-base leading-7 text-[var(--portal-sidebar-muted)]">
+                <p className="max-w-lg text-base leading-7 text-portal-sidebar-muted">
                   {description}
                 </p>
               </div>
@@ -93,10 +93,10 @@ export function AuthShell({
                       key={feature.label}
                       className="grid grid-cols-[5.5rem_1fr] items-baseline gap-4 py-4"
                     >
-                      <span className="text-sm font-semibold tabular-nums text-[var(--portal-chrome-accent)]">
+                      <span className="text-sm font-semibold tabular-nums text-portal-chrome-accent">
                         {feature.label}
                       </span>
-                      <p className="text-sm leading-6 text-[var(--portal-sidebar-muted)]">
+                      <p className="text-sm leading-6 text-portal-sidebar-muted">
                         {feature.description}
                       </p>
                     </div>
@@ -113,14 +113,14 @@ export function AuthShell({
                       )}
                     >
                       <div className="space-y-1">
-                        <h2 className="text-sm font-semibold text-[var(--portal-sidebar-text)]">
+                        <h2 className="text-sm font-semibold text-portal-sidebar-text">
                           {feature.label}
                         </h2>
-                        <p className="text-sm leading-6 text-[var(--portal-sidebar-muted)]">
+                        <p className="text-sm leading-6 text-portal-sidebar-muted">
                           {feature.description}
                         </p>
                       </div>
-                      <span className="text-xs font-semibold uppercase tracking-wide text-[var(--portal-chrome-accent)]">
+                      <span className="text-xs font-semibold uppercase tracking-wide text-portal-chrome-accent">
                         {messages.login.portals.admin.opsMark}
                       </span>
                     </div>
@@ -133,16 +133,16 @@ export function AuthShell({
                       key={feature.label}
                       className="grid grid-cols-[2rem_1fr] gap-4 py-4"
                     >
-                      <div className="flex h-8 w-8 items-center justify-center rounded-lg border border-white/15 text-[var(--portal-chrome-accent)]">
+                      <div className="flex h-8 w-8 items-center justify-center rounded-lg border border-white/15 text-portal-chrome-accent">
                         <span className="text-xs font-semibold">
                           {String(index + 1).padStart(2, '0')}
                         </span>
                       </div>
                       <div className="space-y-1">
-                        <h2 className="text-sm font-semibold text-[var(--portal-sidebar-text)]">
+                        <h2 className="text-sm font-semibold text-portal-sidebar-text">
                           {feature.label}
                         </h2>
-                        <p className="text-sm leading-6 text-[var(--portal-sidebar-muted)]">
+                        <p className="text-sm leading-6 text-portal-sidebar-muted">
                           {feature.description}
                         </p>
                       </div>
@@ -159,7 +159,7 @@ export function AuthShell({
           tabIndex={-1}
           className={cn(
             'relative flex items-center justify-center px-5 py-20 sm:px-8 lg:px-12',
-            isAdmin && 'bg-[var(--portal-ribbon)]',
+            isAdmin && 'bg-portal-ribbon',
           )}
         >
           <div className="absolute right-4 top-4 flex items-center gap-2 sm:right-6 sm:top-6">

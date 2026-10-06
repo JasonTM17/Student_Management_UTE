@@ -707,7 +707,7 @@ export function AssistantPanel() {
                   <div className="relative flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-primary via-[#004eab] to-[#005fcf] text-white shadow-[0_10px_24px_rgba(0,35,90,0.25)] ring-1 ring-white/20">
                     <AssistantMascot className="h-7 w-7" variant="detailed" />
                     <span
-                      className="absolute -right-1 -top-1 inline-flex h-3.5 w-3.5 rounded-full bg-[var(--portal-yellow)] ring-2 ring-background shadow-xs"
+                      className="absolute -right-1 -top-1 inline-flex h-3.5 w-3.5 rounded-full bg-portal-yellow ring-2 ring-background shadow-xs"
                       aria-hidden="true"
                     />
                   </div>
@@ -894,7 +894,7 @@ export function AssistantPanel() {
           >
             <AssistantMascot className="h-7 w-7 transition-transform duration-200 group-hover:scale-110" variant="detailed" />
             <span
-              className="absolute -right-0.5 -top-0.5 inline-flex h-3.5 w-3.5 rounded-full bg-[var(--portal-yellow)] ring-2 ring-card shadow-xs"
+              className="absolute -right-0.5 -top-0.5 inline-flex h-3.5 w-3.5 rounded-full bg-portal-yellow ring-2 ring-card shadow-xs"
               aria-hidden="true"
             />
           </button>

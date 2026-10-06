@@ -39,9 +39,9 @@ export function HomeIdentityBoard() {
   const activePortal = targetPortals[activeIndex] ?? targetPortals[0];
 
   return (
-    <aside className="flex flex-col justify-between rounded-xl border-l-4 border-[var(--portal-chrome-accent)] bg-[var(--portal-sidebar)] p-6 text-[var(--portal-sidebar-text)] shadow-xs">
+    <aside className="flex flex-col justify-between rounded-xl border-l-4 border-portal-chrome-accent bg-portal-sidebar p-6 text-portal-sidebar-text shadow-xs">
       <div>
-        <p className="text-xs font-bold uppercase tracking-wider text-[var(--portal-chrome-accent)]">
+        <p className="text-xs font-bold uppercase tracking-wider text-portal-chrome-accent">
           {messages.home.snapshotEyebrow}
         </p>
         <div
@@ -60,8 +60,8 @@ export function HomeIdentityBoard() {
                 onClick={() => setActiveIndex(index)}
                 className={
                   selected
-                    ? 'border-b-2 border-[var(--portal-chrome-accent)] px-2 pb-3 text-sm font-semibold text-[var(--portal-sidebar-text)]'
-                    : 'border-b-2 border-transparent px-2 pb-3 text-sm font-medium text-[var(--portal-sidebar-text)]/70 hover:text-[var(--portal-sidebar-text)]'
+                    ? 'border-b-2 border-portal-chrome-accent px-2 pb-3 text-sm font-semibold text-portal-sidebar-text'
+                    : 'border-b-2 border-transparent px-2 pb-3 text-sm font-medium text-portal-sidebar-text/70 hover:text-portal-sidebar-text'
                 }
               >
                 {tab}
@@ -73,10 +73,10 @@ export function HomeIdentityBoard() {
           {rows.map((row) => (
             <div key={`${activeIndex}-${row.title}`} className="py-3 text-sm">
               <div className="flex items-center gap-1.5 font-medium">
-                <CheckCircle2 className="h-3.5 w-3.5 shrink-0 text-[var(--portal-chrome-accent)]" />
+                <CheckCircle2 className="h-3.5 w-3.5 shrink-0 text-portal-chrome-accent" />
                 <span className="min-w-0">{row.title}</span>
               </div>
-              <p className="mt-0.5 pl-5 text-xs leading-5 text-[var(--portal-sidebar-text)]/70">
+              <p className="mt-0.5 pl-5 text-xs leading-5 text-portal-sidebar-text/70">
                 {row.description}
               </p>
             </div>

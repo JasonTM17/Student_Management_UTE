@@ -250,7 +250,7 @@ export function AdminFrame({
         <button
           type="button"
           tabIndex={-1}
-          className="fixed inset-0 z-40 bg-[var(--portal-scrim)] lg:hidden"
+          className="fixed inset-0 z-40 bg-portal-scrim lg:hidden"
           onClick={() => {
             setSidebarOpen(false);
             window.requestAnimationFrame(() => openSidebarButtonRef.current?.focus());
@@ -276,16 +276,16 @@ export function AdminFrame({
             href="/admin"
             compact
             markClassName="border-0 bg-white p-1 shadow-none"
-            titleClassName="text-[var(--portal-sidebar-text)]"
+            titleClassName="text-portal-sidebar-text"
             subtitle={messages.adminShell.portalTitle}
-            subtitleClassName="text-[var(--portal-sidebar-muted)]"
+            subtitleClassName="text-portal-sidebar-muted"
           />
           <Button
             ref={sidebarCloseRef}
             type="button"
             variant="ghost"
             size="icon"
-            className="text-[var(--portal-sidebar-text)] hover:bg-white/10 hover:text-[var(--portal-sidebar-text)] lg:hidden"
+            className="text-portal-sidebar-text hover:bg-white/10 hover:text-portal-sidebar-text lg:hidden"
             onClick={() => {
               setSidebarOpen(false);
               window.requestAnimationFrame(() => openSidebarButtonRef.current?.focus());
@@ -296,20 +296,20 @@ export function AdminFrame({
           </Button>
         </div>
 
-        <div className="border-b border-white/10 bg-[var(--portal-sidebar-strong)] px-5 py-3">
+        <div className="border-b border-white/10 bg-portal-sidebar-strong px-5 py-3">
           <div className="flex min-w-0 items-center gap-3">
-            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-[var(--portal-yellow)] text-xs font-bold text-[var(--portal-yellow-ink)] shadow-xs">
+            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-portal-yellow text-xs font-bold text-portal-yellow-ink shadow-xs">
               {messages.adminShell.officeBadge}
             </div>
             <div className="min-w-0 flex-1">
-              <div className="truncate text-sm font-semibold text-[var(--portal-sidebar-text)]">
+              <div className="truncate text-sm font-semibold text-portal-sidebar-text">
                 {messages.adminShell.officeName}
               </div>
-              <div className="truncate text-xs text-[var(--portal-sidebar-muted)]">
+              <div className="truncate text-xs text-portal-sidebar-muted">
                 {user?.email ?? (messages.adminShell.noEmail)}
               </div>
               <div className="mt-2">
-                <span className="inline-flex items-center rounded-md bg-[var(--portal-chrome-accent)]/10 px-2.5 py-0.5 text-[11px] font-semibold uppercase tracking-wider text-[var(--portal-chrome-accent)] border border-[var(--portal-chrome-accent)]/30 shadow-xs">
+                <span className="inline-flex items-center rounded-md bg-portal-chrome-accent/10 px-2.5 py-0.5 text-[11px] font-semibold uppercase tracking-wider text-portal-chrome-accent border border-portal-chrome-accent/30 shadow-xs">
                   {messages.adminShell.systemBadge}
                 </span>
               </div>
@@ -344,9 +344,9 @@ export function AdminFrame({
                       href={item.href}
                       aria-current={isActive ? 'page' : undefined}
                       className={cn(
-                        'relative flex min-h-11 items-center gap-3 rounded-md px-3 py-2 text-sm font-medium text-[var(--portal-sidebar-muted)] transition-[background-color,color] duration-150 hover:bg-white/10 hover:text-[var(--portal-sidebar-text)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--portal-yellow)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--portal-sidebar)]',
+                        'relative flex min-h-11 items-center gap-3 rounded-md px-3 py-2 text-sm font-medium text-portal-sidebar-muted transition-[background-color,color] duration-150 hover:bg-white/10 hover:text-portal-sidebar-text focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-portal-yellow focus-visible:ring-offset-2 focus-visible:ring-offset-portal-sidebar',
                         isActive &&
-                          'bg-white/[0.12] font-semibold text-[var(--portal-sidebar-text)] before:absolute before:left-0 before:h-6 before:w-0.5 before:bg-[var(--portal-yellow)]',
+                          'bg-white/[0.12] font-semibold text-portal-sidebar-text before:absolute before:left-0 before:h-6 before:w-0.5 before:bg-portal-yellow',
                       )}
                     >
                       <Icon className="h-5 w-5 shrink-0" aria-hidden="true" />
@@ -362,7 +362,7 @@ export function AdminFrame({
         <div className="border-t border-white/10 px-4 py-3">
           <button
             type="button"
-            className="flex min-h-11 w-full items-center gap-3 rounded-md px-3 py-2 text-left text-sm font-medium text-[var(--portal-sidebar-text)] transition-colors duration-150 hover:bg-red-500/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--portal-yellow)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--portal-sidebar)]"
+            className="flex min-h-11 w-full items-center gap-3 rounded-md px-3 py-2 text-left text-sm font-medium text-portal-sidebar-text transition-colors duration-150 hover:bg-red-500/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-portal-yellow focus-visible:ring-offset-2 focus-visible:ring-offset-portal-sidebar"
             onClick={() => void logout()}
           >
             <LogOut className="h-5 w-5" aria-hidden="true" />

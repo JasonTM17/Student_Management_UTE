@@ -571,8 +571,8 @@ export default function ProfilePage() {
                     </span>
                   ))}
                   {isDemoUser(user) && (
-                    <span className="inline-flex items-center gap-1.5 rounded-md border border-[var(--portal-chrome-accent)]/40 bg-[var(--portal-chrome-accent)]/15 px-3 py-1 text-xs font-medium text-foreground">
-                      <span className="h-1.5 w-1.5 rounded-full bg-[var(--portal-chrome-accent)]" />
+                    <span className="inline-flex items-center gap-1.5 rounded-md border border-portal-chrome-accent/40 bg-portal-chrome-accent/15 px-3 py-1 text-xs font-medium text-foreground">
+                      <span className="h-1.5 w-1.5 rounded-full bg-portal-chrome-accent" />
                       {locale === 'vi' ? 'Tài khoản demo để trải nghiệm' : 'Demo experience account'}
                     </span>
                   )}

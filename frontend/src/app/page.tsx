@@ -94,7 +94,7 @@ export default function HomePage() {
         {messages.home.skipToContent}
       </a>
 
-      <header className="bg-[var(--portal-sidebar)] text-[var(--portal-sidebar-text)]">
+      <header className="bg-portal-sidebar text-portal-sidebar-text">
         <nav className="mx-auto flex h-16 max-w-[1280px] items-center justify-between gap-2 px-4 sm:px-6 lg:px-12">
           <BrandMark
             href="/"
@@ -102,12 +102,12 @@ export default function HomePage() {
             compact
             className="min-w-0"
             markClassName="border-0 bg-white p-1 shadow-xs"
-            titleClassName="max-sm:sr-only text-[var(--portal-sidebar-text)]"
-            subtitleClassName="hidden sm:block text-[var(--portal-sidebar-muted)]"
+            titleClassName="max-sm:sr-only text-portal-sidebar-text"
+            subtitleClassName="hidden sm:block text-portal-sidebar-muted"
           />
           <div className="flex shrink-0 items-center gap-1 sm:gap-2">
             <LanguageToggle inverse />
-            <ThemeToggle className="text-[var(--portal-sidebar-text)] hover:bg-white/10 hover:text-[var(--portal-sidebar-text)]" />
+            <ThemeToggle className="text-portal-sidebar-text hover:bg-white/10 hover:text-portal-sidebar-text" />
             {user ? (
               <LinkButton href={workspaceHref} variant="warm" className="inline-flex shrink-0 px-3 sm:px-4">
                 {messages.common.actions.openDashboard}
@@ -139,7 +139,7 @@ export default function HomePage() {
               className="col-span-full h-56 w-full rounded-2xl border border-border/60 object-cover shadow-sm sm:h-72 lg:h-80"
             />
           ) : null}
-          <div className="flex flex-col justify-center space-y-6 border-l-4 border-[var(--portal-chrome-accent)] pl-6">
+          <div className="flex flex-col justify-center space-y-6 border-l-4 border-portal-chrome-accent pl-6">
             <div className="flex items-center gap-3.5">
               <div className="relative h-14 w-11 shrink-0">
                 <Image
@@ -168,7 +168,7 @@ export default function HomePage() {
               <LinkButton
                 href={primaryHref}
                 size="lg"
-                className="group min-h-12 bg-[var(--portal-sidebar)] px-8 text-base text-[var(--portal-sidebar-text)] hover:bg-[var(--portal-sidebar-hover)]"
+                className="group min-h-12 bg-portal-sidebar px-8 text-base text-portal-sidebar-text hover:bg-portal-sidebar-hover"
               >
                 {primaryLabel}
                 <ArrowRight className="ml-2 h-4 w-4 transition-transform duration-150 motion-safe:group-hover:translate-x-0.5" />
@@ -230,7 +230,7 @@ export default function HomePage() {
         {/* Campus News & Press Section */}
         <HomeNewsSection />
 
-        <section className="bg-[var(--portal-sidebar)] text-[var(--portal-sidebar-text)]">
+        <section className="bg-portal-sidebar text-portal-sidebar-text">
           <div className="mx-auto max-w-[1280px] px-4 py-10 sm:px-6 lg:px-12 lg:py-12">
             <SectionEyebrow className="portal-menu-label-accent">
               {messages.home.processKicker}
@@ -239,10 +239,10 @@ export default function HomePage() {
               {messages.home.processSteps.map((step, index) => (
                 <li
                   key={step}
-                  className="flex items-center gap-4 border-l-4 border-[var(--portal-chrome-accent)] pl-4 lg:flex-1 lg:border-l-0 lg:pl-0"
+                  className="flex items-center gap-4 border-l-4 border-portal-chrome-accent pl-4 lg:flex-1 lg:border-l-0 lg:pl-0"
                 >
                   <span
-                    className="hidden h-4 w-1 shrink-0 bg-[var(--portal-yellow)] lg:block"
+                    className="hidden h-4 w-1 shrink-0 bg-portal-yellow lg:block"
                     aria-hidden="true"
                   />
                   <span className="text-xl font-semibold leading-7">{step}</span>
@@ -259,7 +259,7 @@ export default function HomePage() {
         </section>
       </main>
 
-      <footer className="bg-[var(--portal-sidebar)] text-[var(--portal-sidebar-text)]">
+      <footer className="bg-portal-sidebar text-portal-sidebar-text">
         <div className="mx-auto max-w-[1280px] px-4 py-12 sm:px-6 lg:px-12">
           <div className="grid gap-8 md:grid-cols-[1.2fr_1fr_1fr]">
             <div className="space-y-3">
@@ -267,16 +267,16 @@ export default function HomePage() {
                 href="/"
                 compact
                 markClassName="border-0 bg-white p-1 shadow-xs"
-                titleClassName="text-[var(--portal-sidebar-text)]"
-                subtitleClassName="text-[var(--portal-sidebar-muted)]"
+                titleClassName="text-portal-sidebar-text"
+                subtitleClassName="text-portal-sidebar-muted"
                 subtitle={messages.home.footerSubtitle}
               />
-              <p className="max-w-sm text-sm leading-6 text-[var(--portal-sidebar-muted)]">
+              <p className="max-w-sm text-sm leading-6 text-portal-sidebar-muted">
                 {copy.footerDescription}
               </p>
             </div>
             <div className="space-y-2">
-              <h2 className="text-sm font-semibold text-[var(--portal-sidebar-text)]">
+              <h2 className="text-sm font-semibold text-portal-sidebar-text">
                 {messages.home.footerWorkspace}
               </h2>
               <ul>
@@ -284,7 +284,7 @@ export default function HomePage() {
                   <li key={item.label}>
                     <LocalizedLink
                       href={item.href}
-                      className="inline-flex min-h-11 items-center text-sm text-[var(--portal-sidebar-muted)] transition-colors duration-150 hover:text-[var(--portal-sidebar-text)] hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--portal-yellow)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--portal-sidebar)]"
+                      className="inline-flex min-h-11 items-center text-sm text-portal-sidebar-muted transition-colors duration-150 hover:text-portal-sidebar-text hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-portal-yellow focus-visible:ring-offset-2 focus-visible:ring-offset-portal-sidebar"
                     >
                       {item.label}
                     </LocalizedLink>
@@ -293,7 +293,7 @@ export default function HomePage() {
               </ul>
             </div>
             <div className="space-y-2">
-              <h2 className="text-sm font-semibold text-[var(--portal-sidebar-text)]">
+              <h2 className="text-sm font-semibold text-portal-sidebar-text">
                 {messages.home.footerDelivery}
               </h2>
               <ul>
@@ -301,7 +301,7 @@ export default function HomePage() {
                   <li key={item.label}>
                     <LocalizedLink
                       href={item.href}
-                      className="inline-flex min-h-11 items-center text-sm text-[var(--portal-sidebar-muted)] transition-colors duration-150 hover:text-[var(--portal-sidebar-text)] hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--portal-yellow)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--portal-sidebar)]"
+                      className="inline-flex min-h-11 items-center text-sm text-portal-sidebar-muted transition-colors duration-150 hover:text-portal-sidebar-text hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-portal-yellow focus-visible:ring-offset-2 focus-visible:ring-offset-portal-sidebar"
                     >
                       {item.label}
                     </LocalizedLink>
@@ -310,7 +310,7 @@ export default function HomePage() {
               </ul>
             </div>
           </div>
-          <div className="mt-8 border-t border-white/10 pt-6 text-sm text-[var(--portal-sidebar-muted)]">
+          <div className="mt-8 border-t border-white/10 pt-6 text-sm text-portal-sidebar-muted">
             &copy; {currentYear} {messages.meta.defaults.siteName}. {messages.home.footerCopyright}
           </div>
         </div>

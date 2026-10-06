@@ -47,8 +47,8 @@ test('public homepage keeps navy chrome so dark mode cannot invert the hero pane
   assert.match(board, /lecturerIdentityRows/);
   assert.match(board, /adminIdentityRows/);
   assert.doesNotMatch(home, /lg:min-h-\[calc\(100dvh-4rem\)\]/);
-  assert.match(home, /bg-\[var\(--portal-sidebar\)\]/);
-  assert.match(home, /text-\[var\(--portal-sidebar-text\)\]/);
+  assert.match(home, /bg-portal-sidebar/);
+  assert.match(home, /text-portal-sidebar-text/);
   assert.doesNotMatch(home, /aside className="[^"]*bg-primary/);
   assert.doesNotMatch(home, /section className="bg-primary text-primary-foreground"/);
   assert.doesNotMatch(
@@ -64,7 +64,7 @@ test('portal tokens and page tab define the institutional visual grammar', () =>
 
   assert.match(globals, /--portal-sidebar:\s*oklch\(/);
   assert.match(globals, /--portal-yellow:\s*oklch\(/);
-  assert.match(brand, /text-\[var\(--portal-yellow-ink\)\]/);
+  assert.match(brand, /text-portal-yellow-ink/);
   assert.match(globals, /--portal-canvas:\s*oklch\(/);
   assert.match(globals, /\.portal-page-ribbon/);
   assert.match(globals, /\.portal-shell\s*\{[\s\S]*overflow-x:\s*clip;/);

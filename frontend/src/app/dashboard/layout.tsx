@@ -745,7 +745,7 @@ export default function DashboardLayout({
         <button
           type="button"
           tabIndex={-1}
-          className="fixed inset-0 z-40 bg-[var(--portal-scrim)] lg:hidden print:hidden"
+          className="fixed inset-0 z-40 bg-portal-scrim lg:hidden print:hidden"
           onClick={() => {
             setSidebarOpen(false);
             window.requestAnimationFrame(() => openSidebarButtonRef.current?.focus());
@@ -783,19 +783,19 @@ export default function DashboardLayout({
             className={cn(sidebarCollapsed && 'justify-center gap-0')}
             markClassName="border-0 bg-white p-1 shadow-none"
             titleClassName={cn(
-              'text-[var(--portal-sidebar-text)]',
+              'text-portal-sidebar-text',
               sidebarCollapsed && 'hidden',
             )}
             subtitle={isAdmin ? messages.adminShell.portalTitle : messages.dashboardShell.portalTitle}
             subtitleClassName={cn(
-              'text-[var(--portal-sidebar-muted)]',
+              'text-portal-sidebar-muted',
               sidebarCollapsed && 'hidden',
             )}
           />
           {!sidebarCollapsed ? (
             <button
               type="button"
-              className="hidden h-8 w-8 shrink-0 items-center justify-center rounded-md text-[var(--portal-sidebar-muted)] transition-colors duration-150 hover:bg-white/10 hover:text-[var(--portal-sidebar-text)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--portal-yellow)] lg:inline-flex"
+              className="hidden h-8 w-8 shrink-0 items-center justify-center rounded-md text-portal-sidebar-muted transition-colors duration-150 hover:bg-white/10 hover:text-portal-sidebar-text focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-portal-yellow lg:inline-flex"
               onClick={() => setSidebarCollapsed(true)}
               aria-label={messages.dashboardShell.controls.collapseSidebar}
               title={messages.dashboardShell.controls.collapseSidebar}
@@ -806,7 +806,7 @@ export default function DashboardLayout({
           ) : (
             <button
               type="button"
-              className="mt-1.5 hidden h-7 w-7 shrink-0 items-center justify-center rounded-md text-[var(--portal-sidebar-muted)] transition-colors duration-150 hover:bg-white/10 hover:text-[var(--portal-sidebar-text)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--portal-yellow)] lg:inline-flex"
+              className="mt-1.5 hidden h-7 w-7 shrink-0 items-center justify-center rounded-md text-portal-sidebar-muted transition-colors duration-150 hover:bg-white/10 hover:text-portal-sidebar-text focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-portal-yellow lg:inline-flex"
               onClick={() => setSidebarCollapsed(false)}
               aria-label={messages.dashboardShell.controls.expandSidebar}
               title={messages.dashboardShell.controls.expandSidebar}
@@ -820,7 +820,7 @@ export default function DashboardLayout({
             type="button"
             variant="ghost"
             size="icon"
-            className="text-[var(--portal-sidebar-text)] hover:bg-white/10 hover:text-[var(--portal-sidebar-text)] lg:hidden"
+            className="text-portal-sidebar-text hover:bg-white/10 hover:text-portal-sidebar-text lg:hidden"
             onClick={() => {
               setSidebarOpen(false);
               window.requestAnimationFrame(() => openSidebarButtonRef.current?.focus());
@@ -833,7 +833,7 @@ export default function DashboardLayout({
 
         <div
           className={cn(
-            'border-b border-white/10 bg-[var(--portal-sidebar-strong)] py-3',
+            'border-b border-white/10 bg-portal-sidebar-strong py-3',
             sidebarCollapsed ? 'px-3' : 'px-5',
           )}
         >
@@ -848,11 +848,11 @@ export default function DashboardLayout({
               aria-label={isAdmin ? messages.admin.title : messages.dashboardShell.menu.profile}
               title={isAdmin ? messages.admin.title : messages.dashboardShell.menu.profile}
               className={cn(
-                'flex min-w-0 items-center gap-3 rounded-md p-1.5 text-left transition-[background-color,color] duration-150 hover:bg-white/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--portal-yellow)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--portal-sidebar)]',
+                'flex min-w-0 items-center gap-3 rounded-md p-1.5 text-left transition-[background-color,color] duration-150 hover:bg-white/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-portal-yellow focus-visible:ring-offset-2 focus-visible:ring-offset-portal-sidebar',
                 sidebarCollapsed && 'justify-center',
               )}
             >
-              <div className="flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-md bg-white/10 text-xs font-bold text-[var(--portal-sidebar-text)]">
+              <div className="flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-md bg-white/10 text-xs font-bold text-portal-sidebar-text">
                 {avatarPhoto ? (
                   // eslint-disable-next-line @next/next/no-img-element
                   <img src={avatarPhoto} alt="" className="h-full w-full object-cover" />
@@ -865,10 +865,10 @@ export default function DashboardLayout({
               </div>
               {!sidebarCollapsed ? (
                 <div className="min-w-0 flex-1">
-                  <div className="truncate text-sm font-semibold text-[var(--portal-sidebar-text)]">
+                  <div className="truncate text-sm font-semibold text-portal-sidebar-text">
                     {fullName}
                   </div>
-                  <div className="truncate text-xs text-[var(--portal-sidebar-muted)]">
+                  <div className="truncate text-xs text-portal-sidebar-muted">
                     {user.email}
                   </div>
                   <div className="mt-2 flex flex-wrap items-center gap-1.5">
@@ -928,10 +928,10 @@ export default function DashboardLayout({
                       aria-current={isActive ? 'page' : undefined}
                       title={sidebarCollapsed ? item.label : undefined}
                       className={cn(
-                        'relative flex min-h-11 items-center gap-3 rounded-md px-3 py-2 text-sm font-medium text-[var(--portal-sidebar-muted)] transition-[background-color,color] duration-150 hover:bg-white/10 hover:text-[var(--portal-sidebar-text)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--portal-yellow)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--portal-sidebar)]',
+                        'relative flex min-h-11 items-center gap-3 rounded-md px-3 py-2 text-sm font-medium text-portal-sidebar-muted transition-[background-color,color] duration-150 hover:bg-white/10 hover:text-portal-sidebar-text focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-portal-yellow focus-visible:ring-offset-2 focus-visible:ring-offset-portal-sidebar',
                         sidebarCollapsed && 'justify-center px-0',
                         isActive &&
-                          'bg-white/[0.12] font-semibold text-[var(--portal-sidebar-text)] before:absolute before:left-0 before:h-6 before:w-0.5 before:bg-[var(--portal-yellow)]',
+                          'bg-white/[0.12] font-semibold text-portal-sidebar-text before:absolute before:left-0 before:h-6 before:w-0.5 before:bg-portal-yellow',
                       )}
                     >
                       <item.icon className="h-5 w-5 shrink-0" aria-hidden="true" />
@@ -952,7 +952,7 @@ export default function DashboardLayout({
             <LocalizedLink
               href="/dashboard/assistant-specialized"
               className={cn(
-                'group flex min-h-11 w-full items-center gap-3 rounded-md px-3 py-2 text-sm font-medium text-[var(--portal-sidebar-muted)] transition-colors duration-150 hover:bg-white/10 hover:text-[var(--portal-sidebar-text)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--portal-yellow)]',
+                'group flex min-h-11 w-full items-center gap-3 rounded-md px-3 py-2 text-sm font-medium text-portal-sidebar-muted transition-colors duration-150 hover:bg-white/10 hover:text-portal-sidebar-text focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-portal-yellow',
                 sidebarCollapsed && 'justify-center px-0',
               )}
               aria-label={messages.assistant.specializedLabel}
@@ -980,7 +980,7 @@ export default function DashboardLayout({
                 : undefined
             }
             className={cn(
-              'flex min-h-11 items-center gap-3 rounded-md px-3 py-2 text-sm text-[var(--portal-sidebar-muted)] transition-[background-color,color] duration-150 hover:bg-white/10 hover:text-[var(--portal-sidebar-text)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--portal-yellow)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--portal-sidebar)]',
+              'flex min-h-11 items-center gap-3 rounded-md px-3 py-2 text-sm text-portal-sidebar-muted transition-[background-color,color] duration-150 hover:bg-white/10 hover:text-portal-sidebar-text focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-portal-yellow focus-visible:ring-offset-2 focus-visible:ring-offset-portal-sidebar',
               sidebarCollapsed && 'justify-center px-0',
             )}
           >
@@ -993,7 +993,7 @@ export default function DashboardLayout({
             aria-label={messages.common.actions.signOut}
             title={sidebarCollapsed ? messages.common.actions.signOut : undefined}
             className={cn(
-              'mt-1 flex min-h-11 w-full items-center gap-3 rounded-md px-3 py-2 text-left text-sm text-[var(--portal-sidebar-text)] transition-[background-color,color] duration-150 hover:bg-red-500/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--portal-yellow)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--portal-sidebar)]',
+              'mt-1 flex min-h-11 w-full items-center gap-3 rounded-md px-3 py-2 text-left text-sm text-portal-sidebar-text transition-[background-color,color] duration-150 hover:bg-red-500/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-portal-yellow focus-visible:ring-offset-2 focus-visible:ring-offset-portal-sidebar',
               sidebarCollapsed && 'justify-center px-0',
             )}
           >
@@ -1348,7 +1348,7 @@ export default function DashboardLayout({
           aria-label={messages.dashboardShell.controls.mobileNavigation}
           aria-hidden={sidebarOpen ? true : undefined}
           inert={sidebarOpen ? true : undefined}
-          className="fixed inset-x-0 bottom-0 z-30 border-t border-[var(--portal-rule)] bg-[var(--portal-surface)]/95 px-2 pb-[env(safe-area-inset-bottom)] shadow-[0_-8px_24px_rgba(25,28,33,0.08)] backdrop-blur md:hidden print:hidden"
+          className="fixed inset-x-0 bottom-0 z-30 border-t border-portal-rule bg-portal-surface/95 px-2 pb-[env(safe-area-inset-bottom)] shadow-[0_-8px_24px_rgba(25,28,33,0.08)] backdrop-blur md:hidden print:hidden"
         >
           <div className="mx-auto grid max-w-md grid-cols-6 gap-1 py-2">
             {mobileNavItems.map((item) => {

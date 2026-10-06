@@ -68,7 +68,7 @@ export function LanguageToggle({
             className={cn(
               'min-h-11 rounded-[4px] px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.08em] transition-[background-color,color,transform] duration-150 motion-safe:active:translate-y-px focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2',
               inverse &&
-                'min-h-9 px-2.5 focus-visible:ring-[var(--portal-yellow)] focus-visible:ring-offset-[var(--portal-sidebar)]',
+                'min-h-9 px-2.5 focus-visible:ring-portal-yellow focus-visible:ring-offset-portal-sidebar',
               isActive
                 ? inverse
                   ? 'bg-white text-slate-950 font-bold shadow-xs'

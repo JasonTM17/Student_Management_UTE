@@ -116,15 +116,15 @@ export default function AssistantSpecializedPage() {
           nav, so the card docks between them — same contract as the floating
           panel's mobile sheet, which already owns the full screen there. */}
       <div className="flex h-[calc(100dvh-11rem)] min-h-[min(320px,calc(100dvh-11rem))] flex-col overflow-hidden rounded-xl border border-border/70 bg-card shadow-xs md:h-[calc(100dvh-9.5rem)] md:min-h-[320px] [@media(max-height:24rem)_and_(max-width:47.9375rem)]:fixed [@media(max-height:24rem)_and_(max-width:47.9375rem)]:inset-x-3 [@media(max-height:24rem)_and_(max-width:47.9375rem)]:bottom-[4.75rem] [@media(max-height:24rem)_and_(max-width:47.9375rem)]:top-[4.25rem] [@media(max-height:24rem)_and_(max-width:47.9375rem)]:z-40 [@media(max-height:24rem)_and_(max-width:47.9375rem)]:h-auto [@media(max-height:24rem)_and_(max-width:47.9375rem)]:min-h-0">
-        <header className="flex items-center gap-3 border-b border-border/70 bg-[var(--portal-sidebar-strong)] px-4 py-3 text-[var(--portal-sidebar-text)]">
-          <span className="flex h-9 w-9 items-center justify-center rounded-md bg-[var(--portal-yellow)]/15 text-[var(--portal-chrome-accent)]">
+        <header className="flex items-center gap-3 border-b border-border/70 bg-portal-sidebar-strong px-4 py-3 text-portal-sidebar-text">
+          <span className="flex h-9 w-9 items-center justify-center rounded-md bg-portal-yellow/15 text-portal-chrome-accent">
             <AssistantMascot className="h-5 w-5" />
           </span>
           <div className="min-w-0 flex-1">
             <h1 className="truncate text-sm font-semibold">
               {messages.assistant.specializedTitle}
             </h1>
-            <p className="truncate text-xs text-[var(--portal-sidebar-muted)]">
+            <p className="truncate text-xs text-portal-sidebar-muted">
               {messages.assistant.specializedTagline}
             </p>
           </div>
@@ -134,7 +134,7 @@ export default function AssistantSpecializedPage() {
             disabled={isSending || authRequired}
             aria-label={messages.assistant.newConversation}
             title={messages.assistant.newConversation}
-            className="flex h-11 w-11 shrink-0 items-center justify-center rounded-md text-[var(--portal-sidebar-muted)] transition-colors hover:bg-white/10 hover:text-[var(--portal-sidebar-text)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
+            className="flex h-11 w-11 shrink-0 items-center justify-center rounded-md text-portal-sidebar-muted transition-colors hover:bg-white/10 hover:text-portal-sidebar-text focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
           >
             <RotateCcw className="h-4 w-4" aria-hidden="true" />
           </button>

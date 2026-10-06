@@ -79,8 +79,10 @@ test('no source file uses the fill token as a foreground or hairline', () => {
         const code = line.replace(/\/\/.*$/, '').replace(/\/\*.*?\*\//g, '');
         // Comments name the forbidden token to explain the rule; skip them.
         if (/^\s*\*/.test(line)) return;
-        for (const match of code.matchAll(/(text|border)-\[var\(--portal-yellow\)\]/g)) {
-          offenders.push(`${relative}:${index + 1} -> ${match[1]}[var(--portal-yellow)]`);
+        // Both the legacy arbitrary form `text-[var(--portal-yellow)]` and the
+        // first-class utility `text-portal-yellow` are the same violation.
+        for (const match of code.matchAll(/(text|border)-(?:\[var\(--portal-yellow\)\]|portal-yellow)(?![\w-])/g)) {
+          offenders.push(`${relative}:${index + 1} -> ${match[0]}`);
         }
       });
     }
@@ -105,7 +107,11 @@ test('the eyebrow rule resolves to the chrome accent, not the fill', () => {
 test('the guillotine guard can actually fail', () => {
   // A guard that cannot fail is not a guard.
   const fixture = 'className="text-[var(--portal-yellow)]"';
-  assert.equal([...fixture.matchAll(/(text|border)-\[var\(--portal-yellow\)\]/g)].length, 1);
-  const fine = 'className="text-[var(--portal-chrome-accent)] bg-[var(--portal-yellow)]/10"';
-  assert.equal([...fine.matchAll(/(text|border)-\[var\(--portal-yellow\)\]/g)].length, 0);
+  assert.equal([...fixture.matchAll(/(text|border)-(?:\[var\(--portal-yellow\)\]|portal-yellow)(?![\w-])/g)].length, 1);
+  const fixture2 = 'className="border-portal-yellow"';
+  assert.equal([...fixture2.matchAll(/(text|border)-(?:\[var\(--portal-yellow\)\]|portal-yellow)(?![\w-])/g)].length, 1);
+  const fine = 'className="text-portal-chrome-accent bg-portal-yellow/10"';
+  assert.equal([...fine.matchAll(/(text|border)-(?:\[var\(--portal-yellow\)\]|portal-yellow)(?![\w-])/g)].length, 0);
+  const ink = 'className="text-portal-yellow-ink"';
+  assert.equal([...ink.matchAll(/(text|border)-(?:\[var\(--portal-yellow\)\]|portal-yellow)(?![\w-])/g)].length, 0);
 });

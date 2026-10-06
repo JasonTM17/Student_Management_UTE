@@ -178,7 +178,7 @@ export default function AdminAppearancePage() {
                 ? 'border-border'
                 : savedLocally
                   ? 'border-amber-500/60 text-amber-600'
-                  : 'border-[var(--portal-chrome-accent)] text-foreground',
+                  : 'border-portal-chrome-accent text-foreground',
             )}
           >
             {isSaving ? copy.saving : savedLocally ? copy.savedLocal : copy.saved}
@@ -356,7 +356,7 @@ export default function AdminAppearancePage() {
                     className={cn(
                       'min-h-11 rounded-md border px-3 py-3 text-left text-sm font-semibold',
                       draft.accent === accent
-                        ? 'border-[var(--portal-chrome-accent)] bg-secondary'
+                        ? 'border-portal-chrome-accent bg-secondary'
                         : 'border-border/80 hover:border-foreground/30',
                     )}
                     aria-pressed={draft.accent === accent}
@@ -451,17 +451,17 @@ export default function AdminAppearancePage() {
             <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
               {copy.preview}
             </h2>
-            <div className="rounded-lg border-l-4 border-[var(--portal-chrome-accent)] bg-[var(--portal-sidebar)] p-6 text-[var(--portal-sidebar-text)]">
-              <p className="text-xs font-semibold uppercase tracking-wide text-[var(--portal-chrome-accent)]">
+            <div className="rounded-lg border-l-4 border-portal-chrome-accent bg-portal-sidebar p-6 text-portal-sidebar-text">
+              <p className="text-xs font-semibold uppercase tracking-wide text-portal-chrome-accent">
                 {preview.eyebrow || fallbackHero.eyebrow}
               </p>
               <p className="mt-4 text-2xl font-semibold leading-8">
                 {preview.title || fallbackHero.title}
               </p>
-              <p className="mt-3 text-sm leading-6 text-[var(--portal-sidebar-muted)]">
+              <p className="mt-3 text-sm leading-6 text-portal-sidebar-muted">
                 {preview.description || fallbackHero.description}
               </p>
-              <p className="mt-6 text-xs text-[var(--portal-sidebar-muted)]">{copy.live}</p>
+              <p className="mt-6 text-xs text-portal-sidebar-muted">{copy.live}</p>
             </div>
           </aside>
         </div>

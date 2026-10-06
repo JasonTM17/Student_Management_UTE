@@ -1,4 +1,14 @@
 /** @type {import('tailwindcss').Config} */
+
+// Portal chrome tokens are authored as complete `oklch()` colours referenced
+// through `var()`. A plain `var()` string cannot take a `/N` alpha modifier —
+// Tailwind only emits the utility when the value carries an `<alpha-value>`
+// placeholder (or the colour is channel-decomposed). Wrapping in color-mix
+// keeps `bg-portal-*/15` working; without a modifier the placeholder becomes
+// 1, i.e. the full colour.
+const portalVar = (token: string) =>
+  `color-mix(in oklab, var(${token}) calc(<alpha-value> * 100%), transparent)`;
+
 module.exports = {
   darkMode: ["class"],
   content: [
@@ -94,34 +104,34 @@ module.exports = {
           },
         },
         // The portal chrome tokens are authored as complete `oklch()` colours,
-        // not HSL triplets, so they are referenced directly rather than wrapped
-        // in `hsl()`. Exposing them as first-class utilities removes the need for
-        // `bg-[var(--portal-surface)]` arbitrary values, where a mistyped token
-        // name fails silently as a transparent background instead of failing the
-        // build. Purely additive: existing arbitrary-value call sites keep working.
+        // not HSL triplets, so they are referenced through `portalVar`, which
+        // preserves `/N` alpha modifiers via color-mix. Exposing them as
+        // first-class utilities removes the need for `bg-[var(--portal-x)]`
+        // arbitrary values, where a mistyped token name fails silently as a
+        // transparent background instead of failing the build.
         portal: {
           sidebar: {
-            DEFAULT: "var(--portal-sidebar)",
-            strong: "var(--portal-sidebar-strong)",
-            hover: "var(--portal-sidebar-hover)",
-            text: "var(--portal-sidebar-text)",
-            muted: "var(--portal-sidebar-muted)",
+            DEFAULT: portalVar("--portal-sidebar"),
+            strong: portalVar("--portal-sidebar-strong"),
+            hover: portalVar("--portal-sidebar-hover"),
+            text: portalVar("--portal-sidebar-text"),
+            muted: portalVar("--portal-sidebar-muted"),
           },
-          canvas: "var(--portal-canvas)",
-          surface: "var(--portal-surface)",
-          rule: "var(--portal-rule)",
-          ribbon: "var(--portal-ribbon)",
-          scrim: "var(--portal-scrim)",
+          canvas: portalVar("--portal-canvas"),
+          surface: portalVar("--portal-surface"),
+          rule: portalVar("--portal-rule"),
+          ribbon: portalVar("--portal-ribbon"),
+          scrim: portalVar("--portal-scrim"),
           // Foreground/hairline accent drawn ON the navy chrome. Theme-stable,
           // unlike `portal.yellow` which is a fill that inverts between themes.
-          "chrome-accent": "var(--portal-chrome-accent)",
+          "chrome-accent": portalVar("--portal-chrome-accent"),
           yellow: {
-            DEFAULT: "var(--portal-yellow)",
-            ink: "var(--portal-yellow-ink)",
+            DEFAULT: portalVar("--portal-yellow"),
+            ink: portalVar("--portal-yellow-ink"),
           },
           "brand-gold": {
-            DEFAULT: "var(--portal-brand-gold)",
-            ink: "var(--portal-brand-gold-ink)",
+            DEFAULT: portalVar("--portal-brand-gold"),
+            ink: portalVar("--portal-brand-gold-ink"),
           },
         },
       },

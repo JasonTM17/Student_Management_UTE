@@ -22,7 +22,7 @@ export function EmptyState({
   return (
     <div
       className={cn(
-        'flex min-h-[220px] flex-col items-center justify-center rounded-xl border border-dashed border-border bg-[var(--portal-surface)] px-6 py-10 text-center shadow-xs',
+        'flex min-h-[220px] flex-col items-center justify-center rounded-xl border border-dashed border-border bg-portal-surface px-6 py-10 text-center shadow-xs',
         className,
       )}
     >
@@ -107,7 +107,7 @@ export function LoadingState({
       role="status"
       aria-live="polite"
       className={cn(
-        'flex min-h-[220px] flex-col items-center justify-center gap-4 rounded-xl border border-border bg-[var(--portal-surface)] px-6 py-10 shadow-xs',
+        'flex min-h-[220px] flex-col items-center justify-center gap-4 rounded-xl border border-border bg-portal-surface px-6 py-10 shadow-xs',
         className,
       )}
     >
@@ -140,11 +140,11 @@ export function ForbiddenState({
     <div
       role="alert"
       className={cn(
-        'flex min-h-[220px] flex-col items-center justify-center rounded-xl border border-[var(--portal-rule)] bg-[var(--portal-surface)] px-6 py-10 text-center shadow-xs',
+        'flex min-h-[220px] flex-col items-center justify-center rounded-xl border border-portal-rule bg-portal-surface px-6 py-10 text-center shadow-xs',
         className,
       )}
     >
-      <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-lg bg-[var(--portal-yellow)] text-[var(--portal-yellow-ink)]">
+      <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-lg bg-portal-yellow text-portal-yellow-ink">
         <ShieldAlert className="h-5 w-5" aria-hidden="true" />
       </div>
       <h3 className="text-lg font-semibold text-foreground">{title}</h3>

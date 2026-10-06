@@ -1002,7 +1002,7 @@ export default function SectionGradingPage() {
                         key={enrollment.id}
                         className={
                           isDirtyRow
-                            ? 'border-l-2 border-l-[var(--portal-chrome-accent)] bg-status-warning/5 transition-colors hover:bg-muted/40 print:border-l-0 print:bg-transparent'
+                            ? 'border-l-2 border-l-portal-chrome-accent bg-status-warning/5 transition-colors hover:bg-muted/40 print:border-l-0 print:bg-transparent'
                             : 'transition-colors hover:bg-muted/40'
                         }
                       >
