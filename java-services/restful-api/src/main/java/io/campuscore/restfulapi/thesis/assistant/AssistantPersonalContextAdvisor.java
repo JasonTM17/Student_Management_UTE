@@ -894,7 +894,10 @@ public class AssistantPersonalContextAdvisor {
      * "nhà trường" compound covers the institutional reading.
      */
     private static final Pattern INSTITUTIONAL_POSSESSIVE = Pattern.compile(
-            "\\b(?:của|cua)\\s+(?:(?:các|mấy|những|bọn|cac|may|nhung|bon)\\s+)?"
+            // Kongming C1: mirror the F-arm quantifier set — "điểm của cả
+            // trường" is an institutional aggregate, not a named person.
+            "\\b(?:của|cua)\\s+(?:(?:các|mấy|những|bọn|cả|mọi|toàn|hai|tụi"
+                    + "|cac|may|nhung|bon|ca|moi|toan|tui)\\s+)?"
                     + "(?:trường|truong|khoa|phòng\\s+(?:đào\\s*tạo|dao\\s*tao)"
                     + "|phong\\s+(?:dao\\s*tao)|ban\\s+giám\\s+hiệu|ban\\s+giam\\s+hieu"
                     + "|nhà\\s+trường|nha\\s+truong|đại\\s+học|dai\\s+hoc|học\\s+viện|hoc\\s+vien"
@@ -932,6 +935,11 @@ public class AssistantPersonalContextAdvisor {
      * institutional owners ("điểm chuẩn của trường", "lịch thi của khoa")
      * keep the public knowledge path, and questions without a personal-data
      * noun ("giáo viên chủ nhiệm của tôi là ai") fall through normally.
+     * Documented fail-soft edges (Kongming C3): a person named "Trường" or
+     * "Khoa" collides with the institutional scrub ("điểm của Trường" deflects
+     * to KB rather than refusing — no leak), and the VI exam arms of
+     * EXAM_SCHEDULE_INTENT carve out "điểm thi học phần của <name>" (an exam
+     * score ask) for the same reason. Both directions stay leak-free.
      */
     public boolean requiresPrivacyRefusal(String message) {
         message = nfc(message);

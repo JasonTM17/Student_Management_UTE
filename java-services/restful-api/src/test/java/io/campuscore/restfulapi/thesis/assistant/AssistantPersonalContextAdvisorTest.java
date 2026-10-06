@@ -2423,6 +2423,10 @@ class AssistantPersonalContextAdvisorTest {
         assertTrue(advisor.requiresPrivacyRefusal("Show me his grades please"));
         assertTrue(advisor.requiresPrivacyRefusal("What is my friend's schedule?"));
         assertTrue(advisor.requiresPrivacyRefusal("Nam's timetable this week"));
+        // Kongming C2: a relation subject in the frame refuses even when the
+        // object is self-possessive — deliberate conservative boundary (the
+        // refusal copy points the user back to asking for their own data).
+        assertTrue(advisor.requiresPrivacyRefusal("mẹ tôi muốn xem điểm của tôi"));
     }
 
     @Test
@@ -2433,6 +2437,11 @@ class AssistantPersonalContextAdvisorTest {
         assertFalse(advisor.requiresPrivacyRefusal("Lịch thi của khoa khi nào công bố?"));
         assertFalse(advisor.requiresPrivacyRefusal("điểm của phòng đào tạo công bố"));
         assertFalse(advisor.requiresPrivacyRefusal("Học phí của trường năm nay thế nào?"));
+        // Kongming C1: quantified institutional possessives are aggregates,
+        // not named persons — the scrub mirrors the F-arm quantifier set.
+        assertFalse(advisor.requiresPrivacyRefusal("điểm của cả trường"));
+        assertFalse(advisor.requiresPrivacyRefusal("lịch của toàn trường"));
+        assertFalse(advisor.requiresPrivacyRefusal("điểm của hai trường"));
         // First-person questions are the asker's own rows — never a refusal.
         assertFalse(advisor.requiresPrivacyRefusal("Điểm của tôi xem ở đâu?"));
         assertFalse(advisor.requiresPrivacyRefusal("Lịch học của em hôm nay"));

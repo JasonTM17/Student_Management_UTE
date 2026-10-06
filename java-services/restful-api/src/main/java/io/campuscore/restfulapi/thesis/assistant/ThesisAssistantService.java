@@ -2237,6 +2237,11 @@ public class ThesisAssistantService {
         if (INTENT_FEES.matcher(folded).find()) families++;
         if (isCourseRegistrationQuery(message)) families++;
         if (isCertificateQuery(message)) families++;
+        // Kongming C4: the credit-limit/prerequisite predicates must be
+        // reachable as detectors too — "SE101 tiên quyết gì, và học phí bao
+        // nhiêu?" previously counted one family and dropped the fees half.
+        if (isCreditLimitQuery(message)) families++;
+        if (isPrerequisiteQuery(message)) families++;
         if (families < 2) return false;
         return MULTI_INTENT_JOINER.matcher(folded).find();
     }
