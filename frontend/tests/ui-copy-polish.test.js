@@ -285,7 +285,10 @@ test('milestone 2: component i18n localization in admin and announcements', () =
   assert.doesNotMatch(adminSurface, /<span>\s*Chi tiết &rarr;\s*<\/span>/);
 
   const adminFrame = read('src/components/admin/AdminFrame.tsx');
-  assert.match(adminFrame, /\{locale === 'vi' \? 'PĐT' : 'OAA'\}/);
+  // The office badge moved to the messages catalog (adminShell.officeBadge:
+  // 'PĐT'/'OAA'); the guardrail stays: the badge must be localized and no raw
+  // PĐT literal may leak into markup.
+  assert.match(adminFrame, /messages\.adminShell\.officeBadge/);
   const rawPdt = adminFrame.match(/>\s*PĐT\s*</g);
   assert.equal(rawPdt, null, 'all PĐT avatar badges must be localized');
 

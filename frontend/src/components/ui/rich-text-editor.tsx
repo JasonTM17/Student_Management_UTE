@@ -147,6 +147,33 @@ Tài liệu quy định chi tiết về đánh giá điểm học phần và đi
   },
 ];
 
+/** Help-dialog example rows: [markdown syntax, rendered description, style]. */
+type HelpExample = [syntax: string, result: string, style?: 'strong' | 'em'];
+
+const HELP_EXAMPLES_VI: HelpExample[] = [
+  ['# Tiêu đề 1', 'Tiêu đề cấp lớn'],
+  ['## Tiêu đề 2', 'Tiêu đề phụ'],
+  ['**In đậm**', 'In đậm văn bản', 'strong'],
+  ['*In nghiêng*', 'In nghiêng văn bản', 'em'],
+  ['- [ ] Việc cần làm', 'Hộp kiểm danh sách việc (Checklist)'],
+  ['> [!NOTE]', 'Hộp cảnh báo/ghi chú nổi bật màu xanh'],
+  ['> [!WARNING]', 'Hộp cảnh báo khẩn cấp màu vàng cam'],
+  ['| Cột 1 | Cột 2 |', 'Bảng biểu dữ liệu có viền và tiêu đề'],
+  ['[Tên](https://...)', 'Đường dẫn liên kết an toàn'],
+];
+
+const HELP_EXAMPLES_EN: HelpExample[] = [
+  ['# Heading 1', 'Top-level heading'],
+  ['## Heading 2', 'Section heading'],
+  ['**Bold**', 'Bold text', 'strong'],
+  ['*Italic*', 'Italic text', 'em'],
+  ['- [ ] Task item', 'Task checklist box'],
+  ['> [!NOTE]', 'Blue highlighted note/callout box'],
+  ['> [!WARNING]', 'Amber urgent warning box'],
+  ['| Col 1 | Col 2 |', 'Bordered data table with header'],
+  ['[Label](https://...)', 'Safe hyperlink'],
+];
+
 export function RichTextEditor({
   value,
   onChange,
@@ -906,42 +933,18 @@ export function RichTextEditor({
                 <span className="font-semibold text-primary">{isVi ? 'Cú pháp' : 'Syntax'}</span>
                 <span className="font-semibold text-primary">{isVi ? 'Kết quả hiển thị' : 'Result'}</span>
               </div>
-              <div className="grid grid-cols-2 gap-2">
-                <code># Tiêu đề 1</code>
-                <span>Tiêu đề cấp lớn</span>
-              </div>
-              <div className="grid grid-cols-2 gap-2">
-                <code>## Tiêu đề 2</code>
-                <span>Tiêu đề phụ</span>
-              </div>
-              <div className="grid grid-cols-2 gap-2">
-                <code>**In đậm**</code>
-                <strong>In đậm văn bản</strong>
-              </div>
-              <div className="grid grid-cols-2 gap-2">
-                <code>*In nghiêng*</code>
-                <em>In nghiêng văn bản</em>
-              </div>
-              <div className="grid grid-cols-2 gap-2">
-                <code>- [ ] Việc cần làm</code>
-                <span>Hộp kiểm danh sách việc (Checklist)</span>
-              </div>
-              <div className="grid grid-cols-2 gap-2">
-                <code>&gt; [!NOTE]</code>
-                <span>Hộp cảnh báo/ghi chú nổi bật màu xanh</span>
-              </div>
-              <div className="grid grid-cols-2 gap-2">
-                <code>&gt; [!WARNING]</code>
-                <span>Hộp cảnh báo khẩn cấp màu vàng cam</span>
-              </div>
-              <div className="grid grid-cols-2 gap-2">
-                <code>| Cột 1 | Cột 2 |</code>
-                <span>Bảng biểu dữ liệu có viền và tiêu đề</span>
-              </div>
-              <div className="grid grid-cols-2 gap-2">
-                <code>[Tên](https://...)</code>
-                <span>Đường dẫn liên kết an toàn</span>
-              </div>
+              {(isVi ? HELP_EXAMPLES_VI : HELP_EXAMPLES_EN).map(([syntax, result, style]) => (
+                <div className="grid grid-cols-2 gap-2" key={syntax}>
+                  <code>{syntax}</code>
+                  {style === 'strong' ? (
+                    <strong>{result}</strong>
+                  ) : style === 'em' ? (
+                    <em>{result}</em>
+                  ) : (
+                    <span>{result}</span>
+                  )}
+                </div>
+              ))}
             </div>
             <div className="mt-5 flex justify-end">
               <button

@@ -1164,6 +1164,7 @@ export default function AdminUsersPage() {
                                     onClick={() => openEdit(record)}
                                     disabled={!canManageTarget}
                                     title={copy.editUserLabel(record.firstName, record.lastName)}
+                                    aria-label={copy.editUserLabel(record.firstName, record.lastName)}
                                   >
                                     <Pencil className="h-4 w-4" />
                                   </Button>
@@ -1173,6 +1174,7 @@ export default function AdminUsersPage() {
                                     onClick={() => void handleResetCredential(record)}
                                     disabled={isSelf || !canManageTarget || resettingUserId === record.id}
                                     title={copy.resetAction}
+                                    aria-label={copy.resetAction}
                                   >
                                     <KeyRound className="h-4 w-4" />
                                   </Button>
@@ -1183,6 +1185,7 @@ export default function AdminUsersPage() {
                                     onClick={() => void handleDelete(record)}
                                     disabled={isSelf || !canManageTarget}
                                     title={copy.deleteUserLabel(record.firstName, record.lastName)}
+                                    aria-label={copy.deleteUserLabel(record.firstName, record.lastName)}
                                   >
                                     <Trash2 className="h-4 w-4" />
                                   </Button>

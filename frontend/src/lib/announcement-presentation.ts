@@ -258,6 +258,19 @@ export function announcementSalutation(
 }
 
 /**
+ * Detects Vietnamese text by its diacritic codepoints. Announcement records
+ * are authored single-language; when a VI-authored item renders on the EN
+ * surface this drives the explicit "VI" content badge instead of letting the
+ * copy read as a locale bug.
+ */
+const VIETNAMESE_MARK_PATTERN =
+  /[ăâđêôơưáàảãạấầẩẫậắằẳẵặéèẻẽẹếềểễệíìỉĩịóòỏõọốồổỗộớờởỡợúùủũụứừửữựýỳỷỹỵ]/i;
+
+export function isVietnameseText(text: string | null | undefined): boolean {
+  return typeof text === 'string' && VIETNAMESE_MARK_PATTERN.test(text);
+}
+
+/**
  * Resolves the issuer badge for an announcement. A missing (or purely
  * technical) publisher renders an honest em-dash: naming a specific office —
  * "Faculty of IT & Academic Affairs" — for a record that never stated one
@@ -697,13 +710,21 @@ export const BRAND_COVER_PLACEHOLDER =
 /**
  * Calculates estimated reading time in minutes and total word count.
  */
-export function calculateReadingTime(content: string | null | undefined): {
+export function calculateReadingTime(
+  content: string | null | undefined,
+  locale: Locale = 'vi',
+): {
   minutes: number;
   wordCount: number;
   displayText: string;
 } {
+  const isVi = locale === 'vi';
   if (!content) {
-    return { minutes: 1, wordCount: 0, displayText: '1 phút đọc' };
+    return {
+      minutes: 1,
+      wordCount: 0,
+      displayText: isVi ? '1 phút đọc' : '1 min read',
+    };
   }
   // Strip html and markdown
   const clean = content
@@ -716,7 +737,9 @@ export function calculateReadingTime(content: string | null | undefined): {
   return {
     minutes,
     wordCount: words,
-    displayText: `${minutes} phút đọc (${words.toLocaleString('vi-VN')} từ)`,
+    displayText: isVi
+      ? `${minutes} phút đọc (${words.toLocaleString('vi-VN')} từ)`
+      : `${minutes} min read (${words.toLocaleString('en-US')} words)`,
   };
 }
 

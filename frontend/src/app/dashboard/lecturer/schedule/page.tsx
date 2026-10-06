@@ -131,6 +131,7 @@ export default function LecturerSchedulePage() {
           departmentNameVi: section.departmentNameVi,
           enrolledCount: section.enrolledCount,
           capacity: section.capacity,
+          credits: section.credits,
           status: section.status,
         });
       });
@@ -171,6 +172,7 @@ export default function LecturerSchedulePage() {
       departmentNameVi: item.departmentNameVi,
       enrolledCount: item.enrolledCount,
       capacity: item.capacity,
+      credits: item.credits,
       status: item.status,
     });
   };

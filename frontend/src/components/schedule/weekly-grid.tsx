@@ -402,7 +402,13 @@ export function WeeklyGrid({
                             onItemSelect ? 'cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring' : '',
                             blockTone(item),
                           )}
-                          title={`${item.courseCode} - ${item.startTime}-${item.endTime}${labels.blockHint ? ` (${labels.blockHint})` : ''}`}
+                          title={`${item.courseCode} - ${item.startTime}-${item.endTime}${
+                            agendaItem.lecturerName ? ` · ${agendaItem.lecturerName}` : ''
+                          }${
+                            agendaItem.enrolledCount !== undefined
+                              ? ` · ${agendaItem.enrolledCount} ${labels.studentsSuffix ?? ''}`.trimEnd()
+                              : ''
+                          }${labels.blockHint ? ` (${labels.blockHint})` : ''}`}
                         >
                           <div className="flex items-center justify-between gap-1">
                             <span className="font-mono text-xs font-extrabold tracking-wide">

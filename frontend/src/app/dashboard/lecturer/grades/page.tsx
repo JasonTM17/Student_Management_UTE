@@ -172,7 +172,7 @@ export default function LecturerGradesPage() {
                     <div className="space-y-3">
                       <div className="space-y-1">
                         <div className="flex flex-wrap items-center gap-2">
-                          <h2 className="text-lg font-semibold text-foreground">
+                          <h3 className="text-lg font-semibold text-foreground">
                             {section.courseCode} - {getLocalizedFlatLabel(
                               locale,
                               section.courseName,
@@ -180,10 +180,10 @@ export default function LecturerGradesPage() {
                               section.courseNameVi,
                               section.courseName,
                             )}
-                          </h2>
-                          <span className="rounded-md bg-secondary px-2.5 py-1 text-xs font-medium text-foreground">
-                            {messages.lecturerGrades.labels.sectionPrefix} {section.sectionNumber}
-                          </span>
+                            <span className="ml-2 inline-flex rounded-md bg-secondary px-2.5 py-1 align-middle text-xs font-medium text-foreground">
+                              {messages.lecturerGrades.labels.sectionPrefix} {section.sectionNumber}
+                            </span>
+                          </h3>
                         </div>
                         <p className="text-sm text-muted-foreground">
                           {getLocalizedFlatLabel(

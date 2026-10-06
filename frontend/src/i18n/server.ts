@@ -131,10 +131,19 @@ export async function getLocalizedMetadata(): Promise<Metadata> {
     description: routeMetadata.description,
     keywords: [...messages.meta.defaults.keywords],
     authors: [
-      { name: 'Trường Đại học Công nghệ Kỹ thuật TP.HCM (HCM-UTE)', url: siteUrl },
+      {
+        name:
+          locale === 'vi'
+            ? 'Trường Đại học Công nghệ Kỹ thuật TP.HCM (HCM-UTE)'
+            : 'Ho Chi Minh City University of Technology and Engineering (HCMUTE)',
+        url: siteUrl,
+      },
       { name: 'CampusUTE Team' },
     ],
-    creator: 'Trường Đại học Công nghệ Kỹ thuật TP.HCM',
+    creator:
+      locale === 'vi'
+        ? 'Trường Đại học Công nghệ Kỹ thuật TP.HCM'
+        : 'Ho Chi Minh City University of Technology and Engineering',
     publisher: 'CampusUTE - HCM-UTE',
     category: 'education',
     alternates: {

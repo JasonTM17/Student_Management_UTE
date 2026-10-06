@@ -242,6 +242,9 @@ export const en = {
   },
   home: {
     navSubtitle: 'Campus academic portal',
+    logoAlt: 'Ho Chi Minh City University of Technology and Engineering logo',
+    schoolName:
+      'Ho Chi Minh City University of Technology and Engineering • HCMUTE',
     eyebrow: 'Ho Chi Minh City University of Technology and Engineering',
     title: 'Academic Portal & Student Management',
     description:
@@ -844,6 +847,19 @@ export const en = {
     signOut: 'Sign out',
     backToDashboard: 'Back to admin dashboard',
     mobileNavigation: 'Admin navigation on mobile',
+    menuAttendance: 'Attendance',
+    menuSiteEditor: 'Site Editor & CMS',
+    menuSystemNotifications: 'System notifications',
+    menuAuditTrail: 'Audit trail',
+    menuAnnouncementsEditor: 'Announcements & Editor',
+    menuUserManagement: 'User Management',
+    officeBadge: 'OAA',
+    officeName: 'Office of Academic Affairs',
+    noEmail: 'No email on file',
+    systemBadge: 'University Administration System',
+    toggleProfile: 'Toggle Academic Affairs Profile',
+    demoTag: 'Demo',
+    demoAccount: 'Demo experience account',
   },
   admin: {
     title: 'Admin dashboard',
@@ -2862,6 +2878,8 @@ export const vi: I18nMessages = {
   },
   home: {
     navSubtitle: 'Cổng học vụ CampusUTE',
+    logoAlt: 'Logo Trường Đại học Công nghệ Kỹ thuật TP.HCM',
+    schoolName: 'Trường Đại học Công nghệ Kỹ thuật TP.HCM • HCM-UTE',
     eyebrow: 'ĐẠI HỌC CÔNG NGHỆ KỸ THUẬT THÀNH PHỐ HỒ CHÍ MINH',
     title: 'Cổng Thông Tin Đào Tạo & Học Vụ Trực Tuyến',
     description:
@@ -3464,6 +3482,19 @@ export const vi: I18nMessages = {
     signOut: 'Đăng xuất',
     backToDashboard: 'Quay lại tổng quan quản trị',
     mobileNavigation: 'Điều hướng quản trị trên điện thoại',
+    menuAttendance: 'Điểm danh',
+    menuSiteEditor: 'Trình soạn thảo website',
+    menuSystemNotifications: 'Thông báo hệ thống',
+    menuAuditTrail: 'Nhật ký kiểm toán',
+    menuAnnouncementsEditor: 'Soạn thông báo & Công văn',
+    menuUserManagement: 'Quản trị Người dùng',
+    officeBadge: 'PĐT',
+    officeName: 'Phòng Đào tạo',
+    noEmail: 'Chưa có email',
+    systemBadge: 'Hệ thống Quản trị Đại học',
+    toggleProfile: 'Mở thông tin Phòng Đào tạo',
+    demoTag: 'Demo trải nghiệm',
+    demoAccount: 'Tài khoản demo để trải nghiệm',
   },
   admin: {
     title: 'Tổng quan quản trị',

@@ -66,7 +66,7 @@ export function AdminFrame({
   // gated to ADMIN/SUPER_ADMIN on both the page and the API, and following any
   // of them bounced this role into a permanent forbidden state.
   const fullAdminAccess = isAdmin || isSuperAdmin;
-  const { messages, locale } = useI18n();
+  const { messages } = useI18n();
   const pathname = stripLocaleFromPathname(usePathname() ?? '/').pathname;
   const [sidebarOpen, setSidebarOpen] = React.useState(false);
   const [isDesktopSidebar, setIsDesktopSidebar] = React.useState(false);
@@ -129,7 +129,7 @@ export function AdminFrame({
         {
           href: '/admin/attendance',
           icon: CalendarCheck,
-          label: locale === 'vi' ? 'Điểm danh' : 'Attendance',
+          label: messages.adminShell.menuAttendance,
         },
         { href: '/admin/semesters', icon: GraduationCap, label: messages.admin.menuItems[6]?.[0] },
         { href: '/admin/academic-years', icon: CalendarRange, label: messages.adminShell.academicYears },
@@ -142,12 +142,12 @@ export function AdminFrame({
       label: messages.adminShell.menuSections.campus,
       items: [
         { href: '/admin/thesis', icon: GraduationCap, label: messages.admin.menuItems[0]?.[0] },
-        { href: '/dashboard/editor', icon: FileEdit, label: locale === 'vi' ? 'Trình soạn thảo website' : 'Site Editor & CMS' },
+        { href: '/dashboard/editor', icon: FileEdit, label: messages.adminShell.menuSiteEditor },
         { href: '/admin/announcements', icon: Megaphone, label: messages.admin.menuItems[9]?.[0] },
         {
           href: '/admin/notifications',
           icon: Bell,
-          label: locale === 'vi' ? 'Thông báo hệ thống' : 'System notifications',
+          label: messages.adminShell.menuSystemNotifications,
         },
         { href: '/admin/assistant-knowledge', icon: BrainCircuit, label: messages.admin.menuItems[10]?.[0] },
         { href: '/admin/appearance', icon: Palette, label: messages.admin.menuItems[11]?.[0] },
@@ -155,7 +155,7 @@ export function AdminFrame({
         {
           href: '/admin/audit',
           icon: ScrollText,
-          label: locale === 'vi' ? 'Nhật ký kiểm toán' : 'Audit trail',
+          label: messages.adminShell.menuAuditTrail,
         },
       ],
     },
@@ -299,18 +299,18 @@ export function AdminFrame({
         <div className="border-b border-white/10 bg-[var(--portal-sidebar-strong)] px-5 py-3">
           <div className="flex min-w-0 items-center gap-3">
             <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-[var(--portal-yellow)] text-xs font-bold text-[var(--portal-yellow-ink)] shadow-xs">
-              {locale === 'vi' ? 'PĐT' : 'OAA'}
+              {messages.adminShell.officeBadge}
             </div>
             <div className="min-w-0 flex-1">
               <div className="truncate text-sm font-semibold text-[var(--portal-sidebar-text)]">
-                {locale === 'vi' ? 'Phòng Đào tạo' : 'Office of Academic Affairs'}
+                {messages.adminShell.officeName}
               </div>
               <div className="truncate text-xs text-[var(--portal-sidebar-muted)]">
-                {user?.email ?? (locale === 'vi' ? 'Chưa có email' : 'No email on file')}
+                {user?.email ?? (messages.adminShell.noEmail)}
               </div>
               <div className="mt-2">
                 <span className="inline-flex items-center rounded-md bg-[var(--portal-chrome-accent)]/10 px-2.5 py-0.5 text-[11px] font-semibold uppercase tracking-wider text-[var(--portal-chrome-accent)] border border-[var(--portal-chrome-accent)]/30 shadow-xs">
-                  {locale === 'vi' ? 'Hệ thống Quản trị Đại học' : 'University Administration System'}
+                  {messages.adminShell.systemBadge}
                 </span>
               </div>
             </div>
@@ -427,23 +427,23 @@ export function AdminFrame({
                   type="button"
                   onClick={() => setProfileOpen((current) => !current)}
                   className="flex min-h-11 items-center gap-3 rounded-md border border-border/70 bg-card px-1.5 py-1 transition-[background-color,border-color] duration-150 hover:bg-secondary/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 sm:px-3"
-                  aria-label={locale === 'vi' ? 'Mở thông tin Phòng Đào tạo' : 'Toggle Academic Affairs Profile'}
+                  aria-label={messages.adminShell.toggleProfile}
                   aria-expanded={profileOpen}
                   aria-controls="admin-profile-menu"
                   aria-haspopup="menu"
                 >
                   <div className="flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-full bg-primary text-xs font-bold text-primary-foreground shadow-xs">
-                    {locale === 'vi' ? 'PĐT' : 'OAA'}
+                    {messages.adminShell.officeBadge}
                   </div>
                   <div className="hidden min-w-0 text-left md:block">
                     <div className="truncate text-sm font-semibold text-foreground">
-                      {locale === 'vi' ? 'Phòng Đào tạo' : 'Office of Academic Affairs'}
+                      {messages.adminShell.officeName}
                     </div>
                     <div className="truncate text-xs text-muted-foreground flex items-center gap-1">
-                      <span>{user?.email ?? (locale === 'vi' ? 'Chưa có email' : 'No email on file')}</span>
+                      <span>{user?.email ?? (messages.adminShell.noEmail)}</span>
                       {isDemoUser(user) && (
                         <span className="text-[10px] text-status-warning-foreground font-medium">
-                          ({locale === 'vi' ? 'Demo trải nghiệm' : 'Demo'})
+                          ({messages.adminShell.demoTag})
                         </span>
                       )}
                     </div>
@@ -458,23 +458,23 @@ export function AdminFrame({
                   >
                     <div className="flex items-center gap-3 border-b border-border/70 px-4 py-4">
                       <div className="flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-full bg-primary text-sm font-bold text-primary-foreground">
-                        {locale === 'vi' ? 'PĐT' : 'OAA'}
+                        {messages.adminShell.officeBadge}
                       </div>
                       <div className="min-w-0 flex-1">
                         <p className="truncate font-semibold text-foreground text-sm">
-                          {locale === 'vi' ? 'Phòng Đào tạo' : 'Office of Academic Affairs'}
+                          {messages.adminShell.officeName}
                         </p>
                         <p className="truncate text-xs text-muted-foreground">
-                          {user?.email ?? (locale === 'vi' ? 'Chưa có email' : 'No email on file')}
+                          {user?.email ?? (messages.adminShell.noEmail)}
                         </p>
                         <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
                           <div className="inline-flex rounded-none bg-primary/10 border border-primary/20 px-2 py-0.5 text-[11px] font-medium text-primary">
-                            {locale === 'vi' ? 'Hệ thống Quản trị Đại học' : 'University Administration System'}
+                            {messages.adminShell.systemBadge}
                           </div>
                           {isDemoUser(user) && (
                             <div className="inline-flex items-center gap-1 rounded-none bg-amber-500/15 border border-amber-500/30 px-2 py-0.5 text-[11px] font-medium text-amber-700 dark:text-amber-300">
                               <span className="h-1.5 w-1.5 rounded-full bg-amber-500" />
-                              {locale === 'vi' ? 'Tài khoản demo để trải nghiệm' : 'Demo experience account'}
+                              {messages.adminShell.demoAccount}
                             </div>
                           )}
                         </div>
@@ -497,7 +497,7 @@ export function AdminFrame({
                         onClick={() => setProfileOpen(false)}
                       >
                         <Megaphone className="h-4 w-4" aria-hidden="true" />
-                        {locale === 'vi' ? 'Soạn thông báo & Công văn' : 'Announcements & Editor'}
+                        {messages.adminShell.menuAnnouncementsEditor}
                       </LocalizedLink>
                       <LocalizedLink
                         href="/admin/users"
@@ -506,7 +506,7 @@ export function AdminFrame({
                         onClick={() => setProfileOpen(false)}
                       >
                         <Users className="h-4 w-4" aria-hidden="true" />
-                        {locale === 'vi' ? 'Quản trị Người dùng' : 'User Management'}
+                        {messages.adminShell.menuUserManagement}
                       </LocalizedLink>
                       <div className="my-1 border-t border-border/70" />
                       <button

@@ -25,10 +25,12 @@ import {
   extractCoverImageDetails,
   formatAnnouncementPublisher,
   formatRelativeTime,
+  isVietnameseText,
   resolveAnnouncementDomain,
   resolveArticleCover,
   stripFirstCoverImage,
 } from '@/lib/announcement-presentation';
+import { ViContentBadge } from '@/components/announcements/ViContentBadge';
 import { DocumentAttachmentsList } from '../DocumentAttachmentsList';
 import { TableOfContents } from '../TableOfContents';
 import { RelatedAnnouncements } from '../RelatedAnnouncements';
@@ -53,7 +55,7 @@ export function EditorialArticleMagazine({
   const isVi = locale === 'vi';
   const { categories } = useArticleTaxonomy();
   const domain = resolveAnnouncementDomain(announcement, locale, categories);
-  const readingTime = calculateReadingTime(announcement.content);
+  const readingTime = calculateReadingTime(announcement.content, locale);
   const coverDetails = extractCoverImageDetails(announcement.content);
   const inlineCoverImage = coverDetails?.url || extractCoverImage(announcement.content);
   const coverImage = inlineCoverImage || resolveArticleCover(announcement);
@@ -129,6 +131,7 @@ export function EditorialArticleMagazine({
           >
             {getCategoryIcon()}
             <span>{domain.categoryLabel}</span>
+            <ViContentBadge show={!isVi && isVietnameseText(announcement.title)} />
           </span>
 
           {announcement.priority === 'HIGH' || announcement.priority === 'URGENT' ? (
@@ -142,7 +145,7 @@ export function EditorialArticleMagazine({
         <div className="flex items-center gap-3 text-xs text-muted-foreground">
           <span className="inline-flex items-center gap-1 font-medium">
             <Clock className="h-3.5 w-3.5 text-primary" />
-            <span>{isVi ? readingTime.displayText : `${readingTime.minutes} min read (${readingTime.wordCount.toLocaleString('en-US')} words)`}</span>
+            <span>{readingTime.displayText}</span>
           </span>
           <span>•</span>
           <span className="font-medium">{relativeTime}</span>
@@ -150,7 +153,10 @@ export function EditorialArticleMagazine({
       </div>
 
       {/* 2. Headline */}
-      <h1 className="break-words text-2xl sm:text-3xl lg:text-4xl font-extrabold tracking-tight text-foreground leading-[1.2]">
+      <h1
+        lang={!isVi && isVietnameseText(announcement.title) ? 'vi' : undefined}
+        className="break-words text-2xl sm:text-3xl lg:text-4xl font-extrabold tracking-tight text-foreground leading-[1.2]"
+      >
         {announcement.title}
       </h1>
 
@@ -240,6 +246,7 @@ export function EditorialArticleMagazine({
         {/* Main Article Content (3 columns on large screens) */}
         <div className="lg:col-span-3 space-y-6">
           <div
+            lang={!isVi && isVietnameseText(bodyContent) ? 'vi' : undefined}
             className={cn(
               'leading-relaxed text-foreground/90 transition-all',
               getFontSizeClass(),

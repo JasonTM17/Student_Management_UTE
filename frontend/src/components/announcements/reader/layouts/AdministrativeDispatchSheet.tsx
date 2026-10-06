@@ -20,6 +20,7 @@ import {
   announcementSectionLabel,
   formatAnnouncementPublisher,
   formatAnnouncementSemester,
+  isVietnameseText,
 } from '@/lib/announcement-presentation';
 import { DocumentAttachmentsList } from '../DocumentAttachmentsList';
 import { TableOfContents } from '../TableOfContents';
@@ -204,7 +205,10 @@ export function AdministrativeDispatchSheet({
         <h1 className="text-xl font-extrabold uppercase tracking-wide text-foreground sm:text-2xl">
           {copy.noticeHeader}
         </h1>
-        <p className="text-base font-bold text-primary sm:text-lg max-w-2xl mx-auto leading-snug">
+        <p
+          lang={!isVi && isVietnameseText(subjectHeading) ? 'vi' : undefined}
+          className="text-base font-bold text-primary sm:text-lg max-w-2xl mx-auto leading-snug"
+        >
           {subjectHeading}
         </p>
         <div className="w-20 border-b border-primary/40 mx-auto pt-1" />
@@ -253,6 +257,7 @@ export function AdministrativeDispatchSheet({
       {/* Rich Body Content */}
       <div className="border-t border-b border-border/60 py-6">
         <div
+          lang={!isVi && isVietnameseText(announcement.content) ? 'vi' : undefined}
           className={cn(
             'leading-relaxed text-foreground/90 transition-all',
             getFontSizeClass(),

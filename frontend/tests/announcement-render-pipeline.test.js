@@ -258,6 +258,7 @@ function loadMagazine() {
     '../DocumentAttachmentsList': { DocumentAttachmentsList: dummyComponent },
     '../TableOfContents': { TableOfContents: dummyComponent },
     '../RelatedAnnouncements': { RelatedAnnouncements: dummyComponent },
+    '@/components/announcements/ViContentBadge': { ViContentBadge: dummyComponent },
   });
 }
 

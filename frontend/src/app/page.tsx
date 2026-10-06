@@ -144,7 +144,7 @@ export default function HomePage() {
               <div className="relative h-14 w-11 shrink-0">
                 <Image
                   src="/hcmute-logo.png"
-                  alt="Logo Trường Đại học Công nghệ Kỹ thuật TP.HCM"
+                  alt={messages.home.logoAlt}
                   fill
                   sizes="44px"
                   priority
@@ -154,7 +154,7 @@ export default function HomePage() {
               <div className="space-y-1">
                 <SectionEyebrow>{hero.eyebrow || messages.home.eyebrow}</SectionEyebrow>
                 <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
-                  Trường Đại học Công nghệ Kỹ thuật TP.HCM • HCM-UTE
+                  {messages.home.schoolName}
                 </p>
               </div>
             </div>

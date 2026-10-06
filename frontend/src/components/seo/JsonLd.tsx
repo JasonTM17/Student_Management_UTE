@@ -6,17 +6,22 @@ interface JsonLdProps {
 
 export function JsonLd({ locale = 'vi' }: JsonLdProps) {
   const siteUrl = getSiteUrl();
+  const isVi = locale === 'vi';
+  const organizationName = isVi
+    ? 'Trường Đại học Công nghệ Kỹ thuật TP.HCM'
+    : 'Ho Chi Minh City University of Technology and Engineering';
 
   const organizationSchema = {
     '@context': 'https://schema.org',
     '@type': 'CollegeOrUniversity',
-    name: 'Trường Đại học Công nghệ Kỹ thuật TP.HCM',
+    name: organizationName,
     alternateName: ['HCM-UTE', 'HCMUTE', 'CampusUTE', 'UTE'],
     url: siteUrl,
     logo: `${siteUrl}/icon.png`,
     image: `${siteUrl}/icon.png`,
-    description:
-      'Cổng thông tin đào tạo và học vụ trực tuyến CampusUTE - Trường Đại học Công nghệ Kỹ thuật TP.HCM.',
+    description: isVi
+      ? 'Cổng thông tin đào tạo và học vụ trực tuyến CampusUTE - Trường Đại học Công nghệ Kỹ thuật TP.HCM.'
+      : 'CampusUTE online academic portal of Ho Chi Minh City University of Technology and Engineering.',
     address: {
       '@type': 'PostalAddress',
       streetAddress: '01 Võ Văn Ngân, Phường Linh Chiểu',
@@ -46,7 +51,7 @@ export function JsonLd({ locale = 'vi' }: JsonLdProps) {
     },
     author: {
       '@type': 'EducationalOrganization',
-      name: 'Trường Đại học Công nghệ Kỹ thuật TP.HCM',
+      name: organizationName,
     },
   };
 
@@ -58,7 +63,7 @@ export function JsonLd({ locale = 'vi' }: JsonLdProps) {
     inLanguage: ['vi-VN', 'en-US'],
     publisher: {
       '@type': 'CollegeOrUniversity',
-      name: 'Trường Đại học Công nghệ Kỹ thuật TP.HCM',
+      name: organizationName,
     },
   };
 

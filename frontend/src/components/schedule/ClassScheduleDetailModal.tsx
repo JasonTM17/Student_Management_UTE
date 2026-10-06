@@ -242,7 +242,8 @@ export function ClassScheduleDetailModal({
                   {locale === 'vi' ? 'Sĩ số đăng ký' : 'Enrolled Students'}
                 </div>
                 <div className="mt-0.5 text-sm font-semibold text-foreground">
-                  {data.enrolledCount} {locale === 'vi' ? 'sinh viên' : 'students'}
+                  {data.enrolledCount}
+                  {data.capacity ? `/${data.capacity}` : ''} {locale === 'vi' ? 'sinh viên' : 'students'}
                 </div>
               </div>
             </div>

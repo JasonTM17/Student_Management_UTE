@@ -25,10 +25,12 @@ import {
   extractCoverImage,
   formatAnnouncementPublisher,
   formatRelativeTime,
+  isVietnameseText,
   resolveAnnouncementDomain,
   resolveArticleCover,
 } from '@/lib/announcement-presentation';
 import { useArticleTaxonomy } from '@/lib/use-article-taxonomy';
+import { ViContentBadge } from '@/components/announcements/ViContentBadge';
 
 interface AnnouncementFeedCardProps {
   announcement: AnnouncementRecord;
@@ -50,6 +52,7 @@ export function AnnouncementFeedCard({
   const isVi = locale === 'vi';
   const [copied, setCopied] = useState(false);
   const { categories } = useArticleTaxonomy();
+  const showViBadge = !isVi && isVietnameseText(announcement.title);
 
   const domain = resolveAnnouncementDomain(announcement, locale, categories);
   const readingTime = calculateReadingTime(announcement.content);
@@ -170,6 +173,7 @@ export function AnnouncementFeedCard({
               <span className="inline-flex items-center gap-1 font-semibold text-primary">
                 {getCategoryIcon()}
                 <span>{domain.categoryLabel}</span>
+                <ViContentBadge show={showViBadge} />
               </span>
               <span>•</span>
               <span className="flex items-center gap-1">
@@ -306,6 +310,7 @@ export function AnnouncementFeedCard({
             <span className="inline-flex items-center gap-1 font-semibold text-primary">
               {getCategoryIcon()}
               <span>{domain.categoryLabel}</span>
+              <ViContentBadge show={showViBadge} />
             </span>
             <span className="flex items-center gap-1">
               <Clock className="h-3 w-3" />

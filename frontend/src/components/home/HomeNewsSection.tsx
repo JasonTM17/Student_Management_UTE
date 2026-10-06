@@ -32,8 +32,10 @@ import {
   extractAnnouncementExcerpt,
   formatAnnouncementPublisher,
   formatRelativeTime,
+  isVietnameseText,
   type ArticleCategoryCode,
 } from '@/lib/announcement-presentation';
+import { ViContentBadge } from '@/components/announcements/ViContentBadge';
 
 type CategoryFilter = 'ALL' | ArticleCategoryCode;
 
@@ -287,7 +289,7 @@ export function HomeNewsSection() {
               {visibleGridItems.map((ann) => {
                 const cover = resolveArticleCover(ann);
                 const domain = resolveAnnouncementDomain(ann, locale, categories);
-                const reading = calculateReadingTime(ann.content);
+                const reading = calculateReadingTime(ann.content, locale);
                 const sapo = extractAnnouncementExcerpt(ann.content, 110);
                 const pub = formatAnnouncementPublisher(ann.publishedBy, locale);
                 const relTime = formatRelativeTime(ann.publishAt || ann.createdAt, locale);
@@ -317,9 +319,12 @@ export function HomeNewsSection() {
                     {/* Card Content */}
                     <div className="flex flex-1 flex-col justify-between p-5 space-y-3">
                       <div className="space-y-2">
-                        <div className="flex items-center justify-between text-[11px] text-muted-foreground">
-                          <span className="font-semibold text-primary">{pub}</span>
-                          <span>{relTime}</span>
+                        <div className="flex items-center justify-between gap-2 text-[11px] text-muted-foreground">
+                          <span className="inline-flex min-w-0 items-center gap-1.5 font-semibold text-primary">
+                            <span className="truncate">{pub}</span>
+                            <ViContentBadge show={!isVi && isVietnameseText(ann.title)} />
+                          </span>
+                          <span className="shrink-0">{relTime}</span>
                         </div>
                         <h4>
                           <button
