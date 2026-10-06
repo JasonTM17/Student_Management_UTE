@@ -575,8 +575,8 @@ public class ThesisAssistantController {
             // would otherwise answer from the academic corpus under load.
             ChatResponse fastPath = lexicalFastPathOrNull(scopedRequest);
             if (fastPath != null) {
-                emitLexicalFastPath(fastPath, request,
-                        AssistantInputGuard.normalizeLocale(request.locale()), sink);
+                emitLexicalFastPath(fastPath, scopedRequest,
+                        AssistantInputGuard.normalizeLocale(scopedRequest.locale()), sink);
                 generationFinished.set(true);
                 stopHeartbeat.run();
                 emitter.complete();

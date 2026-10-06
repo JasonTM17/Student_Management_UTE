@@ -2,6 +2,8 @@ package io.campuscore.restfulapi.engagement;
 
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -781,6 +783,30 @@ class AnnouncementWritePersistenceTest {
         assertEquals(0, announcements.markNotified("existing-announcement", now));
         assertTrue(announcements.findDueForNotification(now, 50).stream()
                 .noneMatch(row -> row.id().equals("existing-announcement")));
+
+        // Claim-scoped re-arm fence: after an unconditional re-arm + a
+        // competitor's later claim, the stale worker's failure-clear
+        // (`notifiedAt <= its own stamp`) must not erase the live marker,
+        // while the claimant's own scoped clear still works.
+        jdbc.update(
+                "UPDATE \"engagement\".\"Announcement\" SET \"publishAt\" = NULL WHERE \"id\" = ?",
+                "existing-announcement");
+        announcements.clearNotifiedAt("existing-announcement");
+        Instant firstClaim = now;
+        assertEquals(1, announcements.markNotified("existing-announcement", firstClaim));
+        announcements.clearNotifiedAt("existing-announcement");
+        Instant secondClaim = firstClaim.plusSeconds(5);
+        assertEquals(1, announcements.markNotified("existing-announcement", secondClaim));
+        announcements.clearNotifiedAt("existing-announcement", firstClaim);
+        assertNotNull(currentNotifiedAt());
+        announcements.clearNotifiedAt("existing-announcement", secondClaim);
+        assertNull(currentNotifiedAt());
+    }
+
+    private Object currentNotifiedAt() {
+        return jdbc.queryForObject(
+                "SELECT \"notifiedAt\" FROM \"engagement\".\"Announcement\" WHERE \"id\" = ?",
+                Object.class, "existing-announcement");
     }
 
     private void seedAnnouncement() {
