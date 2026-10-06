@@ -68,9 +68,9 @@ interface TimelineEntry {
 
 /**
  * Chip and dot colours come from the `status-*` design tokens. The shared
- * `statusToneClass` helper is not reused for the tint because its `/12`
- * background step is outside Tailwind's opacity scale and therefore never
- * generates CSS; the supported `/15` step is spelled out here instead.
+ * `statusToneClass` helper is not reused because these chips also need a
+ * `/30` border ring and the stronger `/15` tint; the helper pairs `/10` with
+ * no border.
  */
 const CHIP_CLASS: Record<StatusTone, string> = {
   success: 'bg-status-success/15 border-status-success/30 text-status-success-foreground',

@@ -875,12 +875,12 @@ export default function DashboardLayout({
                     {/* Institutional brand gold (accent-independent): the role chip
                         and demo marker keep the warm gold identity on the navy
                         chrome even when the site accent is a cool tone. */}
-                    <span className="inline-flex items-center rounded-md border border-[var(--portal-brand-gold)]/40 bg-[var(--portal-brand-gold)]/15 px-2.5 py-0.5 text-xs font-semibold uppercase tracking-wider text-[var(--portal-sidebar-text)] shadow-xs">
+                    <span className="inline-flex items-center rounded-md border border-portal-brand-gold/40 bg-portal-brand-gold/15 px-2.5 py-0.5 text-xs font-semibold uppercase tracking-wider text-portal-sidebar-text shadow-xs">
                       {roleLabel}
                     </span>
                     {isDemoUser(user) && (
-                      <span className="inline-flex items-center gap-1 rounded-md border border-[var(--portal-brand-gold)]/35 bg-[var(--portal-brand-gold)]/12 px-2 py-0.5 text-[11px] font-medium text-[var(--portal-sidebar-text)]">
-                        <span className="h-1.5 w-1.5 rounded-full bg-[var(--portal-brand-gold)] shadow-xs" />
+                      <span className="inline-flex items-center gap-1 rounded-md border border-portal-brand-gold/35 bg-portal-brand-gold/15 px-2 py-0.5 text-[11px] font-medium text-portal-sidebar-text">
+                        <span className="h-1.5 w-1.5 rounded-full bg-portal-brand-gold shadow-xs" />
                         {locale === 'vi' ? 'TK Demo trải nghiệm' : 'Demo account'}
                       </span>
                     )}
@@ -958,7 +958,7 @@ export default function DashboardLayout({
               aria-label={messages.assistant.specializedLabel}
               title={sidebarCollapsed ? messages.assistant.specializedLabel : undefined}
             >
-              <AssistantMascot className="h-5 w-5 shrink-0 text-[var(--portal-brand-gold)] transition-transform duration-200 group-hover:scale-110" />
+              <AssistantMascot className="h-5 w-5 shrink-0 text-portal-brand-gold transition-transform duration-200 group-hover:scale-110" />
               {!sidebarCollapsed ? (
                 <span>{messages.assistant.specializedLabel}</span>
               ) : null}
@@ -1237,7 +1237,7 @@ export default function DashboardLayout({
                       {isDemoUser(user) && (
                         <span className="inline-flex items-center gap-1 text-[11px] font-medium text-muted-foreground">
                           <span
-                            className="h-1.5 w-1.5 rounded-full bg-[var(--portal-brand-gold)]"
+                            className="h-1.5 w-1.5 rounded-full bg-portal-brand-gold"
                             aria-hidden="true"
                           />
                           {locale === 'vi' ? 'Demo trải nghiệm' : 'Demo'}

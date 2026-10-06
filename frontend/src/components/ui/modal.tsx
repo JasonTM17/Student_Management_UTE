@@ -226,7 +226,7 @@ export function ConfirmModal({
         {warning ? (
           <div
             role="status"
-            className="rounded-lg border border-status-warning/40 bg-status-warning/12 px-3 py-2.5 text-sm leading-6 text-status-warning-foreground"
+            className="rounded-lg border border-status-warning/40 bg-status-warning/10 px-3 py-2.5 text-sm leading-6 text-status-warning-foreground"
           >
             {warning}
           </div>

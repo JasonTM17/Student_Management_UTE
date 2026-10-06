@@ -385,7 +385,7 @@ test('dogfood audit: registration conflicts surface the specific backend code', 
 test('registration seat badges keep contrast on selected course rows', () => {
   const page = read('src/app/dashboard/register/page.tsx');
 
-  assert.match(page, /bg-status-success\/12 text-status-success-foreground/);
+  assert.match(page, /bg-status-success\/10 text-status-success-foreground/);
   assert.doesNotMatch(page, /bg-primary\/10 text-status-success/);
 });
 

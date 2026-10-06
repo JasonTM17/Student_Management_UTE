@@ -24,6 +24,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { PageHeader, SectionEyebrow } from '@/components/ui/page-header';
 import { metricToneClass, statusToneClass } from '@/components/ui/status';
+import { StatusPill } from '@/components/ui/status-pill';
 import {
   EmptyState,
   ErrorState,
@@ -743,24 +744,30 @@ export default function EnrollmentsPage() {
 
                                   <div className="flex shrink-0 items-center gap-2">
                                     {isCompleted ? (
-                                      <span className={`inline-flex items-center gap-1.5 rounded-md px-3 py-1 text-xs font-semibold ${statusToneClass('success')}`}>
-                                        <CheckCircle2 className="h-3.5 w-3.5" />
+                                      <StatusPill
+                                        tone="success"
+                                        icon={<CheckCircle2 className="h-3.5 w-3.5" />}
+                                        className="gap-1.5 px-3 py-1 font-semibold"
+                                      >
                                         {copy.filterCompleted}
                                         {course.finalGrade !== null && course.finalGrade !== undefined ? (
                                           <span className="ml-1 border-l border-border/80 pl-1 font-bold">
                                             {course.finalGrade.toFixed(1)} {course.letterGrade ? `(${course.letterGrade})` : ''}
                                           </span>
                                         ) : null}
-                                      </span>
+                                      </StatusPill>
                                     ) : isInProgress ? (
-                                      <span className={`inline-flex items-center gap-1.5 rounded-md px-3 py-1 text-xs font-semibold ${statusToneClass('info')}`}>
-                                        <Clock className="h-3.5 w-3.5" />
+                                      <StatusPill
+                                        tone="info"
+                                        icon={<Clock className="h-3.5 w-3.5" />}
+                                        className="gap-1.5 px-3 py-1 font-semibold"
+                                      >
                                         {copy.filterInProgress}
-                                      </span>
+                                      </StatusPill>
                                     ) : (
-                                      <span className={`inline-flex items-center rounded-md px-3 py-1 text-xs font-medium ${statusToneClass('neutral')}`}>
+                                      <StatusPill tone="neutral" className="px-3 py-1">
                                         {copy.filterNotStarted}
-                                      </span>
+                                      </StatusPill>
                                     )}
                                   </div>
                                 </div>

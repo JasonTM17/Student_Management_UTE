@@ -45,6 +45,18 @@
     --status-info-foreground: var(--primary);
     --status-neutral: var(--muted-foreground);
     --status-neutral-foreground: var(--muted-foreground);
+    /* Role identity hues (blue/emerald/purple) — tokens so badges, chips and
+       the role switcher share one contract instead of raw palette classes.
+       Base values read on tinted surfaces; `-solid` values are theme-fixed
+       fills for white-text buttons. */
+    --role-student: 221 83% 45%;
+    --role-lecturer: 190 66% 28%;
+    --role-admin: 272 72% 46%;
+    --role-super-admin: 340 74% 40%;
+    --role-student-solid: 221 83% 53%;
+    --role-lecturer-solid: 190 78% 36%;
+    --role-admin-solid: 271 91% 55%;
+    --role-super-admin-solid: 340 76% 48%;
     --portal-sidebar: oklch(0.31 0.095 252);
     --portal-sidebar-strong: oklch(0.235 0.075 252);
     --portal-sidebar-hover: oklch(0.37 0.09 252);
@@ -139,6 +151,10 @@
     --status-info-foreground: var(--primary);
     --status-neutral: var(--muted-foreground);
     --status-neutral-foreground: var(--muted-foreground);
+    --role-student: 213 94% 72%;
+    --role-lecturer: 190 72% 66%;
+    --role-admin: 279 88% 75%;
+    --role-super-admin: 340 82% 72%;
     --portal-sidebar: oklch(0.25 0.085 252);
     --portal-sidebar-strong: oklch(0.19 0.065 252);
     --portal-sidebar-hover: oklch(0.33 0.09 252);

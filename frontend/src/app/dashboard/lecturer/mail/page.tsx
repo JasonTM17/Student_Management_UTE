@@ -553,8 +553,8 @@ export default function LecturerMailComposePage() {
         description={copy.description}
         actions={
           <div className="flex flex-col items-start gap-1.5 sm:items-end">
-            <span className="inline-flex items-center gap-1.5 rounded-md border border-[var(--portal-brand-gold)]/40 bg-[var(--portal-brand-gold)]/10 px-3 py-1 text-xs font-semibold text-foreground">
-              <Send className="h-3.5 w-3.5 text-[var(--portal-brand-gold)]" aria-hidden="true" />
+            <span className="inline-flex items-center gap-1.5 rounded-md border border-portal-brand-gold/40 bg-portal-brand-gold/10 px-3 py-1 text-xs font-semibold text-foreground">
+              <Send className="h-3.5 w-3.5 text-portal-brand-gold" aria-hidden="true" />
               {copy.quotaBadge.replace('{count}', formatNumber(sentThisSession))}
             </span>
             <span className="text-xs text-muted-foreground">
@@ -582,7 +582,7 @@ export default function LecturerMailComposePage() {
                 className={cn(
                   'relative rounded-lg border p-4 text-left transition-all duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60',
                   selected
-                    ? 'border-[var(--portal-brand-gold)] bg-[var(--portal-brand-gold)]/10 shadow-xs'
+                    ? 'border-portal-brand-gold bg-portal-brand-gold/10 shadow-xs'
                     : 'border-border/70 bg-card hover:border-primary/50 hover:bg-secondary/40',
                 )}
                 disabled={isSending}
@@ -590,14 +590,14 @@ export default function LecturerMailComposePage() {
                 <span className="flex items-center justify-between gap-2">
                   <span className="flex items-center gap-2 text-sm font-semibold text-foreground">
                     <Mail
-                      className={cn('h-4 w-4 shrink-0', selected ? 'text-[var(--portal-brand-gold)]' : 'text-muted-foreground')}
+                      className={cn('h-4 w-4 shrink-0', selected ? 'text-portal-brand-gold' : 'text-muted-foreground')}
                       aria-hidden="true"
                     />
                     {meta.title}
                   </span>
                   {selected ? (
                     <span
-                      className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-[var(--portal-brand-gold)] text-[var(--portal-brand-gold-ink)]"
+                      className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-portal-brand-gold text-portal-brand-gold-ink"
                       aria-hidden="true"
                     >
                       <Check className="h-3.5 w-3.5" />
@@ -1100,7 +1100,7 @@ export default function LecturerMailComposePage() {
                 className={cn(
                   'mt-1 flex items-center gap-2 rounded-md border px-3 py-2 text-xs font-semibold',
                   readyToSend
-                    ? 'border-emerald-500/40 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300'
+                    ? 'border-status-success/40 bg-status-success/10 text-status-success-foreground'
                     : 'border-border/70 bg-card text-muted-foreground',
                 )}
               >
@@ -1120,7 +1120,7 @@ export default function LecturerMailComposePage() {
           <Card variant="muted">
             <CardContent className="pt-5">
               <h3 className="flex items-center gap-1.5 text-sm font-semibold text-foreground">
-                <Info className="h-4 w-4 text-[var(--portal-brand-gold)]" aria-hidden="true" />
+                <Info className="h-4 w-4 text-portal-brand-gold" aria-hidden="true" />
                 {copy.sandboxTitle}
               </h3>
               <p className="mt-1.5 text-xs leading-5 text-muted-foreground">{copy.sandboxNote}</p>
@@ -1139,7 +1139,7 @@ export default function LecturerMailComposePage() {
           <div className="space-y-2">
             <Button
               type="button"
-              variant="registration"
+              variant="default"
               size="lg"
               className="w-full"
               onClick={() => void handleSend()}
@@ -1166,16 +1166,16 @@ export default function LecturerMailComposePage() {
             <div
               ref={successRef}
               role="status"
-              className="rounded-lg border border-emerald-500/40 bg-emerald-500/10 p-4"
+              className="rounded-lg border border-status-success/40 bg-status-success/10 p-4"
             >
               <div className="flex items-center gap-2">
                 <span
-                  className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-emerald-500 text-white"
+                  className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-status-success text-white"
                   aria-hidden="true"
                 >
                   <Check className="h-5 w-5" />
                 </span>
-                <p className="text-sm font-semibold text-emerald-800 dark:text-emerald-200">{copy.successTitle}</p>
+                <p className="text-sm font-semibold text-status-success-foreground">{copy.successTitle}</p>
               </div>
               <dl className="mt-3 space-y-1.5 text-xs leading-5">
                 <div className="flex gap-2">

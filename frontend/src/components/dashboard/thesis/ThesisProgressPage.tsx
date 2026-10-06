@@ -200,7 +200,7 @@ export default function ThesisProgressPage() {
       </Card>
 
       {attentionMessage ? (
-        <div className="flex items-start gap-4 rounded-lg border border-status-warning/25 bg-status-warning/12 p-5">
+        <div className="flex items-start gap-4 rounded-lg border border-status-warning/25 bg-status-warning/10 p-5">
           <Clock3 className="mt-0.5 h-5 w-5 shrink-0 text-status-warning" />
           <div>
             <p className="font-semibold text-foreground">{messages.thesis.progressAttention}</p>
@@ -210,7 +210,7 @@ export default function ThesisProgressPage() {
       ) : null}
 
       {!hasGroup ? (
-        <div className="flex items-start gap-4 rounded-lg border border-status-warning/25 bg-status-warning/12 p-5">
+        <div className="flex items-start gap-4 rounded-lg border border-status-warning/25 bg-status-warning/10 p-5">
           <UsersRound className="mt-0.5 h-5 w-5 shrink-0 text-status-warning" />
           <div>
             <p className="font-semibold text-foreground">{messages.thesis.noGroup}</p>

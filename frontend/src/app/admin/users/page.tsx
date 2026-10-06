@@ -35,7 +35,8 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Modal } from '@/components/ui/modal';
 import { Select } from '@/components/ui/select';
-import { statusToneClass, type StatusTone } from '@/components/ui/status';
+import { roleSolidClass, roleToneClass, type StatusTone } from '@/components/ui/status';
+import { StatusPill } from '@/components/ui/status-pill';
 import { EmptyState, ErrorState, LoadingState } from '@/components/ui/state-block';
 import { useConfirmationDialog } from '@/components/ui/use-confirmation-dialog';
 import { useI18n } from '@/i18n';
@@ -888,7 +889,7 @@ export default function AdminUsersPage() {
           <Button
             onClick={() => openCreate('LECTURER')}
             variant="outline"
-            className="border-emerald-600/40 text-emerald-700 dark:text-emerald-400 hover:bg-emerald-500/10"
+            className="border-role-lecturer/40 text-role-lecturer hover:bg-role-lecturer/10"
           >
             <School className="mr-2 h-4 w-4" />
             {copy.createLecturer}
@@ -1049,9 +1050,9 @@ export default function AdminUsersPage() {
                       </h3>
                       <p className="text-xs text-muted-foreground">{record.email}</p>
                     </div>
-                    <span className={`inline-flex rounded-md px-2.5 py-1 text-xs font-medium ${statusToneClass(userStatusTone(record.status))}`}>
+                    <StatusPill tone={userStatusTone(record.status)} className="py-1">
                       {statusLabel(record.status)}
-                    </span>
+                    </StatusPill>
                   </div>
                   <div className="flex items-center justify-between text-xs text-muted-foreground">
                     <span className="font-medium text-foreground">{roleLabel(record.roles)}</span>
@@ -1122,27 +1123,21 @@ export default function AdminUsersPage() {
                           {record.email}
                         </td>
                         <td className="px-4 py-3.5">
-                          <span className={`inline-flex rounded-md px-2.5 py-0.5 text-xs font-medium ${statusToneClass(userStatusTone(record.status))}`}>
+                          <StatusPill tone={userStatusTone(record.status)}>
                             {statusLabel(record.status)}
-                          </span>
+                          </StatusPill>
                         </td>
                         <td className="px-4 py-3.5">
-                          {primary === 'STUDENT' ? (
-                            <span className="inline-flex items-center gap-1 rounded-md bg-blue-500/10 px-2 py-0.5 text-xs font-medium text-blue-600 dark:text-blue-400">
+                          <span className={`inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-xs font-medium ${roleToneClass(primary)}`}>
+                            {primary === 'STUDENT' ? (
                               <GraduationCap className="h-3 w-3" />
-                              {copy.roles.STUDENT}
-                            </span>
-                          ) : primary === 'LECTURER' ? (
-                            <span className="inline-flex items-center gap-1 rounded-md bg-emerald-500/10 px-2 py-0.5 text-xs font-medium text-emerald-800 dark:text-emerald-300">
+                            ) : primary === 'LECTURER' ? (
                               <School className="h-3 w-3" />
-                              {copy.roles.LECTURER}
-                            </span>
-                          ) : (
-                            <span className="inline-flex items-center gap-1 rounded-md bg-purple-500/10 px-2 py-0.5 text-xs font-medium text-purple-600 dark:text-purple-400">
+                            ) : (
                               <ShieldCheck className="h-3 w-3" />
-                              {copy.roles.ADMIN}
-                            </span>
-                          )}
+                            )}
+                            {copy.roles[primary]}
+                          </span>
                         </td>
                         <td className="px-4 py-3.5 text-muted-foreground text-xs">
                           {formatDate(record.createdAt)}
@@ -1234,7 +1229,7 @@ export default function AdminUsersPage() {
                     className="rounded-md font-semibold"
                     inactiveClassName="bg-transparent text-muted-foreground hover:bg-transparent hover:text-foreground"
                     active={formData.role === 'STUDENT'}
-                    activeClassName="bg-blue-600 text-white shadow-xs hover:bg-blue-600/90"
+                    activeClassName={roleSolidClass('STUDENT')}
                     onClick={() => {
                       setFormData((c) => ({ ...c, role: 'STUDENT' }));
                     }}
@@ -1246,7 +1241,7 @@ export default function AdminUsersPage() {
                     className="rounded-md font-semibold"
                     inactiveClassName="bg-transparent text-muted-foreground hover:bg-transparent hover:text-foreground"
                     active={formData.role === 'LECTURER'}
-                    activeClassName="bg-emerald-600 text-white shadow-xs hover:bg-emerald-600/90"
+                    activeClassName={roleSolidClass('LECTURER')}
                     onClick={() => {
                       setFormData((c) => ({ ...c, role: 'LECTURER' }));
                     }}
@@ -1258,7 +1253,7 @@ export default function AdminUsersPage() {
                     className="rounded-md font-semibold"
                     inactiveClassName="bg-transparent text-muted-foreground hover:bg-transparent hover:text-foreground"
                     active={formData.role === 'ADMIN'}
-                    activeClassName="bg-purple-600 text-white shadow-xs hover:bg-purple-600/90"
+                    activeClassName={roleSolidClass('ADMIN')}
                     onClick={() => setFormData((c) => ({ ...c, role: 'ADMIN' }))}
                     disabled={!isSuperAdmin}
                     title={!isSuperAdmin ? copy.errors.adminReserved : undefined}
@@ -1340,10 +1335,9 @@ export default function AdminUsersPage() {
               <div className="rounded-lg border border-border/60 bg-secondary/15 p-3 text-xs">
                 <div className="flex items-center justify-between">
                   <span className="text-muted-foreground">{copy.initialStatusLabel}</span>
-                  <span className="inline-flex items-center gap-1 rounded-md bg-emerald-500/10 px-2 py-0.5 font-semibold text-emerald-600 dark:text-emerald-400">
-                    <CheckCircle2 className="h-3 w-3" />
+                  <StatusPill tone="success" icon={<CheckCircle2 className="h-3 w-3" />} className="px-2 font-semibold">
                     {copy.initialStatusActive}
-                  </span>
+                  </StatusPill>
                 </div>
               </div>
             </div>
@@ -1360,11 +1354,7 @@ export default function AdminUsersPage() {
                 <div className="flex items-center gap-2">
                   <div className={cn(
                     'flex h-7 w-7 items-center justify-center rounded-md',
-                    formData.role === 'STUDENT'
-                      ? 'bg-blue-500/10 text-blue-600 dark:text-blue-400'
-                      : formData.role === 'LECTURER'
-                        ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400'
-                        : 'bg-purple-500/10 text-purple-600 dark:text-purple-400',
+                    roleToneClass(formData.role),
                   )}>
                     {formData.role === 'STUDENT' ? (
                       <GraduationCap className="h-4 w-4" />
@@ -1390,11 +1380,7 @@ export default function AdminUsersPage() {
 
                 <span className={cn(
                   'rounded-md px-2.5 py-0.5 text-xs font-semibold',
-                  formData.role === 'STUDENT'
-                    ? 'bg-blue-500/10 text-blue-600 dark:text-blue-400'
-                    : formData.role === 'LECTURER'
-                      ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400'
-                      : 'bg-purple-500/10 text-purple-600 dark:text-purple-400',
+                  roleToneClass(formData.role),
                 )}>
                   {formData.role === 'STUDENT'
                     ? copy.roles.STUDENT
@@ -1538,8 +1524,8 @@ export default function AdminUsersPage() {
               {/* TRƯỜNG HỢP: QUẢN TRỊ VIÊN */}
               {formData.role !== 'STUDENT' && formData.role !== 'LECTURER' && (
                 <div className="space-y-4">
-                  <div className="rounded-xl border border-purple-500/20 bg-purple-500/5 p-4 space-y-2">
-                    <div className="flex items-center gap-2 text-purple-700 dark:text-purple-400">
+                  <div className="rounded-xl border border-role-admin/25 bg-role-admin/10 p-4 space-y-2">
+                    <div className="flex items-center gap-2 text-role-admin">
                       <ShieldCheck className="h-5 w-5" />
                       <span className="text-sm font-semibold">{copy.adminPermissionsTitle}</span>
                     </div>
@@ -1637,7 +1623,7 @@ export default function AdminUsersPage() {
               </div>
               <p
                 role="alert"
-                className="flex items-start gap-2 rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs font-medium text-amber-700 dark:text-amber-400"
+                className="flex items-start gap-2 rounded-lg border border-status-warning/30 bg-status-warning/10 px-3 py-2 text-xs font-medium text-status-warning-foreground"
               >
                 <ShieldCheck className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden="true" />
                 {copy.credentialShownOnce}

@@ -205,6 +205,7 @@ test('admin routes use the same fixed sidebar and retained route inventory', () 
 test('status primitives use semantic tokens instead of raw Tailwind palettes', () => {
   const globals = read('src/app/globals.css');
   const status = read('src/components/ui/status.ts');
+  const pill = read('src/components/ui/status-pill.tsx');
   const badge = read('src/components/thesis/StatusBadge.tsx');
   const layout = read('src/app/layout.tsx');
   // The unused data-table primitive was deleted (UX-P2-6); assert it stays
@@ -220,16 +221,57 @@ test('status primitives use semantic tokens instead of raw Tailwind palettes', (
   assert.match(globals, /--portal-yellow:/);
   assert.match(status, /export function statusToneClass/);
   assert.match(status, /export function metricToneClass/);
-  assert.match(status, /success: 'bg-status-success\/12 text-status-success-foreground'/);
-  assert.match(status, /warning: 'bg-status-warning\/12 text-status-warning-foreground'/);
+  // `/10` must stay a real opacity-scale value: `/12` silently emits no CSS.
+  assert.match(status, /success: 'bg-status-success\/10 text-status-success-foreground'/);
+  assert.match(status, /warning: 'bg-status-warning\/10 text-status-warning-foreground'/);
   assert.doesNotMatch(status, /bg-status-warning\/12 text-status-warning'/);
   assert.doesNotMatch(status, /bg-status-success\/12 text-status-success'/);
   assert.doesNotMatch(badge, /bg-emerald-500/);
   assert.doesNotMatch(status, /bg-emerald-500/);
   assert.doesNotMatch(badge, /bg-(red|amber|blue|violet)-500/);
   assert.doesNotMatch(status, /bg-(emerald|red|amber|blue|violet|yellow)-/);
+  assert.doesNotMatch(pill, /bg-(emerald|red|amber|blue|violet|yellow)-/);
+
+  // Role tokens: every portal role maps to a distinct `--role-*` HSL triplet
+  // consumed by the `role.*` Tailwind group and the status.ts helpers.
+  assert.match(status, /export function roleToneClass/);
+  assert.match(status, /export function roleSolidClass/);
+  assert.match(status, /STUDENT: 'bg-role-student\/10 text-role-student'/);
+  assert.match(status, /SUPER_ADMIN: 'bg-role-super-admin\/10 text-role-super-admin'/);
+  for (const role of ['student', 'lecturer', 'admin', 'super-admin']) {
+    assert.match(globals, new RegExp(`--role-${role}:`));
+    assert.match(globals, new RegExp(`--role-${role}-solid:`));
+  }
+  const config = read('tailwind.config.ts');
+  assert.match(config, /"super-admin"/);
+  assert.match(pill, /statusToneClass/);
   assert.match(layout, /QueryProvider/);
   assert.doesNotMatch(layout, /richColors/);
+});
+
+test('alpha modifiers stay inside the Tailwind opacity scale', () => {
+  // Tailwind v3 resolves `/<n>` modifiers through theme('opacity') only —
+  // values outside the scale (e.g. `/12`) silently emit no CSS at all, which
+  // shipped transparent status pills until Phase 5. Scan every source class
+  // string for non-scale modifiers. Arbitrary `/[0.xx]` forms are fine.
+  const SCALE = new Set([0, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55, 60, 65, 70, 75, 80, 85, 90, 95, 100]);
+  const ALPHA_RE = /(?:bg|text|border|ring|divide|from|via|to|fill|stroke|outline|placeholder|caret|accent|decoration|shadow|border-[trblxyse])-[A-Za-z0-9[\]#_.(),%-]+\/(\d+)(?![\d.%\]])/g;
+  const offenders = [];
+  const walk = (dir) => {
+    for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+      if (entry.name === 'node_modules' || entry.name === '.next' || entry.name === '.mimosa') continue;
+      const full = path.join(dir, entry.name);
+      if (entry.isDirectory()) { walk(full); continue; }
+      if (!/\.(tsx?|jsx?)$/.test(entry.name)) continue;
+      const text = fs.readFileSync(full, 'utf8');
+      let m;
+      while ((m = ALPHA_RE.exec(text))) {
+        if (!SCALE.has(Number(m[1]))) offenders.push(`${path.relative(root, full)}: ${m[0]}`);
+      }
+    }
+  };
+  walk(path.join(root, 'src'));
+  assert.deepEqual(offenders, []);
 });
 
 test('shared states and notification tabs preserve keyboard and feedback semantics', () => {

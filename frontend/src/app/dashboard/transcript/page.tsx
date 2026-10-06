@@ -4,7 +4,8 @@ import { Award, BookOpen, ChevronDown, FileText, GraduationCap, Info, Printer, T
 import { WorkspaceForbiddenState } from '@/components/ProtectedRoute';
 import { Button } from '@/components/ui/button';
 import { LinkButton } from '@/components/ui/link-button';
-import { metricToneClass, statusToneClass } from '@/components/ui/status';
+import { metricToneClass } from '@/components/ui/status';
+import { StatusPill } from '@/components/ui/status-pill';
 import {
   GpaTrendChart,
   GradeDistributionChart,
@@ -420,11 +421,9 @@ export default function TranscriptPage() {
     if (course.status === 'COMPLETED') {
       return (
         <span className="inline-flex flex-wrap items-center justify-end gap-1.5">
-          <span
-            className={`inline-flex items-center rounded-md px-2.5 py-1 text-xs font-semibold ${statusToneClass('success')}`}
-          >
+          <StatusPill tone="success" className="py-1 font-semibold">
             {copy.statusCompleted}
-          </span>
+          </StatusPill>
           {course.letterGrade ? (
             <span className="text-xs font-semibold text-foreground">
               {course.letterGrade}
@@ -438,20 +437,12 @@ export default function TranscriptPage() {
     }
     if (course.status === 'IN_PROGRESS') {
       return (
-        <span
-          className={`inline-flex items-center rounded-md px-2.5 py-1 text-xs font-semibold ${statusToneClass('info')}`}
-        >
+        <StatusPill tone="info" className="py-1 font-semibold">
           {copy.statusInProgress}
-        </span>
+        </StatusPill>
       );
     }
-    return (
-      <span
-        className={`inline-flex items-center rounded-md px-2.5 py-1 text-xs font-medium ${statusToneClass('neutral')}`}
-      >
-        {copy.statusNotStarted}
-      </span>
-    );
+    return <StatusPill tone="neutral">{copy.statusNotStarted}</StatusPill>;
   };
 
   if (authLoading) {

@@ -23,6 +23,7 @@ import {
   LoadingState,
 } from '@/components/ui/state-block';
 import { statusToneClass } from '@/components/ui/status';
+import { StatusPill } from '@/components/ui/status-pill';
 import { cn, htmlToPlainText } from '@/lib/utils';
 
 type NotificationItem = {
@@ -341,9 +342,9 @@ export default function NotificationsCenterPage() {
                             {title}
                           </h2>
                           {!item.isRead ? (
-                            <span className="rounded-md bg-primary/10 px-2 py-1 text-[11px] font-semibold uppercase text-primary">
+                            <StatusPill tone="info" className="px-2 py-1 text-[11px] font-semibold uppercase">
                               {copy.unread}
-                            </span>
+                            </StatusPill>
                           ) : null}
                         </div>
                         <time

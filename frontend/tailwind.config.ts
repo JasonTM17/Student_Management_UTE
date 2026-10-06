@@ -75,6 +75,24 @@ module.exports = {
             foreground: "hsl(var(--status-neutral-foreground))",
           },
         },
+        role: {
+          student: {
+            DEFAULT: "hsl(var(--role-student))",
+            solid: "hsl(var(--role-student-solid))",
+          },
+          lecturer: {
+            DEFAULT: "hsl(var(--role-lecturer))",
+            solid: "hsl(var(--role-lecturer-solid))",
+          },
+          admin: {
+            DEFAULT: "hsl(var(--role-admin))",
+            solid: "hsl(var(--role-admin-solid))",
+          },
+          "super-admin": {
+            DEFAULT: "hsl(var(--role-super-admin))",
+            solid: "hsl(var(--role-super-admin-solid))",
+          },
+        },
         // The portal chrome tokens are authored as complete `oklch()` colours,
         // not HSL triplets, so they are referenced directly rather than wrapped
         // in `hsl()`. Exposing them as first-class utilities removes the need for

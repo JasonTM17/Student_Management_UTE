@@ -29,12 +29,20 @@ and the `registration` button variant.
 | Info | primary | `--status-info` ← `--primary` |
 | Neutral | muted copy | `--status-neutral` ← `--muted-foreground` |
 | HCMUTE yellow chrome | ribbon / groups | `--portal-yellow` |
+| Role: student | blue | `--role-student` (+ `-solid`) |
+| Role: lecturer | teal | `--role-lecturer` (+ `-solid`) |
+| Role: admin | violet | `--role-admin` (+ `-solid`) |
+| Role: super admin | rose | `--role-super-admin` (+ `-solid`) |
 
 Each `--status-*` token has a matching `--status-*-foreground`. Shared status
-and metric surfaces must use `statusToneClass` / `metricToneClass` from
-`src/components/ui/status.ts`. Do not use raw Tailwind palettes
+and metric surfaces must use `statusToneClass` / `metricToneClass` and badges
+should prefer `StatusPill`; role chips use `roleToneClass` / `roleSolidClass`
+from `src/components/ui/status.ts`. Do not use raw Tailwind palettes
 (`bg-emerald-500`, `bg-blue-500`, `bg-violet-500`, `bg-yellow-100`, or other
 `bg-*-500` / `text-*-700` status colors) on shared primitives.
+
+Alpha suffixes must be real Tailwind opacity-scale steps
+(…/10, /15, /20 …): `/<n>` modifiers outside the scale silently emit no CSS.
 
 When a screen is updated, compare it against the matching Stitch desktop and
 mobile references, including loading, empty, error, permission, and long-text

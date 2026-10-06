@@ -364,8 +364,8 @@ export default function StudentAnnouncementsPage() {
                 {currentSemesterName || '—'}
               </span>
               <span>•</span>
-              <span className="flex items-center gap-1 text-emerald-600 dark:text-emerald-400 font-semibold">
-                <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
+              <span className="flex items-center gap-1 text-status-success-foreground font-semibold">
+                <span className="h-2 w-2 rounded-full bg-status-success animate-pulse" />
                 {locale === 'vi' ? 'Kênh trực tuyến mở' : 'Active Channel'}
               </span>
             </div>
@@ -504,7 +504,7 @@ export default function StudentAnnouncementsPage() {
                 className={cn(
                   'group cursor-pointer rounded-xl border bg-card p-5 shadow-xs transition-all hover:border-primary/60 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary',
                   isUrgent
-                    ? 'border-red-500/30 bg-red-500/[0.02] dark:bg-red-500/[0.04]'
+                    ? 'border-status-danger/30 bg-status-danger/10'
                     : 'border-border/70',
                 )}
               >
@@ -569,7 +569,7 @@ export default function StudentAnnouncementsPage() {
                               e.stopPropagation();
                               router.push(href(`/admin/editor?editId=${encodeURIComponent(announcement.id)}`));
                             }}
-                            className="h-7 px-2.5 text-[11px] gap-1 bg-blue-50 text-blue-700 border-blue-200 hover:bg-blue-100 dark:bg-blue-950/40 dark:text-blue-300 dark:border-blue-800 font-semibold"
+                            className="h-7 px-2.5 text-[11px] gap-1 bg-status-info/10 text-status-info border-status-info/30 hover:bg-status-info/15 font-semibold"
                             title={locale === 'vi' ? 'Chỉnh sửa trong Studio' : 'Edit in Studio'}
                           >
                             <FileEdit className="h-3 w-3" />

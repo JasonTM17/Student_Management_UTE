@@ -110,8 +110,8 @@ const chipTone = (pressed: boolean) =>
   }`;
 
 const SEAT_TONE: Record<string, string> = {
-  open: 'bg-status-success/12 text-status-success-foreground',
-  low: 'bg-status-warning/12 text-status-warning-foreground',
+  open: 'bg-status-success/10 text-status-success-foreground',
+  low: 'bg-status-warning/10 text-status-warning-foreground',
   full: 'bg-secondary text-muted-foreground',
 };
 
@@ -726,21 +726,21 @@ export default function RegisterPage() {
         label: copy.applicationStatusApproved,
         description: copy.applicationApproved,
         icon: CheckCircle2,
-        tone: 'text-status-success-foreground bg-status-success/12',
+        tone: 'text-status-success-foreground bg-status-success/10',
       }
     : application?.status === 'REJECTED'
       ? {
           label: copy.applicationStatusRejected,
           description: copy.applicationRejected,
           icon: AlertCircle,
-          tone: 'text-status-danger-foreground bg-status-danger/12',
+          tone: 'text-status-danger-foreground bg-status-danger/10',
         }
       : application
         ? {
             label: copy.applicationStatusPending,
             description: copy.applicationPending,
             icon: Clock3,
-            tone: 'text-status-warning-foreground bg-status-warning/12',
+            tone: 'text-status-warning-foreground bg-status-warning/10',
           }
         : null;
   const canSubmitApplication = !application || application.status === 'REJECTED';
@@ -1098,7 +1098,7 @@ export default function RegisterPage() {
                             <span
                               className={`rounded-md px-2 py-0.5 text-[11px] font-semibold ${
                                 openSeats > 0
-                                  ? 'bg-status-success/12 text-status-success-foreground'
+                                  ? 'bg-status-success/10 text-status-success-foreground'
                                   : 'bg-secondary text-muted-foreground'
                               }`}
                             >
@@ -1163,7 +1163,7 @@ export default function RegisterPage() {
                                         </span>
                                       ) : null}
                                       {section.curriculumRelevance === 'OUTSIDE' ? (
-                                        <span className="rounded-md border border-status-warning/40 bg-status-warning/12 px-2 py-0.5 text-xs font-medium text-status-warning-foreground">
+                                        <span className="rounded-md border border-status-warning/40 bg-status-warning/10 px-2 py-0.5 text-xs font-medium text-status-warning-foreground">
                                           {copy.outsideBadge}
                                         </span>
                                       ) : null}
@@ -1388,7 +1388,7 @@ export default function RegisterPage() {
                             <span
                               className={`rounded-md border px-1.5 py-0.5 text-[11px] font-semibold ${
                                 item.status === 'PENDING'
-                                  ? 'border-status-warning/40 bg-status-warning/12 text-status-warning-foreground'
+                                  ? 'border-status-warning/40 bg-status-warning/10 text-status-warning-foreground'
                                   : 'border-primary/30 bg-primary/10 text-primary'
                               }`}
                             >
@@ -1468,7 +1468,7 @@ export default function RegisterPage() {
                   if (warnings.length === 0) return null;
                   return (
                     <div
-                      className="space-y-1.5 rounded-lg border border-status-warning/40 bg-status-warning/12 p-3"
+                      className="space-y-1.5 rounded-lg border border-status-warning/40 bg-status-warning/10 p-3"
                       role="status"
                     >
                       <p className="flex items-center gap-1.5 text-xs font-bold text-status-warning-foreground">
