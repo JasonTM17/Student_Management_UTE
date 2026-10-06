@@ -12,10 +12,10 @@ import {
   AdminPaginationFooter,
   AdminRowActions,
   AdminTableCard,
-  AdminTableScroll,
   AdminToolbarCard,
   AdminToolbarMeta,
 } from '@/components/admin/AdminSurface';
+import { ResponsiveRecordList } from '@/components/admin/ResponsiveRecordList';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Modal } from '@/components/ui/modal';
@@ -451,8 +451,11 @@ export default function AdminDepartmentsPage() {
               />
             }
           >
-              <div className="space-y-3 md:hidden" role="list" aria-label={copy.tableTitle}>
-                {departments.map((department) => {
+              <ResponsiveRecordList
+                items={departments}
+                keyOf={(department) => department.id}
+                ariaLabel={copy.tableTitle}
+                renderCard={(department) => {
                   const departmentLabel = getLocalizedName(locale, department, department.name);
                   const departmentDescription = getLocalizedDescription(
                     locale,
@@ -461,11 +464,7 @@ export default function AdminDepartmentsPage() {
                   );
 
                   return (
-                    <article
-                      key={`${department.id}-mobile`}
-                      className="rounded-xl border border-border/80 bg-card p-4 shadow-xs"
-                      role="listitem"
-                    >
+                    <>
                       <div className="flex items-start justify-between gap-3">
                         <div className="min-w-0">
                           <p className="text-xs font-semibold uppercase tracking-[0.16em] text-primary">
@@ -501,11 +500,10 @@ export default function AdminDepartmentsPage() {
                           <Trash2 className="h-4 w-4" />
                         </Button>
                       </AdminRowActions>
-                    </article>
+                    </>
                   );
-                })}
-              </div>
-              <AdminTableScroll className="hidden md:block">
+                }}
+              >
                 <table className="w-full min-w-[720px] text-sm">
                   <thead>
                     <tr className="border-b border-border/70 bg-secondary/50 text-left text-muted-foreground">
@@ -582,7 +580,7 @@ export default function AdminDepartmentsPage() {
                     })}
                   </tbody>
                 </table>
-              </AdminTableScroll>
+              </ResponsiveRecordList>
           </AdminTableCard>
         )}
       </div>

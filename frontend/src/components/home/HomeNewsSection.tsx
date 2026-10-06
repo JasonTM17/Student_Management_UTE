@@ -180,6 +180,7 @@ export function HomeNewsSection() {
             return (
               <button
                 key={tab.key}
+                type="button"
                 onClick={() => {
                   setActiveCategory(tab.key);
                   setIsExpanded(false);
@@ -363,6 +364,7 @@ export function HomeNewsSection() {
             {galleryGrid.length > 6 && (
               <div className="flex justify-center pt-2">
                 <button
+                  type="button"
                   onClick={() => setIsExpanded(!isExpanded)}
                   className="inline-flex items-center gap-2 rounded-md border border-border/80 bg-card px-6 py-2.5 text-xs font-bold text-foreground shadow-xs hover:bg-accent transition-colors cursor-pointer"
                 >

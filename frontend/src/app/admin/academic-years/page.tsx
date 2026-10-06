@@ -12,10 +12,10 @@ import {
   AdminPaginationFooter,
   AdminRowActions,
   AdminTableCard,
-  AdminTableScroll,
   AdminToolbarCard,
   AdminToolbarMeta,
 } from '@/components/admin/AdminSurface';
+import { ResponsiveRecordList } from '@/components/admin/ResponsiveRecordList';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Modal } from '@/components/ui/modal';
@@ -367,13 +367,12 @@ export default function AdminAcademicYearsPage() {
               />
             }
           >
-              <div className="space-y-3 md:hidden" role="list" aria-label={copy.tableTitle}>
-                {academicYears.map((record) => (
-                  <article
-                    key={`${record.id}-mobile`}
-                    className="rounded-lg border border-border/70 bg-card p-4 shadow-sm"
-                    role="listitem"
-                  >
+              <ResponsiveRecordList
+                items={academicYears}
+                keyOf={(record) => record.id}
+                ariaLabel={copy.tableTitle}
+                renderCard={(record) => (
+                  <>
                     <div className="flex items-start justify-between gap-3">
                       <div className="min-w-0">
                         <h3 className="font-semibold text-foreground">{record.year}</h3>
@@ -418,10 +417,9 @@ export default function AdminAcademicYearsPage() {
                         <Trash2 className="h-4 w-4" />
                       </Button>
                     </AdminRowActions>
-                  </article>
-                ))}
-              </div>
-              <AdminTableScroll className="hidden md:block">
+                  </>
+                )}
+              >
                 <table className="w-full min-w-[720px] text-sm">
                   <thead>
                     <tr className="bg-secondary text-left text-muted-foreground">
@@ -476,7 +474,7 @@ export default function AdminAcademicYearsPage() {
                     ))}
                   </tbody>
                 </table>
-              </AdminTableScroll>
+              </ResponsiveRecordList>
           </AdminTableCard>
         )}
       </div>
