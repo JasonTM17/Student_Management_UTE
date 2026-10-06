@@ -383,7 +383,7 @@ export default function LoginPage() {
                       : notice.title}
                   </span>
                   {reason === 'signed-out' && (
-                    <span className="inline-flex items-center rounded-xs bg-emerald-500/15 px-2 py-0.5 text-[10px] font-semibold text-emerald-700 dark:text-emerald-300">
+                    <span className="inline-flex items-center rounded-xs bg-emerald-500/15 px-2 py-0.5 text-[11px] font-semibold text-emerald-700 dark:text-emerald-300">
                       {locale === 'vi' ? 'Bảo mật hệ thống' : 'System Secured'}
                     </span>
                   )}

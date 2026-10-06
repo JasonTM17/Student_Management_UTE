@@ -513,7 +513,7 @@ export default function DashboardPage() {
                           ) : null}
                         </div>
                         <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-                          <span className={cn('rounded-md border px-2 py-0.5 text-[10px] font-semibold', shift.tone)}>
+                          <span className={cn('rounded-md border px-2 py-0.5 text-[11px] font-semibold', shift.tone)}>
                             {shift.label}
                           </span>
                           <span className="inline-flex items-center gap-1 tabular-nums">

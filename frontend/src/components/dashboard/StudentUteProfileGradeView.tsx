@@ -260,7 +260,7 @@ export function StudentUteProfileGradeView({
             </h3>
             {isDemoUser(user) && (
               <div className="mt-1 flex justify-center">
-                <span className="inline-flex items-center gap-1 rounded bg-status-warning/15 border border-status-warning/30 px-2 py-0.5 text-[10.5px] font-medium text-status-warning-foreground">
+                <span className="inline-flex items-center gap-1 rounded bg-status-warning/15 border border-status-warning/30 px-2 py-0.5 text-[11px] font-medium text-status-warning-foreground">
                   <span className="h-1.5 w-1.5 rounded-full bg-status-warning animate-pulse" />
                   {locale === 'vi' ? 'Tài khoản demo để trải nghiệm' : 'Demo account'}
                 </span>
@@ -286,7 +286,7 @@ export function StudentUteProfileGradeView({
           <div className="bg-card rounded-lg border border-border shadow-2xs overflow-hidden">
             <div className="px-4 py-2.5 bg-muted/60 border-b border-border font-bold text-xs uppercase text-foreground tracking-wide flex items-center justify-between">
               <span>{card.infoTitle}</span>
-              <span className="text-[10px] text-muted-foreground font-semibold bg-muted px-1.5 py-0.5 rounded-sm">{semesterBadgeLabel}</span>
+              <span className="text-[11px] text-muted-foreground font-semibold bg-muted px-1.5 py-0.5 rounded-sm">{semesterBadgeLabel}</span>
             </div>
             <div className="divide-y divide-border text-xs">
               <div className="grid grid-cols-1 gap-0.5 sm:grid-cols-5 px-4 py-2.5">

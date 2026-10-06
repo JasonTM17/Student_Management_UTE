@@ -399,7 +399,7 @@ export function AnnouncementEditModal({
                   </div>
                   <div className="p-1.5 bg-card">
                     <p className="text-[11px] font-semibold text-foreground truncate" title={bannerTitle}>{bannerTitle}</p>
-                    <span className="text-[9px] text-muted-foreground">{bannerTag}</span>
+                    <span className="text-[11px] text-muted-foreground">{bannerTag}</span>
                   </div>
                 </button>
               );

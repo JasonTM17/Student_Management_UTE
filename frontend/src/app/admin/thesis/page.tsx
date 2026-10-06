@@ -842,7 +842,7 @@ export default function AdminThesisPage() {
                                               <div className="flex items-center gap-2">
                                                 <span
                                                   className={cn(
-                                                    'rounded px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider',
+                                                    'rounded px-1.5 py-0.5 text-[11px] font-semibold uppercase tracking-wider',
                                                     m.memberRole === 'CHAIR'
                                                       ? 'bg-primary/20 text-primary border border-primary/30'
                                                       : m.memberRole === 'SECRETARY'
@@ -923,7 +923,7 @@ export default function AdminThesisPage() {
                                                   {top?.title || tid}
                                                 </span>
                                                 {top?.finalScore != null && (
-                                                  <span className="shrink-0 rounded bg-status-success/20 px-1.5 py-0.5 text-[10px] font-semibold text-status-success-foreground">
+                                                  <span className="shrink-0 rounded bg-status-success/20 px-1.5 py-0.5 text-[11px] font-semibold text-status-success-foreground">
                                                     {messages.thesis.councils.finalScorePoints.replace('{score}', String(top.finalScore))}
                                                   </span>
                                                 )}
@@ -971,7 +971,7 @@ export default function AdminThesisPage() {
                                                 </Button>
                                               </div>
                                               {reviewerId ? (
-                                                <p className="text-[10px] text-muted-foreground">
+                                                <p className="text-[11px] text-muted-foreground">
                                                   {messages.thesis.admin.currentReviewer}: {reviewerName}
                                                 </p>
                                               ) : null}

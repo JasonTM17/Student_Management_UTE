@@ -54,6 +54,7 @@ import { AssistantMascot } from '@/components/assistant/AssistantMascot';
 import { useDocumentTitle } from '@/lib/use-document-title';
 import { Button } from '@/components/ui/button';
 import { useI18n } from '@/i18n';
+import { Skeleton } from '@/components/ui/skeleton';
 import { notificationsApi } from '@/lib/api';
 import { cn, htmlToPlainText } from '@/lib/utils';
 import { stripLocaleFromPathname } from '@/i18n/paths';
@@ -701,9 +702,9 @@ export default function DashboardLayout({
         aria-live="polite"
       >
         <div className="w-full max-w-sm space-y-3">
-          <div className="h-4 w-2/5 animate-pulse rounded bg-primary/20" />
-          <div className="h-3 w-full animate-pulse rounded bg-secondary" />
-          <div className="h-3 w-4/5 animate-pulse rounded bg-secondary" />
+          <Skeleton className="h-4 w-2/5 bg-primary/20" />
+          <Skeleton className="h-3 w-full bg-secondary" />
+          <Skeleton className="h-3 w-4/5 bg-secondary" />
           <p className="pt-2 text-sm text-muted-foreground">
             {messages.common.states.loadingContent}
           </p>

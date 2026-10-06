@@ -195,7 +195,7 @@ export function HomeNewsSection() {
                 <span>{isVi ? tab.labelVi : tab.labelEn}</span>
                 <span
                   className={cn(
-                    'rounded-md px-1.5 py-0.5 text-[10px] font-bold',
+                    'rounded-md px-1.5 py-0.5 text-[11px] font-bold',
                     isActive ? 'bg-primary-foreground/20 text-primary-foreground' : 'bg-muted text-muted-foreground',
                   )}
                 >

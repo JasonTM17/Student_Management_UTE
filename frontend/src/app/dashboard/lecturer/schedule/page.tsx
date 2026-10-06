@@ -505,12 +505,12 @@ export default function LecturerSchedulePage() {
                     >
                       <span>{dayName}</span>
                       {isToday ? (
-                        <span className="rounded bg-background/20 px-1 text-[9px] font-extrabold uppercase">
+                        <span className="rounded bg-background/20 px-1 text-[11px] font-extrabold uppercase">
                           {copy.today}
                         </span>
                       ) : null}
                       <span
-                        className={`rounded-md px-1.5 py-0.5 text-[10px] ${
+                        className={`rounded-md px-1.5 py-0.5 text-[11px] ${
                           isSelected ? 'bg-primary-foreground/20' : 'bg-secondary text-muted-foreground'
                         }`}
                       >
@@ -665,7 +665,7 @@ export default function LecturerSchedulePage() {
                               )}
                             </td>
                             <td className="py-3 px-4 text-center">
-                              <span className="rounded bg-secondary px-2 py-0.5 font-semibold text-[10px] text-foreground">
+                              <span className="rounded bg-secondary px-2 py-0.5 font-semibold text-[11px] text-foreground">
                                 {item.sectionNumber}
                               </span>
                             </td>

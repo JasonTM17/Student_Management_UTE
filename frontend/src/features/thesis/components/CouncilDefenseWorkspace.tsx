@@ -279,7 +279,7 @@ export default function CouncilDefenseWorkspace({
                           </p>
                         ) : scores.length > 0 && (
                           <div className="rounded-lg bg-background/60 p-2.5 text-xs space-y-1.5 border border-border/40">
-                            <span className="font-semibold text-muted-foreground uppercase text-[10px] tracking-wider">
+                            <span className="font-semibold text-muted-foreground uppercase text-[11px] tracking-wider">
                               {messages.thesis.grading.scoresListTitle}:
                             </span>
                             <div className="flex flex-wrap gap-2">

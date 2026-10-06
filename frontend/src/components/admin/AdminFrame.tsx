@@ -442,7 +442,7 @@ export function AdminFrame({
                     <div className="truncate text-xs text-muted-foreground flex items-center gap-1">
                       <span>{user?.email ?? (messages.adminShell.noEmail)}</span>
                       {isDemoUser(user) && (
-                        <span className="text-[10px] text-status-warning-foreground font-medium">
+                        <span className="text-[11px] text-status-warning-foreground font-medium">
                           ({messages.adminShell.demoTag})
                         </span>
                       )}

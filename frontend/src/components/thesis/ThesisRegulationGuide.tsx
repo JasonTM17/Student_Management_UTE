@@ -130,7 +130,7 @@ export function ThesisRegulationGuide() {
                   className="h-full w-full object-cover object-center"
                 />
                 <div className="absolute inset-0 bg-gradient-to-t from-black/50 via-transparent to-transparent" />
-                <div className="absolute bottom-1.5 left-2 rounded-md bg-background/85 px-1.5 py-0.5 text-[9px] font-bold text-foreground backdrop-blur-xs">
+                <div className="absolute bottom-1.5 left-2 rounded-md bg-background/85 px-1.5 py-0.5 text-[11px] font-bold text-foreground backdrop-blur-xs">
                   Hội đồng Đánh giá Khóa luận
                 </div>
               </div>

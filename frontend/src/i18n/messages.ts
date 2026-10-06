@@ -49,6 +49,10 @@ export const en = {
       perPage25: '25 per page',
       perPage50: '50 per page',
       perPage100: '100 per page',
+      loadingTableData: 'Loading table data',
+      loadingMetrics: 'Loading metrics',
+      loadingAnnouncements: 'Loading campus announcements',
+      loadingThesisTopics: 'Loading thesis topics',
     },
     statuses: {
       OPEN: 'Open',
@@ -2685,6 +2689,10 @@ export const vi: I18nMessages = {
       perPage25: '25 dòng / trang',
       perPage50: '50 dòng / trang',
       perPage100: '100 dòng / trang',
+      loadingTableData: 'Đang tải dữ liệu bảng',
+      loadingMetrics: 'Đang tải số liệu',
+      loadingAnnouncements: 'Đang tải thông báo trường',
+      loadingThesisTopics: 'Đang tải đề tài',
     },
     statuses: {
       OPEN: 'Đang mở',

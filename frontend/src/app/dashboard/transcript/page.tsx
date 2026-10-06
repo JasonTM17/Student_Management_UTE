@@ -1,6 +1,6 @@
 'use client';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Award, BookOpen, FileText, GraduationCap, Info, Printer, TrendingUp } from 'lucide-react';
+import { Award, BookOpen, ChevronDown, FileText, GraduationCap, Info, Printer, TrendingUp } from 'lucide-react';
 import { WorkspaceForbiddenState } from '@/components/ProtectedRoute';
 import { Button } from '@/components/ui/button';
 import { LinkButton } from '@/components/ui/link-button';
@@ -95,6 +95,7 @@ export default function TranscriptPage() {
   } | null>(null);
   const [semesters, setSemesters] = useState<Semester[]>([]);
   const [selectedSemester, setSelectedSemester] = useState('');
+  const [semesterOverrides, setSemesterOverrides] = useState<Record<string, boolean>>({});
   const [selectedRecord, setSelectedRecord] = useState<StudentGradeRecord | null>(null);
   const [gpaMode, setGpaMode] = useState<'cumulative' | 'semester' | 'both'>('both');
   const [curriculumData, setCurriculumData] = useState<MyCurriculumResponse | null>(null);
@@ -326,6 +327,7 @@ export default function TranscriptPage() {
           avgTenScale: 'ĐTB hệ 10',
           tenScaleTrendHint: 'Điểm trung bình học kỳ trên thang 10.',
           clickToViewDetail: 'Chi tiết GK/CK',
+          toggleSemester: 'Thu gọn hoặc mở rộng học kỳ',
           distribution: 'Phân bố xếp loại',
           programTitle: 'Chương trình đào tạo',
           programLoading: 'Đang tải chương trình đào tạo',
@@ -381,6 +383,7 @@ export default function TranscriptPage() {
           avgTenScale: '10-scale average',
           tenScaleTrendHint: 'Semester average on the 10-point scale.',
           clickToViewDetail: 'Midterm/final detail',
+          toggleSemester: 'Collapse or expand semester',
           distribution: 'Grade distribution',
           programTitle: 'Study program',
           programLoading: 'Loading study program',
@@ -705,33 +708,60 @@ export default function TranscriptPage() {
           </div>
 
           <div className="space-y-6">
-            {transcriptSemesters.map((semester) => (
+            {transcriptSemesters.map((semester, semesterIndex) => {
+              const isSemesterOpen =
+                semesterOverrides[semester.semesterId] ??
+                semesterIndex === transcriptSemesters.length - 1;
+              const semesterLabel = getLocalizedFlatLabel(
+                locale,
+                semester.semesterName,
+                semester.semesterNameEn,
+                semester.semesterNameVi,
+                semester.semesterName,
+              );
+              return (
               <Card key={semester.semesterId} variant="muted">
                 <CardHeader className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                   <div>
                     <CardTitle className="text-xl">
-                      {getLocalizedFlatLabel(
-                        locale,
-                        semester.semesterName,
-                        semester.semesterNameEn,
-                        semester.semesterNameVi,
-                        semester.semesterName,
-                      )}
+                      {semesterLabel}
                     </CardTitle>
                     <p className="mt-1 flex items-center gap-1.5 text-xs text-muted-foreground">
                       <Info className="h-3.5 w-3.5 text-primary shrink-0" />
                       <span>{copy.clickToViewDetail}</span>
                     </p>
                   </div>
-                  <div className="text-sm text-muted-foreground">
-                    {formatNumber(semester.records.length)}{' '}
-                    {semester.records.length === 1 ? copy.courseWord : copy.coursesWord}{' '}
-                    - {formatNumber(semester.creditsAttempted)} {copy.creditsAttempted} -{' '}
-                    {copy.gradePointLabel}{' '}
-                    {semester.gpa.toFixed(2)}
+                  <div className="flex items-center gap-3">
+                    <div className="text-sm text-muted-foreground">
+                      {formatNumber(semester.records.length)}{' '}
+                      {semester.records.length === 1 ? copy.courseWord : copy.coursesWord}{' '}
+                      - {formatNumber(semester.creditsAttempted)} {copy.creditsAttempted} -{' '}
+                      {copy.gradePointLabel}{' '}
+                      {semester.gpa.toFixed(2)}
+                    </div>
+                    <button
+                      type="button"
+                      className="rounded-md p-1.5 text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring print:hidden"
+                      aria-expanded={isSemesterOpen}
+                      aria-label={`${semesterLabel}: ${copy.toggleSemester}`}
+                      onClick={() =>
+                        setSemesterOverrides((current) => ({
+                          ...current,
+                          [semester.semesterId]: !(
+                            current[semester.semesterId] ??
+                            semesterIndex === transcriptSemesters.length - 1
+                          ),
+                        }))
+                      }
+                    >
+                      <ChevronDown
+                        className={`h-4 w-4 transition-transform ${isSemesterOpen ? '' : '-rotate-90'}`}
+                        aria-hidden="true"
+                      />
+                    </button>
                   </div>
                 </CardHeader>
-                <CardContent>
+                <CardContent className={isSemesterOpen ? undefined : 'hidden print:block'}>
                   <div
                     className="space-y-3 md:hidden"
                     role="list"
@@ -920,7 +950,8 @@ export default function TranscriptPage() {
                   </div>
                 </CardContent>
               </Card>
-            ))}
+              );
+            })}
           </div>
 
           {/* Study program: per-course status grouped by year and semester */}

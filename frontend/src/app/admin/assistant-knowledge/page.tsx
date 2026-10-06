@@ -18,6 +18,7 @@ import { AdminFrame } from '@/components/admin/AdminFrame';
 import {
   AdminFormField,
   AdminMetricCard,
+  AdminPaginationFooter,
   AdminTableCard,
   AdminTableScroll,
 } from '@/components/admin/AdminSurface';
@@ -48,6 +49,7 @@ const states: Array<{ value: '' | AssistantKnowledgeState; en: string; vi: strin
   { value: 'PUBLISHED', en: 'Published', vi: 'Đã xuất bản' },
   { value: 'ARCHIVED', en: 'Archived', vi: 'Đã lưu trữ' },
 ];
+const PAGE_SIZE = 25;
 const domains: Array<{ value: '' | AssistantKnowledgeDomain; en: string; vi: string }> = [
   { value: '', en: 'All domains', vi: 'Tất cả lĩnh vực' },
   { value: 'THESIS', en: 'Thesis', vi: 'Luận văn' },
@@ -242,7 +244,7 @@ function GuidanceTable({
             <tr key={document.documentId} className="border-b border-border/60 align-top last:border-0">
               <td className="max-w-[420px] px-3 py-4">
                 <div className="font-semibold text-foreground">{document.title}</div>
-                <div className="mt-1 truncate text-xs text-muted-foreground">{document.source}</div>
+                <div className="mt-1 truncate text-xs text-muted-foreground" title={document.source}>{document.source}</div>
               </td>
               <td className="px-3 py-4">
                 <span className="inline-flex rounded-md bg-secondary px-2.5 py-1 text-xs font-semibold text-secondary-foreground">
@@ -462,6 +464,19 @@ export default function AdminAssistantKnowledgePage() {
 
   const publishedCount = useMemo(() => documents.filter((row) => row.state === 'PUBLISHED').length, [documents]);
   const pendingCount = useMemo(() => documents.filter((row) => row.state === 'PENDING_REVIEW').length, [documents]);
+  const [page, setPage] = useState(1);
+  useEffect(() => {
+    setPage(1);
+  }, [domainFilter, stateFilter]);
+  const totalPages = Math.max(1, Math.ceil(documents.length / PAGE_SIZE));
+  const currentPage = Math.min(page, totalPages);
+  const pagedDocuments = useMemo(
+    () => documents.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE),
+    [documents, currentPage],
+  );
+  const pageSummary = vi
+    ? `Hiển thị ${pagedDocuments.length} trên ${documents.length} mục`
+    : `Showing ${pagedDocuments.length} of ${documents.length} items`;
 
   const updateForm = useCallback((patch: Partial<AssistantKnowledgeRequest>) => {
     setForm((current) => ({ ...current, ...patch }));
@@ -664,6 +679,15 @@ export default function AdminAssistantKnowledgePage() {
               ? 'Nội dung được kiểm duyệt trước khi trợ lý sử dụng. Nội dung đã lưu trữ vẫn giữ lịch sử thay đổi.'
               : 'Guidance is reviewed before the assistant uses it. Archived items keep their change history.'
           }
+          footer={
+            <AdminPaginationFooter
+              summary={pageSummary}
+              page={currentPage}
+              totalPages={totalPages}
+              onPrevious={() => setPage((current) => current - 1)}
+              onNext={() => setPage((current) => current + 1)}
+            />
+          }
         >
           <GuidanceFilters
             domainFilter={domainFilter}
@@ -687,7 +711,7 @@ export default function AdminAssistantKnowledgePage() {
             />
           ) : (
             <GuidanceTable
-              documents={documents}
+              documents={pagedDocuments}
               isSaving={isSaving}
               vi={vi}
               onEdit={(document) => void openEdit(document)}

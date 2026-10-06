@@ -401,8 +401,8 @@ export default function CertificatesPage() {
               <div className="space-y-3 font-sans">
                 <div>
                   <p className="text-[11px] font-bold uppercase text-slate-800">{certCopy.receiverTitle}</p>
-                  <p className="text-[10px] text-slate-600 leading-tight">{certCopy.receiverFirst}</p>
-                  <p className="text-[10px] text-slate-600 leading-tight">{certCopy.receiverSecond}</p>
+                  <p className="text-[11px] text-slate-600 leading-tight">{certCopy.receiverFirst}</p>
+                  <p className="text-[11px] text-slate-600 leading-tight">{certCopy.receiverSecond}</p>
                 </div>
               </div>
 
@@ -413,7 +413,7 @@ export default function CertificatesPage() {
                 <p className="text-xs font-bold uppercase text-slate-900 leading-tight">
                   {certCopy.issuedByValue}
                 </p>
-                <p className="text-[10px] italic text-slate-600 leading-snug">{certCopy.issuedByNote}</p>
+                <p className="text-[11px] italic text-slate-600 leading-snug">{certCopy.issuedByNote}</p>
               </div>
             </div>
           </div>

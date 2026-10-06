@@ -1427,7 +1427,7 @@ export default function AcademicEditorPage() {
                   <div>
                     <CardTitle className="text-sm font-bold text-foreground flex items-center gap-2">
                       <span>{editorCopy.blockBuilderTitle}</span>
-                      <span className="rounded-md bg-primary/10 px-2 py-0.5 text-[10.5px] font-semibold text-primary">
+                      <span className="rounded-md bg-primary/10 px-2 py-0.5 text-[11px] font-semibold text-primary">
                         {editorCopy.blockBuilderBadge}
                       </span>
                     </CardTitle>
@@ -1563,7 +1563,7 @@ export default function AcademicEditorPage() {
                   <div>
                     <CardTitle className="text-xs font-bold text-foreground flex items-center gap-2">
                       <span>{editorCopy.coverGalleryTitle}</span>
-                      <span className="rounded-md bg-primary/10 px-2 py-0.5 text-[10.5px] font-semibold text-primary">
+                      <span className="rounded-md bg-primary/10 px-2 py-0.5 text-[11px] font-semibold text-primary">
                         8K Nano Banana
                       </span>
                     </CardTitle>
@@ -1618,10 +1618,10 @@ export default function AcademicEditorPage() {
                         ) : null}
                       </div>
                       <div className="p-1.5 bg-card">
-                        <p className="text-[10.5px] font-semibold text-foreground truncate" title={bannerTitle}>
+                        <p className="text-[11px] font-semibold text-foreground truncate" title={bannerTitle}>
                           {bannerTitle}
                         </p>
-                        <span className="text-[9px] text-muted-foreground">{bannerTag}</span>
+                        <span className="text-[11px] text-muted-foreground">{bannerTag}</span>
                       </div>
                     </button>
                   );
@@ -1663,7 +1663,7 @@ export default function AcademicEditorPage() {
                     {isVi
                       ? 'Kho Bài Viết & Thông Báo Đang Lưu Trong Cơ Sở Dữ Liệu'
                       : 'Live Announcements in Campus Records'}
-                    <span className="rounded-md bg-blue-500/10 px-2 py-0.5 text-[10.5px] font-semibold text-blue-600 dark:text-blue-300 border border-blue-500/20">
+                    <span className="rounded-md bg-blue-500/10 px-2 py-0.5 text-[11px] font-semibold text-blue-600 dark:text-blue-300 border border-blue-500/20">
                       {isVi ? 'Kéo thả thứ tự' : 'Custom Order'}
                     </span>
                   </CardTitle>
@@ -1802,7 +1802,7 @@ export default function AcademicEditorPage() {
                           <td className="py-3 px-3 text-center whitespace-nowrap">
                             <span
                               className={cn(
-                                'inline-flex items-center justify-center rounded px-1.5 py-0.5 font-bold text-[10.5px]',
+                                'inline-flex items-center justify-center rounded px-1.5 py-0.5 font-bold text-[11px]',
                                 index === 0
                                   ? 'bg-amber-500/15 text-amber-700 dark:text-amber-300 border border-amber-500/30'
                                   : 'bg-muted text-muted-foreground'
@@ -1824,7 +1824,7 @@ export default function AcademicEditorPage() {
                           <td className="py-3 px-3 whitespace-nowrap">
                             <span
                               className={cn(
-                                'inline-flex items-center rounded-md px-2 py-0.5 text-[10.5px] font-semibold',
+                                'inline-flex items-center rounded-md px-2 py-0.5 text-[11px] font-semibold',
                                 ann.priority === 'URGENT'
                                   ? 'bg-red-500/10 text-red-600 dark:text-red-300 border border-red-500/30'
                                   : ann.priority === 'HIGH'

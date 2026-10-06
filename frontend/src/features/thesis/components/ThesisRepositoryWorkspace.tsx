@@ -235,12 +235,12 @@ export default function ThesisRepositoryWorkspace({
                                     </span>
                                   )}
                                   {m.isLeader && (
-                                    <span className="rounded-md bg-primary/15 px-1.5 py-0.5 text-[10px] font-bold text-primary">
+                                    <span className="rounded-md bg-primary/15 px-1.5 py-0.5 text-[11px] font-bold text-primary">
                                       {messages.thesis.leaderBadge}
                                     </span>
                                   )}
                                   {m.isExternal && (
-                                    <span className="rounded-md bg-indigo-500/15 px-1.5 py-0.5 text-[10px] font-bold text-indigo-700 dark:text-indigo-300">
+                                    <span className="rounded-md bg-indigo-500/15 px-1.5 py-0.5 text-[11px] font-bold text-indigo-700 dark:text-indigo-300">
                                       {messages.thesis.externalBadge}
                                     </span>
                                   )}

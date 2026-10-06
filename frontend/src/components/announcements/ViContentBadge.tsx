@@ -19,7 +19,7 @@ export function ViContentBadge({
       lang="vi"
       title="Bài viết bằng tiếng Việt / Article in Vietnamese"
       className={cn(
-        'inline-flex shrink-0 items-center rounded border border-amber-500/40 bg-amber-500/10 px-1.5 py-px text-[9px] font-bold uppercase tracking-wide text-amber-700 dark:text-amber-400',
+        'inline-flex shrink-0 items-center rounded border border-amber-500/40 bg-amber-500/10 px-1.5 py-px text-[11px] font-bold uppercase tracking-wide text-amber-700 dark:text-amber-400',
         className,
       )}
     >

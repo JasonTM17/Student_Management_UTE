@@ -440,7 +440,7 @@ export default function GradesPage() {
                           {formatNumber(card.creditsEarned)} {copy.creditsWord}
                         </span>
                       </div>
-                      <p className="mt-0.5 text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
+                      <p className="mt-0.5 text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
                         {messages.studentDashboard.gradesVisuals.gpaLabel}
                       </p>
                     </div>

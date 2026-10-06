@@ -217,7 +217,7 @@ export function ThesisWorkflowStepper({ round, formatDateTime }: ThesisWorkflowS
                 {stage.shortDesc}
               </p>
 
-              <span className="mt-2 text-[10px] font-semibold text-primary/80 uppercase tracking-wider">
+              <span className="mt-2 text-[11px] font-semibold text-primary/80 uppercase tracking-wider">
                 {stage.rule}
               </span>
             </button>

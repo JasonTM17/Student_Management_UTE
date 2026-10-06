@@ -170,7 +170,7 @@ export function AdministrativeDispatchSheet({
             />
           </div>
           <div className="space-y-0.5">
-            <p className="text-[10.5px] font-medium uppercase tracking-tight text-muted-foreground">
+            <p className="text-[11px] font-medium uppercase tracking-tight text-muted-foreground">
               {copy.ministryName}
             </p>
             <p className="text-[11.5px] font-bold uppercase tracking-tight text-primary leading-tight">

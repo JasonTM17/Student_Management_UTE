@@ -334,6 +334,7 @@ export default function EnrollmentsPage() {
     [copy.courseWord, copy.coursesWord, formatNumber],
   );
 
+  const [yearOverrides, setYearOverrides] = useState<Record<string, boolean>>({});
   const groupedCurriculum = useMemo(() => {
     const filtered = curriculumCourses.filter((course) => {
       if (statusFilter === 'ALL') return true;
@@ -350,6 +351,16 @@ export default function EnrollmentsPage() {
     }
     return groups;
   }, [curriculumCourses, statusFilter]);
+
+  const currentCurriculumYear = useMemo(() => {
+    const entries = Object.entries(groupedCurriculum);
+    const inProgressYear = entries.find(([, semestersMap]) =>
+      Object.values(semestersMap).some((courses) =>
+        courses.some((course) => course.status === 'IN_PROGRESS'),
+      ),
+    )?.[0];
+    return inProgressYear ?? entries[entries.length - 1]?.[0] ?? null;
+  }, [groupedCurriculum]);
 
   const summaryCards = useMemo(() => {
     if (curriculumData) {
@@ -639,15 +650,39 @@ export default function EnrollmentsPage() {
                   description={copy.noCurriculumCourses}
                 />
               ) : (
-                Object.entries(groupedCurriculum).map(([year, semestersMap]) => (
+                Object.entries(groupedCurriculum).map(([year, semestersMap]) => {
+                  const isYearOpen = yearOverrides[year] ?? year === currentCurriculumYear;
+                  const yearCourseCount = Object.values(semestersMap).reduce(
+                    (total, courses) => total + courses.length,
+                    0,
+                  );
+                  return (
                   <div key={`year-${year}`} className="space-y-5">
-                    <div className="flex items-center gap-2 border-b border-border/60 pb-2">
-                      <GraduationCap className="h-5 w-5 text-primary" />
-                      <h3 className="text-lg font-bold text-foreground">
+                    <h3 className="border-b border-border/60 pb-2 text-lg font-bold text-foreground">
+                      <button
+                        type="button"
+                        className="flex w-full items-center gap-2 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                        aria-expanded={isYearOpen}
+                        onClick={() =>
+                          setYearOverrides((current) => ({
+                            ...current,
+                            [year]: !(current[year] ?? year === currentCurriculumYear),
+                          }))
+                        }
+                      >
+                        <GraduationCap className="h-5 w-5 text-primary" />
                         {copy.yearPrefix} {year}
-                      </h3>
-                    </div>
+                        <span className="text-xs font-medium text-muted-foreground">
+                          {courseCountLabel(yearCourseCount)}
+                        </span>
+                        <ChevronDown
+                          className={`ml-auto h-4 w-4 shrink-0 text-muted-foreground transition-transform ${isYearOpen ? '' : '-rotate-90'}`}
+                          aria-hidden="true"
+                        />
+                      </button>
+                    </h3>
 
+                    {isYearOpen ? (
                     <div className="grid gap-6 lg:grid-cols-2">
                       {Object.entries(semestersMap).map(([sem, courses]) => (
                         <Card key={`year-${year}-sem-${sem}`} variant="muted" className="overflow-hidden">
@@ -697,7 +732,7 @@ export default function EnrollmentsPage() {
                                         {course.prerequisites.map((code) => (
                                           <span
                                             key={code}
-                                            className="rounded bg-secondary px-1.5 py-0.5 font-mono text-[10px] font-semibold text-foreground"
+                                            className="rounded bg-secondary px-1.5 py-0.5 font-mono text-[11px] font-semibold text-foreground"
                                           >
                                             {code}
                                           </span>
@@ -735,8 +770,10 @@ export default function EnrollmentsPage() {
                         </Card>
                       ))}
                     </div>
+                    ) : null}
                   </div>
-                ))
+                  );
+                })
               )}
             </div>
           )}

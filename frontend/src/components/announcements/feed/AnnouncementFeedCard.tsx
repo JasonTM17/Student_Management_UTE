@@ -275,11 +275,11 @@ export function AnnouncementFeedCard({
               />
             </div>
             <div className="relative z-10 flex items-center justify-between">
-              <span className="rounded-md bg-white/20 px-2.5 py-0.5 text-[10.5px] font-bold uppercase tracking-wider backdrop-blur-md">
+              <span className="rounded-md bg-white/20 px-2.5 py-0.5 text-[11px] font-bold uppercase tracking-wider backdrop-blur-md">
                 {domain.categoryLabel}
               </span>
               {isUrgent && (
-                <span className="rounded bg-red-600 px-2 py-0.5 text-[10px] font-bold text-white shadow-xs">
+                <span className="rounded bg-red-600 px-2 py-0.5 text-[11px] font-bold text-white shadow-xs">
                   {isVi ? 'Ưu tiên cao' : 'Urgent'}
                 </span>
               )}
@@ -295,7 +295,7 @@ export function AnnouncementFeedCard({
         {/* Priority Badge on image */}
         {coverImage && isUrgent && (
           <div className="absolute top-2.5 right-2.5 z-10">
-            <span className="inline-flex items-center gap-1 rounded bg-rose-600/90 px-2 py-0.5 text-[10.5px] font-bold text-white backdrop-blur-xs shadow-xs">
+            <span className="inline-flex items-center gap-1 rounded bg-rose-600/90 px-2 py-0.5 text-[11px] font-bold text-white backdrop-blur-xs shadow-xs">
               <Flame className="h-3 w-3" />
               <span>{isVi ? 'Khẩn' : 'Urgent'}</span>
             </span>

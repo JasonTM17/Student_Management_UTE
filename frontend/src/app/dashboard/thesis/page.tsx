@@ -2134,7 +2134,7 @@ export default function ThesisPage() {
                     <span>{pageCopy.tabTopicsAndSupervisors}</span>
                     <span
                       className={cn(
-                        'rounded-md px-2 py-0.5 text-[10px] font-mono font-bold',
+                        'rounded-md px-2 py-0.5 text-[11px] font-mono font-bold',
                         lecturerTab === 'supervision'
                           ? 'bg-primary-foreground/20 text-primary-foreground'
                           : 'bg-muted text-foreground',
@@ -2162,7 +2162,7 @@ export default function ThesisPage() {
                     <span>{pageCopy.tabCouncil}</span>
                     <span
                       className={cn(
-                        'rounded-md px-2 py-0.5 text-[10px] font-mono font-bold',
+                        'rounded-md px-2 py-0.5 text-[11px] font-mono font-bold',
                         lecturerTab === 'defense'
                           ? 'bg-primary-foreground/20 text-primary-foreground'
                           : 'bg-muted text-foreground',
@@ -2190,7 +2190,7 @@ export default function ThesisPage() {
                     <span>{pageCopy.tabRepository}</span>
                     <span
                       className={cn(
-                        'rounded-md px-2 py-0.5 text-[10px] font-mono font-bold',
+                        'rounded-md px-2 py-0.5 text-[11px] font-mono font-bold',
                         lecturerTab === 'repository'
                           ? 'bg-primary-foreground/20 text-primary-foreground'
                           : 'bg-muted text-foreground',

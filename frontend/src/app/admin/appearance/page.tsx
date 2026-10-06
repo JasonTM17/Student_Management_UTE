@@ -399,7 +399,7 @@ export default function AdminAppearancePage() {
                       <span className="w-8 text-sm font-semibold tabular-nums text-muted-foreground">
                         {String(index + 1).padStart(2, '0')}
                       </span>
-                      <span className="min-w-0 flex-1 truncate text-sm font-medium text-foreground">
+                      <span className="min-w-0 flex-1 truncate text-sm font-medium text-foreground" title={post.title}>
                         {post.title}
                       </span>
                       <div className="flex shrink-0 gap-1">

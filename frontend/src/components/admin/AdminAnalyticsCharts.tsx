@@ -396,11 +396,11 @@ export function AdminAnalyticsCharts({ stats, className }: AdminAnalyticsChartsP
               <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
                 {departments.map((dept) => (
                   <div key={dept.code} className="flex items-center gap-2.5 rounded-lg border border-border/60 bg-secondary/20 p-2.5">
-                    <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-primary/10 text-[11px] font-bold text-primary">
+                    <span className="flex h-7 min-w-7 shrink-0 items-center justify-center rounded-md bg-primary/10 px-1.5 text-[11px] font-bold text-primary">
                       {dept.code}
                     </span>
                     <div className="min-w-0 flex-1 text-xs">
-                      <p className="font-semibold text-foreground truncate">{dept.name}</p>
+                      <p className="font-semibold text-foreground truncate" title={dept.name}>{dept.name}</p>
                       <p className="text-muted-foreground">
                         {formatNumber(dept.students)} {copy.studentShortBadge} &bull;{' '}
                         {formatNumber(dept.courses)} {copy.courseShortBadge}

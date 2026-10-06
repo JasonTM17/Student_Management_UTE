@@ -1,4 +1,7 @@
+'use client';
+
 import * as React from 'react';
+import { useI18n } from '@/i18n';
 import { cn } from '@/lib/utils';
 
 export interface SkeletonProps extends React.HTMLAttributes<HTMLDivElement> {
@@ -34,10 +37,11 @@ export function TableSkeleton({
   showHeader = true,
   className,
 }: TableSkeletonProps) {
+  const { messages } = useI18n();
   return (
     <div
       role="status"
-      aria-label="Loading table data"
+      aria-label={messages.common.states.loadingTableData}
       aria-live="polite"
       className={cn(
         'w-full overflow-hidden rounded-xl border border-border/80 bg-card shadow-xs',
@@ -94,10 +98,11 @@ export interface MetricsSkeletonProps {
  * Geometric MetricsSkeleton matching summary counter card grids.
  */
 export function MetricsSkeleton({ count = 4, className }: MetricsSkeletonProps) {
+  const { messages } = useI18n();
   return (
     <div
       role="status"
-      aria-label="Loading metrics"
+      aria-label={messages.common.states.loadingMetrics}
       aria-live="polite"
       className={cn('grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4', className)}
     >
@@ -128,10 +133,11 @@ export interface HomeNewsBentoSkeletonProps {
  * Geometric Bento Grid Skeleton matching HomeNewsSection layout (7-col featured + 5-col stream).
  */
 export function HomeNewsBentoSkeleton({ className }: HomeNewsBentoSkeletonProps) {
+  const { messages } = useI18n();
   return (
     <div
       role="status"
-      aria-label="Loading campus announcements"
+      aria-label={messages.common.states.loadingAnnouncements}
       aria-live="polite"
       className={cn('grid grid-cols-1 gap-6 lg:grid-cols-12 items-stretch', className)}
     >
@@ -198,10 +204,11 @@ export function TopicCardGridSkeleton({
   count = 6,
   className,
 }: TopicCardGridSkeletonProps) {
+  const { messages } = useI18n();
   return (
     <div
       role="status"
-      aria-label="Loading thesis topics"
+      aria-label={messages.common.states.loadingThesisTopics}
       aria-live="polite"
       className={cn('grid gap-4 sm:grid-cols-2 xl:grid-cols-3', className)}
     >

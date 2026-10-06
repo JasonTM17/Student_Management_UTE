@@ -166,7 +166,7 @@ export default function StudentAnnouncementsPage() {
     }
 
     try {
-      const response = await announcementsApi.getMy({ page: nextPage, limit: 50 });
+      const response = await announcementsApi.getMy({ page: nextPage, limit: 20 });
       const data = response.data ?? [];
       // Page 1 replaces the feed; later pages append so the reader keeps what
       // is already on screen.
@@ -378,7 +378,7 @@ export default function StudentAnnouncementsPage() {
               className="h-full w-full object-cover object-center"
             />
             <div className="absolute inset-0 bg-gradient-to-t from-black/50 via-transparent to-transparent" />
-            <div className="absolute bottom-2 left-3 rounded-md bg-background/80 px-2 py-0.5 text-[10px] font-bold text-foreground backdrop-blur-xs">
+            <div className="absolute bottom-2 left-3 rounded-md bg-background/80 px-2 py-0.5 text-[11px] font-bold text-foreground backdrop-blur-xs">
               HCMUTE Campus Portal
             </div>
           </div>

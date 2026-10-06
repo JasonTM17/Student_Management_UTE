@@ -651,7 +651,7 @@ export default function SchedulePage() {
                     >
                       <span>{dayName}</span>
                       {isToday ? (
-                        <span className="rounded bg-background/20 px-1 text-[10px] font-extrabold uppercase">
+                        <span className="rounded bg-background/20 px-1 text-[11px] font-extrabold uppercase">
                           {copy.today}
                         </span>
                       ) : null}

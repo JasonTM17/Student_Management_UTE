@@ -337,10 +337,10 @@ export default function AdminNotificationsPage() {
                         {initialsOf(recipient)}
                       </div>
                       <div className="min-w-0">
-                        <p className="truncate text-sm font-semibold text-foreground">
+                        <p className="truncate text-sm font-semibold text-foreground" title={displayName(recipient)}>
                           {displayName(recipient)}
                         </p>
-                        <p className="truncate text-xs text-muted-foreground">
+                        <p className="truncate text-xs text-muted-foreground" title={recipient.email}>
                           <span className="font-mono">{recipient.email}</span>
                           {roleLabel(recipient) ? ` · ${roleLabel(recipient)}` : ''}
                         </p>
@@ -414,10 +414,10 @@ export default function AdminNotificationsPage() {
                                   {initialsOf(candidate)}
                                 </span>
                                 <span className="min-w-0 flex-1">
-                                  <span className="block truncate text-sm font-medium text-foreground">
+                                  <span className="block truncate text-sm font-medium text-foreground" title={displayName(candidate)}>
                                     {displayName(candidate)}
                                   </span>
-                                  <span className="block truncate text-xs text-muted-foreground">
+                                  <span className="block truncate text-xs text-muted-foreground" title={candidate.email}>
                                     {candidate.email}
                                   </span>
                                 </span>
@@ -559,7 +559,7 @@ export default function AdminNotificationsPage() {
                       <PreviewIcon className="h-4 w-4" aria-hidden="true" />
                     </span>
                     <div className="min-w-0 flex-1">
-                      <p className="truncate text-sm font-semibold text-foreground">
+                      <p className="truncate text-sm font-semibold text-foreground" title={trimmedTitle || copy.previewNoTitle}>
                         {trimmedTitle || copy.previewNoTitle}
                       </p>
                       <p className="mt-1 line-clamp-2 text-sm leading-5 text-muted-foreground">
@@ -665,7 +665,7 @@ export default function AdminNotificationsPage() {
                           <RecordIcon className="h-3.5 w-3.5" aria-hidden="true" />
                         </span>
                         <div className="min-w-0">
-                          <h3 className="truncate text-sm font-semibold text-foreground">
+                          <h3 className="truncate text-sm font-semibold text-foreground" title={record.title}>
                             {record.title}
                           </h3>
                           <p className="mt-1 truncate font-mono text-xs text-muted-foreground" title={record.userId}>
@@ -723,10 +723,10 @@ export default function AdminNotificationsPage() {
                     return (
                       <tr key={record.id} className="border-b border-border/60 last:border-0">
                         <td className="max-w-[320px] px-2 py-3">
-                          <p className="truncate font-medium text-foreground">
+                          <p className="truncate font-medium text-foreground" title={record.title}>
                             {record.title}
                           </p>
-                          <p className="mt-0.5 truncate text-xs text-muted-foreground">
+                          <p className="mt-0.5 truncate text-xs text-muted-foreground" title={record.message}>
                             {record.message}
                           </p>
                         </td>

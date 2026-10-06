@@ -137,7 +137,7 @@ export default function LecturerAnnouncementsPage() {
     }
 
     try {
-      const response = await announcementsApi.getMy({ page: nextPage, limit: 50 });
+      const response = await announcementsApi.getMy({ page: nextPage, limit: 25 });
       const data = response.data ?? [];
       // Page 1 replaces the feed; later pages append so the reader keeps what
       // is already on screen.

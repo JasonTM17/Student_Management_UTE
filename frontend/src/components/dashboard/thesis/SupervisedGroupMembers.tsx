@@ -143,12 +143,12 @@ export function SupervisedGroupMembers({ group, roundOpen = true, onChanged }: S
                     </span>
                   ) : null}
                   {member.isLeader ? (
-                    <span className="ml-1.5 rounded bg-primary/10 px-1.5 py-0.5 text-[10px] font-semibold text-primary">
+                    <span className="ml-1.5 rounded bg-primary/10 px-1.5 py-0.5 text-[11px] font-semibold text-primary">
                       {messages.thesis.leaderBadge}
                     </span>
                   ) : null}
                   {member.isExternal ? (
-                    <span className="ml-1.5 rounded bg-amber-500/10 px-1.5 py-0.5 text-[10px] font-semibold text-amber-700 dark:text-amber-300">
+                    <span className="ml-1.5 rounded bg-amber-500/10 px-1.5 py-0.5 text-[11px] font-semibold text-amber-700 dark:text-amber-300">
                       {messages.thesis.externalBadge}
                     </span>
                   ) : null}

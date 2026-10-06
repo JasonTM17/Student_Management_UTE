@@ -516,7 +516,7 @@ export function AssistantMessages({
                   ) : null}
                 </div>
                 {timeLabel && !message.pending ? (
-                  <p className="mt-0.5 px-1 text-[10px] leading-none text-muted-foreground/80">
+                  <p className="mt-0.5 px-1 text-[11px] leading-none text-muted-foreground/80">
                     {timeLabel}
                   </p>
                 ) : null}

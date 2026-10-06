@@ -76,7 +76,7 @@ export function RelatedAnnouncements({
                 <div className="flex items-center justify-between gap-2 mb-2">
                   <span
                     className={cn(
-                      'inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-[10px] font-bold uppercase tracking-tight',
+                      'inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-[11px] font-bold uppercase tracking-tight',
                       domain.domain === 'EDITORIAL_ARTICLE'
                         ? 'bg-blue-500/10 text-blue-600 dark:text-blue-400'
                         : 'bg-red-500/10 text-red-600 dark:text-red-400',

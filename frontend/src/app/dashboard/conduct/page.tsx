@@ -897,7 +897,7 @@ export default function StudentConductPage() {
             </CardTitle>
           </CardHeader>
           <CardContent className="p-4 space-y-2 text-xs">
-            <div className="grid grid-cols-[4.25rem_5.5rem_1fr] items-center gap-2 px-2.5 pb-1.5 text-[10px] font-bold uppercase tracking-wider text-muted-foreground border-b border-border/50 sm:grid-cols-[5rem_7.5rem_1fr]">
+            <div className="grid grid-cols-[4.25rem_5.5rem_1fr] items-center gap-2 px-2.5 pb-1.5 text-[11px] font-bold uppercase tracking-wider text-muted-foreground border-b border-border/50 sm:grid-cols-[5rem_7.5rem_1fr]">
               <span>{copy.historyRank}</span>
               <span>{copy.range}</span>
               <span className="text-right">{copy.note}</span>

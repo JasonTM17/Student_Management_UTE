@@ -249,7 +249,7 @@ export function AssistantMarkdownContent({
               className="my-2.5 overflow-x-auto rounded-lg border border-border/80 bg-muted/60 p-3 font-mono text-xs"
             >
               {block.language && (
-                <div className="mb-1 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+                <div className="mb-1 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
                   {block.language}
                 </div>
               )}
