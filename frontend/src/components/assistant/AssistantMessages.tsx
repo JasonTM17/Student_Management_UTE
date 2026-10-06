@@ -277,7 +277,7 @@ export function AssistantMessages({
                   className={cn(
                     'relative px-3.5 py-2.5 text-sm leading-6 shadow-xs transition-shadow break-words [overflow-wrap:anywhere]',
                     isUser
-                      ? 'rounded-2xl rounded-tr-xs bg-gradient-to-br from-primary via-[#004eab] to-[#005fcf] text-primary-foreground font-medium'
+                      ? 'rounded-2xl rounded-tr-xs bg-gradient-to-br from-primary via-[#004eab] to-[#005fcf] text-white font-medium'
                       : 'rounded-2xl rounded-tl-xs border border-border/80 bg-card text-foreground',
                   )}
                 >
