@@ -21,7 +21,13 @@ import {
   getLocalizedFlatLabel,
   getLocalizedName,
 } from '@/lib/academic-content';
-import { buildWeeklyGrid } from '@/lib/weekly-grid';
+import {
+  accentForCourse,
+  dayLabel,
+  ORDERED_DAYS,
+  WeeklyGrid,
+  type WeeklyGridAgendaItem,
+} from '@/components/schedule/weekly-grid';
 import { LecturerSection, Semester } from '@/types/api';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { PageHeader, SectionEyebrow } from '@/components/ui/page-header';
@@ -38,57 +44,7 @@ import {
   ScheduleDetailData,
 } from '@/components/schedule/ClassScheduleDetailModal';
 
-type LecturerAgendaItem = {
-  id: string;
-  courseCode: string;
-  courseName: string;
-  courseNameEn?: string;
-  courseNameVi?: string;
-  sectionNumber: string;
-  dayOfWeek: number; // 1=Sunday, 2=Monday, ..., 7=Saturday
-  startTime: string;
-  endTime: string;
-  building?: string;
-  roomNumber?: string;
-  departmentName?: string;
-  departmentNameEn?: string;
-  departmentNameVi?: string;
-  enrolledCount: number;
-  capacity?: number;
-  status?: string;
-};
-
-const DAY_LABELS_VI: Record<number, string> = {
-  1: 'Chủ Nhật',
-  2: 'Thứ Hai',
-  3: 'Thứ Ba',
-  4: 'Thứ Tư',
-  5: 'Thứ Năm',
-  6: 'Thứ Sáu',
-  7: 'Thứ Bảy',
-};
-
-const DAY_LABELS_EN: Record<number, string> = {
-  1: 'Sunday',
-  2: 'Monday',
-  3: 'Tuesday',
-  4: 'Wednesday',
-  5: 'Thursday',
-  6: 'Friday',
-  7: 'Saturday',
-};
-
-// Standard academic week display order: Monday to Sunday
-const ORDERED_DAYS = [2, 3, 4, 5, 6, 7, 1];
-
-/**
- * Unified enterprise academic theme for all class blocks across all roles.
- * Clean, consistent, and distraction-free institutional styling without rainbow colors.
- */
-const UNIFIED_COURSE_ACCENT =
-  'bg-primary/[0.04] dark:bg-primary/[0.08] text-foreground border-primary/25 dark:border-primary/35 hover:border-primary/60 hover:bg-primary/[0.08] dark:hover:bg-primary/[0.12]';
-
-const accentForCourse = (_courseCode?: string): string => UNIFIED_COURSE_ACCENT;
+type LecturerAgendaItem = WeeklyGridAgendaItem;
 
 export default function LecturerSchedulePage() {
   const { user, hasAccess, isLoading: authLoading } = useRequireAuth(['LECTURER']);
@@ -197,7 +153,27 @@ export default function LecturerSchedulePage() {
     return map;
   }, [agenda]);
 
-  const weeklyGrid = useMemo(() => buildWeeklyGrid(agenda), [agenda]);
+  /** Opens the detail modal with every field the lecturer grid item carries. */
+  const openDetail = (item: WeeklyGridAgendaItem) => {
+    setSelectedDetail({
+      courseCode: item.courseCode,
+      courseName: item.courseName ?? item.courseCode,
+      courseNameEn: item.courseNameEn,
+      courseNameVi: item.courseNameVi,
+      sectionNumber: item.sectionNumber,
+      dayOfWeek: item.dayOfWeek,
+      startTime: item.startTime,
+      endTime: item.endTime,
+      building: item.building,
+      roomNumber: item.roomNumber,
+      departmentName: item.departmentName,
+      departmentNameEn: item.departmentNameEn,
+      departmentNameVi: item.departmentNameVi,
+      enrolledCount: item.enrolledCount,
+      capacity: item.capacity,
+      status: item.status,
+    });
+  };
 
   const totalStudentsCount = useMemo(() => {
     return sections.reduce((sum, section) => sum + (section.enrolledCount || 0), 0);
@@ -258,6 +234,7 @@ export default function LecturerSchedulePage() {
           classroom: 'Phòng học',
           enrolled: 'Sĩ số',
           actions: 'Chi tiết',
+          studentsSuffix: 'sinh viên',
         }
       : {
           eyebrow: 'Lecturer area',
@@ -297,6 +274,7 @@ export default function LecturerSchedulePage() {
           classroom: 'Room',
           enrolled: 'Enrolled',
           actions: 'Details',
+          studentsSuffix: 'students',
         };
 
   if (authLoading) {
@@ -477,308 +455,25 @@ export default function LecturerSchedulePage() {
                   </div>
                 </CardHeader>
                 <CardContent className="p-4 sm:p-6">
-                  {/* Desktop / Tablet Weekly Grid */}
-                  <div className="hidden md:block">
-                    <div
-                      className="grid gap-2 overflow-x-auto pb-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-          tabIndex={0}
-                      style={{ gridTemplateColumns: '72px repeat(7, minmax(130px, 1fr))' }}
-                      role="table"
-                      aria-label={copy.weeklyGrid}
-                    >
-                      <div role="row" className="contents">
-          <div role="columnheader" aria-label={locale === 'vi' ? 'Giờ' : 'Time'} style={{ gridColumn: 1, gridRow: 1 }} />
-                      {ORDERED_DAYS.map((dayNum, colIndex) => {
-                        const dayName = locale === 'vi' ? DAY_LABELS_VI[dayNum] : DAY_LABELS_EN[dayNum];
-                        const isToday = dayNum === todayDow;
-                        return (
-                          <div
-                            key={`grid-header-${dayNum}`}
-                role="columnheader"
-                aria-colindex={colIndex + 2}
-                            className={`rounded-lg py-2.5 px-1 text-center transition-all ${
-                              isToday
-                                ? 'border border-primary/50 bg-primary/10 text-primary shadow-sm font-black'
-                                : 'bg-secondary/40 text-foreground font-bold'
-                            }`}
-                            style={{ gridColumn: colIndex + 2, gridRow: 1 }}
-                          >
-                            <div className="text-xs uppercase tracking-wider">{dayName}</div>
-                            {isToday ? (
-                              <span className="mt-0.5 inline-block rounded-md bg-primary px-2 py-0.5 text-[9px] font-bold text-primary-foreground">
-                                {copy.today}
-                              </span>
-                            ) : null}
-                          </div>
-                        );
-                      })}
-
-                      </div>
-          {weeklyGrid.slots.map((slot, slotIndex) => (
-                        <div role="row" aria-rowindex={slotIndex + 2} className="contents" key={`slot-${slot}`}>
-                          <div
-                            className="flex items-start justify-end pr-2 pt-2 text-xs font-semibold tabular-nums text-muted-foreground"
-                            role="rowheader"
-                style={{ gridColumn: 1, gridRow: slotIndex + 2 }}
-                          >
-                            {slot}
-                          </div>
-                          {ORDERED_DAYS.map((dayNum, colIndex) => {
-                            const cellItems = weeklyGrid.cells[`${dayNum}-${slot}`] ?? [];
-                            const isToday = dayNum === todayDow;
-
-                            if (cellItems.length === 0) {
-                              // Skip rendering cell if this time slot is covered by an earlier meeting spanning downwards
-                              const isCoveredByEarlier = agenda.some(
-                                (m) => m.dayOfWeek === dayNum && m.startTime < slot && slot < m.endTime,
-                              );
-                              if (isCoveredByEarlier) {
-                                return null;
-                              }
-
-                              return (
-                                <div
-                                  key={`cell-${dayNum}-${slot}`}
-                      role="cell"
-                      aria-colindex={colIndex + 2}
-                                  className={`min-h-[105px] rounded-lg border border-dashed border-border/70 transition hover:border-primary/40 hover:bg-card/90 ${
-                                    isToday ? 'bg-primary/[0.02] border-primary/20' : 'bg-card/60'
-                                  }`}
-                                  style={{ gridColumn: colIndex + 2, gridRow: slotIndex + 2 }}
-                                />
-                              );
-                            }
-
-                            const rowSpan = Math.max(...cellItems.map((item) => item.span ?? 1));
-                            return (
-                              <div
-                                key={`cell-${dayNum}-${slot}`}
-                      role="cell"
-                      aria-colindex={colIndex + 2}
-                                className="flex min-w-0 flex-col gap-1.5"
-                    aria-rowspan={rowSpan}
-                                style={{
-                                  gridColumn: colIndex + 2,
-                                  gridRow: `${slotIndex + 2} / span ${rowSpan}`,
-                                }}
-                              >
-                                {cellItems.map((item) => {
-                                  const matchingAgenda = agenda.find((a) => a.id === item.id);
-                                  const courseName = getLocalizedName(
-                                    locale,
-                                    {
-                                      code: item.courseCode,
-                                      name: item.courseName,
-                                      nameEn: item.courseNameEn,
-                                      nameVi: item.courseNameVi,
-                                    },
-                                    item.courseName,
-                                  );
-
-                                  const isMorning = (item.startTime || '').localeCompare('12:00') < 0;
-                                  const isAfternoon =
-                                    (item.startTime || '').localeCompare('12:00') >= 0 &&
-                                    (item.startTime || '').localeCompare('18:00') < 0;
-                                  const shiftBadge = isMorning
-                                    ? (locale === 'vi' ? 'Sáng' : 'AM')
-                                    : isAfternoon
-                                    ? (locale === 'vi' ? 'Chiều' : 'PM')
-                                    : (locale === 'vi' ? 'Tối' : 'Eve');
-
-                                  return (
-                                    <div
-                                      key={item.id}
-                                      role="button"
-                                      tabIndex={0}
-                                      onKeyDown={(event) => {
-                                        if (event.key === 'Enter' || event.key === ' ') {
-                                          event.preventDefault();
-                                          event.currentTarget.click();
-                                        }
-                                      }}
-                                      onClick={() => {
-                                        setSelectedDetail({
-                                          courseCode: item.courseCode,
-                                          courseName: item.courseName ?? item.courseCode,
-                                          courseNameEn: item.courseNameEn,
-                                          courseNameVi: item.courseNameVi,
-                                          sectionNumber: item.sectionNumber,
-                                          dayOfWeek: item.dayOfWeek,
-                                          startTime: item.startTime,
-                                          endTime: item.endTime,
-                                          building: item.building,
-                                          roomNumber: item.roomNumber,
-                                          departmentName: matchingAgenda?.departmentName,
-                                          departmentNameEn: matchingAgenda?.departmentNameEn,
-                                          departmentNameVi: matchingAgenda?.departmentNameVi,
-                                          enrolledCount: matchingAgenda?.enrolledCount,
-                                          capacity: matchingAgenda?.capacity,
-                                          status: matchingAgenda?.status,
-                                        });
-                                      }}
-                                      className={`flex-1 rounded-lg border p-2.5 text-xs leading-tight transition-all hover:scale-[1.01] hover:shadow-md cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${accentForCourse(
-                                        item.courseCode,
-                                      )}`}
-                                      title={`${item.courseCode} - ${item.startTime}-${item.endTime} (${copy.clickToViewDetails})`}
-                                    >
-                                      <div className="flex items-center justify-between gap-1">
-                                        <span className="font-mono text-[11px] font-extrabold tracking-wide">
-                                          {item.courseCode}
-                                        </span>
-                                        <div className="flex items-center gap-1">
-                                          <span className="rounded bg-background/80 px-1.5 py-0.5 text-[9px] font-semibold text-foreground border border-border/40">
-                                            {item.sectionNumber}
-                                          </span>
-                                          <span className="rounded bg-primary/10 text-primary px-1.5 py-0.5 text-[9px] font-bold">
-                                            {shiftBadge}
-                                          </span>
-                                        </div>
-                                      </div>
-                                      <div
-                                        className="mt-1.5 font-bold text-[12px] leading-snug line-clamp-2 text-foreground"
-                                        title={courseName}
-                                      >
-                                        {courseName}
-                                      </div>
-                                      <div className="mt-2 space-y-1 text-[10px] text-muted-foreground border-t border-current/10 pt-1.5">
-                                        <div className="flex items-center justify-between gap-1">
-                                          <span className="inline-flex items-center gap-1 font-medium">
-                                            <Clock className="h-3 w-3 text-primary" />
-                                            {item.startTime}-{item.endTime}
-                                          </span>
-                                          {item.roomNumber ? (
-                                            <span className="inline-flex items-center gap-1 font-bold text-foreground">
-                                              <MapPin className="h-3 w-3 text-primary" />
-                                              {item.building ? `${item.building}-` : ''}
-                                              {item.roomNumber}
-                                            </span>
-                                          ) : null}
-                                        </div>
-                                        {matchingAgenda?.enrolledCount !== undefined ? (
-                                          <div className="flex items-center gap-1 truncate text-foreground/80 font-medium">
-                                            <Users className="h-3 w-3 shrink-0 text-primary" />
-                                            <span>{matchingAgenda.enrolledCount} {locale === 'vi' ? 'sinh viên' : 'students'}</span>
-                                          </div>
-                                        ) : null}
-                                      </div>
-                                    </div>
-                                  );
-                                })}
-                              </div>
-                            );
-                          })}
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-
-                  {/* Mobile stacked fallback */}
-                  <div className="grid gap-4 md:hidden">
-                    {ORDERED_DAYS.map((dayNum) => {
-                      const dayName = locale === 'vi' ? DAY_LABELS_VI[dayNum] : DAY_LABELS_EN[dayNum];
-                      const items = slotsByDay[dayNum] ?? [];
-                      const isToday = dayNum === todayDow;
-
-                      return (
-                        <div
-                          key={`mobile-day-${dayNum}`}
-                          className={`rounded-lg border p-4 transition-all ${
-                            isToday
-                              ? 'border-primary/50 bg-primary/[0.04]'
-                              : 'border-border/70 bg-card'
-                          }`}
-                        >
-                          <div className="mb-3 flex items-center justify-between">
-                            <div className="flex items-center gap-2">
-                              <h3 className="font-bold text-foreground text-sm">{dayName}</h3>
-                              {isToday ? (
-                                <span className="rounded-md bg-primary px-2 py-0.5 text-[9px] font-bold text-primary-foreground">
-                                  {copy.today}
-                                </span>
-                              ) : null}
-                            </div>
-                            <span className="text-xs text-muted-foreground font-semibold">
-                              {items.length} {items.length === 1 ? copy.item : copy.items}
-                            </span>
-                          </div>
-
-                          {items.length === 0 ? (
-                            <p className="text-xs text-muted-foreground italic">{copy.noTeachingSlot}</p>
-                          ) : (
-                            <div className="space-y-2.5">
-                              {items.map((item) => (
-                                <div
-                                  key={item.id}
-                                  role="button"
-                                  tabIndex={0}
-                                  onKeyDown={(event) => {
-                                    if (event.key === 'Enter' || event.key === ' ') {
-                                      event.preventDefault();
-                                      event.currentTarget.click();
-                                    }
-                                  }}
-                                  onClick={() =>
-                                    setSelectedDetail({
-                                      courseCode: item.courseCode,
-                                      courseName: item.courseName,
-                                      courseNameEn: item.courseNameEn,
-                                      courseNameVi: item.courseNameVi,
-                                      sectionNumber: item.sectionNumber,
-                                      dayOfWeek: item.dayOfWeek,
-                                      startTime: item.startTime,
-                                      endTime: item.endTime,
-                                      building: item.building,
-                                      roomNumber: item.roomNumber,
-                                      departmentName: item.departmentName,
-                                      departmentNameEn: item.departmentNameEn,
-                                      departmentNameVi: item.departmentNameVi,
-                                      enrolledCount: item.enrolledCount,
-                                      capacity: item.capacity,
-                                      status: item.status,
-                                    })
-                                  }
-                                  className={`rounded-lg border p-3 text-xs transition hover:shadow-sm cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${accentForCourse(
-                                    item.courseCode,
-                                  )}`}
-                                >
-                                  <div className="flex items-center justify-between">
-                                    <span className="font-mono font-bold">{item.courseCode}</span>
-                                    <span className="rounded bg-background/60 px-1.5 py-0.5 text-[10px]">
-                                      {copy.sectionPrefix} {item.sectionNumber}
-                                    </span>
-                                  </div>
-                                  <div className="mt-1 font-semibold text-foreground text-xs">
-                                    {getLocalizedCourseLabel(
-                                      locale,
-                                      {
-                                        code: item.courseCode,
-                                        name: item.courseName,
-                                        nameEn: item.courseNameEn,
-                                        nameVi: item.courseNameVi,
-                                      },
-                                      item.courseName,
-                                    )}
-                                  </div>
-                                  <div className="mt-2 flex items-center justify-between text-[11px] text-muted-foreground">
-                                    <span className="inline-flex items-center gap-1">
-                                      <Clock className="h-3 w-3 text-primary" />
-                                      {item.startTime} - {item.endTime}
-                                    </span>
-                                    {item.roomNumber ? (
-                                      <span className="inline-flex items-center gap-1 font-medium text-foreground">
-                                        <MapPin className="h-3 w-3 text-primary" />
-                                        {item.building ? `${item.building}-` : ''}{item.roomNumber}
-                                      </span>
-                                    ) : null}
-                                  </div>
-                                </div>
-                              ))}
-                            </div>
-                          )}
-                        </div>
-                      );
-                    })}
-                  </div>
+                  {/* Shared weekly grid: same renderer as the student
+                      timetable, lecturer context fields ride along. */}
+                  <WeeklyGrid
+                    items={agenda}
+                    locale={locale}
+                    todayDow={todayDow}
+                    onItemSelect={openDetail}
+                    labels={{
+                      gridAriaLabel: copy.weeklyGrid,
+                      today: copy.today,
+                      sectionPrefix: copy.sectionPrefix,
+                      roomPending: copy.roomPending,
+                      noSlot: copy.noTeachingSlot,
+                      blockHint: copy.clickToViewDetails,
+                      item: copy.item,
+                      items: copy.items,
+                      studentsSuffix: copy.studentsSuffix,
+                    }}
+                  />
                 </CardContent>
               </Card>
             </div>
@@ -790,7 +485,7 @@ export default function LecturerSchedulePage() {
               {/* Day Selector Pills */}
               <div className="flex flex-wrap items-center gap-2">
                 {ORDERED_DAYS.map((dayNum) => {
-                  const dayName = locale === 'vi' ? DAY_LABELS_VI[dayNum] : DAY_LABELS_EN[dayNum];
+                  const dayName = dayLabel(locale, dayNum);
                   const count = (slotsByDay[dayNum] ?? []).length;
                   const isSelected = selectedDayTab === dayNum;
                   const isToday = dayNum === todayDow;
@@ -830,7 +525,7 @@ export default function LecturerSchedulePage() {
                   <div className="flex items-center justify-between">
                     <CardTitle className="text-lg font-bold flex items-center gap-2">
                       <Calendar className="h-5 w-5 text-primary" />
-                      {locale === 'vi' ? DAY_LABELS_VI[selectedDayTab] : DAY_LABELS_EN[selectedDayTab]}
+                      {dayLabel(locale, selectedDayTab)}
                     </CardTitle>
                     <span className="text-xs text-muted-foreground font-semibold">
                       {(slotsByDay[selectedDayTab] ?? []).length} {copy.items}
@@ -850,26 +545,15 @@ export default function LecturerSchedulePage() {
                       {(slotsByDay[selectedDayTab] ?? []).map((item) => (
                         <div
                           key={item.id}
-                          onClick={() =>
-                            setSelectedDetail({
-                              courseCode: item.courseCode,
-                              courseName: item.courseName,
-                              courseNameEn: item.courseNameEn,
-                              courseNameVi: item.courseNameVi,
-                              sectionNumber: item.sectionNumber,
-                              dayOfWeek: item.dayOfWeek,
-                              startTime: item.startTime,
-                              endTime: item.endTime,
-                              building: item.building,
-                              roomNumber: item.roomNumber,
-                              departmentName: item.departmentName,
-                              departmentNameEn: item.departmentNameEn,
-                              departmentNameVi: item.departmentNameVi,
-                              enrolledCount: item.enrolledCount,
-                              capacity: item.capacity,
-                              status: item.status,
-                            })
-                          }
+                          role="button"
+                          tabIndex={0}
+                          onKeyDown={(event) => {
+                            if (event.key === 'Enter' || event.key === ' ') {
+                              event.preventDefault();
+                              openDetail(item);
+                            }
+                          }}
+                          onClick={() => openDetail(item)}
                           className={`rounded-lg border p-4 transition-all hover:scale-[1.01] hover:shadow-md cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${accentForCourse(
                             item.courseCode,
                           )}`}
@@ -957,7 +641,7 @@ export default function LecturerSchedulePage() {
                     </thead>
                     <tbody className="divide-y divide-border/60 bg-card">
                       {agenda.map((item, idx) => {
-                        const dayName = locale === 'vi' ? DAY_LABELS_VI[item.dayOfWeek] : DAY_LABELS_EN[item.dayOfWeek];
+                        const dayName = dayLabel(locale, item.dayOfWeek);
                         const isToday = item.dayOfWeek === todayDow;
                         return (
                           <tr
@@ -1018,26 +702,7 @@ export default function LecturerSchedulePage() {
                               <Button
                                 size="sm"
                                 variant="ghost"
-                                onClick={() =>
-                                  setSelectedDetail({
-                                    courseCode: item.courseCode,
-                                    courseName: item.courseName,
-                                    courseNameEn: item.courseNameEn,
-                                    courseNameVi: item.courseNameVi,
-                                    sectionNumber: item.sectionNumber,
-                                    dayOfWeek: item.dayOfWeek,
-                                    startTime: item.startTime,
-                                    endTime: item.endTime,
-                                    building: item.building,
-                                    roomNumber: item.roomNumber,
-                                    departmentName: item.departmentName,
-                                    departmentNameEn: item.departmentNameEn,
-                                    departmentNameVi: item.departmentNameVi,
-                                    enrolledCount: item.enrolledCount,
-                                    capacity: item.capacity,
-                                    status: item.status,
-                                  })
-                                }
+                                onClick={() => openDetail(item)}
                                 className="h-7 px-2.5 text-xs font-semibold text-primary hover:text-primary hover:bg-primary/10"
                               >
                                 {copy.actions}

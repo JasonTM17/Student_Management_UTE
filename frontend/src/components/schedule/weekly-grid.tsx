@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import { Clock, GraduationCap, MapPin } from 'lucide-react';
+import { Clock, GraduationCap, MapPin, Users } from 'lucide-react';
 import {
   buildWeeklyGrid,
   type WeeklyGridItem,
@@ -122,6 +122,12 @@ export interface WeeklyGridLabels {
   blockHint: string;
   item: string;
   items: string;
+  /**
+   * Word after the enrollment figure in a block's footer meta
+   * ("sinh viên" / "students"). Only lecturers pass this; student blocks show
+   * `lecturerName` in the same slot instead.
+   */
+  studentsSuffix?: string;
 }
 
 /** Agenda projection: grid items plus the context fields blocks render. */
@@ -129,6 +135,12 @@ export type WeeklyGridAgendaItem = WeeklyGridItem & {
   lecturerName?: string;
   credits?: number;
   status?: string;
+  /** Lecturer-context fields: carried through to the detail modal. */
+  departmentName?: string;
+  departmentNameEn?: string;
+  departmentNameVi?: string;
+  enrolledCount?: number;
+  capacity?: number;
 };
 
 export interface WeeklyGridProps {
@@ -425,14 +437,28 @@ export function WeeklyGrid({
                                 </span>
                               ) : null}
                             </div>
-                            {agendaItem.lecturerName && rowSpan >= 2 && cellItems.length === 1 ? (
-                              <div
-                                className="flex items-center gap-1 truncate text-foreground/80 font-medium"
-                                title={agendaItem.lecturerName}
-                              >
-                                <GraduationCap className="h-3 w-3 shrink-0 text-primary" />
-                                <span className="truncate">{agendaItem.lecturerName}</span>
-                              </div>
+                            {/* One context line only, and only in tall single-item
+                                cells — a second line in a 1-slot or stacked cell
+                                overflows the block. Lecturers see enrollment,
+                                students see their lecturer's name. */}
+                            {rowSpan >= 2 && cellItems.length === 1 ? (
+                              agendaItem.lecturerName ? (
+                                <div
+                                  className="flex items-center gap-1 truncate text-foreground/80 font-medium"
+                                  title={agendaItem.lecturerName}
+                                >
+                                  <GraduationCap className="h-3 w-3 shrink-0 text-primary" />
+                                  <span className="truncate">{agendaItem.lecturerName}</span>
+                                </div>
+                              ) : agendaItem.enrolledCount !== undefined ? (
+                                <div className="flex items-center gap-1 truncate text-foreground/80 font-medium">
+                                  <Users className="h-3 w-3 shrink-0 text-primary" />
+                                  <span className="truncate">
+                                    {agendaItem.enrolledCount}
+                                    {labels.studentsSuffix ? ` ${labels.studentsSuffix}` : ''}
+                                  </span>
+                                </div>
+                              ) : null
                             ) : null}
                           </div>
                         </div>
