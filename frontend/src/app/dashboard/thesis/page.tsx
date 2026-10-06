@@ -49,11 +49,13 @@ import { ThesisRegulationGuide } from '@/components/thesis/ThesisRegulationGuide
 import { RoundMilestoneCard } from '@/components/thesis/RoundMilestoneCard';
 import CouncilDefenseWorkspace from '@/features/thesis/components/CouncilDefenseWorkspace';
 import GvpbReviewPanel from '@/features/thesis/components/GvpbReviewPanel';
-import MetricCard, {
+import {
   fillCopy,
   formatReportFileSize,
   renderInlineBold,
 } from '@/features/thesis/components/MetricCard';
+import { WorkspaceMetricCard } from '@/components/dashboard/WorkspaceSurface';
+import { metricToneClass } from '@/components/ui/status';
 import StudentGroupCard, {
   type StudentGroupMemberRow,
 } from '@/features/thesis/components/StudentGroupCard';
@@ -2075,10 +2077,10 @@ export default function ThesisPage() {
           ) : null}
 
           <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-            <MetricCard label={messages.thesis.roundStatus} value={statusLabel(selectedRound.status)} icon={<CalendarDays className="h-5 w-5" />} tone="warning" />
-            <MetricCard label={messages.thesis.topics} value={topics.length} icon={<FileStack className="h-5 w-5" />} tone="info" />
-            <MetricCard label={messages.thesis.groups} value={groups.length} icon={<UsersRound className="h-5 w-5" />} tone="success" />
-            <MetricCard label={messages.thesis.groupsTitle} value={currentGroup ? currentGroup.memberStudentIds.length : 0} icon={<Check className="h-5 w-5" />} tone="neutral" />
+            <WorkspaceMetricCard label={messages.thesis.roundStatus} value={statusLabel(selectedRound.status)} icon={<CalendarDays className="h-5 w-5" />} toneClassName={metricToneClass('warning')} />
+            <WorkspaceMetricCard label={messages.thesis.topics} value={topics.length} icon={<FileStack className="h-5 w-5" />} toneClassName={metricToneClass('info')} />
+            <WorkspaceMetricCard label={messages.thesis.groups} value={groups.length} icon={<UsersRound className="h-5 w-5" />} toneClassName={metricToneClass('success')} />
+            <WorkspaceMetricCard label={messages.thesis.groupsTitle} value={currentGroup ? currentGroup.memberStudentIds.length : 0} icon={<Check className="h-5 w-5" />} toneClassName={metricToneClass('neutral')} />
           </div>
 
           <Card variant="muted">
