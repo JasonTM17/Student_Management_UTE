@@ -64,6 +64,7 @@ export default function CurriculumPage() {
   const { locale, messages, formatNumber } = useI18n();
   const copy = messages.curriculum;
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('ALL');
+  const [chainsOpen, setChainsOpen] = useState(false);
 
   const curriculumQuery = useApiQuery(['curriculum', 'mine'], () => curriculumApi.getMyCurriculum(), {
     enabled: hasAccess,
@@ -341,13 +342,32 @@ export default function CurriculumPage() {
 
           {prereqChains.length > 0 ? (
             <Card variant="muted" className="overflow-hidden">
-              <CardHeader className="border-b border-border/60 bg-secondary/20 py-3">
-                <CardTitle className="flex items-center gap-2 text-sm font-semibold text-foreground">
-                  <GitBranch className="h-4 w-4 text-primary" aria-hidden="true" />
-                  {copy.chainsTitle}
-                </CardTitle>
-                <p className="text-xs leading-5 text-muted-foreground">{copy.chainsDescription}</p>
+              <CardHeader className={`bg-secondary/20 py-3 ${chainsOpen ? 'border-b border-border/60' : ''}`}>
+                <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+                  <CardTitle className="flex items-center gap-2 text-sm font-semibold text-foreground">
+                    <GitBranch className="h-4 w-4 text-primary" aria-hidden="true" />
+                    {copy.chainsTitle}
+                  </CardTitle>
+                  <button
+                    type="button"
+                    aria-expanded={chainsOpen}
+                    onClick={() => setChainsOpen((open) => !open)}
+                    className="ml-auto inline-flex items-center gap-1.5 rounded-md px-2 py-1 text-xs font-semibold text-primary transition hover:bg-primary/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                  >
+                    <ChevronDown
+                      className={`h-3.5 w-3.5 transition-transform ${chainsOpen ? '' : '-rotate-90'}`}
+                      aria-hidden="true"
+                    />
+                    {chainsOpen
+                      ? copy.chainsCollapse
+                      : copy.chainsExpand.replace('{count}', formatNumber(prereqChains.length))}
+                  </button>
+                </div>
+                {chainsOpen ? (
+                  <p className="text-xs leading-5 text-muted-foreground">{copy.chainsDescription}</p>
+                ) : null}
               </CardHeader>
+              {chainsOpen ? (
               <CardContent className="space-y-2.5 p-4">
                 {prereqChains.map((chain) => (
                   <div key={chain.join('>')} className="flex flex-wrap items-center gap-x-1.5 gap-y-1.5">
@@ -377,6 +397,7 @@ export default function CurriculumPage() {
                   </div>
                 ))}
               </CardContent>
+              ) : null}
             </Card>
           ) : null}
 

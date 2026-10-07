@@ -763,6 +763,8 @@ export const en = {
     chainsTitle: 'Prerequisite chains',
     chainsDescription:
       'Each course must be passed to unlock the next one in the chain. ✓ = completed, blue = in progress, grey = not started.',
+    chainsExpand: 'Show {count} chains',
+    chainsCollapse: 'Hide chains',
     emptyTitle: 'No curriculum assigned',
     emptyDescription:
       'Your student profile has no study program attached yet. Contact the Academic Office to have one assigned.',
@@ -3463,6 +3465,8 @@ export const vi: I18nMessages = {
     chainsTitle: 'Chuỗi tiên quyết',
     chainsDescription:
       'Phải đạt môn trước mới được đăng ký môn sau trong chuỗi. ✓ = đã hoàn tất, xanh dương = đang học, xám = chưa học.',
+    chainsExpand: 'Hiện {count} chuỗi',
+    chainsCollapse: 'Thu gọn chuỗi',
     emptyTitle: 'Chưa có chương trình đào tạo',
     emptyDescription:
       'Hồ sơ sinh viên của bạn chưa được gán chương trình đào tạo. Vui lòng liên hệ Phòng Đào tạo để được cấp khung chương trình.',
