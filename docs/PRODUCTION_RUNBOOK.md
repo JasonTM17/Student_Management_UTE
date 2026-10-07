@@ -64,6 +64,50 @@ guidance in `docs/DEMO_RUNBOOK.md`.
   1 MB global / 64 KB assistant / 4 KB on credential routes (login, refresh,
   change-password, logout).
 
+## Render + Supabase operating notes
+
+The live deployment is Render (REST API) + Supabase (PostgreSQL) + Vercel
+(web). Adapted preflight for data-touching migrations:
+
+1. **Snapshot before apply.** When a pushed migration contains `INSERT`,
+   `UPDATE`, `DELETE`, or trigger `DISABLE` blocks (seed/repair files, not pure
+   DDL), take a Supabase backup first: Dashboard -> Database -> Backups ->
+   create a manual snapshot (or `pg_dump` the affected schemas). The
+   reconciliation classes — `V108` (seat counts), `V111`/`V112` (demo dataset
+   parity) — mutate live rows and were verified locally before push; keep that
+   discipline.
+2. **Verify Flyway outcome, not just deploy status.** A `live` deploy means
+   the container booted; confirm the migration landed and succeeded:
+
+   ```sql
+   SELECT version, description, success
+   FROM thesis.flyway_schema_history
+   ORDER BY installed_rank DESC LIMIT 5;
+   ```
+
+   `success = t` is required. A failed row needs a repair forward-migration,
+   never an edit of the applied file (CI enforces immutability).
+3. **Watch scheduled jobs after fixes.** The assistant catalog-sync job
+   (`PREREQUISITE_MAP_SYNC`) runs daily at `04:12 UTC` (11:12 VN) via Spring
+   `@Scheduled` — there is no HTTP trigger, so a fix can only be observed on
+   the next real tick. Failure signature in Render logs:
+   `bad SQL grammar` == PostgreSQL `SQLState 42501` (permission denied on the
+   RLS runtime role) — Spring maps every `42xxx` state to grammar. After the
+   daily run, confirm a fresh revision exists:
+
+   ```sql
+   SELECT id, kind, created_at FROM assistant.assistant_catalog_revision
+   WHERE kind = 'prerequisite-map'
+   ORDER BY created_at DESC LIMIT 1;
+   ```
+
+   A no-drift run legitimately creates no new revision; the signal of a
+   healthy run is the *absence* of the 42501 ERROR line in logs for that tick.
+4. **Post-deploy smoke.** `node scripts/prod-smoke.mjs` runs a read-only
+   end-to-end check (demo logins, thesis trio roster, curriculum plan,
+   assistant answer, admin user search) in under a minute; run it after every
+   Render/Vercel deploy and after migration-affecting pushes.
+
 ## Rollback
 
 Stop Caddy traffic, set the previous verified full SHA, pull and restart the

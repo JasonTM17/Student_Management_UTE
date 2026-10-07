@@ -177,6 +177,8 @@ jobs:
               fi
             done <<< "$edited"
           fi
+      - name: Migration filenames and versions are well-formed
+        run: node scripts/check-migrations.mjs
       - name: Validate Compose
         run: docker compose config
       - name: Secret hygiene

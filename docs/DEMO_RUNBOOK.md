@@ -38,6 +38,11 @@ curl.exe -s -H "X-Health-Key: <HEALTH_READINESS_KEY>" http://127.0.0.1:4010/api/
 
 # Kiểm tra Web Portal phản hồi HTTP 200
 curl.exe -s -o NUL -w "Web Status: %{http_code}\n" http://127.0.0.1:3100/vi
+
+# Smoke test end-to-end chỉ-đọc (login 5 tài khoản demo, nhóm KLTN 3 thành viên,
+# chương trình đào tạo, Trợ lý AI, admin thấy tài khoản mới) — chạy sau mỗi deploy:
+node scripts/prod-smoke.mjs                    # production (www.campusute.io.vn)
+$env:BASE_URL="http://localhost:3100"; node scripts/prod-smoke.mjs   # stack local
 ```
 
 ---
@@ -69,12 +74,22 @@ curl.exe -s -o NUL -w "Web Status: %{http_code}\n" http://127.0.0.1:3100/vi
 
 | Vai trò | Email đăng nhập | Mật khẩu | Phạm vi quyền hạn & Dữ liệu sẵn có |
 | --- | --- | --- | --- |
-| **Sinh viên (Chính)** | `student@campuscore.edu` | `password123` | Đầy đủ lịch học kỳ hiện tại, điểm số, đăng ký học phần, hỏi Trợ lý AI |
-| **Giảng viên** | `lecturer@campuscore.edu` | `password123` | Quản lý danh sách lớp dạy, vào điểm học phần, hướng dẫn luận văn |
-| **Quản trị viên 1** | `admin@campuscore.edu` | `password123` | Điều hành toàn trường, mở lớp học phần, tạo bản thảo tri thức RAG |
+| **Sinh viên (Chính / Nhóm trưởng KLTN)** | `student@campuscore.edu` | `password123` | Nguyễn Tiến Sơn — nhóm trưởng nhóm KLTN "Cổng quản lý học vụ CampusCore" (Chờ xét duyệt). Đầy đủ lịch học 8 lớp kỳ hiện tại, 18 môn đã hoàn tất, đăng ký học phần, hỏi Trợ lý AI |
+| **Sinh viên 2 (cùng nhóm KLTN)** | `student2@campuscore.edu` | `password123` | Trần Minh Quân (24110058) — thành viên nhóm của Tiến Sơn: cùng thời khóa biểu 8 lớp, 18 môn đã hoàn tất, thấy chung thẻ nhóm KLTN |
+| **Sinh viên 3 (cùng nhóm KLTN)** | `student3@campuscore.edu` | `password123` | Lê Thị Thu Hằng (24110059) — thành viên nhóm của Tiến Sơn: cùng thời khóa biểu 8 lớp, 18 môn đã hoàn tất, thấy chung thẻ nhóm KLTN |
+| **Giảng viên (GVHD nhóm KLTN)** | `lecturer@campuscore.edu` | `password123` | Giảng viên hướng dẫn đề tài "Cổng quản lý học vụ CampusCore" — mở Khu luận văn sẽ thấy nhóm 3 SV đang **Chờ xét duyệt** kèm nút **Duyệt / Từ chối** |
+| **Quản trị viên 1** | `admin@campuscore.edu` | `password123` | Điều hành toàn trường, mở lớp học phần, tạo bản thảo tri thức RAG (prod kiêm `TRUONG_KHOA`) |
 | **Quản trị viên 2** | `admin002@campuscore.demo` | `password123` | Dùng để thực hiện nguyên tắc Four-Eyes duyệt bản nháp tri thức của Admin 1 |
 
 *Danh bạ giảng viên phụ `lecturer002@campuscore.demo` đến `lecturer012@campuscore.demo` cũng được seed sẵn để lịch dạy và hội đồng phản ánh quy mô trường thực tế.*
+
+> **Nhóm KLTN demo sẵn (không cần dựng lại)**: ba tài khoản `student@`, `student2@`,
+> `student3@` đã nằm chung một nhóm KLTN thật trong đợt *"Khóa luận Tốt nghiệp -
+> Niên khóa 2022 - 2026"* — nhóm trưởng Tiến Sơn, đề tài "Cổng quản lý học vụ
+> CampusCore", trạng thái **Đã gửi / Chờ xét duyệt**. Đăng nhập bất kỳ tài khoản
+> nào trong ba tài khoản đều thấy cùng một thẻ nhóm; đăng nhập `lecturer@` (GVHD
+> của đề tài) thấy nhóm trong mục *"Nhóm hướng dẫn & xét duyệt"* với nút
+> **Duyệt / Từ chối** để trình diễn trực tiếp bước xét duyệt nhóm.
 
 ---
 
