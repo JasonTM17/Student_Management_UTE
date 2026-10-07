@@ -101,3 +101,6 @@ scratch/
 .workbuddy-ai/
 .zcodeignore
 .zcode/
+
+# Devin agent runtime config (local-only)
+.devin/
