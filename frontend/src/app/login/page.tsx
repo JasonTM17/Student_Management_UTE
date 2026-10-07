@@ -34,6 +34,17 @@ const DEMO_ACCOUNT_EMAILS: Record<LoginPortal, string> = {
 };
 
 /**
+ * The seeded KLTN trio: three students in one thesis group so a demo can swap
+ * between leader and member views without typing emails. All three share the
+ * student demo password; clicking a row fills the form (never auto-submits).
+ */
+const STUDENT_DEMO_ACCOUNTS: ReadonlyArray<{ email: string; name: string; leader: boolean }> = [
+  { email: 'student@campuscore.edu', name: 'Tiến Sơn Nguyễn', leader: true },
+  { email: 'student2@campuscore.edu', name: 'Minh Quân Trần', leader: false },
+  { email: 'student3@campuscore.edu', name: 'Thu Hằng Lê Thị', leader: false },
+];
+
+/**
  * Demo passwords are read from the environment and have no in-source fallback,
  * so a build that was not explicitly given them cannot print one.
  *
@@ -319,12 +330,53 @@ export default function LoginPage() {
               {locale === 'vi' ? 'Điền nhanh' : 'Quick fill'}
             </button>
           </div>
-          <div className="text-muted-foreground flex items-center justify-between gap-2">
-            <code className="min-w-0 truncate font-semibold text-foreground/90" title={demoCredentials.email}>{demoCredentials.email}</code>
-            <span className="text-[11px] bg-secondary px-2 py-0.5 rounded text-foreground font-mono font-medium">
-              {demoCredentials.password}
-            </span>
-          </div>
+          {portal === 'student' ? (
+            <div className="space-y-1" role="group" aria-label={locale === 'vi' ? 'Chọn tài khoản sinh viên demo' : 'Choose a demo student account'}>
+              {STUDENT_DEMO_ACCOUNTS.map((account) => {
+                const active = email === account.email;
+                return (
+                  <button
+                    key={account.email}
+                    type="button"
+                    onClick={() => {
+                      setEmail(account.email);
+                      setPassword(demoCredentials.password);
+                    }}
+                    className={cn(
+                      'flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left transition-colors cursor-pointer',
+                      active ? 'bg-primary/10 ring-1 ring-primary/30' : 'hover:bg-primary/5',
+                    )}
+                  >
+                    <span className={cn('h-1.5 w-1.5 shrink-0 rounded-full', active ? 'bg-primary' : 'bg-muted-foreground/30')} />
+                    <span className="min-w-0 flex-1 truncate font-medium text-foreground">
+                      {account.name}
+                      {account.leader ? (
+                        <span className="ml-1.5 rounded bg-primary/15 px-1.5 py-px text-[10px] font-semibold text-primary align-middle">
+                          {locale === 'vi' ? 'Nhóm trưởng' : 'Leader'}
+                        </span>
+                      ) : null}
+                    </span>
+                    <code className="shrink-0 truncate text-[11px] text-muted-foreground">{account.email}</code>
+                  </button>
+                );
+              })}
+              <div className="flex items-center justify-between gap-2 px-2 pt-1">
+                <span className="text-[11px] text-muted-foreground">
+                  {locale === 'vi' ? 'Mật khẩu chung' : 'Shared password'}
+                </span>
+                <span className="text-[11px] bg-secondary px-2 py-0.5 rounded text-foreground font-mono font-medium">
+                  {demoCredentials.password}
+                </span>
+              </div>
+            </div>
+          ) : (
+            <div className="text-muted-foreground flex items-center justify-between gap-2">
+              <code className="min-w-0 truncate font-semibold text-foreground/90" title={demoCredentials.email}>{demoCredentials.email}</code>
+              <span className="text-[11px] bg-secondary px-2 py-0.5 rounded text-foreground font-mono font-medium">
+                {demoCredentials.password}
+              </span>
+            </div>
+          )}
           {isStaleDemoPassword(demoCredentials.password) ? (
             <p
               role="note"
@@ -335,9 +387,13 @@ export default function LoginPage() {
             </p>
           ) : null}
           <p className="text-[11px] text-muted-foreground pt-1 border-t border-primary/10">
-            {locale === 'vi'
-              ? '💡 Đây là tài khoản demo dùng để trải nghiệm đầy đủ các tính năng của hệ thống CampusUTE.'
-              : '💡 This is a demo account provided to experience all features of CampusUTE.'}
+            {portal === 'student'
+              ? (locale === 'vi'
+                ? '💡 Ba tài khoản là 3 thành viên cùng một nhóm KLTN — chọn từng tài khoản để xem nhóm chung.'
+                : '💡 These three accounts are members of the same KLTN thesis group — sign in as each to see the shared group.')
+              : (locale === 'vi'
+                ? '💡 Đây là tài khoản demo dùng để trải nghiệm đầy đủ các tính năng của hệ thống CampusUTE.'
+                : '💡 This is a demo account provided to experience all features of CampusUTE.')}
           </p>
         </div>
         ) : null}
@@ -510,7 +566,9 @@ export default function LoginPage() {
               >
                 {messages.login.emailLabel}
               </label>
-              {demoCredentials && email === demoCredentials.email ? (
+              {demoCredentials && (portal === 'student'
+                ? STUDENT_DEMO_ACCOUNTS.some((account) => account.email === email)
+                : email === demoCredentials.email) ? (
                 <span className="inline-flex items-center gap-1 text-[11px] font-medium text-amber-700 dark:text-amber-400">
                   <span className="h-1.5 w-1.5 rounded-full bg-amber-500 animate-pulse" />
                   {locale === 'vi' ? 'Tài khoản demo để trải nghiệm' : 'Demo experience account'}
