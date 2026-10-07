@@ -64,7 +64,9 @@ public class EmailServiceImpl implements EmailService {
                     StandardCharsets.UTF_8.name()));
             helper.setTo(to);
             helper.setSubject(subject);
-            helper.setText(htmlBody, true);
+            // multipart/alternative: clients that cannot render HTML still get
+            // a readable plain-text copy instead of a raw markup dump.
+            helper.setText(htmlToPlainText(htmlBody), htmlBody);
 
             mailSender.send(mimeMessage);
             log.info("Email sent successfully to {} [Subject: {}, Template: {}]", to, subject, templateName);
@@ -161,6 +163,25 @@ public class EmailServiceImpl implements EmailService {
 
         String subject = "[CampusUTE] Thông báo Kết quả Học tập & Rèn luyện - " + request.studentId();
         sendHtmlEmail(request.to(), subject, "grade-alert", variables);
+    }
+
+    /** Strips markup into a readable plain-text alternative for multipart mail. */
+    private static String htmlToPlainText(String html) {
+        String text = html
+                .replaceAll("(?is)<(script|style)[^>]*>.*?</\\1>", " ")
+                .replaceAll("(?i)<br\\s*/?>", "\n")
+                .replaceAll("(?i)</(p|div|tr|h[1-6]|li|table)>", "\n")
+                .replaceAll("<[^>]+>", " ")
+                .replace("&nbsp;", " ")
+                .replace("&amp;", "&")
+                .replace("&lt;", "<")
+                .replace("&gt;", ">")
+                .replace("&quot;", "\"")
+                .replace("&#39;", "'")
+                .replaceAll("[ \\t]+", " ")
+                .replaceAll(" ?\\n ?", "\n")
+                .replaceAll("\\n{3,}", "\n\n");
+        return text.trim();
     }
 
     /**
