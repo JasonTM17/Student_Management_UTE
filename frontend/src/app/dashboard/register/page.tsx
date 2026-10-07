@@ -131,6 +131,9 @@ export default function RegisterPage() {
   const [previewSectionId, setPreviewSectionId] = useState('');
   const [collapsedCourseIds, setCollapsedCourseIds] = useState<Set<string>>(new Set());
   const [policyOpen, setPolicyOpen] = useState(false);
+  // The registered-list + weekly preview take a full screen before the
+  // catalog on mobile — collapsed by default there, always shown on xl.
+  const [railDetailsOpen, setRailDetailsOpen] = useState(false);
   const [applicationReason, setApplicationReason] = useState('');
   const [applicationBusy, setApplicationBusy] = useState(false);
   const [pending, setPending] = useState('');
@@ -775,7 +778,7 @@ export default function RegisterPage() {
 
   const policyCard = (
     <Card
-      className="order-3 overflow-hidden border-primary/20 bg-gradient-to-br from-primary/[0.06] via-card to-card lg:order-first"
+      className="order-first overflow-hidden border-primary/20 bg-gradient-to-br from-primary/[0.06] via-card to-card"
       data-testid="credit-limit-policy"
     >
       <button
@@ -1348,6 +1351,55 @@ export default function RegisterPage() {
                   )}
                 </div>
 
+                {(() => {
+                  const warnings: string[] = [];
+                  for (const item of registered) {
+                    const catalogSection = sectionsById.get(item.sectionId);
+                    const label = sectionLabel(item.section, item.sectionId);
+                    if (catalogSection?.curriculumRelevance === 'OUTSIDE') {
+                      warnings.push(copy.warningOutsideLine.replace('{section}', label));
+                    }
+                    if (catalogSection?.scheduleConflict) {
+                      warnings.push(copy.warningConflictLine.replace('{section}', label));
+                    }
+                  }
+                  if (warnings.length === 0) return null;
+                  return (
+                    <div
+                      className="space-y-1.5 rounded-lg border border-status-warning/40 bg-status-warning/10 p-3"
+                      role="status"
+                    >
+                      <p className="flex items-center gap-1.5 text-xs font-bold text-status-warning-foreground">
+                        <TriangleAlert className="h-3.5 w-3.5" aria-hidden="true" />
+                        {copy.railWarningsTitle}
+                      </p>
+                      {warnings.map((warning) => (
+                        <p key={warning} className="text-xs leading-4 text-status-warning-foreground">
+                          {warning}
+                        </p>
+                      ))}
+                    </div>
+                  );
+                })()}
+
+                {registered.length > 0 ? (
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    className="w-full gap-1.5 text-xs text-muted-foreground xl:hidden"
+                    aria-expanded={railDetailsOpen}
+                    onClick={() => setRailDetailsOpen((open) => !open)}
+                  >
+                    <ChevronDown
+                      className={`h-3.5 w-3.5 transition-transform ${railDetailsOpen ? '' : '-rotate-90'}`}
+                      aria-hidden="true"
+                    />
+                    {railDetailsOpen ? copy.railCollapseDetails : copy.railExpandDetails}
+                  </Button>
+                ) : null}
+
+                <div className={`space-y-3 ${railDetailsOpen ? '' : 'hidden'} xl:block`}>
                 {registered.length > 0 ? (
                   <Button
                     type="button"
@@ -1469,37 +1521,6 @@ export default function RegisterPage() {
                   </div>
                 )}
 
-                {(() => {
-                  const warnings: string[] = [];
-                  for (const item of registered) {
-                    const catalogSection = sectionsById.get(item.sectionId);
-                    const label = sectionLabel(item.section, item.sectionId);
-                    if (catalogSection?.curriculumRelevance === 'OUTSIDE') {
-                      warnings.push(copy.warningOutsideLine.replace('{section}', label));
-                    }
-                    if (catalogSection?.scheduleConflict) {
-                      warnings.push(copy.warningConflictLine.replace('{section}', label));
-                    }
-                  }
-                  if (warnings.length === 0) return null;
-                  return (
-                    <div
-                      className="space-y-1.5 rounded-lg border border-status-warning/40 bg-status-warning/10 p-3"
-                      role="status"
-                    >
-                      <p className="flex items-center gap-1.5 text-xs font-bold text-status-warning-foreground">
-                        <TriangleAlert className="h-3.5 w-3.5" aria-hidden="true" />
-                        {copy.railWarningsTitle}
-                      </p>
-                      {warnings.map((warning) => (
-                        <p key={warning} className="text-xs leading-4 text-status-warning-foreground">
-                          {warning}
-                        </p>
-                      ))}
-                    </div>
-                  );
-                })()}
-
                 <div className="space-y-2 rounded-lg border border-border/70 p-3">
                   <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
                     {copy.miniTimetableTitle}
@@ -1541,6 +1562,7 @@ export default function RegisterPage() {
                       {copy.legendConflict}
                     </span>
                   </div>
+                </div>
                 </div>
               </CardContent>
             </Card>
