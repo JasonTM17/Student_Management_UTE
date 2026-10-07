@@ -133,7 +133,7 @@ export default function RegisterPage() {
   const [collapsedCourseIds, setCollapsedCourseIds] = useState<Set<string>>(new Set());
   const [policyOpen, setPolicyOpen] = useState(false);
   // The registered-list + weekly preview take a full screen before the
-  // catalog on mobile — collapsed by default there, always shown on xl.
+  // catalog on mobile — collapsed by default there, always shown on lg.
   const [railDetailsOpen, setRailDetailsOpen] = useState(false);
   const [applicationReason, setApplicationReason] = useState('');
   const [applicationBusy, setApplicationBusy] = useState(false);
@@ -792,7 +792,7 @@ export default function RegisterPage() {
 
   const policyCard = (
     <Card
-      className="min-w-0 overflow-hidden border-primary/20 bg-gradient-to-br from-primary/[0.06] via-card to-card xl:col-span-12"
+      className="min-w-0 overflow-hidden border-primary/20 bg-gradient-to-br from-primary/[0.06] via-card to-card lg:col-span-12"
       data-testid="credit-limit-policy"
     >
       <button
@@ -1057,12 +1057,12 @@ export default function RegisterPage() {
             />
           ) : null}
 
-          <div className="grid min-w-0 grid-cols-1 gap-6 xl:grid-cols-12">
+          <div className="grid min-w-0 grid-cols-1 gap-6 lg:grid-cols-12">
             {/* The policy card takes a full-width row so the enrolled rail and
                 weekly timetable line up beside the catalog instead of beside it. */}
             {policyCard}
             {/* Left column: search + catalog lead; the credit-limit card follows on mobile. */}
-            <div className="flex min-w-0 flex-col gap-6 xl:col-span-8">
+            <div className="flex min-w-0 flex-col gap-6 lg:col-span-8">
               <Card className="order-1 min-w-0 overflow-hidden">
                 <CardContent className="space-y-3 p-4">
                   <label className="block min-w-0 space-y-2">
@@ -1354,7 +1354,7 @@ export default function RegisterPage() {
             {/* Right rail: enrolled summary card + a separate weekly-timetable
                 card that pins under the header on desktop so the hover preview
                 stays visible while the catalog scrolls. */}
-            <div className="order-first min-w-0 space-y-4 xl:order-none xl:col-span-4">
+            <div className="order-first min-w-0 space-y-4 lg:order-none lg:col-span-4">
             <Card>
               <CardHeader className="flex flex-wrap items-center gap-x-2 gap-y-1.5 space-y-0 pb-3">
                 <CardTitle className="mr-auto whitespace-nowrap">{copy.enrolledRail}</CardTitle>
@@ -1450,7 +1450,7 @@ export default function RegisterPage() {
                     type="button"
                     variant="ghost"
                     size="sm"
-                    className="w-full gap-1.5 text-xs text-muted-foreground xl:hidden"
+                    className="w-full gap-1.5 text-xs text-muted-foreground lg:hidden"
                     aria-expanded={railDetailsOpen}
                     onClick={() => setRailDetailsOpen((open) => !open)}
                   >
@@ -1462,7 +1462,7 @@ export default function RegisterPage() {
                   </Button>
                 ) : null}
 
-                <div className={`space-y-3 ${railDetailsOpen ? '' : 'hidden'} xl:block`}>
+                <div className={`space-y-3 ${railDetailsOpen ? '' : 'hidden'} lg:block`}>
                 {registered.length > 0 ? (
                   <Button
                     type="button"
@@ -1480,7 +1480,7 @@ export default function RegisterPage() {
                 {registered.length === 0 ? (
                   <p className="text-sm text-muted-foreground">{copy.railEmpty}</p>
                 ) : (
-                  <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-1">
+                  <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-1">
                     {registered.map((item) => {
                     const section = item.section;
                     // Optimistic/pending rows can lack the joined section —
@@ -1572,7 +1572,7 @@ export default function RegisterPage() {
             {/* Own card beside the enrolled list — follows the same collapse
                 toggle on small screens, sticks under the header on desktop. */}
             <Card
-              className={`${railDetailsOpen ? '' : 'hidden'} xl:block xl:sticky xl:top-[calc(var(--portal-header-height)+0.75rem)]`}
+              className={`${railDetailsOpen ? '' : 'hidden'} lg:block lg:sticky lg:top-[calc(var(--portal-header-height)+0.75rem)]`}
             >
               <CardHeader className="pb-3">
                 <CardTitle>{copy.miniTimetableTitle}</CardTitle>
