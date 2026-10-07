@@ -392,6 +392,11 @@ public class TwoFactorService {
                     Map.of(
                             "subject", MAIL_SUBJECT,
                             "recipientName", user.firstName() != null ? user.firstName() : "Bạn",
+                            "accountEmail", maskEmail(user.email()),
+                            "requestedAt", java.time.format.DateTimeFormatter
+                                    .ofPattern("HH:mm 'ngày' dd/MM/yyyy")
+                                    .withZone(java.time.ZoneId.of("Asia/Ho_Chi_Minh"))
+                                    .format(clock.instant()),
                             "code", code,
                             "expiryMinutes", (int) CODE_TTL.toMinutes()));
         } catch (RuntimeException exception) {

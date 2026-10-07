@@ -215,7 +215,8 @@ public class MailController {
     }
 
     private static final java.util.Set<String> PREVIEW_TEMPLATES =
-            java.util.Set.of("test-verification", "academic-announcement", "course-registration", "grade-alert");
+            java.util.Set.of("test-verification", "academic-announcement", "course-registration", "grade-alert",
+                    "two-factor-code");
 
     private Map<String, Object> buildSampleData(String templateName) {
         Map<String, Object> data = new HashMap<>();
@@ -264,6 +265,14 @@ public class MailController {
                         new CourseItem("SE016", "An toàn Thông tin & Mật mã Ứng dụng", 3, "TS. Phạm Thanh Tùng", "Thứ 5 (Tiết 1-3) - B202"),
                         new CourseItem("SE017", "Học máy Ứng dụng & Trí tuệ Nhân tạo", 3, "TS. Nguyễn Quốc Dũng", "Thứ 6 (Tiết 6-8) - C301")
                 ));
+            }
+            case "two-factor-code" -> {
+                data.put("subject", "[CampusUTE] Mã xác thực hai yếu tố");
+                data.put("recipientName", "Jason");
+                data.put("accountEmail", "j***@gmail.com");
+                data.put("requestedAt", nowStr);
+                data.put("code", "638585");
+                data.put("expiryMinutes", 10);
             }
             case "grade-alert" -> {
                 data.put("subject", "[CampusUTE] Bảng điểm Học kỳ & Điểm rèn luyện");

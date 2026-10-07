@@ -19,32 +19,38 @@
                 Kính chào <span th:text="${recipientName != null ? recipientName : 'Bạn'}">Bạn</span>,
               </p>
               <p class="prose">
-                Bạn (hoặc ai đó) vừa thực hiện bước xác thực hai yếu tố trên Cổng Đào tạo CampusCore.
+                Bạn (hoặc ai đó) vừa yêu cầu mã xác thực hai yếu tố cho tài khoản
+                <strong th:text="${accountEmail}">tài khoản CampusUTE</strong> trên Cổng Đào tạo CampusUTE.
                 Nhập mã dưới đây để tiếp tục:
               </p>
 
               <div style="margin:28px 0;text-align:center;">
-                <div style="display:inline-block;padding:18px 36px;border:1px solid #dce5ef;border-radius:12px;background-color:#f6f9fd;">
-                  <span style="font-family:'Courier New',Courier,monospace;font-size:38px;font-weight:700;letter-spacing:12px;color:#132d50;" th:text="${code}">000000</span>
+                <div style="display:inline-block;padding:18px 36px;border:1px solid #c8d8ea;border-radius:12px;background-color:#f6f9fd;box-shadow:0 1px 2px rgba(19,45,80,0.08);">
+                  <span style="font-family:'Courier New',Courier,monospace;font-size:38px;font-weight:700;letter-spacing:14px;color:#102d50;" th:text="${code}">000000</span>
                 </div>
+                <p style="margin:12px 0 0;color:#63788f;font-size:12px;line-height:18px;">
+                  Hết hạn sau <strong th:text="${expiryMinutes != null ? expiryMinutes : 10}">10</strong> phút
+                  <span th:if="${requestedAt != null}"> · Yêu cầu lúc <span th:text="${requestedAt}">--:--</span></span>
+                </p>
               </div>
 
               <div class="status-panel" style="margin:0 0 24px;padding:18px 20px;border:1px solid #f0d9a8;border-left:4px solid #b7791f;border-radius:10px;background-color:#fdf8ec;">
-                <p class="status-label">LƯU Ý BẢO MẬT</p>
+                <p class="status-label" style="color:#8a5a00;">LƯU Ý BẢO MẬT</p>
                 <p class="status-copy">
-                  Mã có hiệu lực trong <strong th:text="${expiryMinutes != null ? expiryMinutes : 10}">10</strong> phút
-                  và chỉ dùng được một lần. Không chia sẻ mã này cho bất kỳ ai —
-                  nhân viên của trường không bao giờ yêu cầu mã xác thực của bạn.
+                  Mã chỉ dùng được một lần. Không chia sẻ mã này cho bất kỳ ai —
+                  nhân viên của trường <strong>không bao giờ</strong> yêu cầu mã xác thực của bạn
+                  qua điện thoại, email hay tin nhắn.
                 </p>
               </div>
 
               <p class="prose" style="color:#64748b;">
-                Nếu bạn không yêu cầu mã này, hãy bỏ qua email và đổi mật khẩu để bảo vệ tài khoản.
+                Nếu bạn không thực hiện yêu cầu này, có thể ai đó đang cố truy cập tài khoản của bạn.
+                Hãy bỏ qua email này và <strong>đổi mật khẩu ngay</strong> để bảo vệ tài khoản.
               </p>
             </td>
           </tr>
 
-          <tr th:replace="~{mail/fragments :: footer('Email tự động từ hệ thống CampusCore — vui lòng không trả lời')}"></tr>
+          <tr th:replace="~{mail/fragments :: footer('Email tự động từ hệ thống CampusUTE — vui lòng không trả lời. Không chia sẻ mật khẩu hoặc mã OTP với bất kỳ ai.')}"></tr>
         </table>
       </td>
     </tr>
