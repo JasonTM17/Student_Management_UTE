@@ -1275,10 +1275,11 @@ export default function RegisterPage() {
               {policyCard}
             </div>
 
-            {/* Right rail: live summary, warnings, and the weekly preview.
-                Sticky on desktop so the registered list + timetable stay
-                visible while the catalog scrolls. */}
-            <Card className="order-first min-w-0 self-start xl:sticky xl:top-[calc(var(--portal-header-height)+0.75rem)] xl:col-span-4 xl:order-none xl:max-h-[calc(100dvh-var(--portal-header-height)-1.5rem)] xl:overflow-y-auto">
+            {/* Right rail: enrolled summary card + a separate weekly-timetable
+                card that pins under the header on desktop so the hover preview
+                stays visible while the catalog scrolls. */}
+            <div className="order-first min-w-0 space-y-4 xl:order-none xl:col-span-4">
+            <Card>
               <CardHeader className="flex flex-wrap items-center gap-x-2 gap-y-1.5 space-y-0 pb-3">
                 <CardTitle className="mr-auto whitespace-nowrap">{copy.enrolledRail}</CardTitle>
                 <div className="flex shrink-0 items-center gap-1.5">
@@ -1436,6 +1437,15 @@ export default function RegisterPage() {
                     }>;
                     const courseName = section?.course?.name ?? catalogSection?.courseName ?? '';
                     const courseCredits = section?.course?.credits ?? catalogSection?.credits;
+                    const scheduleText = schedules
+                      .map(
+                        (schedule) =>
+                          `${shortDayLabel(locale, schedule.dayOfWeek)} ${schedule.startTime}–${schedule.endTime}` +
+                          ((schedule.room ?? schedule.classroom?.roomNumber)
+                            ? ` · ${copy.scheduleChipRoom.replace('{room}', schedule.room ?? schedule.classroom?.roomNumber ?? '')}`
+                            : ''),
+                      )
+                      .join('  ·  ');
                     return (
                       // Intentionally a <div>, not <article>: the register/drop
                       // e2e locators filter catalog <article> rows by section
@@ -1443,88 +1453,69 @@ export default function RegisterPage() {
                       // would collide with them.
                       <div
                         key={item.id}
-                        className="space-y-2.5 rounded-lg border border-border/70 bg-card p-3 shadow-sm transition-colors hover:border-primary/40"
+                        className="flex items-center gap-2 rounded-lg border border-border/70 bg-card px-2.5 py-2 shadow-xs transition-colors hover:border-primary/40"
                       >
-                        <div className="flex items-start justify-between gap-2">
-                          <div className="flex min-w-0 flex-wrap items-center gap-1.5">
+                        <div className="min-w-0 flex-1">
+                          <div className="flex flex-wrap items-center gap-1.5">
                             <span className="rounded-md bg-primary/10 px-1.5 py-0.5 font-mono text-[11px] font-bold tracking-tight text-primary">
                               {sectionLabel(
                                 section ?? catalogSection,
                                 item.sectionId,
                               )}
                             </span>
-                            <span
-                              className={`rounded-md border px-1.5 py-0.5 text-[11px] font-semibold ${
-                                item.status === 'PENDING'
-                                  ? 'border-status-warning/40 bg-status-warning/10 text-status-warning-foreground'
-                                  : 'border-primary/30 bg-primary/10 text-primary'
-                              }`}
-                            >
-                              {item.status === 'PENDING' ? copy.pendingLabel : copy.registered}
-                            </span>
-                          </div>
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            size="icon"
-                            className="h-8 w-8 shrink-0 text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
-                            aria-label={copy.drop}
-                            title={copy.drop}
-                            onClick={() => void drop(item)}
-                            disabled={pending === item.id || item.id.startsWith('pending:')}
-                          >
-                            <Trash2 className="h-4 w-4" aria-hidden="true" />
-                          </Button>
-                        </div>
-                        {courseName ? (
-                          <p
-                            className="text-sm font-semibold leading-5 text-foreground line-clamp-2"
-                            title={courseName}
-                          >
-                            {courseName}
-                          </p>
-                        ) : null}
-                        <div className="flex flex-wrap items-center gap-1.5">
-                          {schedules.length === 0 ? (
-                            <span className="rounded-md border border-dashed border-border bg-secondary/40 px-2 py-0.5 text-xs italic text-muted-foreground">
-                              {copy.scheduleNone}
-                            </span>
-                          ) : (
-                            schedules.map((schedule, index) => (
-                              <span
-                                key={`${item.id}-schedule-${index}`}
-                                className="inline-flex flex-wrap items-center gap-1 rounded-md bg-secondary/60 px-2 py-0.5 text-xs text-foreground"
-                              >
-                                <span className="font-bold text-primary">
-                                  {shortDayLabel(locale, schedule.dayOfWeek)}
-                                </span>
-                                <span className="tabular-nums">
-                                  {schedule.startTime}–{schedule.endTime}
-                                </span>
-                                {(schedule.room ?? schedule.classroom?.roomNumber) ? (
-                                  <span className="text-muted-foreground">
-                                    · {copy.scheduleChipRoom.replace('{room}', schedule.room ?? schedule.classroom?.roomNumber ?? '')}
-                                  </span>
-                                ) : null}
+                            {item.status === 'PENDING' ? (
+                              <span className="rounded-md border border-status-warning/40 bg-status-warning/10 px-1.5 py-0.5 text-[11px] font-semibold text-status-warning-foreground">
+                                {copy.pendingLabel}
                               </span>
-                            ))
-                          )}
-                        </div>
-                        {courseCredits ? (
-                          <p className="text-xs font-medium text-muted-foreground">
-                            {formatNumber(courseCredits)} {copy.creditsUnit}
+                            ) : null}
+                            {courseCredits ? (
+                              <span className="text-[11px] font-medium text-muted-foreground">
+                                {formatNumber(courseCredits)} {copy.creditsUnit}
+                              </span>
+                            ) : null}
+                          </div>
+                          {courseName ? (
+                            <p
+                              className="mt-1 truncate text-sm font-medium leading-5 text-foreground"
+                              title={courseName}
+                            >
+                              {courseName}
+                            </p>
+                          ) : null}
+                          <p className="mt-0.5 truncate text-xs text-muted-foreground" title={scheduleText || undefined}>
+                            {scheduleText || copy.scheduleNone}
                           </p>
-                        ) : null}
+                        </div>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8 shrink-0 text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
+                          aria-label={copy.drop}
+                          title={copy.drop}
+                          onClick={() => void drop(item)}
+                          disabled={pending === item.id || item.id.startsWith('pending:')}
+                        >
+                          <Trash2 className="h-4 w-4" aria-hidden="true" />
+                        </Button>
                       </div>
                     );
                     })}
                   </div>
                 )}
+                </div>
+              </CardContent>
+            </Card>
 
-                <div className="space-y-2 rounded-lg border border-border/70 p-3">
-                  <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
-                    {copy.miniTimetableTitle}
-                  </p>
+            {/* Own card beside the enrolled list — follows the same collapse
+                toggle on small screens, sticks under the header on desktop. */}
+            <Card
+              className={`${railDetailsOpen ? '' : 'hidden'} xl:block xl:sticky xl:top-[calc(var(--portal-header-height)+0.75rem)]`}
+            >
+              <CardHeader className="pb-3">
+                <CardTitle>{copy.miniTimetableTitle}</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-2">
                   <WeeklyGrid
                     compact
                     items={[...timetableItems, ...previewTimetable]}
@@ -1562,10 +1553,9 @@ export default function RegisterPage() {
                       {copy.legendConflict}
                     </span>
                   </div>
-                </div>
-                </div>
               </CardContent>
             </Card>
+            </div>
           </div>
 
           {actionError ? (
