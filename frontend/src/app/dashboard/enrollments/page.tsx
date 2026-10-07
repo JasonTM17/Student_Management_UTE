@@ -16,7 +16,7 @@ import {
 import { useRequireAuth } from '@/context/AuthContext';
 import { curriculumApi, downloadRegistrationSlipPdf, enrollmentsApi } from '@/lib/api';
 import { getLocalizedName } from '@/lib/academic-content';
-import { isActiveEnrollment, isDroppableEnrollment } from '@/lib/enrollment-status';
+import { isDroppableEnrollment } from '@/lib/enrollment-status';
 import { WorkspaceForbiddenState } from '@/components/ProtectedRoute';
 import { LinkButton } from '@/components/ui/link-button';
 import { Enrollment, MyCurriculumCourse, MyCurriculumResponse } from '@/types/api';
@@ -50,6 +50,16 @@ function getDayName(day: number, locale: 'en' | 'vi') {
   return dayLabel(locale, day === 0 ? 1 : day);
 }
 
+function lecturerName(enrollment: Enrollment): string {
+  const user = enrollment.section?.lecturer?.user;
+  return user ? `${user.lastName ?? ''} ${user.firstName ?? ''}`.trim() : '';
+}
+
+function classroomLabel(schedule?: { classroom?: { building: string; roomNumber: string } }) {
+  const room = schedule?.classroom;
+  return room ? `${room.building} ${room.roomNumber}`.trim() : '';
+}
+
 export default function EnrollmentsPage() {
   const { user, hasAccess, isLoading: authLoading } = useRequireAuth(['STUDENT']);
   const { locale, formatDate, formatNumber, messages } = useI18n();
@@ -79,7 +89,9 @@ export default function EnrollmentsPage() {
           emptyDescription:
             'Khi bạn đăng ký một lớp học phần, lịch học và thông tin lớp sẽ xuất hiện ở đây.',
           tabCurriculum: 'Chương trình đào tạo (CTĐT)',
+          tabCurriculumShort: 'CTĐT',
           tabEnrollments: 'Hồ sơ đăng ký học phần',
+          tabEnrollmentsShort: 'Đăng ký',
           statCurriculumTotal: 'Tổng môn học CTĐT',
           statCompleted: 'Đã hoàn tất',
           statInProgress: 'Đang học',
@@ -101,13 +113,16 @@ export default function EnrollmentsPage() {
           creditsLabel: 'tín chỉ',
           gradeScore: 'Điểm',
           noCurriculumCourses: 'Không có môn học nào thuộc nhóm trạng thái này.',
-          recordTitle: 'Hồ sơ đăng ký lớp học phần',
-          detailsLabel: 'Chi tiết lớp',
           sectionPrefix: 'Lớp học phần',
           enrolledOn: 'Đăng ký ngày',
           unknownCourse: 'Môn học',
           unavailableCourseName: 'Chưa có tên môn',
           unknownSection: 'Chưa rõ lớp học phần',
+          unknownSemester: 'Chưa rõ học kỳ',
+          colCourse: 'Môn học',
+          colSection: 'Lớp HP',
+          colSchedule: 'Lịch học',
+          colStatus: 'Trạng thái',
           dropCourse: 'Hủy môn học',
           droppingCourse: 'Đang hủy môn',
           confirmTitle: 'Hủy môn học',
@@ -135,7 +150,9 @@ export default function EnrollmentsPage() {
           emptyDescription:
             'Once you enroll in a class, its schedule and details will appear here.',
           tabCurriculum: 'Curriculum Roadmap',
+          tabCurriculumShort: 'Curriculum',
           tabEnrollments: 'Enrollment Records',
+          tabEnrollmentsShort: 'Enrolled',
           statCurriculumTotal: 'Total Curriculum Courses',
           statCompleted: 'Completed',
           statInProgress: 'In Progress',
@@ -157,13 +174,16 @@ export default function EnrollmentsPage() {
           creditsLabel: 'credits',
           gradeScore: 'Grade',
           noCurriculumCourses: 'No courses found for the selected status filter.',
-          recordTitle: 'Enrolled Class Sections',
-          detailsLabel: 'Class details',
           sectionPrefix: 'Class',
           enrolledOn: 'Enrolled',
           unknownCourse: 'Course',
           unavailableCourseName: 'Unavailable',
           unknownSection: 'Unknown class',
+          unknownSemester: 'Unknown semester',
+          colCourse: 'Course',
+          colSection: 'Class',
+          colSchedule: 'Schedule',
+          colStatus: 'Status',
           dropCourse: 'Drop course',
           droppingCourse: 'Dropping course',
           confirmTitle: 'Drop course',
@@ -322,10 +342,24 @@ export default function EnrollmentsPage() {
     ],
   );
 
-  const activeEnrollments = useMemo(
-    () => enrollments.filter((e) => isActiveEnrollment(e.status)),
-    [enrollments],
-  );
+  const groupedEnrollments = useMemo(() => {
+    const groups = new Map<string, { label: string; sortKey: string; items: Enrollment[] }>();
+    for (const enrollment of enrollments) {
+      const semester = enrollment.semester;
+      const key = semester?.id ?? 'unknown';
+      if (!groups.has(key)) {
+        groups.set(key, {
+          label: semester
+            ? getLocalizedName(locale, semester, semester.name)
+            : copy.unknownSemester,
+          sortKey: semester?.startDate ?? '',
+          items: [],
+        });
+      }
+      groups.get(key)!.items.push(enrollment);
+    }
+    return [...groups.values()].sort((a, b) => b.sortKey.localeCompare(a.sortKey));
+  }, [enrollments, locale, copy.unknownSemester]);
 
   const courseCountLabel = useCallback(
     (count: number) =>
@@ -488,27 +522,27 @@ export default function EnrollmentsPage() {
         <LoadingState label={copy.loading} />
       ) : (
         <>
-          <div className="grid gap-4 md:grid-cols-3">
+          <div className="grid grid-cols-3 gap-2 sm:gap-4">
             {summaryCards.map((item) => {
               const Icon = item.icon;
               return (
                 <Card key={item.label} variant="elevated">
-                  <CardContent className="flex items-center justify-between gap-4 pt-6">
-                    <div>
-                      <div className="text-sm font-medium text-muted-foreground">
+                  <CardContent className="flex flex-col gap-2 p-3 sm:flex-row sm:items-center sm:justify-between sm:gap-4 sm:pt-6">
+                    <div className="min-w-0">
+                      <div className="text-[11px] font-medium leading-tight text-muted-foreground sm:text-sm">
                         {item.label}
                       </div>
-                      <div className="mt-1 text-2xl font-bold tracking-tight text-foreground sm:text-3xl">
+                      <div className="mt-1 text-lg font-bold tracking-tight text-foreground sm:text-3xl">
                         {item.value}
                       </div>
                       {item.subvalue ? (
-                        <div className="mt-1 text-xs text-muted-foreground">
+                        <div className="mt-0.5 text-[11px] leading-tight text-muted-foreground sm:text-xs">
                           {item.subvalue}
                         </div>
                       ) : null}
                     </div>
                     <div
-                      className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-lg ${item.tone}`}
+                      className={`hidden h-11 w-11 shrink-0 items-center justify-center rounded-lg sm:flex ${item.tone}`}
                     >
                       <Icon className="h-5 w-5" />
                     </div>
@@ -519,22 +553,23 @@ export default function EnrollmentsPage() {
           </div>
 
           <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border/70 pb-3">
-            <div className="flex items-center gap-2" role="tablist" aria-label={copy.tabCurriculum}>
+            <div className="grid grid-cols-2 gap-2 sm:flex sm:items-center" role="tablist" aria-label={copy.tabCurriculum}>
               <button
                 type="button"
                 role="tab"
                 aria-selected={activeTab === 'curriculum'}
                 onClick={() => setActiveTab('curriculum')}
-                className={`flex min-h-10 items-center gap-2 rounded-lg px-4 py-2 text-sm font-semibold transition ${
+                className={`flex min-h-10 items-center justify-center gap-2 rounded-lg px-3 py-2 text-sm font-semibold transition sm:px-4 ${
                   activeTab === 'curriculum'
                     ? 'bg-primary text-primary-foreground shadow-sm'
                     : 'bg-secondary/40 text-muted-foreground hover:bg-secondary hover:text-foreground'
                 }`}
               >
-                <Layers className="h-4 w-4" />
-                {copy.tabCurriculum}
+                <Layers className="h-4 w-4 shrink-0" />
+                <span className="truncate sm:hidden">{copy.tabCurriculumShort}</span>
+                <span className="hidden truncate sm:inline">{copy.tabCurriculum}</span>
                 {curriculumCourses.length > 0 && (
-                  <span className="ml-1 rounded-md bg-primary-foreground/20 px-2 py-0.5 text-xs">
+                  <span className="ml-1 shrink-0 rounded-md bg-primary-foreground/20 px-2 py-0.5 text-xs">
                     {curriculumCourses.length}
                   </span>
                 )}
@@ -544,15 +579,16 @@ export default function EnrollmentsPage() {
                 role="tab"
                 aria-selected={activeTab === 'enrollments'}
                 onClick={() => setActiveTab('enrollments')}
-                className={`flex min-h-10 items-center gap-2 rounded-lg px-4 py-2 text-sm font-semibold transition ${
+                className={`flex min-h-10 items-center justify-center gap-2 rounded-lg px-3 py-2 text-sm font-semibold transition sm:px-4 ${
                   activeTab === 'enrollments'
                     ? 'bg-primary text-primary-foreground shadow-sm'
                     : 'bg-secondary/40 text-muted-foreground hover:bg-secondary hover:text-foreground'
                 }`}
               >
-                <BookOpen className="h-4 w-4" />
-                {copy.tabEnrollments}
-                <span className="ml-1 rounded-md bg-muted px-2 py-0.5 text-xs text-foreground">
+                <BookOpen className="h-4 w-4 shrink-0" />
+                <span className="truncate sm:hidden">{copy.tabEnrollmentsShort}</span>
+                <span className="hidden truncate sm:inline">{copy.tabEnrollments}</span>
+                <span className="ml-1 shrink-0 rounded-md bg-muted px-2 py-0.5 text-xs text-foreground">
                   {enrollments.length}
                 </span>
               </button>
@@ -786,7 +822,7 @@ export default function EnrollmentsPage() {
           )}
 
           {activeTab === 'enrollments' && (
-            <div>
+            <div className="space-y-6">
               {enrollments.length === 0 ? (
                 <EmptyState
                   icon={BookOpen}
@@ -797,182 +833,203 @@ export default function EnrollmentsPage() {
                   }
                 />
               ) : (
-                <Card variant="muted">
-                  <CardHeader className="flex flex-row items-center justify-between pb-2">
-                    <CardTitle className="text-xl">{copy.recordTitle}</CardTitle>
-                    {enrollments.length > 0 ? (
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        onClick={() => void handleDownloadSlip()}
-                        disabled={downloadingSlip}
-                        className="gap-2 text-xs"
-                      >
-                        <FileDown className="h-3.5 w-3.5" aria-hidden="true" />
-                        {downloadingSlip ? copy.exportSlipDownloading : copy.exportSlip}
-                      </Button>
-                    ) : null}
-                  </CardHeader>
-                  <CardContent className="space-y-3 sm:space-y-4">
-                    {enrollments.map((enrollment) => {
-                      const courseCode = enrollment.section?.course?.code ?? copy.unknownCourse;
-                      const courseName = getLocalizedName(
-                        locale,
-                        enrollment.section?.course,
-                        enrollment.section?.course?.name ?? copy.unavailableCourseName,
-                      );
-                      const courseLabel = `${courseCode} ${courseName}`.trim();
+                groupedEnrollments.map((group) => {
+                  const groupCredits = group.items.reduce(
+                    (total, item) => total + (item.section?.course?.credits ?? 0),
+                    0,
+                  );
+                  return (
+                    <Card key={group.label} variant="muted" className="overflow-hidden">
+                      <CardHeader className="flex flex-row items-center justify-between gap-3 border-b border-border/60 bg-secondary/20 py-3">
+                        <CardTitle className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">
+                          {group.label}
+                        </CardTitle>
+                        <span className="shrink-0 text-xs font-medium tabular-nums text-muted-foreground">
+                          {courseCountLabel(group.items.length)} · {formatNumber(groupCredits)} {copy.creditsLabel}
+                        </span>
+                      </CardHeader>
+                      <CardContent className="p-0">
+                        {/* Compact scannable table — the primary "môn đã đăng ký" view */}
+                        <div className="hidden overflow-x-auto sm:block">
+                          <table className="w-full text-sm">
+                            <thead>
+                              <tr className="border-b border-border/60 text-left text-xs uppercase tracking-wider text-muted-foreground">
+                                <th className="px-4 py-2.5 font-semibold">{copy.colCourse}</th>
+                                <th className="px-3 py-2.5 font-semibold">{copy.colSection}</th>
+                                <th className="px-3 py-2.5 font-semibold">{copy.colSchedule}</th>
+                                <th className="px-3 py-2.5 font-semibold">{copy.colStatus}</th>
+                                <th className="px-3 py-2.5 text-right font-semibold" aria-label="actions" />
+                              </tr>
+                            </thead>
+                            <tbody className="divide-y divide-border/60">
+                              {group.items.map((enrollment) => {
+                                const courseCode = enrollment.section?.course?.code ?? copy.unknownCourse;
+                                const courseName = getLocalizedName(
+                                  locale,
+                                  enrollment.section?.course,
+                                  enrollment.section?.course?.name ?? copy.unavailableCourseName,
+                                );
+                                const courseLabel = `${courseCode} ${courseName}`.trim();
+                                return (
+                                  <tr key={enrollment.id} className="transition-colors hover:bg-secondary/15">
+                                    <td className="px-4 py-3">
+                                      <div className="flex items-baseline gap-2">
+                                        <span className="font-mono text-xs font-semibold text-primary">
+                                          {courseCode}
+                                        </span>
+                                        <span className="text-xs tabular-nums text-muted-foreground">
+                                          {enrollment.section?.course?.credits} {copy.creditsLabel}
+                                        </span>
+                                      </div>
+                                      <div className="mt-0.5 font-medium leading-snug text-foreground">
+                                        {courseName}
+                                      </div>
+                                    </td>
+                                    <td className="px-3 py-3">
+                                      <span className="inline-flex rounded-md bg-secondary px-2 py-1 text-xs font-medium text-foreground">
+                                        {enrollment.section?.sectionNumber || copy.unknownSection}
+                                      </span>
+                                    </td>
+                                    <td className="px-3 py-3">
+                                      {enrollment.section?.schedules?.length ? (
+                                        <div className="flex flex-col gap-1">
+                                          {enrollment.section.schedules.map((schedule, index) => (
+                                            <span
+                                              key={`${enrollment.id}-sched-${index}`}
+                                              className="inline-flex items-center gap-1.5 text-xs text-muted-foreground"
+                                            >
+                                              <Clock className="h-3 w-3" />
+                                              {getDayName(schedule.dayOfWeek, locale)}{' '}
+                                              {schedule.startTime}-{schedule.endTime}
+                                              {classroomLabel(schedule) && ` · ${classroomLabel(schedule)}`}
+                                            </span>
+                                          ))}
+                                        </div>
+                                      ) : (
+                                        <span className="text-xs text-muted-foreground">—</span>
+                                      )}
+                                      {lecturerName(enrollment) && (
+                                        <span className="mt-1 inline-flex items-center gap-1.5 text-xs text-muted-foreground">
+                                          <GraduationCap className="h-3 w-3" />
+                                          {lecturerName(enrollment)}
+                                        </span>
+                                      )}
+                                    </td>
+                                    <td className="px-3 py-3">
+                                      <span
+                                        className={`inline-flex rounded-md px-2.5 py-1 text-xs font-medium ${
+                                          statusTone[enrollment.status] ?? 'bg-secondary text-foreground'
+                                        }`}
+                                      >
+                                        {messages.common.statuses[enrollment.status as keyof typeof messages.common.statuses] ?? messages.common.statuses.UNKNOWN}
+                                      </span>
+                                    </td>
+                                    <td className="px-3 py-3 text-right">
+                                      {isDroppableEnrollment(enrollment.status) ? (
+                                        <Button
+                                          type="button"
+                                          variant="ghost"
+                                          size="sm"
+                                          className="h-8 px-2 text-destructive hover:bg-destructive/10 hover:text-destructive"
+                                          onClick={() => void handleDrop(enrollment.id, courseLabel)}
+                                          disabled={isDropping === enrollment.id}
+                                          aria-label={`${copy.dropCourse} ${courseLabel}`}
+                                        >
+                                          <Trash2 className="h-4 w-4" />
+                                        </Button>
+                                      ) : null}
+                                    </td>
+                                  </tr>
+                                );
+                              })}
+                            </tbody>
+                          </table>
+                        </div>
 
-                      return (
-                        <div
-                          key={enrollment.id}
-                          className="rounded-xl border border-border/80 bg-card px-3 py-3 shadow-xs transition hover:border-primary/40 sm:px-5 sm:py-5"
-                        >
-                          <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
-                            <div className="min-w-0 flex-1">
-                              <div className="flex flex-wrap items-center gap-2">
-                                <h2 className="min-w-0 break-words text-base font-semibold text-foreground sm:text-lg">
-                                  {courseCode} - {courseName}
-                                </h2>
-                                <span className="rounded-md bg-secondary px-2.5 py-1 text-xs font-medium text-foreground">
-                                  {copy.sectionPrefix}{' '}
-                                  {enrollment.section?.sectionNumber || copy.unknownSection}
-                                </span>
-                                <span
-                                  className={`rounded-md px-2.5 py-1 text-xs font-medium ${
-                                    statusTone[enrollment.status] ??
-                                      'bg-secondary text-foreground'
-                                  }`}
-                                >
-                                  {messages.common.statuses[enrollment.status as keyof typeof messages.common.statuses] ?? messages.common.statuses.UNKNOWN}
-                                </span>
-                              </div>
-
-                              <div className="mt-3 hidden space-y-3 sm:block">
-                                <div className="flex flex-wrap gap-4 text-sm text-muted-foreground">
-                                  <span className="inline-flex items-center gap-2">
-                                    <Calendar className="h-4 w-4" />
-                                    {copy.enrolledOn} {formatDate(enrollment.enrolledAt)}
-                                  </span>
-                                  <span>
-                                    {enrollment.section?.course?.credits} {copy.creditsLabel}
-                                  </span>
-                                  {enrollment.section?.lecturer ? (
-                                    <span>
-                                      {(enrollment.section.lecturer as { fullName?: string }).fullName ??
-                                        `${enrollment.section.lecturer.user?.lastName ?? ''} ${enrollment.section.lecturer.user?.firstName ?? ''}`.trim()}
+                        {/* Mobile: compact rows, schedule visible without expanding */}
+                        <ul className="divide-y divide-border/60 sm:hidden">
+                          {group.items.map((enrollment) => {
+                            const courseCode = enrollment.section?.course?.code ?? copy.unknownCourse;
+                            const courseName = getLocalizedName(
+                              locale,
+                              enrollment.section?.course,
+                              enrollment.section?.course?.name ?? copy.unavailableCourseName,
+                            );
+                            const courseLabel = `${courseCode} ${courseName}`.trim();
+                            return (
+                              <li key={enrollment.id} className="px-3 py-3">
+                                <div className="flex items-start justify-between gap-2">
+                                  <div className="flex min-w-0 items-baseline gap-2">
+                                    <span className="font-mono text-xs font-semibold text-primary">
+                                      {courseCode}
                                     </span>
-                                  ) : null}
-                                  {enrollment.section?.classroom ? (
-                                    <span className="inline-flex items-center gap-2">
-                                      <MapPin className="h-4 w-4" />
-                                      {enrollment.section.classroom.building}{' '}
-                                      {enrollment.section.classroom.roomNumber}
+                                    <span className="text-[11px] tabular-nums text-muted-foreground">
+                                      {enrollment.section?.course?.credits} {copy.creditsLabel} ·{' '}
+                                      {copy.sectionPrefix} {enrollment.section?.sectionNumber || copy.unknownSection}
                                     </span>
-                                  ) : null}
+                                  </div>
+                                  <span
+                                    className={`shrink-0 rounded-md px-2 py-0.5 text-[11px] font-medium ${
+                                      statusTone[enrollment.status] ?? 'bg-secondary text-foreground'
+                                    }`}
+                                  >
+                                    {messages.common.statuses[enrollment.status as keyof typeof messages.common.statuses] ?? messages.common.statuses.UNKNOWN}
+                                  </span>
                                 </div>
-
+                                <div className="mt-1 text-sm font-medium leading-snug text-foreground">
+                                  {courseName}
+                                </div>
                                 {enrollment.section?.schedules?.length ? (
-                                  <div className="flex flex-wrap gap-2">
+                                  <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1">
                                     {enrollment.section.schedules.map((schedule, index) => (
                                       <span
-                                        key={`${enrollment.id}-desktop-${index}`}
-                                        className="inline-flex items-center gap-2 rounded-md bg-secondary px-3 py-1 text-xs text-foreground"
+                                        key={`${enrollment.id}-m-${index}`}
+                                        className="inline-flex items-center gap-1.5 text-xs text-muted-foreground"
                                       >
-                                        <Clock className="h-3.5 w-3.5" />
+                                        <Clock className="h-3 w-3" />
                                         {getDayName(schedule.dayOfWeek, locale)}{' '}
-                                        {schedule.startTime}-
-                                        {schedule.endTime}
+                                        {schedule.startTime}-{schedule.endTime}
                                       </span>
                                     ))}
                                   </div>
                                 ) : null}
-                              </div>
-
-                              <details className="group mt-3 sm:hidden">
-                                <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between gap-3 rounded-lg bg-secondary/60 px-3 py-2 text-sm font-medium text-foreground outline-none transition-colors hover:bg-secondary focus-visible:ring-2 focus-visible:ring-ring [&::-webkit-details-marker]:hidden">
-                                  <span>{copy.detailsLabel}</span>
-                                  <ChevronDown className="h-4 w-4 shrink-0 transition-transform group-open:rotate-180" />
-                                </summary>
-                                <div className="space-y-3 border-t border-border/70 pt-3">
-                                  <div className="grid grid-cols-2 gap-2 text-xs text-muted-foreground">
-                                    <span className="col-span-2 inline-flex items-center gap-2">
-                                      <Calendar className="h-4 w-4 shrink-0" />
-                                      {copy.enrolledOn} {formatDate(enrollment.enrolledAt)}
+                                <div className="mt-2 flex items-center gap-3 text-[11px] text-muted-foreground">
+                                  <span className="inline-flex items-center gap-1.5">
+                                    <Calendar className="h-3 w-3" />
+                                    {copy.enrolledOn} {formatDate(enrollment.enrolledAt)}
+                                  </span>
+                                  {lecturerName(enrollment) && (
+                                    <span className="inline-flex items-center gap-1.5">
+                                      <GraduationCap className="h-3 w-3" />
+                                      {lecturerName(enrollment)}
                                     </span>
-                                    <span>
-                                      {enrollment.section?.course?.credits} {copy.creditsLabel}
+                                  )}
+                                  {classroomLabel(enrollment.section?.schedules?.[0]) ? (
+                                    <span className="inline-flex items-center gap-1.5">
+                                      <MapPin className="h-3 w-3" />
+                                      {classroomLabel(enrollment.section?.schedules?.[0])}
                                     </span>
-                                    {enrollment.section?.lecturer ? (
-                                      <span className="truncate">
-                                        {(enrollment.section.lecturer as { fullName?: string }).fullName ??
-                                          `${enrollment.section.lecturer.user?.lastName ?? ''} ${enrollment.section.lecturer.user?.firstName ?? ''}`.trim()}
-                                      </span>
-                                    ) : null}
-                                    {enrollment.section?.classroom ? (
-                                      <span className="col-span-2 inline-flex items-center gap-2">
-                                        <MapPin className="h-4 w-4 shrink-0" />
-                                        {enrollment.section.classroom.building}{' '}
-                                        {enrollment.section.classroom.roomNumber}
-                                      </span>
-                                    ) : null}
-                                  </div>
-
-                                  {enrollment.section?.schedules?.length ? (
-                                    <div className="flex flex-wrap gap-2">
-                                      {enrollment.section.schedules.map((schedule, index) => (
-                                        <span
-                                          key={`${enrollment.id}-mobile-${index}`}
-                                          className="inline-flex items-center gap-2 rounded-md bg-secondary px-3 py-1 text-xs text-foreground"
-                                        >
-                                          <Clock className="h-3.5 w-3.5" />
-                                          {getDayName(schedule.dayOfWeek, locale)}{' '}
-                                          {schedule.startTime}-
-                                          {schedule.endTime}
-                                        </span>
-                                      ))}
-                                    </div>
                                   ) : null}
-
                                   {isDroppableEnrollment(enrollment.status) ? (
-                                    <Button
+                                    <button
                                       type="button"
-                                      variant="destructive"
-                                      className="w-full"
+                                      className="ml-auto inline-flex items-center gap-1 font-medium text-destructive"
                                       onClick={() => void handleDrop(enrollment.id, courseLabel)}
                                       disabled={isDropping === enrollment.id}
                                     >
-                                      <Trash2 className="mr-2 h-4 w-4" />
-                                      {isDropping === enrollment.id
-                                        ? copy.droppingCourse
-                                        : copy.dropCourse}
-                                    </Button>
+                                      <Trash2 className="h-3.5 w-3.5" />
+                                      {isDropping === enrollment.id ? copy.droppingCourse : copy.dropCourse}
+                                    </button>
                                   ) : null}
                                 </div>
-                              </details>
-                            </div>
-
-                            {isDroppableEnrollment(enrollment.status) ? (
-                              <Button
-                                type="button"
-                                variant="destructive"
-                                className="hidden shrink-0 sm:inline-flex"
-                                onClick={() => void handleDrop(enrollment.id, courseLabel)}
-                                disabled={isDropping === enrollment.id}
-                              >
-                                <Trash2 className="mr-2 h-4 w-4" />
-                                {isDropping === enrollment.id
-                                  ? copy.droppingCourse
-                                  : copy.dropCourse}
-                              </Button>
-                            ) : null}
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </CardContent>
-                </Card>
+                              </li>
+                            );
+                          })}
+                        </ul>
+                      </CardContent>
+                    </Card>
+                  );
+                })
               )}
             </div>
           )}
