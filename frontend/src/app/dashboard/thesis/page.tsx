@@ -833,8 +833,13 @@ export default function ThesisPage() {
       if (g.approvalStatus === 'APPROVED' && !supervisedReports[g.id]) {
         void thesisApi.getReport(g.id)
           .then((rep) => setSupervisedReports((prev) => ({ ...prev, [g.id]: rep })))
-          .catch(() => {
-            setSecondaryDataError(true);
+          .catch((err: unknown) => {
+            // 404 REPORT_NOT_FOUND means the group has not submitted yet —
+            // an expected state, not a data error.
+            const status = (err as { response?: { status?: number } })?.response?.status;
+            if (status !== 404 && status !== 204) {
+              setSecondaryDataError(true);
+            }
           });
       }
     }

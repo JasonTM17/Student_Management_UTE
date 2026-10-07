@@ -864,7 +864,7 @@ export default function DashboardLayout({
                   <div className="truncate text-sm font-semibold text-portal-sidebar-text">
                     {fullName}
                   </div>
-                  <div className="truncate text-xs text-portal-sidebar-muted">
+                  <div className="truncate text-xs text-portal-sidebar-muted" title={user.email}>
                     {user.email}
                   </div>
                   <div className="mt-2 flex flex-wrap items-center gap-1.5">
@@ -1354,7 +1354,7 @@ export default function DashboardLayout({
                     aria-expanded={sidebarOpen}
                     aria-controls="dashboard-sidebar"
                     className={cn(
-                      'relative flex min-h-11 min-w-0 flex-col items-center justify-center gap-1 rounded-md px-1 py-1 text-xs font-medium transition-[background-color,color] duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
+                      'relative flex min-h-11 min-w-0 flex-col items-center justify-center gap-1 rounded-md px-0.5 py-1 text-xs font-medium transition-[background-color,color] duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
                       sidebarOpen
                         ? 'bg-secondary text-primary'
                         : 'text-muted-foreground hover:bg-secondary hover:text-foreground',
@@ -1393,7 +1393,7 @@ export default function DashboardLayout({
                   href={item.href}
                   aria-current={isActive ? 'page' : undefined}
                   className={cn(
-                    'flex min-h-11 min-w-0 flex-col items-center justify-center gap-1 rounded-md px-1 py-1 text-xs font-medium transition-[background-color,color] duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
+                    'flex min-h-11 min-w-0 flex-col items-center justify-center gap-1 rounded-md px-0.5 py-1 text-xs font-medium transition-[background-color,color] duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
                     isActive
                       ? 'bg-secondary text-primary'
                       : 'text-muted-foreground hover:bg-secondary hover:text-foreground',
@@ -1414,7 +1414,7 @@ export default function DashboardLayout({
               data-mobile-assistant-slot="true"
               aria-label={messages.assistant.specializedLabel}
               title={messages.assistant.slotLabel}
-              className="flex min-h-11 min-w-0 w-full flex-col items-center justify-center gap-1 rounded-md px-1 py-1 text-xs font-medium text-muted-foreground transition-[background-color,color] duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring hover:bg-secondary hover:text-foreground"
+              className="flex min-h-11 min-w-0 w-full flex-col items-center justify-center gap-1 rounded-md px-0.5 py-1 text-xs font-medium text-muted-foreground transition-[background-color,color] duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring hover:bg-secondary hover:text-foreground"
             >
               <AssistantMascot className="h-5 w-5 shrink-0" />
               <span
