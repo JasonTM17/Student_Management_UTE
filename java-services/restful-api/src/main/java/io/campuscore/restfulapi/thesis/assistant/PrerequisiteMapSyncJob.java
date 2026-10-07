@@ -5,7 +5,6 @@ import java.util.Map;
 import java.util.UUID;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Profile;
@@ -58,30 +57,39 @@ public class PrerequisiteMapSyncJob {
 
     private final NamedParameterJdbcTemplate jdbc;
     private final SqlKnowledgeReleasePromoter promoter;
+    private final AssistantRlsTransactionRunner transactions;
 
     public PrerequisiteMapSyncJob(
             @Qualifier(AssistantDatabaseConfiguration.JDBC_TEMPLATE) NamedParameterJdbcTemplate jdbc,
-            SqlKnowledgeReleasePromoter promoter) {
+            SqlKnowledgeReleasePromoter promoter,
+            AssistantRlsTransactionRunner transactions) {
         this.jdbc = jdbc;
         this.promoter = promoter;
+        this.transactions = transactions;
     }
 
     /** Runs daily at 04:12 server time (off-peak, fixed schedule, no overlap). */
     @Scheduled(cron = "${assistant.prerequisite-map-sync.cron:0 12 4 * * *}")
     public void synchronizeMapDocuments() {
         try {
-            int updated = 0;
-            for (Map.Entry<String, String> entry : Map.of(
-                    "catalog-prerequisite-map-vi", buildBody(true),
-                    "catalog-prerequisite-map-en", buildBody(false)).entrySet()) {
-                updated += rewriteIfDrifted(entry.getKey(), entry.getValue());
-            }
-            if (updated > 0) {
+            // CATALOG_SYNC binds the session GUCs and wraps the whole sync in
+            // one authoring transaction — promote() requires it, and the RLS
+            // policies on the knowledge tables only open for this scope.
+            Integer updated = transactions.executeUnchecked(AssistantRlsBoundary.Access.CATALOG_SYNC, () -> {
+                String viBody = buildBody(true);
+                String enBody = buildBody(false);
+                int count = 0;
+                count += rewriteIfDrifted("catalog-prerequisite-map-vi", viBody);
+                count += rewriteIfDrifted("catalog-prerequisite-map-en", enBody);
+                return count;
+            });
+            if (updated != null && updated > 0) {
                 log.info("PREREQUISITE_MAP_SYNC regenerated {} document(s) from live CourseRequirement rows", updated);
             }
         } catch (Exception exception) {
             // Telemetry job: a failed sync must never break the assistant.
-            log.warn("PREREQUISITE_MAP_SYNC failed: {}", exception.getMessage());
+            log.warn("PREREQUISITE_MAP_SYNC failed: {}: {}",
+                    exception.getClass().getSimpleName(), exception.getMessage());
         }
     }
 
@@ -112,7 +120,9 @@ public class PrerequisiteMapSyncJob {
         @SuppressWarnings("unchecked")
         Map<String, Object> typedDoc = doc;
 
-        // Archive the superseded revision, then append the regenerated one.
+        // Archive the superseded revision, append the regenerated one, and
+        // refresh the document's published content — the admin publish path
+        // does the same, and without it every run would redetect the drift.
         jdbc.update("UPDATE assistant.knowledge_document_revision SET state='ARCHIVED' "
                         + "WHERE document_id=:id AND state='PUBLISHED'",
                 Map.of("id", documentId));
@@ -138,6 +148,9 @@ public class PrerequisiteMapSyncJob {
                         + "WHERE document_id=:id AND version=:version",
                 new MapSqlParameterSource().addValue("id", documentId).addValue("version", nextVersion),
                 UUID.class);
+        jdbc.update("UPDATE assistant.knowledge_document SET content=:content,updated_at=CURRENT_TIMESTAMP "
+                        + "WHERE id=:id",
+                new MapSqlParameterSource().addValue("id", documentId).addValue("content", body));
         promoter.promote(documentId, revisionId, "prerequisite-map-sync");
         return 1;
     }

@@ -137,7 +137,7 @@ public class AssistantRlsRuntimeVerifier implements SmartInitializingSingleton {
                     || result.getLong("forced_rls_tables") != 13
                     || result.getLong("assistant_tables") != 13
                     || result.getLong("policy_tables") != 13
-                    || result.getLong("policy_count") != 47
+                    || result.getLong("policy_count") != 59
                     || result.getLong("policies_for_other_roles") != 0
                     || result.getLong("role_memberships") != 0
                     || result.getLong("role_context_defaults") != 0

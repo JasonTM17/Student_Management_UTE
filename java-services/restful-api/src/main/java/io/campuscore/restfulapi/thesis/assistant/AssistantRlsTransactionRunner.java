@@ -152,6 +152,7 @@ public final class AssistantRlsTransactionRunner {
             case ADMIN_GOVERNANCE -> active.scope() == AssistantRlsContext.Scope.ADMIN_GOVERNANCE;
             case RETENTION -> active.scope() == AssistantRlsContext.Scope.RETENTION;
             case KNOWLEDGE_PROJECTION -> active.scope() == AssistantRlsContext.Scope.KNOWLEDGE_PROJECTION;
+            case CATALOG_SYNC -> active.scope() == AssistantRlsContext.Scope.CATALOG_SYNC;
         };
         if (!compatible) {
             throw new IllegalStateException("Assistant RLS scope cannot be escalated or changed within an active transaction");

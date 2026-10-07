@@ -22,7 +22,8 @@ final class AssistantRlsContext {
         INTERNAL_OWNER,
         ADMIN_GOVERNANCE,
         RETENTION,
-        KNOWLEDGE_PROJECTION
+        KNOWLEDGE_PROJECTION,
+        CATALOG_SYNC
     }
 
     record Identity(String ownerId, Scope scope, boolean admin) {
@@ -31,7 +32,8 @@ final class AssistantRlsContext {
                     && (ownerId == null || ownerId.isBlank())) {
                 throw new IllegalArgumentException("An owner identity is required for this Assistant scope");
             }
-            if ((scope == Scope.RETENTION || scope == Scope.KNOWLEDGE_PROJECTION) && ownerId != null) {
+            if ((scope == Scope.RETENTION || scope == Scope.KNOWLEDGE_PROJECTION || scope == Scope.CATALOG_SYNC)
+                    && ownerId != null) {
                 throw new IllegalArgumentException("System Assistant scopes cannot carry a user owner");
             }
             if (scope != Scope.ADMIN_GOVERNANCE && scope != Scope.USER && admin) {
@@ -50,6 +52,7 @@ final class AssistantRlsContext {
             case ADMIN_GOVERNANCE -> authenticatedUser(true);
             case RETENTION -> new Identity(null, Scope.RETENTION, false);
             case KNOWLEDGE_PROJECTION -> new Identity(null, Scope.KNOWLEDGE_PROJECTION, false);
+            case CATALOG_SYNC -> new Identity(null, Scope.CATALOG_SYNC, false);
         };
     }
 

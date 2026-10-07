@@ -19,6 +19,8 @@ public @interface AssistantRlsBoundary {
         /** Narrow scheduled lease-recovery and retention operations. */
         RETENTION,
         /** Narrow Supabase-to-Assistant knowledge projection operations. */
-        KNOWLEDGE_PROJECTION
+        KNOWLEDGE_PROJECTION,
+        /** Narrow scheduled catalog-sync operations (e.g. prerequisite map regeneration). */
+        CATALOG_SYNC
     }
 }

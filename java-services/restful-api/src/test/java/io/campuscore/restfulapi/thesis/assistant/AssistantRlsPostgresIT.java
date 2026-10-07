@@ -96,7 +96,8 @@ class AssistantRlsPostgresIT {
     @Test
     void runtimeLoginIsDedicatedAndMissingContextDefaultsToDeny() throws Throwable {
         assertFalse(primaryDataSource == assistantDataSource);
-        assertEquals("postgres", scalar(primaryJdbc.getJdbcTemplate(), "SELECT current_user"));
+        assertEquals(System.getenv().getOrDefault("ASSISTANT_RLS_PRIMARY_USER", "postgres"),
+                scalar(primaryJdbc.getJdbcTemplate(), "SELECT current_user"));
         Map<String, Object> role = assistantJdbc.queryForMap("""
                 SELECT current_user, session_user, r.rolcanlogin, r.rolsuper, r.rolcreatedb,
                        r.rolcreaterole, r.rolinherit, r.rolreplication, r.rolbypassrls,
@@ -125,7 +126,7 @@ class AssistantRlsPostgresIT {
         assertEquals(0L, ((Number) role.get("memberships")).longValue());
         assertEquals(13L, ((Number) role.get("rls_tables")).longValue());
         assertEquals(13L, ((Number) role.get("forced_rls_tables")).longValue());
-        assertEquals(47L, ((Number) role.get("policy_count")).longValue());
+        assertEquals(59L, ((Number) role.get("policy_count")).longValue());
         assertEquals("", role.get("owner_setting"));
         assertEquals("", role.get("scope_setting"));
         assertEquals("", role.get("admin_setting"));
@@ -189,7 +190,9 @@ class AssistantRlsPostgresIT {
         assertEquals(1, asUser(ownerB, "ROLE_LECTURER", () -> count("SELECT COUNT(*) FROM assistant.chat_turn_ledger")));
         assertEquals(1, asUser(ownerB, "ROLE_LECTURER", () -> count("SELECT COUNT(*) FROM assistant.provider_dispatch_registry")));
         assertEquals(1, asUser(ownerB, "ROLE_LECTURER", () -> count("SELECT COUNT(*) FROM assistant.usage_bucket WHERE scope='USER'")));
-        assertEquals(1, asUser(ownerA, "ROLE_STUDENT", () -> count(
+        int globalBuckets = scalarCount(primaryJdbc.getJdbcTemplate(),
+                "SELECT COUNT(*) FROM assistant.usage_bucket WHERE owner_id='*' AND scope='GLOBAL'");
+        assertEquals(globalBuckets, asUser(ownerA, "ROLE_STUDENT", () -> count(
                 "SELECT COUNT(*) FROM assistant.usage_bucket WHERE owner_id='*' AND scope='GLOBAL'")));
         assertThrows(org.springframework.dao.DataAccessException.class, () -> asUser(ownerA, "ROLE_STUDENT", () ->
                 turns.reserve(ownerB, UUID.randomUUID(), "c".repeat(64), null, "vi", "forged-owner", 90)));
@@ -306,8 +309,12 @@ class AssistantRlsPostgresIT {
         // The *_admin_read policies deliberately carry no owner predicate — the
         // feedback console must aggregate across owners. User scope still sees
         // only its own rows, and the admin policies grant SELECT only.
-        assertEquals(2, asAdmin(adminOwner, () -> count("SELECT COUNT(*) FROM assistant.chat_message_feedback")));
-        assertEquals(2, asAdmin(adminOwner, () -> count("SELECT COUNT(*) FROM assistant.chat_message")));
+        int allFeedback = scalarCount(primaryJdbc.getJdbcTemplate(),
+                "SELECT COUNT(*) FROM assistant.chat_message_feedback");
+        int allMessages = scalarCount(primaryJdbc.getJdbcTemplate(),
+                "SELECT COUNT(*) FROM assistant.chat_message");
+        assertEquals(allFeedback, asAdmin(adminOwner, () -> count("SELECT COUNT(*) FROM assistant.chat_message_feedback")));
+        assertEquals(allMessages, asAdmin(adminOwner, () -> count("SELECT COUNT(*) FROM assistant.chat_message")));
         assertEquals(1, asUser(ownerA, "ROLE_STUDENT", () -> count("SELECT COUNT(*) FROM assistant.chat_message_feedback")));
         assertEquals(0, asAdmin(adminOwner, () -> assistantJdbc.update(
                 "UPDATE assistant.chat_message_feedback SET rating='DOWN' WHERE owner_id=:owner",
