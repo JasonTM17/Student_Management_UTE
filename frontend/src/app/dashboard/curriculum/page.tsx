@@ -7,6 +7,7 @@ import {
   CheckCircle2,
   ChevronDown,
   Clock,
+  GitBranch,
   GraduationCap,
   Unlock,
 } from 'lucide-react';
@@ -83,6 +84,11 @@ export default function CurriculumPage() {
     [courses],
   );
 
+  const courseByCode = useMemo(
+    () => new Map(courses.map((course) => [course.code, course])),
+    [courses],
+  );
+
   const isAvailable = useCallback(
     (course: MyCurriculumCourse) =>
       course.status === 'NOT_STARTED'
@@ -103,6 +109,44 @@ export default function CurriculumPage() {
     map.forEach((list) => list.sort());
     return map;
   }, [courses]);
+
+  /**
+   * Every maximal prerequisite path, from a no-prerequisite root down to a
+   * leaf. Cycles are pruned defensively and paths fully contained inside a
+   * longer chain are dropped, so each rendered row is a distinct study path
+   * ("pass A to unlock B, pass B to unlock C").
+   */
+  const prereqChains = useMemo(() => {
+    const byCode = new Map(courses.map((course) => [course.code, course]));
+    const paths: string[][] = [];
+    const walk = (code: string, path: string[]) => {
+      const next = (unlocksByCode.get(code) ?? []).filter(
+        (dependent) => byCode.has(dependent) && !path.includes(dependent),
+      );
+      if (next.length === 0) {
+        if (path.length > 1) paths.push(path);
+        return;
+      }
+      next.forEach((dependent) => walk(dependent, [...path, dependent]));
+    };
+    const dependentCodes = new Set<string>();
+    unlocksByCode.forEach((dependents) => dependents.forEach((code) => dependentCodes.add(code)));
+    courses
+      .filter(
+        (course) =>
+          !dependentCodes.has(course.code)
+          && (unlocksByCode.get(course.code)?.length ?? 0) > 0,
+      )
+      .forEach((root) => walk(root.code, [root.code]));
+    const isSubPath = (a: string[], b: string[]) =>
+      a.length < b.length
+      && Array.from({ length: b.length - a.length + 1 }, (_, i) => i).some(
+        (offset) => a.every((code, j) => b[offset + j] === code),
+      );
+    return paths
+      .filter((path) => !paths.some((other) => other !== path && isSubPath(path, other)))
+      .sort((a, b) => b.length - a.length);
+  }, [courses, unlocksByCode]);
 
   const openSectionCountByCourseId = useMemo(() => {
     const map = new Map<string, number>();
@@ -294,6 +338,47 @@ export default function CurriculumPage() {
               </div>
             </div>
           </div>
+
+          {prereqChains.length > 0 ? (
+            <Card variant="muted" className="overflow-hidden">
+              <CardHeader className="border-b border-border/60 bg-secondary/20 py-3">
+                <CardTitle className="flex items-center gap-2 text-sm font-semibold text-foreground">
+                  <GitBranch className="h-4 w-4 text-primary" aria-hidden="true" />
+                  {copy.chainsTitle}
+                </CardTitle>
+                <p className="text-xs leading-5 text-muted-foreground">{copy.chainsDescription}</p>
+              </CardHeader>
+              <CardContent className="space-y-2.5 p-4">
+                {prereqChains.map((chain) => (
+                  <div key={chain.join('>')} className="flex flex-wrap items-center gap-x-1.5 gap-y-1.5">
+                    {chain.map((code, step) => {
+                      const course = courseByCode.get(code);
+                      const status = statusByCode.get(code) ?? 'NOT_STARTED';
+                      return (
+                        <span key={`${chain.join('>')}-${code}-${step}`} className="inline-flex items-center gap-1.5">
+                          {step > 0 ? (
+                            <ArrowRight className="h-3 w-3 shrink-0 text-muted-foreground/60" aria-hidden="true" />
+                          ) : null}
+                          <span
+                            className={`rounded px-1.5 py-0.5 font-mono text-[11px] font-semibold ${
+                              status === 'COMPLETED'
+                                ? 'bg-status-success/10 text-status-success-foreground'
+                                : status === 'IN_PROGRESS'
+                                  ? 'bg-status-info/10 text-status-info-foreground'
+                                  : 'bg-secondary text-muted-foreground'
+                            }`}
+                            title={course ? getLocalizedName(locale, course, course.name) : code}
+                          >
+                            {status === 'COMPLETED' ? `✓ ${code}` : code}
+                          </span>
+                        </span>
+                      );
+                    })}
+                  </div>
+                ))}
+              </CardContent>
+            </Card>
+          ) : null}
 
           {availableCourses.length > 0 && (statusFilter === 'ALL' || statusFilter === 'AVAILABLE') ? (
             <Card variant="muted" className="overflow-hidden border-primary/25">
