@@ -10,6 +10,7 @@ import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import java.util.List;
 import org.springframework.context.annotation.Profile;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -32,6 +33,7 @@ public class ThesisRoundReadController {
         @ApiResponse(responseCode = "200", description = "Truy xuất danh sách đợt thành công")
     })
     @GetMapping
+    @PreAuthorize("hasAnyRole('STUDENT','LECTURER','ADMIN','SUPER_ADMIN','TRUONG_KHOA')")
     public List<RoundResponse> list(
             @Parameter(description = "Lọc theo trạng thái đợt (PROPOSAL_OPEN, REGISTRATION_OPEN, RESULTS_PUBLISHED, v.v.)")
             @RequestParam(required = false) RoundStatus status) {

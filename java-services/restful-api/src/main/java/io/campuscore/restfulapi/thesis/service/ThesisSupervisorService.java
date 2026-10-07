@@ -7,6 +7,8 @@ import io.campuscore.restfulapi.thesis.repository.ThesisTopicRepository;
 import io.campuscore.restfulapi.web.DomainException;
 import java.util.List;
 import java.util.UUID;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.context.annotation.Profile;
 import org.springframework.http.HttpStatus;
 import org.springframework.jdbc.core.namedparam.MapSqlParameterSource;
@@ -26,14 +28,25 @@ import org.springframework.util.StringUtils;
 @Profile("persistence")
 public class ThesisSupervisorService {
 
+    private static final Logger log = LoggerFactory.getLogger(ThesisSupervisorService.class);
+
     private final NamedParameterJdbcTemplate jdbc;
     private final ThesisTopicRepository topics;
     private final AdminAuditRecorder audit;
+    private final ThesisNotificationService notifier;
 
+    /** Compatibility constructor for tests that only exercise supervisor math. */
     public ThesisSupervisorService(NamedParameterJdbcTemplate jdbc, ThesisTopicRepository topics, AdminAuditRecorder audit) {
+        this(jdbc, topics, audit, null);
+    }
+
+    @org.springframework.beans.factory.annotation.Autowired
+    public ThesisSupervisorService(NamedParameterJdbcTemplate jdbc, ThesisTopicRepository topics,
+            AdminAuditRecorder audit, ThesisNotificationService notifier) {
         this.jdbc = jdbc;
         this.topics = topics;
         this.audit = audit;
+        this.notifier = notifier;
     }
 
     /**
@@ -133,6 +146,11 @@ public class ThesisSupervisorService {
         // thesis_topic_supervisor_order_unique UNIQUE (topic_id, supervisor_order)
         // backstops duplicate orders: two racing writers both claim order 1 and
         // one insert aborts.
+        // Captured before the rewrite so only genuinely new supervisors are
+        // notified — re-saving an unchanged roster must not re-ping anyone.
+        List<String> previousSupervisorIds = jdbc.queryForList(
+                "SELECT lecturer_id FROM thesis.thesis_topic_supervisor WHERE topic_id = :topicId",
+                new MapSqlParameterSource("topicId", topicId), String.class);
         Integer existing = jdbc.queryForObject(
                 "SELECT COUNT(*) FROM thesis.thesis_topic_supervisor WHERE topic_id = :topicId",
                 new MapSqlParameterSource().addValue("topicId", topicId), Integer.class);
@@ -156,6 +174,18 @@ public class ThesisSupervisorService {
         afterState.put("supervisorIds", normalized);
         audit.record(subject(actor), null, "TOPIC_SUPERVISORS_UPDATED", "THESIS_TOPIC", topicId.toString(),
                 "Supervisors set to " + normalized + " for topic " + topicId, null, afterState);
+        if (notifier != null) {
+            List<String> added = normalized.stream()
+                    .filter(id -> !previousSupervisorIds.contains(id))
+                    .toList();
+            if (!added.isEmpty()) {
+                try {
+                    notifier.notifySupervisorsAssigned(topicId, added);
+                } catch (RuntimeException exception) {
+                    log.warn("Thesis supervisor notification fan-out failed for topic {}", topicId, exception);
+                }
+            }
+        }
         return list(topicId, actor);
     }
 

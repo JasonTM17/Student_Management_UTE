@@ -47,6 +47,9 @@ public class ThesisMutationService {
     private static final int MIN_GROUP_MEMBERS = 1;
     private static final int MAX_GROUP_MEMBERS = 3;
 
+    private static final org.slf4j.Logger log =
+            org.slf4j.LoggerFactory.getLogger(ThesisMutationService.class);
+
     private final NamedParameterJdbcTemplate jdbc;
     private final ThesisRegistrationRoundRepository rounds;
     private final ThesisRoundReadPort roundReadPort;
@@ -54,6 +57,7 @@ public class ThesisMutationService {
     private final ThesisGroupReadRepository groups;
     private final ThesisRoundReadService roundReads;
     private final AdminAuditRecorder audit;
+    private final ThesisNotificationService notifier;
 
     /**
      * Wires the write boundary over the shared JDBC template and the thesis repositories.
@@ -73,6 +77,19 @@ public class ThesisMutationService {
             ThesisGroupReadRepository groups,
             ThesisRoundReadService roundReads,
             AdminAuditRecorder audit) {
+        this(jdbc, rounds, roundReadPort, topics, groups, roundReads, audit, null);
+    }
+
+    @org.springframework.beans.factory.annotation.Autowired
+    public ThesisMutationService(
+            NamedParameterJdbcTemplate jdbc,
+            ThesisRegistrationRoundRepository rounds,
+            ThesisRoundReadPort roundReadPort,
+            ThesisTopicRepository topics,
+            ThesisGroupReadRepository groups,
+            ThesisRoundReadService roundReads,
+            AdminAuditRecorder audit,
+            ThesisNotificationService notifier) {
         this.jdbc = jdbc;
         this.rounds = rounds;
         this.roundReadPort = roundReadPort;
@@ -80,6 +97,7 @@ public class ThesisMutationService {
         this.groups = groups;
         this.roundReads = roundReads;
         this.audit = audit;
+        this.notifier = notifier;
     }
 
     /**
@@ -443,7 +461,15 @@ public class ThesisMutationService {
             throw conflict("SCORES_INCOMPLETE",
                     "Every approved group must have a finalized score before results are published");
         }
-        return transitionRound(id, RoundStatus.REGISTRATION_CLOSED, RoundStatus.RESULTS_PUBLISHED, actor);
+        RoundResponse response = transitionRound(id, RoundStatus.REGISTRATION_CLOSED, RoundStatus.RESULTS_PUBLISHED, actor);
+        if (notifier != null) {
+            try {
+                notifier.notifyResultsPublished(id);
+            } catch (RuntimeException exception) {
+                log.warn("Thesis results-published notification fan-out failed for round {}", id, exception);
+            }
+        }
+        return response;
     }
 
     /**
@@ -752,6 +778,13 @@ public class ThesisMutationService {
         boolean isNewTopic = !topicId.equals(group.topicId());
         jdbc.update("UPDATE thesis.thesis_group SET topic_id = :topicId, status = CASE WHEN status = 'DRAFT' THEN 'SUBMITTED' ELSE status END, approval_status = CASE WHEN approval_status = 'REJECTED' OR :isNewTopic THEN 'PENDING' ELSE approval_status END, approved_by = CASE WHEN :isNewTopic THEN NULL ELSE approved_by END, approved_at = CASE WHEN :isNewTopic THEN NULL ELSE approved_at END, rejection_reason = CASE WHEN approval_status = 'REJECTED' OR :isNewTopic THEN NULL ELSE rejection_reason END, updated_at = CURRENT_TIMESTAMP, version = version + 1 WHERE id = :groupId",
                 params().addValue("topicId", topicId).addValue("groupId", groupId).addValue("isNewTopic", isNewTopic));
+        if (notifier != null && isNewTopic) {
+            try {
+                notifier.notifyTopicAssigned(groupId, topicId);
+            } catch (RuntimeException exception) {
+                log.warn("Thesis topic-assigned notification fan-out failed for group {}", groupId, exception);
+            }
+        }
         return groups.findById(groupId);
     }
 
@@ -864,6 +897,13 @@ public class ThesisMutationService {
         // traceable even though approved_by already stores them on the row.
         audit.record(subject(actor), null, "THESIS_GROUP_APPROVED", "THESIS_GROUP", groupId.toString(),
                 "Thesis group approved");
+        if (notifier != null) {
+            try {
+                notifier.notifyGroupDecision(groupId, true, null);
+            } catch (RuntimeException exception) {
+                log.warn("Thesis group-approval notification fan-out failed for group {}", groupId, exception);
+            }
+        }
         return groups.findById(groupId);
     }
 
@@ -896,6 +936,13 @@ public class ThesisMutationService {
         // transaction as the mutation (recorder runs MANDATORY).
         audit.record(subject(actor), null, "THESIS_GROUP_REJECTED", "THESIS_GROUP", groupId.toString(),
                 "Thesis group rejected; reason: " + reason);
+        if (notifier != null) {
+            try {
+                notifier.notifyGroupDecision(groupId, false, reason);
+            } catch (RuntimeException exception) {
+                log.warn("Thesis group-rejection notification fan-out failed for group {}", groupId, exception);
+            }
+        }
         return groups.findById(groupId);
     }
 

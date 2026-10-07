@@ -37,8 +37,12 @@ public class ThesisCouncilService {
     private static final String SCORE_COMPONENT = "DEFENSE";
     private static final String GVPB_COMPONENT = "GVPB";
 
+    private static final org.slf4j.Logger log =
+            org.slf4j.LoggerFactory.getLogger(ThesisCouncilService.class);
+
     private final NamedParameterJdbcTemplate jdbc;
     private final AdminAuditRecorder audit;
+    private final ThesisNotificationService notifier;
 
     /**
      * Creates the service over the shared named-parameter JDBC template.
@@ -48,8 +52,15 @@ public class ThesisCouncilService {
      *              caller's transaction so the grade and its trace commit together
      */
     public ThesisCouncilService(NamedParameterJdbcTemplate jdbc, AdminAuditRecorder audit) {
+        this(jdbc, audit, null);
+    }
+
+    @org.springframework.beans.factory.annotation.Autowired
+    public ThesisCouncilService(NamedParameterJdbcTemplate jdbc, AdminAuditRecorder audit,
+            ThesisNotificationService notifier) {
         this.jdbc = jdbc;
         this.audit = audit;
+        this.notifier = notifier;
     }
 
     // ---------- councils ----------
@@ -735,6 +746,13 @@ public class ThesisCouncilService {
         audit.record(subject(actor), null, "COUNCIL_SCORE_FINALIZED", "THESIS_TOPIC", topicId.toString(),
                 "Defense score finalized for topic " + topicId + " at " + average,
                 beforeState, afterState);
+        if (notifier != null) {
+            try {
+                notifier.notifyScoreFinalized(topicId);
+            } catch (RuntimeException exception) {
+                log.warn("Thesis finalize notification fan-out failed for topic {}", topicId, exception);
+            }
+        }
         return new TopicResult(topicId, average, subject(actor), Instant.now(), "GRADED");
     }
 
