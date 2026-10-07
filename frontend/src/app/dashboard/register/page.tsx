@@ -792,7 +792,7 @@ export default function RegisterPage() {
 
   const policyCard = (
     <Card
-      className="order-first overflow-hidden border-primary/20 bg-gradient-to-br from-primary/[0.06] via-card to-card"
+      className="min-w-0 overflow-hidden border-primary/20 bg-gradient-to-br from-primary/[0.06] via-card to-card xl:col-span-12"
       data-testid="credit-limit-policy"
     >
       <button
@@ -1058,6 +1058,9 @@ export default function RegisterPage() {
           ) : null}
 
           <div className="grid min-w-0 grid-cols-1 gap-6 xl:grid-cols-12">
+            {/* The policy card takes a full-width row so the enrolled rail and
+                weekly timetable line up beside the catalog instead of beside it. */}
+            {policyCard}
             {/* Left column: search + catalog lead; the credit-limit card follows on mobile. */}
             <div className="flex min-w-0 flex-col gap-6 xl:col-span-8">
               <Card className="order-1 min-w-0 overflow-hidden">
@@ -1346,8 +1349,6 @@ export default function RegisterPage() {
                   </div>
                 )}
               </Card>
-
-              {policyCard}
             </div>
 
             {/* Right rail: enrolled summary card + a separate weekly-timetable
