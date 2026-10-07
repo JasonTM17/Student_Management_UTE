@@ -56,7 +56,7 @@ import { Button } from '@/components/ui/button';
 import { useI18n } from '@/i18n';
 import { Skeleton } from '@/components/ui/skeleton';
 import { notificationsApi } from '@/lib/api';
-import { cn, htmlToPlainText } from '@/lib/utils';
+import { cn, htmlToPlainText, stripNotificationTagPrefix } from '@/lib/utils';
 import { stripLocaleFromPathname } from '@/i18n/paths';
 import { isDemoUser, loginHref, portalFromPathname } from '@/lib/login-portal';
 
@@ -1159,7 +1159,7 @@ export default function DashboardLayout({
                                 <div className="flex items-start justify-between gap-2">
                                   <span className="min-w-0 break-words text-xs font-semibold text-foreground group-hover:text-primary transition-colors">
                                     {/* Titles can carry pasted markup too — strip, never render raw tags. */}
-                                    {htmlToPlainText(notification.title, 200) || messages.dashboardShell.notifications.fallbackTitle}
+                                    {stripNotificationTagPrefix(notification.title, 200) || messages.dashboardShell.notifications.fallbackTitle}
                                   </span>
                                   <ChevronRight className="h-3.5 w-3.5 shrink-0 text-muted-foreground transition-transform duration-150 group-hover:translate-x-0.5 group-hover:text-primary" />
                                 </div>
@@ -1340,9 +1340,9 @@ export default function DashboardLayout({
           aria-label={messages.dashboardShell.controls.mobileNavigation}
           aria-hidden={sidebarOpen ? true : undefined}
           inert={sidebarOpen ? true : undefined}
-          className="fixed inset-x-0 bottom-0 z-30 border-t border-portal-rule bg-portal-surface/95 px-2 pb-[env(safe-area-inset-bottom)] shadow-[0_-8px_24px_rgba(25,28,33,0.08)] backdrop-blur md:hidden print:hidden"
+          className="fixed inset-x-0 bottom-0 z-30 border-t border-portal-rule bg-portal-surface/95 px-1 pb-[env(safe-area-inset-bottom)] shadow-[0_-8px_24px_rgba(25,28,33,0.08)] backdrop-blur md:hidden print:hidden"
         >
-          <div className="mx-auto grid max-w-md grid-cols-6 gap-1 py-2">
+          <div className="mx-auto grid max-w-md grid-cols-6 gap-0.5 py-2">
             {mobileNavItems.map((item) => {
               if (item.kind === 'menu') {
                 return (

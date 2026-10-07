@@ -18,10 +18,21 @@ export function htmlToPlainText(content: string | undefined, maxLength = 160): s
   const text = content
     .replace(/<figure[\s\S]*?<\/figure>/gi, ' ')
     .replace(/<[^>]*>/g, ' ')
+    .replace(/<[a-zA-Z/!][^>]*$/g, ' ')
+    .replace(/<\/[a-zA-Z]+(?![a-zA-Z>])/g, ' ')
     .replace(/\s+/g, ' ')
     .trim();
   if (text.length <= maxLength) {
     return text;
   }
   return `${text.slice(0, maxLength).trim()}…`;
+}
+
+/**
+ * Announcement fan-out tags titles with a transport prefix ('[Announcement] ')
+ * that reads as an internal label. Plain-text surfaces drop it; the row's icon
+ * and link already carry the category.
+ */
+export function stripNotificationTagPrefix(title: string | undefined, maxLength = 200): string {
+  return htmlToPlainText(title, maxLength).replace(/^\[(announcement|thông báo)\]\s*/i, '');
 }

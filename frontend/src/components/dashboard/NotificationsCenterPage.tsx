@@ -24,7 +24,7 @@ import {
 } from '@/components/ui/state-block';
 import { statusToneClass } from '@/components/ui/status';
 import { StatusPill } from '@/components/ui/status-pill';
-import { cn, htmlToPlainText } from '@/lib/utils';
+import { cn, htmlToPlainText, stripNotificationTagPrefix } from '@/lib/utils';
 
 type NotificationItem = {
   id: string;
@@ -305,7 +305,7 @@ export default function NotificationsCenterPage() {
               {visibleItems.map((item) => {
               // Bodies (and occasionally titles) arrive as authored HTML; this
               // surface renders plain text, never raw markup.
-              const title = htmlToPlainText(item.title, 300) || copy.fallbackTitle;
+              const title = stripNotificationTagPrefix(item.title, 300) || copy.fallbackTitle;
               const content =
                 htmlToPlainText(item.content || item.message, 2000) || copy.fallbackContent;
               const isBusy = busyId === item.id;
