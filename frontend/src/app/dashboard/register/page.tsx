@@ -301,8 +301,9 @@ export default function RegisterPage() {
     const set = new Set<string>();
     for (const enrollment of enrollments) {
       if (!ACTIVE_ENROLLMENT_STATUSES.has(enrollment.status)) continue;
-      if (enrollment.section?.courseId) {
-        set.add(enrollment.section.courseId);
+      const courseId = enrollment.section?.course?.id ?? enrollment.section?.courseId;
+      if (courseId) {
+        set.add(courseId);
       }
     }
     return set;
@@ -1248,6 +1249,11 @@ export default function RegisterPage() {
                                       {section.scheduleConflict ? (
                                         <span className="rounded-md border border-destructive/30 bg-destructive/10 px-2 py-0.5 text-xs font-medium text-destructive">
                                           {copy.conflictBadge}
+                                        </span>
+                                      ) : null}
+                                      {!isRegistered && alreadyHasCourse ? (
+                                        <span className="rounded-md border border-status-warning/40 bg-status-warning/10 px-2 py-0.5 text-xs font-medium text-status-warning-foreground">
+                                          {copy.duplicateCourseBadge}
                                         </span>
                                       ) : null}
                                       {section.curriculumRelevance === 'OUTSIDE' ? (
