@@ -64,6 +64,7 @@ type DashboardMenuLabelKey =
   | 'dashboard'
   | 'courseRegistration'
   | 'myCourses'
+  | 'curriculum'
   | 'schedule'
   | 'grades'
   | 'transcript'
@@ -103,6 +104,7 @@ const studentMenuSections: readonly DashboardMenuSectionConfig[] = [
     items: [
       { href: '/dashboard/register', icon: ClipboardList, labelKey: 'courseRegistration' },
       { href: '/dashboard/enrollments', icon: BookOpen, labelKey: 'myCourses' },
+      { href: '/dashboard/curriculum', icon: GraduationCap, labelKey: 'curriculum' },
       { href: '/dashboard/schedule', icon: Calendar, labelKey: 'schedule' },
       { href: '/dashboard/grades', icon: FileText, labelKey: 'grades' },
       { href: '/dashboard/transcript', icon: School, labelKey: 'transcript' },
@@ -373,6 +375,10 @@ export default function DashboardLayout({
       '/dashboard/enrollments': {
         title: messages.dashboardShell.menu.myCourses,
         description: messages.dashboardShell.routeDescriptions.enrollments,
+      },
+      '/dashboard/curriculum': {
+        title: messages.dashboardShell.menu.curriculum,
+        description: messages.dashboardShell.routeDescriptions.curriculum,
       },
       '/dashboard/schedule': {
         title: messages.dashboardShell.menu.schedule,

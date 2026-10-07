@@ -731,6 +731,42 @@ export const en = {
       action: 'Action',
     },
   },
+  curriculum: {
+    eyebrow: 'Student portal',
+    title: 'Curriculum',
+    description:
+      'Your study program, prerequisite chains, and the courses you can register for now.',
+    progressLabel: 'Credit progress',
+    statusSummaryLabel: 'Curriculum status summary',
+    creditsLabel: 'credits',
+    mandatory: 'Mandatory',
+    elective: 'Elective',
+    yearPrefix: 'Year',
+    semesterPrefix: 'Semester',
+    courseWord: 'course',
+    coursesWord: 'courses',
+    filterAll: 'All courses',
+    filterAvailable: 'Ready to register',
+    filterCompleted: 'Completed',
+    filterInProgress: 'In progress',
+    filterNotStarted: 'Not started',
+    availableTitle: 'Ready to register now',
+    availableDescription:
+      'Prerequisites satisfied — these courses are open for you. Sections offered this term link straight to registration.',
+    availableEmpty:
+      'No unblocked courses left — every remaining course still waits on a prerequisite or you have finished the plan.',
+    openSections: '{count} sections open this term',
+    noOpenSection: 'No section offered this term',
+    registerCta: 'Register',
+    prerequisiteLabel: 'Prerequisites:',
+    unlocksLabel: 'Unlocks:',
+    emptyTitle: 'No curriculum assigned',
+    emptyDescription:
+      'Your student profile has no study program attached yet. Contact the Academic Office to have one assigned.',
+    unavailableTitle: 'Curriculum unavailable',
+    loadFailed: 'Your curriculum could not be loaded right now.',
+    completedWithGrade: 'Passed',
+  },
   announcementTemplates: {
     LEAVE_MAKEUP: {
       label: 'Class cancellation & makeup session',
@@ -1256,6 +1292,7 @@ export const en = {
       dashboard: 'Dashboard',
       courseRegistration: 'Course registration',
       myCourses: 'My courses',
+      curriculum: 'Curriculum',
       schedule: 'Schedule',
       grades: 'Grades',
       transcript: 'Transcript',
@@ -1344,6 +1381,8 @@ export const en = {
         'Browse classes and manage registration decisions for the current term.',
       enrollments:
         'Track the classes you are taking and their class details.',
+      curriculum:
+        'See your study program, prerequisite chains, and which courses you can register for now.',
       schedule:
         'Keep the weekly class view close while the rest of the portal stays reachable.',
       grades: 'Review published grades and current academic standing.',
@@ -3389,6 +3428,42 @@ export const vi: I18nMessages = {
       action: 'Thao tác',
     },
   },
+  curriculum: {
+    eyebrow: 'Cổng Sinh viên',
+    title: 'Chương trình đào tạo',
+    description:
+      'Khung chương trình của ngành bạn, chuỗi học phần tiên quyết và các môn bạn có thể đăng ký ngay.',
+    progressLabel: 'Tiến độ tín chỉ',
+    statusSummaryLabel: 'Tóm tắt trạng thái CTĐT',
+    creditsLabel: 'tín chỉ',
+    mandatory: 'Bắt buộc',
+    elective: 'Tự chọn',
+    yearPrefix: 'Năm học',
+    semesterPrefix: 'Học kỳ',
+    courseWord: 'môn',
+    coursesWord: 'môn',
+    filterAll: 'Tất cả môn',
+    filterAvailable: 'Có thể đăng ký',
+    filterCompleted: 'Đã hoàn tất',
+    filterInProgress: 'Đang học',
+    filterNotStarted: 'Chưa học',
+    availableTitle: 'Có thể đăng ký ngay',
+    availableDescription:
+      'Bạn đã đủ điều kiện tiên quyết cho các môn dưới đây. Môn đang mở lớp trong kỳ này có nút chuyển thẳng sang trang đăng ký.',
+    availableEmpty:
+      'Không còn môn nào được mở khóa — các môn còn lại đều chờ học phần tiên quyết hoặc bạn đã hoàn thành chương trình.',
+    openSections: 'Đang mở {count} lớp trong kỳ này',
+    noOpenSection: 'Kỳ này chưa mở lớp',
+    registerCta: 'Đăng ký',
+    prerequisiteLabel: 'Tiên quyết:',
+    unlocksLabel: 'Là tiên quyết của:',
+    emptyTitle: 'Chưa có chương trình đào tạo',
+    emptyDescription:
+      'Hồ sơ sinh viên của bạn chưa được gán chương trình đào tạo. Vui lòng liên hệ Phòng Đào tạo để được cấp khung chương trình.',
+    unavailableTitle: 'Chưa tải được chương trình đào tạo',
+    loadFailed: 'Không tải được chương trình đào tạo của bạn lúc này.',
+    completedWithGrade: 'Đạt',
+  },
   announcementTemplates: {
     LEAVE_MAKEUP: {
       label: 'Nghỉ học & Học bù',
@@ -3911,6 +3986,7 @@ export const vi: I18nMessages = {
       dashboard: 'Tổng quan',
       courseRegistration: 'Đăng ký học phần',
       myCourses: 'Môn học của tôi',
+      curriculum: 'Chương trình đào tạo',
       schedule: 'Thời khóa biểu',
       grades: 'Điểm số',
       transcript: 'Bảng điểm',
@@ -3999,6 +4075,8 @@ export const vi: I18nMessages = {
         'Xem các lớp học phần và quản lý đăng ký cho học kỳ hiện tại.',
       enrollments:
         'Theo dõi các môn đang học và thông tin lớp học phần tương ứng.',
+      curriculum:
+        'Xem khung chương trình ngành, chuỗi tiên quyết và các môn có thể đăng ký ngay.',
       schedule:
         'Giữ góc nhìn thời khóa biểu theo tuần trong tầm tay khi phần còn lại của cổng vẫn sẵn sàng.',
       grades: 'Xem điểm đã công bố và trạng thái học tập hiện tại.',
