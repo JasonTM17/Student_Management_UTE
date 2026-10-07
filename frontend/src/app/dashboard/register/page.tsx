@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } fro
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import {
   AlertCircle,
+  BookOpen,
   CalendarClock,
   CheckCircle2,
   ChevronDown,
@@ -776,6 +777,18 @@ export default function RegisterPage() {
     ?? (eligibilityQuery.isError && !ROUND_UNAVAILABLE_CODES.has(eligibilityErrorCode ?? '') ? eligibilityQuery.error : null)
     ?? (sectionsQuery.isError ? sectionsQuery.error : null);
 
+  const railWarnings: string[] = [];
+  for (const item of registered) {
+    const catalogSection = sectionsById.get(item.sectionId);
+    const label = sectionLabel(item.section, item.sectionId);
+    if (catalogSection?.curriculumRelevance === 'OUTSIDE') {
+      railWarnings.push(copy.warningOutsideLine.replace('{section}', label));
+    }
+    if (catalogSection?.scheduleConflict) {
+      railWarnings.push(copy.warningConflictLine.replace('{section}', label));
+    }
+  }
+
   const policyCard = (
     <Card
       className="order-first overflow-hidden border-primary/20 bg-gradient-to-br from-primary/[0.06] via-card to-card"
@@ -909,19 +922,75 @@ export default function RegisterPage() {
         title={copy.title}
         description={copy.description}
         actions={
-          registered.length > 0 ? (
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              onClick={() => void handleDownloadSlip()}
-              disabled={downloadingSlip}
-              className="gap-2"
-            >
-              <FileDown className="h-4 w-4" aria-hidden="true" />
-              {downloadingSlip ? copy.exportSlipDownloading : copy.exportSlip}
-            </Button>
-          ) : undefined
+          <>
+            {/* At-a-glance registration summary beside the page title so the
+                key numbers stay visible without scrolling to the rail. */}
+            {!roundsQuery.isLoading && !roundsQuery.isError && roundOpen ? (
+              <div className="inline-flex max-w-full items-center gap-2.5 rounded-lg border border-border/70 bg-secondary/40 px-3 py-1.5 text-xs">
+                <span className="inline-flex shrink-0 items-center gap-1.5 font-semibold text-foreground">
+                  <BookOpen className="h-3.5 w-3.5 text-primary" aria-hidden="true" />
+                  {copy.groupSectionCount.replace('{count}', formatNumber(registered.length))}
+                </span>
+                <span className="text-border" aria-hidden="true">|</span>
+                <span className="inline-flex shrink-0 items-center gap-1.5">
+                  <span className="tabular-nums font-semibold text-foreground">
+                    {totalRegisteredCredits}
+                    /
+                    {creditLimit === null ? copy.creditLimitUnavailable : formatNumber(creditLimit)}{' '}
+                    {copy.creditsUnit}
+                  </span>
+                  {creditLimit !== null ? (
+                    <span
+                      className="hidden h-1.5 w-14 overflow-hidden rounded-full bg-secondary sm:inline-block"
+                      role="progressbar"
+                      aria-valuenow={totalRegisteredCredits}
+                      aria-valuemax={creditLimit}
+                    >
+                      <span
+                        className={`block h-full ${
+                          totalRegisteredCredits > creditLimit
+                            ? 'bg-status-danger'
+                            : totalRegisteredCredits === creditLimit
+                              ? 'bg-status-warning'
+                              : 'bg-primary'
+                        }`}
+                        style={{
+                          width: `${Math.min(100, (totalRegisteredCredits / creditLimit) * 100)}%`,
+                        }}
+                      />
+                    </span>
+                  ) : null}
+                </span>
+                {creditLimit !== null && creditLimit - totalRegisteredCredits > 0 ? (
+                  <span className="hidden shrink-0 font-medium text-muted-foreground md:inline">
+                    {copy.headerCreditsRemaining.replace('{count}', formatNumber(creditLimit - totalRegisteredCredits))}
+                  </span>
+                ) : null}
+                {railWarnings.length > 0 ? (
+                  <span
+                    className="inline-flex shrink-0 items-center gap-1 font-semibold text-status-warning-foreground"
+                    title={railWarnings.join(' · ')}
+                  >
+                    <TriangleAlert className="h-3.5 w-3.5" aria-hidden="true" />
+                    {formatNumber(railWarnings.length)}
+                  </span>
+                ) : null}
+              </div>
+            ) : null}
+            {registered.length > 0 ? (
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => void handleDownloadSlip()}
+                disabled={downloadingSlip}
+                className="gap-2"
+              >
+                <FileDown className="h-4 w-4" aria-hidden="true" />
+                {downloadingSlip ? copy.exportSlipDownloading : copy.exportSlip}
+              </Button>
+            ) : null}
+          </>
         }
       />
       {roundsQuery.isLoading ? (
@@ -1352,20 +1421,7 @@ export default function RegisterPage() {
                   )}
                 </div>
 
-                {(() => {
-                  const warnings: string[] = [];
-                  for (const item of registered) {
-                    const catalogSection = sectionsById.get(item.sectionId);
-                    const label = sectionLabel(item.section, item.sectionId);
-                    if (catalogSection?.curriculumRelevance === 'OUTSIDE') {
-                      warnings.push(copy.warningOutsideLine.replace('{section}', label));
-                    }
-                    if (catalogSection?.scheduleConflict) {
-                      warnings.push(copy.warningConflictLine.replace('{section}', label));
-                    }
-                  }
-                  if (warnings.length === 0) return null;
-                  return (
+                {railWarnings.length === 0 ? null : (
                     <div
                       className="space-y-1.5 rounded-lg border border-status-warning/40 bg-status-warning/10 p-3"
                       role="status"
@@ -1374,14 +1430,13 @@ export default function RegisterPage() {
                         <TriangleAlert className="h-3.5 w-3.5" aria-hidden="true" />
                         {copy.railWarningsTitle}
                       </p>
-                      {warnings.map((warning) => (
+                      {railWarnings.map((warning) => (
                         <p key={warning} className="text-xs leading-4 text-status-warning-foreground">
                           {warning}
                         </p>
                       ))}
                     </div>
-                  );
-                })()}
+                )}
 
                 {registered.length > 0 ? (
                   <Button
