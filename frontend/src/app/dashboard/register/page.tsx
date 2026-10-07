@@ -721,10 +721,14 @@ export default function RegisterPage() {
   }
 
   const application: CreditLimitApplication | null = applicationQuery.data ?? null;
+  const approvedLimit =
+    application?.status === 'APPROVED' && typeof application.requestedLimit === 'number'
+      ? application.requestedLimit
+      : null;
   const applicationStatus = application?.status === 'APPROVED'
     ? {
-        label: copy.applicationStatusApproved,
-        description: copy.applicationApproved,
+        label: copy.applicationStatusApproved.replace('{count}', formatNumber(approvedLimit ?? 0)),
+        description: copy.applicationApproved.replace('{count}', formatNumber(approvedLimit ?? 0)),
         icon: CheckCircle2,
         tone: 'text-status-success-foreground bg-status-success/10',
       }
@@ -817,16 +821,28 @@ export default function RegisterPage() {
                 {copy.approvedLimitLabel}
               </p>
               <p className="mt-2 text-2xl font-semibold text-foreground">
-                {creditLimit === null ? (
-                  <span className="text-muted-foreground">{copy.creditLimitUnavailable}</span>
-                ) : (
+                {approvedLimit !== null ? (
                   <>
-                    {formatNumber(creditLimit)}{' '}
+                    {formatNumber(approvedLimit)}{' '}
                     <span className="text-sm font-medium text-muted-foreground">{copy.creditsUnit}</span>
                   </>
+                ) : application?.status === 'PENDING' ? (
+                  <span className="text-base font-medium text-muted-foreground">
+                    {copy.approvedLimitPendingValue}
+                  </span>
+                ) : (
+                  <span className="text-base font-medium text-muted-foreground">
+                    {copy.approvedLimitNone}
+                  </span>
                 )}
               </p>
-              <p className="mt-1 text-xs leading-5 text-muted-foreground">{copy.approvedLimitHint}</p>
+              <p className="mt-1 text-xs leading-5 text-muted-foreground">
+                {approvedLimit !== null
+                  ? copy.approvedLimitAppliedHint
+                  : application?.status === 'PENDING'
+                    ? copy.approvedLimitPendingHint
+                    : copy.approvedLimitHint}
+              </p>
             </div>
           </div>
 
@@ -1275,7 +1291,7 @@ export default function RegisterPage() {
               <CardContent className="space-y-3">
                 <div className="space-y-2 rounded-lg border border-border/70 bg-secondary/30 p-3">
                   <div className="flex items-center justify-between text-xs">
-                    <span className="font-medium text-muted-foreground">{copy.termCreditLimitLabel}</span>
+                    <span className="font-medium text-muted-foreground">{copy.creditsUsedLabel}</span>
                     <span className="font-bold text-foreground">
                       {totalRegisteredCredits}
                       /
