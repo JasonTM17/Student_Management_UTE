@@ -263,7 +263,7 @@ export function AssistantMessages({
               {/* Message Bubble Container */}
               <div
                 className={cn(
-                  'flex flex-col',
+                  'flex min-w-0 flex-col',
                   isUser ? 'items-end max-w-[84%]' : 'items-start max-w-[88%]',
                 )}
               >
@@ -275,7 +275,7 @@ export function AssistantMessages({
                       : messages.assistant.label
                   }
                   className={cn(
-                    'relative px-3.5 py-2.5 text-sm leading-6 shadow-xs transition-shadow break-words [overflow-wrap:anywhere]',
+                    'relative min-w-0 max-w-full px-3.5 py-2.5 text-sm leading-6 shadow-xs transition-shadow break-words [overflow-wrap:anywhere]',
                     isUser
                       ? 'rounded-2xl rounded-tr-xs bg-gradient-to-br from-primary via-[#004eab] to-[#005fcf] text-white font-medium'
                       : 'rounded-2xl rounded-tl-xs border border-border/80 bg-card text-foreground',

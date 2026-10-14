@@ -1,4 +1,6 @@
 import { test, expect, type Page, type Route } from '@playwright/test';
+import fs from 'node:fs';
+import path from 'node:path';
 import { submitLiveLogin } from './fixtures/live-login';
 
 test.describe.configure({ timeout: 120_000 });
@@ -22,7 +24,8 @@ function jsonResponse(body: unknown, status = 200) {
   return { status, contentType: 'application/json', body: JSON.stringify(body) };
 }
 
-function streamAnswer(text: string, requestId: string, locale = 'vi', turn = 1) {
+function streamAnswer(text: string, requestId: string, locale = 'vi', turn = 1,
+  citation?: import('../src/lib/thesis-api').AssistantCitation) {
   const frame = (type: string, value: unknown) => `event: ${type}\ndata: ${JSON.stringify(value)}\n\n`;
   return {
     status: 200,
@@ -31,7 +34,8 @@ function streamAnswer(text: string, requestId: string, locale = 'vi', turn = 1) 
       requestId, clientRequestId: requestId, conversationId, locale,
       turnId: `33333333-3333-4333-8333-${String(turn).padStart(12, '0')}`,
       model: 'lexical-fallback',
-    }) + frame('delta', { sequence: 0, text }) + frame('done', {
+    }) + frame('delta', { sequence: 0, text })
+    + (citation ? frame('citation', { citation }) : '') + frame('done', {
       messageId: `55555555-5555-4555-8555-${String(turn).padStart(12, '0')}`,
       reasonCode: 'ANSWERED', degraded: false,
     }),
@@ -229,6 +233,100 @@ for (const locale of ['vi', 'en'] as const) {
       await expect(page.getByRole('log', { name: /Specialized AI Assistant|Trợ lý AI chuyên sâu/i })).toHaveAttribute('tabindex', '0');
     } finally {
       await held.cleanup();
+    }
+  });
+}
+
+for (const locale of ['vi', 'en'] as const) {
+  test(`specialized ${locale} keeps long code and citations inside the message viewport`, async ({ page }) => {
+    const seeds = JSON.parse(fs.readFileSync(
+      path.resolve(__dirname, '../../supabase/seed/assistant-specialized-knowledge.json'), 'utf8'),
+    ) as { slug: string; title: string; content: string; locale: string }[];
+    const doc = seeds.find((entry) => entry.slug === `specialized-spring-dependency-constructor-injection-${locale}`)!;
+    const citation = {
+      id: 'citation-di-layout', sourceId: 'citation-di-layout',
+      slug: doc.slug, title: doc.title, source: 'campuscore-specialized-focus-v115',
+      locale, excerpt: doc.content.slice(0, 280),
+      domain: 'SPECIALIZED', sourceKind: 'CURATED',
+    };
+    await mockAssistantShell(page);
+    await page.route(chatStream, (route) => {
+      const { clientRequestId, locale: requestLocale } = route.request().postDataJSON();
+      return route.fulfill(streamAnswer(doc.content, clientRequestId, requestLocale, 1, citation));
+    });
+    await login(page, locale);
+    await page.goto(`/${locale}/dashboard/assistant-specialized`);
+    const composer = page.getByRole('textbox', { name: specializedComposerName });
+    await composer.fill(locale === 'vi'
+      ? 'Giải thích ngắn gọn Dependency Injection trong Spring Boot và cho một ví dụ constructor injection.'
+      : 'Explain Dependency Injection in Spring Boot with a constructor injection example.');
+    await page.getByRole('button', { name: sendName }).click();
+    const answer = page.getByRole('article', { name: answerName }).last();
+    await expect(answer).toContainText('public OrderService(PaymentGateway gateway)');
+    await expect(answer).toContainText('private final PaymentGateway gateway');
+    const citationToggle = answer.locator('button[aria-controls^="assistant-citations-"]');
+    await expect(citationToggle).toBeVisible();
+    await citationToggle.click();
+    const citationBox = answer.locator('[id^="assistant-citations-"]');
+    await expect(citationBox).toBeVisible();
+
+    const geometry = () => page.evaluate(() => {
+      const log = document.querySelector('main [role="log"]')!;
+      const article = [...log.querySelectorAll('[role="article"]')].at(-1)!;
+      const box = (e: Element) => {
+        const r = e.getBoundingClientRect();
+        return { left: r.left, right: r.right };
+      };
+      const citationEl = article.querySelector('[id^="assistant-citations-"]');
+      return {
+        document: {
+          clientWidth: document.documentElement.clientWidth,
+          scrollWidth: document.documentElement.scrollWidth,
+        },
+        log: {
+          clientWidth: log.clientWidth, scrollWidth: log.scrollWidth,
+          scrollLeft: log.scrollLeft, ...box(log),
+        },
+        bubble: box(article.parentElement!),
+        article: box(article),
+        paragraphs: [...article.querySelectorAll('p')]
+          .map((p) => ({ clientWidth: p.clientWidth, scrollWidth: p.scrollWidth })),
+        pres: [...article.querySelectorAll('pre')].map((pre) => ({
+          clientWidth: pre.clientWidth, scrollWidth: pre.scrollWidth,
+          overflowX: getComputedStyle(pre).overflowX,
+        })),
+        citation: citationEl ? box(citationEl) : null,
+      };
+    });
+
+    for (const width of [320, 390, 768, 1440]) {
+      await page.setViewportSize({ width, height: 900 });
+      await expect(async () => {
+        const m = await geometry();
+        expect(m.document.scrollWidth, `document overflow at ${width}px`).toBeLessThanOrEqual(m.document.clientWidth + 1);
+        expect(m.log.scrollWidth, `log overflow at ${width}px`).toBeLessThanOrEqual(m.log.clientWidth + 1);
+        expect(m.bubble.left, `bubble left at ${width}px`).toBeGreaterThanOrEqual(m.log.left - 1);
+        expect(m.bubble.right, `bubble right at ${width}px`).toBeLessThanOrEqual(m.log.right + 1);
+        expect(m.article.left, `article left at ${width}px`).toBeGreaterThanOrEqual(m.log.left - 1);
+        expect(m.article.right, `article right at ${width}px`).toBeLessThanOrEqual(m.log.right + 1);
+        for (const p of m.paragraphs) {
+          expect(p.scrollWidth, `prose overflow at ${width}px`).toBeLessThanOrEqual(p.clientWidth + 1);
+        }
+        expect(m.citation, `citation presence at ${width}px`).not.toBeNull();
+        expect(m.citation!.left).toBeGreaterThanOrEqual(m.article.left - 1);
+        expect(m.citation!.right).toBeLessThanOrEqual(m.article.right + 1);
+        if (width <= 390) {
+          expect(m.pres.length).toBeGreaterThan(0);
+          expect(m.pres[0].scrollWidth).toBeGreaterThan(m.pres[0].clientWidth);
+          expect(['auto', 'scroll']).toContain(m.pres[0].overflowX);
+          await answer.locator('pre').first().evaluate((node) => { node.scrollLeft = node.scrollWidth; });
+          const afterScroll = await geometry();
+          expect(afterScroll.log.scrollLeft, `log scrollLeft after pre scroll at ${width}px`).toBe(0);
+          for (const p of afterScroll.paragraphs) {
+            expect(p.scrollWidth).toBeLessThanOrEqual(p.clientWidth + 1);
+          }
+        }
+      }).toPass({ timeout: 5_000 });
     }
   });
 }

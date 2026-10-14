@@ -145,3 +145,23 @@ test('localized page title survives replacement by navigation metadata and relea
   document.title = 'Next route title';
   assert.equal(document.title, 'Next route title');
 });
+
+test('user and assistant bubbles stay shrinkable so fenced code cannot overflow the log', () => {
+  const { AssistantMessages } = load('src/components/assistant/AssistantMessages.tsx');
+  const code = '```java\npublic OrderService(PaymentGateway gateway) { this.gateway = gateway; }\n```';
+  const html = renderToStaticMarkup(React.createElement(AssistantMessages, {
+    messageList: [
+      { id: 'user-1', role: 'user', content: code },
+      { id: 'assistant-1', role: 'assistant', content: `Explained.\n\n${code}` },
+    ],
+    onFeedback() {},
+  }));
+  const pairs = [...html.matchAll(/<div class="(flex[^"]*)"><div role="article" aria-label="(You|Assistant)" class="([^"]*)"/g)];
+  assert.equal(pairs.length, 2);
+  for (const [, bubble, , article] of pairs) {
+    assert.match(bubble, /\bmin-w-0\b/);
+    assert.match(article, /\bmin-w-0\b/);
+    assert.match(article, /\bmax-w-full\b/);
+  }
+  assert.match(html, /<pre class="[^"]*overflow-x-auto[^"]*"/);
+});
