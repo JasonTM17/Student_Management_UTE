@@ -32,6 +32,7 @@ import { cn } from '@/lib/utils';
 const DEMO_ACCOUNT_EMAILS: Record<LoginPortal, string> = {
   student: 'student@campuscore.edu',
   lecturer: 'lecturer@campuscore.edu',
+  dean: 'dean@campuscore.edu',
   admin: 'admin@campuscore.edu',
 };
 
@@ -55,13 +56,15 @@ const STUDENT_DEMO_ACCOUNTS: ReadonlyArray<{ email: string; name: string; leader
  * `process.env.NEXT_PUBLIC_*` only when it can see the literal key, so a computed
  * lookup would silently read `undefined` in the browser.
  *
- * The admin (Academic Office) portal deliberately has no entry: its account
- * governs users and academic records, so it is never published in the client
- * bundle or pre-filled. Admins still sign in normally through the portal tab.
+ * The admin and dean portals deliberately have no entry: privileged accounts
+ * govern users, academic records, and faculty oversight, so their passwords
+ * are never published in the client bundle or pre-filled. They still sign in
+ * normally through a portal tab.
  */
 const DEMO_PASSWORDS: Record<LoginPortal, string | undefined> = {
   student: process.env.NEXT_PUBLIC_DEMO_STUDENT_PASSWORD,
   lecturer: process.env.NEXT_PUBLIC_DEMO_LECTURER_PASSWORD,
+  dean: undefined,
   admin: undefined,
 };
 
@@ -190,15 +193,18 @@ export default function LoginPage() {
   const finishLogin = async (user: User) => {
     if (!portalMatchesUser(portal, user)) {
       const belongsTo = portalFromUser(user);
-      // There is no admin tab to pick, so a privileged account that signs in
-      // from the student or lecturer form is not a real mismatch: keep the
-      // session and route it like a normal admin sign-in.
-      if (belongsTo === 'admin') {
-        if (user.roles?.includes('TRUONG_KHOA') && !user.roles?.includes('ADMIN')) {
-          router.push(href('/admin/thesis'));
-        } else {
-          router.push(href(postLoginRoute('admin')));
-        }
+      // Privileged accounts are never refused from a visible tab: a dean or
+      // admin signing in on the student/lecturer form is not a real mismatch,
+      // so keep the session and route it to its own portal destination. A dean
+      // who deliberately used the hidden admin deep link still lands on the
+      // council workspace it opens (/admin/thesis) rather than the read-only
+      // observation dashboard.
+      if (belongsTo === 'admin' || belongsTo === 'dean') {
+        const target =
+          portal === 'admin' && belongsTo === 'dean'
+            ? '/admin/thesis'
+            : postLoginRoute(belongsTo);
+        router.push(href(target));
         return;
       }
       await logout({ redirect: false });
@@ -207,9 +213,7 @@ export default function LoginPage() {
       return;
     }
 
-    if (portal === 'admin' && user.roles?.includes('TRUONG_KHOA') && !user.roles?.includes('ADMIN')) {
-      router.push(href('/admin/thesis'));
-    } else if (portal === 'lecturer' && user.roles?.includes('TRUONG_BO_MON')) {
+    if (portal === 'lecturer' && user.roles?.includes('TRUONG_BO_MON')) {
       router.push(href('/dashboard/thesis'));
     } else {
       router.push(href(postLoginRoute(portal)));
@@ -317,7 +321,7 @@ export default function LoginPage() {
         </div>
 
         <div
-          className="grid grid-cols-2 gap-1.5 rounded-xl border border-slate-300/80 dark:border-border/80 bg-slate-200/90 dark:bg-muted/90 p-1.5 shadow-inner"
+          className="grid grid-cols-3 gap-1.5 rounded-xl border border-slate-300/80 dark:border-border/80 bg-slate-200/90 dark:bg-muted/90 p-1.5 shadow-inner"
           role="tablist"
           aria-label={messages.login.portals.groupLabel}
         >

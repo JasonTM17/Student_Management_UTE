@@ -38,15 +38,17 @@ test('report submission UI exposes writing controls only to the group leader', (
   assert.match(page, /submitReport\(currentGroup\.id/);
 });
 
-test('faculty-head role reaches the thesis administration portal', () => {
+test('faculty-head role reaches the dean observation workspace and thesis administration', () => {
   const auth = read('src/lib/login-portal.ts');
-  const login = read('src/app/login/page.tsx');
   const adminPage = read('src/app/admin/thesis/page.tsx');
   const workspace = read('src/app/dashboard/thesis/page.tsx');
+  const deanPage = read('src/app/dashboard/dean/page.tsx');
 
+  // TRUONG_KHOA routing lives in the portal module: the dean tab and every
+  // privileged pass-through land on the faculty observation dashboard.
   assert.match(auth, /TRUONG_KHOA/);
-  assert.match(login, /TRUONG_KHOA/);
-  assert.match(login, /\/admin\/thesis/);
+  assert.match(auth, /\/dashboard\/dean/);
+  assert.match(deanPage, /isFacultyHead/);
   assert.match(adminPage, /isFacultyHead/);
   assert.match(workspace, /isFacultyHead/);
 });

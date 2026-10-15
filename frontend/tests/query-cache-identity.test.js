@@ -830,7 +830,13 @@ function loadApiModule() {
     },
     '@/i18n/paths': {
       addLocalePrefix: (value) => value,
-      stripLocaleFromPathname: (value) => ({ locale: '', pathname: value }),
+      stripLocaleFromPathname: (value) => {
+        const match = value.match(/^\/(en|vi)(?=\/|$)/);
+        return {
+          locale: match ? match[1] : '',
+          pathname: match ? value.replace(/^\/(en|vi)/, '') || '/' : value,
+        };
+      },
     },
     '@/lib/public-api-url': { resolvePublicApiBaseUrl: () => '/api/v1' },
     '@/lib/session-hint': { CSRF_COOKIE_NAME: 'cc_csrf' },
@@ -1461,6 +1467,28 @@ test('session transport: a discovered 401 publishes signed-out to sibling tabs b
       'siblings must hear about the dead shared session, not discover it one-by-one',
     );
     assert.ok(location.href.includes('/login'), 'the failing tab still navigates to login');
+  } finally {
+    globalThis.window = previousWindow;
+    globalThis.document = previousDocument;
+  }
+});
+
+test('session transport: a dead cookie on /login does not reload the page in a loop', async () => {
+  const { interceptors, getCalls, sessionSyncPublished } = loadApiModule();
+  const previousWindow = globalThis.window;
+  const previousDocument = globalThis.document;
+  const location = { pathname: '/vi/login', origin: 'http://localhost', href: '' };
+  globalThis.window = { location };
+  globalThis.document = { cookie: '' };
+  try {
+    const config = { method: 'get', url: '/sections', skipAuthRefresh: true };
+    await assert.rejects(interceptors.responseError({ config, response: { status: 401 } }));
+    const meCalls = getCalls.filter((call) => call.args[0] === '/auth/me');
+    assert.equal(meCalls.length, 1, 'the redirect boundary confirms the cookie once');
+    meCalls[0].reject({ response: { status: 401 } });
+    await settle();
+    assert.deepEqual(sessionSyncPublished, ['signed-out'], 'siblings still converge on the dead session');
+    assert.equal(location.href, '', 'already on /login — navigating again would reload the login page forever');
   } finally {
     globalThis.window = previousWindow;
     globalThis.document = previousDocument;

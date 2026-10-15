@@ -147,8 +147,12 @@ test.describe('public and auth', () => {
     await expect(page.locator('[data-login-portal="lecturer"]')).toBeVisible();
     await expect(page.getByRole('heading', { name: /faculty sign-in/i })).toBeVisible();
     await expect(page.locator('form').getByText(/faculty office/i)).toBeVisible();
+    await page.getByRole('tab', { name: /^dean$/i }).click();
+    await expect(page).toHaveURL(/portal=dean/);
+    await expect(page.locator('[data-login-portal="dean"]')).toBeVisible();
+    await expect(page.getByRole('heading', { name: /dean sign-in/i })).toBeVisible();
     // There is no admin tab anymore: the admin chrome is only reachable by
-    // the ?portal=admin deep link, which selects neither visible tab.
+    // the ?portal=admin deep link, which selects no visible tab.
     await expect(page.getByRole('tab', { name: /^admin$/i })).toHaveCount(0);
     await page.goto('/en/login?portal=admin');
     await expect(page.locator('[data-login-portal="admin"]')).toBeVisible();

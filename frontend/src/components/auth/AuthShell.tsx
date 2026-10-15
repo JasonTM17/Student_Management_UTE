@@ -37,6 +37,7 @@ export function AuthShell({
 }: AuthShellProps) {
   const { messages } = useI18n();
   const isAdmin = portal === 'admin';
+  const isDean = portal === 'dean';
   const isLecturer = portal === 'lecturer';
 
   return (
@@ -69,9 +70,11 @@ export function AuthShell({
                 subtitle={
                   isAdmin
                     ? messages.authShell.adminSubtitle
-                    : isLecturer
-                      ? messages.authShell.lecturerSubtitle
-                      : messages.authShell.desktopSubtitle
+                    : isDean
+                      ? messages.authShell.deanSubtitle
+                      : isLecturer
+                        ? messages.authShell.lecturerSubtitle
+                        : messages.authShell.desktopSubtitle
                 }
                 markClassName="border-0 bg-white p-1 shadow-xs"
                 titleClassName="text-portal-sidebar-text"
@@ -173,9 +176,11 @@ export function AuthShell({
                 subtitle={
                   isAdmin
                     ? messages.authShell.adminSubtitle
-                    : isLecturer
-                      ? messages.authShell.lecturerSubtitle
-                      : messages.authShell.mobileSubtitle
+                    : isDean
+                      ? messages.authShell.deanSubtitle
+                      : isLecturer
+                        ? messages.authShell.lecturerSubtitle
+                        : messages.authShell.mobileSubtitle
                 }
               />
             </div>

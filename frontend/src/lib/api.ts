@@ -211,11 +211,23 @@ function isBrowser() {
 
 function navigateToLogin(reason: 'session-expired' | 'unauthorized') {
   const { locale, pathname } = stripLocaleFromPathname(window.location.pathname);
+  // A revoked session keeps its HttpOnly access cookie until the next login,
+  // so the login page's own session probe still 401s. Re-navigating from here
+  // would reload /login forever and block the sign-in form.
+  if (pathname === '/login') {
+    return;
+  }
   const loginPath = locale ? addLocalePrefix('/login', locale) : '/login';
   const loginUrl = new URL(loginPath, window.location.origin);
   loginUrl.searchParams.set('reason', reason);
   if (pathname.startsWith('/admin')) {
     loginUrl.searchParams.set('portal', 'admin');
+  } else if (pathname.startsWith('/dashboard/dean')) {
+    loginUrl.searchParams.set('portal', 'dean');
+  } else if (pathname.startsWith('/dashboard/thesis')) {
+    // The thesis workspace belongs to department heads and deans, whose
+    // accounts sign in through the lecturer-shaped portals.
+    loginUrl.searchParams.set('portal', 'lecturer');
   } else if (pathname.startsWith('/dashboard/lecturer')) {
     loginUrl.searchParams.set('portal', 'lecturer');
   } else {

@@ -12,7 +12,7 @@ export function WorkspaceForbiddenState({
 }: {
   signedIn?: boolean;
 }) {
-  const { isLecturer, isAdmin, isSuperAdmin } = useAuth();
+  const { isLecturer, isAdmin, isSuperAdmin, isFacultyHead } = useAuth();
   const { messages } = useI18n();
   const copy = messages.workspaceForbidden;
   const title = copy.title;
@@ -20,9 +20,11 @@ export function WorkspaceForbiddenState({
   const actionHref = signedIn
     ? isAdmin || isSuperAdmin
       ? '/admin'
-      : isLecturer
-        ? '/dashboard/lecturer'
-        : '/dashboard'
+      : isFacultyHead
+        ? '/dashboard/dean'
+        : isLecturer
+          ? '/dashboard/lecturer'
+          : '/dashboard'
     : '/login';
   const actionLabel = signedIn
     ? messages.common.actions.openDashboard
@@ -49,7 +51,7 @@ export function ProtectedRoute({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     if (!isLoading && !user) {
       router.push(
-        `${href('/login')}?portal=${window.location.pathname.includes('/admin') ? 'admin' : window.location.pathname.includes('/lecturer') ? 'lecturer' : 'student'}`,
+        `${href('/login')}?portal=${window.location.pathname.includes('/admin') ? 'admin' : window.location.pathname.includes('/dashboard/dean') ? 'dean' : window.location.pathname.includes('/lecturer') ? 'lecturer' : 'student'}`,
       );
     }
   }, [href, user, isLoading, router]);

@@ -356,48 +356,51 @@ test('approved topic archive callback confirms and removes the saved topic', asy
   assert.equal(fixture.state().viewingTopic, null);
 });
 
-test('department-head sign-in routes to thesis and preserves lecturer/student routes', async () => {
+test('department-head sign-in routes to thesis and preserves lecturer/student/dean routes', async () => {
   for (const [portal, roles, expected] of [
     ['lecturer', ['TRUONG_BO_MON'], '/dashboard/thesis'],
     ['lecturer', ['LECTURER'], '/dashboard/lecturer'],
     ['lecturer', ['LECTURER', 'TRUONG_KHOA'], '/dashboard/lecturer'],
     ['student', ['STUDENT'], '/dashboard'],
-    ['admin', ['TRUONG_KHOA'], '/admin/thesis'],
     ['admin', ['ADMIN'], '/admin'],
+    ['dean', ['TRUONG_KHOA'], '/dashboard/dean'],
+    ['dean', ['LECTURER', 'TRUONG_KHOA'], '/dashboard/dean'],
   ]) {
     let destination;
     const route = executeDeclaration('app/login/page.tsx', 'finishLogin', {
       portal, portalMatchesUser: () => true, logout: async () => {}, setFormError: () => {},
       portalCopy: {}, router: { push: value => { destination = value; } }, href: value => value,
-      postLoginRoute: value => ({ lecturer: '/dashboard/lecturer', student: '/dashboard', admin: '/admin' })[value],
+      postLoginRoute: value => ({ lecturer: '/dashboard/lecturer', student: '/dashboard', admin: '/admin', dean: '/dashboard/dean' })[value],
     });
     await route({ roles });
     assert.equal(destination, expected);
   }
 });
 
-test('a privileged account signed in from a visible tab routes to the admin portal', async () => {
-  // With no admin tab rendered, an ADMIN/SUPER_ADMIN/TRUONG_KHOA account
-  // submitting the student or lecturer form must not be refused.
-  for (const [portal, roles, expected] of [
-    ['student', ['ADMIN'], '/admin'],
-    ['lecturer', ['SUPER_ADMIN'], '/admin'],
-    ['student', ['TRUONG_KHOA'], '/admin/thesis'],
-    ['lecturer', ['TRUONG_KHOA'], '/admin/thesis'],
+test('a privileged account signed in from the wrong tab routes to its own portal', async () => {
+  // An ADMIN/SUPER_ADMIN/TRUONG_KHOA account submitting a non-matching form is
+  // never refused: the session is kept and routed to the account's own portal.
+  for (const [portal, roles, belongsTo, expected] of [
+    ['student', ['ADMIN'], 'admin', '/admin'],
+    ['lecturer', ['SUPER_ADMIN'], 'admin', '/admin'],
+    ['student', ['TRUONG_KHOA'], 'dean', '/dashboard/dean'],
+    ['lecturer', ['TRUONG_KHOA'], 'dean', '/dashboard/dean'],
+    ['admin', ['TRUONG_KHOA'], 'dean', '/admin/thesis'],
+    ['dean', ['ADMIN'], 'admin', '/admin'],
   ]) {
     let destination;
     let loggedOut = false;
     const route = executeDeclaration('app/login/page.tsx', 'finishLogin', {
       portal,
       portalMatchesUser: () => false,
-      portalFromUser: () => 'admin',
+      portalFromUser: () => belongsTo,
       logout: async () => { loggedOut = true; },
       setFormError: () => {},
       setMismatchPortal: () => {},
       portalCopy: {},
       router: { push: value => { destination = value; } },
       href: value => value,
-      postLoginRoute: value => ({ lecturer: '/dashboard/lecturer', student: '/dashboard', admin: '/admin' })[value],
+      postLoginRoute: value => ({ lecturer: '/dashboard/lecturer', student: '/dashboard', admin: '/admin', dean: '/dashboard/dean' })[value],
     });
     await route({ roles });
     assert.equal(destination, expected);

@@ -1,15 +1,22 @@
 import type { User } from '@/types/api';
 
-export const LOGIN_PORTALS = ['student', 'lecturer', 'admin'] as const;
+export const LOGIN_PORTALS = ['student', 'lecturer', 'dean', 'admin'] as const;
 export type LoginPortal = (typeof LOGIN_PORTALS)[number];
 
-// The admin tab is intentionally not offered on the login form: privileged
-// accounts sign in from the same visible tabs and are routed by role. 'admin'
-// remains a valid LoginPortal for deep links and guard redirects.
-export const VISIBLE_LOGIN_PORTALS = ['student', 'lecturer'] as const;
+// The admin tab is intentionally not offered on the login form: ADMIN and
+// SUPER_ADMIN accounts sign in from a visible tab and are routed by role.
+// 'admin' remains a valid LoginPortal for deep links and guard redirects.
+// 'dean' (Trưởng khoa) is visible because the dean dashboard is a distinct
+// workspace with its own tab.
+export const VISIBLE_LOGIN_PORTALS = ['student', 'lecturer', 'dean'] as const;
 
 export function parseLoginPortal(value: string | null | undefined): LoginPortal {
-  if (value === 'lecturer' || value === 'admin' || value === 'student') {
+  if (
+    value === 'lecturer' ||
+    value === 'dean' ||
+    value === 'admin' ||
+    value === 'student'
+  ) {
     return value;
   }
 
@@ -31,7 +38,11 @@ export function portalMatchesUser(
   const roles = userRoles(user);
 
   if (portal === 'admin') {
-    return roles.includes('ADMIN') || roles.includes('SUPER_ADMIN') || roles.includes('TRUONG_KHOA');
+    return roles.includes('ADMIN') || roles.includes('SUPER_ADMIN');
+  }
+
+  if (portal === 'dean') {
+    return roles.includes('TRUONG_KHOA');
   }
 
   if (portal === 'lecturer') {
@@ -44,6 +55,10 @@ export function portalMatchesUser(
 export function postLoginRoute(portal: LoginPortal): string {
   if (portal === 'admin') {
     return '/admin';
+  }
+
+  if (portal === 'dean') {
+    return '/dashboard/dean';
   }
 
   if (portal === 'lecturer') {
@@ -59,8 +74,12 @@ export function portalFromUser(user: Pick<User, 'role' | 'roles'> | null | undef
   }
 
   const roles = userRoles(user);
-  if (roles.includes('SUPER_ADMIN') || roles.includes('ADMIN') || roles.includes('TRUONG_KHOA')) {
+  if (roles.includes('SUPER_ADMIN') || roles.includes('ADMIN')) {
     return 'admin';
+  }
+
+  if (roles.includes('TRUONG_KHOA')) {
+    return 'dean';
   }
 
   if (roles.includes('LECTURER') || roles.includes('TRUONG_BO_MON')) {
@@ -75,7 +94,13 @@ export function portalFromPathname(pathname: string): LoginPortal {
     return 'admin';
   }
 
-  if (pathname.includes('/dashboard/lecturer')) {
+  if (pathname.includes('/dashboard/dean')) {
+    return 'dean';
+  }
+
+  // The thesis workspace belongs to department heads and deans; both
+  // authenticate through lecturer-shaped portals.
+  if (pathname.includes('/dashboard/lecturer') || pathname.includes('/dashboard/thesis')) {
     return 'lecturer';
   }
 
