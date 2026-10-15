@@ -6,7 +6,8 @@
 |---|---|---|---|
 | **Frontend Web** | Vercel | `https://campusute.io.vn` / `https://www.campusute.io.vn` | **LIVE (Ready)** |
 | **Backend REST API** | Render | `https://campuscore-backend-p4em.onrender.com` | **LIVE (Ready)** |
-| **Database** | Supabase PostgreSQL | `https://mjodncaunvjekwlgyclg.supabase.co` | **HEALTHY** |
+| **Database** | Neon PostgreSQL (Free, Singapore) | project `gentle-sunset-44685098` → `campusute_prod_20261015t060105z` | **LIVE (cutover 2026-10-15)** |
+| **DB Rollback** | Supabase PostgreSQL | `https://mjodncaunvjekwlgyclg.supabase.co` | **FROZEN (write-fenced, snapshot 2026-10-15T06:01Z)** |
 | **Mã nguồn Git** | GitHub | `https://github.com/JasonTM17/Student_Management_UTE` | **UP-TO-DATE** |
 
 ---
@@ -108,3 +109,17 @@ Phát hành phần xem học phần đã đăng ký và lịch tuần, các sử
 - **Khôi phục**: deployment trước là `dpl_G5n256qdHSgw2kk453nTXZaTpeaF` ([URL](https://campusute-j1ada315h-nguyen-sons-projects-4f98af92.vercel.app)). Lệnh đã lưu: `vercel rollback dpl_G5n256qdHSgw2kk453nTXZaTpeaF --yes`; **chưa thực thi rollback**.
 
 
+
+### Cutover Database: Supabase → Neon Free (Singapore) — 15/10/2026 (UTC)
+
+Chỉ chuyển **database**; backend vẫn trên Render, frontend vẫn trên Vercel. File báo cáo khóa luận không thuộc phạm vi (vẫn lưu `local` trên Render — mất khi redeploy; 8 record `s3` chỉ là metadata seed, không có blob nào trong DB).
+
+- **Cửa sổ ngưng ghi**: ~06:00–06:12Z. Write-fence `campusute_cutover_20261015t060039z` cài trigger `reject_write` trên 71 bảng nghiệp vụ của nguồn trước khi chụp; probe ghi xác nhận bị chặn (SQLSTATE 25006).
+- **Snapshot**: `pg_dump --snapshot` nhất quán, 3.321.916 bytes, sha256 `67b3bbece0fcda31f307acf5628d548618174f38c78a1814fb8e6d754348e91f`, manifest `neon-source-snapshot-20261015T060105Z.json` (71 bảng, 59 policy, sequence + grant runtime).
+- **Đích**: database cô lập `campusute_prod_20261015t060105z` trên project `gentle-sunset-44685098` (ap-southeast-1). 71 trigger fence được lọc khỏi TOC trước restore (hàm guard ở schema ngoài phạm vi dump).
+- **Kiểm chứng sau restore**: 13/13 check PASS — checksum MD5 từng bảng khớp nguồn, sequence, policy RLS (canonical hóa biểu thức), FK hợp lệ, không grant PUBLIC vào schema `assistant`, verifier RLS đúng của ứng dụng chạy bằng role `campuscore_assistant_runtime` (13 bảng RLS/FORCE, 59 policy, connlimit 8), probe từ chối truy cập sai chủ PASS.
+- **Bất biến nghiệp vụ**: Flyway `116` success; nhóm demo `SUBMITTED`/`PENDING`, Sơn nhóm trưởng, đủ 4 thành viên ACTIVE; Vũ Quốc Huy 0 đăng ký/0 điểm, role STUDENT.
+- **Chuyển đổi**: cập nhật `SPRING_DATASOURCE_*` + `ASSISTANT_DB_*` trên Render → Neon; deploy `dep-db86riou01pc73eofudg` LIVE. `lastLoginAt` ghi mới vào Neon xác nhận app đang dùng đúng đích.
+- **Kiểm chứng production sau cutover**: `prod-smoke` **16/16 PASS** (6 login, roster 4 người, giảng viên thấy nhóm pending, assistant grounded, admin tìm được thành viên mới); trình duyệt thật student4: đăng nhập → dashboard → trang khóa luận hiển thị đủ 4 tên, 0 console error.
+- **Quota Neon Free**: job `ScheduledAnnouncementNotifyJob` nâng lên 15 phút (`-Dengagement.announcement-notify.delay-ms=900000` trong `JAVA_TOOL_OPTIONS`) để DB được autosuspend (5 phút) giữa các nhịp poll; sync tri thức Supabase REST vốn đã tắt (`ASSISTANT_SUPABASE_ENABLED` mặc định false, authority-mode `sql`). Ước lượng ~15–25 CU-h/tháng, dưới hạn 100 — cần quan sát thực tế qua Neon console.
+- **Rollback**: Supabase giữ nguyên snapshot trước cutover, đang bị fence (mọi ghi bị từ chối). Phục hồi env từ `.devin/neon-migration/rollback-render-environment-20261015t060039z.json`, rồi chạy `neon-cutover-fence.py release neon-cutover-fence-20261015t060039z.json` với tham số nguồn Supabase để gỡ fence. Database rehearsal `campusute_trial_20261015t014700z` còn trên Neon — có thể xóa khi dọn dẹp.
