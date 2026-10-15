@@ -142,7 +142,7 @@ export default function RegisterPage() {
     else params.delete('tab');
     if (term) params.set('semester', term);
     const query = params.toString();
-    router.push(`${pathname}${query ? `?${query}` : ''}${window.location.hash}`, { scroll: false });
+    window.history.pushState(null, '', `${pathname}${query ? `?${query}` : ''}${window.location.hash}`);
   };
 
   // ---- browse state (kept across mutations; no full reload anywhere) ----

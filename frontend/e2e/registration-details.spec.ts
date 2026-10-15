@@ -358,6 +358,56 @@ for (const locale of ['en', 'vi'] as const) {
     expect(fixture.errors).toEqual([]);
   });
 
+  test(`registration details ${locale}: semester navigation commits before the RSC round trip`, async ({ page }) => {
+    const fixture = await mockRegistration(page);
+    await page.goto(`/${locale}/dashboard/register?keep=academic#semester-context`);
+    const registered = page.getByRole('tab', { name: names[locale].registered, exact: true });
+    await expect(registered).toBeVisible({ timeout: 20_000 });
+    await registered.click();
+    const panel = page.getByRole('tabpanel', { name: names[locale].registered, exact: true });
+    const semester = panel.getByRole('combobox', { name: names[locale].semester });
+    const list = panel.getByTestId('registered-courses-list');
+    await expect(semester).toHaveValue('term-3');
+    await expect(list.getByText('MF101', { exact: true })).toBeVisible();
+
+    let releaseRsc: () => void = () => {};
+    const rscGate = new Promise<void>((resolve) => { releaseRsc = resolve; });
+    await page.route(`**/${locale}/dashboard/register**`, async (route) => {
+      const request = route.request();
+      const url = new URL(request.url());
+      const isRsc = request.headers()['rsc'] === '1' || url.searchParams.has('_rsc');
+      if (request.method() === 'GET' && isRsc && url.searchParams.get('semester') === 'term-1') {
+        await rscGate;
+      }
+      await route.continue();
+    });
+
+    try {
+      await semester.selectOption('term-1');
+      await expect(semester).toHaveValue('term-1');
+      const url = new URL(page.url());
+      expect(url.searchParams.get('tab')).toBe('registered');
+      expect(url.searchParams.get('semester')).toBe('term-1');
+      expect(url.searchParams.get('keep')).toBe('academic');
+      expect(url.hash).toBe('#semester-context');
+      await expect(list.getByText('PAST104', { exact: true })).toBeVisible();
+      await expect(list.getByText('MF101', { exact: true })).toHaveCount(0);
+    } finally {
+      releaseRsc();
+    }
+
+    await page.goBack();
+    await expect(semester).toHaveValue('term-3');
+    await expect(list.getByText('MF101', { exact: true })).toBeVisible();
+    await page.goForward();
+    await expect(semester).toHaveValue('term-1');
+    await expect(list.getByText('PAST104', { exact: true })).toBeVisible();
+    await page.reload();
+    await expect(semester).toHaveValue('term-1');
+    await expect(list.getByText('PAST104', { exact: true })).toBeVisible();
+    expect(fixture.errors).toEqual([]);
+  });
+
   test(`registration details ${locale}: closed registration retains semester access and honest empty state`, async ({ page }) => {
     const fixture = await mockRegistration(page, { rounds: 'closed' });
     const panel = await openDetails(page, locale);
