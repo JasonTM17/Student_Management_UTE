@@ -57,6 +57,33 @@ public final class ThesisMutationDtos {
     }
 
     /**
+     * Non-destructive report edit. Absent fields keep the stored value;
+     * {@code clearUrl} explicitly removes the link and is only legal while a
+     * file artifact remains (the report must keep at least one artifact).
+     */
+    public record ReportUpdateRequest(String title, String note, String url, Boolean clearUrl) {
+    }
+
+    /** The audited report-deadline escape hatch for a REGISTRATION_CLOSED round. */
+    public record ReportDeadlineUpdateRequest(Instant gvpbDeadline) {
+    }
+
+    /**
+     * Consequence preview the admin reviews before confirming
+     * close-registration: non-cancelled group counts by approval state, the
+     * number of report rows already submitted in the round, and whether the
+     * GVPB report deadline has already passed.
+     */
+    public record CloseRegistrationPreviewResponse(
+            long groupCount,
+            long approvedGroupCount,
+            long pendingGroupCount,
+            long reportCount,
+            Instant gvpbDeadline,
+            boolean reportDeadlinePassed) {
+    }
+
+    /**
      * Minimal directory entry so a leader can invite a classmate into the
      * group. Deliberately carries no email: a directory lookup must not
      * expose contact PII to the whole student body.

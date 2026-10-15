@@ -215,6 +215,85 @@ class ThesisReportWriteWindowTest {
                 .andExpect(status().isOk());
     }
 
+    // ---------- artifact coexistence: upsert never destroys the sibling ----------
+
+    @Test
+    void linkSubmitOnAFileReportPreservesTheAttachedDocument() throws Exception {
+        Instant now = Instant.now();
+        UUID roundId = insertRound("rw-coexist-file-then-link", "KLTN", "REGISTRATION_CLOSED",
+                now.minusSeconds(3_600), now.plusSeconds(30L * 24 * 60 * 60),
+                now.plusSeconds(31L * 24 * 60 * 60));
+        UUID groupId = insertApprovedGroup(roundId, "rw-leader-coexist-1");
+
+        mvc.perform(multipart("/api/v1/thesis/groups/{id}/report/file", groupId)
+                        .file(new MockMultipartFile("file", "report.docx",
+                                MediaType.APPLICATION_OCTET_STREAM_VALUE, DOCX_BYTES))
+                        .with(studentJwt("rw-leader-coexist-1")))
+                .andExpect(status().isOk());
+        String storageKey = jdbc.queryForObject(
+                "SELECT storage_key FROM thesis.thesis_group_report WHERE group_id = ?", String.class, groupId);
+        assertThat(storageKey).isNotNull();
+
+        // The link path used to DELETE the row and take the document with it.
+        mvc.perform(post("/api/v1/thesis/groups/{id}/report", groupId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"url\":\"https://drive.example.com/companion.pdf\",\"title\":\"Companion link\"}")
+                        .with(studentJwt("rw-leader-coexist-1")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.url").value("https://drive.example.com/companion.pdf"))
+                .andExpect(jsonPath("$.fileName").value("report.docx"));
+
+        assertThat(jdbc.queryForObject(
+                "SELECT storage_key FROM thesis.thesis_group_report WHERE group_id = ?", String.class, groupId))
+                .isEqualTo(storageKey);
+        assertThat(reportRows(groupId)).isEqualTo(1);
+
+        mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get(
+                        "/api/v1/thesis/groups/{id}/report/file", groupId)
+                        .with(studentJwt("rw-leader-coexist-1")))
+                .andExpect(status().isOk())
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.content()
+                        .bytes(DOCX_BYTES));
+    }
+
+    @Test
+    void fileSubmitOnALinkReportPreservesTheUrl() throws Exception {
+        Instant now = Instant.now();
+        UUID roundId = insertRound("rw-coexist-link-then-file", "KLTN", "REGISTRATION_CLOSED",
+                now.minusSeconds(3_600), now.plusSeconds(30L * 24 * 60 * 60),
+                now.plusSeconds(31L * 24 * 60 * 60));
+        UUID groupId = insertApprovedGroup(roundId, "rw-leader-coexist-2");
+
+        mvc.perform(post("/api/v1/thesis/groups/{id}/report", groupId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"url\":\"https://drive.example.com/link.pdf\"}")
+                        .with(studentJwt("rw-leader-coexist-2")))
+                .andExpect(status().isOk());
+        Object submittedAt = jdbc.queryForObject(
+                "SELECT submitted_at FROM thesis.thesis_group_report WHERE group_id = ?", Object.class, groupId);
+
+        // The file path used to overwrite url with NULL via DELETE+INSERT.
+        mvc.perform(multipart("/api/v1/thesis/groups/{id}/report/file", groupId)
+                        .file(new MockMultipartFile("file", "attached.docx",
+                                MediaType.APPLICATION_OCTET_STREAM_VALUE, DOCX_BYTES))
+                        .with(studentJwt("rw-leader-coexist-2")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.url").value("https://drive.example.com/link.pdf"))
+                .andExpect(jsonPath("$.fileName").value("attached.docx"));
+
+        assertThat(jdbc.queryForObject(
+                "SELECT url FROM thesis.thesis_group_report WHERE group_id = ?", String.class, groupId))
+                .isEqualTo("https://drive.example.com/link.pdf");
+        assertThat(jdbc.queryForObject(
+                "SELECT storage_key FROM thesis.thesis_group_report WHERE group_id = ?", String.class, groupId))
+                .isNotNull();
+        // submitted_at/submitted_by are immutable after the first submission.
+        assertThat(jdbc.queryForObject(
+                "SELECT submitted_at FROM thesis.thesis_group_report WHERE group_id = ?", Object.class, groupId))
+                .isEqualTo(submittedAt);
+        assertThat(reportRows(groupId)).isEqualTo(1);
+    }
+
     @Test
     void anAuthoredGradingDeadlineFreezesTheReportOnEveryRoundType() throws Exception {
         // A round that does carry a grading deadline is frozen by it whatever

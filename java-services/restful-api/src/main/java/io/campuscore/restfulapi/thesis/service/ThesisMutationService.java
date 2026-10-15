@@ -12,6 +12,7 @@ import io.campuscore.restfulapi.thesis.repository.ThesisRegistrationRoundReposit
 import io.campuscore.restfulapi.thesis.repository.ThesisRoundReadPort;
 import io.campuscore.restfulapi.thesis.repository.ThesisTopicRepository;
 import io.campuscore.restfulapi.thesis.web.ThesisGroupReadDtos.GroupResponse;
+import io.campuscore.restfulapi.thesis.web.ThesisMutationDtos.CloseRegistrationPreviewResponse;
 import io.campuscore.restfulapi.thesis.web.ThesisMutationDtos.GroupCreateRequest;
 import io.campuscore.restfulapi.thesis.web.ThesisMutationDtos.MemberRequest;
 import io.campuscore.restfulapi.thesis.web.ThesisMutationDtos.ProgressRequest;
@@ -384,6 +385,81 @@ public class ThesisMutationService {
         }
         audit.record(subject(actor), null, "THESIS_ROUND_CANCELLED", "THESIS_ROUND", id.toString(),
                 "Round cancelled");
+        return roundReads.get(id);
+    }
+
+    /**
+     * Consequence preview for close-registration (plan F2): the admin sees how
+     * many non-cancelled groups the round carries by approval state, how many
+     * report rows are already submitted, and whether the authored GVPB report
+     * deadline has already passed. Read-only by design — the close itself
+     * still succeeds when the deadline passed (a hard block would strand the
+     * round in REGISTRATION_OPEN forever), so the preview carries the warning
+     * instead of enforcing it.
+     */
+    @Transactional(readOnly = true)
+    public CloseRegistrationPreviewResponse closeRegistrationPreview(UUID roundId) {
+        Map<String, Object> round = one(
+                "SELECT gvpb_deadline FROM thesis.thesis_registration_round WHERE id = :id",
+                params().addValue("id", roundId), "ROUND_NOT_FOUND", "Thesis registration round not found");
+        Map<String, Object> counts = jdbc.queryForMap(
+                "SELECT COUNT(*) AS group_count, "
+                        + "COUNT(*) FILTER (WHERE approval_status = 'APPROVED') AS approved_count, "
+                        + "COUNT(*) FILTER (WHERE approval_status = 'PENDING') AS pending_count "
+                        + "FROM thesis.thesis_group WHERE round_id = :roundId AND status <> 'CANCELLED'",
+                params().addValue("roundId", roundId));
+        Long reportRows = jdbc.queryForObject(
+                "SELECT COUNT(*) FROM thesis.thesis_group_report WHERE round_id = :roundId",
+                params().addValue("roundId", roundId), Long.class);
+        Instant gvpbDeadline = instantOf(round.get("gvpb_deadline"));
+        boolean deadlinePassed = gvpbDeadline != null && !Instant.now().isBefore(gvpbDeadline);
+        return new CloseRegistrationPreviewResponse(
+                ((Number) counts.get("group_count")).longValue(),
+                ((Number) counts.get("approved_count")).longValue(),
+                ((Number) counts.get("pending_count")).longValue(),
+                reportRows == null ? 0 : reportRows,
+                gvpbDeadline,
+                deadlinePassed);
+    }
+
+    /**
+     * The report-window escape hatch (plan F1): a REGISTRATION_CLOSED round
+     * whose GVPB deadline already passed used to freeze its reports forever —
+     * no transition reopened them and {@code updateRound} is locked once
+     * registration opens. This audited mutation moves {@code gvpb_deadline}
+     * forward, reopening report submission only; roster and registration stay
+     * closed. MON_HOC/NCKH rounds deliberately have no escape hatch: their
+     * freeze is the RESULTS_PUBLISHED lifecycle, which is terminal by design.
+     * The shared column also bounds GVPB scoring, so extending it reopens that
+     * window too (documented in plan risk R4).
+     */
+    @Transactional
+    public RoundResponse extendReportDeadline(UUID id, Instant newDeadline, Jwt actor) {
+        Map<String, Object> current = one(
+                "SELECT status, thesis_type, gvpb_deadline FROM thesis.thesis_registration_round "
+                        + "WHERE id = :id FOR UPDATE",
+                params().addValue("id", id), "ROUND_NOT_FOUND", "Thesis registration round not found");
+        if (!RoundStatus.REGISTRATION_CLOSED.name().equals(current.get("status"))) {
+            throw conflict("ROUND_STATE_CONFLICT",
+                    "The report deadline can only be extended while the round is REGISTRATION_CLOSED");
+        }
+        RoundType roundType = requireRoundType((String) current.get("thesis_type"));
+        if (!roundType.requiresGvpbDeadline()) {
+            throw invalid(roundType + " rounds carry no GVPB deadline; their report window ends at results publication");
+        }
+        if (newDeadline == null || !newDeadline.isAfter(Instant.now())) {
+            throw invalid("gvpbDeadline must be in the future");
+        }
+        Map<String, Object> beforeState = new LinkedHashMap<>();
+        beforeState.put("gvpb_deadline", instantOf(current.get("gvpb_deadline")));
+        jdbc.update(
+                "UPDATE thesis.thesis_registration_round SET gvpb_deadline = :gvpbDeadline, "
+                        + "updated_at = CURRENT_TIMESTAMP, version = version + 1 WHERE id = :id",
+                params().addValue("id", id).addValue("gvpbDeadline", tsOf(newDeadline)));
+        Map<String, Object> afterState = new LinkedHashMap<>();
+        afterState.put("gvpb_deadline", newDeadline);
+        audit.record(subject(actor), null, "THESIS_ROUND_REPORT_DEADLINE_EXTENDED", "THESIS_ROUND", id.toString(),
+                "Report submission deadline extended", beforeState, afterState);
         return roundReads.get(id);
     }
 

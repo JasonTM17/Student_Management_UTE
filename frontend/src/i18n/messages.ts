@@ -144,6 +144,13 @@ export const en = {
         UNSUPPORTED_FILE_TYPE: 'Only Word (.doc, .docx) and PDF files are accepted.',
         INVALID_FILE_CONTENT: 'The file content does not match its extension.',
         FILE_REQUIRED: 'Choose a file to submit.',
+        REPORT_STORAGE_UNAVAILABLE:
+          'The stored report document cannot be reached on the server right now.',
+        REPORT_ARTIFACT_REQUIRED:
+          'A report needs a link or an attached document — add one before removing the other.',
+        GROUP_STATE_CONFLICT: 'This group is not in a state that allows that action.',
+        ROUND_STATE_CONFLICT: 'This round is not in a state that allows that action.',
+        VALIDATION_ERROR: 'Some submitted values are invalid. Review them and try again.',
         // Thesis results and council
         RESULTS_NOT_READY: 'No topic has been graded yet; the chair must finalize scores first.',
         RESULTS_INCOMPLETE: 'Every approved group must be graded before results are published.',
@@ -2232,6 +2239,9 @@ export const en = {
     membersNeededForApproval: 'A draft with 1 or 2 members can be completed before approval. Add {count} more member(s) to reach the minimum of 3; approval requires 3 to 5 members.',
     noGroup: 'You do not have a group in this round yet.',
     noGroupDescription: 'Create a group when registration opens.',
+    membershipRoundHint:
+      'Your group belongs to “{round}” — switch to that round to see its details and report.',
+    membershipRoundOpen: 'Open my group’s round',
     noTopics: 'No published topics yet.',
     noTopicsDescription:
       'The department will publish the available directions before topic selection opens.',
@@ -2296,6 +2306,8 @@ export const en = {
       fileTooLarge: 'The document must be 20 MB or smaller.',
       fileTypeUnsupported: 'Only .pdf, .doc and .docx documents are accepted.',
       downloadFile: 'Download document',
+      fileUnavailable:
+        'The document is no longer in server storage. Please submit the report file again.',
       documentAttached: 'Attached document',
       lockedTitle: 'Report submissions are closed',
       lockedDescription:
@@ -2303,7 +2315,7 @@ export const en = {
       lockedAt: 'Locked since',
       replaceConfirmTitle: 'Replace the submitted report?',
       replaceConfirmDescription:
-        'Uploading again discards the current document and link. The previous version cannot be recovered.',
+        'Uploading a new file replaces the stored document. The previous file cannot be recovered; the report link and details stay in place.',
       replaceConfirmAction: 'Replace report',
       titleCounter: '{count}/240 characters',
       noteCounter: '{count}/500 characters',
@@ -2311,6 +2323,16 @@ export const en = {
       uploadCancel: 'Cancel upload',
       leaderOnlyBanner:
         'Only the group leader submits or replaces the report. {leader} submits it on behalf of the group.',
+      pendingApproval: 'The report opens once your group is approved.',
+      openUntil: 'Submissions stay open until {deadline}.',
+      closedFinalTitle: 'Round finished — submissions closed',
+      updateSuccess: 'Report updated.',
+      detachFile: 'Remove document',
+      detachConfirmTitle: 'Remove the attached document?',
+      detachConfirmDescription:
+        'The stored document is deleted and cannot be recovered. The report link, title and note stay in place.',
+      detachConfirmAction: 'Remove document',
+      detachSuccess: 'Document removed from the report.',
     },
     results: {
       title: 'Results',
@@ -2476,6 +2498,18 @@ export const en = {
       reviewerAssigned: 'Counter-reviewer assigned.',
       reviewerIsSupervisor: 'A topic supervisor cannot be its counter-reviewer.',
       reviewerFrozen: 'The counter-reviewer already submitted a score — the assignment is frozen.',
+      closePreviewGroups: 'Groups in this round: {count}.',
+      closePreviewApproved: 'Approved: {count}.',
+      closePreviewPending: 'Awaiting approval: {count}.',
+      closePreviewReports: 'Reports already submitted: {count}.',
+      closePreviewDeadlinePassed:
+        'The report deadline has already passed — groups cannot submit until you extend it with “Extend report deadline”.',
+      reportDeadlineExtend: 'Extend report deadline',
+      reportDeadlineModalTitle: 'Extend report submission deadline',
+      reportDeadlineModalDescription:
+        'Groups can submit or update their report until this time. Extending the deadline also reopens the GVPB counter-review window for this round.',
+      reportDeadlineInvalid: 'Choose a deadline in the future.',
+      reportDeadlineSuccess: 'Report deadline extended.',
     },
   },
   assistant: {
@@ -2942,6 +2976,13 @@ export const vi: I18nMessages = {
         UNSUPPORTED_FILE_TYPE: 'Chỉ nhận tệp Word (.doc, .docx) và PDF.',
         INVALID_FILE_CONTENT: 'Nội dung tệp không khớp với phần mở rộng.',
         FILE_REQUIRED: 'Hãy chọn tệp để nộp.',
+        REPORT_STORAGE_UNAVAILABLE:
+          'Tài liệu lưu trữ trên máy chủ hiện không truy cập được.',
+        REPORT_ARTIFACT_REQUIRED:
+          'Bài nộp cần một liên kết hoặc tài liệu đính kèm — hãy thêm một phần trước khi gỡ phần còn lại.',
+        GROUP_STATE_CONFLICT: 'Nhóm hiện không ở trạng thái cho phép thao tác này.',
+        ROUND_STATE_CONFLICT: 'Đợt hiện không ở trạng thái cho phép thao tác này.',
+        VALIDATION_ERROR: 'Một số giá trị đã nhập chưa hợp lệ. Hãy kiểm tra rồi thử lại.',
         // Kết quả và hội đồng
         RESULTS_NOT_READY: 'Chưa có đề tài nào được chấm điểm; hội đồng cần chốt điểm trước.',
         RESULTS_INCOMPLETE: 'Mọi nhóm đã được duyệt phải có điểm trước khi công bố kết quả.',
@@ -5024,6 +5065,9 @@ export const vi: I18nMessages = {
     membersNeededForApproval: 'Nhóm nháp có 1 hoặc 2 thành viên có thể tiếp tục bổ sung trước khi duyệt. Cần thêm {count} thành viên để đủ mức tối thiểu 3; nhóm được duyệt phải có từ 3 đến 5 thành viên.',
     noGroup: 'Bạn chưa có nhóm trong đợt này.',
     noGroupDescription: 'Tạo nhóm khi đợt đăng ký mở.',
+    membershipRoundHint:
+      'Nhóm của bạn thuộc đợt “{round}” — hãy chuyển sang đợt đó để xem thông tin và báo cáo.',
+    membershipRoundOpen: 'Mở đợt của nhóm tôi',
     noTopics: 'Chưa có đề tài được công bố.',
     noTopicsDescription:
       'Bộ môn sẽ công bố các hướng đề tài trước khi mở bước lựa chọn.',
@@ -5088,6 +5132,8 @@ export const vi: I18nMessages = {
       fileTooLarge: 'Tài liệu phải nhỏ hơn hoặc bằng 20 MB.',
       fileTypeUnsupported: 'Chỉ nhận tài liệu .pdf, .doc và .docx.',
       downloadFile: 'Tải tài liệu',
+      fileUnavailable:
+        'Tài liệu không còn trên máy chủ lưu trữ. Vui lòng nộp lại file báo cáo.',
       documentAttached: 'Tài liệu đính kèm',
       lockedTitle: 'Đã hết thời hạn nộp báo cáo',
       lockedDescription:
@@ -5095,7 +5141,7 @@ export const vi: I18nMessages = {
       lockedAt: 'Khoá từ',
       replaceConfirmTitle: 'Thay thế báo cáo đã nộp?',
       replaceConfirmDescription:
-        'Tải lên lần nữa sẽ ghi đè tài liệu và liên kết hiện có. Phiên bản trước không thể khôi phục.',
+        'Tải lên tệp mới sẽ thay thế tài liệu đã lưu. Tệp trước không thể khôi phục; liên kết và thông tin báo cáo được giữ lại.',
       replaceConfirmAction: 'Thay thế báo cáo',
       titleCounter: '{count}/240 ký tự',
       noteCounter: '{count}/500 ký tự',
@@ -5103,6 +5149,16 @@ export const vi: I18nMessages = {
       uploadCancel: 'Huỷ tải lên',
       leaderOnlyBanner:
         'Chỉ nhóm trưởng mới nộp hoặc thay thế báo cáo. {leader} sẽ nộp thay nhóm.',
+      pendingApproval: 'Báo cáo mở sau khi nhóm được duyệt.',
+      openUntil: 'Hạn nộp báo cáo đến {deadline}.',
+      closedFinalTitle: 'Đợt đã kết thúc — đã khóa nộp báo cáo',
+      updateSuccess: 'Đã cập nhật báo cáo.',
+      detachFile: 'Gỡ tài liệu',
+      detachConfirmTitle: 'Gỡ tài liệu đính kèm?',
+      detachConfirmDescription:
+        'Tài liệu đã lưu sẽ bị xóa vĩnh viễn và không thể khôi phục. Liên kết, tiêu đề và ghi chú của báo cáo được giữ lại.',
+      detachConfirmAction: 'Gỡ tài liệu',
+      detachSuccess: 'Đã gỡ tài liệu khỏi báo cáo.',
     },
     results: {
       title: 'Kết quả',
@@ -5268,6 +5324,18 @@ export const vi: I18nMessages = {
       reviewerAssigned: 'Đã phân công giảng viên phản biện.',
       reviewerIsSupervisor: 'Giảng viên hướng dẫn không thể làm phản biện đề tài của chính mình.',
       reviewerFrozen: 'Giảng viên phản biện đã nộp điểm — không thể đổi phân công.',
+      closePreviewGroups: 'Số nhóm trong đợt: {count}.',
+      closePreviewApproved: 'Đã duyệt: {count}.',
+      closePreviewPending: 'Chờ xét duyệt: {count}.',
+      closePreviewReports: 'Báo cáo đã nộp: {count}.',
+      closePreviewDeadlinePassed:
+        'Hạn nộp báo cáo đã qua — nhóm sẽ không nộp được cho tới khi bạn gia hạn bằng “Gia hạn hạn nộp báo cáo”.',
+      reportDeadlineExtend: 'Gia hạn hạn nộp báo cáo',
+      reportDeadlineModalTitle: 'Gia hạn hạn nộp báo cáo',
+      reportDeadlineModalDescription:
+        'Nhóm có thể nộp hoặc cập nhật báo cáo đến thời điểm này. Gia hạn cũng mở lại cửa sổ chấm phản biện (GVPB) của đợt.',
+      reportDeadlineInvalid: 'Hãy chọn thời điểm trong tương lai.',
+      reportDeadlineSuccess: 'Đã gia hạn hạn nộp báo cáo.',
     },
   },
   assistant: {

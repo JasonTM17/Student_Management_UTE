@@ -53,6 +53,8 @@ class ThesisGroupRosterCopyTest {
 
     @BeforeEach
     void cleanDatabase() {
+        // thesis_group_report is ON DELETE RESTRICT -> delete reports before groups.
+        jdbc.update("DELETE FROM thesis.thesis_group_report");
         jdbc.update("DELETE FROM thesis.thesis_group_member");
         jdbc.update("DELETE FROM thesis.thesis_group");
         jdbc.update("DELETE FROM thesis.thesis_topic");

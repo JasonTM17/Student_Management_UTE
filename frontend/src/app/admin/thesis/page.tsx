@@ -40,6 +40,7 @@ import { lecturersApi } from '@/lib/api';
 import type { Lecturer } from '@/types/api';
 import {
   thesisApi,
+  type ThesisCloseRegistrationPreview,
   type ThesisCouncil,
   type ThesisCouncilMemberRole,
   type ThesisGroup,
@@ -126,6 +127,13 @@ export default function AdminThesisPage() {
   const [showEditRoundModal, setShowEditRoundModal] = useState(false);
   const [editingRoundId, setEditingRoundId] = useState('');
 
+  // Extend-report-deadline modal state (the F1 escape hatch for a
+  // REGISTRATION_CLOSED round whose gvpbDeadline already passed).
+  const [showExtendDeadlineModal, setShowExtendDeadlineModal] = useState(false);
+  const [extendDeadlineRoundId, setExtendDeadlineRoundId] = useState('');
+  const [extendDeadlineValue, setExtendDeadlineValue] = useState('');
+  const [extendDeadlineError, setExtendDeadlineError] = useState('');
+
   // GVPB counter-reviewer assignment drafts, keyed by topic id
   const [reviewerDrafts, setReviewerDrafts] = useState<Record<string, string>>({});
 
@@ -192,6 +200,9 @@ export default function AdminThesisPage() {
     if (code === 'RESULTS_NOT_READY') return codes.RESULTS_NOT_READY;
     if (code === 'RESULTS_NOT_PUBLISHED') return codes.RESULTS_NOT_PUBLISHED;
     if (code === 'GROUP_APPROVAL_STATE_CONFLICT') return codes.GROUP_APPROVAL_STATE_CONFLICT;
+    if (code === 'ROUND_STATE_CONFLICT') return codes.ROUND_STATE_CONFLICT;
+    if (code === 'GROUP_STATE_CONFLICT') return codes.GROUP_STATE_CONFLICT;
+    if (code === 'VALIDATION_ERROR') return codes.VALIDATION_ERROR;
     return messages.thesis.actionFailed;
   };
 
@@ -347,12 +358,36 @@ export default function AdminThesisPage() {
   ) => {
     // Lifecycle transitions move every group and lecturer in the round, so a
     // single misclick cannot silently open registration or publish results.
+    // Closing registration must never be blind (F2): fetch the server-side
+    // consequence preview first so the dialog shows real group/report counts.
+    // A preview read failure must not block the transition — fall back to the
+    // generic confirm copy.
+    let closePreview: ThesisCloseRegistrationPreview | null = null;
+    if (action === 'close') {
+      closePreview = await thesisApi.closeRegistrationPreview(roundId).catch(() => null);
+    }
+    let message = transitionConfirmCopy(action);
+    let warning: string | undefined;
+    if (closePreview) {
+      const adminCopy = messages.thesis.admin;
+      message = [
+        message,
+        adminCopy.closePreviewGroups.replace('{count}', String(closePreview.groupCount)),
+        adminCopy.closePreviewApproved.replace('{count}', String(closePreview.approvedGroupCount)),
+        adminCopy.closePreviewPending.replace('{count}', String(closePreview.pendingGroupCount)),
+        adminCopy.closePreviewReports.replace('{count}', String(closePreview.reportCount)),
+      ].join(' ');
+      if (closePreview.reportDeadlinePassed) {
+        warning = adminCopy.closePreviewDeadlinePassed;
+      }
+    }
     const confirmed = await confirm({
       title: messages.thesis.admin.transitionConfirmTitle,
-      message: transitionConfirmCopy(action),
+      message,
       confirmText: messages.common.actions.confirm,
       cancelText: messages.common.actions.cancel,
       variant: action === 'publish-results' || action === 'close' ? 'destructive' : 'default',
+      warning,
     });
     if (!confirmed) return;
     setIsSaving(true);
@@ -395,6 +430,45 @@ export default function AdminThesisPage() {
   };
 
   const toLocalInput = (iso?: string | null) => (iso ? iso.slice(0, 16) : '');
+
+  /** Opens the deadline-extension modal prefilled with the current deadline. */
+  const openExtendDeadlineModal = (round: ThesisRound) => {
+    setExtendDeadlineRoundId(round.id);
+    setExtendDeadlineValue(toLocalInput(round.gvpbDeadline));
+    setExtendDeadlineError('');
+    setShowExtendDeadlineModal(true);
+  };
+
+  const extendReportDeadline = async () => {
+    const parsed = extendDeadlineValue ? new Date(extendDeadlineValue) : null;
+    if (
+      !extendDeadlineRoundId ||
+      !parsed ||
+      Number.isNaN(parsed.getTime()) ||
+      parsed.getTime() <= Date.now()
+    ) {
+      setExtendDeadlineError(messages.thesis.admin.reportDeadlineInvalid);
+      return;
+    }
+    setIsSaving(true);
+    setError('');
+    setSuccess('');
+    setExtendDeadlineError('');
+    try {
+      await thesisApi.extendReportDeadline(extendDeadlineRoundId, parsed.toISOString());
+      setSuccess(messages.thesis.admin.reportDeadlineSuccess);
+      setShowExtendDeadlineModal(false);
+      setExtendDeadlineRoundId('');
+      await loadData();
+      if (expandedRoundId === extendDeadlineRoundId) {
+        await loadRoundDetail(extendDeadlineRoundId);
+      }
+    } catch (err: unknown) {
+      setExtendDeadlineError(transitionErrorMessage(err));
+    } finally {
+      setIsSaving(false);
+    }
+  };
 
   /** The edit modal reuses the create-form state; opening it loads the round. */
   const openEditRoundModal = (round: ThesisRound) => {
@@ -679,6 +753,20 @@ export default function AdminThesisPage() {
                           {round.status === 'REGISTRATION_CLOSED' ? (
                             <Button type="button" size="sm" onClick={() => void transitionRound(round.id, 'publish-results')} disabled={isSaving}>
                               {messages.thesis.admin.publishResults}
+                            </Button>
+                          ) : null}
+                          {/* F1 escape hatch: a closed round whose report
+                              deadline passed gets a visible way to reopen the
+                              submission window without a code change. */}
+                          {round.status === 'REGISTRATION_CLOSED' && round.gvpbDeadline ? (
+                            <Button
+                              type="button"
+                              size="sm"
+                              variant="outline"
+                              onClick={() => openExtendDeadlineModal(round)}
+                              disabled={isSaving}
+                            >
+                              {messages.thesis.admin.reportDeadlineExtend}
                             </Button>
                           ) : null}
                           {(round.status === 'DRAFT' || round.status === 'PROPOSAL_OPEN' || round.status === 'PROPOSALS_PUBLISHED') ? (
@@ -1342,6 +1430,55 @@ export default function AdminThesisPage() {
               </>
             );
           })()}
+        </div>
+      </Modal>
+      {/* Extend Report Deadline Modal — the audited escape hatch for a closed
+          round whose report deadline already passed. */}
+      <Modal
+        isOpen={showExtendDeadlineModal}
+        onClose={() => {
+          if (!isSaving) {
+            setShowExtendDeadlineModal(false);
+            setExtendDeadlineRoundId('');
+          }
+        }}
+        title={messages.thesis.admin.reportDeadlineModalTitle}
+      >
+        <div className="space-y-4">
+          <p className="text-sm text-muted-foreground">
+            {messages.thesis.admin.reportDeadlineModalDescription}
+          </p>
+          {extendDeadlineError ? (
+            <div className="rounded-md border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive">
+              {extendDeadlineError}
+            </div>
+          ) : null}
+          <label className="flex flex-col gap-2 text-sm font-medium text-foreground">
+            {messages.thesis.admin.gvpbDeadline}
+            <Input
+              type="datetime-local"
+              value={extendDeadlineValue}
+              onChange={(e) => setExtendDeadlineValue(e.target.value)}
+              required
+            />
+          </label>
+          <div className="flex justify-end gap-2 pt-2">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setShowExtendDeadlineModal(false)}
+              disabled={isSaving}
+            >
+              {messages.common.actions.cancel}
+            </Button>
+            <Button
+              type="button"
+              onClick={() => void extendReportDeadline()}
+              disabled={isSaving || !extendDeadlineValue}
+            >
+              {messages.thesis.admin.reportDeadlineExtend}
+            </Button>
+          </div>
         </div>
       </Modal>
       {confirmationDialog}

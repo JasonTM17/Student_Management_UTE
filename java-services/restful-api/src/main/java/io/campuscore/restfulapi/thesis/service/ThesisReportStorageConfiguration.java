@@ -17,6 +17,7 @@ public class ThesisReportStorageConfiguration {
         return switch (provider) {
             case "local" -> new LocalThesisReportStorage(properties);
             case "supabase" -> new SupabaseThesisReportStorage(properties);
+            case "database" -> new DatabaseThesisReportStorage(properties);
             default -> throw new IllegalStateException(
                     "Unsupported thesis.report.storage.provider: " + provider);
         };

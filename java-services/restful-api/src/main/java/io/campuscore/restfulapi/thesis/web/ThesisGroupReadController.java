@@ -47,6 +47,19 @@ public class ThesisGroupReadController {
                 actor.getClaimAsString("lecturerId"));
     }
 
+    @Operation(summary = "Lấy các nhóm của người gọi trên mọi đợt", description = "Sinh viên thấy nhóm mình là thành viên/nhóm trưởng, giảng viên thấy nhóm thuộc đề tài mình hướng dẫn — dùng để tự chọn đợt chứa nhóm thay vì đợt mới nhất")
+    @ApiResponses({
+        @ApiResponse(responseCode = "200", description = "Truy xuất danh sách nhóm của người gọi thành công"),
+        @ApiResponse(responseCode = "401", description = "Chưa xác thực"),
+        @ApiResponse(responseCode = "403", description = "Không có hồ sơ sinh viên/giảng viên")
+    })
+    @GetMapping("/mine")
+    @PreAuthorize("hasAnyRole('STUDENT','LECTURER','ADMIN','SUPER_ADMIN','TRUONG_KHOA')")
+    public List<GroupResponse> mine(@AuthenticationPrincipal Jwt actor) {
+        return groups.listMine(roles(actor), actor.getClaimAsString("studentId"),
+                actor.getClaimAsString("lecturerId"));
+    }
+
     @Operation(summary = "Xem chi tiết một nhóm sinh viên theo UUID", description = "Truy xuất thông tin chi tiết một nhóm khóa luận: đề tài đã chọn, trạng thái phê duyệt của GVHD và danh sách thành viên")
     @ApiResponses({
         @ApiResponse(responseCode = "200", description = "Tìm thấy nhóm khóa luận"),

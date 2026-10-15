@@ -5,10 +5,13 @@ import io.campuscore.restfulapi.thesis.service.ThesisMutationService;
 import io.campuscore.restfulapi.thesis.service.ThesisReportService;
 import io.campuscore.restfulapi.thesis.service.ThesisSupervisorService;
 import io.campuscore.restfulapi.thesis.web.ThesisGroupReadDtos.GroupResponse;
+import io.campuscore.restfulapi.thesis.web.ThesisMutationDtos.CloseRegistrationPreviewResponse;
 import io.campuscore.restfulapi.thesis.web.ThesisMutationDtos.GroupCreateRequest;
 import io.campuscore.restfulapi.thesis.web.ThesisMutationDtos.GroupRejectionRequest;
 import io.campuscore.restfulapi.thesis.web.ThesisMutationDtos.MemberRequest;
 import io.campuscore.restfulapi.thesis.web.ThesisMutationDtos.ProgressRequest;
+import io.campuscore.restfulapi.thesis.web.ThesisMutationDtos.ReportDeadlineUpdateRequest;
+import io.campuscore.restfulapi.thesis.web.ThesisMutationDtos.ReportUpdateRequest;
 import io.campuscore.restfulapi.thesis.web.ThesisMutationDtos.RoundCreateRequest;
 import io.campuscore.restfulapi.thesis.web.ThesisMutationDtos.StudentSearchResponse;
 import io.campuscore.restfulapi.thesis.web.ThesisMutationDtos.TopicAssignmentRequest;
@@ -132,6 +135,34 @@ public class ThesisMutationController {
     public RoundResponse closeRegistration(@Parameter(description = "Mã UUID của đợt", required = true) @PathVariable UUID id,
             @AuthenticationPrincipal Jwt actor) {
         return mutations.transitionRound(id, RoundStatus.REGISTRATION_OPEN, RoundStatus.REGISTRATION_CLOSED, actor);
+    }
+
+    /**
+     * The close must never be blind (plan F2): the admin reviews group/report
+     * counts and whether the report deadline already passed before confirming.
+     */
+    @Operation(summary = "Xem trước hệ quả khi đóng đăng ký", description = "Trả về số nhóm, số báo cáo đã nộp và trạng thái hạn nộp báo cáo của đợt trước khi đóng đăng ký")
+    @GetMapping("/rounds/{id}/close-registration-preview")
+    @PreAuthorize("hasAnyRole('ADMIN','TRUONG_KHOA','SUPER_ADMIN')")
+    public CloseRegistrationPreviewResponse closeRegistrationPreview(
+            @Parameter(description = "Mã UUID của đợt", required = true) @PathVariable UUID id,
+            @AuthenticationPrincipal Jwt actor) {
+        return mutations.closeRegistrationPreview(id);
+    }
+
+    /**
+     * Escape hatch for the report-window dead-end (plan F1): while the round
+     * is REGISTRATION_CLOSED the GVPB report deadline may be extended forward;
+     * roster mutation stays closed. The change is audited.
+     */
+    @Operation(summary = "Gia hạn nộp báo cáo", description = "Dời hạn nộp báo cáo (gvpbDeadline) của đợt đang REGISTRATION_CLOSED sang thời điểm mới; thao tác được ghi audit")
+    @PutMapping("/rounds/{id}/report-deadline")
+    @PreAuthorize("hasAnyRole('ADMIN','TRUONG_KHOA','SUPER_ADMIN')")
+    public RoundResponse extendReportDeadline(
+            @Parameter(description = "Mã UUID của đợt", required = true) @PathVariable UUID id,
+            @RequestBody ReportDeadlineUpdateRequest request,
+            @AuthenticationPrincipal Jwt actor) {
+        return mutations.extendReportDeadline(id, request == null ? null : request.gvpbDeadline(), actor);
     }
 
     /** Brief R9: publish graded results to the students of the round. */
@@ -271,6 +302,34 @@ public class ThesisMutationController {
             @RequestPart(value = "note", required = false) String note,
             @AuthenticationPrincipal Jwt actor) {
         return reports.submitFile(id, file, title, note, actor);
+    }
+
+    /**
+     * Non-destructive report edit (plan F4): title/note/link only — the stored
+     * document is never touched here, and clearing the link requires a file
+     * artifact to remain.
+     */
+    @Operation(summary = "Chỉnh sửa báo cáo", description = "Cập nhật tiêu đề, ghi chú hoặc liên kết báo cáo mà không xóa tệp đính kèm; chỉ nhóm trưởng")
+    @PatchMapping("/groups/{id}/report")
+    @PreAuthorize("hasRole('STUDENT')")
+    public ReportResponse updateReport(
+            @PathVariable UUID id,
+            @RequestBody ReportUpdateRequest request,
+            @AuthenticationPrincipal Jwt actor) {
+        return reports.updateReport(id, request, actor);
+    }
+
+    /**
+     * Detaches the stored document while the link artifact stays (plan F4).
+     * The object itself is deleted only after the row update commits.
+     */
+    @Operation(summary = "Gỡ tệp đính kèm khỏi báo cáo", description = "Xóa tệp báo cáo đính kèm nhưng giữ lại liên kết; chỉ nhóm trưởng")
+    @DeleteMapping("/groups/{id}/report/file")
+    @PreAuthorize("hasRole('STUDENT')")
+    public ReportResponse removeReportFile(
+            @PathVariable UUID id,
+            @AuthenticationPrincipal Jwt actor) {
+        return reports.removeReportFile(id, actor);
     }
 
     /** Feedback item 7: download the attached document; same read matrix as the report metadata. */

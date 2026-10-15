@@ -44,6 +44,27 @@ public class ThesisGroupReadService {
         return groups.findByRoundIdAndStudentId(roundId, requireStudentId(roles, studentId));
     }
 
+    /**
+     * Groups the caller participates in across every round. Students see their
+     * own memberships, lecturers see groups on topics they supervise — the same
+     * self-scoped visibility rules as the per-round list, minus the round
+     * filter. Used to land the workspace on the round that actually holds the
+     * caller's group instead of the newest open round.
+     */
+    @Transactional(readOnly = true)
+    public List<GroupResponse> listMine(
+            List<String> roles,
+            String studentId,
+            String lecturerId) {
+        if (roles.contains("STUDENT")) {
+            return groups.findByStudentId(requireStudentId(roles, studentId));
+        }
+        if (roles.contains("LECTURER")) {
+            return groups.findBySupervisorId(requireLecturerId(lecturerId));
+        }
+        return List.of();
+    }
+
     @Transactional(readOnly = true)
     public GroupResponse get(
             UUID id,

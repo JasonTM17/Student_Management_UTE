@@ -41,6 +41,34 @@ public class ThesisGroupReadRepository {
         return hydrate(rows);
     }
 
+    /** All groups the student belongs to, across every round (newest first). */
+    public List<GroupResponse> findByStudentId(String studentId) {
+        List<GroupRow> rows = jdbc.query(
+                "SELECT g.id, g.round_id, g.leader_student_id, g.topic_id, g.status, "
+                        + "g.approval_status, g.rejection_reason FROM thesis.thesis_group g "
+                        + "JOIN thesis.thesis_group_member m ON m.group_id = g.id "
+                        + "WHERE m.student_id = :studentId "
+                        + "ORDER BY g.created_at DESC",
+                new MapSqlParameterSource("studentId", studentId),
+                ThesisGroupReadRepository::row);
+        return hydrate(rows);
+    }
+
+    /** Groups whose topic the lecturer supervises, across every round. */
+    public List<GroupResponse> findBySupervisorId(String lecturerId) {
+        List<GroupRow> rows = jdbc.query(
+                "SELECT g.id, g.round_id, g.leader_student_id, g.topic_id, g.status, "
+                        + "g.approval_status, g.rejection_reason FROM thesis.thesis_group g "
+                        + "JOIN thesis.thesis_topic t ON t.id = g.topic_id "
+                        + "WHERE EXISTS ("
+                        + "  SELECT 1 FROM thesis.thesis_topic_supervisor ts "
+                        + "  WHERE ts.topic_id = t.id AND ts.lecturer_id = :lecturerId) "
+                        + "ORDER BY g.created_at DESC",
+                new MapSqlParameterSource("lecturerId", lecturerId),
+                ThesisGroupReadRepository::row);
+        return hydrate(rows);
+    }
+
     /** Groups of the round whose topic the lecturer supervises (EXISTS keeps rows unique). */
     public List<GroupResponse> findByRoundIdAndSupervisorId(UUID roundId, String lecturerId) {
         List<GroupRow> rows = jdbc.query(

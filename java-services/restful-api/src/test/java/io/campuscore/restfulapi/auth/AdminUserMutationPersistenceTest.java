@@ -1279,12 +1279,14 @@ class AdminUserMutationPersistenceTest {
         jdbc.update("DELETE FROM academic.conduct_semester_score");
         jdbc.update("DELETE FROM academic.conduct_activity");
         jdbc.update("DELETE FROM academic.\"Section\"");
+        // thesis_group_report references its group with ON DELETE RESTRICT:
+        // the report row must go before the group rows it protects.
+        jdbc.update("DELETE FROM thesis.thesis_group_report");
         jdbc.update("DELETE FROM thesis.thesis_group_member");
         jdbc.update("DELETE FROM thesis.thesis_group");
         jdbc.update("DELETE FROM thesis.thesis_council_member");
         jdbc.update("DELETE FROM thesis.thesis_topic_supervisor");
         jdbc.update("DELETE FROM academic.\"EnrollmentEvent\"");
-        jdbc.update("DELETE FROM thesis.thesis_group_report");
         jdbc.update("DELETE FROM thesis.thesis_topic_score");
         jdbc.update("DELETE FROM thesis.thesis_topic");
         jdbc.update("DELETE FROM engagement.\"Announcement\"");

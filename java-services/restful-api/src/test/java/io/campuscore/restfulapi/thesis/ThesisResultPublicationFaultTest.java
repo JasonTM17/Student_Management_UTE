@@ -243,6 +243,8 @@ abstract class ThesisPublicationFixture {
     private void clearPrivateRows() {
         // These contexts use dedicated in-memory databases, never a shared DB.
         jdbc.update("DELETE FROM notifications.notification");
+        // thesis_group_report is ON DELETE RESTRICT -> delete reports before groups.
+        jdbc.update("DELETE FROM thesis.thesis_group_report");
         jdbc.update("DELETE FROM thesis.thesis_group_member");
         jdbc.update("DELETE FROM thesis.thesis_group");
         jdbc.update("DELETE FROM thesis.thesis_topic_supervisor");

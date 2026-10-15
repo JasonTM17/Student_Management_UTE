@@ -56,6 +56,13 @@ services:
       # through a demo day while still bounding provider spend.
       - key: ASSISTANT_USER_DAILY_QUOTA
         value: "100"
+      # Report bytes must outlive a container redeploy: the default 'local'
+      # provider writes to the container tmp dir, which Render wipes on every
+      # deploy — the file is gone while its metadata row remains. 'database'
+      # keeps the document in Postgres (file_data), durable with zero extra
+      # infrastructure at this scale.
+      - key: THESIS_REPORT_STORAGE_PROVIDER
+        value: "database"
       - key: DEEPSEEK_ENABLED
         value: "true"
       - key: DEEPSEEK_API_KEY

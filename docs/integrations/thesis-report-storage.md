@@ -44,6 +44,20 @@ browser storage, a committed file, or logs. Do not enable this provider in the
 local preview unless a real, private test bucket is intentionally supplied.
 No hosted bucket, policy, or object is created by the local Docker workflow.
 
+## Database provider (durable without external storage)
+
+`provider=database` stores the document bytes directly in
+`thesis.thesis_group_report.file_data` — the V44 compatibility column — and
+leaves `storage_key` NULL. The document survives container redeploys because it
+lives in PostgreSQL, making this the correct choice for hosts with ephemeral
+filesystems (e.g. Render free tier) when no object-storage account exists.
+The same 20 MiB policy bound applies; at larger scale move to the Supabase
+provider instead of growing the primary table.
+
+```text
+THESIS_REPORT_STORAGE_PROVIDER=database
+```
+
 ## Rendering and lifecycle
 
 The thesis page renders the stored filename, MIME type, size, submission time,

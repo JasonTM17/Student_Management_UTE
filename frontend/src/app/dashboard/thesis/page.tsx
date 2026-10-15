@@ -29,6 +29,7 @@ import {
 import { useAuth } from '@/context/AuthContext';
 import { toast } from 'sonner';
 import { classifyThesisScore } from '@/lib/grade-scale';
+import { pickPreferredThesisRound } from '@/lib/thesis-round';
 import { Button } from '@/components/ui/button';
 import { LinkButton } from '@/components/ui/link-button';
 import { Input } from '@/components/ui/input';
@@ -196,8 +197,15 @@ export default function ThesisPage() {
 
   const { confirm, confirmationDialog } = useConfirmationDialog();
 
+  // Server-owned membership across every round: the round holding the
+  // student's group anchors the workspace, and the persistent banner below can
+  // always point back to it even after the reader switches rounds (F3).
+  const [myGroups, setMyGroups] = useState<ThesisGroup[] | null>(null);
+
   // Group report state (approved groups only)
   const [groupReport, setGroupReport] = useState<ThesisGroupReport | null>(null);
+  const [groupReportLoadError, setGroupReportLoadError] = useState<string | null>(null);
+  const [groupReportReloadToken, setGroupReportReloadToken] = useState(0);
   const [isReportLoading, setIsReportLoading] = useState(false);
   const [isReportFormOpen, setIsReportFormOpen] = useState(false);
   const [reportTitle, setReportTitle] = useState('');
@@ -538,6 +546,46 @@ export default function ThesisPage() {
   }, [isLecturer, messages.thesis.loadFailed, selectedRoundId]);
 
   const hasAutoSelectedRoundRef = useRef(false);
+  const hasAutoSelectedStudentRoundRef = useRef(false);
+
+  // Students have no workload feed, so without this lookup the workspace opens
+  // on the newest open round and reports "no group in this round" even though
+  // their group sits in an older closed/published one. The membership list is
+  // fetched once when the student role resolves; a failure leaves the default
+  // selection in place and the round selector usable.
+  useEffect(() => {
+    if (!isStudent) return;
+    let cancelled = false;
+    thesisApi
+      .myGroups()
+      .then((mine) => {
+        if (!cancelled) setMyGroups(mine);
+      })
+      .catch(() => {
+        // Membership lookup failing must not break the workspace.
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [isStudent]);
+
+  // The round that actually holds the student's group wins over the "newest
+  // open round" default; both the one-shot retarget below and the persistent
+  // banner read this same server-owned answer.
+  const membershipRoundId = useMemo(
+    () => pickPreferredThesisRound(rounds, myGroups),
+    [rounds, myGroups],
+  );
+
+  // One-shot retarget: an explicit ?roundId link or a manual choice still
+  // wins; the banner keeps offering the way back regardless.
+  useEffect(() => {
+    if (!isStudent || explicitRoundId || !membershipRoundId || hasAutoSelectedStudentRoundRef.current) {
+      return;
+    }
+    hasAutoSelectedStudentRoundRef.current = true;
+    setSelectedRoundId((current) => (current === membershipRoundId ? current : membershipRoundId));
+  }, [explicitRoundId, isStudent, membershipRoundId]);
 
   useEffect(() => {
     if (!isSupervisorOrAdmin || !lecturerWorkload || explicitRoundId || hasAutoSelectedRoundRef.current) return;
@@ -747,9 +795,13 @@ export default function ThesisPage() {
   const reportGroupId = currentGroup?.id;
   const reportApprovalStatus = currentGroup?.approvalStatus;
 
+  // The report row belongs to the group, not to the approval state: load it
+  // whenever a group exists (404 → null stays "not submitted yet"), so a
+  // reopened/pending group still shows what it already sent (F3/F6).
   useEffect(() => {
-    if (!reportGroupId || reportApprovalStatus !== 'APPROVED') {
+    if (!reportGroupId) {
       setGroupReport(null);
+      setGroupReportLoadError(null);
       setIsReportFormOpen(false);
       return;
     }
@@ -758,10 +810,20 @@ export default function ThesisPage() {
     const loadReport = async () => {
       try {
         const report = await thesisApi.getReport(reportGroupId);
-        if (!cancelled) setGroupReport(report);
-      } catch {
-        // A missing report (404 REPORT_NOT_FOUND) is expected before submission.
-        if (!cancelled) setGroupReport(null);
+        if (!cancelled) {
+          setGroupReport(report);
+          setGroupReportLoadError(null);
+        }
+      } catch (caught) {
+        if (cancelled) return;
+        setGroupReport(null);
+        // 404 REPORT_NOT_FOUND is expected before submission; anything else is
+        // a real fetch failure and must not render as "no report submitted".
+        setGroupReportLoadError(
+          getThesisErrorCode(caught) === 'REPORT_NOT_FOUND'
+            ? null
+            : messages.thesis.report.loadFailed,
+        );
       } finally {
         if (!cancelled) setIsReportLoading(false);
       }
@@ -770,7 +832,7 @@ export default function ThesisPage() {
     return () => {
       cancelled = true;
     };
-  }, [reportGroupId, reportApprovalStatus]);
+  }, [reportGroupId, reportApprovalStatus, groupReportReloadToken, messages.thesis.report.loadFailed]);
 
   useEffect(() => {
     if (!isStudent || !selectedRoundId || selectedRound?.status !== 'RESULTS_PUBLISHED') {
@@ -904,8 +966,14 @@ export default function ThesisPage() {
     try {
       await thesisApi.downloadRepositoryReportFile(report.reportId, report);
       toast.success(locale === 'vi' ? 'Đã tải tài liệu báo cáo' : 'Downloaded report artifact');
-    } catch {
-      toast.error(locale === 'vi' ? 'Không thể tải tài liệu báo cáo' : 'Failed to download report artifact');
+    } catch (caught) {
+      toast.error(
+        getThesisErrorCode(caught) === 'REPORT_STORAGE_UNAVAILABLE'
+          ? messages.thesis.report.fileUnavailable
+          : locale === 'vi'
+            ? 'Không thể tải tài liệu báo cáo'
+            : 'Failed to download report artifact',
+      );
     }
   };
 
@@ -1258,7 +1326,7 @@ export default function ThesisPage() {
   };
 
   const openReportForm = () => {
-    if (reportDeadlinePassed) return;
+    if (reportWindowState !== 'open') return;
     setReportTitle(groupReport?.title ?? '');
     setReportUrl(groupReport?.url ?? '');
     setReportNote(groupReport?.note ?? '');
@@ -1278,8 +1346,14 @@ export default function ThesisPage() {
     if (!report?.fileName) return;
     try {
       await thesisApi.downloadReportFile(groupId, report);
-    } catch {
-      toast.error(messages.thesis.report.submitFailed);
+    } catch (caught) {
+      // REPORT_STORAGE_UNAVAILABLE means the stored bytes are gone for good
+      // (ephemeral container storage); the fix is a re-upload, so say so.
+      toast.error(
+        getThesisErrorCode(caught) === 'REPORT_STORAGE_UNAVAILABLE'
+          ? messages.thesis.report.fileUnavailable
+          : messages.thesis.report.submitFailed,
+      );
     }
   };
 
@@ -1288,12 +1362,66 @@ export default function ThesisPage() {
     await downloadReportArtifact(currentGroup.id, groupReport);
   };
 
+  /**
+   * Shared error map for every report write path (create, PATCH edit, file
+   * replace, file detach). The window can close between render and submit
+   * because the panel gates on a snapshot, so the localized domain copies beat
+   * the generic failure line.
+   */
+  const reportWriteErrorMessage = (caught: unknown): string => {
+    const codes = messages.common.campusErrors.codes;
+    const code = getThesisErrorCode(caught);
+    if (code === 'FILE_TOO_LARGE') return messages.thesis.report.fileTooLarge;
+    if (code === 'UNSUPPORTED_FILE_TYPE' || code === 'INVALID_FILE_CONTENT') {
+      return messages.thesis.report.fileTypeUnsupported;
+    }
+    if (code === 'REPORT_WINDOW_CLOSED') return codes.REPORT_WINDOW_CLOSED;
+    if (code === 'REPORT_DEADLINE_PASSED') return codes.REPORT_DEADLINE_PASSED;
+    if (code === 'REPORT_ARTIFACT_REQUIRED') return codes.REPORT_ARTIFACT_REQUIRED;
+    if (code === 'GROUP_STATE_CONFLICT') return codes.GROUP_STATE_CONFLICT;
+    if (code === 'ROUND_STATE_CONFLICT') return codes.ROUND_STATE_CONFLICT;
+    if (code === 'GROUP_OWNER_REQUIRED') return codes.GROUP_OWNER_REQUIRED;
+    if (code === 'VALIDATION_ERROR') return codes.VALIDATION_ERROR;
+    if (code === 'REPORT_STORAGE_UNAVAILABLE') return messages.thesis.report.fileUnavailable;
+    return messages.thesis.report.submitFailed;
+  };
+
+  /** Detaches only the stored document; the link/metadata survive (F4). */
+  const handleDetachReportFile = async () => {
+    if (!currentGroup || !groupReport?.fileName) return;
+    const approved = await confirm({
+      title: messages.thesis.report.detachConfirmTitle,
+      message: messages.thesis.report.detachConfirmDescription,
+      confirmText: messages.thesis.report.detachConfirmAction,
+      cancelText: messages.common.actions.cancel,
+      variant: 'destructive',
+    });
+    if (!approved) return;
+    setIsActionPending(true);
+    setActionError('');
+    setActionSuccess('');
+    try {
+      const saved = await thesisApi.deleteReportFile(currentGroup.id);
+      setGroupReport(saved);
+      setActionSuccess(messages.thesis.report.detachSuccess);
+      toast.success(messages.thesis.report.detachSuccess);
+    } catch (caught) {
+      const message = reportWriteErrorMessage(caught);
+      setActionError(message);
+      toast.error(message);
+    } finally {
+      setIsActionPending(false);
+    }
+  };
+
   const handleSubmitReport = async (event: React.FormEvent) => {
     event.preventDefault();
     if (!currentGroup) return;
     const url = reportUrl.trim();
 
     // Feedback item 7: a Word/PDF upload or a link — at least one artifact.
+    // A stored file also counts, so a file-only report can still have its
+    // title/note edited without inventing a link (F7).
     if (reportFile) {
       const lowerName = reportFile.name.toLowerCase();
       const extensionOk = REPORT_FILE_EXTENSIONS.some((ext) => lowerName.endsWith(ext));
@@ -1305,7 +1433,7 @@ export default function ThesisPage() {
         setReportError(messages.thesis.report.fileTooLarge);
         return;
       }
-    } else if (!url && !groupReport?.url) {
+    } else if (!url && !groupReport?.url && !groupReport?.fileName) {
       setReportError(messages.thesis.report.fileRequired);
       return;
     }
@@ -1316,10 +1444,10 @@ export default function ThesisPage() {
     try {
       let saved: ThesisGroupReport;
       if (reportFile) {
-        // Replacing an existing report discards the stored document and the
-        // attached link, and the previous version cannot be recovered, so the
-        // leader confirms before the destructive call is made.
-        if (groupReport) {
+        // Only a real artifact loss earns the destructive confirm: a freshly
+        // chosen file replaces the stored document. Metadata edits and link
+        // changes go through PATCH without any scary dialog.
+        if (groupReport?.fileName) {
           const approved = await confirm({
             title: messages.thesis.report.replaceConfirmTitle,
             message: messages.thesis.report.replaceConfirmDescription,
@@ -1346,43 +1474,49 @@ export default function ThesisPage() {
           reportUploadAbortRef.current = null;
           setReportUploadPercent(null);
         }
+        // The link field is independent of the upload (file + link coexist):
+        // a URL typed or cleared alongside the file goes through PATCH right
+        // after the document lands.
+        const previousUrl = groupReport?.url ?? '';
+        if (url !== previousUrl) {
+          saved = await thesisApi.updateReport(
+            currentGroup.id,
+            url ? { url } : { clearUrl: true },
+          );
+        }
+      } else if (groupReport) {
+        // Non-destructive PATCH: the stored file and the submitted_* audit
+        // stamp stay untouched. An emptied URL field means the leader cleared
+        // the link on purpose — the server refuses when it is the last
+        // artifact (409 REPORT_ARTIFACT_REQUIRED, mapped above).
+        saved = await thesisApi.updateReport(currentGroup.id, {
+          title: reportTitle.trim() || undefined,
+          note: reportNote.trim() || undefined,
+          ...(url ? { url } : groupReport.url ? { clearUrl: true } : {}),
+        });
       } else {
-        // Keep the previous link when the leader only refreshes the metadata
-        // of a link-based report without re-entering the URL.
-        const effectiveUrl = url || groupReport?.url || '';
-        if (!effectiveUrl) {
+        // First submission without a file: the link-only create path.
+        if (!url) {
           setReportError(messages.thesis.report.fileRequired);
           setIsActionPending(false);
           return;
         }
         saved = await thesisApi.submitReport(currentGroup.id, {
           title: reportTitle.trim() || undefined,
-          url: effectiveUrl,
+          url,
           note: reportNote.trim() || undefined,
         });
       }
       setGroupReport(saved);
       setReportFile(null);
       setIsReportFormOpen(false);
-      setActionSuccess(messages.thesis.report.submitSuccess);
+      setActionSuccess(groupReport ? messages.thesis.report.updateSuccess : messages.thesis.report.submitSuccess);
     } catch (caught) {
       if (caught instanceof DOMException && caught.name === 'AbortError') {
         // The leader cancelled the upload on purpose: not an error to report.
         setReportError('');
       } else {
-        const code = getThesisErrorCode(caught);
-        if (code === 'FILE_TOO_LARGE') {
-          setReportError(messages.thesis.report.fileTooLarge);
-        } else if (code === 'UNSUPPORTED_FILE_TYPE' || code === 'INVALID_FILE_CONTENT') {
-          setReportError(messages.thesis.report.fileTypeUnsupported);
-        } else if (code === 'REPORT_WINDOW_CLOSED') {
-          // The round status can change between render and submit (the panel
-          // gates on it), so surface the localized window copy, not the
-          // generic failure, when the server rejects the race.
-          setReportError(messages.common.campusErrors.codes.REPORT_WINDOW_CLOSED);
-        } else {
-          setReportError(messages.thesis.report.submitFailed);
-        }
+        setReportError(reportWriteErrorMessage(caught));
       }
     } finally {
       setIsActionPending(false);
@@ -1654,17 +1788,36 @@ export default function ThesisPage() {
   // that can only fail. A round type without this date never freezes, matching
   // the server.
   const reportDeadlinePassed = Number.isFinite(reportDeadlineMs) && Date.now() >= reportDeadlineMs;
-  // The backend also freezes reports until the owning round reaches
-  // REGISTRATION_CLOSED (409 REPORT_WINDOW_CLOSED, checked right after the
-  // deadline): gate the control on the round status the panel already loads,
-  // and keep the current behaviour while the owning round is unknown.
-  const reportWindowClosed =
-    reportDeadlineRound != null && reportDeadlineRound.status !== 'REGISTRATION_CLOSED';
+  // Four honest window states replace the old two-flag check, which read
+  // RESULTS_PUBLISHED/CLOSED rounds as "opens after registration closes" —
+  // backwards. Order matters: a finished round stays finished even when its
+  // deadline date also passed, and an unknown owning round stays permissive
+  // (the server remains the write gate, 409 REPORT_WINDOW_CLOSED).
+  const reportWindowState: 'notYetOpen' | 'open' | 'deadlinePassed' | 'closedFinal' =
+    reportDeadlineRound == null
+      ? 'open'
+      : reportDeadlineRound.status === 'RESULTS_PUBLISHED' ||
+          reportDeadlineRound.status === 'CLOSED' ||
+          reportDeadlineRound.status === 'CANCELLED'
+        ? 'closedFinal'
+        : reportDeadlinePassed
+          ? 'deadlinePassed'
+          : reportDeadlineRound.status === 'REGISTRATION_CLOSED'
+            ? 'open'
+            : 'notYetOpen';
 
   // The report panel stays here: it owns the submission form, its state, and
-  // the leader-only rights it renders.
-  const studentReportSection =
-    currentGroup && currentGroup.approvalStatus === 'APPROVED' ? (
+  // the leader-only rights it renders. A group that is not approved yet still
+  // owns its report row — say so instead of rendering nothing and looking
+  // like the data vanished.
+  const studentReportSection = !currentGroup ? null : currentGroup.approvalStatus !== 'APPROVED' ? (
+    <div className="rounded-xl border border-border/70 bg-card p-4">
+      <p className="flex items-start gap-2 text-xs text-muted-foreground">
+        <Info className="mt-0.5 h-4 w-4 shrink-0 text-primary" aria-hidden="true" />
+        <span>{messages.thesis.report.pendingApproval}</span>
+      </p>
+    </div>
+  ) : (
       <div className="rounded-xl border border-border/70 bg-card p-4">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex items-center gap-2">
@@ -1674,12 +1827,19 @@ export default function ThesisPage() {
             </span>
           </div>
           {isGroupLeader ? (
-            reportDeadlinePassed ? (
+            reportWindowState === 'deadlinePassed' ? (
               <span className="inline-flex shrink-0 items-center gap-1.5 rounded-md border border-amber-300 bg-amber-50 px-2.5 py-1 text-xs font-semibold text-amber-800 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-300">
                 <Lock className="h-3.5 w-3.5" aria-hidden="true" />
                 {messages.thesis.report.lockedTitle}
               </span>
-            ) : reportWindowClosed ? (
+            ) : reportWindowState === 'closedFinal' ? (
+              // Terminal rounds stay terminal: never a button that can only
+              // fail, and never the backwards "opens later" copy.
+              <span className="inline-flex shrink-0 items-center gap-1.5 rounded-md border border-border/70 bg-muted/50 px-2.5 py-1 text-xs font-semibold text-muted-foreground">
+                <Lock className="h-3.5 w-3.5" aria-hidden="true" />
+                {messages.thesis.report.closedFinalTitle}
+              </span>
+            ) : reportWindowState === 'notYetOpen' ? (
               // Locked until registration closes: show the real CTA disabled
               // with the same copy the error map carries, never a button that
               // can only fail with a generic toast.
@@ -1693,18 +1853,28 @@ export default function ThesisPage() {
                 </span>
               </div>
             ) : (
-              <Button
-                type="button"
-                size="sm"
-                variant="outline"
-                onClick={openReportForm}
-                disabled={isActionPending}
-                className="shrink-0"
-              >
-                {groupReport
-                  ? messages.thesis.report.update
-                  : messages.thesis.report.submit}
-              </Button>
+              <div className="flex shrink-0 flex-col items-end gap-1">
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  onClick={openReportForm}
+                  disabled={isActionPending}
+                  className="shrink-0"
+                >
+                  {groupReport
+                    ? messages.thesis.report.update
+                    : messages.thesis.report.submit}
+                </Button>
+                {reportDeadlineAt ? (
+                  <span className="inline-flex max-w-[16rem] items-start gap-1.5 text-xs text-muted-foreground">
+                    <CalendarDays className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                    {fillCopy(messages.thesis.report.openUntil, {
+                      deadline: formatDateTime(reportDeadlineAt),
+                    })}
+                  </span>
+                ) : null}
+              </div>
             )
           ) : (
             // Read-only variant: a member must know the report is not theirs to
@@ -1761,16 +1931,33 @@ export default function ThesisPage() {
                     </p>
                   </div>
                 </div>
-                <Button
-                  type="button"
-                  size="sm"
-                  variant="outline"
-                  onClick={() => void handleDownloadReportFile()}
-                  className="shrink-0 self-start sm:self-auto"
-                >
-                  {messages.thesis.report.downloadFile}
-                  <FileDown className="ml-1.5 h-3.5 w-3.5" aria-hidden="true" />
-                </Button>
+                <div className="flex shrink-0 flex-col gap-2 self-start sm:flex-row sm:items-center sm:self-auto">
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    onClick={() => void handleDownloadReportFile()}
+                    className="shrink-0"
+                  >
+                    {messages.thesis.report.downloadFile}
+                    <FileDown className="ml-1.5 h-3.5 w-3.5" aria-hidden="true" />
+                  </Button>
+                  {isGroupLeader && reportWindowState === 'open' ? (
+                    // The only destructive report action left: detach the
+                    // stored document while the link/metadata survive.
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="ghost"
+                      onClick={() => void handleDetachReportFile()}
+                      disabled={isActionPending}
+                      className="shrink-0 text-destructive hover:bg-destructive/10 hover:text-destructive"
+                    >
+                      {messages.thesis.report.detachFile}
+                      <Trash2 className="ml-1.5 h-3.5 w-3.5" aria-hidden="true" />
+                    </Button>
+                  ) : null}
+                </div>
               </div>
             ) : null}
             {groupReport.url ? (
@@ -1791,6 +1978,22 @@ export default function ThesisPage() {
               {messages.thesis.report.submittedAt}:{' '}
               {formatDateTime(groupReport.submittedAt)}
             </p>
+          </div>
+        ) : groupReportLoadError ? (
+          <div className="mt-3 flex items-center justify-between gap-3 rounded-xl border border-destructive/30 bg-destructive/5 p-3">
+            <p className="flex items-start gap-2 text-xs text-destructive">
+              <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
+              <span>{groupReportLoadError}</span>
+            </p>
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              className="shrink-0"
+              onClick={() => setGroupReportReloadToken((token) => token + 1)}
+            >
+              {messages.common.actions.retry}
+            </Button>
           </div>
         ) : (
           <p className="mt-3 text-sm text-muted-foreground">
@@ -2029,7 +2232,7 @@ export default function ThesisPage() {
           </form>
         ) : null}
       </div>
-    ) : null;
+    );
 
   // The Stitch board puts the submission history beside the form: first
   // submission, latest update, and the supervisor-feedback milestone, with the
@@ -2178,6 +2381,34 @@ export default function ThesisPage() {
           {actionSuccess ? (
             <div className="rounded-xl border border-status-success/30 bg-status-success/10 px-4 py-3 text-sm text-status-success-foreground shadow-xs">
               {actionSuccess}
+            </div>
+          ) : null}
+
+          {/* F3 fallback: the membership round never silently disappears —
+              a persistent banner points back to it whenever the student is
+              viewing a different round. */}
+          {membershipRoundId && membershipRoundId !== selectedRoundId && !currentGroup ? (
+            <div
+              role="status"
+              className="flex flex-col gap-3 rounded-xl border border-primary/30 bg-primary/[0.06] px-4 py-3 text-sm text-foreground shadow-xs sm:flex-row sm:items-center sm:justify-between"
+            >
+              <span className="flex items-start gap-2">
+                <Info className="mt-0.5 h-4 w-4 shrink-0 text-primary" aria-hidden="true" />
+                <span>
+                  {fillCopy(messages.thesis.membershipRoundHint, {
+                    round: rounds.find((round) => round.id === membershipRoundId)?.name ?? '',
+                  })}
+                </span>
+              </span>
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                className="shrink-0"
+                onClick={() => setSelectedRoundId(membershipRoundId)}
+              >
+                {messages.thesis.membershipRoundOpen}
+              </Button>
             </div>
           ) : null}
 

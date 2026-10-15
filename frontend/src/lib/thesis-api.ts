@@ -84,6 +84,20 @@ export interface ThesisGroupReport {
   fileSize?: number | null;
 }
 
+/**
+ * Server preview for `close-registration` (F2): the consequence data the
+ * admin confirms against — roster counts, reports already submitted, and
+ * whether the shared GVPB/report deadline already passed.
+ */
+export interface ThesisCloseRegistrationPreview {
+  groupCount: number;
+  approvedGroupCount: number;
+  pendingGroupCount: number;
+  reportCount: number;
+  gvpbDeadline: string | null;
+  reportDeadlinePassed: boolean;
+}
+
 export interface ThesisRepositorySupervisor {
   displayName: string;
   supervisorOrder: number;
@@ -601,6 +615,34 @@ export const thesisApi = {
     return response.data;
   },
 
+  /**
+   * Reads the close-registration consequence preview (group/report counts,
+   * deadline state) so the confirm dialog is never blind. Read-only.
+   */
+  closeRegistrationPreview: async (
+    roundId: string,
+  ): Promise<ThesisCloseRegistrationPreview> => {
+    const response = await api.get<ThesisCloseRegistrationPreview>(
+      '/thesis/rounds/' + roundId + '/close-registration-preview',
+    );
+    return response.data;
+  },
+
+  /**
+   * Escape hatch for a closed round whose report deadline already passed:
+   * extends `gvpbDeadline` while REGISTRATION_CLOSED (audited server-side).
+   */
+  extendReportDeadline: async (
+    roundId: string,
+    gvpbDeadline: string,
+  ): Promise<ThesisRound> => {
+    const response = await api.put<ThesisRound>(
+      '/thesis/rounds/' + roundId + '/report-deadline',
+      { gvpbDeadline },
+    );
+    return response.data;
+  },
+
   publishProposals: async (roundId: string): Promise<ThesisRound> => {
     const response = await api.post<ThesisRound>(
       '/thesis/rounds/' + roundId + '/publish-proposals',
@@ -701,6 +743,16 @@ export const thesisApi = {
 
   getTopic: async (topicId: string): Promise<ThesisTopic> => {
     const response = await api.get<ThesisTopic>('/thesis/topics/' + topicId);
+    return response.data;
+  },
+
+  /**
+   * Groups the caller belongs to across every round — a student sees their own
+   * memberships, a lecturer the groups on topics they supervise. Lets the
+   * workspace open on the round that actually holds the caller's group.
+   */
+  myGroups: async (): Promise<ThesisGroup[]> => {
+    const response = await api.get<ThesisGroup[]>('/thesis/groups/mine');
     return response.data;
   },
 
@@ -884,6 +936,35 @@ export const thesisApi = {
     anchor.click();
     anchor.remove();
     URL.revokeObjectURL(url);
+  },
+
+  /**
+   * Non-destructive report edit (F4/F7): updates title/note/link without
+   * touching the stored file or the `submitted_*` audit stamp. `clearUrl`
+   * explicitly detaches the link; the server refuses (409
+   * REPORT_ARTIFACT_REQUIRED) when it would leave the report empty.
+   */
+  updateReport: async (
+    groupId: string,
+    patch: { title?: string; note?: string; url?: string; clearUrl?: boolean },
+  ): Promise<ThesisGroupReport> => {
+    const response = await api.patch<ThesisGroupReport>(
+      '/thesis/groups/' + groupId + '/report',
+      patch,
+    );
+    return response.data;
+  },
+
+  /**
+   * Detaches only the stored document; the link and metadata survive.
+   * Refused with 409 REPORT_ARTIFACT_REQUIRED when the file is the last
+   * artifact (ck_report_artifact).
+   */
+  deleteReportFile: async (groupId: string): Promise<ThesisGroupReport> => {
+    const response = await api.delete<ThesisGroupReport>(
+      '/thesis/groups/' + groupId + '/report/file',
+    );
+    return response.data;
   },
 
   getReport: async (groupId: string): Promise<ThesisGroupReport> => {

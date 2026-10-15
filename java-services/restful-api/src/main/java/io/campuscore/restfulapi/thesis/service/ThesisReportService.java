@@ -1,6 +1,7 @@
 package io.campuscore.restfulapi.thesis.service;
 
 import io.campuscore.restfulapi.thesis.domain.RoundStatus;
+import io.campuscore.restfulapi.thesis.web.ThesisMutationDtos.ReportUpdateRequest;
 import io.campuscore.restfulapi.web.DomainException;
 import java.time.Instant;
 import java.util.LinkedHashMap;
@@ -53,20 +54,36 @@ public class ThesisReportService {
         }
         requireReportWritable(group);
         requireApproved(groupId);
-        StoredObjectRef previous = existingStoredObject(groupId);
-        jdbc.update("DELETE FROM thesis.thesis_group_report WHERE group_id = :groupId",
-                params().addValue("groupId", groupId));
-        jdbc.update(
-                "INSERT INTO thesis.thesis_group_report (id, group_id, round_id, submitted_by, title, url, note) "
-                        + "VALUES (:id, :groupId, :roundId, :submittedBy, :title, :url, :note)",
-                params().addValue("id", UUID.randomUUID())
-                        .addValue("groupId", groupId)
-                        .addValue("roundId", group.roundId())
-                        .addValue("submittedBy", studentId(actor))
+        // Upsert: the first submission INSERTs the row and every later edit
+        // UPDATEs it in place. The attached document columns, submission
+        // identity (submitted_by) and timestamp (submitted_at) are never
+        // destroyed by a link/metadata edit, and no storage object is deleted
+        // on this path because no file is replaced.
+        int updated = jdbc.update(
+                "UPDATE thesis.thesis_group_report SET "
+                        + "title = CASE WHEN :titlePresent THEN :title ELSE title END, "
+                        + "url = :url, "
+                        + "note = CASE WHEN :notePresent THEN :note ELSE note END, "
+                        + "updated_at = CURRENT_TIMESTAMP "
+                        + "WHERE group_id = :groupId",
+                params().addValue("groupId", groupId)
+                        .addValue("titlePresent", title != null)
                         .addValue("title", blankToNull(title, 240))
                         .addValue("url", trimmedUrl)
+                        .addValue("notePresent", note != null)
                         .addValue("note", blankToNull(note, 500)));
-        cleanupStoredObject(previous);
+        if (updated == 0) {
+            jdbc.update(
+                    "INSERT INTO thesis.thesis_group_report (id, group_id, round_id, submitted_by, title, url, note) "
+                            + "VALUES (:id, :groupId, :roundId, :submittedBy, :title, :url, :note)",
+                    params().addValue("id", UUID.randomUUID())
+                            .addValue("groupId", groupId)
+                            .addValue("roundId", group.roundId())
+                            .addValue("submittedBy", studentId(actor))
+                            .addValue("title", blankToNull(title, 240))
+                            .addValue("url", trimmedUrl)
+                            .addValue("note", blankToNull(note, 500)));
+        }
         return get(groupId, actor);
     }
 
@@ -79,39 +96,162 @@ public class ThesisReportService {
         requireReportWritable(group);
         requireApproved(groupId);
         StoredObjectRef previous = existingStoredObject(groupId);
-        String storageKey = "thesis-reports/" + groupId + "/" + UUID.randomUUID() + "." + validated.extension();
+        // The database provider keeps bytes in file_data instead of an object
+        // store, so no storage_key is written and put() is not needed.
+        boolean inDatabase = "database".equals(storage.provider());
+        String storageKey = inDatabase
+                ? null
+                : "thesis-reports/" + groupId + "/" + UUID.randomUUID() + "." + validated.extension();
         String checksum = sha256(validated.data());
-        storage.put(storageKey, validated.contentType(), validated.data());
+        if (!inDatabase) {
+            storage.put(storageKey, validated.contentType(), validated.data());
+        }
         try {
-            jdbc.update("DELETE FROM thesis.thesis_group_report WHERE group_id = :groupId",
-                    params().addValue("groupId", groupId));
-            jdbc.update(
-                    "INSERT INTO thesis.thesis_group_report (id, group_id, round_id, submitted_by, title, url, note, "
-                            + "file_name, file_type, file_size, file_data, storage_provider, storage_bucket, "
-                            + "storage_key, file_sha256) "
-                            + "VALUES (:id, :groupId, :roundId, :submittedBy, :title, :url, :note, "
-                            + ":fileName, :fileType, :fileSize, :fileData, :storageProvider, :storageBucket, "
-                            + ":storageKey, :fileSha256)",
-                    params().addValue("id", UUID.randomUUID())
-                            .addValue("groupId", groupId)
-                            .addValue("roundId", group.roundId())
-                            .addValue("submittedBy", studentId(actor))
+            // Upsert: replace only the file/storage/checksum columns. A prior
+            // link (url), the submission identity and submitted_at survive an
+            // upload; title/note are overwritten only when the caller sent a
+            // new value.
+            int updated = jdbc.update(
+                    "UPDATE thesis.thesis_group_report SET "
+                            + "title = CASE WHEN :titlePresent THEN :title ELSE title END, "
+                            + "note = CASE WHEN :notePresent THEN :note ELSE note END, "
+                            + "file_name = :fileName, file_type = :fileType, file_size = :fileSize, "
+                            + "file_data = :fileData, storage_provider = :storageProvider, "
+                            + "storage_bucket = :storageBucket, storage_key = :storageKey, "
+                            + "file_sha256 = :fileSha256, updated_at = CURRENT_TIMESTAMP "
+                            + "WHERE group_id = :groupId",
+                    params().addValue("groupId", groupId)
+                            .addValue("titlePresent", title != null)
                             .addValue("title", blankToNull(title, 240))
-                            .addValue("url", (String) null)
+                            .addValue("notePresent", note != null)
                             .addValue("note", blankToNull(note, 500))
                             .addValue("fileName", validated.fileName())
                             .addValue("fileType", validated.contentType())
                             .addValue("fileSize", validated.size())
-                            // V44 remains a read-compatibility column only.
-                            .addValue("fileData", (byte[]) null)
+                            .addValue("fileData", inDatabase ? validated.data() : (byte[]) null)
                             .addValue("storageProvider", storage.provider())
                             .addValue("storageBucket", storage.bucket())
                             .addValue("storageKey", storageKey)
                             .addValue("fileSha256", checksum));
+            if (updated == 0) {
+                jdbc.update(
+                        "INSERT INTO thesis.thesis_group_report (id, group_id, round_id, submitted_by, title, url, note, "
+                                + "file_name, file_type, file_size, file_data, storage_provider, storage_bucket, "
+                                + "storage_key, file_sha256) "
+                                + "VALUES (:id, :groupId, :roundId, :submittedBy, :title, :url, :note, "
+                                + ":fileName, :fileType, :fileSize, :fileData, :storageProvider, :storageBucket, "
+                                + ":storageKey, :fileSha256)",
+                        params().addValue("id", UUID.randomUUID())
+                                .addValue("groupId", groupId)
+                                .addValue("roundId", group.roundId())
+                                .addValue("submittedBy", studentId(actor))
+                                .addValue("title", blankToNull(title, 240))
+                                .addValue("url", (String) null)
+                                .addValue("note", blankToNull(note, 500))
+                                .addValue("fileName", validated.fileName())
+                                .addValue("fileType", validated.contentType())
+                                .addValue("fileSize", validated.size())
+                                // V44-era column doubles as the durable store for
+                                // the database provider; object providers keep it null.
+                                .addValue("fileData", inDatabase ? validated.data() : (byte[]) null)
+                                .addValue("storageProvider", storage.provider())
+                                .addValue("storageBucket", storage.bucket())
+                                .addValue("storageKey", storageKey)
+                                .addValue("fileSha256", checksum));
+            }
         } catch (RuntimeException exception) {
             deleteNewObjectAfterFailure(storageKey);
             throw exception;
         }
+        // The previous object is replaced only when the row actually carried a
+        // storage object; the deletion stays deferred to afterCommit.
+        cleanupStoredObject(previous);
+        return get(groupId, actor);
+    }
+
+    /**
+     * Non-destructive metadata/link edit. Field-absent means "keep the stored
+     * value": a record attribute cannot distinguish an absent JSON key from a
+     * JSON null, so only {@code clearUrl} performs the explicit link removal —
+     * and only while a file artifact remains, keeping the {@code
+     * ck_report_artifact} invariant intact.
+     */
+    @Transactional
+    public ReportResponse updateReport(UUID groupId, ReportUpdateRequest request, Jwt actor) {
+        GroupContext group = loadGroup(groupId);
+        requireWriteAccess(group, actor);
+        requireReportWritable(group);
+        requireApproved(groupId);
+        Map<String, Object> row = one(
+                "SELECT url, storage_key, file_data IS NOT NULL AS has_file_data "
+                        + "FROM thesis.thesis_group_report WHERE group_id = :groupId",
+                params().addValue("groupId", groupId), "REPORT_NOT_FOUND", "The group has not submitted a report yet");
+        boolean hasFileArtifact = row.get("storage_key") != null || Boolean.TRUE.equals(row.get("has_file_data"));
+        String newUrl = (String) row.get("url");
+        boolean requestSetsUrl = request != null && request.url() != null;
+        boolean requestClearsUrl = request != null && Boolean.TRUE.equals(request.clearUrl());
+        if (requestSetsUrl && requestClearsUrl) {
+            throw invalid("url and clearUrl cannot be combined");
+        }
+        if (requestSetsUrl) {
+            String trimmedUrl = request.url().trim();
+            if (trimmedUrl.isEmpty()
+                    || (!trimmedUrl.startsWith("http://") && !trimmedUrl.startsWith("https://"))) {
+                throw invalid("url must be an http(s) link to the report document");
+            }
+            newUrl = trimmedUrl;
+        } else if (requestClearsUrl) {
+            if (!hasFileArtifact) {
+                throw conflict("REPORT_ARTIFACT_REQUIRED",
+                        "A report must keep at least one artifact; attach a document before removing the link");
+            }
+            newUrl = null;
+        }
+        boolean titlePresent = request != null && request.title() != null;
+        boolean notePresent = request != null && request.note() != null;
+        jdbc.update(
+                "UPDATE thesis.thesis_group_report SET "
+                        + "title = CASE WHEN :titlePresent THEN :title ELSE title END, "
+                        + "note = CASE WHEN :notePresent THEN :note ELSE note END, "
+                        + "url = :url, "
+                        + "updated_at = CURRENT_TIMESTAMP "
+                        + "WHERE group_id = :groupId",
+                params().addValue("groupId", groupId)
+                        .addValue("titlePresent", titlePresent)
+                        .addValue("title", titlePresent ? blankToNull(request.title(), 240) : null)
+                        .addValue("notePresent", notePresent)
+                        .addValue("note", notePresent ? blankToNull(request.note(), 500) : null)
+                        .addValue("url", newUrl));
+        return get(groupId, actor);
+    }
+
+    /**
+     * Detaches the stored document while keeping the link artifact. The file
+     * columns are nulled in the same UPDATE and the object itself is deleted
+     * afterCommit; refusing when no link remains keeps the report legal under
+     * {@code ck_report_artifact}.
+     */
+    @Transactional
+    public ReportResponse removeReportFile(UUID groupId, Jwt actor) {
+        GroupContext group = loadGroup(groupId);
+        requireWriteAccess(group, actor);
+        requireReportWritable(group);
+        requireApproved(groupId);
+        Map<String, Object> row = one(
+                "SELECT url FROM thesis.thesis_group_report WHERE group_id = :groupId",
+                params().addValue("groupId", groupId), "REPORT_NOT_FOUND", "The group has not submitted a report yet");
+        if (row.get("url") == null) {
+            throw conflict("REPORT_ARTIFACT_REQUIRED",
+                    "A report must keep at least one artifact; attach a link before removing the document");
+        }
+        StoredObjectRef previous = existingStoredObject(groupId);
+        jdbc.update(
+                "UPDATE thesis.thesis_group_report SET "
+                        + "file_name = NULL, file_type = NULL, file_size = NULL, file_data = NULL, "
+                        + "storage_provider = NULL, storage_bucket = NULL, storage_key = NULL, "
+                        + "file_sha256 = NULL, updated_at = CURRENT_TIMESTAMP "
+                        + "WHERE group_id = :groupId",
+                params().addValue("groupId", groupId));
         cleanupStoredObject(previous);
         return get(groupId, actor);
     }
@@ -209,19 +349,24 @@ public class ThesisReportService {
                     "Only lecturers or academic staff can access the round thesis archive");
         }
         MapSqlParameterSource parameters = params().addValue("roundId", roundId);
-        String scope = "";
+        // Staff archive (plan F6): an admin sees every report row of the round
+        // — a group reopened to PENDING or one without a topic must not hide
+        // its submitted deliverable. The lecturer branch keeps the approval
+        // and department scope; a topic-less row self-excludes there because
+        // its NULL department_id never matches the lecturer's.
+        String filter = "";
         if (!admin) {
             parameters.addValue("departmentId", activeLecturerDepartment(actor));
-            scope = " AND t.department_id = :departmentId";
+            filter = " AND g.approval_status = 'APPROVED' AND g.status <> 'CANCELLED'"
+                    + " AND t.department_id = :departmentId";
         }
         return jdbc.query(
                 "SELECT r.group_id, r.title, r.url, r.note, r.submitted_by, r.submitted_at, r.updated_at, "
                         + "r.file_name, r.file_type, r.file_size "
                         + "FROM thesis.thesis_group_report r "
                         + "JOIN thesis.thesis_group g ON g.id = r.group_id "
-                        + "JOIN thesis.thesis_topic t ON t.id = g.topic_id "
-                        + "WHERE r.round_id = :roundId AND g.approval_status = 'APPROVED' "
-                        + "AND g.status <> 'CANCELLED'" + scope + " ORDER BY r.submitted_at DESC",
+                        + "LEFT JOIN thesis.thesis_topic t ON t.id = g.topic_id "
+                        + "WHERE r.round_id = :roundId" + filter + " ORDER BY r.submitted_at DESC",
                 parameters,
                 (rs, ignored) -> new ReportResponse(
                         UUID.fromString(rs.getString("group_id")),
@@ -251,10 +396,14 @@ public class ThesisReportService {
                     "Only lecturers or academic staff can access the round thesis archive");
         }
         MapSqlParameterSource parameters = params().addValue("roundId", roundId);
-        String scope = "";
+        // Same archive rule as listByRound: admins see every report of the
+        // round; lecturers keep the approval + department scope (topic-less
+        // rows self-exclude via the NULL department join).
+        String filter = "";
         if (!admin) {
             parameters.addValue("departmentId", activeLecturerDepartment(actor));
-            scope = " AND t.department_id = :departmentId";
+            filter = " AND g.approval_status = 'APPROVED' AND g.status <> 'CANCELLED'"
+                    + " AND t.department_id = :departmentId";
         }
         String sql = """
                 SELECT r.id AS report_id, r.title, r.url, r.note, r.submitted_at, r.updated_at,
@@ -275,7 +424,7 @@ public class ThesisReportService {
                        submitter_user."lastName" AS submitter_last_name
                 FROM thesis.thesis_group_report r
                  JOIN thesis.thesis_group g ON g.id = r.group_id
-                 JOIN thesis.thesis_topic t ON t.id = g.topic_id
+                 LEFT JOIN thesis.thesis_topic t ON t.id = g.topic_id
                  LEFT JOIN academic."Department" d ON d."id" = t.department_id
                 LEFT JOIN thesis.thesis_group_member gm ON gm.group_id = g.id
                 LEFT JOIN campuscore_auth."Student" s ON s."id" = gm.student_id
@@ -290,9 +439,7 @@ public class ThesisReportService {
                 LEFT JOIN campuscore_auth."User" submitter_user
                     ON submitter_user."id" = submitted_student."userId"
                 WHERE r.round_id = :roundId
-                  AND g.approval_status = 'APPROVED'
-                  AND g.status <> 'CANCELLED'
-                """ + scope + " ORDER BY r.submitted_at DESC, gm.member_order, sup.supervisor_order";
+                """ + filter + " ORDER BY r.submitted_at DESC, gm.member_order, sup.supervisor_order";
         Map<UUID, RepositoryBuilder> builders = new LinkedHashMap<>();
         jdbc.query(sql, parameters, rs -> {
             UUID reportId = UUID.fromString(rs.getString("report_id"));
@@ -671,6 +818,9 @@ public class ThesisReportService {
     }
 
     private void deleteNewObjectAfterFailure(String key) {
+        if (!StringUtils.hasText(key)) {
+            return;
+        }
         try {
             storage.delete(key);
         } catch (ThesisReportStorageException cleanupFailure) {
