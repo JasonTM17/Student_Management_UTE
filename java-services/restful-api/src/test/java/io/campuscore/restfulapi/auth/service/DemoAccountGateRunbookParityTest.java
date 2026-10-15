@@ -27,6 +27,8 @@ class DemoAccountGateRunbookParityTest {
             Path.of("src/main/resources/db/migration/V82__activate_runbook_demo_accounts.sql");
     private static final Path V77 =
             Path.of("src/main/resources/db/migration/V77__align_demo_account_passwords.sql");
+    private static final Path V116 =
+            Path.of("src/main/resources/db/migration/V116__align_four_member_demo_team.sql");
     private static final Pattern EMAIL = Pattern.compile("'([A-Za-z0-9._-]+@campuscore\\.(?:demo|edu))'");
 
     @Test
@@ -49,6 +51,13 @@ class DemoAccountGateRunbookParityTest {
     void gateStillCoversTheShowcaseTrio() {
         assertThat(DemoAccountGate.DEMO_EMAILS).containsAll(List.of(
                 "student@campuscore.edu", "lecturer@campuscore.edu", "admin@campuscore.edu"));
+    }
+
+    @Test
+    void gateCoversEveryAccountV116Aligns() throws Exception {
+        Set<String> aligned = quotedEmails(V116);
+        assertThat(aligned).isNotEmpty();
+        assertThat(aligned).allMatch(DemoAccountGate.DEMO_EMAILS::contains);
     }
 
     private static Set<String> quotedEmails(Path migration) throws Exception {

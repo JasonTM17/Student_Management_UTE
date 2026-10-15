@@ -118,7 +118,7 @@ public class ThesisGroupReadRepository {
     private static String joinName(String firstName, String lastName) {
         String first = firstName == null ? "" : firstName.trim();
         String last = lastName == null ? "" : lastName.trim();
-        return (first + " " + last).trim();
+        return (last + " " + first).trim();
     }
 
     private static String blankToNull(String value) {

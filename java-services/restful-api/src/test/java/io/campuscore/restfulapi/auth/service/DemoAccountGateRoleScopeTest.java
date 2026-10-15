@@ -70,6 +70,9 @@ class DemoAccountGateRoleScopeTest {
         jdbc.update("INSERT INTO \"campuscore_auth\".\"Role\" (\"id\", \"name\") VALUES ('role-lecturer', 'LECTURER')");
         jdbc.update("INSERT INTO \"campuscore_auth\".\"Role\" (\"id\", \"name\") VALUES ('role-admin', 'ADMIN')");
         seedDemoUser("demo-student", "student@campuscore.edu", List.of("role-student"));
+        seedDemoUser("demo-student-2", "student2@campuscore.edu", List.of("role-student"));
+        seedDemoUser("demo-student-3", "student3@campuscore.edu", List.of("role-student"));
+        seedDemoUser("demo-student-4", "student4@campuscore.edu", List.of("role-student"));
         seedDemoUser("demo-lecturer", "lecturer@campuscore.edu", List.of("role-lecturer"));
         seedDemoUser("demo-admin", "admin@campuscore.edu", List.of("role-admin"));
         seedDemoUser("demo-council", "lecturer003@campuscore.demo", List.of("role-lecturer"));
@@ -106,6 +109,9 @@ class DemoAccountGateRoleScopeTest {
         gate(true, "STUDENT").run(null);
 
         assertThat(statusOf("student@campuscore.edu")).isEqualTo("ACTIVE");
+        assertThat(statusOf("student2@campuscore.edu")).isEqualTo("ACTIVE");
+        assertThat(statusOf("student3@campuscore.edu")).isEqualTo("ACTIVE");
+        assertThat(statusOf("student4@campuscore.edu")).isEqualTo("ACTIVE");
         assertThat(statusOf("lecturer@campuscore.edu")).isEqualTo("LOCKED");
         assertThat(statusOf("admin@campuscore.edu")).isEqualTo("LOCKED");
         assertThat(statusOf("lecturer003@campuscore.demo")).isEqualTo("LOCKED");
@@ -118,9 +124,25 @@ class DemoAccountGateRoleScopeTest {
         gate(true, "student, lecturer").run(null);
 
         assertThat(statusOf("student@campuscore.edu")).isEqualTo("ACTIVE");
+        assertThat(statusOf("student2@campuscore.edu")).isEqualTo("ACTIVE");
+        assertThat(statusOf("student3@campuscore.edu")).isEqualTo("ACTIVE");
+        assertThat(statusOf("student4@campuscore.edu")).isEqualTo("ACTIVE");
         assertThat(statusOf("lecturer@campuscore.edu")).isEqualTo("ACTIVE");
         assertThat(statusOf("lecturer003@campuscore.demo")).isEqualTo("ACTIVE");
         assertThat(statusOf("admin@campuscore.edu")).isEqualTo("LOCKED");
+    }
+
+    @Test
+    void lecturerScopeLeavesEveryStudentTeamMemberLocked() {
+        gate(true, "LECTURER").run(null);
+
+        assertThat(statusOf("student@campuscore.edu")).isEqualTo("LOCKED");
+        assertThat(statusOf("student2@campuscore.edu")).isEqualTo("LOCKED");
+        assertThat(statusOf("student3@campuscore.edu")).isEqualTo("LOCKED");
+        assertThat(statusOf("student4@campuscore.edu")).isEqualTo("LOCKED");
+        assertThat(statusOf("lecturer@campuscore.edu")).isEqualTo("ACTIVE");
+        assertThat(statusOf("lecturer003@campuscore.demo")).isEqualTo("ACTIVE");
+        assertThat(statusOf("nguyen.van.a@student.hcmute.edu.vn")).isEqualTo("LOCKED");
     }
 
     @Test
@@ -128,6 +150,9 @@ class DemoAccountGateRoleScopeTest {
         gate(true, "").run(null);
 
         assertThat(statusOf("student@campuscore.edu")).isEqualTo("ACTIVE");
+        assertThat(statusOf("student2@campuscore.edu")).isEqualTo("ACTIVE");
+        assertThat(statusOf("student3@campuscore.edu")).isEqualTo("ACTIVE");
+        assertThat(statusOf("student4@campuscore.edu")).isEqualTo("ACTIVE");
         assertThat(statusOf("lecturer@campuscore.edu")).isEqualTo("ACTIVE");
         assertThat(statusOf("admin@campuscore.edu")).isEqualTo("ACTIVE");
         assertThat(statusOf("lecturer003@campuscore.demo")).isEqualTo("ACTIVE");
@@ -138,6 +163,9 @@ class DemoAccountGateRoleScopeTest {
         gate(false, "STUDENT").run(null);
 
         assertThat(statusOf("student@campuscore.edu")).isEqualTo("LOCKED");
+        assertThat(statusOf("student2@campuscore.edu")).isEqualTo("LOCKED");
+        assertThat(statusOf("student3@campuscore.edu")).isEqualTo("LOCKED");
+        assertThat(statusOf("student4@campuscore.edu")).isEqualTo("LOCKED");
         assertThat(statusOf("lecturer@campuscore.edu")).isEqualTo("LOCKED");
         assertThat(statusOf("admin@campuscore.edu")).isEqualTo("LOCKED");
         assertThat(statusOf("lecturer003@campuscore.demo")).isEqualTo("LOCKED");

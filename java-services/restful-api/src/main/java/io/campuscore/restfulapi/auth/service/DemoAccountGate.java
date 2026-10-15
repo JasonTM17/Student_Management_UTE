@@ -24,12 +24,12 @@ import org.springframework.stereotype.Component;
  * that is ACTIVE on a host reachable by the public is an open administrator
  * login. Nothing in the seed can express "active only where the operator asked
  * for it", so this gate re-applies the decision on every boot from
- * {@code campuscore.demo.accounts-enabled} (env {@code DEMO_ACCOUNTS_ENABLED}).
+ * {@code app.demo.accounts-enabled} (env {@code DEMO_ACCOUNTS_ENABLED}).
  * A Flyway migration cannot do this: a versioned migration runs once, and a
  * repeatable one only re-runs when its checksum changes, so neither reacts to a
  * changed environment variable.
  *
- * <p>Optional role scope: {@code campuscore.demo.roles} (env
+ * <p>Optional role scope: {@code app.demo.roles} (env
  * {@code DEMO_ACCOUNTS_ROLES}, comma-separated role names such as
  * {@code STUDENT} or {@code STUDENT,LECTURER}). When enabled AND a scope is
  * set, only demo accounts whose role (via {@code campuscore_auth."UserRole"} →
@@ -39,12 +39,19 @@ import org.springframework.stereotype.Component;
  * email list below stays the only selector, so a real user can never be
  * touched by either branch.
  *
- * <p>The gate is fail-soft. Disabling the demo accounts is a hardening step, not
- * a correctness requirement, so a database hiccup must not stop the application
- * from starting.
+ * <p>The gate fails closed. A database error while applying the requested state
+ * propagates out of {@link #run}, aborting startup rather than letting the
+ * application serve traffic with an unenforced demo policy — an account that
+ * stayed ACTIVE because the lock could not be applied is exactly the exposure
+ * this gate exists to close.
  */
 @Component
-@Profile("persistence")
+// The "test" profile deliberately excludes this runner: schema-less H2 test
+// slices create their fixtures in @BeforeEach, which runs after the runner —
+// a fail-closed gate would (correctly) abort those contexts at boot. Tests
+// exercise the gate by constructing it directly (DemoAccountGateRoleScopeTest,
+// DemoAccountGateFailClosedTest, DemoTeamMigrationPostgresIT).
+@Profile("persistence & !test")
 public class DemoAccountGate implements ApplicationRunner {
     private static final Logger log = LoggerFactory.getLogger(DemoAccountGate.class);
 
@@ -53,13 +60,17 @@ public class DemoAccountGate implements ApplicationRunner {
      * must never touch a real user, so it matches exact seeded addresses rather
      * than any pattern.
      *
-     * <p>Covers the three .edu showcase accounts (V50) and the runbook-documented
-     * .demo accounts activated by V82 (the Four-Eyes second approver and the
-     * council examiners). {@code DemoAccountGateRunbookParityTest} pins this list
+     * <p>Covers the .edu showcase accounts (V50 plus the seeded thesis-team
+     * students) and the runbook-documented .demo accounts activated by V82 (the
+     * Four-Eyes second approver and the council examiners).
+     * {@code DemoAccountGateRunbookParityTest} pins this list
      * to V82's, so the migration and the gate cannot drift apart.
      */
     static final List<String> DEMO_EMAILS = List.of(
             "student@campuscore.edu",
+            "student2@campuscore.edu",
+            "student3@campuscore.edu",
+            "student4@campuscore.edu",
             "lecturer@campuscore.edu",
             "admin@campuscore.edu",
             "admin002@campuscore.demo",
@@ -167,7 +178,12 @@ public class DemoAccountGate implements ApplicationRunner {
                         roleScope, activated, locked);
             }
         } catch (DataAccessException ex) {
-            log.warn("Demo account gate skipped; seeded accounts keep their stored status");
+            // Fail closed: the message only — never credentials or parameter
+            // values — then abort startup so the deployment cannot run with an
+            // unenforced demo policy.
+            log.warn("Demo account gate could not apply the configured demo policy; aborting startup: {}",
+                    ex.getMessage());
+            throw ex;
         }
     }
 
