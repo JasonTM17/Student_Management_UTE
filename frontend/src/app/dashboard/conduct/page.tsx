@@ -22,10 +22,14 @@ import { useRequireAuth } from '@/context/AuthContext';
 import { useI18n } from '@/i18n';
 import {
   conductApi,
+  semestersApi,
   type ConductActivity,
   type ConductSemesterScore,
   type StudentConductSummary,
 } from '@/lib/api';
+import { pickPreferredSemesterId } from '@/lib/semesters';
+import { getLocalizedName } from '@/lib/academic-content';
+import type { Semester } from '@/types/api';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Modal } from '@/components/ui/modal';
@@ -245,6 +249,10 @@ export default function StudentConductPage() {
   const copy = conductCopy[locale];
 
   const [summary, setSummary] = useState<StudentConductSummary | null>(null);
+  // Semester options come from the system catalog, not from the student's own
+  // score history: every term stays selectable and a term without records
+  // renders its empty state instead of disappearing from the list.
+  const [semesters, setSemesters] = useState<Semester[]>([]);
   const [selectedSemesterId, setSelectedSemesterId] = useState<string>('');
   const [selectedActivity, setSelectedActivity] = useState<ConductActivity | null>(null);
   const [loading, setLoading] = useState(true);
@@ -255,13 +263,21 @@ export default function StudentConductPage() {
     setLoading(true);
     setError('');
     try {
-      const data = await conductApi.getMyConduct();
+      const [data, semesterResult] = await Promise.all([
+        conductApi.getMyConduct(),
+        // Non-fatal: on failure the selector falls back to the terms that
+        // carry score records so the page never loses its options.
+        semestersApi.getAll().catch(() => null),
+      ]);
       setSummary(data);
-      if (data.currentSemester) {
-        setSelectedSemesterId(data.currentSemester.semesterId);
-      } else if (data.history.length > 0) {
-        setSelectedSemesterId(data.history[0].semesterId);
-      }
+      const catalog = semesterResult?.data ?? [];
+      setSemesters(catalog);
+      setSelectedSemesterId(
+        data.currentSemester?.semesterId
+          || pickPreferredSemesterId(catalog)
+          || data.history[0]?.semesterId
+          || '',
+      );
     } catch {
       setSummary(null);
       setError(copy.loadErrorTitle);
@@ -274,14 +290,44 @@ export default function StudentConductPage() {
     void loadConduct();
   }, [loadConduct]);
 
+  // Exact match only: picking a term with no record must render the empty
+  // state, not silently relabel the current semester's data under it.
   const activeSemesterScore = useMemo(() => {
-    if (!summary) return null;
-    const match = (summary.currentSemester && summary.currentSemester.semesterId === selectedSemesterId)
-      ? summary.currentSemester
-      : (summary.history.find((s) => s.semesterId === selectedSemesterId) || summary.currentSemester);
-    if (!match) return null;
-    return match;
+    if (!summary || !selectedSemesterId) return null;
+    if (summary.currentSemester?.semesterId === selectedSemesterId) {
+      return summary.currentSemester;
+    }
+    return summary.history.find((s) => s.semesterId === selectedSemesterId) ?? null;
   }, [summary, selectedSemesterId]);
+
+  const semesterOptions = useMemo(() => {
+    const recordBySemester = new Map<string, ConductSemesterScore>();
+    for (const score of summary?.history ?? []) {
+      recordBySemester.set(score.semesterId, score);
+    }
+    if (summary?.currentSemester) {
+      recordBySemester.set(summary.currentSemester.semesterId, summary.currentSemester);
+    }
+    const seen = new Set<string>();
+    const options: { id: string; name: string; record?: ConductSemesterScore }[] = [];
+    for (const semester of semesters) {
+      seen.add(semester.id);
+      options.push({
+        id: semester.id,
+        name: getLocalizedName(locale, semester, semester.name),
+        record: recordBySemester.get(semester.id),
+      });
+    }
+    // A scored term missing from the catalog still stays reachable.
+    const orphans = [...(summary?.history ?? []), ...(summary?.currentSemester ? [summary.currentSemester] : [])];
+    for (const score of orphans) {
+      if (!seen.has(score.semesterId)) {
+        seen.add(score.semesterId);
+        options.push({ id: score.semesterId, name: score.semesterName, record: score });
+      }
+    }
+    return options;
+  }, [semesters, summary, locale]);
 
   const formatSemesterName = (name: string | null | undefined) => {
     if (!name) return '—';
@@ -557,9 +603,11 @@ export default function StudentConductPage() {
             onChange={(e) => setSelectedSemesterId(e.target.value)}
             className="w-full rounded-md border border-border bg-background px-3 py-1.5 text-sm font-semibold text-foreground focus:outline-none focus:ring-2 focus:ring-primary/40 sm:w-auto"
           >
-            {summary?.history.map((sem) => (
-              <option key={sem.semesterId} value={sem.semesterId}>
-                {formatSemesterName(sem.semesterName)} ({formatNumber(sem.totalScore)} {copy.optionScoreUnit} - {rankLabel(sem.classification, sem.classificationVi)})
+            {semesterOptions.map((option) => (
+              <option key={option.id} value={option.id}>
+                {option.record
+                  ? `${formatSemesterName(option.name)} (${formatNumber(option.record.totalScore)} ${copy.optionScoreUnit} - ${rankLabel(option.record.classification, option.record.classificationVi)})`
+                  : formatSemesterName(option.name)}
               </option>
             ))}
           </select>

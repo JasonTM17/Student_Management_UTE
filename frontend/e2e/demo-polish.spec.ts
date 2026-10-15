@@ -205,7 +205,7 @@ const thesisGroup = {
   ],
 };
 
-async function mockStudent(page: Page, singleTerm = false) {
+async function mockStudent(page: Page, singleTerm = false, overrides: Record<string, unknown> = {}) {
   const errors: string[] = [];
   page.on('pageerror', (error) => errors.push(error.message));
   page.on('console', (message) => {
@@ -363,6 +363,8 @@ async function mockStudent(page: Page, singleTerm = false) {
           schedules: [{ dayOfWeek: day, startTime: '07:00', endTime: '09:30' }],
         },
       })),
+      // Per-test payload overrides land last so a case can swap any fixture.
+      ...overrides,
     };
     if (!(pathname in payloads)) {
       errors.push(`Unexpected API request: ${pathname}`);
@@ -651,6 +653,75 @@ test('demo polish: dark mode keeps dashboard contrast and viewport fit', async (
   await noOverflow(page);
   await page.screenshot({ path: test.info().outputPath('dashboard-dark.png'), fullPage: true });
   expect(errors).toEqual([]);
+});
+
+test('demo polish: the conduct selector lists every catalog term and empty terms render safely', async ({ page }) => {
+  // The catalog ships term-1/term-2; the student has a score record only for
+  // term-2 plus a legacy term that no longer exists in the catalog. Every
+  // catalog term must stay selectable and a record-free term must render the
+  // empty state — not another term's score.
+  const conductRecord = (semesterId: string, semesterName: string, totalScore: number) => ({
+    id: `score-${semesterId}`,
+    semesterId,
+    semesterName,
+    totalScore,
+    classification: 'TOT',
+    classificationVi: 'Tốt',
+    status: 'APPROVED',
+    evaluatorName: 'Dr. Demo',
+    criteria: [],
+    activities: [],
+  });
+  const errors = await mockStudent(page, false, {
+    '/api/v1/conduct/my': {
+      studentId: 'student-profile',
+      studentCode: 'CS-DEMO-001',
+      fullName: 'Demo Student',
+      cumulativeAverageScore: 85,
+      cumulativeClassificationVi: 'Tốt',
+      currentSemester: null,
+      history: [
+        conductRecord('term-2', 'Term 2', 85),
+        conductRecord('term-legacy', 'Legacy term', 70),
+      ],
+    },
+  });
+
+  await page.goto('/en/dashboard/conduct');
+  const selector = page.getByRole('combobox', { name: 'Semester:' });
+  await expect(selector).toBeVisible();
+  // term-1 + term-2 from the catalog plus the orphan legacy record; catalog
+  // terms localize via nameEn ('Semester N').
+  await expect(selector.locator('option')).toHaveCount(3);
+  await expect(selector.locator('option', { hasText: 'Semester 1' })).toHaveCount(1);
+  await expect(selector.locator('option', { hasText: /Semester 2 \(85 pts - Good\)/ })).toHaveCount(1);
+  await expect(selector.locator('option', { hasText: /Legacy term \(70 pts - Good\)/ })).toHaveCount(1);
+
+  // Picking the record-free catalog term must show the empty state, never
+  // another term's score. The per-semester "earned" line must fall back to
+  // the neutral dash, not the recorded 85.
+  await selector.selectOption('term-1');
+  await expect(page.getByText('Criterion details have not been published for this semester yet.')).toBeVisible();
+  await expect(page.getByText('No conduct activities this semester')).toBeVisible();
+  const earnedLine = page.locator('span').filter({ hasText: /^Earned:/ });
+  await expect(earnedLine).toContainText('—');
+  await expect(earnedLine).not.toContainText('85');
+  await noOverflow(page);
+
+  // A zero-record student still gets the catalog options and the empty state,
+  // in both locales.
+  const emptyErrors = await mockStudent(page);
+  await page.goto('/en/dashboard/conduct');
+  await expect(selector.locator('option')).toHaveCount(2);
+  await expect(page.getByText('Criterion details have not been published for this semester yet.')).toBeVisible();
+  await noOverflow(page);
+  await page.goto('/vi/dashboard/conduct');
+  const viSelector = page.getByRole('combobox', { name: 'Học kỳ:' });
+  await expect(viSelector.locator('option')).toHaveCount(2);
+  await expect(viSelector.locator('option', { hasText: 'Học kỳ 1' })).toHaveCount(1);
+  await expect(page.getByText('Chi tiết từng tiêu chí chưa được công bố cho học kỳ này.')).toBeVisible();
+  await noOverflow(page);
+  expect([...errors, ...emptyErrors]).toEqual([]);
 });
 
 for (const singleTerm of [false, true]) {
