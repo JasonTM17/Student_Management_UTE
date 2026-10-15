@@ -179,6 +179,37 @@ class AuthLoginPersistenceTest {
                     "createdAt" TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP
                 )
                 """);
+        // Account mutation validates curriculum/department references and, on
+        // role conversion, counts rows across the academic/thesis/engagement
+        // history tables. This fixture runs without Flyway, so those schemas
+        // get the minimal column set the service queries.
+        jdbc.execute("CREATE SCHEMA IF NOT EXISTS academic");
+        jdbc.execute("CREATE SCHEMA IF NOT EXISTS thesis");
+        jdbc.execute("CREATE SCHEMA IF NOT EXISTS engagement");
+        jdbc.execute("CREATE TABLE IF NOT EXISTS academic.\"Curriculum\" (\"id\" VARCHAR(120) PRIMARY KEY, \"isActive\" BOOLEAN NOT NULL)");
+        jdbc.execute("CREATE TABLE IF NOT EXISTS academic.\"Department\" (\"id\" VARCHAR(120) PRIMARY KEY, \"isActive\" BOOLEAN NOT NULL)");
+        jdbc.execute("CREATE TABLE IF NOT EXISTS academic.\"Enrollment\" (\"id\" VARCHAR(120) PRIMARY KEY, \"studentId\" VARCHAR(120))");
+        jdbc.execute("CREATE TABLE IF NOT EXISTS academic.\"Attendance\" (\"id\" VARCHAR(120) PRIMARY KEY, \"studentId\" VARCHAR(120))");
+        jdbc.execute("CREATE TABLE IF NOT EXISTS academic.\"RegistrationSlip\" (\"id\" VARCHAR(120) PRIMARY KEY, \"studentId\" VARCHAR(120))");
+        jdbc.execute("CREATE TABLE IF NOT EXISTS academic.\"CreditLimitApplication\" (\"id\" VARCHAR(120) PRIMARY KEY, \"studentId\" VARCHAR(120))");
+        jdbc.execute("CREATE TABLE IF NOT EXISTS academic.conduct_semester_score (id VARCHAR(120) PRIMARY KEY, student_id VARCHAR(120))");
+        jdbc.execute("CREATE TABLE IF NOT EXISTS academic.conduct_activity (id VARCHAR(120) PRIMARY KEY, student_id VARCHAR(120))");
+        jdbc.execute("CREATE TABLE IF NOT EXISTS academic.\"EnrollmentEvent\" (\"id\" VARCHAR(120) PRIMARY KEY, \"studentId\" VARCHAR(120))");
+        jdbc.execute("CREATE TABLE IF NOT EXISTS academic.\"Section\" (\"id\" VARCHAR(120) PRIMARY KEY, \"lecturerId\" VARCHAR(120))");
+        jdbc.execute("CREATE TABLE IF NOT EXISTS thesis.thesis_group_member (id VARCHAR(120) PRIMARY KEY, student_id VARCHAR(120))");
+        jdbc.execute("CREATE TABLE IF NOT EXISTS thesis.thesis_group (id VARCHAR(120) PRIMARY KEY, leader_student_id VARCHAR(120))");
+        jdbc.execute("CREATE TABLE IF NOT EXISTS thesis.thesis_group_report (id VARCHAR(120) PRIMARY KEY, submitted_by VARCHAR(120))");
+        jdbc.execute("CREATE TABLE IF NOT EXISTS thesis.thesis_council_member (id VARCHAR(120) PRIMARY KEY, lecturer_id VARCHAR(120))");
+        jdbc.execute("CREATE TABLE IF NOT EXISTS thesis.thesis_topic_supervisor (id VARCHAR(120) PRIMARY KEY, lecturer_id VARCHAR(120))");
+        jdbc.execute("CREATE TABLE IF NOT EXISTS thesis.thesis_topic_score (id VARCHAR(120) PRIMARY KEY, lecturer_id VARCHAR(120))");
+        jdbc.execute("CREATE TABLE IF NOT EXISTS thesis.thesis_topic (id VARCHAR(120) PRIMARY KEY, gvpb_lecturer_id VARCHAR(120))");
+        jdbc.execute("CREATE TABLE IF NOT EXISTS engagement.\"Announcement\" (\"id\" VARCHAR(120) PRIMARY KEY, \"lecturerId\" VARCHAR(120))");
+        jdbc.update("DELETE FROM academic.\"Curriculum\"");
+        jdbc.update("DELETE FROM academic.\"Department\"");
+        jdbc.update(
+                "INSERT INTO academic.\"Curriculum\" (\"id\", \"isActive\") VALUES ('curriculum-demo', TRUE)");
+        jdbc.update(
+                "INSERT INTO academic.\"Department\" (\"id\", \"isActive\") VALUES ('department-demo', TRUE)");
         jdbc.update("DELETE FROM campuscore_audit.\"AdminAudit\"");
         jdbc.update("DELETE FROM \"campuscore_auth\".\"Session\"");
         jdbc.update("DELETE FROM \"campuscore_auth\".\"Student\"");
