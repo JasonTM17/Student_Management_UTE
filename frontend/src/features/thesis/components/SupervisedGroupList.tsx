@@ -92,7 +92,7 @@ export default function SupervisedGroupList({
                           String(group.memberStudentIds.length),
                         )}
                       </span>
-                      <MemberAvatars memberIds={group.memberStudentIds} max={3} />
+                      <MemberAvatars memberIds={group.memberStudentIds} members={group.members} max={3} />
                     </div>
                     {group.rejectionReason ? (
                       <p className="text-xs italic text-destructive">
