@@ -36,14 +36,15 @@ const DEMO_ACCOUNT_EMAILS: Record<LoginPortal, string> = {
 };
 
 /**
- * The seeded KLTN trio: three students in one thesis group so a demo can swap
- * between leader and member views without typing emails. All three share the
+ * The seeded KLTN group: four students in one thesis group so a demo can swap
+ * between leader and member views without typing emails. All four share the
  * student demo password; clicking a row fills the form (never auto-submits).
  */
 const STUDENT_DEMO_ACCOUNTS: ReadonlyArray<{ email: string; name: string; leader: boolean }> = [
-  { email: 'student@campuscore.edu', name: 'Tiến Sơn Nguyễn', leader: true },
-  { email: 'student2@campuscore.edu', name: 'Minh Quân Trần', leader: false },
-  { email: 'student3@campuscore.edu', name: 'Thu Hằng Lê Thị', leader: false },
+  { email: 'student@campuscore.edu', name: 'Nguyễn Tiến Sơn', leader: true },
+  { email: 'student2@campuscore.edu', name: 'Huỳnh Hồng Thủy', leader: false },
+  { email: 'student3@campuscore.edu', name: 'Trần Thị Ngọc Quyên', leader: false },
+  { email: 'student4@campuscore.edu', name: 'Vũ Quốc Huy', leader: false },
 ];
 
 /**
@@ -424,8 +425,8 @@ export default function LoginPage() {
           <p className="text-[11px] text-muted-foreground pt-1 border-t border-primary/10">
             {portal === 'student'
               ? (locale === 'vi'
-                ? '💡 Ba tài khoản là 3 thành viên cùng một nhóm KLTN — chọn từng tài khoản để xem nhóm chung.'
-                : '💡 These three accounts are members of the same KLTN thesis group — sign in as each to see the shared group.')
+                ? '💡 Bốn tài khoản là 4 thành viên cùng một nhóm KLTN — chọn từng tài khoản để xem nhóm chung.'
+                : '💡 These four accounts are members of the same KLTN thesis group — sign in as each to see the shared group.')
               : (locale === 'vi'
                 ? '💡 Đây là tài khoản demo dùng để trải nghiệm đầy đủ các tính năng của hệ thống CampusUTE.'
                 : '💡 This is a demo account provided to experience all features of CampusUTE.')}

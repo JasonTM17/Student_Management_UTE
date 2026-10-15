@@ -555,7 +555,10 @@ Cơ sở dữ liệu seed sẵn các tài khoản tương ứng với các nhóm
 
 | Vai trò (Role) | Email đăng nhập | Mật khẩu demo | Quyền hạn và phạm vi truy cập |
 | --- | --- | --- | --- |
-| **Sinh viên (Student)** | `student@campuscore.edu` | `password123` | Đăng ký học phần, xem TKB, tra cứu điểm/bảng điểm, hỏi Trợ lý AI, đăng ký đề tài khóa luận |
+| **Sinh viên (Student)** — Nguyễn Tiến Sơn, MSSV `24110054` (trưởng nhóm) | `student@campuscore.edu` | `password123` | Đăng ký học phần, xem TKB, tra cứu điểm/bảng điểm, hỏi Trợ lý AI, đăng ký đề tài khóa luận |
+| **Sinh viên** — Huỳnh Hồng Thủy, MSSV `24110345` | `student2@campuscore.edu` | `password123` | Cùng quyền sinh viên; thành viên nhóm khóa luận demo |
+| **Sinh viên** — Trần Thị Ngọc Quyên, MSSV `24110051` | `student3@campuscore.edu` | `password123` | Cùng quyền sinh viên; thành viên nhóm khóa luận demo |
+| **Sinh viên** — Vũ Quốc Huy, MSSV `24162050` | `student4@campuscore.edu` | `password123` | Cùng quyền sinh viên; thành viên nhóm khóa luận demo |
 | **Giảng viên (Lecturer)** | `lecturer@campuscore.edu` | `password123` | Xem lịch dạy, chấm/nhập điểm học phần, đề xuất và hướng dẫn các nhóm khóa luận |
 | **Quản trị viên (Admin)** | `admin@campuscore.edu` | `password123` | Quản trị người dùng, danh mục khoa/ngành/phòng học, mở lớp học phần, soạn thảo tri thức RAG |
 | **Quản trị viên thứ 2** | `admin002@campuscore.demo` | `password123` | Tài khoản Quản trị độc lập dùng để duyệt chéo tri thức RAG theo nguyên tắc Four-Eyes |

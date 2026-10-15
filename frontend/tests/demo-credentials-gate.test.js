@@ -88,3 +88,17 @@ test('the login page warns on stale quick-fill values and never auto-submits', (
   // Quick-fill is fill-only: no submit() call anywhere on the page.
   assert.doesNotMatch(loginPage, /\.submit\(\)|requestSubmit/, 'quick-fill must not auto-submit the form');
 });
+
+test('student quick-fill lists exactly the four approved team members', () => {
+  const list = loginPage.match(/const STUDENT_DEMO_ACCOUNTS[\s\S]*?\n\];/);
+  assert.ok(list, 'the student quick-fill list must be declared');
+  const rows = [...list[0].matchAll(/\{ email: '([^']+)', name: '([^']+)', leader: (true|false) \}/g)]
+    .map(([, email, name, leader]) => ({ email, name, leader: leader === 'true' }));
+  assert.deepEqual(rows, [
+    { email: 'student@campuscore.edu', name: 'Nguyễn Tiến Sơn', leader: true },
+    { email: 'student2@campuscore.edu', name: 'Huỳnh Hồng Thủy', leader: false },
+    { email: 'student3@campuscore.edu', name: 'Trần Thị Ngọc Quyên', leader: false },
+    { email: 'student4@campuscore.edu', name: 'Vũ Quốc Huy', leader: false },
+  ]);
+  assert.equal(rows.filter((row) => row.leader).length, 1, 'exactly one leader row');
+});

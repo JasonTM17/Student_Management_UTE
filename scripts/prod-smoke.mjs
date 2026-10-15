@@ -2,7 +2,7 @@
 // environment. Run after every deploy:
 //   node scripts/prod-smoke.mjs                      # prod (www.campusute.io.vn)
 //   BASE_URL=http://localhost:3100 node scripts/prod-smoke.mjs   # local stack
-// Covers: demo-account logins, thesis trio roster, curriculum plan,
+// Covers: demo-account logins, four-member thesis roster, curriculum plan,
 // assistant grounding, admin user visibility. Mutating checks (enroll/drop)
 // stay opt-in via SMOKE_MUTATE=1 so a routine run never changes prod data.
 const BASE = process.env.BASE_URL || 'https://www.campusute.io.vn';
@@ -53,7 +53,24 @@ async function groups(jar) {
   return { status: res.status, arr };
 }
 
-const TRIO = ['Tiến Sơn', 'Minh Quân', 'Thu Hằng'];
+const GROUP_ID = 'f9a4d567-2e0b-445a-b634-4e5f6a7b8c93';
+const TEAM = [
+  { key: 'student', email: 'student@campuscore.edu', userId: 'student-user', profileId: 'student-profile', studentNumber: '24110054', name: 'Nguyễn Tiến Sơn', leader: true, order: 1 },
+  { key: 'student2', email: 'student2@campuscore.edu', userId: 'student-user-2', profileId: 'student-profile-058', studentNumber: '24110345', name: 'Huỳnh Hồng Thủy', leader: false, order: 2 },
+  { key: 'student3', email: 'student3@campuscore.edu', userId: 'student-user-3', profileId: 'student-profile-059', studentNumber: '24110051', name: 'Trần Thị Ngọc Quyên', leader: false, order: 3 },
+  { key: 'student4', email: 'student4@campuscore.edu', userId: 'student-user-4', profileId: 'student-profile-team-004', studentNumber: '24162050', name: 'Vũ Quốc Huy', leader: false, order: 4 },
+];
+
+function matchesTeamGroup(group) {
+  const roster = group?.members || [];
+  return group?.id === GROUP_ID && group?.leaderStudentId === 'student-profile'
+    && roster.length === TEAM.length
+    && roster.filter(member => member.isLeader).length === 1
+    && TEAM.every(expected => roster.some(member => member.studentId === expected.profileId
+      && member.studentNumber === expected.studentNumber && member.displayName === expected.name
+      && member.memberOrder === expected.order && member.isLeader === expected.leader
+      && member.isExternal === false && member.contact === expected.email));
+}
 
 (async () => {
   console.log(`Smoke: ${BASE}`);
@@ -64,30 +81,34 @@ const TRIO = ['Tiến Sơn', 'Minh Quân', 'Thu Hằng'];
     student: 'student@campuscore.edu',
     student2: 'student2@campuscore.edu',
     student3: 'student3@campuscore.edu',
+    student4: 'student4@campuscore.edu',
     lecturer: 'lecturer@campuscore.edu',
     admin: 'admin@campuscore.edu',
   })) {
     const r = await login(email);
     sessions[key] = r.jar;
-    check(`login ${email}`, r.status === 200 && r.jar.cc_access_token, `status=${r.status}`);
+    const expected = TEAM.find(member => member.key === key);
+    const user = r.body.user;
+    const identityMatches = !expected || (user?.id === expected.userId
+      && user.email === expected.email
+      && `${user.lastName} ${user.firstName}`.trim() === expected.name
+      && user.status === 'ACTIVE' && user.roles?.length === 1 && user.roles[0] === 'STUDENT');
+    check(`login ${key}`, r.status === 200 && r.jar.cc_access_token && identityMatches, `status=${r.status}`);
   }
 
-  // -- Thesis trio: leader + both members see the same roster ----------------
-  for (const key of ['student', 'student2', 'student3']) {
+  // -- Thesis team: leader + all members see the same roster -----------------
+  for (const { key } of TEAM) {
     if (!sessions[key].cc_access_token) continue;
     const { status, arr } = await groups(sessions[key]);
-    const trio = arr.find(g => (g.members || []).length === 3);
-    const names = (trio?.members || []).map(m => `${m.displayName || ''}`);
-    const leaderOk = (trio?.members || []).some(m => m.isLeader && `${m.displayName}`.includes('Sơn'));
-    check(`thesis trio visible for ${key}`, status === 200 && TRIO.every(n => names.join(' ').includes(n)) && leaderOk,
+    check(`thesis team visible for ${key}`, status === 200 && arr.some(matchesTeamGroup),
       `status=${status} groups=${arr.length}`);
   }
 
-  // -- Lecturer: sees the trio as a pending supervised group ------------------
+  // -- Lecturer: sees the team as a pending supervised group ------------------
   if (sessions.lecturer.cc_access_token) {
     const { status, arr } = await groups(sessions.lecturer);
-    const pending = arr.find(g => g.approvalStatus === 'PENDING' && (g.members || []).length === 3);
-    check('lecturer sees pending trio group', status === 200 && !!pending, `status=${status}`);
+    const pending = arr.find(group => group.approvalStatus === 'PENDING' && matchesTeamGroup(group));
+    check('lecturer sees pending team group', status === 200 && !!pending, `status=${status}`);
   }
 
   // -- Curriculum: student plan resolves --------------------------------------
@@ -125,11 +146,12 @@ const TRIO = ['Tiến Sơn', 'Minh Quân', 'Thu Hằng'];
 
   // -- Admin: new demo accounts are searchable ---------------------------------
   if (sessions.admin.cc_access_token) {
-    for (const q of ['student2', 'student3']) {
+    for (const member of TEAM.slice(1)) {
+      const q = member.email.split('@')[0];
       const res = await fetch(`${API}/users?search=${q}`, { headers: headers(sessions.admin) });
       const j = await res.json().catch(() => ({}));
       const arr = j.content || j.users || j.data || (Array.isArray(j) ? j : []);
-      check(`admin finds ${q}`, res.status === 200 && arr.length > 0, `status=${res.status}`);
+      check(`admin finds ${member.key}`, res.status === 200 && arr.some(user => user.id === member.userId), `status=${res.status}`);
     }
   }
 
