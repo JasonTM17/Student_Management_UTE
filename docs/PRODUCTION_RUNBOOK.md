@@ -64,15 +64,19 @@ guidance in `docs/DEMO_RUNBOOK.md`.
   1 MB global / 64 KB assistant / 4 KB on credential routes (login, refresh,
   change-password, logout).
 
-## Render + Supabase operating notes
+## Render + Neon operating notes
 
-The live deployment is Render (REST API) + Supabase (PostgreSQL) + Vercel
-(web). Adapted preflight for data-touching migrations:
+The live deployment is Render (REST API) + Neon Free Singapore (PostgreSQL) +
+Vercel (web). Supabase is the write-fenced pre-cutover snapshot, not a
+synchronized standby. Current cutover evidence, quota limits and the untested
+reverse-migration gate are recorded in [deployment.md](deployment.md#cutover-database-supabase--neon-free-singapore--15102026-utc).
+Adapted preflight for data-touching migrations:
 
 1. **Snapshot before apply.** When a pushed migration contains `INSERT`,
    `UPDATE`, `DELETE`, or trigger `DISABLE` blocks (seed/repair files, not pure
-   DDL), take a Supabase backup first: Dashboard -> Database -> Backups ->
-   create a manual snapshot (or `pg_dump` the affected schemas). The
+   DDL), take a backup of the active Neon production database first, using
+   a consistent `pg_dump` of the affected schemas and a checksum manifest.
+   Do not treat the frozen Supabase snapshot as a backup of new Neon writes. The
    reconciliation classes — `V108` (seat counts), `V111`/`V112` (demo dataset
    parity) — mutate live rows and were verified locally before push; keep that
    discipline.
@@ -103,8 +107,10 @@ The live deployment is Render (REST API) + Supabase (PostgreSQL) + Vercel
 
    A no-drift run legitimately creates no new revision; the signal of a
    healthy run is the *absence* of the 42501 ERROR line in logs for that tick.
-4. **Post-deploy smoke.** `node scripts/prod-smoke.mjs` runs a read-only
-   end-to-end check (demo logins, thesis trio roster, curriculum plan,
+4. **Post-deploy smoke.** `node scripts/prod-smoke.mjs` does not mutate academic
+   records by default, but logins and the assistant check write sessions, last-login
+   timestamps and chat history. It runs an
+   end-to-end check (demo logins, four-member thesis roster, curriculum plan,
    assistant answer, admin user search) in under a minute; run it after every
    Render/Vercel deploy and after migration-affecting pushes.
 
