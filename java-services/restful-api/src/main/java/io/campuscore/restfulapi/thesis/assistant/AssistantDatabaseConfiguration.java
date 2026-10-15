@@ -63,7 +63,23 @@ public class AssistantDatabaseConfiguration {
             @Value("${assistant.datasource.password:}") String password,
             @Value("${assistant.datasource.maximum-pool-size:4}") int maximumPoolSize,
             @Value("${assistant.datasource.connection-timeout-ms:15000}") long connectionTimeoutMs,
+            @Value("${assistant.datasource.idle-timeout-ms:60000}") long idleTimeoutMs,
+            @Value("${assistant.datasource.keepalive-time-ms:0}") long keepaliveTimeMs,
             @Value("${assistant.rls.test-mode:false}") boolean testMode) {
+        return buildAssistantDataSource(url, username, password, maximumPoolSize,
+                connectionTimeoutMs, idleTimeoutMs, keepaliveTimeMs, testMode);
+    }
+
+    DataSource assistantDataSource(String url, String username, String password,
+            int maximumPoolSize, long connectionTimeoutMs, boolean testMode) {
+        return buildAssistantDataSource(url, username, password, maximumPoolSize,
+                connectionTimeoutMs, 60_000L, 0L, testMode);
+    }
+
+    private DataSource buildAssistantDataSource(String url, String username, String password,
+            int maximumPoolSize, long connectionTimeoutMs, long idleTimeoutMs,
+            long keepaliveTimeMs, boolean testMode) {
+        validatePoolTiming(idleTimeoutMs, keepaliveTimeMs);
         if (testMode) {
             throw new IllegalStateException("Assistant RLS test mode is forbidden outside the test profile");
         }
@@ -80,16 +96,8 @@ public class AssistantDatabaseConfiguration {
         }
         rejectCredentialsEmbeddedInUrl(url);
 
-        HikariConfig config = new HikariConfig();
-        config.setPoolName("campuscore-assistant");
-        config.setJdbcUrl(url);
-        config.setUsername(username);
-        config.setPassword(password);
-        config.setMaximumPoolSize(maximumPoolSize);
-        config.setMinimumIdle(0);
-        config.setConnectionTimeout(connectionTimeoutMs);
-        config.setValidationTimeout(Math.min(3000, connectionTimeoutMs));
-        config.setInitializationFailTimeout(5000);
+        HikariConfig config = newAssistantPoolConfig(url, username, password, maximumPoolSize,
+                connectionTimeoutMs, idleTimeoutMs, keepaliveTimeMs);
         try {
             return new HikariDataSource(config);
         } catch (RuntimeException poolFailure) {
@@ -105,6 +113,35 @@ public class AssistantDatabaseConfiguration {
                     UnavailableAssistantDataSource.UNAVAILABLE_REASON);
             return new UnavailableAssistantDataSource(reason);
         }
+    }
+
+    private static void validatePoolTiming(long idleTimeoutMs, long keepaliveTimeMs) {
+        if (idleTimeoutMs < 10_000L) {
+            throw new IllegalArgumentException(
+                    "assistant.datasource.idle-timeout-ms must be at least 10000");
+        }
+        if (keepaliveTimeMs != 0 && keepaliveTimeMs < 30_000L) {
+            throw new IllegalArgumentException(
+                    "assistant.datasource.keepalive-time-ms must be 0 (disabled) or at least 30000");
+        }
+    }
+
+    static HikariConfig newAssistantPoolConfig(String url, String username, String password,
+            int maximumPoolSize, long connectionTimeoutMs, long idleTimeoutMs, long keepaliveTimeMs) {
+        validatePoolTiming(idleTimeoutMs, keepaliveTimeMs);
+        HikariConfig config = new HikariConfig();
+        config.setPoolName("campuscore-assistant");
+        config.setJdbcUrl(url);
+        config.setUsername(username);
+        config.setPassword(password);
+        config.setMaximumPoolSize(maximumPoolSize);
+        config.setMinimumIdle(0);
+        config.setConnectionTimeout(connectionTimeoutMs);
+        config.setValidationTimeout(Math.min(3000, connectionTimeoutMs));
+        config.setInitializationFailTimeout(5000);
+        config.setIdleTimeout(idleTimeoutMs);
+        config.setKeepaliveTime(keepaliveTimeMs);
+        return config;
     }
 
     /**

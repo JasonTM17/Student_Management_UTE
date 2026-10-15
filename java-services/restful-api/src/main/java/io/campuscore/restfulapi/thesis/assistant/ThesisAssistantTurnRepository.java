@@ -33,12 +33,22 @@ public class ThesisAssistantTurnRepository {
     private static final long COMPLETED_RETENTION_DAYS = 90L;
     private final NamedParameterJdbcTemplate jdbc;
     private final boolean postgres;
+    private final AssistantRecoveryActivity activity;
 
     public ThesisAssistantTurnRepository(
             @org.springframework.beans.factory.annotation.Qualifier(AssistantDatabaseConfiguration.JDBC_TEMPLATE)
             NamedParameterJdbcTemplate jdbc) {
+        this(jdbc, new AssistantRecoveryActivity(false, 300_000L, 900_000L, System::nanoTime));
+    }
+
+    @org.springframework.beans.factory.annotation.Autowired
+    public ThesisAssistantTurnRepository(
+            @org.springframework.beans.factory.annotation.Qualifier(AssistantDatabaseConfiguration.JDBC_TEMPLATE)
+            NamedParameterJdbcTemplate jdbc,
+            AssistantRecoveryActivity activity) {
         this.jdbc = jdbc;
         this.postgres = databaseIsPostgres(jdbc);
+        this.activity = activity;
     }
 
     @Transactional(transactionManager = AssistantDatabaseConfiguration.TRANSACTION_MANAGER)
@@ -57,6 +67,7 @@ public class ThesisAssistantTurnRepository {
     public Reservation reserve(String ownerId, UUID clientRequestId, String requestHash,
             UUID requestedConversationId, String locale, String leaseOwner, int retentionDays,
             Consumer<ExpiredLease> fence) {
+        activity.markActivity();
         // A retry is also a recovery opportunity. Resolve an expired worker
         // lease before deciding that the idempotency key is still active.
         notifyFence(fence, recoverExpiredByRequest(ownerId, clientRequestId));

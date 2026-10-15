@@ -8,17 +8,25 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import static org.mockito.Mockito.atLeastOnce;
+import static org.mockito.Mockito.clearInvocations;
+import static org.mockito.Mockito.verify;
+
+import com.zaxxer.hikari.HikariDataSource;
 import io.campuscore.restfulapi.thesis.assistant.ThesisAssistantDtos.Citation;
 import java.util.List;
 import java.util.UUID;
 import java.sql.Timestamp;
 import java.time.Instant;
+import javax.sql.DataSource;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.jdbc.core.namedparam.MapSqlParameterSource;
 import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
 import org.springframework.test.context.ActiveProfiles;
+import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
 
 /** H2 parity oracle for the V12 ledger CAS and fencing invariants. */
 @SpringBootTest
@@ -28,6 +36,26 @@ class ThesisAssistantTurnLedgerH2Test {
     @Autowired private ThesisAssistantTurnRepository turns;
     @Autowired private ThesisAssistantRepository legacyHistory;
     @Autowired private NamedParameterJdbcTemplate jdbc;
+    @Autowired @Qualifier("dataSource") private DataSource primaryDataSource;
+    @MockitoSpyBean private AssistantRecoveryActivity recoveryActivity;
+
+    @Test
+    void reserveMarksActivityOnTheSharedRecoveryTracker() {
+        clearInvocations(recoveryActivity);
+        String owner = "activity-owner-" + UUID.randomUUID();
+        turns.reserve(owner, UUID.randomUUID(),
+                AssistantInputGuard.canonicalHash("topic", "en", null), null, "en", "lease", 90);
+        verify(recoveryActivity, atLeastOnce()).markActivity();
+    }
+
+    @Test
+    void primaryPoolCarriesTheAutosuspendFriendlyBindings() {
+        HikariDataSource hikari = (HikariDataSource) primaryDataSource;
+        assertEquals(0, hikari.getMinimumIdle());
+        assertEquals(60_000L, hikari.getIdleTimeout());
+        assertEquals(0L, hikari.getKeepaliveTime());
+        assertEquals(8, hikari.getMaximumPoolSize());
+    }
 
     @Test
     void reserveSnapshotDispatchAndCompleteCommitOneUserAndAssistant() {

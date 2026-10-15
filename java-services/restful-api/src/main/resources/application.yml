@@ -113,6 +113,12 @@ assistant:
     password: ${ASSISTANT_DB_PASSWORD:}
     maximum-pool-size: ${ASSISTANT_DB_POOL_MAX:4}
     connection-timeout-ms: ${ASSISTANT_DB_CONNECTION_TIMEOUT_MS:15000}
+    idle-timeout-ms: ${ASSISTANT_DB_IDLE_TIMEOUT_MS:60000}
+    keepalive-time-ms: ${ASSISTANT_DB_KEEPALIVE_TIME_MS:0}
+  recovery:
+    activity-aware: ${ASSISTANT_RECOVERY_ACTIVITY_AWARE:true}
+    active-window-ms: ${ASSISTANT_RECOVERY_ACTIVE_WINDOW_MS:300000}
+    safety-interval-ms: ${ASSISTANT_RECOVERY_SAFETY_INTERVAL_MS:900000}
   rls:
     test-mode: ${ASSISTANT_RLS_TEST_MODE:false}
   knowledge:
@@ -205,9 +211,11 @@ spring:
     password: ${SPRING_DATASOURCE_PASSWORD:}
     hikari:
       maximum-pool-size: ${DB_POOL_MAX:8}
-      minimum-idle: ${DB_POOL_MIN:2}
+      minimum-idle: ${DB_POOL_MIN:0}
       connection-timeout: ${DB_CONNECTION_TIMEOUT_MS:15000}
       validation-timeout: ${DB_VALIDATION_TIMEOUT_MS:3000}
+      idle-timeout: ${DB_POOL_IDLE_TIMEOUT_MS:60000}
+      keepalive-time: ${DB_POOL_KEEPALIVE_MS:0}
   jpa:
     hibernate:
       # Flyway owns two identifier families: snake_case (thesis, academic) and quoted

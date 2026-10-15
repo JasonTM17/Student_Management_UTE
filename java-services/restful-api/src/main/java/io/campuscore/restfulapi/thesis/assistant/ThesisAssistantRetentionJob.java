@@ -20,12 +20,22 @@ public class ThesisAssistantRetentionJob {
     private final ThesisAssistantRepository repository;
     private final ThesisAssistantTurnRepository turns;
     private final AssistantCancellationRegistry cancellations;
+    private final AssistantRecoveryActivity activity;
 
     public ThesisAssistantRetentionJob(ThesisAssistantRepository repository,
             ThesisAssistantTurnRepository turns, AssistantCancellationRegistry cancellations) {
+        this(repository, turns, cancellations,
+                new AssistantRecoveryActivity(false, 300_000L, 900_000L, System::nanoTime));
+    }
+
+    @org.springframework.beans.factory.annotation.Autowired
+    public ThesisAssistantRetentionJob(ThesisAssistantRepository repository,
+            ThesisAssistantTurnRepository turns, AssistantCancellationRegistry cancellations,
+            AssistantRecoveryActivity activity) {
         this.repository = repository;
         this.turns = turns;
         this.cancellations = cancellations;
+        this.activity = activity;
     }
 
     /**
@@ -37,10 +47,15 @@ public class ThesisAssistantRetentionJob {
     @Scheduled(fixedDelayString = "${assistant.recovery-delay-ms:30000}",
             initialDelayString = "${assistant.recovery-initial-delay-ms:30000}")
     public void recoverExpiredLeases() {
+        if (!activity.shouldSweep()) {
+            return;
+        }
         try {
-            turns.recoverExpiredLeases(lease ->
-                    cancellations.fence(lease.ownerId(), lease.clientRequestId(), lease.leaseGeneration()));
+            int recovered = turns.recoverExpiredLeases(lease ->
+                    cancellations.fence(lease.ownerId(), lease.clientRequestId(), lease.leaseGeneration())).size();
+            activity.sweepSucceeded(recovered >= 100);
         } catch (Exception ex) {
+            activity.sweepFailed();
             log.warn("Failed to recover expired assistant leases: {}", ex.getMessage(), ex);
         }
     }
