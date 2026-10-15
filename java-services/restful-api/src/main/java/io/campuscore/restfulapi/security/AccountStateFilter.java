@@ -113,7 +113,15 @@ public class AccountStateFilter extends OncePerRequestFilter {
     }
 
     private static boolean isSessionCleanupEndpoint(String uri) {
-        return "/api/v1/auth/logout".equals(uri) || "/api/v1/auth/refresh".equals(uri);
+        // These endpoints establish, replace or discard session state rather
+        // than consume it; a stale access token must not strand login, 2FA
+        // verification or self-service recovery behind a revoked session.
+        return "/api/v1/auth/login".equals(uri)
+                || "/api/v1/auth/two-factor/verify".equals(uri)
+                || "/api/v1/auth/forgot-password".equals(uri)
+                || "/api/v1/auth/reset-password".equals(uri)
+                || "/api/v1/auth/logout".equals(uri)
+                || "/api/v1/auth/refresh".equals(uri);
     }
 
     /** The minimal endpoints an issued account needs to rotate its password. */

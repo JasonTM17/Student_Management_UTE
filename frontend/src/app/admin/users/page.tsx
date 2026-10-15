@@ -43,7 +43,11 @@ import { useI18n } from '@/i18n';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 import { campusErrorMessage } from '@/lib/campus-error';
-import { isPrivilegedAccountTarget } from '@/lib/admin-user-guards';
+import {
+  isPrivilegedAccountTarget,
+  primaryManagedRole,
+  type ManagedRole,
+} from '@/lib/admin-user-guards';
 
 interface UserRecord {
   id: string;
@@ -54,22 +58,21 @@ interface UserRecord {
   // The admin API serializes roles as an array (matching AuthUserResponse);
   // it used to send a comma-joined string and every consumer split it back.
   roles?: string[];
+  // Profile-presence flags let the edit form ask for official IDs only when a
+  // role conversion must create the profile; older responses omit them and the
+  // held roles act as the fallback signal.
+  hasStudentProfile?: boolean;
+  hasLecturerProfile?: boolean;
   createdAt: string;
 }
 
-type ManagedRole = 'STUDENT' | 'LECTURER' | 'ADMIN' | 'SUPER_ADMIN';
 const defaultRole: ManagedRole = 'STUDENT';
 
-function primaryRole(roles?: string[]): ManagedRole {
-  return (
-    (roles ?? []).find((role): role is ManagedRole =>
-      ['STUDENT', 'LECTURER', 'ADMIN', 'SUPER_ADMIN'].includes(role.trim().toUpperCase()),
-    )?.trim().toUpperCase() as ManagedRole | undefined
-  ) ?? defaultRole;
-}
+const ACCOUNT_STATUSES = ['ACTIVE', 'PENDING', 'SUSPENDED', 'LOCKED', 'DISABLED'] as const;
 
-function roleLabel(roles?: string[]) {
-  return (roles ?? []).filter(Boolean).join(', ') || defaultRole;
+function usesLecturerProfileRole(role: string): boolean {
+  const normalized = role.trim().toUpperCase();
+  return normalized === 'LECTURER' || normalized === 'TRUONG_KHOA';
 }
 
 function isRecordSuperAdmin(u: UserRecord): boolean {
@@ -166,7 +169,7 @@ export default function AdminUsersPage() {
   // the current rows, so the tab count cannot describe a different set than
   // the table.
   const [totalItems, setTotalItems] = useState(0);
-  const [roleFilter, setRoleFilter] = useState<'ALL' | 'STUDENT' | 'LECTURER' | 'ADMIN'>('ALL');
+  const [roleFilter, setRoleFilter] = useState<'ALL' | ManagedRole>('ALL');
 
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [editingUser, setEditingUser] = useState<UserRecord | null>(null);
@@ -183,6 +186,7 @@ export default function AdminUsersPage() {
     firstName: '',
     lastName: '',
     role: defaultRole as ManagedRole,
+    status: 'ACTIVE',
     // Student-specific fields
     studentId: '',
     year: '1',
@@ -200,8 +204,11 @@ export default function AdminUsersPage() {
   // Sync role filter from URL query param if present
   useEffect(() => {
     const roleParam = searchParams.get('role');
-    if (roleParam && ['STUDENT', 'LECTURER', 'ADMIN'].includes(roleParam.toUpperCase())) {
-      setRoleFilter(roleParam.toUpperCase() as 'STUDENT' | 'LECTURER' | 'ADMIN');
+    if (
+      roleParam &&
+      ['STUDENT', 'LECTURER', 'ADMIN', 'TRUONG_KHOA', 'SUPER_ADMIN'].includes(roleParam.toUpperCase())
+    ) {
+      setRoleFilter(roleParam.toUpperCase() as ManagedRole);
     }
   }, [searchParams]);
 
@@ -340,6 +347,7 @@ export default function AdminUsersPage() {
           createStudentTitle: 'Thêm mới tài khoản sinh viên',
           createLecturerTitle: 'Thêm mới tài khoản giảng viên',
           createAdminTitle: 'Thêm mới tài khoản quản trị viên',
+          createDeanTitle: 'Thêm mới tài khoản trưởng khoa',
           emailLabel: 'Địa chỉ email trường cấp',
           issuedSecretTitle: 'Hệ thống tự cấp mật khẩu tạm thời',
           issuedSecretNote:
@@ -373,10 +381,12 @@ export default function AdminUsersPage() {
           firstName: 'Tên',
           lastName: 'Họ và tên đệm',
           roleLabel: 'Vai trò hệ thống',
+          statusFieldLabel: 'Trạng thái tài khoản',
           roles: {
             STUDENT: 'Sinh viên',
             LECTURER: 'Giảng viên',
             ADMIN: 'Quản trị viên',
+            TRUONG_KHOA: 'Trưởng khoa',
             SUPER_ADMIN: 'Siêu quản trị viên',
           },
           saving: 'Đang lưu dữ liệu...',
@@ -395,6 +405,8 @@ export default function AdminUsersPage() {
             'Chọn loại tài khoản để hệ thống tải hồ sơ học vụ chuyên biệt tương ứng',
           rolesShort: {
             ADMIN: 'Quản trị',
+            TRUONG_KHOA: 'Trưởng khoa',
+            SUPER_ADMIN: 'Siêu QTV',
           },
           accountSectionTitle: '1. Thông tin tài khoản & đăng nhập',
           accountSectionHint: 'Định danh đăng nhập và bảo mật tài khoản',
@@ -402,21 +414,27 @@ export default function AdminUsersPage() {
           firstNamePlaceholder: 'An',
           initialStatusLabel: 'Trạng thái tài khoản ban đầu:',
           initialStatusActive: 'Đang hoạt động (ACTIVE)',
+          unsupportedRoleHint:
+            'Tài khoản này mang vai trò tùy chỉnh — vai trò được giữ nguyên và không chỉnh sửa trong biểu mẫu này.',
+          selfStatusHint: 'Không thể tự thay đổi trạng thái tài khoản của chính mình.',
+          copyFailed: 'Không thể sao chép — hãy ghi lại mật khẩu thủ công.',
           assignmentSectionTitle: '2. Hồ sơ phân công học vụ',
           assignmentHints: {
             STUDENT: 'Thông tin hồ sơ đào tạo sinh viên chính quy',
             LECTURER: 'Thông tin học hàm và bộ môn giảng dạy',
+            TRUONG_KHOA: 'Hồ sơ giảng viên chính thức gắn với vai trò trưởng khoa',
             ADMIN: 'Phân quyền quản trị hệ thống',
+            SUPER_ADMIN: 'Phân quyền siêu quản trị toàn hệ thống',
           },
           studentIdLabel: 'Mã số sinh viên (MSSV) *',
           studentIdDescription: 'Mã định danh sinh viên dùng tra cứu điểm, ĐRL và ĐKHP',
           studentIdPlaceholder: 'ví dụ: 24110054',
-          cohortLabel: 'Khóa đào tạo *',
+          cohortLabel: 'Năm học *',
           yearOptions: {
-            '1': 'Năm 1 (Khóa K2026)',
-            '2': 'Năm 2 (Khóa K2025)',
-            '3': 'Năm 3 (Khóa K2024)',
-            '4': 'Năm 4 (Khóa K2023)',
+            '1': 'Năm 1',
+            '2': 'Năm 2',
+            '3': 'Năm 3',
+            '4': 'Năm 4',
           },
           curriculumLabel: 'Khung chương trình *',
           facultyLabel: 'Khoa / Viện đào tạo',
@@ -449,6 +467,9 @@ export default function AdminUsersPage() {
             'Tài khoản có toàn quyền truy cập phân hệ Quản trị viện, quản lý danh mục người dùng, giảng viên, môn học, lớp học phần, bảng tin thông báo và cấu hình trường học.',
           createStudentAction: '+ Tạo tài khoản sinh viên',
           createLecturerAction: '+ Tạo tài khoản giảng viên',
+          createDeanAction: '+ Tạo tài khoản trưởng khoa',
+          createdDean: 'Đã tạo tài khoản trưởng khoa thành công',
+          createDean: 'Thêm trưởng khoa',
         }
       : {
           loading: 'Loading user management',
@@ -491,6 +512,7 @@ export default function AdminUsersPage() {
           createStudentTitle: 'Add New Student Account',
           createLecturerTitle: 'Add New Lecturer Account',
           createAdminTitle: 'Add New Administrator Account',
+          createDeanTitle: 'Add New Dean Account',
           emailLabel: 'Campus Email Address',
           issuedSecretTitle: 'The system issues the temporary credential',
           issuedSecretNote:
@@ -524,10 +546,12 @@ export default function AdminUsersPage() {
           firstName: 'First name',
           lastName: 'Last name',
           roleLabel: 'System role',
+          statusFieldLabel: 'Account status',
           roles: {
             STUDENT: 'Student',
             LECTURER: 'Lecturer',
             ADMIN: 'Administrator',
+            TRUONG_KHOA: 'Dean',
             SUPER_ADMIN: 'Super administrator',
           },
           saving: 'Saving...',
@@ -546,6 +570,8 @@ export default function AdminUsersPage() {
             'Choose the account type so the system loads the matching academic profile',
           rolesShort: {
             ADMIN: 'Admin',
+            TRUONG_KHOA: 'Dean',
+            SUPER_ADMIN: 'Super admin',
           },
           accountSectionTitle: '1. Account & Sign-in Details',
           accountSectionHint: 'Sign-in identity and account security',
@@ -553,22 +579,28 @@ export default function AdminUsersPage() {
           firstNamePlaceholder: 'e.g. An',
           initialStatusLabel: 'Initial account status:',
           initialStatusActive: 'Active (ACTIVE)',
+          unsupportedRoleHint:
+            'This account holds custom roles — they are kept unchanged and cannot be edited from this form.',
+          selfStatusHint: 'You cannot change your own account status.',
+          copyFailed: 'Copy failed — write the credential down manually.',
           assignmentSectionTitle: '2. Academic Assignment Profile',
           assignmentHints: {
             STUDENT: 'Academic profile details for the enrolled student',
             LECTURER: 'Academic title and teaching department details',
+            TRUONG_KHOA: 'Official lecturer profile attached to the dean role',
             ADMIN: 'System administration permissions',
+            SUPER_ADMIN: 'Full super-administration permissions',
           },
           studentIdLabel: 'Student ID (MSSV) *',
           studentIdDescription:
             'The identifier used to look up grades, conduct, and course registration',
           studentIdPlaceholder: 'e.g. 24110054',
-          cohortLabel: 'Cohort *',
+          cohortLabel: 'Study year *',
           yearOptions: {
-            '1': 'Year 1 (Cohort K2026)',
-            '2': 'Year 2 (Cohort K2025)',
-            '3': 'Year 3 (Cohort K2024)',
-            '4': 'Year 4 (Cohort K2023)',
+            '1': 'Year 1',
+            '2': 'Year 2',
+            '3': 'Year 3',
+            '4': 'Year 4',
           },
           curriculumLabel: 'Curriculum *',
           facultyLabel: 'Faculty / Training Institute',
@@ -602,12 +634,51 @@ export default function AdminUsersPage() {
             'This account has full access to the administration modules, managing users, lecturers, courses, sections, notices, and school configuration.',
           createStudentAction: '+ Create student account',
           createLecturerAction: '+ Create lecturer account',
+          createDeanAction: '+ Create dean account',
+          createdDean: 'Dean account created successfully',
+          createDean: 'Add Dean',
         };
 
   const statusLabel = (status: string | null | undefined) =>
     messages.common.statuses[
       (status ?? 'UNKNOWN').toUpperCase() as keyof typeof messages.common.statuses
     ] ?? messages.common.statuses.UNKNOWN;
+
+  // Each held role gets its localized name; custom roles the admin console does
+  // not model stay raw instead of collapsing into a wrong default label.
+  const recordRoleLabel = (roles?: string[]) =>
+    (roles ?? [])
+      .map((role) => copy.roles[role.trim().toUpperCase() as ManagedRole] ?? role)
+      .filter(Boolean)
+      .join(', ') || '—';
+
+  const isSelfEditing = Boolean(
+    editingUser && user && (user.id === editingUser.id || user.email === editingUser.email),
+  );
+  const editingPrimaryRole = editingUser ? primaryManagedRole(editingUser.roles) : null;
+  // A record carrying only custom roles is presented read-only: omitting role
+  // from the update payload preserves what this form cannot represent.
+  const roleUnsupported = Boolean(editingUser) && editingPrimaryRole === null;
+  const recordHasStudentProfile = (record: UserRecord) =>
+    record.hasStudentProfile ?? recordRoles(record).includes('STUDENT');
+  const recordHasLecturerProfile = (record: UserRecord) =>
+    record.hasLecturerProfile ?? recordRoles(record).includes('LECTURER');
+  const editNeedsStudentFields = Boolean(
+    editingUser && !roleUnsupported && formData.role === 'STUDENT' && !recordHasStudentProfile(editingUser),
+  );
+  const editNeedsLecturerFields = Boolean(
+    editingUser &&
+      !roleUnsupported &&
+      usesLecturerProfileRole(formData.role) &&
+      !recordHasLecturerProfile(editingUser),
+  );
+  const showAssignmentColumn =
+    !roleUnsupported &&
+    (!editingUser ||
+      formData.role === 'ADMIN' ||
+      formData.role === 'SUPER_ADMIN' ||
+      editNeedsStudentFields ||
+      editNeedsLecturerFields);
 
   if (isAuthLoading || isLoggingOut || !canAccess) {
     return <LoadingState label={copy.loading} className="m-8" />;
@@ -622,6 +693,7 @@ export default function AdminUsersPage() {
       firstName: '',
       lastName: '',
       role,
+      status: 'ACTIVE',
       studentId: '',
       year: '1',
       curriculumId: curricula[0]?.id || '',
@@ -653,7 +725,8 @@ export default function AdminUsersPage() {
       email: userRecord.email,
       firstName: userRecord.firstName,
       lastName: userRecord.lastName,
-      role: primaryRole(userRecord.roles),
+      role: primaryManagedRole(userRecord.roles) ?? defaultRole,
+      status: (userRecord.status ?? '').trim().toUpperCase() || 'ACTIVE',
       studentId: '',
       year: '1',
       curriculumId: curricula[0]?.id || '',
@@ -773,7 +846,7 @@ export default function AdminUsersPage() {
     try {
       if (editingUser) {
         const isSelf = Boolean(user && (user.id === editingUser.id || user.email === editingUser.email));
-        if (isSelf && formData.role !== primaryRole(editingUser.roles)) {
+        if (isSelf && !roleUnsupported && formData.role !== editingPrimaryRole) {
           const selfRoleMsg =
             locale === 'vi'
               ? 'Không thể tự thay đổi vai trò của chính mình.'
@@ -784,20 +857,51 @@ export default function AdminUsersPage() {
           return;
         }
 
-        await usersApi.update(editingUser.id, {
+        const nextFieldErrors: Record<string, string> = {};
+        if (editNeedsStudentFields) {
+          if (!formData.studentId.trim()) nextFieldErrors.studentId = copy.errors.studentIdRequired;
+          if (!(formData.curriculumId || curricula[0]?.id)) nextFieldErrors.curriculumId = copy.errors.curriculumRequired;
+        }
+        if (editNeedsLecturerFields) {
+          if (!formData.employeeId.trim()) nextFieldErrors.employeeId = copy.errors.employeeIdRequired;
+          if (!(formData.departmentId || departments[0]?.id)) nextFieldErrors.departmentId = copy.errors.departmentRequired;
+        }
+        if (Object.keys(nextFieldErrors).length > 0) {
+          setFieldErrors(nextFieldErrors);
+          setIsSaving(false);
+          return;
+        }
+        setFieldErrors({});
+
+        const payload: Record<string, any> = {
           firstName: formData.firstName.trim(),
           lastName: formData.lastName.trim(),
-          role: formData.role,
-        });
+          status: formData.status,
+        };
+        // A custom-only role set is not representable in this editor: omit the
+        // field so the update preserves the record's roles untouched.
+        if (!roleUnsupported) {
+          payload.role = formData.role;
+        }
+        if (editNeedsStudentFields) {
+          payload.studentId = formData.studentId.trim();
+          payload.year = formData.year;
+          payload.curriculumId = formData.curriculumId || curricula[0]?.id || '';
+        }
+        if (editNeedsLecturerFields) {
+          payload.employeeId = formData.employeeId.trim();
+          payload.departmentId = formData.departmentId || departments[0]?.id || '';
+        }
+        await usersApi.update(editingUser.id, payload);
         toast.success(copy.updated);
       } else {
         const nextFieldErrors: Record<string, string> = {};
         if (formData.role === 'STUDENT') {
           if (!formData.studentId.trim()) nextFieldErrors.studentId = copy.errors.studentIdRequired;
-          if (!formData.curriculumId) nextFieldErrors.curriculumId = copy.errors.curriculumRequired;
-        } else if (formData.role === 'LECTURER') {
+          if (!(formData.curriculumId || curricula[0]?.id)) nextFieldErrors.curriculumId = copy.errors.curriculumRequired;
+        } else if (usesLecturerProfileRole(formData.role)) {
           if (!formData.employeeId.trim()) nextFieldErrors.employeeId = copy.errors.employeeIdRequired;
-          if (!formData.departmentId) nextFieldErrors.departmentId = copy.errors.departmentRequired;
+          if (!(formData.departmentId || departments[0]?.id)) nextFieldErrors.departmentId = copy.errors.departmentRequired;
         }
         if (Object.keys(nextFieldErrors).length > 0) {
           setFieldErrors(nextFieldErrors);
@@ -822,13 +926,13 @@ export default function AdminUsersPage() {
           // departmentId is deliberately NOT sent: the DTO accepts it but the
           // student profile writer ignores it, so collecting a faculty choice
           // here would silently discard the admin's input.
-        } else if (formData.role === 'LECTURER') {
+        } else if (usesLecturerProfileRole(formData.role)) {
           // academicTitle and specialization are not fields of the user-create
           // DTO: they live on the lecturer directory record maintained by the
           // Academic Office, so the disabled inputs above must not pretend the
           // value travels with this account.
           payload.employeeId = formData.employeeId.trim();
-          payload.departmentId = formData.departmentId;
+          payload.departmentId = formData.departmentId || departments[0]?.id || '';
         }
 
         const created = await usersApi.create(payload);
@@ -840,6 +944,8 @@ export default function AdminUsersPage() {
           toast.success(copy.createdStudent);
         } else if (formData.role === 'LECTURER') {
           toast.success(copy.createdLecturer);
+        } else if (formData.role === 'TRUONG_KHOA') {
+          toast.success(copy.createdDean);
         } else {
           toast.success(copy.createdUser);
         }
@@ -881,7 +987,9 @@ export default function AdminUsersPage() {
       ? copy.createStudentTitle
       : formData.role === 'LECTURER'
         ? copy.createLecturerTitle
-        : copy.createAdminTitle;
+        : formData.role === 'TRUONG_KHOA'
+          ? copy.createDeanTitle
+          : copy.createAdminTitle;
 
   return (
     <AdminFrame
@@ -905,15 +1013,26 @@ export default function AdminUsersPage() {
             {copy.createLecturer}
           </Button>
           {isSuperAdmin ? (
-            <Button
-              onClick={() => openCreate('ADMIN')}
-              variant="ghost"
-              size="sm"
-              className="text-xs text-muted-foreground hover:text-foreground"
-            >
-              <Plus className="mr-1 h-3.5 w-3.5" />
-              {copy.roles.ADMIN}
-            </Button>
+            <>
+              <Button
+                onClick={() => openCreate('ADMIN')}
+                variant="ghost"
+                size="sm"
+                className="text-xs text-muted-foreground hover:text-foreground"
+              >
+                <Plus className="mr-1 h-3.5 w-3.5" />
+                {copy.roles.ADMIN}
+              </Button>
+              <Button
+                onClick={() => openCreate('TRUONG_KHOA')}
+                variant="ghost"
+                size="sm"
+                className="text-xs text-muted-foreground hover:text-foreground"
+              >
+                <Plus className="mr-1 h-3.5 w-3.5" />
+                {copy.createDean}
+              </Button>
+            </>
           ) : null}
         </div>
       }
@@ -980,6 +1099,28 @@ export default function AdminUsersPage() {
               >
                 <ShieldCheck className="h-3.5 w-3.5" />
                 {copy.roles.ADMIN}
+              </RoleTabButton>
+              <RoleTabButton
+                active={roleFilter === 'TRUONG_KHOA'}
+                activeClassName="bg-status-success text-status-success-foreground shadow-xs hover:bg-status-success/90"
+                onClick={() => {
+                  setRoleFilter('TRUONG_KHOA');
+                  setPage(1);
+                }}
+              >
+                <School className="h-3.5 w-3.5" />
+                {copy.roles.TRUONG_KHOA}
+              </RoleTabButton>
+              <RoleTabButton
+                active={roleFilter === 'SUPER_ADMIN'}
+                activeClassName="bg-status-warning text-status-warning-foreground shadow-xs hover:bg-status-warning/90"
+                onClick={() => {
+                  setRoleFilter('SUPER_ADMIN');
+                  setPage(1);
+                }}
+              >
+                <ShieldCheck className="h-3.5 w-3.5" />
+                {copy.roles.SUPER_ADMIN}
               </RoleTabButton>
             </div>
 
@@ -1065,7 +1206,7 @@ export default function AdminUsersPage() {
                     </StatusPill>
                   </div>
                   <div className="flex items-center justify-between text-xs text-muted-foreground">
-                    <span className="font-medium text-foreground">{roleLabel(record.roles)}</span>
+                    <span className="font-medium text-foreground">{recordRoleLabel(record.roles)}</span>
                     <span>{formatDate(record.createdAt)}</span>
                   </div>
                   <AdminRowActions>
@@ -1121,7 +1262,7 @@ export default function AdminUsersPage() {
                 </thead>
                 <tbody className="divide-y divide-border/60">
                   {users.map((record) => {
-                    const primary = primaryRole(record.roles);
+                    const primary = primaryManagedRole(record.roles);
                     return (
                       <tr key={record.id} className="hover:bg-secondary/20 transition-colors">
                         <td className="px-4 py-3.5">
@@ -1138,15 +1279,15 @@ export default function AdminUsersPage() {
                           </StatusPill>
                         </td>
                         <td className="px-4 py-3.5">
-                          <span className={`inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-xs font-medium ${roleToneClass(primary)}`}>
+                          <span className={`inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-xs font-medium ${roleToneClass(primary ?? '')}`}>
                             {primary === 'STUDENT' ? (
                               <GraduationCap className="h-3 w-3" />
-                            ) : primary === 'LECTURER' ? (
+                            ) : primary === 'LECTURER' || primary === 'TRUONG_KHOA' ? (
                               <School className="h-3 w-3" />
                             ) : (
                               <ShieldCheck className="h-3 w-3" />
                             )}
-                            {copy.roles[primary]}
+                            {primary ? copy.roles[primary] : recordRoleLabel(record.roles)}
                           </span>
                         </td>
                         <td className="px-4 py-3.5 text-muted-foreground text-xs">
@@ -1262,6 +1403,18 @@ export default function AdminUsersPage() {
                   <RoleTabButton
                     className="rounded-md font-semibold"
                     inactiveClassName="bg-transparent text-muted-foreground hover:bg-transparent hover:text-foreground"
+                    active={formData.role === 'TRUONG_KHOA'}
+                    activeClassName={roleSolidClass('TRUONG_KHOA')}
+                    onClick={() => setFormData((c) => ({ ...c, role: 'TRUONG_KHOA' }))}
+                    disabled={!isSuperAdmin}
+                    title={!isSuperAdmin ? copy.errors.adminReserved : undefined}
+                  >
+                    <School className="h-3.5 w-3.5" />
+                    {copy.rolesShort.TRUONG_KHOA}
+                  </RoleTabButton>
+                  <RoleTabButton
+                    className="rounded-md font-semibold"
+                    inactiveClassName="bg-transparent text-muted-foreground hover:bg-transparent hover:text-foreground"
                     active={formData.role === 'ADMIN'}
                     activeClassName={roleSolidClass('ADMIN')}
                     onClick={() => setFormData((c) => ({ ...c, role: 'ADMIN' }))}
@@ -1270,6 +1423,18 @@ export default function AdminUsersPage() {
                   >
                     <ShieldCheck className="h-3.5 w-3.5" />
                     {copy.rolesShort.ADMIN}
+                  </RoleTabButton>
+                  <RoleTabButton
+                    className="rounded-md font-semibold"
+                    inactiveClassName="bg-transparent text-muted-foreground hover:bg-transparent hover:text-foreground"
+                    active={formData.role === 'SUPER_ADMIN'}
+                    activeClassName={roleSolidClass('SUPER_ADMIN')}
+                    onClick={() => setFormData((c) => ({ ...c, role: 'SUPER_ADMIN' }))}
+                    disabled={!isSuperAdmin}
+                    title={!isSuperAdmin ? copy.errors.adminReserved : undefined}
+                  >
+                    <ShieldCheck className="h-3.5 w-3.5" />
+                    {copy.rolesShort.SUPER_ADMIN}
                   </RoleTabButton>
                 </div>
               </div>
@@ -1301,7 +1466,7 @@ export default function AdminUsersPage() {
                   placeholder={
                     formData.role === 'STUDENT'
                       ? 'sv.nguyenvana@student.ute.edu.vn'
-                      : formData.role === 'LECTURER'
+                      : usesLecturerProfileRole(formData.role)
                         ? 'gv.tranvanb@ute.edu.vn'
                         : 'admin.hoangdung@ute.edu.vn'
                   }
@@ -1342,22 +1507,86 @@ export default function AdminUsersPage() {
                 </AdminFormField>
               </div>
 
-              <div className="rounded-lg border border-border/60 bg-secondary/15 p-3 text-xs">
-                <div className="flex items-center justify-between">
-                  <span className="text-muted-foreground">{copy.initialStatusLabel}</span>
-                  <StatusPill tone="success" icon={<CheckCircle2 className="h-3 w-3" />} className="px-2 font-semibold">
-                    {copy.initialStatusActive}
-                  </StatusPill>
+              {editingUser ? (
+                <>
+                  <AdminFormField
+                    label={copy.roleLabel}
+                    description={
+                      isSelfEditing
+                        ? (locale === 'vi'
+                            ? 'Không thể tự thay đổi vai trò tài khoản của chính mình.'
+                            : 'You cannot change your own system role.')
+                        : roleUnsupported
+                          ? copy.unsupportedRoleHint
+                          : undefined
+                    }
+                  >
+                    <Select
+                      value={roleUnsupported ? '' : formData.role}
+                      disabled={isSelfEditing || roleUnsupported}
+                      onChange={(e) => setFormData((c) => ({ ...c, role: e.target.value as ManagedRole }))}
+                      options={(() => {
+                        if (roleUnsupported) {
+                          return [{ value: '', label: recordRoleLabel(editingUser.roles) }];
+                        }
+                        const options = [
+                          { value: 'STUDENT', label: copy.roles.STUDENT },
+                          { value: 'LECTURER', label: copy.roles.LECTURER },
+                          ...(isSuperAdmin
+                            ? [
+                                { value: 'ADMIN', label: copy.roles.ADMIN },
+                                { value: 'TRUONG_KHOA', label: copy.roles.TRUONG_KHOA },
+                                { value: 'SUPER_ADMIN', label: copy.roles.SUPER_ADMIN },
+                              ]
+                            : []),
+                        ];
+                        if (editingPrimaryRole && !options.some((o) => o.value === editingPrimaryRole)) {
+                          options.unshift({ value: editingPrimaryRole, label: copy.roles[editingPrimaryRole] });
+                        }
+                        return options;
+                      })()}
+                    />
+                  </AdminFormField>
+                  <AdminFormField
+                    label={copy.statusFieldLabel}
+                    description={isSelfEditing ? copy.selfStatusHint : undefined}
+                  >
+                    <Select
+                      value={formData.status}
+                      disabled={isSelfEditing}
+                      onChange={(e) => setFormData((c) => ({ ...c, status: e.target.value }))}
+                      options={[
+                        ...(ACCOUNT_STATUSES.includes(
+                          formData.status as (typeof ACCOUNT_STATUSES)[number],
+                        )
+                          ? []
+                          : [{ value: formData.status, label: statusLabel(formData.status) }]),
+                        ...ACCOUNT_STATUSES.map((status) => ({
+                          value: status,
+                          label: statusLabel(status),
+                        })),
+                      ]}
+                    />
+                  </AdminFormField>
+                </>
+              ) : (
+                <div className="rounded-lg border border-border/60 bg-secondary/15 p-3 text-xs">
+                  <div className="flex items-center justify-between">
+                    <span className="text-muted-foreground">{copy.initialStatusLabel}</span>
+                    <StatusPill tone="success" icon={<CheckCircle2 className="h-3 w-3" />} className="px-2 font-semibold">
+                      {copy.initialStatusActive}
+                    </StatusPill>
+                  </div>
                 </div>
-              </div>
+              )}
             </div>
 
             {/* CỘT 2: HỒ SƠ HỌC VỤ CHUYÊN BIỆT THEO VAI TRÒ.
-                The update endpoint only carries name/role/status, and openEdit
-                has no profile values to echo, so the profile-fields section is
-                hidden while a record is being edited: a required mark the form
-                can neither fill honestly nor submit is worse than no field. */}
-            {editingUser && (formData.role === 'STUDENT' || formData.role === 'LECTURER') ? null : (
+                On edit the profile section only reappears when the selected
+                role needs a profile the record lacks (per hasStudentProfile /
+                hasLecturerProfile): an existing official profile is never
+                re-typed or reassigned from this form. */}
+            {!showAssignmentColumn ? null : (
             <div className="space-y-4 rounded-xl border border-border/80 bg-card p-4">
               {/* Header Cột 2 */}
               <div className="flex items-center justify-between border-b border-border/70 pb-3">
@@ -1368,7 +1597,7 @@ export default function AdminUsersPage() {
                   )}>
                     {formData.role === 'STUDENT' ? (
                       <GraduationCap className="h-4 w-4" />
-                    ) : formData.role === 'LECTURER' ? (
+                    ) : usesLecturerProfileRole(formData.role) ? (
                       <School className="h-4 w-4" />
                     ) : (
                       <ShieldCheck className="h-4 w-4" />
@@ -1379,11 +1608,7 @@ export default function AdminUsersPage() {
                       {copy.assignmentSectionTitle}
                     </h4>
                     <p className="text-xs text-muted-foreground">
-                      {formData.role === 'STUDENT'
-                        ? copy.assignmentHints.STUDENT
-                        : formData.role === 'LECTURER'
-                          ? copy.assignmentHints.LECTURER
-                          : copy.assignmentHints.ADMIN}
+                      {copy.assignmentHints[formData.role]}
                     </p>
                   </div>
                 </div>
@@ -1392,16 +1617,12 @@ export default function AdminUsersPage() {
                   'rounded-md px-2.5 py-0.5 text-xs font-semibold',
                   roleToneClass(formData.role),
                 )}>
-                  {formData.role === 'STUDENT'
-                    ? copy.roles.STUDENT
-                    : formData.role === 'LECTURER'
-                      ? copy.roles.LECTURER
-                      : copy.roles.ADMIN}
+                  {copy.roles[formData.role]}
                 </span>
               </div>
 
               {/* TRƯỜNG HỢP: SINH VIÊN */}
-              {formData.role === 'STUDENT' && (
+              {formData.role === 'STUDENT' && (!editingUser || editNeedsStudentFields) && (
                 <div className="space-y-3.5">
                   <AdminFormField
                     label={copy.studentIdLabel}
@@ -1463,8 +1684,8 @@ export default function AdminUsersPage() {
                 </div>
               )}
 
-              {/* TRƯỜNG HỢP: GIẢNG VIÊN */}
-              {formData.role === 'LECTURER' && (
+              {/* TRƯỜNG HỢP: GIẢNG VIÊN / TRƯỞNG KHOA */}
+              {usesLecturerProfileRole(formData.role) && (!editingUser || editNeedsLecturerFields) && (
                 <div className="space-y-3.5">
                   <AdminFormField
                     label={copy.employeeIdLabel}
@@ -1532,7 +1753,7 @@ export default function AdminUsersPage() {
               )}
 
               {/* TRƯỜNG HỢP: QUẢN TRỊ VIÊN */}
-              {formData.role !== 'STUDENT' && formData.role !== 'LECTURER' && (
+              {(formData.role === 'ADMIN' || formData.role === 'SUPER_ADMIN') && (
                 <div className="space-y-4">
                   <div className="rounded-xl border border-role-admin/25 bg-role-admin/10 p-4 space-y-2">
                     <div className="flex items-center gap-2 text-role-admin">
@@ -1543,36 +1764,6 @@ export default function AdminUsersPage() {
                       {copy.adminPermissionsDescription}
                     </p>
                   </div>
-
-                  {(() => {
-                    const isSelfEditing = Boolean(editingUser && user && (user.id === editingUser.id || user.email === editingUser.email));
-                    return (
-                      <AdminFormField
-                        label={copy.roleLabel}
-                        description={
-                          isSelfEditing
-                            ? (locale === 'vi'
-                                ? 'Không thể tự thay đổi vai trò tài khoản của chính mình.'
-                                : 'You cannot change your own system role.')
-                            : undefined
-                        }
-                      >
-                        <Select
-                          value={formData.role}
-                          disabled={isSelfEditing}
-                          onChange={(e) => setFormData((c) => ({ ...c, role: e.target.value as ManagedRole }))}
-                          options={[
-                            { value: 'ADMIN', label: copy.roles.ADMIN },
-                            ...(isSuperAdmin
-                              ? [{ value: 'SUPER_ADMIN', label: copy.roles.SUPER_ADMIN }]
-                              : []),
-                            { value: 'STUDENT', label: copy.roles.STUDENT },
-                            { value: 'LECTURER', label: copy.roles.LECTURER },
-                          ]}
-                        />
-                      </AdminFormField>
-                    );
-                  })()}
                 </div>
               )}
             </div>
@@ -1592,7 +1783,9 @@ export default function AdminUsersPage() {
                     ? copy.createStudentAction
                     : formData.role === 'LECTURER'
                       ? copy.createLecturerAction
-                      : copy.createUser}
+                      : formData.role === 'TRUONG_KHOA'
+                        ? copy.createDeanAction
+                        : copy.createUser}
             </Button>
           </AdminDialogFooter>
         </form>
@@ -1623,9 +1816,17 @@ export default function AdminUsersPage() {
                 <Button
                   type="button"
                   variant="outline"
-                  onClick={() => {
-                    void navigator.clipboard?.writeText(issuedCredential.secret);
-                    toast.success(copy.copied);
+                  onClick={async () => {
+                    if (!navigator.clipboard) {
+                      toast.error(copy.copyFailed);
+                      return;
+                    }
+                    try {
+                      await navigator.clipboard.writeText(issuedCredential.secret);
+                      toast.success(copy.copied);
+                    } catch {
+                      toast.error(copy.copyFailed);
+                    }
                   }}
                 >
                   {copy.copyAction}

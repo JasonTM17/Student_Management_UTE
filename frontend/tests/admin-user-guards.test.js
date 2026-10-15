@@ -46,3 +46,37 @@ test('role names are normalized before matching', async () => {
   assert.equal(isPrivilegedAccountTarget([' truong_khoa ']), true);
   assert.equal(isPrivilegedAccountTarget(['admin']), true);
 });
+
+test('custom non-system roles are privileged targets like the reserved roles', async () => {
+  const { isPrivilegedAccountTarget } = await loadGuardsModule();
+  assert.equal(isPrivilegedAccountTarget(['AUDITOR']), true);
+  assert.equal(isPrivilegedAccountTarget(['STUDENT', 'AUDITOR']), true);
+  assert.equal(isPrivilegedAccountTarget(['']), false);
+  assert.equal(isPrivilegedAccountTarget(['  ']), false);
+});
+
+test('primaryManagedRole picks the highest managed role regardless of array order', async () => {
+  const { primaryManagedRole } = await loadGuardsModule();
+  assert.equal(primaryManagedRole(['STUDENT']), 'STUDENT');
+  assert.equal(primaryManagedRole(['LECTURER']), 'LECTURER');
+  assert.equal(primaryManagedRole(['LECTURER', 'TRUONG_KHOA']), 'TRUONG_KHOA');
+  assert.equal(primaryManagedRole(['TRUONG_KHOA', 'LECTURER']), 'TRUONG_KHOA');
+  assert.equal(primaryManagedRole(['LECTURER', 'ADMIN']), 'ADMIN');
+  assert.equal(primaryManagedRole(['STUDENT', 'ADMIN', 'SUPER_ADMIN']), 'SUPER_ADMIN');
+  assert.equal(primaryManagedRole(['ADMIN', 'SUPER_ADMIN']), 'SUPER_ADMIN');
+});
+
+test('primaryManagedRole normalizes case and whitespace', async () => {
+  const { primaryManagedRole } = await loadGuardsModule();
+  assert.equal(primaryManagedRole([' truong_khoa ', 'lecturer']), 'TRUONG_KHOA');
+  assert.equal(primaryManagedRole(['admin']), 'ADMIN');
+});
+
+test('primaryManagedRole returns null for custom-only or empty role sets', async () => {
+  const { primaryManagedRole } = await loadGuardsModule();
+  assert.equal(primaryManagedRole(['AUDITOR']), null);
+  assert.equal(primaryManagedRole(['AUDITOR', 'ROLE_X']), null);
+  assert.equal(primaryManagedRole([]), null);
+  assert.equal(primaryManagedRole(null), null);
+  assert.equal(primaryManagedRole(undefined), null);
+});

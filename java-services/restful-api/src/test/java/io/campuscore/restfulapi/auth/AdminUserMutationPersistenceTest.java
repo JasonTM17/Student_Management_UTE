@@ -21,6 +21,8 @@ import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.MethodSource;
 import org.mockito.Mockito;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
@@ -433,6 +435,675 @@ class AdminUserMutationPersistenceTest {
                 .isTrue();
     }
 
+    @Test
+    void createFacultyHeadAssignsTheLecturerDeanPairAndOfficialProfile() throws Exception {
+        // V89 contract: TRUONG_KHOA is a job title on a lecturer account, so the
+        // issuance must land the LECTURER+TRUONG_KHOA pair and the official
+        // lecturer profile in one account — not a dean without a profile.
+        MvcResult result = mvc.perform(post("/api/v1/users")
+                        .with(superJwt())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "email":"issued.dean@campuscore.edu",
+                                  "firstName":"Issued",
+                                  "lastName":"Dean",
+                                  "role":"TRUONG_KHOA",
+                                  "employeeId":"GV-DEAN-001",
+                                  "departmentId":"department-demo"
+                                }
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.temporaryPassword").isNotEmpty())
+                .andExpect(jsonPath("$.roles", org.hamcrest.Matchers.containsInAnyOrder("LECTURER", "TRUONG_KHOA")))
+                .andExpect(jsonPath("$.hasLecturerProfile").value(true))
+                .andExpect(jsonPath("$.hasStudentProfile").value(false))
+                .andReturn();
+
+        String userId = objectMapper.readTree(result.getResponse().getContentAsString()).path("id").asText();
+        assertThat(roleNames(userId)).containsExactlyInAnyOrder("LECTURER", "TRUONG_KHOA");
+        assertThat(jdbc.queryForObject(
+                "SELECT \"employeeId\" FROM \"campuscore_auth\".\"Lecturer\" WHERE \"userId\" = ?",
+                String.class, userId))
+                .isEqualTo("GV-DEAN-001");
+        assertThat(jdbc.queryForObject(
+                "SELECT COUNT(*) FROM \"campuscore_auth\".\"Student\" WHERE \"userId\" = ?",
+                Integer.class, userId))
+                .isZero();
+    }
+
+    @Test
+    void createFacultyHeadRequiresTheSameOfficialFieldsAsALecturer() throws Exception {
+        // No invented or defaulted official identifiers: the dean profile is the
+        // lecturer profile, so the same employeeId/departmentId requirements hold.
+        mvc.perform(post("/api/v1/users")
+                        .with(superJwt())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"email":"dean.nofields@campuscore.edu","firstName":"No","lastName":"Fields","role":"TRUONG_KHOA"}
+                                """))
+                .andExpect(status().isBadRequest());
+
+        assertThat(jdbc.queryForObject(
+                "SELECT COUNT(*) FROM \"campuscore_auth\".\"User\" WHERE \"email\" = 'dean.nofields@campuscore.edu'",
+                Integer.class))
+                .isZero();
+    }
+
+    @Test
+    void createFacultyHeadRejectsDuplicateEmployeeIdAndInactiveDepartment() throws Exception {
+        jdbc.update("INSERT INTO \"campuscore_auth\".\"Lecturer\""
+                + " (\"id\", \"userId\", \"departmentId\", \"employeeId\", \"isActive\")"
+                + " VALUES ('taken-lecturer', 'third-user', 'department-demo', 'GV-TAKEN', TRUE)");
+
+        mvc.perform(post("/api/v1/users")
+                        .with(superJwt())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"email":"dean.dup@campuscore.edu","firstName":"Dup","lastName":"Dean","role":"TRUONG_KHOA","employeeId":"GV-TAKEN","departmentId":"department-demo"}
+                                """))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("EMPLOYEE_ID_EXISTS"));
+
+        mvc.perform(post("/api/v1/users")
+                        .with(superJwt())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"email":"dean.inactive@campuscore.edu","firstName":"Inact","lastName":"Dean","role":"TRUONG_KHOA","employeeId":"GV-DEAN-9","departmentId":"department-inactive"}
+                                """))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("VALIDATION_ERROR"));
+    }
+
+    @Test
+    void promotingLecturerToFacultyHeadKeepsTheSameOfficialProfile() throws Exception {
+        insertUser("lect-user", "lect@campuscore.edu", "Lect", "User");
+        insertUserRole("lect-user-role", "lect-user", "role-lecturer");
+        jdbc.update("INSERT INTO \"campuscore_auth\".\"Lecturer\""
+                + " (\"id\", \"userId\", \"departmentId\", \"employeeId\", \"isActive\")"
+                + " VALUES ('lect-keep-profile', 'lect-user', 'department-demo', 'GV-KEEP', TRUE)");
+
+        mvc.perform(put("/api/v1/users/lect-user")
+                        .with(superJwt())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"role\":\"TRUONG_KHOA\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.roles", org.hamcrest.Matchers.containsInAnyOrder("LECTURER", "TRUONG_KHOA")));
+
+        assertThat(roleNames("lect-user")).containsExactlyInAnyOrder("LECTURER", "TRUONG_KHOA");
+        // The promotion must not mint a second profile or rewrite the official
+        // identifiers: same row id, same employeeId and department.
+        assertThat(jdbc.queryForList(
+                "SELECT \"id\" FROM \"campuscore_auth\".\"Lecturer\" WHERE \"userId\" = 'lect-user'",
+                String.class))
+                .containsExactly("lect-keep-profile");
+        assertThat(jdbc.queryForObject(
+                "SELECT \"employeeId\" FROM \"campuscore_auth\".\"Lecturer\" WHERE \"userId\" = 'lect-user'",
+                String.class))
+                .isEqualTo("GV-KEEP");
+    }
+
+    @Test
+    void demotingDeanBackToLecturerRevokesSessionsAndKeepsTheProfile() throws Exception {
+        insertUser("dean-user", "dean@campuscore.edu", "Dean", "User");
+        insertUserRole("dean-user-tk", "dean-user", "role-truong-khoa");
+        insertUserRole("dean-user-lect", "dean-user", "role-lecturer");
+        jdbc.update("INSERT INTO \"campuscore_auth\".\"Lecturer\""
+                + " (\"id\", \"userId\", \"departmentId\", \"employeeId\", \"isActive\")"
+                + " VALUES ('dean-keep-profile', 'dean-user', 'department-demo', 'GV-DEAN', TRUE)");
+        jdbc.update("INSERT INTO \"campuscore_auth\".\"Session\""
+                + " (\"id\", \"userId\", \"refreshToken\", \"expiresAt\", \"createdAt\")"
+                + " VALUES ('dean-session', 'dean-user', 'hashed',"
+                + " CURRENT_TIMESTAMP + INTERVAL '1' HOUR, CURRENT_TIMESTAMP)");
+
+        // The account already holds LECTURER, but the dean pair is genuinely
+        // changing, so refresh sessions must still be cut.
+        mvc.perform(put("/api/v1/users/dean-user")
+                        .with(superJwt())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"role\":\"LECTURER\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.roles", org.hamcrest.Matchers.contains("LECTURER")));
+
+        assertThat(roleNames("dean-user")).containsExactly("LECTURER");
+        assertThat(jdbc.queryForList(
+                "SELECT \"id\" FROM \"campuscore_auth\".\"Lecturer\" WHERE \"userId\" = 'dean-user'",
+                String.class))
+                .containsExactly("dean-keep-profile");
+        assertThat(jdbc.queryForObject(
+                "SELECT COUNT(*) FROM \"campuscore_auth\".\"Session\" WHERE \"userId\" = 'dean-user'",
+                Integer.class))
+                .isZero();
+    }
+
+    @Test
+    void ordinaryAdminEchoingTheUnchangedDeanRoleLeavesTheProfileUntouched() throws Exception {
+        insertUser("dean-echo", "dean.echo@campuscore.edu", "Dean", "Echo");
+        insertUserRole("dean-echo-tk", "dean-echo", "role-truong-khoa");
+        insertUserRole("dean-echo-lect", "dean-echo", "role-lecturer");
+        jdbc.update("INSERT INTO \"campuscore_auth\".\"Lecturer\""
+                + " (\"id\", \"userId\", \"departmentId\", \"employeeId\", \"isActive\")"
+                + " VALUES ('dean-echo-profile', 'dean-echo', 'department-demo', 'GV-ECHO', TRUE)");
+        jdbc.update("INSERT INTO \"campuscore_auth\".\"Session\""
+                + " (\"id\", \"userId\", \"refreshToken\", \"expiresAt\", \"createdAt\")"
+                + " VALUES ('dean-echo-session', 'dean-echo', 'hashed',"
+                + " CURRENT_TIMESTAMP + INTERVAL '1' HOUR, CURRENT_TIMESTAMP)");
+
+        // Per AdminRoleCeilingTest the unchanged-role echo is allowed so other
+        // fields stay savable; it must not destroy the lecturer profile or cut
+        // sessions the way a real role change does.
+        mvc.perform(put("/api/v1/users/dean-echo")
+                        .with(adminJwt())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"role\":\"TRUONG_KHOA\",\"firstName\":\"Renamed\"}"))
+                .andExpect(status().isOk());
+
+        assertThat(roleNames("dean-echo")).containsExactlyInAnyOrder("LECTURER", "TRUONG_KHOA");
+        assertThat(jdbc.queryForList(
+                "SELECT \"id\" FROM \"campuscore_auth\".\"Lecturer\" WHERE \"userId\" = 'dean-echo'",
+                String.class))
+                .containsExactly("dean-echo-profile");
+        assertThat(jdbc.queryForObject(
+                "SELECT COUNT(*) FROM \"campuscore_auth\".\"Session\" WHERE \"userId\" = 'dean-echo'",
+                Integer.class))
+                .isEqualTo(1);
+        assertThat(jdbc.queryForObject(
+                "SELECT \"firstName\" FROM \"campuscore_auth\".\"User\" WHERE \"id\" = 'dean-echo'",
+                String.class))
+                .isEqualTo("Renamed");
+    }
+
+    @Test
+    void typedUpdateCreatesTheTargetProfileOnRoleConversion() throws Exception {
+        insertUser("convert-student", "convert.student@campuscore.edu", "Convert", "Student");
+        insertUserRole("convert-student-role", "convert-student", "role-admin");
+        mvc.perform(put("/api/v1/users/convert-student")
+                        .with(superJwt())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"role":"STUDENT","studentId":"SV-CONV-1","curriculumId":"curriculum-demo","year":1}
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.hasStudentProfile").value(true));
+        assertThat(jdbc.queryForObject(
+                "SELECT \"studentId\" FROM \"campuscore_auth\".\"Student\" WHERE \"userId\" = 'convert-student'",
+                String.class))
+                .isEqualTo("SV-CONV-1");
+        assertThat(roleNames("convert-student")).containsExactly("STUDENT");
+
+        insertUser("convert-lecturer", "convert.lecturer@campuscore.edu", "Convert", "Lecturer");
+        insertUserRole("convert-lecturer-role", "convert-lecturer", "role-admin");
+        mvc.perform(put("/api/v1/users/convert-lecturer")
+                        .with(superJwt())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"role":"LECTURER","employeeId":"GV-CONV-1","departmentId":"department-demo"}
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.hasLecturerProfile").value(true));
+        assertThat(jdbc.queryForObject(
+                "SELECT \"employeeId\" FROM \"campuscore_auth\".\"Lecturer\" WHERE \"userId\" = 'convert-lecturer'",
+                String.class))
+                .isEqualTo("GV-CONV-1");
+        assertThat(roleNames("convert-lecturer")).containsExactly("LECTURER");
+    }
+
+    @Test
+    void roleConversionIsBlockedWhenTheObsoleteProfileCarriesHistory() throws Exception {
+        insertUser("history-student", "history.student@campuscore.edu", "History", "Student");
+        insertUserRole("history-student-role", "history-student", "role-student");
+        jdbc.update("INSERT INTO \"campuscore_auth\".\"Student\""
+                + " (\"id\", \"userId\", \"studentId\", \"curriculumId\", \"year\", \"status\","
+                + " \"admissionDate\", \"createdAt\", \"updatedAt\")"
+                + " VALUES ('history-student-profile', 'history-student', 'SV-HIST-1', 'curriculum-demo',"
+                + " 3, 'ACTIVE', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)");
+        jdbc.update("INSERT INTO academic.conduct_semester_score (id, student_id)"
+                + " VALUES ('conduct-row-1', 'history-student-profile')");
+
+        // The student profile owns a conduct record. Deleting it would erase
+        // that history, so the conversion must refuse and leave everything —
+        // role, profile, and conduct row — exactly as it was.
+        mvc.perform(put("/api/v1/users/history-student")
+                        .with(superJwt())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"role":"LECTURER","employeeId":"GV-HIST-1","departmentId":"department-demo"}
+                                """))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("PROFILE_HAS_HISTORY"));
+        assertThat(roleNames("history-student")).containsExactly("STUDENT");
+        assertThat(jdbc.queryForObject(
+                "SELECT COUNT(*) FROM \"campuscore_auth\".\"Student\" WHERE \"id\" = 'history-student-profile'",
+                Integer.class))
+                .isEqualTo(1);
+        assertThat(jdbc.queryForObject(
+                "SELECT COUNT(*) FROM academic.conduct_semester_score WHERE student_id = 'history-student-profile'",
+                Integer.class))
+                .isEqualTo(1);
+
+        // A profile with no history converts normally.
+        mvc.perform(put("/api/v1/users/history-student")
+                        .with(superJwt())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"role\":\"ADMIN\"}"))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("PROFILE_HAS_HISTORY"));
+
+        insertUser("clean-student", "clean.student@campuscore.edu", "Clean", "Student");
+        insertUserRole("clean-student-role", "clean-student", "role-student");
+        jdbc.update("INSERT INTO \"campuscore_auth\".\"Student\""
+                + " (\"id\", \"userId\", \"studentId\", \"curriculumId\", \"year\", \"status\","
+                + " \"admissionDate\", \"createdAt\", \"updatedAt\")"
+                + " VALUES ('clean-student-profile', 'clean-student', 'SV-CLEAN-1', 'curriculum-demo',"
+                + " 1, 'ACTIVE', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)");
+        mvc.perform(put("/api/v1/users/clean-student")
+                        .with(superJwt())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"role":"LECTURER","employeeId":"GV-CLEAN-1","departmentId":"department-demo"}
+                                """))
+                .andExpect(status().isOk());
+        assertThat(roleNames("clean-student")).containsExactly("LECTURER");
+        assertThat(jdbc.queryForObject(
+                "SELECT COUNT(*) FROM \"campuscore_auth\".\"Student\" WHERE \"id\" = 'clean-student-profile'",
+                Integer.class))
+                .isEqualTo(0);
+    }
+
+    @Test
+    void missingOrDuplicateProfileFieldsAbortTheWholeConversion() throws Exception {
+        insertUser("abort-user", "abort@campuscore.edu", "Abort", "User");
+        insertUserRole("abort-user-role", "abort-user", "role-admin");
+        jdbc.update("INSERT INTO \"campuscore_auth\".\"Session\""
+                + " (\"id\", \"userId\", \"refreshToken\", \"expiresAt\", \"createdAt\")"
+                + " VALUES ('abort-session', 'abort-user', 'hashed',"
+                + " CURRENT_TIMESTAMP + INTERVAL '1' HOUR, CURRENT_TIMESTAMP)");
+
+        // Missing profile fields: nothing may be written — not the name, not
+        // the role, and the sessions stay.
+        mvc.perform(put("/api/v1/users/abort-user")
+                        .with(superJwt())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"role\":\"STUDENT\",\"firstName\":\"ShouldNotLand\"}"))
+                .andExpect(status().isBadRequest());
+        assertThat(roleNames("abort-user")).containsExactly("ADMIN");
+        assertThat(jdbc.queryForObject(
+                "SELECT \"firstName\" FROM \"campuscore_auth\".\"User\" WHERE \"id\" = 'abort-user'",
+                String.class))
+                .isEqualTo("Abort");
+        assertThat(jdbc.queryForObject(
+                "SELECT COUNT(*) FROM \"campuscore_auth\".\"Session\" WHERE \"userId\" = 'abort-user'",
+                Integer.class))
+                .isEqualTo(1);
+        assertThat(jdbc.queryForObject(
+                "SELECT COUNT(*) FROM \"campuscore_auth\".\"Student\" WHERE \"userId\" = 'abort-user'",
+                Integer.class))
+                .isZero();
+
+        // A duplicate official id conflicts before any write the same way.
+        mvc.perform(put("/api/v1/users/abort-user")
+                        .with(superJwt())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"role":"STUDENT","studentId":"SV-TARGET","curriculumId":"curriculum-demo","year":1}
+                                """))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("STUDENT_ID_EXISTS"));
+        assertThat(roleNames("abort-user")).containsExactly("ADMIN");
+    }
+
+    @Test
+    void resendingTheSameRoleDoesNotRewriteTheExistingProfile() throws Exception {
+        insertUser("same-user", "same@campuscore.edu", "Same", "User");
+        insertUserRole("same-user-role", "same-user", "role-student");
+        jdbc.update("INSERT INTO \"campuscore_auth\".\"Student\""
+                + " (\"id\", \"userId\", \"studentId\", \"curriculumId\", \"year\", \"status\","
+                + " \"admissionDate\", \"createdAt\", \"updatedAt\")"
+                + " VALUES ('same-student-profile', 'same-user', 'SV-SAME', 'curriculum-demo',"
+                + " 2, 'ACTIVE', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)");
+
+        // Profile fields on an ordinary same-role edit must not reassign the
+        // official profile: the row id and the recorded identifiers stay.
+        mvc.perform(put("/api/v1/users/same-user")
+                        .with(adminJwt())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"role":"STUDENT","firstName":"Renamed","studentId":"SV-OTHER","curriculumId":"curriculum-inactive","year":4}
+                                """))
+                .andExpect(status().isOk());
+
+        assertThat(jdbc.queryForList(
+                "SELECT \"id\" FROM \"campuscore_auth\".\"Student\" WHERE \"userId\" = 'same-user'",
+                String.class))
+                .containsExactly("same-student-profile");
+        assertThat(jdbc.queryForObject(
+                "SELECT \"studentId\" FROM \"campuscore_auth\".\"Student\" WHERE \"userId\" = 'same-user'",
+                String.class))
+                .isEqualTo("SV-SAME");
+        assertThat(jdbc.queryForObject(
+                "SELECT \"year\" FROM \"campuscore_auth\".\"Student\" WHERE \"userId\" = 'same-user'",
+                Integer.class))
+                .isEqualTo(2);
+    }
+
+    @Test
+    void studentYearMustBeAPositiveInteger() throws Exception {
+        for (String badYear : List.of("0", "-1", "abc", "1.5")) {
+            mvc.perform(post("/api/v1/users")
+                            .with(adminJwt())
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content("""
+                                    {"email":"bad.year@campuscore.edu","firstName":"Bad","lastName":"Year","role":"STUDENT","studentId":"SV-BAD-YEAR","curriculumId":"curriculum-demo","year":%s}
+                                    """.formatted("abc".equals(badYear) || "1.5".equals(badYear) ? "\"" + badYear + "\"" : badYear)))
+                    .andExpect(status().isBadRequest())
+                    .andExpect(jsonPath("$.code").value("VALIDATION_ERROR"));
+        }
+        assertThat(jdbc.queryForObject(
+                "SELECT COUNT(*) FROM \"campuscore_auth\".\"User\" WHERE \"email\" = 'bad.year@campuscore.edu'",
+                Integer.class))
+                .isZero();
+    }
+
+    @Test
+    void newProfilesRejectInactiveOrMissingAcademicReferences() throws Exception {
+        mvc.perform(post("/api/v1/users")
+                        .with(adminJwt())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"email":"inactive.cur@campuscore.edu","firstName":"Inact","lastName":"Cur","role":"STUDENT","studentId":"SV-INACT-C","curriculumId":"curriculum-inactive","year":1}
+                                """))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("VALIDATION_ERROR"));
+        mvc.perform(post("/api/v1/users")
+                        .with(adminJwt())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"email":"missing.cur@campuscore.edu","firstName":"Miss","lastName":"Cur","role":"STUDENT","studentId":"SV-MISS-C","curriculumId":"curriculum-missing","year":1}
+                                """))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("VALIDATION_ERROR"));
+        mvc.perform(post("/api/v1/users")
+                        .with(adminJwt())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"email":"missing.dept@campuscore.edu","firstName":"Miss","lastName":"Dept","role":"LECTURER","employeeId":"GV-MISS-D","departmentId":"department-missing"}
+                                """))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("VALIDATION_ERROR"));
+
+        assertThat(jdbc.queryForObject(
+                "SELECT COUNT(*) FROM \"campuscore_auth\".\"User\" WHERE \"email\" LIKE '%.cur@campuscore.edu' OR \"email\" LIKE '%.dept@campuscore.edu'",
+                Integer.class))
+                .isZero();
+    }
+
+    @Test
+    void statusEditsNormalizeCaseBlankKeepsCurrentAndCutsSessions() throws Exception {
+        jdbc.update("INSERT INTO \"campuscore_auth\".\"Session\""
+                + " (\"id\", \"userId\", \"refreshToken\", \"expiresAt\", \"createdAt\")"
+                + " VALUES ('second-session', 'second-user', 'hashed',"
+                + " CURRENT_TIMESTAMP + INTERVAL '1' HOUR, CURRENT_TIMESTAMP)");
+
+        mvc.perform(put("/api/v1/users/second-user")
+                        .with(adminJwt())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"status\":\"suspended\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("SUSPENDED"));
+        assertThat(jdbc.queryForObject(
+                "SELECT \"status\" FROM \"campuscore_auth\".\"User\" WHERE \"id\" = 'second-user'",
+                String.class))
+                .isEqualTo("SUSPENDED");
+        assertThat(jdbc.queryForObject(
+                "SELECT COUNT(*) FROM \"campuscore_auth\".\"Session\" WHERE \"userId\" = 'second-user'",
+                Integer.class))
+                .isZero();
+
+        mvc.perform(put("/api/v1/users/second-user")
+                        .with(adminJwt())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"status\":\"active\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("ACTIVE"));
+        assertThat(jdbc.queryForObject(
+                "SELECT \"status\" FROM \"campuscore_auth\".\"User\" WHERE \"id\" = 'second-user'",
+                String.class))
+                .isEqualTo("ACTIVE");
+
+        // A blank status means "not provided", never a stored blank.
+        mvc.perform(put("/api/v1/users/second-user")
+                        .with(adminJwt())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"status\":\"  \",\"firstName\":\"Renamed\"}"))
+                .andExpect(status().isOk());
+        assertThat(jdbc.queryForObject(
+                "SELECT \"status\" FROM \"campuscore_auth\".\"User\" WHERE \"id\" = 'second-user'",
+                String.class))
+                .isEqualTo("ACTIVE");
+    }
+
+    @Test
+    void listAndDetailExposeStudentAndLecturerProfilePresence() throws Exception {
+        insertUserRole("second-user-student", "second-user", "role-student");
+        jdbc.update("INSERT INTO \"campuscore_auth\".\"Student\""
+                + " (\"id\", \"userId\", \"studentId\", \"curriculumId\", \"year\", \"status\","
+                + " \"admissionDate\", \"createdAt\", \"updatedAt\")"
+                + " VALUES ('second-student-profile', 'second-user', 'SV-SECOND', 'curriculum-demo',"
+                + " 1, 'ACTIVE', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)");
+
+        // target-user carries both fixture profiles; second-user carries a
+        // student profile only; third-user carries none.
+        mvc.perform(get("/api/v1/users")
+                        .queryParam("limit", "20")
+                        .with(adminJwt()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data[?(@.id == 'target-user')].hasStudentProfile").value(org.hamcrest.Matchers.contains(true)))
+                .andExpect(jsonPath("$.data[?(@.id == 'target-user')].hasLecturerProfile").value(org.hamcrest.Matchers.contains(true)))
+                .andExpect(jsonPath("$.data[?(@.id == 'second-user')].hasStudentProfile").value(org.hamcrest.Matchers.contains(true)))
+                .andExpect(jsonPath("$.data[?(@.id == 'second-user')].hasLecturerProfile").value(org.hamcrest.Matchers.contains(false)))
+                .andExpect(jsonPath("$.data[?(@.id == 'third-user')].hasStudentProfile").value(org.hamcrest.Matchers.contains(false)));
+
+        // Detail answers the same flags; the protected target needs the
+        // super-admin actor, so read an unprotected account there.
+        mvc.perform(get("/api/v1/users/second-user").with(adminJwt()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.hasStudentProfile").value(true))
+                .andExpect(jsonPath("$.hasLecturerProfile").value(false));
+    }
+
+    @ParameterizedTest(name = "delete keeps a student whose only history is {0}")
+    @MethodSource("studentOnlyHistoryInserts")
+    void deleteKeepsStudentAccountsWhoseProfileCarriesAnyHistory(String label, String historyInsert)
+            throws Exception {
+        insertUser("del-" + label, "del." + label + "@campuscore.edu", "Del", label);
+        insertUserRole("del-" + label + "-role", "del-" + label, "role-student");
+        jdbc.update("INSERT INTO \"campuscore_auth\".\"Student\""
+                + " (\"id\", \"userId\", \"studentId\", \"curriculumId\", \"year\", \"status\","
+                + " \"admissionDate\", \"createdAt\", \"updatedAt\")"
+                + " VALUES ('del-" + label + "-profile', 'del-" + label + "', 'SV-DEL-" + label + "',"
+                + " 'curriculum-demo', 1, 'ACTIVE', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)");
+        jdbc.update("INSERT INTO \"campuscore_auth\".\"Session\""
+                + " (\"id\", \"userId\", \"refreshToken\", \"expiresAt\", \"createdAt\")"
+                + " VALUES ('del-" + label + "-session', 'del-" + label + "', 'hashed',"
+                + " CURRENT_TIMESTAMP + INTERVAL '1' HOUR, CURRENT_TIMESTAMP)");
+        jdbc.update(historyInsert.formatted("del-" + label + "-profile"));
+
+        mvc.perform(delete("/api/v1/users/del-" + label).with(superJwt()))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("PROFILE_HAS_HISTORY"));
+
+        assertThat(jdbc.queryForObject(
+                "SELECT COUNT(*) FROM \"campuscore_auth\".\"User\" WHERE \"id\" = 'del-" + label + "'",
+                Integer.class)).isEqualTo(1);
+        assertThat(jdbc.queryForObject(
+                "SELECT COUNT(*) FROM \"campuscore_auth\".\"Student\" WHERE \"id\" = 'del-" + label + "-profile'",
+                Integer.class)).isEqualTo(1);
+        assertThat(jdbc.queryForObject(
+                "SELECT COUNT(*) FROM \"campuscore_auth\".\"Session\" WHERE \"userId\" = 'del-" + label + "'",
+                Integer.class)).isEqualTo(1);
+        assertThat(jdbc.queryForObject(
+                "SELECT COUNT(*) FROM campuscore_audit.\"AdminAudit\" WHERE \"entityId\" = 'del-" + label + "'",
+                Integer.class)).isZero();
+    }
+
+    static java.util.stream.Stream<org.junit.jupiter.params.provider.Arguments> studentOnlyHistoryInserts() {
+        return java.util.stream.Stream.of(
+                org.junit.jupiter.params.provider.Arguments.of("attendance",
+                        "INSERT INTO academic.\"Attendance\" (\"id\", \"studentId\") VALUES ('del-attendance-row', '%s')"),
+                org.junit.jupiter.params.provider.Arguments.of("conduct",
+                        "INSERT INTO academic.conduct_semester_score (id, student_id) VALUES ('del-conduct-row', '%s')"),
+                org.junit.jupiter.params.provider.Arguments.of("credit",
+                        "INSERT INTO academic.\"CreditLimitApplication\" (\"id\", \"studentId\") VALUES ('del-credit-row', '%s')"));
+    }
+
+    @Test
+    void deleteRemovesACleanProfiledAccount() throws Exception {
+        insertUser("del-clean", "del.clean@campuscore.edu", "Del", "Clean");
+        insertUserRole("del-clean-role", "del-clean", "role-student");
+        jdbc.update("INSERT INTO \"campuscore_auth\".\"Student\""
+                + " (\"id\", \"userId\", \"studentId\", \"curriculumId\", \"year\", \"status\","
+                + " \"admissionDate\", \"createdAt\", \"updatedAt\")"
+                + " VALUES ('del-clean-profile', 'del-clean', 'SV-DEL-CLEAN', 'curriculum-demo',"
+                + " 1, 'ACTIVE', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)");
+        jdbc.update("INSERT INTO \"campuscore_auth\".\"Session\""
+                + " (\"id\", \"userId\", \"refreshToken\", \"expiresAt\", \"createdAt\")"
+                + " VALUES ('del-clean-session', 'del-clean', 'hashed',"
+                + " CURRENT_TIMESTAMP + INTERVAL '1' HOUR, CURRENT_TIMESTAMP)");
+
+        mvc.perform(delete("/api/v1/users/del-clean").with(superJwt()))
+                .andExpect(status().isOk());
+
+        assertThat(jdbc.queryForObject(
+                "SELECT COUNT(*) FROM \"campuscore_auth\".\"User\" WHERE \"id\" = 'del-clean'",
+                Integer.class)).isZero();
+        assertThat(jdbc.queryForObject(
+                "SELECT COUNT(*) FROM \"campuscore_auth\".\"Student\" WHERE \"id\" = 'del-clean-profile'",
+                Integer.class)).isZero();
+        assertThat(jdbc.queryForObject(
+                "SELECT COUNT(*) FROM \"campuscore_auth\".\"Session\" WHERE \"userId\" = 'del-clean'",
+                Integer.class)).isZero();
+    }
+
+    @ParameterizedTest(name = "conversion keeps a {0} profile referenced by {1}")
+    @MethodSource("newlyGuardedHistoryReferences")
+    void roleConversionIsBlockedByEveryNewlyGuardedReference(
+            String profileKind, String label, String historyInsert, String conversionPayload) throws Exception {
+        insertUser("ref-" + label, "ref." + label + "@campuscore.edu", "Ref", label);
+        jdbc.update("INSERT INTO \"campuscore_auth\".\"Session\""
+                + " (\"id\", \"userId\", \"refreshToken\", \"expiresAt\", \"createdAt\")"
+                + " VALUES ('ref-" + label + "-session', 'ref-" + label + "', 'hashed',"
+                + " CURRENT_TIMESTAMP + INTERVAL '1' HOUR, CURRENT_TIMESTAMP)");
+        String profileTable;
+        if ("student".equals(profileKind)) {
+            insertUserRole("ref-" + label + "-role", "ref-" + label, "role-student");
+            jdbc.update("INSERT INTO \"campuscore_auth\".\"Student\""
+                    + " (\"id\", \"userId\", \"studentId\", \"curriculumId\", \"year\", \"status\","
+                    + " \"admissionDate\", \"createdAt\", \"updatedAt\")"
+                    + " VALUES ('ref-" + label + "-profile', 'ref-" + label + "', 'SV-REF-" + label + "',"
+                    + " 'curriculum-demo', 1, 'ACTIVE', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)");
+            profileTable = "\"campuscore_auth\".\"Student\"";
+        } else {
+            insertUserRole("ref-" + label + "-role", "ref-" + label, "role-lecturer");
+            jdbc.update("INSERT INTO \"campuscore_auth\".\"Lecturer\""
+                    + " (\"id\", \"userId\", \"departmentId\", \"employeeId\", \"isActive\")"
+                    + " VALUES ('ref-" + label + "-profile', 'ref-" + label + "', 'department-demo',"
+                    + " 'GV-REF-" + label + "', TRUE)");
+            profileTable = "\"campuscore_auth\".\"Lecturer\"";
+        }
+        jdbc.update(historyInsert.formatted("ref-" + label + "-profile"));
+
+        mvc.perform(put("/api/v1/users/ref-" + label)
+                        .with(superJwt())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(conversionPayload))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("PROFILE_HAS_HISTORY"));
+
+        assertThat(jdbc.queryForObject(
+                "SELECT COUNT(*) FROM " + profileTable + " WHERE \"id\" = 'ref-" + label + "-profile'",
+                Integer.class)).isEqualTo(1);
+        assertThat(jdbc.queryForObject(
+                "SELECT COUNT(*) FROM \"campuscore_auth\".\"Session\" WHERE \"userId\" = 'ref-" + label + "'",
+                Integer.class)).isEqualTo(1);
+        assertThat(roleNames("ref-" + label))
+                .containsExactly("student".equals(profileKind) ? "STUDENT" : "LECTURER");
+    }
+
+    static java.util.stream.Stream<org.junit.jupiter.params.provider.Arguments> newlyGuardedHistoryReferences() {
+        return java.util.stream.Stream.of(
+                org.junit.jupiter.params.provider.Arguments.of("student", "enevt",
+                        "INSERT INTO academic.\"EnrollmentEvent\" (\"id\", \"studentId\") VALUES ('ref-enevt-row', '%s')",
+                        "{\"role\":\"LECTURER\",\"employeeId\":\"GV-CONV-ENEVT\",\"departmentId\":\"department-demo\"}"),
+                org.junit.jupiter.params.provider.Arguments.of("student", "report",
+                        "INSERT INTO thesis.thesis_group_report (id, submitted_by) VALUES ('ref-report-row', '%s')",
+                        "{\"role\":\"LECTURER\",\"employeeId\":\"GV-CONV-REPORT\",\"departmentId\":\"department-demo\"}"),
+                org.junit.jupiter.params.provider.Arguments.of("lecturer", "score",
+                        "INSERT INTO thesis.thesis_topic_score (id, lecturer_id) VALUES ('ref-score-row', '%s')",
+                        "{\"role\":\"STUDENT\",\"studentId\":\"SV-CONV-SCORE\",\"curriculumId\":\"curriculum-demo\",\"year\":1}"),
+                org.junit.jupiter.params.provider.Arguments.of("lecturer", "gvpb",
+                        "INSERT INTO thesis.thesis_topic (id, gvpb_lecturer_id) VALUES ('ref-gvpb-row', '%s')",
+                        "{\"role\":\"STUDENT\",\"studentId\":\"SV-CONV-GVPB\",\"curriculumId\":\"curriculum-demo\",\"year\":1}"),
+                org.junit.jupiter.params.provider.Arguments.of("lecturer", "announce",
+                        "INSERT INTO engagement.\"Announcement\" (\"id\", \"lecturerId\") VALUES ('ref-announce-row', '%s')",
+                        "{\"role\":\"STUDENT\",\"studentId\":\"SV-CONV-ANN\",\"curriculumId\":\"curriculum-demo\",\"year\":1}"));
+    }
+
+    @Test
+    void ordinaryAdminCannotChangeAProtectedAccountsStatusButSuperAdminCan() throws Exception {
+        insertUser("dean-suspended", "dean.suspended@campuscore.edu", "Dean", "Suspended");
+        insertUserRole("dean-suspended-tk", "dean-suspended", "role-truong-khoa");
+        insertUserRole("dean-suspended-lect", "dean-suspended", "role-lecturer");
+        jdbc.update("INSERT INTO \"campuscore_auth\".\"Lecturer\""
+                + " (\"id\", \"userId\", \"departmentId\", \"employeeId\", \"isActive\")"
+                + " VALUES ('dean-suspended-profile', 'dean-suspended', 'department-demo', 'GV-SUSP', TRUE)");
+        jdbc.update("UPDATE \"campuscore_auth\".\"User\" SET \"status\" = 'SUSPENDED' WHERE \"id\" = 'dean-suspended'");
+
+        // The role echo is the unchanged dean role, but reactivating the
+        // account puts the reserved role back into service — a plain
+        // administrator may not do that, and nothing may be written.
+        mvc.perform(put("/api/v1/users/dean-suspended")
+                        .with(adminJwt())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"role\":\"TRUONG_KHOA\",\"status\":\"ACTIVE\",\"firstName\":\"ShouldNotLand\"}"))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("ROLE_ESCALATION"));
+        assertThat(jdbc.queryForObject(
+                "SELECT \"status\" FROM \"campuscore_auth\".\"User\" WHERE \"id\" = 'dean-suspended'",
+                String.class)).isEqualTo("SUSPENDED");
+        assertThat(jdbc.queryForObject(
+                "SELECT \"firstName\" FROM \"campuscore_auth\".\"User\" WHERE \"id\" = 'dean-suspended'",
+                String.class)).isEqualTo("Dean");
+
+        mvc.perform(put("/api/v1/users/dean-suspended")
+                        .with(superJwt())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"status\":\"ACTIVE\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("ACTIVE"));
+    }
+
+    @Test
+    void selfEchoingOnlyTheLecturerHalfOfTheDeanPairIsRejected() throws Exception {
+        insertUser("dean-self", "dean.self@campuscore.edu", "Dean", "Self");
+        insertUserRole("dean-self-tk", "dean-self", "role-truong-khoa");
+        insertUserRole("dean-self-lect", "dean-self", "role-lecturer");
+        jdbc.update("INSERT INTO \"campuscore_auth\".\"Lecturer\""
+                + " (\"id\", \"userId\", \"departmentId\", \"employeeId\", \"isActive\")"
+                + " VALUES ('dean-self-profile', 'dean-self', 'department-demo', 'GV-SELF', TRUE)");
+
+        // The account already holds LECTURER, so the old hasRole check let this
+        // through and quietly dropped TRUONG_KHOA. The desired-set comparison
+        // refuses it; only the whole unchanged pair may be echoed back.
+        assertThat(org.assertj.core.api.Assertions.catchThrowable(() ->
+                userMutations.update("dean-self", Map.of("role", "LECTURER"), true, "dean-self")))
+                .isInstanceOf(io.campuscore.restfulapi.web.DomainException.class)
+                .extracting("code").isEqualTo("SELF_ROLE_CHANGE_NOT_ALLOWED");
+        assertThat(roleNames("dean-self")).containsExactlyInAnyOrder("LECTURER", "TRUONG_KHOA");
+
+        userMutations.update("dean-self", Map.of("role", "TRUONG_KHOA"), true, "dean-self");
+        assertThat(roleNames("dean-self")).containsExactlyInAnyOrder("LECTURER", "TRUONG_KHOA");
+    }
+
     private void createTables() {
         jdbc.execute("""
                 CREATE TABLE IF NOT EXISTS "campuscore_auth"."User" (
@@ -523,6 +1194,21 @@ class AdminUserMutationPersistenceTest {
                 """);
         jdbc.execute("CREATE SCHEMA IF NOT EXISTS academic");
         jdbc.execute("""
+                CREATE TABLE IF NOT EXISTS academic."Department" (
+                    "id" VARCHAR(120) PRIMARY KEY,
+                    "name" VARCHAR(180) NOT NULL,
+                    "isActive" BOOLEAN NOT NULL DEFAULT TRUE
+                )
+                """);
+        jdbc.execute("""
+                CREATE TABLE IF NOT EXISTS academic."Curriculum" (
+                    "id" VARCHAR(120) PRIMARY KEY,
+                    "name" VARCHAR(180) NOT NULL,
+                    "departmentId" VARCHAR(120) NOT NULL REFERENCES academic."Department" ("id"),
+                    "isActive" BOOLEAN NOT NULL DEFAULT TRUE
+                )
+                """);
+        jdbc.execute("""
                 CREATE TABLE IF NOT EXISTS academic."Lecturer" (
                     "id" VARCHAR(120) PRIMARY KEY,
                     "userId" VARCHAR(120) NOT NULL,
@@ -537,6 +1223,27 @@ class AdminUserMutationPersistenceTest {
                     "updatedAt" TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
                 )
                 """);
+        // History-bearing tables the profile-removal guard consults. In
+        // production these hold enrollments, attendance, conduct and thesis
+        // rows; here they only need the referenced column.
+        jdbc.execute("CREATE TABLE IF NOT EXISTS academic.\"Enrollment\" (\"id\" VARCHAR(120) PRIMARY KEY, \"studentId\" VARCHAR(120))");
+        jdbc.execute("CREATE TABLE IF NOT EXISTS academic.\"Attendance\" (\"id\" VARCHAR(120) PRIMARY KEY, \"studentId\" VARCHAR(120))");
+        jdbc.execute("CREATE TABLE IF NOT EXISTS academic.\"RegistrationSlip\" (\"id\" VARCHAR(120) PRIMARY KEY, \"studentId\" VARCHAR(120))");
+        jdbc.execute("CREATE TABLE IF NOT EXISTS academic.\"CreditLimitApplication\" (\"id\" VARCHAR(120) PRIMARY KEY, \"studentId\" VARCHAR(120))");
+        jdbc.execute("CREATE TABLE IF NOT EXISTS academic.conduct_semester_score (id VARCHAR(120) PRIMARY KEY, student_id VARCHAR(120))");
+        jdbc.execute("CREATE TABLE IF NOT EXISTS academic.conduct_activity (id VARCHAR(120) PRIMARY KEY, student_id VARCHAR(120))");
+        jdbc.execute("CREATE TABLE IF NOT EXISTS academic.\"Section\" (\"id\" VARCHAR(120) PRIMARY KEY, \"lecturerId\" VARCHAR(120))");
+        jdbc.execute("CREATE SCHEMA IF NOT EXISTS thesis");
+        jdbc.execute("CREATE TABLE IF NOT EXISTS thesis.thesis_group (id VARCHAR(120) PRIMARY KEY, leader_student_id VARCHAR(120))");
+        jdbc.execute("CREATE TABLE IF NOT EXISTS thesis.thesis_group_member (id VARCHAR(120) PRIMARY KEY, student_id VARCHAR(120))");
+        jdbc.execute("CREATE TABLE IF NOT EXISTS thesis.thesis_council_member (id VARCHAR(120) PRIMARY KEY, lecturer_id VARCHAR(120))");
+        jdbc.execute("CREATE TABLE IF NOT EXISTS thesis.thesis_topic_supervisor (id VARCHAR(120) PRIMARY KEY, lecturer_id VARCHAR(120))");
+        jdbc.execute("CREATE TABLE IF NOT EXISTS academic.\"EnrollmentEvent\" (\"id\" VARCHAR(120) PRIMARY KEY, \"studentId\" VARCHAR(120))");
+        jdbc.execute("CREATE TABLE IF NOT EXISTS thesis.thesis_group_report (id VARCHAR(120) PRIMARY KEY, submitted_by VARCHAR(120))");
+        jdbc.execute("CREATE TABLE IF NOT EXISTS thesis.thesis_topic_score (id VARCHAR(120) PRIMARY KEY, lecturer_id VARCHAR(120))");
+        jdbc.execute("CREATE TABLE IF NOT EXISTS thesis.thesis_topic (id VARCHAR(120) PRIMARY KEY, gvpb_lecturer_id VARCHAR(120))");
+        jdbc.execute("CREATE SCHEMA IF NOT EXISTS engagement");
+        jdbc.execute("CREATE TABLE IF NOT EXISTS engagement.\"Announcement\" (\"id\" VARCHAR(120) PRIMARY KEY, \"lecturerId\" VARCHAR(120))");
         jdbc.execute("""
                 CREATE TABLE IF NOT EXISTS campuscore_audit."AdminAudit" (
                     "id" VARCHAR(120) PRIMARY KEY,
@@ -563,13 +1270,41 @@ class AdminUserMutationPersistenceTest {
         jdbc.update("DELETE FROM \"campuscore_auth\".\"Role\"");
         jdbc.update("DELETE FROM \"campuscore_auth\".\"User\"");
         jdbc.update("DELETE FROM academic.\"Lecturer\"");
+        jdbc.update("DELETE FROM academic.\"Curriculum\"");
+        jdbc.update("DELETE FROM academic.\"Department\"");
+        jdbc.update("DELETE FROM academic.\"Enrollment\"");
+        jdbc.update("DELETE FROM academic.\"Attendance\"");
+        jdbc.update("DELETE FROM academic.\"RegistrationSlip\"");
+        jdbc.update("DELETE FROM academic.\"CreditLimitApplication\"");
+        jdbc.update("DELETE FROM academic.conduct_semester_score");
+        jdbc.update("DELETE FROM academic.conduct_activity");
+        jdbc.update("DELETE FROM academic.\"Section\"");
+        jdbc.update("DELETE FROM thesis.thesis_group_member");
+        jdbc.update("DELETE FROM thesis.thesis_group");
+        jdbc.update("DELETE FROM thesis.thesis_council_member");
+        jdbc.update("DELETE FROM thesis.thesis_topic_supervisor");
+        jdbc.update("DELETE FROM academic.\"EnrollmentEvent\"");
+        jdbc.update("DELETE FROM thesis.thesis_group_report");
+        jdbc.update("DELETE FROM thesis.thesis_topic_score");
+        jdbc.update("DELETE FROM thesis.thesis_topic");
+        jdbc.update("DELETE FROM engagement.\"Announcement\"");
     }
 
     private void insertFixture() {
         insertRole("role-admin", "ADMIN", true);
         insertRole("role-super-admin", "SUPER_ADMIN", true);
         insertRole("role-student", "STUDENT", true);
+        insertRole("role-lecturer", "LECTURER", true);
+        insertRole("role-truong-khoa", "TRUONG_KHOA", true);
         insertRole("role-auditor", "AUDITOR", false);
+        jdbc.update("INSERT INTO academic.\"Department\" (\"id\", \"name\", \"isActive\")"
+                + " VALUES ('department-demo', 'Demo Department', TRUE)");
+        jdbc.update("INSERT INTO academic.\"Department\" (\"id\", \"name\", \"isActive\")"
+                + " VALUES ('department-inactive', 'Retired Department', FALSE)");
+        jdbc.update("INSERT INTO academic.\"Curriculum\" (\"id\", \"name\", \"departmentId\", \"isActive\")"
+                + " VALUES ('curriculum-demo', 'Demo Curriculum', 'department-demo', TRUE)");
+        jdbc.update("INSERT INTO academic.\"Curriculum\" (\"id\", \"name\", \"departmentId\", \"isActive\")"
+                + " VALUES ('curriculum-inactive', 'Retired Curriculum', 'department-demo', FALSE)");
         insertPermission("permission-admin", "admin", "write");
         insertPermission("permission-academic", "academic", "read");
         insertPermission("permission-audit", "audit", "read");

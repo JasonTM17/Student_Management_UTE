@@ -131,6 +131,30 @@ class AccountStateFilterTest {
     }
 
     @Test
+    void staleTokenOnSessionEstablishmentEndpointsPassesThrough() throws Exception {
+        // A revoked session leaves the access cookie behind; login, 2FA
+        // verification and account recovery must still run so the user can
+        // establish a fresh session instead of being stranded on 401.
+        when(repository.findAccountAuthorization("user-stale")).thenReturn(Optional.empty());
+        for (String uri : new String[] {
+                "/api/v1/auth/login",
+                "/api/v1/auth/two-factor/verify",
+                "/api/v1/auth/forgot-password",
+                "/api/v1/auth/reset-password" }) {
+            authenticate("user-stale");
+
+            MockHttpServletRequest request = new MockHttpServletRequest("POST", uri);
+            MockHttpServletResponse response = new MockHttpServletResponse();
+            FilterChain chain = mock(FilterChain.class);
+
+            filter.doFilter(request, response, chain);
+
+            assertEquals(200, response.getStatus(), uri);
+            verify(chain).doFilter(request, response);
+        }
+    }
+
+    @Test
     void databaseOutageOnProtectedAssistantReturns503() throws Exception {
         authenticate("user-4");
         when(repository.findAccountAuthorization("user-4"))

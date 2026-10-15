@@ -64,7 +64,12 @@ public final class AdminUserRequestDtos {
         }
     }
 
-    /** Profile/role/status payload. Absent fields keep their current value. */
+    /**
+     * Profile/role/status payload. Absent fields keep their current value. The
+     * profile fields match {@link AdminUserCreateRequest}: they are only read
+     * when a role conversion must mint a new official profile, so an existing
+     * profile is never reassigned by a generic edit.
+     */
     public record AdminUserUpdateRequest(
             @Size(max = 120, message = "firstName must contain at most 120 characters")
             String firstName,
@@ -75,7 +80,16 @@ public final class AdminUserRequestDtos {
             @Size(max = 40, message = "phone must contain at most 40 characters")
             String phone,
             @Size(max = 40, message = "status must contain at most 40 characters")
-            String status) {
+            String status,
+            @Size(max = 120, message = "studentId must contain at most 120 characters")
+            String studentId,
+            Object year,
+            @Size(max = 120, message = "curriculumId must contain at most 120 characters")
+            String curriculumId,
+            @Size(max = 120, message = "employeeId must contain at most 120 characters")
+            String employeeId,
+            @Size(max = 120, message = "departmentId must contain at most 120 characters")
+            String departmentId) {
 
         public Map<String, Object> toInput() {
             Map<String, Object> input = new LinkedHashMap<>();
@@ -84,6 +98,13 @@ public final class AdminUserRequestDtos {
             putIfPresent(input, "role", role);
             putIfPresent(input, "phone", phone);
             putIfPresent(input, "status", status);
+            putIfPresent(input, "studentId", studentId);
+            if (year != null) {
+                input.put("year", year);
+            }
+            putIfPresent(input, "curriculumId", curriculumId);
+            putIfPresent(input, "employeeId", employeeId);
+            putIfPresent(input, "departmentId", departmentId);
             return input;
         }
     }

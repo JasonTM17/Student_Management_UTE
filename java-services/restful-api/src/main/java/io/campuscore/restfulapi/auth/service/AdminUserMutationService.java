@@ -32,6 +32,8 @@ public class AdminUserMutationService {
     private static final String STUDENT = "\"campuscore_auth\".\"Student\"";
     private static final String LECTURER = "\"campuscore_auth\".\"Lecturer\"";
     private static final Set<String> SYSTEM_ROLES = Set.of("STUDENT", "LECTURER", "ADMIN", "TRUONG_KHOA", "SUPER_ADMIN");
+    private static final String ACADEMIC_DEPARTMENT = "academic.\"Department\"";
+    private static final String ACADEMIC_CURRICULUM = "academic.\"Curriculum\"";
     /**
      * Roles a plain administrator may not hand out. {@code TRUONG_KHOA} is here
      * because a faculty head governs the thesis round lifecycle, which the role
@@ -103,7 +105,9 @@ public class AdminUserMutationService {
                 .addValue("foldTo", LikePattern.FOLD_TO);
         List<Map<String, Object>> data = jdbc.queryForList(
                 "SELECT u.\"id\", u.\"email\", u.\"firstName\", u.\"lastName\", u.\"status\", u.\"phone\", u.\"createdAt\","
-                        + " COALESCE((SELECT STRING_AGG(r.\"name\", ',') FROM " + USER_ROLE + " ur JOIN " + ROLE + " r ON r.\"id\" = ur.\"roleId\" WHERE ur.\"userId\" = u.\"id\"), '') AS roles"
+                        + " COALESCE((SELECT STRING_AGG(r.\"name\", ',') FROM " + USER_ROLE + " ur JOIN " + ROLE + " r ON r.\"id\" = ur.\"roleId\" WHERE ur.\"userId\" = u.\"id\"), '') AS roles,"
+                        + " EXISTS(SELECT 1 FROM " + STUDENT + " sp WHERE sp.\"userId\" = u.\"id\") AS \"hasStudentProfile\","
+                        + " EXISTS(SELECT 1 FROM " + LECTURER + " lp WHERE lp.\"userId\" = u.\"id\") AS \"hasLecturerProfile\""
                         // PostgreSQL cannot infer the type of an unbound NULL in an IS NULL
                         // predicate. Cast optional filters so the first request from the admin
                         // console (which intentionally sends neither filter) remains valid.
@@ -173,7 +177,9 @@ public class AdminUserMutationService {
         } catch (DataIntegrityViolationException exception) {
             throw conflict(exception);
         }
-        assignRole(id, role);
+        for (String systemRole : desiredSystemRoles(role)) {
+            assignRole(id, systemRole);
+        }
         ensureProfile(id, role, input);
         // Recorded without the request map: it carries a credential by design.
         audit.record(actorId, null, "CREATED", "USER", id,
@@ -252,7 +258,9 @@ public class AdminUserMutationService {
     @Transactional
     public Map<String, Object> update(String id, Map<String, Object> input) {
         return update(id, input, false, null);
-    }    @Transactional
+    }
+
+    @Transactional
     public Map<String, Object> update(String id, Map<String, Object> input, boolean canManageSuperAdmin) {
         return update(id, input, canManageSuperAdmin, null);
     }
@@ -267,15 +275,22 @@ public class AdminUserMutationService {
         String requestedRole = rawRole == null || rawRole.toString().isBlank()
                 ? null
                 : text(input, "role", "STUDENT").toUpperCase(java.util.Locale.ROOT);
+        // Canonical status form computed once: the same normalized value feeds
+        // every comparison below and the SQL binding, and a blank means "not
+        // provided" — it is never stored.
+        String newStatus = input.get("status") == null ? null : text(input, "status", "");
+        String canonicalStatus = newStatus == null || newStatus.isBlank()
+                ? null
+                : newStatus.toUpperCase(java.util.Locale.ROOT);
         if (currentUserId != null && currentUserId.equals(id)) {
-            if (requestedRole != null && !hasRole(id, requestedRole)) {
+            if (requestedRole != null
+                    && !systemRoleNames(id).equals(desiredSystemRoles(requestedRole))) {
                 throw problem(
                         HttpStatus.BAD_REQUEST,
                         "SELF_ROLE_CHANGE_NOT_ALLOWED",
                         "You cannot change your own system role");
             }
-            String status = input.get("status") == null ? null : text(input, "status", "");
-            if (status != null && !status.isBlank() && !"ACTIVE".equalsIgnoreCase(status)) {
+            if (canonicalStatus != null && !"ACTIVE".equals(canonicalStatus)) {
                 throw problem(
                         HttpStatus.BAD_REQUEST,
                         "SELF_DEACTIVATION_NOT_ALLOWED",
@@ -293,16 +308,14 @@ public class AdminUserMutationService {
                     "ROLE_ESCALATION",
                     "Only a super administrator can manage administrator accounts");
         }
-        String requestedStatus = input.get("status") == null ? null : text(input, "status", "");
         // Disabling a protected account is the same refusal as deleting it: the role
-        // stops functioning either way. Re-sending an unchanged role is not covered
-        // by that guard, so this closes the gap the grant-side exemption leaves.
-        if (requestedStatus != null && !requestedStatus.isBlank()
-                && !"ACTIVE".equalsIgnoreCase(requestedStatus)) {
-            requireSuperAdminForProtectedAccount(id, canManageSuperAdmin, "disable");
+        // stops functioning either way, and reactivating it hands the reserved role
+        // back into service. Re-sending an unchanged role is not covered by that
+        // guard, so this closes the gap the grant-side exemption leaves.
+        if (canonicalStatus != null) {
+            requireSuperAdminForProtectedAccount(id, canManageSuperAdmin, "change status");
         }
-        if (requestedStatus != null && !requestedStatus.isBlank()
-                && !ACCOUNT_STATUSES.contains(requestedStatus.toUpperCase(java.util.Locale.ROOT))) {
+        if (canonicalStatus != null && !ACCOUNT_STATUSES.contains(canonicalStatus)) {
             // Free-form status values would silently break the account-state
             // filter and the console badges; only the lifecycle set is valid.
             throw problem(
@@ -322,11 +335,10 @@ public class AdminUserMutationService {
                         + " \"status\" = COALESCE(:status, \"status\"), \"updatedAt\" = CURRENT_TIMESTAMP WHERE \"id\" = :id",
                 new MapSqlParameterSource().addValue("id", id).addValue("firstName", input.get("firstName"))
                         .addValue("lastName", input.get("lastName")).addValue("phone", input.get("phone"))
-                        .addValue("status", input.get("status")));
+                        .addValue("status", canonicalStatus));
         if (updated == 0) throw problem(HttpStatus.NOT_FOUND, "USER_NOT_FOUND", "User not found");
-        String newStatus = input.get("status") == null ? null : text(input, "status", "");
         if (previousStatus != null && "ACTIVE".equalsIgnoreCase(previousStatus)
-                && newStatus != null && !newStatus.isBlank() && !"ACTIVE".equalsIgnoreCase(newStatus)) {
+                && canonicalStatus != null && !"ACTIVE".equals(canonicalStatus)) {
             // Deactivation must cut live access immediately: drop refresh
             // sessions so the stale token cannot rotate, and the account-state
             // filter rejects remaining access tokens on the next request.
@@ -339,9 +351,26 @@ public class AdminUserMutationService {
             // -minute TTL. A genuine role change now cuts live sessions the
             // same way deactivation does (same caveat: refresh rotation dies
             // with the session rows).
-            boolean roleChanged = !hasRole(id, requestedRole);
-            replaceSystemRole(id, requestedRole);
-            removeObsoleteProfiles(id, requestedRole);
+            Set<String> desiredRoles = desiredSystemRoles(requestedRole);
+            // A conversion that mints a new official profile validates the
+            // carried identifiers before any role or profile write, so a
+            // duplicate or missing value leaves every column untouched.
+            boolean needsStudentProfile =
+                    desiredRoles.contains("STUDENT") && !profileExists(id, "STUDENT");
+            boolean needsLecturerProfile =
+                    desiredRoles.contains("LECTURER") && !profileExists(id, "LECTURER");
+            if (needsStudentProfile) {
+                preflightProfileConflicts("STUDENT", input);
+            }
+            if (needsLecturerProfile) {
+                preflightProfileConflicts("LECTURER", input);
+            }
+            // The change test compares the whole system-role set, not just the
+            // requested name: demoting a dean to LECTURER is genuine even though
+            // the account already holds LECTURER.
+            boolean roleChanged = !systemRoleNames(id).equals(desiredRoles);
+            replaceSystemRoles(id, desiredRoles);
+            removeObsoleteProfiles(id, desiredRoles);
             ensureProfile(id, requestedRole, input);
             if (roleChanged) {
                 revokeSessions(id);
@@ -353,9 +382,9 @@ public class AdminUserMutationService {
                 "USER", id,
                 "Updated user " + id
                         + (requestedRole != null ? " to role " + requestedRole : "")
-                        + (newStatus != null && !newStatus.isBlank() ? " status " + newStatus : ""),
+                        + (canonicalStatus != null ? " status " + canonicalStatus : ""),
                 Map.of("status", String.valueOf(previousStatus), "role", String.valueOf(requestedRole)),
-                Map.of("status", String.valueOf(newStatus), "role", String.valueOf(requestedRole)));
+                Map.of("status", String.valueOf(canonicalStatus), "role", String.valueOf(requestedRole)));
         return find(id);
     }
 
@@ -380,6 +409,8 @@ public class AdminUserMutationService {
         // Same ceiling as update()/resetPassword(): a plain administrator can
         // neither edit, reset, nor hard-delete an account holding a reserved role.
         requireSuperAdminForProtectedAccount(id, canManageSuperAdmin, "delete");
+        requireRemovableProfile(id, "STUDENT");
+        requireRemovableProfile(id, "LECTURER");
         // Capture the row first: a hard delete leaves nothing to describe afterwards,
         // and "which account was destroyed and by whom" is the whole point of the
         // record. A read failure is not fatal — the DELETE below reports not-found.
@@ -405,7 +436,9 @@ public class AdminUserMutationService {
         Map<String, Object> user = jdbc.queryForMap(
                 "SELECT u.\"id\", u.\"email\", u.\"firstName\", u.\"lastName\", u.\"status\", u.\"phone\", u.\"createdAt\","
                         + " COALESCE((SELECT STRING_AGG(r.\"name\", ',') FROM " + USER_ROLE
-                        + " ur JOIN " + ROLE + " r ON r.\"id\" = ur.\"roleId\" WHERE ur.\"userId\" = u.\"id\"), '') AS roles"
+                        + " ur JOIN " + ROLE + " r ON r.\"id\" = ur.\"roleId\" WHERE ur.\"userId\" = u.\"id\"), '') AS roles,"
+                        + " EXISTS(SELECT 1 FROM " + STUDENT + " sp WHERE sp.\"userId\" = u.\"id\") AS \"hasStudentProfile\","
+                        + " EXISTS(SELECT 1 FROM " + LECTURER + " lp WHERE lp.\"userId\" = u.\"id\") AS \"hasLecturerProfile\""
                         + " FROM " + USER + " u WHERE u.\"id\" = :id",
                 new MapSqlParameterSource("id", id));
         withRolesAsArray(user);
@@ -437,20 +470,46 @@ public class AdminUserMutationService {
         jdbc.update("INSERT INTO " + USER_ROLE + " (\"id\", \"userId\", \"roleId\") SELECT :id, :userId, :roleId WHERE NOT EXISTS (SELECT 1 FROM " + USER_ROLE + " WHERE \"userId\" = :userId AND \"roleId\" = :roleId)", new MapSqlParameterSource().addValue("id", UUID.randomUUID().toString()).addValue("userId", userId).addValue("roleId", roleId));
     }
 
-    private void replaceSystemRole(String userId, String roleName) {
-        String roleId = roleId(roleName);
+    private void replaceSystemRoles(String userId, Set<String> roleNames) {
+        List<String> roleIds = roleNames.stream().map(this::roleId).toList();
         MapSqlParameterSource params = new MapSqlParameterSource()
                 .addValue("userId", userId)
-                .addValue("roleId", roleId);
+                .addValue("roleIds", roleIds);
         jdbc.update(
                 "DELETE FROM " + USER_ROLE + " WHERE \"userId\" = :userId AND \"roleId\" IN"
-                        + " (SELECT \"id\" FROM " + ROLE + " WHERE \"isSystem\" = TRUE AND \"id\" <> :roleId)",
+                        + " (SELECT \"id\" FROM " + ROLE + " WHERE \"isSystem\" = TRUE AND \"id\" NOT IN (:roleIds))",
                 params);
-        jdbc.update(
-                "INSERT INTO " + USER_ROLE + " (\"id\", \"userId\", \"roleId\")"
-                        + " SELECT :id, :userId, :roleId WHERE NOT EXISTS"
-                        + " (SELECT 1 FROM " + USER_ROLE + " WHERE \"userId\" = :userId AND \"roleId\" = :roleId)",
-                params.addValue("id", UUID.randomUUID().toString()));
+        for (String roleId : roleIds) {
+            jdbc.update(
+                    "INSERT INTO " + USER_ROLE + " (\"id\", \"userId\", \"roleId\")"
+                            + " SELECT :id, :userId, :roleId WHERE NOT EXISTS"
+                            + " (SELECT 1 FROM " + USER_ROLE + " WHERE \"userId\" = :userId AND \"roleId\" = :roleId)",
+                    new MapSqlParameterSource().addValue("id", UUID.randomUUID().toString())
+                            .addValue("userId", userId).addValue("roleId", roleId));
+        }
+    }
+
+    /**
+     * TRUONG_KHOA is a job title carried by a lecturer account, so the dean pair
+     * — never a bare TRUONG_KHOA — is the desired system-role set for that role.
+     * Every other request maps to itself.
+     */
+    private static Set<String> desiredSystemRoles(String roleName) {
+        return "TRUONG_KHOA".equals(roleName)
+                ? Set.of("LECTURER", "TRUONG_KHOA")
+                : Set.of(roleName);
+    }
+
+    /** Both members of the dean pair are bound to the lecturer profile. */
+    private static boolean usesLecturerProfile(String roleName) {
+        return "LECTURER".equals(roleName) || "TRUONG_KHOA".equals(roleName);
+    }
+
+    private Set<String> systemRoleNames(String userId) {
+        return new java.util.HashSet<>(jdbc.queryForList(
+                "SELECT r.\"name\" FROM " + USER_ROLE + " ur JOIN " + ROLE + " r ON r.\"id\" = ur.\"roleId\""
+                        + " WHERE ur.\"userId\" = :userId AND r.\"isSystem\" = TRUE",
+                new MapSqlParameterSource("userId", userId), String.class));
     }
 
     /**
@@ -600,14 +659,23 @@ public class AdminUserMutationService {
                 Integer.class).isEmpty();
     }
 
-    private void removeObsoleteProfiles(String userId, String roleName) {
+    private void removeObsoleteProfiles(String userId, Set<String> desiredRoles) {
         try {
-            if (!"STUDENT".equals(roleName)) {
+            if (!desiredRoles.contains("STUDENT")) {
+                // The auth table is a view over academic."Student": deleting it
+                // cascades attendance, conduct and credit-limit history while
+                // thesis memberships silently orphan. A profile that already
+                // carries academic records is deactivated, never converted
+                // destructively.
+                requireRemovableProfile(userId, "STUDENT");
                 jdbc.update(
                         "DELETE FROM " + STUDENT + " WHERE \"userId\" = :userId",
                         new MapSqlParameterSource("userId", userId));
             }
-            if (!"LECTURER".equals(roleName)) {
+            // The dean pair contains LECTURER, so promoting or demoting a
+            // faculty head never deletes the shared lecturer profile.
+            if (!desiredRoles.contains("LECTURER")) {
+                requireRemovableProfile(userId, "LECTURER");
                 jdbc.update(
                         "DELETE FROM " + LECTURER + " WHERE \"userId\" = :userId",
                         new MapSqlParameterSource("userId", userId));
@@ -618,6 +686,58 @@ public class AdminUserMutationService {
                     "PROFILE_IN_USE",
                     "The existing academic profile is still referenced");
         }
+    }
+
+    /**
+     * Deleting a profiled account's row through the campuscore_auth view hits
+     * the academic base table, where conduct, attendance and credit-limit
+     * rows are ON DELETE CASCADE and thesis memberships carry no key at all.
+     * A conversion that would erase or orphan that history is refused; the
+     * admin can still deactivate the account instead.
+     */
+    private void requireRemovableProfile(String userId, String roleName) {
+        String table = "STUDENT".equals(roleName) ? STUDENT : LECTURER;
+        List<String> profileIds = jdbc.queryForList(
+                "SELECT \"id\" FROM " + table + " WHERE \"userId\" = :userId FOR UPDATE",
+                new MapSqlParameterSource("userId", userId), String.class);
+        if (profileIds.isEmpty()) {
+            return;
+        }
+        String profileId = profileIds.getFirst();
+        long references = 0;
+        if ("STUDENT".equals(roleName)) {
+            references += countReferences("academic.\"Enrollment\"", "\"studentId\"", profileId);
+            references += countReferences("academic.\"Attendance\"", "\"studentId\"", profileId);
+            references += countReferences("academic.\"RegistrationSlip\"", "\"studentId\"", profileId);
+            references += countReferences("academic.\"CreditLimitApplication\"", "\"studentId\"", profileId);
+            references += countReferences("academic.conduct_semester_score", "student_id", profileId);
+            references += countReferences("academic.conduct_activity", "student_id", profileId);
+            references += countReferences("academic.\"EnrollmentEvent\"", "\"studentId\"", profileId);
+            references += countReferences("thesis.thesis_group_member", "student_id", profileId);
+            references += countReferences("thesis.thesis_group", "leader_student_id", profileId);
+            references += countReferences("thesis.thesis_group_report", "submitted_by", profileId);
+        } else {
+            references += countReferences("academic.\"Section\"", "\"lecturerId\"", profileId);
+            references += countReferences("thesis.thesis_council_member", "lecturer_id", profileId);
+            references += countReferences("thesis.thesis_topic_supervisor", "lecturer_id", profileId);
+            references += countReferences("thesis.thesis_topic_score", "lecturer_id", profileId);
+            references += countReferences("thesis.thesis_topic", "gvpb_lecturer_id", profileId);
+            references += countReferences("engagement.\"Announcement\"", "\"lecturerId\"", profileId);
+        }
+        if (references > 0) {
+            throw problem(
+                    HttpStatus.CONFLICT,
+                    "PROFILE_HAS_HISTORY",
+                    "The existing profile has academic history; deactivate the account instead of converting its role");
+        }
+    }
+
+    private long countReferences(String table, String column, String profileId) {
+        Long count = jdbc.queryForObject(
+                "SELECT COUNT(*) FROM " + table + " WHERE " + column + " = :profileId",
+                new MapSqlParameterSource("profileId", profileId),
+                Long.class);
+        return count == null ? 0 : count;
     }
 
     private String roleId(String roleName) {
@@ -646,6 +766,10 @@ public class AdminUserMutationService {
             } catch (NumberFormatException exception) {
                 throw problem(HttpStatus.BAD_REQUEST, "VALIDATION_ERROR", "year must be a number");
             }
+            if (year < 1) {
+                throw problem(HttpStatus.BAD_REQUEST, "VALIDATION_ERROR", "year must be a positive integer");
+            }
+            requireActiveReference(ACADEMIC_CURRICULUM, curriculumId);
             jdbc.update(
                     "INSERT INTO " + STUDENT
                             + " (\"id\", \"userId\", \"studentId\", \"curriculumId\", \"year\", \"status\","
@@ -658,9 +782,10 @@ public class AdminUserMutationService {
                             .addValue("studentId", studentNumber)
                             .addValue("curriculumId", curriculumId)
                             .addValue("year", year));
-        } else if ("LECTURER".equals(roleName)) {
+        } else if (usesLecturerProfile(roleName)) {
             String employeeId = required(input, "employeeId");
             String departmentId = required(input, "departmentId");
+            requireActiveReference(ACADEMIC_DEPARTMENT, departmentId);
             jdbc.update(
                     "INSERT INTO " + LECTURER
                             + " (\"id\", \"userId\", \"departmentId\", \"employeeId\", \"isActive\")"
@@ -673,8 +798,19 @@ public class AdminUserMutationService {
         }
     }
 
+    private void requireActiveReference(String table, String id) {
+        Long count = jdbc.queryForObject(
+                "SELECT COUNT(*) FROM " + table + " WHERE \"id\" = :id AND \"isActive\" = TRUE",
+                new MapSqlParameterSource("id", id),
+                Long.class);
+        if (count == null || count == 0) {
+            throw problem(HttpStatus.BAD_REQUEST, "VALIDATION_ERROR",
+                    "Referenced academic record is missing or inactive");
+        }
+    }
+
     private boolean profileExists(String userId, String roleName) {
-        String table = "STUDENT".equals(roleName) ? STUDENT : "LECTURER".equals(roleName) ? LECTURER : null;
+        String table = "STUDENT".equals(roleName) ? STUDENT : usesLecturerProfile(roleName) ? LECTURER : null;
         if (table == null) {
             return true;
         }
@@ -702,15 +838,22 @@ public class AdminUserMutationService {
 
     /** Deterministic duplicate detection; the DB constraint is the backstop. */
     private void preflightConflicts(String email, String role, Map<String, Object> input, String excludeUserId) {
-        Long emailCount = jdbc.queryForObject(
-                "SELECT COUNT(*) FROM " + USER + " WHERE LOWER(\"email\") = :email"
-                        + " AND (:id IS NULL OR \"id\" <> CAST(:id AS VARCHAR))",
-                new MapSqlParameterSource().addValue("email", email)
-                        .addValue("id", excludeUserId, Types.VARCHAR),
-                Long.class);
-        if (emailCount != null && emailCount > 0) {
-            throw problem(HttpStatus.CONFLICT, "EMAIL_EXISTS", "This email is already registered");
+        if (email != null) {
+            Long emailCount = jdbc.queryForObject(
+                    "SELECT COUNT(*) FROM " + USER + " WHERE LOWER(\"email\") = :email"
+                            + " AND (:id IS NULL OR \"id\" <> CAST(:id AS VARCHAR))",
+                    new MapSqlParameterSource().addValue("email", email)
+                            .addValue("id", excludeUserId, Types.VARCHAR),
+                    Long.class);
+            if (emailCount != null && emailCount > 0) {
+                throw problem(HttpStatus.CONFLICT, "EMAIL_EXISTS", "This email is already registered");
+            }
         }
+        preflightProfileConflicts(role, input);
+    }
+
+    /** Official-identifier duplicate check for the profile class a role needs. */
+    private void preflightProfileConflicts(String role, Map<String, Object> input) {
         if ("STUDENT".equals(role)) {
             String studentId = text(input, "studentId", null);
             if (studentId != null) {
@@ -723,7 +866,7 @@ public class AdminUserMutationService {
                 }
             }
         }
-        if ("LECTURER".equals(role)) {
+        if (usesLecturerProfile(role)) {
             String employeeId = text(input, "employeeId", null);
             if (employeeId != null) {
                 Long count = jdbc.queryForObject(
