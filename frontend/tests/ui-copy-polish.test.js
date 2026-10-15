@@ -224,6 +224,30 @@ test('thesis workflow copy is localized and the English side carries no Vietname
   assert.equal(thesisWorkflowVi.guide.rules[0].number, 'Điều R1');
 });
 
+test('dean overview copy has en/vi key parity', () => {
+  const ts = require('typescript');
+  const source = read('src/i18n/messages-dean-overview.ts');
+  const output = ts.transpileModule(source, {
+    compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2020 },
+  }).outputText;
+  const moduleRecord = { exports: {} };
+  Function('module', 'exports', output)(moduleRecord, moduleRecord.exports);
+  const { deanOverviewEn, deanOverviewVi } = moduleRecord.exports;
+
+  const flat = (value, trail = '') => {
+    if (typeof value === 'string') return [trail];
+    if (Array.isArray(value)) return value.flatMap((item, index) => flat(item, `${trail}[${index}]`));
+    if (value && typeof value === 'object') {
+      return Object.entries(value).flatMap(([key, child]) => flat(child, trail ? `${trail}.${key}` : key));
+    }
+    return [];
+  };
+  const english = flat(deanOverviewEn);
+  const vietnamese = flat(deanOverviewVi);
+  assert.ok(english.length > 20, `expected a substantial dean overview dictionary, got ${english.length}`);
+  assert.deepEqual(vietnamese, english, 'dean overview vi and en must expose the same keys');
+});
+
 test('thesis page labels come from the dictionary instead of Vietnamese literals', () => {
   const VI = /[ăâêôơưđáàảãạấầẩẫậắằẳẵặéèẻẽẹếềểễệíìỉĩịóòỏõọốồổỗộớờởỡợúùủũụứừửữựýỳỷỹ]/i;
   const page = read('src/app/dashboard/thesis/page.tsx');
@@ -259,9 +283,14 @@ test('milestone 2: meta.defaults.keywords array length parity between en and vi'
   const output = ts.transpileModule(source, {
     compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2020 },
   }).outputText;
+  const tsNamespaces = {
+    'messages-thesis-workflow': 'src/i18n/messages-thesis-workflow.ts',
+    'messages-dean-overview': 'src/i18n/messages-dean-overview.ts',
+  };
   const customRequire = (id) => {
-    if (id.includes('messages-thesis-workflow')) {
-      const target = path.join(root, 'src/i18n/messages-thesis-workflow.ts');
+    const namespace = Object.keys(tsNamespaces).find((name) => id.includes(name));
+    if (namespace) {
+      const target = path.join(root, tsNamespaces[namespace]);
       const modSource = fs.readFileSync(target, 'utf8');
       const modOutput = ts.transpileModule(modSource, {
         compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2020 },

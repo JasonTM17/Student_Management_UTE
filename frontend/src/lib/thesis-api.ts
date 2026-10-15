@@ -220,6 +220,88 @@ export interface ThesisGradingTask {
   myScoreRows: number;
 }
 
+/** Faculty-head (TRUONG_KHOA) observation projection — read-only, faculty-scoped. */
+export interface DeanFacultyScope {
+  facultyId: string;
+  facultyName: string;
+  departmentId: string;
+  departmentName: string;
+}
+
+export interface DeanOverviewRound {
+  id: string;
+  name: string;
+  thesisType: string;
+  status: string;
+}
+
+export interface DeanDepartmentCount {
+  departmentId: string;
+  departmentName: string;
+  groupCount: number;
+  topicCount: number;
+}
+
+export interface DeanOverviewStats {
+  totalGroups: number;
+  groupsPendingApproval: number;
+  groupsApproved: number;
+  groupsRejected: number;
+  groupsWithoutTopic: number;
+  totalMembers: number;
+  facultyTopics: number;
+  supervisorCount: number;
+  byDepartment: DeanDepartmentCount[];
+}
+
+export interface DeanSupervisorRef {
+  lecturerId: string;
+  employeeId?: string | null;
+  displayName?: string | null;
+  departmentName?: string | null;
+  supervisorOrder: number;
+}
+
+export interface DeanGroupMember {
+  studentNumber?: string | null;
+  displayName?: string | null;
+  contact?: string | null;
+  isExternal: boolean;
+  isLeader: boolean;
+  memberOrder: number;
+}
+
+export interface DeanGroup {
+  id: string;
+  status: string;
+  approvalStatus: string;
+  rejectionReason?: string | null;
+  topicId?: string | null;
+  topicTitle?: string | null;
+  departmentId?: string | null;
+  departmentName?: string | null;
+  supervisors: DeanSupervisorRef[];
+  members: DeanGroupMember[];
+  createdAt?: string | null;
+}
+
+export interface DeanSupervisorWorkload {
+  lecturerId: string;
+  employeeId?: string | null;
+  displayName?: string | null;
+  departmentName?: string | null;
+  supervisedTopics: number;
+  supervisedGroups: number;
+}
+
+export interface DeanOverview {
+  faculty: DeanFacultyScope;
+  round: DeanOverviewRound;
+  stats: DeanOverviewStats;
+  supervisors: DeanSupervisorWorkload[];
+  groups: DeanGroup[];
+}
+
 export interface ThesisLecturerWorkload {
   topics: ThesisSupervisedTopic[];
   councils: ThesisCouncilAssignment[];
@@ -1016,6 +1098,13 @@ export const thesisApi = {
 
   myWorkload: async (): Promise<ThesisLecturerWorkload> => {
     const response = await api.get<ThesisLecturerWorkload>('/thesis/me/workload');
+    return response.data;
+  },
+
+  deanOverview: async (roundId: string): Promise<DeanOverview> => {
+    const response = await api.get<DeanOverview>('/thesis/dean/overview', {
+      params: { roundId },
+    });
     return response.data;
   },
 

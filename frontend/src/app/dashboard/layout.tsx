@@ -23,6 +23,7 @@ import {
   ClipboardCheck,
   ClipboardList,
   DoorOpen,
+  Eye,
   FileEdit,
   FileText,
   GraduationCap,
@@ -78,7 +79,8 @@ type DashboardMenuLabelKey =
   | 'notifications'
   | 'teachingSchedule'
   | 'gradeManagement'
-  | 'mailCompose';
+  | 'mailCompose'
+  | 'deanOverview';
 
 type DashboardMenuSectionKey = 'overview' | 'academic' | 'teaching' | 'campus';
 
@@ -345,7 +347,14 @@ export default function DashboardLayout({
     : (isLecturer ? lecturerMenuSections : studentMenuSections).map((section) => ({
         ...section,
         label: menuSectionLabels[section.sectionKey],
-        items: section.items.map((item) => ({
+        items: [
+          ...section.items,
+          // The faculty head keeps the lecturer workspace and gains a
+          // read-only faculty thesis observation entry under Campus.
+          ...(section.sectionKey === 'campus' && isFacultyHead
+            ? [{ href: '/dashboard/dean', icon: Eye, labelKey: 'deanOverview' as const }]
+            : []),
+        ].map((item) => ({
           ...item,
           label: menuLabels[item.labelKey],
         })),
@@ -405,6 +414,10 @@ export default function DashboardLayout({
       '/dashboard/thesis': {
         title: messages.dashboardShell.menu.thesis,
         description: messages.dashboardShell.routeDescriptions.thesis,
+      },
+      '/dashboard/dean': {
+        title: messages.dashboardShell.menu.deanOverview,
+        description: messages.dashboardShell.routeDescriptions.deanOverview,
       },
       '/dashboard/certificates': {
         title: messages.dashboardShell.menu.certificates,

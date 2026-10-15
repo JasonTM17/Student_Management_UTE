@@ -1,5 +1,6 @@
 import type { Locale } from '@/i18n/config';
 import { thesisWorkflowEn, thesisWorkflowVi } from '@/i18n/messages-thesis-workflow';
+import { deanOverviewEn, deanOverviewVi } from '@/i18n/messages-dean-overview';
 
 export const en = {
   common: {
@@ -466,6 +467,7 @@ export const en = {
     desktopSubtitle: 'Campus academic portal',
     mobileSubtitle: 'Academic access',
     lecturerSubtitle: 'Faculty portal',
+    deanSubtitle: 'Faculty oversight',
     adminSubtitle: 'Campus operations',
   },
   login: {
@@ -587,6 +589,25 @@ export const en = {
           'Class lists stay next to the students you teach.',
           'Enter and review scores for the sections you teach.',
           'Check teaching hours without switching to another desk.',
+        ],
+      },
+      dean: {
+        tab: 'Dean',
+        eyebrow: 'Dean portal',
+        title: 'Sign in to the dean portal.',
+        description:
+          'Observe thesis groups, student members, and supervising lecturers across the faculty.',
+        heading: 'Dean sign-in',
+        subheading: 'Use your dean campus account to open faculty oversight.',
+        officeSupport: 'Faculty office',
+        destination: 'A matching dean account opens the faculty observation dashboard.',
+        mismatch:
+          'This account belongs to another campus portal. Open the student, lecturer, or admin sign-in instead.',
+        featureTitles: ['Rounds', 'Groups', 'Workload'],
+        featureDescriptions: [
+          'Follow every thesis round running in the faculty.',
+          'See group rosters, leaders, and topic status.',
+          'Check supervisor workload across departments.',
         ],
       },
       admin: {
@@ -1362,6 +1383,7 @@ export const en = {
       teachingSchedule: 'Teaching schedule',
       gradeManagement: 'Grade management',
       mailCompose: 'Academic email',
+      deanOverview: 'Faculty thesis overview',
       profileSettings: 'Profile settings',
       profile: 'Profile',
       settings: 'Settings',
@@ -1459,6 +1481,8 @@ export const en = {
         'Share updates with the students connected to your sections.',
       lecturerMail:
         'Compose official academic emails from campus templates: notices, registration confirmations, and grade alerts.',
+      deanOverview:
+        'Read-only faculty view of thesis groups, members, and supervising lecturers.',
       thesis:
         'Track thesis registration rounds, topics, groups, and progress.',
       editor:
@@ -2672,6 +2696,7 @@ export const en = {
     toastDownloaded: 'Academic results chart downloaded (SVG)',
   },
   thesisWorkflow: thesisWorkflowEn,
+  deanOverview: deanOverviewEn,
   attendance: {
     eyebrow: 'Student area',
     title: 'Attendance',
@@ -3239,6 +3264,7 @@ export const vi: I18nMessages = {
     desktopSubtitle: 'Cổng học vụ CampusUTE',
     mobileSubtitle: 'Truy cập học vụ',
     lecturerSubtitle: 'Không gian giảng viên',
+    deanSubtitle: 'Không gian trưởng khoa',
     adminSubtitle: 'Công cụ quản trị nhà trường',
   },
   login: {
@@ -3360,6 +3386,25 @@ export const vi: I18nMessages = {
           'Danh sách lớp học phần bạn phụ trách.',
           'Nhập và quản lý điểm cho các lớp học phần.',
           'Xem thời khóa biểu giảng dạy trực quan.',
+        ],
+      },
+      dean: {
+        tab: 'Trưởng khoa',
+        eyebrow: 'Cổng Trưởng khoa',
+        title: 'Đăng nhập Cổng Trưởng khoa.',
+        description:
+          'Quan sát các nhóm khóa luận, thành viên sinh viên và giảng viên hướng dẫn trong toàn khoa.',
+        heading: 'Đăng nhập trưởng khoa',
+        subheading: 'Dùng tài khoản trưởng khoa để mở bảng quan sát của khoa.',
+        officeSupport: 'Văn phòng Khoa',
+        destination: 'Tài khoản trưởng khoa hợp lệ sẽ mở Bảng quan sát khóa luận khoa.',
+        mismatch:
+          'Tài khoản này thuộc cổng khác. Hãy mở đăng nhập sinh viên, giảng viên hoặc quản trị.',
+        featureTitles: ['Đợt khóa luận', 'Nhóm & thành viên', 'Phân bổ GVHD'],
+        featureDescriptions: [
+          'Theo dõi mọi đợt khóa luận đang diễn ra trong khoa.',
+          'Xem danh sách nhóm, nhóm trưởng và trạng thái đề tài.',
+          'Nắm khối lượng hướng dẫn của từng giảng viên theo bộ môn.',
         ],
       },
       admin: {
@@ -4131,6 +4176,7 @@ export const vi: I18nMessages = {
       teachingSchedule: 'Lịch giảng dạy',
       gradeManagement: 'Quản lý điểm',
       mailCompose: 'Email học vụ',
+      deanOverview: 'Quan sát khóa luận khoa',
       profileSettings: 'Cài đặt hồ sơ',
       profile: 'Hồ sơ',
       settings: 'Cài đặt',
@@ -4228,6 +4274,8 @@ export const vi: I18nMessages = {
         'Chia sẻ cập nhật với sinh viên trong các lớp của bạn.',
       lecturerMail:
         'Soạn email học vụ chính thức theo mẫu của nhà trường: thông báo, xác nhận đăng ký và cảnh báo điểm.',
+      deanOverview:
+        'Bảng chỉ-đọc quan sát nhóm khóa luận, thành viên và giảng viên hướng dẫn trong khoa.',
       thesis:
         'Theo dõi đợt đăng ký đề tài, nhóm sinh viên và tiến độ luận văn.',
       editor:
@@ -5440,6 +5488,7 @@ export const vi: I18nMessages = {
     toastDownloaded: 'Đã tải xuống biểu đồ kết quả học tập (SVG)',
   },
   thesisWorkflow: thesisWorkflowVi,
+  deanOverview: deanOverviewVi,
   attendance: {
     eyebrow: 'Khu vực Sinh viên',
     title: 'Điểm danh',
