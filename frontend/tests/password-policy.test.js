@@ -196,6 +196,62 @@ test('rule precedence matches the backend order', async () => {
   );
 });
 
+async function loginNoticeMapper(reason) {
+  const sourcePath = path.join(root, 'src/app/login/page.tsx');
+  const source = fs.readFileSync(sourcePath, 'utf8');
+  const parsed = ts.createSourceFile(sourcePath, source, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX);
+  let memoBody;
+  function visit(node) {
+    if (
+      ts.isCallExpression(node)
+      && node.expression.getText(parsed) === 'useMemo'
+      && node.getText(parsed).includes('session-expired')
+    ) {
+      memoBody = node.arguments[0];
+    }
+    ts.forEachChild(node, visit);
+  }
+  visit(parsed);
+  assert.ok(memoBody && ts.isArrowFunction(memoBody), 'Actual login notice memo required');
+  const reasonMessages = {
+    sessionExpired: 'SE', unauthorized: 'UA', signedOut: 'SO', passwordRotated: 'PR',
+  };
+  const { outputText } = ts.transpileModule('(' + memoBody.getText(parsed) + ')()', {
+    compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.None },
+  });
+  return vm.runInNewContext(outputText, { reason, messages: { login: { reasonMessages } } }, { filename: 'login-notice.js' });
+}
+
+test('login notice maps password-rotated to the localized rotation message', async () => {
+  assert.equal(await loginNoticeMapper('password-rotated'), 'PR');
+  assert.equal(await loginNoticeMapper('session-expired'), 'SE');
+  assert.equal(await loginNoticeMapper('unauthorized'), 'UA');
+  assert.equal(await loginNoticeMapper('signed-out'), 'SO');
+  assert.equal(await loginNoticeMapper('unknown-reason'), undefined);
+  assert.equal(await loginNoticeMapper(''), undefined);
+});
+
+test('both locales define the passwordRotated notice title and body', () => {
+  const sourcePath = path.join(root, 'src/i18n/messages.ts');
+  const source = fs.readFileSync(sourcePath, 'utf8');
+  const parsed = ts.createSourceFile(sourcePath, source, ts.ScriptTarget.Latest, true, ts.ScriptKind.TS);
+  const blocks = [];
+  function visit(node) {
+    if (ts.isPropertyAssignment(node) && node.name.getText(parsed) === 'reasonMessages') {
+      blocks.push(node.initializer.getText(parsed));
+    }
+    ts.forEachChild(node, visit);
+  }
+  visit(parsed);
+  assert.equal(blocks.length, 2, 'exactly the en and vi reasonMessages blocks');
+  for (const block of blocks) {
+    assert.ok(block.includes('passwordRotated'), 'locale missing passwordRotated');
+    const rotated = block.slice(block.indexOf('passwordRotated'));
+    assert.ok(rotated.includes('title:'), 'passwordRotated needs a title');
+    assert.ok(rotated.includes('body:'), 'passwordRotated needs a body');
+  }
+});
+
 test('mapPasswordErrorCode only recognizes the known code namespace', async () => {
   const { mapPasswordErrorCode } = await loadPolicyModule();
   for (const code of [

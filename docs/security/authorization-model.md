@@ -49,6 +49,14 @@ replacement commits may finish. This boundary does not promise cancellation of
 in-flight work, recovery of past side effects, or access-token blacklisting on
 single-session logout.
 
+Credential verification and replacement serialize on the account's User row
+lock, so login, refresh, reset issuance/redemption, and password writes for the
+same account queue rather than interleave; no `lock_timeout` is configured, so
+an operational stall on one account delays only that account's auth. A request
+carrying a stale credential fails closed even on `permitAll` reads — the
+frontend treats that as session death and routes to sign-in rather than
+serving anonymous content silently.
+
 Apply the forward
 [V121 migration](../../java-services/restful-api/src/main/resources/db/migration/V121__revoke_access_on_credential_rotation.sql)
 with enforcing backend code. Do not serve a mixture of enforcing and older

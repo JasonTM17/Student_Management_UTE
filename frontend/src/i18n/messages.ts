@@ -521,6 +521,10 @@ export const en = {
         title: 'Password updated',
         body: 'Your password has been reset. Sign in with your new password.',
       },
+      passwordRotated: {
+        title: 'Password changed',
+        body: 'Your password was changed. Sign in with your new password.',
+      },
     },
     runtimeNotice: {
       infoTitle: 'Preview ready',
@@ -3368,6 +3372,10 @@ export const vi: I18nMessages = {
       passwordReset: {
         title: 'Đã cập nhật mật khẩu',
         body: 'Mật khẩu của bạn đã được đặt lại. Hãy đăng nhập bằng mật khẩu mới.',
+      },
+      passwordRotated: {
+        title: 'Đã đổi mật khẩu',
+        body: 'Mật khẩu của bạn đã được thay đổi. Hãy đăng nhập bằng mật khẩu mới.',
       },
     },
     runtimeNotice: {

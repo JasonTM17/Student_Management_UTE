@@ -139,6 +139,10 @@ export default function LoginPage() {
       return messages.login.reasonMessages.signedOut;
     }
 
+    if (reason === 'password-rotated') {
+      return messages.login.reasonMessages.passwordRotated;
+    }
+
     return undefined;
   }, [messages.login.reasonMessages, reason]);
 
