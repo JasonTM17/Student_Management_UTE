@@ -421,9 +421,15 @@ public class AdminCatalogMutationService {
             }
             String startTime = requiredScheduleText(schedule, "startTime");
             String endTime = requiredScheduleText(schedule, "endTime");
-            // Zero-padded HH:mm compares lexicographically the same as it does
-            // chronologically.
-            if (startTime.compareTo(endTime) >= 0) {
+            // startTime/endTime are VARCHAR(10) columns compared
+            // lexicographically everywhere downstream (the conflict SQL below
+            // and RegistrationService.overlaps), which only matches
+            // chronological order for the zero-padded HH:mm form. Enforce the
+            // format here — an unpadded "7:00" would silently produce missed
+            // and phantom schedule conflicts.
+            java.time.LocalTime start = parseScheduleTime(startTime, "startTime");
+            java.time.LocalTime end = parseScheduleTime(endTime, "endTime");
+            if (!start.isBefore(end)) {
                 throw problem(HttpStatus.BAD_REQUEST, "INVALID_SCHEDULE",
                         "startTime must be before endTime");
             }
@@ -723,6 +729,23 @@ public class AdminCatalogMutationService {
             throw new IllegalArgumentException(name + " is required for each schedule");
         }
         return value;
+    }
+
+    /**
+     * Parse a schedule clock value, accepting only the zero-padded HH:mm form
+     * the VARCHAR columns are compared as everywhere downstream.
+     */
+    private static java.time.LocalTime parseScheduleTime(String value, String name) {
+        if (!value.matches("\\d{2}:\\d{2}")) {
+            throw problem(HttpStatus.BAD_REQUEST, "INVALID_SCHEDULE",
+                    name + " must use zero-padded HH:mm (e.g. 07:00)");
+        }
+        try {
+            return java.time.LocalTime.parse(value);
+        } catch (java.time.format.DateTimeParseException exception) {
+            throw problem(HttpStatus.BAD_REQUEST, "INVALID_SCHEDULE",
+                    name + " must be a valid HH:mm time (e.g. 07:00)");
+        }
     }
 
     private static String optionalScheduleText(Map<?, ?> schedule, String name, String fallback) {

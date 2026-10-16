@@ -47,6 +47,9 @@ public class AcademicMutationService {
      */
     private static final List<String> GRADEABLE_STATUSES = List.of("ENROLLED", "CONFIRMED", "COMPLETED");
 
+    /** Hard bound on the admin enrollment CSV export (rows). */
+    private static final int EXPORT_LIMIT = 50_000;
+
     private static final org.slf4j.Logger log =
             org.slf4j.LoggerFactory.getLogger(AcademicMutationService.class);
 
@@ -180,6 +183,10 @@ public class AcademicMutationService {
         addFilter(filters, parameters, "courseId", courseId, "section.\"courseId\" = :courseId");
         addFilter(filters, parameters, "sectionId", sectionId, "e.\"sectionId\" = :sectionId");
         String where = filters.isEmpty() ? "" : " WHERE " + String.join(" AND ", filters);
+        // Unfiltered exports used to load the whole enrollment table into
+        // memory. A CSV past this bound would be unusable anyway; the caller
+        // narrows filters instead of streaming the entire history.
+        parameters.addValue("exportLimit", EXPORT_LIMIT);
         List<Map<String, Object>> rows = jdbc.queryForList(
                 "SELECT e.\"id\", student.\"studentId\" AS student_number,"
                         + " student_user.\"email\", student_user.\"firstName\", student_user.\"lastName\","
@@ -192,7 +199,7 @@ public class AcademicMutationService {
                         + " JOIN " + SECTION + " section ON section.\"id\" = e.\"sectionId\""
                         + " JOIN " + COURSE + " course ON course.\"id\" = section.\"courseId\""
                         + " JOIN " + SEMESTER + " semester ON semester.\"id\" = e.\"semesterId\""
-                        + where + " ORDER BY e.\"enrolledAt\" DESC",
+                        + where + " ORDER BY e.\"enrolledAt\" DESC LIMIT :exportLimit",
                 parameters);
         StringBuilder csv = new StringBuilder(
                 "id,studentNumber,email,studentName,courseCode,courseName,section,semester,status,enrolledAt,finalGrade,letterGrade\r\n");
@@ -337,10 +344,15 @@ public class AcademicMutationService {
                         + " \"gradeStatus\" = :gradeStatus, \"updatedAt\" = CURRENT_TIMESTAMP WHERE \"id\" = :id",
                 enrollmentBatch.toArray(new MapSqlParameterSource[0]));
 
-        if (admin && actorId != null && !actorId.isBlank()) {
-            audit.record(actorId, null, "GRADE_UPDATE_BY_ADMIN", "SECTION", sectionId,
-                    "Admin " + actorId + " saved draft grades for " + effectiveGrades.size()
-                            + " enrollment(s) in section " + sectionId);
+        // Component scores are delete+inserted per save with no per-row
+        // history, so the audit row is the only trace that a grade write
+        // happened. Record it for both caller kinds — the routine lecturer
+        // save used to leave no trace at all (admin-only audit).
+        if (actorId != null && !actorId.isBlank()) {
+            audit.record(actorId, null, admin ? "GRADE_UPDATE_BY_ADMIN" : "GRADE_UPDATE",
+                    "SECTION", sectionId,
+                    (admin ? "Admin " : "Lecturer ") + actorId + " saved draft grades for "
+                            + effectiveGrades.size() + " enrollment(s) in section " + sectionId);
         }
     }
 
@@ -407,10 +419,11 @@ public class AcademicMutationService {
             // (dropped/cancelled) enrollment that publish must not resurrect.
             throw problem(HttpStatus.CONFLICT, "GRADES_EMPTY", "No complete grades are ready to publish");
         }
-        if (admin && actorId != null && !actorId.isBlank()) {
-            audit.record(actorId, null, "GRADE_PUBLISH_BY_ADMIN", "SECTION", sectionId,
-                    "Admin " + actorId + " published official grades for section " + sectionId
-                            + " (" + updated + " enrollment(s))");
+        if (actorId != null && !actorId.isBlank()) {
+            audit.record(actorId, null, admin ? "GRADE_PUBLISH_BY_ADMIN" : "GRADE_PUBLISH",
+                    "SECTION", sectionId,
+                    (admin ? "Admin " : "Lecturer ") + actorId + " published official grades for section "
+                            + sectionId + " (" + updated + " enrollment(s))");
         }
         if (gradeNotifier != null && !audience.isEmpty()) {
             if (org.springframework.transaction.support.TransactionSynchronizationManager.isSynchronizationActive()) {

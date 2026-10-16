@@ -92,6 +92,41 @@ class AcademicCourseProgressIntegrityTest {
                 .isZero();
     }
 
+    @Test
+    void repeatedCourseKeepsNumericAndLetterGradeFromTheSameBestPublishedAttempt() {
+        insertEnrollment("enrollment-repeat-best", "COMPLETED", "PUBLISHED", "7.00", "B");
+        insertEnrollment("enrollment-repeat-lower", "COMPLETED", "PUBLISHED", "6.70", "C+");
+        insertEnrollment("enrollment-repeat-draft", "COMPLETED", "DRAFT", "9.00", "A+");
+        insertEnrollment("enrollment-repeat-other-student", "COMPLETED", "PUBLISHED", "9.50", "A");
+        jdbc.update("UPDATE \"academic\".\"Enrollment\" SET \"courseId\" = 'course-repeat'"
+                + " WHERE \"id\" LIKE 'enrollment-repeat-%'");
+        jdbc.update("UPDATE \"academic\".\"Enrollment\" SET \"studentId\" = 'student-2'"
+                + " WHERE \"id\" = 'enrollment-repeat-other-student'");
+
+        AcademicReadRepository.CourseProgressRow repeated = reads.findCourseProgressByStudentId("student-1")
+                .stream().filter(row -> row.courseId().equals("course-repeat")).findFirst().orElseThrow();
+
+        assertThat(repeated.progressLevel()).isEqualTo(2);
+        assertThat(repeated.finalGrade()).isEqualByComparingTo("7.00");
+        assertThat(repeated.letterGrade()).as("letter must belong to the selected numeric grade").isEqualTo("B");
+    }
+
+    @Test
+    void bestAttemptPrefersNumericGradeAndBreaksEqualGradeTiesByEnrollmentId() {
+        insertEnrollment("enrollment-tie-a", "COMPLETED", "PUBLISHED", "7.00", "B");
+        insertEnrollment("enrollment-tie-b", "COMPLETED", "PUBLISHED", "7.00", "C+");
+        insertEnrollment("enrollment-tie-null", "COMPLETED", "PUBLISHED", null, "A");
+        jdbc.update("UPDATE \"academic\".\"Enrollment\" SET \"courseId\" = 'course-tie'"
+                + " WHERE \"id\" LIKE 'enrollment-tie-%'");
+
+        AcademicReadRepository.CourseProgressRow tied = reads.findCourseProgressByStudentId("student-1")
+                .stream().filter(row -> row.courseId().equals("course-tie")).findFirst().orElseThrow();
+
+        assertThat(tied.progressLevel()).isEqualTo(2);
+        assertThat(tied.finalGrade()).isEqualByComparingTo("7.00");
+        assertThat(tied.letterGrade()).isEqualTo("B");
+    }
+
     private void insertEnrollment(
             String id, String status, String gradeStatus, String finalGrade, String letterGrade) {
         String courseCode = id.substring("enrollment-".length());

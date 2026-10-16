@@ -838,15 +838,21 @@ public class RegistrationService {
         if (preferred != null) {
             return preferred;
         }
-        if ("ADD_DROP".equals(preferredKind)) {
-            Map<String, Object> registration = rounds.stream()
-                    .filter(row -> "REGISTRATION".equals(String.valueOf(row.get("kind"))))
-                    .filter(row -> inWindow(row, now))
-                    .findFirst()
-                    .orElse(null);
-            if (registration != null) {
-                return registration;
-            }
+        // The two round kinds are interchangeable for reads, and each write
+        // path must keep working while the other window is the only one open:
+        // drops fall back to a live REGISTRATION round, and enrollments fall
+        // back to a live ADD_DROP round (its seeded name is literally
+        // "supplementary registration + drop" — adds are its purpose, so
+        // blocking them between the registration deadline and the add/drop
+        // deadline left students unable to add courses for days).
+        String fallbackKind = "ADD_DROP".equals(preferredKind) ? "REGISTRATION" : "ADD_DROP";
+        Map<String, Object> fallback = rounds.stream()
+                .filter(row -> fallbackKind.equals(String.valueOf(row.get("kind"))))
+                .filter(row -> inWindow(row, now))
+                .findFirst()
+                .orElse(null);
+        if (fallback != null) {
+            return fallback;
         }
         throw problem(HttpStatus.CONFLICT, "WINDOW_CLOSED", "No open registration window");
     }
@@ -946,12 +952,15 @@ public class RegistrationService {
 
     private void assertPrereqAndCoreq(String studentId, String courseId, String semesterId, List<String> requestSectionIds) {
         List<Map<String, Object>> requirements = jdbc.queryForList(
-                "SELECT \"requiredCourseId\" AS required_course_id, \"kind\" FROM " + REQUIREMENT + " WHERE \"courseId\" = :courseId",
+                "SELECT \"requiredCourseId\" AS required_course_id, \"kind\", \"minLetterGrade\" AS min_letter_grade"
+                        + " FROM " + REQUIREMENT + " WHERE \"courseId\" = :courseId",
                 new MapSqlParameterSource("courseId", courseId));
         for (Map<String, Object> requirement : requirements) {
             String required = String.valueOf(requirement.get("required_course_id"));
             String kind = String.valueOf(requirement.get("kind"));
-            if ("PREREQ".equals(kind) && !hasCompleted(studentId, required)) {
+            String minLetter = requirement.get("min_letter_grade") == null
+                    ? null : String.valueOf(requirement.get("min_letter_grade"));
+            if ("PREREQ".equals(kind) && !hasCompleted(studentId, required, minLetter)) {
                 throw problem(HttpStatus.UNPROCESSABLE_ENTITY, "PREREQUISITE_UNMET", "A required prerequisite is missing");
             }
             if ("COREQ".equals(kind) && !hasActiveCourse(studentId, semesterId, required) && !requestHasCourse(requestSectionIds, required)) {
@@ -960,9 +969,13 @@ public class RegistrationService {
         }
     }
 
-    private boolean hasCompleted(String studentId, String courseId) {
-        Long count = jdbc.queryForObject(
-                "SELECT COUNT(*) FROM " + ENROLLMENT
+    /** Letter ordering used for prerequisite minimum-grade enforcement. */
+    private static final java.util.Map<String, Integer> LETTER_RANK = java.util.Map.of(
+            "F", 0, "D", 1, "D+", 2, "C", 3, "C+", 4, "B", 5, "B+", 6, "A", 7, "A+", 8);
+
+    private boolean hasCompleted(String studentId, String courseId, String minLetter) {
+        List<String> letters = jdbc.queryForList(
+                "SELECT \"letterGrade\" FROM " + ENROLLMENT
                         + " WHERE \"studentId\" = :studentId AND \"courseId\" = :courseId"
                         + " AND \"gradeStatus\" IN ('COMPLETED', 'PUBLISHED')"
                         // A passing letter is required: a graded row without a
@@ -971,8 +984,19 @@ public class RegistrationService {
                         + " AND \"letterGrade\" IS NOT NULL"
                         + " AND \"letterGrade\" NOT IN ('F', 'W')",
                 new MapSqlParameterSource().addValue("studentId", studentId).addValue("courseId", courseId),
-                Long.class);
-        return count != null && count > 0;
+                String.class);
+        if (letters.isEmpty()) {
+            return false;
+        }
+        // minLetterGrade was a dead column: the gate accepted any non-F/W pass.
+        // When the requirement declares a floor (e.g. 'B'), the student's best
+        // achieved letter must rank at or above it; an unknown floor value is
+        // ignored rather than silently tightening or loosening the rule.
+        int minRank = minLetter == null ? Integer.MIN_VALUE
+                : LETTER_RANK.getOrDefault(minLetter.trim().toUpperCase(java.util.Locale.ROOT), Integer.MIN_VALUE);
+        return letters.stream()
+                .map(letter -> LETTER_RANK.getOrDefault(letter, Integer.MIN_VALUE))
+                .anyMatch(rank -> rank >= minRank);
     }
 
     private boolean hasActiveCourse(String studentId, String semesterId, String courseId) {

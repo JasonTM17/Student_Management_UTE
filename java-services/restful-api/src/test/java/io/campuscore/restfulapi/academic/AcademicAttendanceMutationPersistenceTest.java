@@ -85,6 +85,39 @@ class AcademicAttendanceMutationPersistenceTest {
     }
 
     @Test
+    void duplicateStudentIdInOnePayloadIsDedupedLastWriteWins() throws Exception {
+        // A payload naming the same student twice used to hit the unique key
+        // and surface as a 500. The contract is JSON-object semantics: the
+        // last entry wins, exactly one row persists.
+        String payload = """
+                {
+                    "date": "2026-08-25",
+                    "records": [
+                        {"studentId": "student-1", "status": "PRESENT"},
+                        {"studentId": "student-2", "status": "PRESENT"},
+                        {"studentId": "student-1", "status": "ABSENT", "notes": "ra về giữa giờ"}
+                    ]
+                }
+                """;
+
+        mvc.perform(put("/api/v1/attendance/sections/section-1")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(payload)
+                        .with(lecturerJwt("lecturer-1")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.updatedCount").value(2));
+
+        assertThat(jdbc.queryForObject(
+                        "SELECT COUNT(*) FROM \"academic\".\"Attendance\" WHERE \"sectionId\" = 'section-1'",
+                        Integer.class))
+                .isEqualTo(2);
+        assertThat(jdbc.queryForObject(
+                        "SELECT \"status\" FROM \"academic\".\"Attendance\" WHERE \"sectionId\" = 'section-1' AND \"studentId\" = 'student-1'",
+                        String.class))
+                .isEqualTo("ABSENT");
+    }
+
+    @Test
     void isoInstantAndDateOnlyReferToOneUtcAttendanceDayIncludingLegacyRows() throws Exception {
         mvc.perform(put("/api/v1/attendance/sections/section-1").with(lecturerJwt("lecturer-1"))
                 .contentType(MediaType.APPLICATION_JSON)
