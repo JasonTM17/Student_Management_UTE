@@ -536,14 +536,17 @@ export function TinyMceEditor({
     }
   };
 
-  // Copy HTML to clipboard
+  // Copy HTML to clipboard — a rejected write must surface, not leave the
+  // button looking dead while nothing reached the clipboard.
   const handleCopyHtml = async () => {
     try {
       await navigator.clipboard.writeText(value);
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
     } catch {
-      // fallback
+      toast.error(
+        isVi ? 'Không thể sao chép — hãy dùng nút tải xuống.' : 'Copy failed — use the download button instead.',
+      );
     }
   };
 

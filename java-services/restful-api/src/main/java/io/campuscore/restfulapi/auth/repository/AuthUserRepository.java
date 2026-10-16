@@ -132,6 +132,33 @@ public class AuthUserRepository {
     }
 
     /**
+     * Whether this account holds a live refresh session whose last-observed
+     * client IP equals the given address. Used by the login lockout check: a
+     * failed-attempt lock is keyed to the account, so an attacker who knows a
+     * victim's email could otherwise keep that account permanently locked by
+     * submitting five bad passwords every lock window. A live session row is
+     * only written after a real credential exchange (and its ipAddress is
+     * refreshed on each rotation), so an address present here has previously
+     * completed a successful login for this account — TCP cannot spoof a
+     * source address, so that history is the trust signal.
+     */
+    public boolean hasRecentSessionFromIp(String userId, String ipAddress, Instant now) {
+        if (ipAddress == null || ipAddress.isBlank()) {
+            return false;
+        }
+        Integer count = jdbc.queryForObject(
+                "SELECT COUNT(*) FROM " + SESSION_TABLE
+                        + " WHERE \"userId\" = :userId AND \"ipAddress\" = :ipAddress"
+                        + " AND \"expiresAt\" > :now",
+                new MapSqlParameterSource()
+                        .addValue("userId", userId)
+                        .addValue("ipAddress", ipAddress)
+                        .addValue("now", localDateTime(now)),
+                Integer.class);
+        return count != null && count > 0;
+    }
+
+    /**
      * Lightweight per-request account state used by the account-state filter:
      * selects only the two enforcement columns so the check stays cheap.
      */

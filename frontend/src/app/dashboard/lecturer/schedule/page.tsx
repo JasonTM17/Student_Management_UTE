@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Calendar,
   CalendarDays,
@@ -33,11 +33,14 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { PageHeader, SectionEyebrow } from '@/components/ui/page-header';
 import { Select } from '@/components/ui/select';
 import { Button } from '@/components/ui/button';
+import { useRovingTabs } from '@/components/ui/use-roving-tabs';
 import {
   EmptyState,
   ErrorState,
   LoadingState,
 } from '@/components/ui/state-block';
+
+const LECTURER_VIEW_MODES = ['grid', 'day', 'list'] as const;
 import { useI18n } from '@/i18n';
 import {
   ClassScheduleDetailModal,
@@ -58,6 +61,7 @@ export default function LecturerSchedulePage() {
 
   // 3 view options matching student schedule: 'grid' (Lưới tuần), 'day' (Theo ngày), 'list' (Danh sách)
   const [viewMode, setViewMode] = useState<'grid' | 'day' | 'list'>('grid');
+  const viewModeTabs = useRovingTabs(LECTURER_VIEW_MODES, viewMode, setViewMode);
 
   // Today indicator: 1 = Sunday, 2 = Monday ... 7 = Saturday
   const todayDow = useMemo(() => {
@@ -77,21 +81,30 @@ export default function LecturerSchedulePage() {
     }
   }, []);
 
+  // A stale semester response must not land on the newly selected semester —
+  // the grid (and print view) would show the wrong term's assignments.
+  const scheduleGenerationRef = useRef(0);
+
   const fetchSchedule = useCallback(async () => {
+    const generation = ++scheduleGenerationRef.current;
     setIsLoading(true);
     setError('');
 
     try {
       const data = await sectionsApi.getMySchedule(selectedSemester || undefined);
+      if (scheduleGenerationRef.current !== generation) return;
       setSections(data);
     } catch {
+      if (scheduleGenerationRef.current !== generation) return;
       setError(
         locale === 'vi'
           ? 'Hiện chưa thể tải phân công giảng dạy.'
           : 'Teaching assignments could not be loaded.',
       );
     } finally {
-      setIsLoading(false);
+      if (scheduleGenerationRef.current === generation) {
+        setIsLoading(false);
+      }
     }
   }, [locale, selectedSemester]);
 
@@ -376,8 +389,13 @@ export default function LecturerSchedulePage() {
               className="flex items-center gap-1 rounded-lg bg-secondary/60 p-1"
             >
               <Button
+                ref={viewModeTabs.tabRef('grid')}
                 role="tab"
+                id="lecturer-schedule-tab-grid"
+                aria-controls="lecturer-schedule-panel-grid"
                 aria-selected={viewMode === 'grid'}
+                tabIndex={viewModeTabs.tabIndex('grid')}
+                onKeyDown={(event) => viewModeTabs.onKeyDown(event, 0)}
                 variant={viewMode === 'grid' ? 'default' : 'ghost'}
                 size="sm"
                 onClick={() => setViewMode('grid')}
@@ -387,8 +405,13 @@ export default function LecturerSchedulePage() {
                 {copy.viewGrid}
               </Button>
               <Button
+                ref={viewModeTabs.tabRef('day')}
                 role="tab"
+                id="lecturer-schedule-tab-day"
+                aria-controls="lecturer-schedule-panel-day"
                 aria-selected={viewMode === 'day'}
+                tabIndex={viewModeTabs.tabIndex('day')}
+                onKeyDown={(event) => viewModeTabs.onKeyDown(event, 1)}
                 variant={viewMode === 'day' ? 'default' : 'ghost'}
                 size="sm"
                 onClick={() => setViewMode('day')}
@@ -398,8 +421,13 @@ export default function LecturerSchedulePage() {
                 {copy.viewDay}
               </Button>
               <Button
+                ref={viewModeTabs.tabRef('list')}
                 role="tab"
+                id="lecturer-schedule-tab-list"
+                aria-controls="lecturer-schedule-panel-list"
                 aria-selected={viewMode === 'list'}
+                tabIndex={viewModeTabs.tabIndex('list')}
+                onKeyDown={(event) => viewModeTabs.onKeyDown(event, 2)}
                 variant={viewMode === 'list' ? 'default' : 'ghost'}
                 size="sm"
                 onClick={() => setViewMode('list')}
@@ -442,7 +470,7 @@ export default function LecturerSchedulePage() {
 
           {/* MAIN SCHEDULE VIEW AREA */}
           {viewMode === 'grid' && (
-            <div className="space-y-6">
+            <div id="lecturer-schedule-panel-grid" role="tabpanel" aria-labelledby="lecturer-schedule-tab-grid" className="space-y-6">
               <Card variant="muted" className="min-w-0 overflow-hidden border-border/80 shadow-sm">
                 <CardHeader className="border-b border-border/70 bg-card/50 pb-4">
                   <div className="flex flex-wrap items-center justify-between gap-3">
@@ -483,7 +511,7 @@ export default function LecturerSchedulePage() {
 
           {/* DAY VIEW AREA */}
           {viewMode === 'day' && (
-            <div className="space-y-6">
+            <div id="lecturer-schedule-panel-day" role="tabpanel" aria-labelledby="lecturer-schedule-tab-day" className="space-y-6">
               {/* Day Selector Pills */}
               <div className="flex flex-wrap items-center gap-2">
                 {ORDERED_DAYS.map((dayNum) => {
@@ -612,6 +640,7 @@ export default function LecturerSchedulePage() {
 
           {/* LIST VIEW AREA: Executive Academic Timetable Table */}
           {viewMode === 'list' && (
+            <div id="lecturer-schedule-panel-list" role="tabpanel" aria-labelledby="lecturer-schedule-tab-list">
             <Card variant="muted" className="border-border/80 shadow-sm overflow-hidden">
               <CardHeader className="border-b border-border/70 bg-card/60 pb-4">
                 <div className="flex flex-wrap items-center justify-between gap-3">
@@ -718,6 +747,7 @@ export default function LecturerSchedulePage() {
                 </div>
               </CardContent>
             </Card>
+            </div>
           )}
 
           {/* Official Signatures for Print View */}

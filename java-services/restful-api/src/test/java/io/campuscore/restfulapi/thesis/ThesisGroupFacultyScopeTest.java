@@ -3,16 +3,27 @@ package io.campuscore.restfulapi.thesis;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import io.campuscore.restfulapi.thesis.service.ThesisReportService;
+import io.campuscore.restfulapi.web.DomainException;
+import java.nio.charset.StandardCharsets;
 import java.sql.Timestamp;
 import java.time.Instant;
 import java.util.UUID;
+import java.util.Map;
+import java.util.LinkedHashMap;
+import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.http.HttpStatus;
+import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.web.servlet.MockMvc;
@@ -41,9 +52,13 @@ class ThesisGroupFacultyScopeTest {
     @Autowired
     private MockMvc mvc;
 
+    @Autowired
+    private ThesisReportService reports;
+
     @BeforeEach
     void cleanDatabase() {
         jdbc.update("DELETE FROM thesis.thesis_group_report");
+        jdbc.update("DELETE FROM thesis.thesis_council");
         jdbc.update("DELETE FROM thesis.thesis_group_member");
         jdbc.update("DELETE FROM thesis.thesis_group");
         jdbc.update("DELETE FROM thesis.thesis_topic_supervisor");
@@ -165,6 +180,153 @@ class ThesisGroupFacultyScopeTest {
                         .with(ThesisAuthorityFixture.role(jdbc, "gscope-admin", "ADMIN")))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.length()").value(1));
+    }
+
+    @Test
+    void deanCannotReadForeignReportMetadataOrEitherDownloadAlias() throws Exception {
+        UUID round = insertRound("Foreign report scope");
+        seedSiblingAndForeignDepartments();
+        String dean = ensureLecturer("gscope-report-dean", "department-demo");
+        UUID group = insertGroup(round, insertTopic(round, "gscope-dept-foreign", "Foreign report"));
+        UUID report = insertReport(round, group);
+
+        for (String path : new String[] {"/groups/" + group + "/report",
+                "/groups/" + group + "/report/file", "/reports/" + report + "/file"}) {
+            mvc.perform(get("/api/v1/thesis" + path)
+                            .with(ThesisAuthorityFixture.role(jdbc, dean, "TRUONG_KHOA")))
+                    .andExpect(status().isNotFound());
+        }
+    }
+
+    @Test
+    void deanArchivesKeepPendingSiblingAndTopiclessFacultyReportsWithoutForeignReports() throws Exception {
+        UUID round = insertRound("Faculty report history");
+        seedSiblingAndForeignDepartments();
+        String dean = ensureLecturer("gscope-history-dean", "department-demo");
+        UUID own = insertGroup(round, insertTopic(round, "department-demo", "Own report"));
+        UUID sibling = insertGroup(round, insertTopic(round, "gscope-dept-sibling", "Sibling report"));
+        UUID foreign = insertGroup(round, insertTopic(round, "gscope-dept-foreign", "Foreign report"));
+        UUID topiclessOwn = insertGroup(round, null);
+        insertMember(topiclessOwn, round, ensureStudent("gscope-history-own", "curriculum-demo"), 1);
+        UUID topiclessForeign = insertGroup(round, null);
+        insertMember(topiclessForeign, round, ensureStudent("gscope-history-frg", "gscope-curr-foreign"), 1);
+        Map<UUID, UUID> reportIds = new LinkedHashMap<>();
+        for (UUID group : new UUID[] {own, sibling, foreign, topiclessOwn, topiclessForeign}) {
+            reportIds.put(group, insertReport(round, group));
+        }
+
+        for (String archive : new String[] {"reports", "repository"}) {
+            var response = mvc.perform(get("/api/v1/thesis/rounds/{id}/" + archive, round)
+                            .with(ThesisAuthorityFixture.role(jdbc, dean, "TRUONG_KHOA")))
+                    .andExpect(status().isOk()).andExpect(jsonPath("$.length()").value(3));
+            String key = archive.equals("reports") ? "groupId" : "reportId";
+            for (UUID group : new UUID[] {own, sibling, topiclessOwn}) {
+                UUID expected = archive.equals("reports") ? group : reportIds.get(group);
+                response.andExpect(jsonPath("$[?(@." + key + " == '" + expected + "')]").isNotEmpty());
+            }
+            for (UUID group : new UUID[] {foreign, topiclessForeign}) {
+                UUID excluded = archive.equals("reports") ? group : reportIds.get(group);
+                response.andExpect(jsonPath("$[?(@." + key + " == '" + excluded + "')]").isEmpty());
+            }
+        }
+        for (UUID group : new UUID[] {own, sibling, topiclessOwn}) {
+            mvc.perform(get("/api/v1/thesis/groups/{id}/report/file", group)
+                            .with(ThesisAuthorityFixture.role(jdbc, dean, "TRUONG_KHOA")))
+                    .andExpect(status().isOk()).andExpect(content().bytes(REPORT_BYTES));
+        }
+        mvc.perform(get("/api/v1/thesis/groups/{id}/report", topiclessForeign)
+                        .with(ThesisAuthorityFixture.role(jdbc, dean, "TRUONG_KHOA")))
+                .andExpect(status().isNotFound());
+    }
+
+    @Test
+    void deanReportReadsRequireAnActiveProfile() throws Exception {
+        UUID round = insertRound("Profile required for reports");
+        UUID group = insertGroup(round, insertTopic(round, "department-demo", "Any report"));
+        insertReport(round, group);
+        String inactive = ensureLecturer("gscope-inactive-dean", "department-demo");
+        jdbc.update("UPDATE campuscore_auth.\"Lecturer\" SET \"isActive\"=FALSE WHERE \"userId\"=?", inactive);
+        for (String subject : new String[] {"gscope-profileless-dean", inactive}) {
+            for (String path : new String[] {"/groups/" + group + "/report",
+                    "/rounds/" + round + "/reports", "/rounds/" + round + "/repository"}) {
+                mvc.perform(get("/api/v1/thesis" + path)
+                                .with(ThesisAuthorityFixture.role(jdbc, subject, "TRUONG_KHOA")))
+                        .andExpect(status().isForbidden());
+            }
+        }
+    }
+
+    @Test
+    void deanRetainsExplicitCrossFacultySupervisorReviewerAndCouncilAssignments() throws Exception {
+        UUID round = insertRound("Assigned foreign reports");
+        seedSiblingAndForeignDepartments();
+        String lecturer = "gscope-assigned-dean";
+        String dean = ensureLecturer(lecturer, "department-demo");
+        ThesisAuthorityFixture.lecturer(jdbc, lecturer);
+        UUID council = UUID.randomUUID();
+        jdbc.update("INSERT INTO thesis.thesis_council (id,round_id,name,created_by) VALUES (?,?,'Scope council',?)",
+                council, round, dean);
+        jdbc.update("INSERT INTO thesis.thesis_council_member (id,council_id,lecturer_id,member_role) VALUES (?,?,?,'MEMBER')",
+                UUID.randomUUID(), council, lecturer);
+        for (int assignment = 0; assignment < 3; assignment++) {
+            UUID topic = insertTopic(round, "gscope-dept-foreign", "Assigned report " + assignment);
+            UUID group = insertGroup(round, topic);
+            insertReport(round, group);
+            if (assignment == 0) {
+                jdbc.update("INSERT INTO thesis.thesis_topic_supervisor (id,topic_id,lecturer_id,supervisor_order) VALUES (?,?,?,1)",
+                        UUID.randomUUID(), topic, lecturer);
+            } else if (assignment == 1) {
+                jdbc.update("UPDATE thesis.thesis_topic SET gvpb_lecturer_id=? WHERE id=?", lecturer, topic);
+            } else {
+                jdbc.update("INSERT INTO thesis.thesis_council_topic (id,council_id,topic_id,assigned_by) VALUES (?,?,?,?)",
+                        UUID.randomUUID(), council, topic, dean);
+            }
+            mvc.perform(get("/api/v1/thesis/groups/{id}/report/file", group)
+                            .with(ThesisAuthorityFixture.role(jdbc, dean, "TRUONG_KHOA")))
+                    .andExpect(status().isOk()).andExpect(content().bytes(REPORT_BYTES));
+        }
+        for (String archive : new String[] {"reports", "repository"}) {
+            mvc.perform(get("/api/v1/thesis/rounds/{id}/" + archive, round)
+                            .with(ThesisAuthorityFixture.role(jdbc, dean, "TRUONG_KHOA")))
+                    .andExpect(status().isOk()).andExpect(jsonPath("$.length()").value(3));
+        }
+    }
+
+    @Test
+    void deanCannotBorrowAnotherSubjectsLecturerProfileForReports() {
+        UUID round = insertRound("Subject bound faculty scope");
+        UUID group = insertGroup(round, insertTopic(round, "department-demo", "Bound report"));
+        insertReport(round, group);
+        ensureLecturer("gscope-bound-dean", "department-demo");
+        Jwt borrowed = Jwt.withTokenValue("scope-fixture").header("alg", "none")
+                .subject("gscope-different-subject").claim("roles", List.of("TRUONG_KHOA"))
+                .claim("lecturerId", "gscope-bound-dean").build();
+        assertThatThrownBy(() -> reports.get(group, borrowed))
+                .isInstanceOfSatisfying(DomainException.class,
+                        error -> assertThat(error.getStatus()).isEqualTo(HttpStatus.FORBIDDEN));
+    }
+
+    @Test
+    void globalAdminsRetainForeignPendingReportAccess() throws Exception {
+        UUID round = insertRound("Global report staff");
+        seedSiblingAndForeignDepartments();
+        UUID group = insertGroup(round, insertTopic(round, "gscope-dept-foreign", "Foreign report"));
+        insertReport(round, group);
+        for (String role : new String[] {"ADMIN", "SUPER_ADMIN"}) {
+            mvc.perform(get("/api/v1/thesis/groups/{id}/report/file", group)
+                            .with(ThesisAuthorityFixture.role(jdbc, "gscope-staff-" + role, role)))
+                    .andExpect(status().isOk()).andExpect(content().bytes(REPORT_BYTES));
+        }
+    }
+
+    private static final byte[] REPORT_BYTES = "%PDF-1.7\nscope fixture\n%%EOF\n".getBytes(StandardCharsets.US_ASCII);
+
+    private UUID insertReport(UUID roundId, UUID groupId) {
+        UUID reportId = UUID.randomUUID();
+        jdbc.update("INSERT INTO thesis.thesis_group_report (id,group_id,round_id,submitted_by,title,file_name,file_type,file_size,file_data)"
+                        + " VALUES (?,?,?,'gscope-leader','Scope report','scope.pdf','application/pdf',?,?)",
+                reportId, groupId, roundId, (long) REPORT_BYTES.length, REPORT_BYTES);
+        return reportId;
     }
 
     // ---------- fixtures ----------

@@ -7,12 +7,14 @@ interface ReadingProgressBarProps {
   progress: number; // 0 - 100
   className?: string;
   tone?: string;
+  ariaLabel?: string;
 }
 
 export function ReadingProgressBar({
   progress,
   className,
   tone = 'from-blue-600 via-indigo-500 to-primary',
+  ariaLabel = 'Tiến trình đọc bài viết',
 }: ReadingProgressBarProps) {
   const clamped = Math.min(100, Math.max(0, progress));
 
@@ -22,7 +24,7 @@ export function ReadingProgressBar({
       aria-valuenow={Math.round(clamped)}
       aria-valuemin={0}
       aria-valuemax={100}
-      aria-label="Tiến trình đọc bài viết"
+      aria-label={ariaLabel}
       className={cn(
         'sticky top-0 z-30 h-1 w-full bg-border/40 overflow-hidden print:hidden',
         className,

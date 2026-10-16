@@ -104,13 +104,18 @@ function AdvisorAvatar({ lecturer, size = 'md' }: { lecturer: Lecturer; size?: '
   );
 }
 
-function QuotaBar({ topicCount, maxTopics }: AdvisorWorkload) {
+function QuotaBar({ topicCount, maxTopics, isVi }: AdvisorWorkload & { isVi?: boolean }) {
   const isAvailable = topicCount < maxTopics;
   const percent = maxTopics > 0 ? Math.min(100, Math.round((topicCount / maxTopics) * 100)) : 0;
 
   return (
     <div
       role="progressbar"
+      aria-label={
+        isVi === false
+          ? `Topic quota: ${topicCount} of ${maxTopics}`
+          : `Chỉ tiêu đề tài: ${topicCount}/${maxTopics}`
+      }
       aria-valuenow={percent}
       aria-valuemin={0}
       aria-valuemax={100}
@@ -548,7 +553,7 @@ export default function ThesisAdvisorDirectoryPage() {
                 {isAvailable ? (isVi ? 'Còn nhận' : 'Available') : (isVi ? 'Đủ' : 'Full')}
               </span>
             </div>
-            <QuotaBar {...workload} />
+            <QuotaBar {...workload} isVi={isVi} />
           </div>
         );
       },
@@ -852,7 +857,7 @@ export default function ThesisAdvisorDirectoryPage() {
                                 {workload.topicCount} / {workload.maxTopics} {isVi ? 'đề tài' : 'theses'}
                               </span>
                             </div>
-                            <QuotaBar {...workload} />
+                            <QuotaBar {...workload} isVi={isVi} />
                           </div>
                         </div>
 
@@ -1028,7 +1033,7 @@ export default function ThesisAdvisorDirectoryPage() {
                     {workloadFor(advisorWorkloadMap, selectedAdvisor.id).maxTopics}
                   </span>
                 </div>
-                <QuotaBar {...workloadFor(advisorWorkloadMap, selectedAdvisor.id)} />
+                <QuotaBar {...workloadFor(advisorWorkloadMap, selectedAdvisor.id)} isVi={isVi} />
               </div>
             </div>
 

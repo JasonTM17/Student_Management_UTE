@@ -348,6 +348,11 @@ function CodeBlock({ code, language }: { code: string; language?: string }) {
         setCopyFailed(true);
         setTimeout(() => setCopyFailed(false), 2000);
       });
+    } else {
+      // Insecure contexts (plain http://) expose no clipboard API at all —
+      // acknowledge the click instead of leaving a dead button.
+      setCopyFailed(true);
+      setTimeout(() => setCopyFailed(false), 2000);
     }
   };
 

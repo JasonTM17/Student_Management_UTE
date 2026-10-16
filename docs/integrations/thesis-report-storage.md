@@ -88,6 +88,21 @@ owns presentation; [report persistence](../../java-services/restful-api/src/main
 owns authorization, artifact preservation and the write boundary shared with
 group membership and round publication.
 
+Report confidentiality follows academic responsibility: `ADMIN` and
+`SUPER_ADMIN` have institution-wide read authority; `TRUONG_KHOA` has own-faculty
+authority determined from the caller's current, active, subject-bound lecturer
+profile. An absent, inactive or unbound profile must fail closed. Own-faculty
+history includes `PENDING` and topicless groups; approval is not a prerequisite
+for preserving staff access to an existing artifact. A faculty head who also
+holds `LECTURER` retains legitimate explicit supervisor, council and
+counter-reviewer assignments across faculties. Metadata, both round archives
+(`reports` and `repository`) and both file-download aliases must share this
+boundary so an alternate read route cannot expose another faculty's work.
+See `get`, `requireDeanFaculty` and `archiveFilter` in
+[report persistence](../../java-services/restful-api/src/main/java/io/campuscore/restfulapi/thesis/service/ThesisReportService.java)
+and the [faculty-scope regressions](../../java-services/restful-api/src/test/java/io/campuscore/restfulapi/thesis/ThesisGroupFacultyScopeTest.java)
+for the executable owners.
+
 Metadata changes must not silently discard an attached file, a retained link
 or fields omitted by the caller. Replacement and detachment must preserve the
 last committed artifact if the transaction rolls back. Object storage is not

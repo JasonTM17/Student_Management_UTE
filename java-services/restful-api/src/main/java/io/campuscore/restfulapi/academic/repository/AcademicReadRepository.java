@@ -865,26 +865,37 @@ public class AcademicReadRepository {
     /**
      * Best progress per course for a student: 2 = passed/completed, 1 = active
      * enrollment, 0 = touched but not running (dropped/cancelled/failed).
+     * Numeric and letter grades come from the same best published passing attempt.
      */
     public List<CourseProgressRow> findCourseProgressByStudentId(String studentId) {
         return jdbc.query(
-                "SELECT e.\"courseId\" AS course_id,"
-                        + " MAX(CASE"
-                        // publishGrades stamps status='COMPLETED' on every graded row,
-                        // including failures: completion must require a published
-                        // passing letter, exactly like the passed_grade/passed_letter
-                        // arms below. The bare status arm used to mark an F course as
-                        // finished curriculum progress.
-                        + "   WHEN e.\"gradeStatus\" = 'PUBLISHED' AND e.\"letterGrade\" IS NOT NULL AND e.\"letterGrade\" <> 'F' THEN 2"
-                        + "   WHEN e.\"status\" IN ('ENROLLED', 'CONFIRMED', 'PENDING') THEN 1"
-                        + "   ELSE 0 END) AS progress_level,"
-                        + " MAX(CASE WHEN e.\"gradeStatus\" = 'PUBLISHED' AND e.\"letterGrade\" IS NOT NULL AND e.\"letterGrade\" <> 'F'"
-                        + "          THEN e.\"finalGrade\" END) AS passed_grade,"
-                        + " MAX(CASE WHEN e.\"gradeStatus\" = 'PUBLISHED' AND e.\"letterGrade\" IS NOT NULL AND e.\"letterGrade\" <> 'F'"
-                        + "          THEN e.\"letterGrade\" END) AS passed_letter"
-                        + " FROM \"academic\".\"Enrollment\" e"
-                        + " WHERE e.\"studentId\" = :studentId"
-                        + " GROUP BY e.\"courseId\"",
+                """
+                WITH student_enrollments AS (
+                    SELECT "id", "courseId", "status", "gradeStatus", "finalGrade", "letterGrade"
+                    FROM "academic"."Enrollment"
+                    WHERE "studentId" = :studentId
+                ), progress AS (
+                    SELECT "courseId" AS course_id,
+                           MAX(CASE
+                               WHEN "gradeStatus" = 'PUBLISHED' AND "letterGrade" IS NOT NULL AND "letterGrade" <> 'F' THEN 2
+                               WHEN "status" IN ('ENROLLED', 'CONFIRMED', 'PENDING') THEN 1
+                               ELSE 0 END) AS progress_level
+                    FROM student_enrollments
+                    GROUP BY "courseId"
+                ), passing_attempts AS (
+                    SELECT "courseId", "finalGrade", "letterGrade",
+                           ROW_NUMBER() OVER (PARTITION BY "courseId"
+                               ORDER BY CASE WHEN "finalGrade" IS NULL THEN 1 ELSE 0 END,
+                                        "finalGrade" DESC, "id" ASC) AS attempt_rank
+                    FROM student_enrollments
+                    WHERE "gradeStatus" = 'PUBLISHED' AND "letterGrade" IS NOT NULL AND "letterGrade" <> 'F'
+                )
+                SELECT p.course_id, p.progress_level,
+                       a."finalGrade" AS passed_grade, a."letterGrade" AS passed_letter
+                FROM progress p
+                LEFT JOIN passing_attempts a
+                    ON a."courseId" IS NOT DISTINCT FROM p.course_id AND a.attempt_rank = 1
+                """,
                 new MapSqlParameterSource("studentId", studentId),
                 (rs, ignored) -> new CourseProgressRow(
                         rs.getString("course_id"),

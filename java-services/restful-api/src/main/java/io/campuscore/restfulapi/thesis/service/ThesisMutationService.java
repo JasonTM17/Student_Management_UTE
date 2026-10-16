@@ -944,7 +944,8 @@ public class ThesisMutationService {
             // first so the downgrade leaves a review trail.
             throw conflict("GROUP_STATE_CONFLICT", "An approved group cannot change its topic");
         }
-        Map<String, Object> topic = one("SELECT id, round_id, status, max_groups FROM thesis.thesis_topic WHERE id = :id FOR UPDATE", params().addValue("id", topicId), "TOPIC_NOT_FOUND", "Thesis topic not found");
+        Map<String, Object> topic = one("SELECT id, round_id, status, max_groups, department_id FROM thesis.thesis_topic WHERE id = :id FOR UPDATE", params().addValue("id", topicId), "TOPIC_NOT_FOUND", "Thesis topic not found");
+        requireDeanTopicAccess(topicId, String.valueOf(topic.get("department_id")), actor);
         if (!group.roundId().equals(topic.get("round_id"))) {
             throw conflict("TOPIC_ROUND_MISMATCH", "Topic belongs to another registration round");
         }
@@ -1184,7 +1185,7 @@ public class ThesisMutationService {
     }
 
     private void authorizeLeaderOrAdmin(GroupRow group, Jwt actor) {
-        if (isAdmin(actor)) {
+        if (isGroupAdmin(group, actor)) {
             return;
         }
         if (!group.leaderStudentId().equals(studentId(actor))) {
@@ -1203,7 +1204,7 @@ public class ThesisMutationService {
      * not apply; the open-round gate still does and is enforced by the caller.
      */
     private boolean authorizeMemberManagement(GroupRow group, Jwt actor) {
-        if (isAdmin(actor)) {
+        if (isGroupAdmin(group, actor)) {
             return false;
         }
         String lecturerId = normalize(actor == null ? null : actor.getClaimAsString("lecturerId"));
@@ -1229,7 +1230,7 @@ public class ThesisMutationService {
     }
 
     private void authorizeReviewer(GroupRow group, Jwt actor) {
-        if (isAdmin(actor)) return;
+        if (isGroupAdmin(group, actor)) return;
         if (group.topicId() == null) {
             throw new DomainException(HttpStatus.FORBIDDEN, "GROUP_REVIEWER_REQUIRED", "Only an assigned supervisor or admin can review this group");
         }
@@ -1250,6 +1251,52 @@ public class ThesisMutationService {
         }
 
         throw new DomainException(HttpStatus.FORBIDDEN, "GROUP_REVIEWER_REQUIRED", "Only an assigned supervisor or admin can review this group");
+    }
+
+    /** Group governance is faculty-bound; round/topic lifecycle authority is separate. */
+    private boolean isGroupAdmin(GroupRow group, Jwt actor) {
+        if (isGlobalAdmin(actor)) return true;
+        if (!hasRole(actor, "TRUONG_KHOA")) return false;
+        ThesisGroupReadRepository.LecturerScope scope = requireDeanScope(actor);
+        if (groups.groupInFaculty(group.id(), scope.facultyId()) || isDeanSupervisor(group.topicId(), actor)) {
+            return true;
+        }
+        throw notFound("THESIS_GROUP_NOT_FOUND", "Thesis group not found");
+    }
+
+    private ThesisGroupReadRepository.LecturerScope requireDeanScope(Jwt actor) {
+        ThesisGroupReadRepository.LecturerScope scope = groups.findLecturerScope(
+                normalize(actor.getClaimAsString("lecturerId")), subject(actor));
+        if (scope == null) {
+            throw new DomainException(HttpStatus.FORBIDDEN, "FACULTY_PROFILE_REQUIRED",
+                    "An active lecturer profile bound to the faculty head is required");
+        }
+        return scope;
+    }
+
+    /** Check the destination too: an own-faculty group cannot confer access to a foreign topic. */
+    private void requireDeanTopicAccess(UUID topicId, String departmentId, Jwt actor) {
+        if (isGlobalAdmin(actor) || !hasRole(actor, "TRUONG_KHOA")) return;
+        ThesisGroupReadRepository.LecturerScope scope = requireDeanScope(actor);
+        Integer matches = jdbc.queryForObject(
+                "SELECT COUNT(*) FROM academic.\"Department\" WHERE \"id\" = :departmentId AND \"facultyId\" = :facultyId",
+                params().addValue("departmentId", departmentId).addValue("facultyId", scope.facultyId()), Integer.class);
+        if ((matches != null && matches > 0) || isDeanSupervisor(topicId, actor)) return;
+        throw notFound("TOPIC_NOT_FOUND", "Thesis topic not found");
+    }
+
+    private boolean isDeanSupervisor(UUID topicId, Jwt actor) {
+        return topicId != null && isLecturer(actor)
+                && isSupervisorOf(topicId, normalize(actor.getClaimAsString("lecturerId")));
+    }
+
+    private static boolean isGlobalAdmin(Jwt actor) {
+        return hasRole(actor, "ADMIN") || hasRole(actor, "SUPER_ADMIN");
+    }
+
+    private static boolean hasRole(Jwt actor, String role) {
+        List<String> roles = actor == null ? null : actor.getClaimAsStringList("roles");
+        return roles != null && roles.contains(role);
     }
 
     private void authorizeTopicOwner(ThesisTopic topic, Jwt actor) {

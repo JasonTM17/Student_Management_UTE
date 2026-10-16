@@ -362,6 +362,51 @@ class AcademicEnrollmentMutationPersistenceTest {
                 .andExpect(jsonPath("$[0].id").value("section-open"));
     }
 
+    @Test
+    void enrollFallsBackToOpenAddDropRoundWhenRegistrationClosed() throws Exception {
+        // Registration window expired; the fixture's ADD_DROP round stays open
+        // until 2030 — enrollment must still succeed inside it.
+        jdbc.update("UPDATE \"academic\".\"RegistrationRound\" SET \"windowEnd\" = ? WHERE \"id\" = ?",
+                localDateTime(Instant.parse("2020-01-01T00:00:00Z")), "round-open");
+
+        mvc.perform(post("/api/v1/enrollments/enroll")
+                        .with(studentJwt("student-user-1", "student-1"))
+                        .header("Idempotency-Key", "enroll-add-drop-fallback")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"sectionId\":\"section-open\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.sectionId").value("section-open"))
+                .andExpect(jsonPath("$.status").value("ENROLLED"));
+    }
+
+    @Test
+    void prerequisiteMinLetterGradeFloorBlocksBelowAndPassesAtFloor() throws Exception {
+        // Requirement floor 'B': a D+ pass must NOT satisfy it.
+        jdbc.update(
+                "INSERT INTO \"academic\".\"CourseRequirement\""
+                        + " (\"id\", \"courseId\", \"requiredCourseId\", \"kind\", \"minLetterGrade\")"
+                        + " VALUES ('req-test-floor', 'course-open', 'course-overlap', 'PREREQ', 'B')");
+        seedCompletedEnrollment("enrollment-floor-low", "section-overlap", "course-overlap", "D+");
+
+        mvc.perform(post("/api/v1/enrollments/enroll")
+                        .with(studentJwt("student-user-1", "student-1"))
+                        .header("Idempotency-Key", "enroll-floor-low")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"sectionId\":\"section-open\"}"))
+                .andExpect(status().isUnprocessableEntity())
+                .andExpect(jsonPath("$.code").value("PREREQUISITE_UNMET"));
+
+        // Raising the achieved letter to B+ clears the same gate.
+        jdbc.update("UPDATE \"academic\".\"Enrollment\" SET \"letterGrade\" = 'B+' WHERE \"id\" = 'enrollment-floor-low'");
+        mvc.perform(post("/api/v1/enrollments/enroll")
+                        .with(studentJwt("student-user-1", "student-1"))
+                        .header("Idempotency-Key", "enroll-floor-pass")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"sectionId\":\"section-open\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("ENROLLED"));
+    }
+
     /**
      * Catalog v2: every section carries its schedules (day/time/room/lecturer)
      * and its curriculum relevance label. dayOfWeek is emitted verbatim from

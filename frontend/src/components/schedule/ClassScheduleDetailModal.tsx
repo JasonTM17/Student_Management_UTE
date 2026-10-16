@@ -1,6 +1,5 @@
 'use client';
 
-import { useEffect, useRef } from 'react';
 import {
   Award,
   Building,
@@ -9,9 +8,9 @@ import {
   GraduationCap,
   MapPin,
   Users,
-  X,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { Modal } from '@/components/ui/modal';
 import { useI18n } from '@/i18n';
 
 export interface ScheduleDetailData {
@@ -71,23 +70,6 @@ export function ClassScheduleDetailModal({
   isLecturer = false,
 }: ClassScheduleDetailModalProps) {
   const { messages } = useI18n();
-  const modalRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') {
-        onClose();
-      }
-    };
-    if (isOpen) {
-      window.addEventListener('keydown', handleKeyDown);
-      document.body.style.overflow = 'hidden';
-    }
-    return () => {
-      window.removeEventListener('keydown', handleKeyDown);
-      document.body.style.overflow = '';
-    };
-  }, [isOpen, onClose]);
 
   if (!isOpen || !data) return null;
 
@@ -102,20 +84,17 @@ export function ClassScheduleDetailModal({
       : data.courseNameEn ?? data.courseName;
 
   return (
-    <div
-      className="fixed inset-0 z-[60] flex items-center justify-center bg-background/80 p-4 backdrop-blur-sm animate-in fade-in-0"
-      onClick={onClose}
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby="schedule-modal-title"
+    // Shared Modal supplies the focus trap, focus restore, Escape handling,
+    // and body scroll lock this dialog used to miss.
+    <Modal
+      isOpen={isOpen}
+      onClose={onClose}
+      dialogLabel={displayName}
+      showCloseButton
+      className="max-w-lg"
     >
-      <div
-        ref={modalRef}
-        className="w-full max-w-lg rounded-lg border border-border bg-card p-6 shadow-xl transition-all zoom-in-95"
-        onClick={(e) => e.stopPropagation()}
-      >
         {/* Header */}
-        <div className="flex items-start justify-between gap-4 border-b border-border/80 pb-4">
+        <div className="flex items-start justify-between gap-4 border-b border-border/80 pb-4 pr-10">
           <div>
             <div className="flex items-center gap-2">
               <span className="rounded bg-primary/10 px-2.5 py-1 font-mono text-xs font-bold text-primary">
@@ -139,14 +118,6 @@ export function ClassScheduleDetailModal({
               {displayName}
             </h3>
           </div>
-          <button
-            type="button"
-            onClick={onClose}
-            aria-label={locale === 'vi' ? 'Đóng' : 'Close'}
-            className="rounded p-1.5 text-muted-foreground transition hover:bg-secondary hover:text-foreground"
-          >
-            <X className="h-5 w-5" />
-          </button>
         </div>
 
         {/* Content details grid */}
@@ -274,7 +245,6 @@ export function ClassScheduleDetailModal({
             {locale === 'vi' ? 'Đóng' : 'Close'}
           </Button>
         </div>
-      </div>
-    </div>
+    </Modal>
   );
 }

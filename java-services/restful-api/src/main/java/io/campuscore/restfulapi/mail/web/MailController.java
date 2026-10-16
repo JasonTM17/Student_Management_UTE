@@ -211,7 +211,13 @@ public class MailController {
         }
         Map<String, Object> sampleData = buildSampleData(templateName);
         String html = emailService.renderPreview(templateName, sampleData);
-        return ResponseEntity.ok(html);
+        // The preview is served same-origin (where the readable cc_csrf cookie
+        // lives). Sample data is static today, but sandbox the document so a
+        // template that ever gains dynamic values cannot execute scripts.
+        return ResponseEntity.ok()
+                .header("Content-Security-Policy", "sandbox")
+                .header("X-Content-Type-Options", "nosniff")
+                .body(html);
     }
 
     private static final java.util.Set<String> PREVIEW_TEMPLATES =

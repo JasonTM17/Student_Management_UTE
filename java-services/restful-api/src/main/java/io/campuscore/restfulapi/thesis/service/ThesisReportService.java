@@ -1,6 +1,7 @@
 package io.campuscore.restfulapi.thesis.service;
 
 import io.campuscore.restfulapi.thesis.domain.RoundStatus;
+import io.campuscore.restfulapi.thesis.repository.ThesisGroupReadRepository;
 import io.campuscore.restfulapi.thesis.web.ThesisMutationDtos.ReportUpdateRequest;
 import io.campuscore.restfulapi.web.DomainException;
 import java.time.Instant;
@@ -38,12 +39,14 @@ public class ThesisReportService {
     private final NamedParameterJdbcTemplate jdbc;
     private final ThesisReportStorage storage;
     private final ThesisReportStorageProperties storageProperties;
+    private final ThesisGroupReadRepository groups;
 
     public ThesisReportService(NamedParameterJdbcTemplate jdbc, ThesisReportStorage storage,
-            ThesisReportStorageProperties storageProperties) {
+            ThesisReportStorageProperties storageProperties, ThesisGroupReadRepository groups) {
         this.jdbc = jdbc;
         this.storage = storage;
         this.storageProperties = storageProperties;
+        this.groups = groups;
     }
 
     @Transactional
@@ -289,8 +292,9 @@ public class ThesisReportService {
     @Transactional(readOnly = true)
     public ReportResponse get(UUID groupId, Jwt actor) {
         GroupContext group = loadGroup(groupId);
-        boolean admin = hasRole(actor, "ADMIN") || hasRole(actor, "SUPER_ADMIN")
-                || hasRole(actor, "TRUONG_KHOA");
+        boolean admin = hasRole(actor, "ADMIN") || hasRole(actor, "SUPER_ADMIN");
+        boolean dean = !admin && hasRole(actor, "TRUONG_KHOA");
+        boolean facultyReader = dean && groups.groupInFaculty(groupId, requireDeanFaculty(actor));
         boolean lecturer = !admin && isActiveLecturerActor(actor);
         String actorLecturerId = lecturer ? lecturerId(actor) : "";
         boolean member = count("SELECT COUNT(*) FROM thesis.thesis_group_member WHERE group_id = :groupId AND student_id = :studentId",
@@ -315,12 +319,14 @@ public class ThesisReportService {
                 && "APPROVED".equals(group.approvalStatus())
                 && !"CANCELLED".equals(group.status())
                 && sameDepartment(group.topicDepartmentId(), actor);
-        if (lecturer && !member && !supervisor && !councilMember && !admin && !gvpbReviewer && !sameDepartmentArchive) {
+        boolean authorized = member || supervisor || councilMember || admin || facultyReader
+                || gvpbReviewer || sameDepartmentArchive;
+        if (!authorized && (lecturer || dean)) {
             // Do not disclose whether a report exists to a lecturer outside the
             // department archive scope.
             throw notFound("REPORT_NOT_FOUND", "The report is not available in your department archive");
         }
-        if (!member && !supervisor && !councilMember && !admin && !lecturer) {
+        if (!authorized) {
             throw new DomainException(HttpStatus.FORBIDDEN, "GROUP_MEMBER_REQUIRED",
                     "Only group members, supervisors, council reviewers, or staff can read the report");
         }
@@ -348,25 +354,13 @@ public class ThesisReportService {
 
     @Transactional(readOnly = true)
     public List<ReportResponse> listByRound(UUID roundId, Jwt actor) {
-        boolean admin = hasRole(actor, "ADMIN") || hasRole(actor, "SUPER_ADMIN")
-                || hasRole(actor, "TRUONG_KHOA");
-        boolean lecturer = !admin && isActiveLecturerActor(actor);
-        if (!admin && !lecturer) {
-            throw new DomainException(HttpStatus.FORBIDDEN, "LECTURER_OR_STAFF_REQUIRED",
-                    "Only lecturers or academic staff can access the round thesis archive");
-        }
         MapSqlParameterSource parameters = params().addValue("roundId", roundId);
         // Staff archive (plan F6): an admin sees every report row of the round
         // — a group reopened to PENDING or one without a topic must not hide
         // its submitted deliverable. The lecturer branch keeps the approval
         // and department scope; a topic-less row self-excludes there because
         // its NULL department_id never matches the lecturer's.
-        String filter = "";
-        if (!admin) {
-            parameters.addValue("departmentId", activeLecturerDepartment(actor));
-            filter = " AND g.approval_status = 'APPROVED' AND g.status <> 'CANCELLED'"
-                    + " AND t.department_id = :departmentId";
-        }
+        String filter = archiveFilter(actor, parameters);
         return jdbc.query(
                 "SELECT r.group_id, r.title, r.url, r.note, r.submitted_by, r.submitted_at, r.updated_at, "
                         + "r.file_name, r.file_type, r.file_size "
@@ -395,23 +389,11 @@ public class ThesisReportService {
      */
     @Transactional(readOnly = true)
     public List<RepositoryReportResponse> listRepository(UUID roundId, Jwt actor) {
-        boolean admin = hasRole(actor, "ADMIN") || hasRole(actor, "SUPER_ADMIN")
-                || hasRole(actor, "TRUONG_KHOA");
-        boolean lecturer = !admin && isActiveLecturerActor(actor);
-        if (!admin && !lecturer) {
-            throw new DomainException(HttpStatus.FORBIDDEN, "LECTURER_OR_STAFF_REQUIRED",
-                    "Only lecturers or academic staff can access the round thesis archive");
-        }
         MapSqlParameterSource parameters = params().addValue("roundId", roundId);
         // Same archive rule as listByRound: admins see every report of the
         // round; lecturers keep the approval + department scope (topic-less
         // rows self-exclude via the NULL department join).
-        String filter = "";
-        if (!admin) {
-            parameters.addValue("departmentId", activeLecturerDepartment(actor));
-            filter = " AND g.approval_status = 'APPROVED' AND g.status <> 'CANCELLED'"
-                    + " AND t.department_id = :departmentId";
-        }
+        String filter = archiveFilter(actor, parameters);
         String sql = """
                 SELECT r.id AS report_id, r.title, r.url, r.note, r.submitted_at, r.updated_at,
                        r.file_name, r.file_type, r.file_size,
@@ -562,6 +544,54 @@ public class ThesisReportService {
                 (String) group.get("topic_department_id"));
     }
 
+    private String requireDeanFaculty(Jwt actor) {
+        ThesisGroupReadRepository.LecturerScope scope = groups.findLecturerScope(lecturerId(actor), actor.getSubject());
+        if (scope == null) {
+            throw new DomainException(HttpStatus.FORBIDDEN, "LECTURER_PROFILE_REQUIRED",
+                    "An active lecturer profile bound to the faculty head is required");
+        }
+        return scope.facultyId();
+    }
+
+    /** Staff history stays readable regardless of approval; only its ownership scope changes. */
+    private String archiveFilter(Jwt actor, MapSqlParameterSource parameters) {
+        if (hasRole(actor, "ADMIN") || hasRole(actor, "SUPER_ADMIN")) return "";
+        if (hasRole(actor, "TRUONG_KHOA")) {
+            parameters.addValue("facultyId", requireDeanFaculty(actor));
+            String filter = """
+                    AND (EXISTS (
+                        SELECT 1 FROM academic."Department" fd
+                        WHERE fd."id" = t.department_id AND fd."facultyId" = :facultyId)
+                    OR (g.topic_id IS NULL AND EXISTS (
+                        SELECT 1 FROM thesis.thesis_group_member fm
+                        JOIN campuscore_auth."Student" fs ON fs."id" = fm.student_id
+                        JOIN academic."Curriculum" fc ON fc."id" = fs."curriculumId"
+                        JOIN academic."Department" fd ON fd."id" = fc."departmentId"
+                        WHERE fm.group_id = g.id AND fd."facultyId" = :facultyId))
+                    """;
+            // The faculty lookup already verified this lecturer id belongs to the active caller.
+            if (hasRole(actor, "LECTURER")) {
+                parameters.addValue("assignedLecturerId", lecturerId(actor));
+                filter += """
+                        OR t.gvpb_lecturer_id = :assignedLecturerId
+                        OR EXISTS (SELECT 1 FROM thesis.thesis_topic_supervisor assigned
+                            WHERE assigned.topic_id = t.id AND assigned.lecturer_id = :assignedLecturerId)
+                        OR EXISTS (SELECT 1 FROM thesis.thesis_council_member cm
+                            JOIN thesis.thesis_council_topic ct ON ct.council_id = cm.council_id
+                            WHERE ct.topic_id = t.id AND cm.lecturer_id = :assignedLecturerId)
+                        """;
+            }
+            return " " + filter + ")";
+        }
+        if (!isActiveLecturerActor(actor)) {
+            throw new DomainException(HttpStatus.FORBIDDEN, "LECTURER_OR_STAFF_REQUIRED",
+                    "Only lecturers or academic staff can access the round thesis archive");
+        }
+        parameters.addValue("departmentId", activeLecturerDepartment(actor));
+        return " AND g.approval_status = 'APPROVED' AND g.status <> 'CANCELLED'"
+                + " AND t.department_id = :departmentId";
+    }
+
     private boolean sameDepartment(String topicDepartmentId, Jwt actor) {
         if (!StringUtils.hasText(topicDepartmentId)) return false;
         return topicDepartmentId.equals(activeLecturerDepartment(actor));
@@ -590,7 +620,7 @@ public class ThesisReportService {
      * A lecturer identifier is an identity attribute, not an authority by
      * itself.  Only a token carrying the lecturer role and an active database
      * profile may enter lecturer-scoped archive/supervisor/council branches.
-     * Governance roles short-circuit before this helper is called.
+     * Faculty heads also require their separate subject-bound faculty lookup.
      */
     private boolean isActiveLecturerActor(Jwt actor) {
         if (!hasRole(actor, "LECTURER")) {

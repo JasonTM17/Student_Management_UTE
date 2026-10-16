@@ -55,6 +55,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const lastKnownUserIdRef = useRef<string | null>(null);
   const sessionGenerationRef = useRef(0);
   const latestRefreshRequestRef = useRef(0);
+  // The 30s identity poll gets its own counter. Sharing
+  // latestRefreshRequestRef meant a poll firing mid-refresh discarded the
+  // explicit refreshUser() result (isCurrent failed) even though the poll
+  // itself never writes identity — the refreshed profile silently stayed
+  // stale until the next call.
+  const latestPollRequestRef = useRef(0);
+  const refreshInFlightRef = useRef(false);
   const sessionMutationPendingRef = useRef(false);
   const logoutPendingRef = useRef(false);
   const logoutPathnameRef = useRef<string | null>(null);
@@ -87,12 +94,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
     const generation = sessionGenerationRef.current;
     const request = ++latestRefreshRequestRef.current;
+    refreshInFlightRef.current = true;
     const isCurrent = () =>
       generation === sessionGenerationRef.current &&
       request === latestRefreshRequestRef.current &&
       !sessionReloadPendingRef.current;
 
     if (!hasCsrfSessionHint()) {
+      refreshInFlightRef.current = false;
       if (isCurrent()) {
         clearSessionState();
       }
@@ -126,6 +135,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           clearSessionState();
         }
       }
+    } finally {
+      refreshInFlightRef.current = false;
     }
   }, [clearSessionState, setUserIdentity]);
 
@@ -396,11 +407,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
       pollInFlight = true;
       const generation = sessionGenerationRef.current;
-      const request = ++latestRefreshRequestRef.current;
+      const request = ++latestPollRequestRef.current;
       const isCurrent = () =>
         active &&
         generation === sessionGenerationRef.current &&
-        request === latestRefreshRequestRef.current &&
+        request === latestPollRequestRef.current &&
+        !refreshInFlightRef.current &&
         !sessionReloadPendingRef.current;
       const csrfHintBefore = readCsrfSessionHint();
       try {

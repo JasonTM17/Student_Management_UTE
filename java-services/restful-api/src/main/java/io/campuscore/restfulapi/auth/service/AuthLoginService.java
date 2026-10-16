@@ -18,6 +18,7 @@ import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.HexFormat;
+import java.util.Optional;
 import java.util.UUID;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -43,6 +44,14 @@ public class AuthLoginService {
 
     private static final int MAX_FAILED_ATTEMPTS = 5;
     private static final Duration LOCK_DURATION = Duration.ofMinutes(30);
+
+    /**
+     * Timing-oracle mitigation: a bcrypt comparison against a fixed hash costs
+     * the same whether the account exists or not, so unknown-email logins no
+     * longer return measurably faster than known-email ones.
+     */
+    private static final String DUMMY_PASSWORD_HASH =
+            "$2a$10$7EqJtq98hPqEX7fNZaFWoOhi5s5dOH.td9LVsNWxfuHP2QsRZMPwq";
 
     private final AuthUserRepository users;
     private final PasswordEncoder passwordEncoder;
@@ -82,11 +91,28 @@ public class AuthLoginService {
         if (normalizedEmail.isBlank() || !isValidEmail(normalizedEmail)) {
             throw new BadCredentialsException("Invalid credentials");
         }
-        AuthUserRecord user = users.findByEmail(normalizedEmail)
-                .orElseThrow(() -> new BadCredentialsException("Invalid credentials"));
+        Optional<AuthUserRecord> found = users.findByEmail(normalizedEmail);
+        if (found.isEmpty()) {
+            // Burn one bcrypt comparison so the unknown-email path costs the
+            // same as the known-email one (account-existence timing oracle).
+            passwordEncoder.matches(password, DUMMY_PASSWORD_HASH);
+            throw new BadCredentialsException("Invalid credentials");
+        }
+        AuthUserRecord user = found.get();
         Instant now = clock.instant();
 
-        if (!"ACTIVE".equals(user.status()) || (user.lockedUntil() != null && user.lockedUntil().isAfter(now))) {
+        boolean locked = user.lockedUntil() != null && user.lockedUntil().isAfter(now);
+        // The failed-attempt lock is account-keyed, which made it a permanent
+        // DoS lever for any known email. A caller connecting from an address
+        // that already holds a live session for this account is treated as
+        // the legitimate owner and bypasses the lock — TCP source addresses
+        // cannot be forged, so attacker IPs (which hold no session) remain
+        // fully locked. The password check below still applies either way.
+        if (locked && ipAddress != null && users.hasRecentSessionFromIp(user.id(), ipAddress, now)) {
+            locked = false;
+        }
+
+        if (!"ACTIVE".equals(user.status()) || locked) {
             throw new BadCredentialsException("Invalid credentials");
         }
 
@@ -121,7 +147,11 @@ public class AuthLoginService {
         AuthUserRecord user = users.findById(userId)
                 .orElseThrow(() -> new BadCredentialsException("Invalid credentials"));
         Instant now = clock.instant();
-        if (!"ACTIVE".equals(user.status()) || (user.lockedUntil() != null && user.lockedUntil().isAfter(now))) {
+        boolean locked = user.lockedUntil() != null && user.lockedUntil().isAfter(now);
+        if (locked && ipAddress != null && users.hasRecentSessionFromIp(user.id(), ipAddress, now)) {
+            locked = false;
+        }
+        if (!"ACTIVE".equals(user.status()) || locked) {
             throw new BadCredentialsException("Invalid credentials");
         }
         users.recordSuccessfulLogin(user.id(), now);

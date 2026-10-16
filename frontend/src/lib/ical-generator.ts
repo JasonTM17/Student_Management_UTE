@@ -61,14 +61,58 @@ export function formatIcsUtcDateTime(date: Date): string {
  * Calculates the first occurrence date of a specific day of week
  * on or after the base start date.
  * dayOfWeek: 1 = Sunday, 2 = Monday, ..., 7 = Saturday.
+ *
+ * Both input and output are treated as civil (calendar) dates anchored at
+ * UTC midnight — the function only ever reads/writes UTC fields. Callers
+ * must parse date-only strings ("YYYY-MM-DD") with `new Date()` (which
+ * yields UTC midnight) and must not mix in browser-local getDay/setDate,
+ * otherwise users outside UTC see the event shifted by a day.
  */
 export function findFirstOccurrenceDate(baseStartDate: Date, dayOfWeek: number): Date {
   const targetJsDay = dayOfWeek === 1 ? 0 : dayOfWeek - 1; // 0 = Sun, 1 = Mon, ..., 6 = Sat
-  const currentJsDay = baseStartDate.getDay();
+  const currentJsDay = baseStartDate.getUTCDay();
   const diffDays = (targetJsDay - currentJsDay + 7) % 7;
-  const result = new Date(baseStartDate);
-  result.setDate(baseStartDate.getDate() + diffDays);
-  return result;
+  return new Date(Date.UTC(
+    baseStartDate.getUTCFullYear(),
+    baseStartDate.getUTCMonth(),
+    baseStartDate.getUTCDate() + diffDays,
+  ));
+}
+
+/**
+ * Formats a civil date (held as a UTC-midnight Date) plus a wall-clock
+ * HH:mm into an RFC 5545 local datetime string: YYYYMMDDTHHmmss.
+ */
+function formatCivilDateTime(civilDate: Date, hours: number, minutes: number): string {
+  const year = civilDate.getUTCFullYear();
+  const month = pad(civilDate.getUTCMonth() + 1);
+  const day = pad(civilDate.getUTCDate());
+  return `${year}${month}${day}T${pad(hours)}${pad(minutes)}00`;
+}
+
+// Asia/Ho_Chi_Minh has been a fixed UTC+07:00 offset (no DST) since 1975,
+// so converting a VN civil end-of-day to a UTC instant is a constant shift.
+const VIETNAM_UTC_OFFSET_MS = 7 * 60 * 60 * 1000;
+
+/**
+ * Today's civil date in Vietnam, expressed as a UTC-midnight Date.
+ */
+function vietnamCivilToday(): Date {
+  const vnNow = new Date(Date.now() + VIETNAM_UTC_OFFSET_MS);
+  return new Date(Date.UTC(vnNow.getUTCFullYear(), vnNow.getUTCMonth(), vnNow.getUTCDate()));
+}
+
+/**
+ * Parses an API date value into a UTC-midnight Date holding the civil date.
+ * Date-only strings ("YYYY-MM-DD") already parse as UTC midnight, but a
+ * datetime without an explicit zone ("YYYY-MM-DDTHH:mm:ss") would parse as
+ * browser-local — so the date portion is extracted and rebuilt in UTC.
+ */
+function parseCivilDateOnly(value: string): Date | undefined {
+  const match = /^(\d{4})-(\d{2})-(\d{2})/.exec(value);
+  if (!match) return undefined;
+  const date = new Date(Date.UTC(+match[1], +match[2] - 1, +match[3]));
+  return isNaN(date.getTime()) ? undefined : date;
 }
 
 /**
@@ -93,21 +137,28 @@ export function buildScheduleIcsEvents(
 ): IcsEvent[] {
   const events: IcsEvent[] = [];
 
-  // Determine semester start date or fallback to current semester start
-  let baseStartDate = semester?.startDate ? new Date(semester.startDate) : new Date();
-  if (isNaN(baseStartDate.getTime())) {
-    baseStartDate = new Date();
-  }
+  // Determine semester start date or fallback to today in Vietnam. All
+  // downstream math stays in UTC fields so the exported times are Vietnam
+  // wall-clock regardless of the viewer's own timezone.
+  const baseStartDate =
+    (semester?.startDate ? parseCivilDateOnly(semester.startDate) : undefined)
+    ?? vietnamCivilToday();
 
-  // Determine semester end date for recurrence UNTIL
+  // Determine semester end date for recurrence UNTIL. The end date is a
+  // Vietnam civil date; the last valid instant is 23:59:59+07:00, emitted
+  // as the equivalent UTC instant (16:59:59Z of the same day).
   let untilUtcStr: string | undefined;
-  if (semester?.endDate) {
-    const endDate = new Date(semester.endDate);
-    if (!isNaN(endDate.getTime())) {
-      // Set to 23:59:59 on the end date
-      endDate.setHours(23, 59, 59, 999);
-      untilUtcStr = formatIcsUtcDateTime(endDate);
-    }
+  const endDate = semester?.endDate ? parseCivilDateOnly(semester.endDate) : undefined;
+  if (endDate) {
+    const vnEndOfDayUtc = new Date(
+      Date.UTC(
+        endDate.getUTCFullYear(),
+        endDate.getUTCMonth(),
+        endDate.getUTCDate(),
+        23, 59, 59,
+      ) - VIETNAM_UTC_OFFSET_MS,
+    );
+    untilUtcStr = formatIcsUtcDateTime(vnEndOfDayUtc);
   }
 
   const activeEnrollments = enrollments.filter(
@@ -141,12 +192,6 @@ export function buildScheduleIcsEvents(
       const start = parseTimeString(schedule.startTime);
       const end = parseTimeString(schedule.endTime);
 
-      const startDate = new Date(firstDate);
-      startDate.setHours(start.hours, start.minutes, 0, 0);
-
-      const endDate = new Date(firstDate);
-      endDate.setHours(end.hours, end.minutes, 0, 0);
-
       const building = schedule.classroom?.building;
       const room = schedule.classroom?.roomNumber;
       const location = [room ? (locale === 'vi' ? `Phòng ${room}` : `Room ${room}`) : '', building]
@@ -176,8 +221,8 @@ export function buildScheduleIcsEvents(
         summary,
         description: descLines.join('\n'),
         location,
-        dtstart: formatIcsLocalDateTime(startDate),
-        dtend: formatIcsLocalDateTime(endDate),
+        dtstart: formatCivilDateTime(firstDate, start.hours, start.minutes),
+        dtend: formatCivilDateTime(firstDate, end.hours, end.minutes),
         rrule: untilUtcStr ? `FREQ=WEEKLY;UNTIL=${untilUtcStr}` : undefined,
       });
     }

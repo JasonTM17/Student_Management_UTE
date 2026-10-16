@@ -104,6 +104,34 @@ class AdminCatalogMutationPersistenceTest {
     }
 
     @Test
+    void sectionCreateRejectsNonZeroPaddedClockValues() throws Exception {
+        // "7:00" sorts lexicographically between "10:00" and "19:59", so a
+        // non-padded write silently defeated every conflict check. The write
+        // path now requires strict HH:mm.
+        mvc.perform(post("/api/v1/sections")
+                        .with(adminJwt())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "id": "section-bad-time",
+                                  "sectionNumber": "04",
+                                  "courseId": "course-old",
+                                  "semesterId": "semester-old",
+                                  "classroomId": "room-1",
+                                  "capacity": 25,
+                                  "schedules": [
+                                    {"dayOfWeek": 2, "startTime": "7:00", "endTime": "09:00", "classroomId": "room-1"}
+                                  ]
+                                }
+                                """))
+                .andExpect(status().isBadRequest());
+        assertThat(jdbc.queryForObject(
+                        "SELECT COUNT(*) FROM \"academic\".\"Section\" WHERE \"id\" = 'section-bad-time'",
+                        Integer.class))
+                .isZero();
+    }
+
+    @Test
     void sectionUpdatePersistsMutableCourseSemesterAndReplacementSchedules() throws Exception {
         mvc.perform(put("/api/v1/sections/section-existing")
                         .with(adminJwt())

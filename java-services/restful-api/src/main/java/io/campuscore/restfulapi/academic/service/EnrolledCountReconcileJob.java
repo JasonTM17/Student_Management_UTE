@@ -36,8 +36,15 @@ import org.springframework.stereotype.Component;
 public class EnrolledCountReconcileJob {
     private static final Logger log = LoggerFactory.getLogger(EnrolledCountReconcileJob.class);
 
-    /** Same active-enrollment definition as RegistrationService seat accounting. */
-    static final String ACTIVE_STATUS_PREDICATE = "('ENROLLED', 'PENDING', 'CONFIRMED')";
+    /**
+     * Same seat-occupancy definition the registration flow maintains
+     * ({@code ENROLLED/PENDING/CONFIRMED}) plus {@code COMPLETED}: publishing
+     * grades flips the enrollment to COMPLETED but those students still
+     * occupy the seats the counter records — excluding them made every
+     * published section read as permanently drifted (and repair would zero a
+     * live roster).
+     */
+    static final String ACTIVE_STATUS_PREDICATE = "('ENROLLED', 'PENDING', 'CONFIRMED', 'COMPLETED')";
     private static final int LOGGED_SECTION_LIMIT = 20;
 
     private final NamedParameterJdbcTemplate jdbc;

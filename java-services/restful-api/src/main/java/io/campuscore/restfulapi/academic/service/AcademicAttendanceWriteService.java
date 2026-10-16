@@ -13,6 +13,7 @@ import java.time.ZoneOffset;
 import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 import org.springframework.context.annotation.Profile;
@@ -66,8 +67,11 @@ public class AcademicAttendanceWriteService {
         }
 
         Set<String> enrolledStudentIds = repository.findActiveEnrolledStudentIds(normalizedSectionId);
-        List<String> targetStudentIds = new ArrayList<>();
-        List<AttendanceInsertRow> insertRows = new ArrayList<>();
+        // Dedupe by student: a payload that names the same student twice used
+        // to insert two rows on the (studentId, sectionId, date) unique key
+        // and surface as a 500. Last entry wins, like a JSON object.
+        Set<String> targetStudentIds = new java.util.LinkedHashSet<>();
+        Map<String, AttendanceInsertRow> insertRows = new java.util.LinkedHashMap<>();
         Instant now = Instant.now();
 
         for (StudentAttendanceEntry entry : request.records()) {
@@ -88,6 +92,7 @@ public class AcademicAttendanceWriteService {
             // kept, so a lecturer could never un-mark an attendance entry.
             if ("RESET".equals(upperStatus)) {
                 targetStudentIds.add(normalizedStudentId);
+                insertRows.remove(normalizedStudentId);
                 continue;
             }
             if (!ALLOWED_STATUSES.contains(upperStatus)) {
@@ -96,7 +101,7 @@ public class AcademicAttendanceWriteService {
             }
 
             targetStudentIds.add(normalizedStudentId);
-            insertRows.add(new AttendanceInsertRow(
+            insertRows.put(normalizedStudentId, new AttendanceInsertRow(
                     UUID.randomUUID().toString(),
                     normalizedStudentId,
                     normalizedSectionId,
@@ -109,10 +114,10 @@ public class AcademicAttendanceWriteService {
 
         // Delete existing records for (sectionId, date, studentIds) to ensure idempotent replacement;
         // RESET entries are deleted only (they contribute no insert row).
-        repository.deleteAttendanceRecords(normalizedSectionId, normalizedDate, targetStudentIds);
+        repository.deleteAttendanceRecords(normalizedSectionId, normalizedDate, new ArrayList<>(targetStudentIds));
 
         // Batch insert the attendance rows
-        repository.insertAttendanceBatch(insertRows);
+        repository.insertAttendanceBatch(new ArrayList<>(insertRows.values()));
 
         return new AttendanceMutationResponse(
                 normalizedSectionId,
@@ -123,13 +128,23 @@ public class AcademicAttendanceWriteService {
                         : "Attendance recorded successfully for " + insertRows.size() + " students");
     }
 
+    /**
+     * Attendance is recorded per local (Asia/Ho_Chi_Minh) calendar day, keyed
+     * as that day's UTC midnight. An ISO instant is first resolved to the
+     * local date it falls on — truncating the instant at the UTC boundary
+     * keyed evening classes (17:00Z–23:59Z = the next local day) to the wrong
+     * calendar date and split same-day records across two keys.
+     */
+    private static final java.time.ZoneId CAMPUS_ZONE = java.time.ZoneId.of("Asia/Ho_Chi_Minh");
+
     private static Instant parseAndNormalizeDate(String value) {
         if (value == null || value.isBlank()) {
             throw new DomainException(HttpStatus.BAD_REQUEST, "INVALID_ATTENDANCE_DATE", "date is required");
         }
         String trimmed = value.trim();
         try {
-            return Instant.parse(trimmed).truncatedTo(java.time.temporal.ChronoUnit.DAYS);
+            LocalDate localDate = LocalDate.ofInstant(Instant.parse(trimmed), CAMPUS_ZONE);
+            return localDate.atStartOfDay().toInstant(ZoneOffset.UTC);
         } catch (DateTimeParseException ignored) {
             try {
                 return LocalDate.parse(trimmed).atStartOfDay().toInstant(ZoneOffset.UTC);

@@ -212,7 +212,7 @@ export default function CertificatesPage() {
               <Award className="h-4 w-4 text-primary" />
               {certCopy.selectPurposeTitle}
             </h2>
-            <div className="space-y-2.5">
+            <div className="space-y-2.5" role="radiogroup" aria-label={certCopy.selectPurposeTitle}>
               {PURPOSE_OPTIONS.map((opt) => {
                 const Icon = opt.icon;
                 const isSelected = opt.id === selectedPurpose;
@@ -221,6 +221,8 @@ export default function CertificatesPage() {
                   <button
                     key={opt.id}
                     type="button"
+                    role="radio"
+                    aria-checked={isSelected}
                     onClick={() => setSelectedPurpose(opt.id)}
                     className={`w-full text-left p-3.5 rounded-lg border transition-all flex items-start gap-3.5 ${
                       isSelected

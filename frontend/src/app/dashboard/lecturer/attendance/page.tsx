@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useId, useMemo, useState } from 'react';
+import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react';
 import {
   AlertCircle,
   CalendarCheck,
@@ -87,6 +87,11 @@ export default function LecturerAttendancePage() {
   const [resetStudentIds, setResetStudentIds] = useState<Set<string>>(new Set());
   const [sectionSummary, setSectionSummary] = useState<SectionAttendanceSummary | null>(null);
   const [existingReadFailed, setExistingReadFailed] = useState(false);
+  // Request generations: a stale sections/roster response must never overwrite
+  // the newer selection — writing D1's roster under D2 would persist marks to
+  // the wrong students on Save.
+  const sectionsGenerationRef = useRef(0);
+  const rosterGenerationRef = useRef(0);
 
   // 1. Fetch semesters
   const fetchSemesters = useCallback(async () => {
@@ -100,12 +105,14 @@ export default function LecturerAttendancePage() {
 
   // 2. Fetch lecturer's assigned sections
   const fetchSections = useCallback(async () => {
+    const generation = ++sectionsGenerationRef.current;
     setIsLoadingSections(true);
     setSectionsLoadFailed(false);
     try {
       const data = await sectionsApi.getMyGradingSections(
         selectedSemester || undefined,
       );
+      if (sectionsGenerationRef.current !== generation) return;
       setSections(data);
       if (data.length > 0) {
         setSelectedSectionId((prev) => {
@@ -116,27 +123,33 @@ export default function LecturerAttendancePage() {
         setSelectedSectionId('');
       }
     } catch {
+      if (sectionsGenerationRef.current !== generation) return;
       // A failed load must not render as "no classes assigned": flag it so the
       // roster area shows an error + retry instead of a false empty state.
       setSections([]);
       setSectionsLoadFailed(true);
     } finally {
-      setIsLoadingSections(false);
+      if (sectionsGenerationRef.current === generation) {
+        setIsLoadingSections(false);
+      }
     }
   }, [selectedSemester]);
 
   // 3. Fetch roster and existing attendance records for the selected section and date
   const fetchRosterAndAttendance = useCallback(async (sectionId: string, date: string) => {
+    // Each new (sectionId, date) fetch starts a new generation and clears the
+    // previous rows: leaving the old roster in place while a reload was in
+    // flight let Save persist stale marks under the new selection.
+    const generation = ++rosterGenerationRef.current;
+    setRoster([]);
+    setSectionSummary(null);
+    setExistingReadFailed(false);
     if (!sectionId) {
-      setRoster([]);
-      setSectionSummary(null);
-      setExistingReadFailed(false);
       return;
     }
 
     setIsLoadingRoster(true);
     setError('');
-    setExistingReadFailed(false);
 
     let existingReadFailedNow = false;
     try {
@@ -154,6 +167,7 @@ export default function LecturerAttendancePage() {
         }),
         attendanceApi.getSectionSummary(sectionId).catch(() => null),
       ]);
+      if (rosterGenerationRef.current !== generation) return;
       setExistingReadFailed(existingReadFailedNow);
 
       const attendanceMap = new Map<string, { status: AttendanceStatus; notes: string | null }>();
@@ -181,9 +195,12 @@ export default function LecturerAttendancePage() {
       setResetStudentIds(new Set());
       setSectionSummary(summary);
     } catch {
+      if (rosterGenerationRef.current !== generation) return;
       setError(copy.rosterLoadErrorDescription);
     } finally {
-      setIsLoadingRoster(false);
+      if (rosterGenerationRef.current === generation) {
+        setIsLoadingRoster(false);
+      }
     }
   }, [copy.rosterLoadErrorDescription]);
 
@@ -248,9 +265,11 @@ export default function LecturerAttendancePage() {
   };
 
   const handleSave = async () => {
-    if (!selectedSectionId || roster.length === 0) return;
-    // Belt for the disabled buttons: never overwrite a section whose saved
-    // attendance could not be read back (would mass-reset real records).
+    // Belt for the disabled buttons: never save while a roster fetch is in
+    // flight (the rows on screen may belong to a previous section/date) and
+    // never overwrite a section whose saved attendance could not be read back
+    // (would mass-reset real records).
+    if (!selectedSectionId || roster.length === 0 || isLoadingRoster) return;
     if (existingReadFailed) {
       toast.error(copy.existingReadWarning);
       return;
@@ -593,7 +612,7 @@ export default function LecturerAttendancePage() {
               <Button
                 size="sm"
                 onClick={handleSave}
-                disabled={isSaving || existingReadFailed}
+                disabled={isSaving || existingReadFailed || isLoadingRoster}
                 className="bg-primary text-primary-foreground font-semibold"
               >
                 <Save className="mr-1.5 h-4 w-4" />
@@ -722,7 +741,7 @@ export default function LecturerAttendancePage() {
           <div className="flex justify-end pt-2 print:hidden">
             <Button
               onClick={handleSave}
-              disabled={isSaving || existingReadFailed}
+              disabled={isSaving || existingReadFailed || isLoadingRoster}
               className="bg-primary text-primary-foreground font-semibold px-6"
             >
               <Save className="mr-2 h-4 w-4" />

@@ -415,7 +415,9 @@ export default function AcademicEditorPage() {
   };
 
   const saveDraft = useCallback(() => {
-    const timestamp = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+    // Stamp drafts in the UI locale — the browser default can differ (e.g.
+    // en-US AM/PM shown to a vi-VN reader).
+    const timestamp = new Date().toLocaleTimeString(isVi ? 'vi-VN' : 'en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
     const payload: StoredEditorDocument = {
       title,
       category,
@@ -438,7 +440,7 @@ export default function AcademicEditorPage() {
       // so the author believed a draft existed that did not.
       toast.error(copy.draftSaveFailed);
     }
-  }, [audienceKnown, category, content, copy.draftSaveFailed, copy.savedToast, editingId, editingVersion, editorType, priority, priorityKnown, targetRole, title]);
+  }, [audienceKnown, category, content, copy.draftSaveFailed, copy.savedToast, editingId, editingVersion, editorType, isVi, priority, priorityKnown, targetRole, title]);
 
   const handleCopy = useCallback(async () => {
     try {
@@ -469,6 +471,20 @@ export default function AcademicEditorPage() {
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
   }, [content, editorType, title]);
+
+  /**
+   * Drop the localStorage draft + TinyMCE autosave without touching live
+   * editor state. Called after a successful create/update so a later reload
+   * cannot hydrate a pre-publish body and stale editingVersion.
+   */
+  const clearPersistedDraft = useCallback(() => {
+    try {
+      localStorage.removeItem(STORAGE_KEY);
+    } catch {
+      // ignore
+    }
+    clearTinyMceAutosaveDrafts(studioEditorRef.current?.id);
+  }, []);
 
   const handleReset = useCallback(() => {
     // RT-P3-3: routed through the unsaved-changes guard so the confirm text
@@ -770,11 +786,10 @@ export default function AcademicEditorPage() {
       deepLinkLoadedRef.current = true;
     };
     announcementsApi
-      .getAll({ page: 1, limit: 50 })
-      .then((res) => {
+      .getById(targetId)
+      .then((found) => {
         if (cancelled) return;
         markLoaded();
-        const found = (res.data || []).find((a) => a.id === targetId);
         if (found) {
           setDeepLinkNotice(null);
           handleLoadAnnouncement(found);
@@ -879,6 +894,10 @@ export default function AcademicEditorPage() {
         ...audienceFor(targetRole),
       });
 
+      // A published document must not resurrect from the persisted draft —
+      // reloading used to hydrate the pre-publish body and re-Publish wrote a
+      // duplicate (or conflicted on a stale expectedVersion for edits).
+      clearPersistedDraft();
       toast.success(
         isVi
           ? 'Đã phát hành thông báo thành công lên toàn trường!'
@@ -921,6 +940,10 @@ export default function AcademicEditorPage() {
       });
 
       setEditingVersion((prev) => prev + 1);
+      // Same rule as publish: the saved draft mirrors the just-written state,
+      // so the persisted copy is dropped to keep reloads from reopening a
+      // stale editingVersion (which the next update then 409s on).
+      clearPersistedDraft();
       toast.success(
         isVi ? 'Đã cập nhật bài viết thành công vào cơ sở dữ liệu!' : 'Announcement updated in database!'
       );
@@ -1400,12 +1423,12 @@ export default function AcademicEditorPage() {
                 <div className="flex flex-wrap items-center gap-4">
                   <span className="flex items-center gap-1.5">
                     <FileEdit className="h-3.5 w-3.5 text-primary" />
-                    <strong>{stats.words.toLocaleString()}</strong> {copy.words}
+                    <strong>{stats.words.toLocaleString(isVi ? 'vi-VN' : 'en-US')}</strong> {copy.words}
                   </span>
                   <span>•</span>
                   <span className="flex items-center gap-1.5">
                     <BookOpen className="h-3.5 w-3.5 text-primary" />
-                    <strong>{stats.chars.toLocaleString()}</strong> {copy.characters}
+                    <strong>{stats.chars.toLocaleString(isVi ? 'vi-VN' : 'en-US')}</strong> {copy.characters}
                   </span>
                   <span>•</span>
                   <span className="flex items-center gap-1.5">

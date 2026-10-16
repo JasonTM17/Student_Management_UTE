@@ -508,6 +508,15 @@ export function AdminFrame({
                         <Users className="h-4 w-4" aria-hidden="true" />
                         {messages.adminShell.menuUserManagement}
                       </LocalizedLink>
+                      <div className="my-1 border-t border-border/70 pt-1 sm:hidden">
+                        <div className="flex items-center justify-between px-3 py-1.5">
+                          <span className="text-xs text-muted-foreground">{messages.adminShell.preferences}</span>
+                          <div className="flex items-center gap-1">
+                            <LanguageToggle />
+                            <ThemeToggle className="h-8 w-8" />
+                          </div>
+                        </div>
+                      </div>
                       <div className="my-1 border-t border-border/70" />
                       <button
                         type="button"

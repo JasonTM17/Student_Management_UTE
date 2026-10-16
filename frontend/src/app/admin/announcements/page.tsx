@@ -56,6 +56,7 @@ import {
   type ReorderBlockReason,
 } from '@/lib/announcement-reorder';
 import { useConfirmationDialog } from '@/components/ui/use-confirmation-dialog';
+import { useRovingTabs } from '@/components/ui/use-roving-tabs';
 import { useI18n } from '@/i18n';
 import {
   reorderCopyEn,
@@ -263,6 +264,11 @@ export default function AdminAnnouncementsPage() {
   const [lifecycleReason, setLifecycleReason] = useState('');
   const [previewRole, setPreviewRole] = useState<AnnouncementRole>('STUDENT');
   const [previewYear, setPreviewYear] = useState('1');
+  const statusTabs = useRovingTabs(['ACTIVE', 'ARCHIVED', 'ALL'], filters.status, (status) => {
+    setFilters((current) => ({ ...current, status }));
+    setPage(1);
+  });
+  const previewRoleTabs = useRovingTabs(['STUDENT', 'LECTURER'], previewRole, setPreviewRole);
   const [busy, setBusy] = useState(false);
   const editorSnapshot = useRef('');
   const [reorderList, setReorderList] = useState<AnnouncementRecord[]>([]);
@@ -911,14 +917,17 @@ export default function AdminAnnouncementsPage() {
                 <div>
                   <p className="text-sm font-semibold text-foreground">{copy.status}</p>
                   <div className="mt-2 flex flex-wrap gap-2" role="tablist" aria-label={copy.status}>
-                    {(['ACTIVE', 'ARCHIVED', 'ALL'] as const).map((status) => {
+                    {(['ACTIVE', 'ARCHIVED', 'ALL'] as const).map((status, statusIndex) => {
                       const label = status === 'ACTIVE' ? copy.active : status === 'ARCHIVED' ? copy.archived : copy.all;
                       return (
                         <button
                           key={status}
+                          ref={statusTabs.tabRef(status)}
                           type="button"
                           role="tab"
                           aria-selected={filters.status === status}
+                          tabIndex={statusTabs.tabIndex(status)}
+                          onKeyDown={(event) => statusTabs.onKeyDown(event, statusIndex)}
                           className={`min-h-11 rounded-md border px-4 text-sm font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 ${filters.status === status ? 'border-primary bg-primary text-primary-foreground' : 'border-input bg-background text-foreground hover:bg-secondary'}`}
                           onClick={() => {
                             setFilters((current) => ({ ...current, status }));
@@ -1204,8 +1213,8 @@ export default function AdminAnnouncementsPage() {
                     </div>
                     <CardDescription>{vi ? 'Kiểm tra nhanh nội dung sẽ xuất hiện với từng vai trò.' : 'Check how the notice will appear for each role.'}</CardDescription>
                     <div className="mt-3 grid grid-cols-2 gap-2" role="tablist" aria-label={copy.preview}>
-                      {(['STUDENT', 'LECTURER'] as const).map((role) => (
-                        <button key={role} type="button" role="tab" aria-selected={previewRole === role} className={`min-h-11 rounded-md border px-3 text-sm font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 ${previewRole === role ? 'border-primary bg-primary text-primary-foreground' : 'border-input bg-background text-foreground hover:bg-secondary'}`} onClick={() => setPreviewRole(role)}>
+                      {(['STUDENT', 'LECTURER'] as const).map((role, roleIndex) => (
+                        <button key={role} ref={previewRoleTabs.tabRef(role)} type="button" role="tab" aria-selected={previewRole === role} tabIndex={previewRoleTabs.tabIndex(role)} onKeyDown={(event) => previewRoleTabs.onKeyDown(event, roleIndex)} className={`min-h-11 rounded-md border px-3 text-sm font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 ${previewRole === role ? 'border-primary bg-primary text-primary-foreground' : 'border-input bg-background text-foreground hover:bg-secondary'}`} onClick={() => setPreviewRole(role)}>
                           {role === 'STUDENT' ? copy.previewStudent : copy.previewLecturer}
                         </button>
                       ))}

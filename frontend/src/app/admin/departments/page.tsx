@@ -412,7 +412,7 @@ export default function AdminDepartmentsPage() {
                   value={searchInput}
                   onChange={(event) => setSearchInput(event.target.value)}
                   placeholder={copy.searchPlaceholder}
-                  aria-label={copy.searchPlaceholder}
+                  aria-label={copy.searchLabel}
                   icon={<Search className="h-4 w-4" />}
                 />
               </div>

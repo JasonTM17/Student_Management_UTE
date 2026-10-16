@@ -70,7 +70,10 @@ public class AnnouncementReadController {
         @ApiResponse(responseCode = "404", description = "Không tìm thấy thông báo")
     })
     @GetMapping("{id}")
-    @PreAuthorize("hasAnyRole('LECTURER', 'ADMIN', 'SUPER_ADMIN')")
+    // Students need this for share deep-links (/dashboard/announcements?id=…);
+    // the service applies the same audience visibility the feed uses, so an
+    // out-of-scope id answers 404 exactly like an absent one.
+    @PreAuthorize("hasAnyRole('STUDENT','LECTURER','ADMIN','SUPER_ADMIN','TRUONG_KHOA','TRUONG_BO_MON')")
     public AnnouncementResponse getAnnouncement(
             @Parameter(description = "Mã định danh thông báo") @PathVariable String id,
             @AuthenticationPrincipal Jwt jwt) {
