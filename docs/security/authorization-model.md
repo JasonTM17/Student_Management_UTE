@@ -51,8 +51,11 @@ single-session logout.
 
 Credential verification and replacement serialize on the account's User row
 lock, so login, refresh, reset issuance/redemption, and password writes for the
-same account queue rather than interleave; no `lock_timeout` is configured, so
-an operational stall on one account delays only that account's auth. A request
+same account queue rather than interleave. Row-lock contention is per account,
+but waiting transactions occupy shared database connections and request
+capacity, so sustained contention can also delay other accounts. The
+application does not configure a credential-operation `lock_timeout`;
+the connection-pool acquisition timeout is a separate limit. A request
 carrying a stale credential fails closed even on `permitAll` reads — the
 frontend treats that as session death and routes to sign-in rather than
 serving anonymous content silently.
