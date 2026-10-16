@@ -98,7 +98,13 @@ public class AuthLoginService {
             passwordEncoder.matches(password, DUMMY_PASSWORD_HASH);
             throw new BadCredentialsException("Invalid credentials");
         }
-        AuthUserRecord user = found.get();
+        // Credential verification and session issuance share the same User
+        // lock as password replacement; never mint a current revision after
+        // verifying a password from a snapshot taken before that replacement.
+        users.lockUserRow(found.get().id());
+        AuthUserRecord user = users.findById(found.get().id())
+                .filter(current -> normalizedEmail.equals(current.email()))
+                .orElseThrow(() -> new BadCredentialsException("Invalid credentials"));
         Instant now = clock.instant();
 
         boolean locked = user.lockedUntil() != null && user.lockedUntil().isAfter(now);
@@ -143,7 +149,12 @@ public class AuthLoginService {
      */
     @Transactional(noRollbackFor = {BadCredentialsException.class, AppException.class})
     public LoginResult completeLogin(String challengeId, String code, String ipAddress, String userAgent) {
-        String userId = twoFactor.consumeLoginChallenge(challengeId, code);
+        String userId = twoFactor.loginChallengeUserId(challengeId);
+        // Resolve without a Challenge lock, then keep the global order User
+        // before Challenge/Session. Consumption re-reads after this lock so a
+        // credential replacement can invalidate a waiting LOGIN challenge.
+        users.lockUserRow(userId);
+        twoFactor.consumeLoginChallenge(challengeId, code);
         AuthUserRecord user = users.findById(userId)
                 .orElseThrow(() -> new BadCredentialsException("Invalid credentials"));
         Instant now = clock.instant();
@@ -261,6 +272,7 @@ public class AuthLoginService {
 
     @Transactional
     public void changePassword(String userId, String oldPassword, String newPassword) {
+        users.lockUserRow(userId);
         AuthUserRecord user = requireActiveUser(userId);
         if (oldPassword == null || oldPassword.isBlank() || newPassword == null || newPassword.isBlank()) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Password fields are required");
@@ -339,7 +351,8 @@ public class AuthLoginService {
                 user.permissions(),
                 user.studentId(),
                 user.studentYear(),
-                user.lecturerId());
+                user.lecturerId(),
+                user.credentialVersion());
     }
 
     private LoginResult issueSession(AuthUserRecord user, String ipAddress, String userAgent) {

@@ -113,6 +113,16 @@ public class PasswordResetService {
         if (user == null || !isEligible(user)) {
             return;
         }
+        // Issuance and consumption share User -> ResetToken lock order.
+        users.lockUserRow(user.id());
+        String normalizedEmail = normalizeEmail(email);
+        user = users.findById(user.id())
+                .filter(current -> current.email().equals(normalizedEmail))
+                .filter(PasswordResetService::isEligible)
+                .orElse(null);
+        if (user == null) {
+            return;
+        }
         Instant now = clock.instant();
         if (tokens.countRecentByUser(user.id(), now.minus(REQUEST_WINDOW))
                 >= MAX_REQUESTS_PER_WINDOW) {
@@ -152,6 +162,8 @@ public class PasswordResetService {
         TokenRecord token = tokens.findByTokenHash(tokenHash)
                 .filter(found -> found.usedAt() == null && found.expiresAt().isAfter(now))
                 .orElseThrow(PasswordResetService::invalidToken);
+        // Match login/refresh/admin order: User before reset-token/session.
+        users.lockUserRow(token.userId());
         AuthUserRecord user = users.findById(token.userId())
                 .filter(PasswordResetService::isEligible)
                 .orElseThrow(PasswordResetService::invalidToken);

@@ -36,7 +36,8 @@ public final class CurrentAccountJwt {
                 .findAccountAuthorization(subject).orElseThrow(() -> new IllegalStateException("Missing fixture account: " + subject));
         String email = jdbc.queryForObject("SELECT \"email\" FROM campuscore_auth.\"User\" WHERE \"id\"=?", String.class, subject);
         return jwt().jwt(token -> {
-            token.subject(subject).claim("email", email).claim("roles", state.roles()).claim("permissions", state.permissions());
+            token.subject(subject).claim("email", email).claim("roles", state.roles()).claim("permissions", state.permissions())
+                    .claim("credentialVersion", state.credentialVersion());
             if (state.studentId() != null) token.claim("studentId", state.studentId());
             if (state.studentYear() != null) token.claim("student", Map.of("year", state.studentYear()));
             if (state.lecturerId() != null) token.claim("lecturerId", state.lecturerId());

@@ -98,6 +98,8 @@ class AuthLoginPersistenceTest {
                     "updatedAt" TIMESTAMP NOT NULL
                 )
                 """);
+        io.campuscore.restfulapi.testsupport.AccountAuthorityFixture.ensureCredentialReplacementSchema(jdbc);
+        jdbc.update("DELETE FROM campuscore_auth.\"TwoFactorChallenge\"");
         jdbc.execute("""
                 CREATE TABLE IF NOT EXISTS "campuscore_auth"."Role" (
                     "id" VARCHAR(120) PRIMARY KEY,
@@ -316,8 +318,30 @@ class AuthLoginPersistenceTest {
                 Boolean.class);
         org.junit.jupiter.api.Assertions.assertFalse(flag);
 
+        // Credential replacement revokes both transport forms of the earlier access token.
         mvc.perform(put("/api/v1/auth/profile")
                         .header("Authorization", "Bearer " + accessToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"phone\":\"0900000000\"}"))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.code").value("SESSION_INVALID"));
+        mvc.perform(get("/api/v1/auth/me").header("Authorization", "Bearer " + accessToken))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.code").value("SESSION_INVALID"));
+        mvc.perform(get("/api/v1/auth/me").cookie(login.getResponse().getCookie("cc_access_token")))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.code").value("SESSION_INVALID"));
+
+        MvcResult freshLogin = mvc.perform(post("/api/v1/auth/login")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"email\":\"student@campuscore.edu\",\"password\":\"" + rotatedSecret + "\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.user.mustChangePassword").value(false))
+                .andReturn();
+        String freshAccessToken = objectMapper.readTree(freshLogin.getResponse().getContentAsString())
+                .get("accessToken").asText();
+        mvc.perform(put("/api/v1/auth/profile")
+                        .header("Authorization", "Bearer " + freshAccessToken)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"phone\":\"0900000000\"}"))
                 .andExpect(status().isOk());
@@ -788,14 +812,48 @@ class AuthLoginPersistenceTest {
                                 + "\",\"newPassword\":\"" + newSecret + "\"}"))
                 .andExpect(status().isOk());
 
-        // … and re-submitting the now-current password is its own 400.
+        // Re-authenticate after rotation before testing reuse of the current password.
+        MvcResult freshLogin = mvc.perform(post("/api/v1/auth/login")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"email\":\"student@campuscore.edu\",\"password\":\"" + newSecret + "\"}"))
+                .andExpect(status().isOk()).andReturn();
+        String freshAccessToken = objectMapper.readTree(freshLogin.getResponse().getContentAsString())
+                .get("accessToken").asText();
         mvc.perform(post("/api/v1/auth/change-password")
-                        .header("Authorization", "Bearer " + accessToken)
+                        .header("Authorization", "Bearer " + freshAccessToken)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"oldPassword\":\"" + newSecret
                                 + "\",\"newPassword\":\"" + newSecret + "\"}"))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value("PASSWORD_REUSED"));
+    }
+
+    @Test
+    void ordinaryPasswordRotationRevokesBothAccessTransportsAndAdvancesEpochOnEachReplacement() throws Exception {
+        String secret = "password123";
+        MvcResult login = loginStudent().andExpect(status().isOk()).andReturn();
+        for (long expectedVersion = 1; expectedVersion <= 2; expectedVersion++) {
+            String access = objectMapper.readTree(login.getResponse().getContentAsString()).get("accessToken").asText();
+            String replacement = "epoch-" + UUID.randomUUID();
+            mvc.perform(post("/api/v1/auth/change-password").header("Authorization", "Bearer " + access)
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content("{\"oldPassword\":\"" + secret + "\",\"newPassword\":\"" + replacement + "\"}"))
+                    .andExpect(status().isOk());
+            mvc.perform(get("/api/v1/auth/me").header("Authorization", "Bearer " + access))
+                    .andExpect(status().isUnauthorized()).andExpect(jsonPath("$.code").value("SESSION_INVALID"));
+            mvc.perform(get("/api/v1/auth/me").cookie(login.getResponse().getCookie("cc_access_token")))
+                    .andExpect(status().isUnauthorized()).andExpect(jsonPath("$.code").value("SESSION_INVALID"));
+            org.junit.jupiter.api.Assertions.assertEquals(expectedVersion, jdbc.queryForObject(
+                    "SELECT \"credentialVersion\" FROM campuscore_auth.\"User\" WHERE \"id\"='student-user'", Long.class));
+            login = mvc.perform(post("/api/v1/auth/login").contentType(MediaType.APPLICATION_JSON)
+                            .content("{\"email\":\"student@campuscore.edu\",\"password\":\"" + replacement + "\"}"))
+                    .andExpect(status().isOk()).andReturn();
+            String fresh = objectMapper.readTree(login.getResponse().getContentAsString()).get("accessToken").asText();
+            org.junit.jupiter.api.Assertions.assertEquals(expectedVersion,
+                    ((Number) jwtDecoder.decode(fresh).getClaim("credentialVersion")).longValue());
+            mvc.perform(get("/api/v1/auth/me").header("Authorization", "Bearer " + fresh)).andExpect(status().isOk());
+            secret = replacement;
+        }
     }
 
     private void assertPolicyRejection(String accessToken, String oldSecret, String candidate, String code)

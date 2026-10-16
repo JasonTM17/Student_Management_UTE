@@ -61,8 +61,52 @@ class AccountStateFilterTest {
     }
 
     private static AuthUserRepository.AccountAuthorization state(String status, boolean mustChangePassword) {
+        return state(status, mustChangePassword, 0L);
+    }
+
+    private static AuthUserRepository.AccountAuthorization state(String status, boolean mustChangePassword, long version) {
         return new AuthUserRepository.AccountAuthorization(status, mustChangePassword, null, null, null,
-                java.util.Set.of(), java.util.Set.of());
+                java.util.Set.of(), java.util.Set.of(), version);
+    }
+
+    @Test
+    void credentialVersionMustMatchCurrentEpochAndMalformedClaimsFailClosed() throws Exception {
+        Object[][] cases = {
+                {null, 0L, 200}, {0, 0L, 200}, {1L, 1L, 200}, {null, 1L, 401},
+                {0L, 1L, 401}, {2L, 1L, 401}, {-1L, 0L, 401},
+                {"0", 0L, 401}, {0.5D, 0L, 401}, {true, 0L, 401}, {java.util.List.of(0), 0L, 401}
+        };
+        for (Object[] testCase : cases) {
+            var token = Jwt.withTokenValue("epoch-fixture").header("alg", "HS256").subject("epoch-user")
+                    .issuedAt(Instant.now()).expiresAt(Instant.now().plusSeconds(900));
+            if (testCase[0] != null) token.claim("credentialVersion", testCase[0]);
+            SecurityContextHolder.getContext().setAuthentication(
+                    new JwtAuthenticationToken(token.build(), Collections.emptyList()));
+            when(repository.findAccountAuthorization("epoch-user"))
+                    .thenReturn(Optional.of(state("ACTIVE", false, (Long) testCase[1])));
+            var request = new MockHttpServletRequest("GET", "/api/v1/auth/me");
+            var response = new MockHttpServletResponse();
+            var chain = mock(FilterChain.class);
+            filter.doFilter(request, response, chain);
+            assertEquals(testCase[2], response.getStatus(), "claim type/value must respect the persisted epoch");
+            if ((Integer) testCase[2] == 401) {
+                assertTrue(response.getContentAsString().contains("SESSION_INVALID"));
+                verify(chain, never()).doFilter(request, response);
+            } else verify(chain).doFilter(request, response);
+        }
+    }
+
+    @Test
+    void staleCredentialCookiesDoNotBlockLogoutCleanup() throws Exception {
+        authenticate("epoch-user");
+        when(repository.findAccountAuthorization("epoch-user"))
+                .thenReturn(Optional.of(state("ACTIVE", false, 1L)));
+        var request = new MockHttpServletRequest("POST", "/api/v1/auth/logout");
+        var response = new MockHttpServletResponse();
+        var chain = mock(FilterChain.class);
+        filter.doFilter(request, response, chain);
+        assertEquals(200, response.getStatus());
+        verify(chain).doFilter(request, response);
     }
 
     @Test

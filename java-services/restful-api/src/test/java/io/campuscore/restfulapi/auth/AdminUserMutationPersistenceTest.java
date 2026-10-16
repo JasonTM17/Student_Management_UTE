@@ -408,6 +408,38 @@ class AdminUserMutationPersistenceTest {
     }
 
     @Test
+    void administrativeResetRevokesRealAccessTokensAndTheNewCredentialCanAuthenticate() throws Exception {
+        String initial = "initial-" + java.util.UUID.randomUUID();
+        jdbc.update("UPDATE campuscore_auth.\"User\" SET \"password\"=? WHERE \"id\"='second-user'",
+                new org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder().encode(initial));
+        insertUserRole("second-student-role", "second-user", "role-student");
+        MvcResult login = mvc.perform(post("/api/v1/auth/login").contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"email\":\"second@campuscore.edu\",\"password\":\"" + initial + "\"}"))
+                .andExpect(status().isOk()).andReturn();
+        String oldAccess = objectMapper.readTree(login.getResponse().getContentAsString()).get("accessToken").asText();
+        io.campuscore.restfulapi.testsupport.AccountAuthorityFixture.pendingLoginChallenge(jdbc, "admin-reset-pending-login", "second-user");
+        MvcResult reset = mvc.perform(post("/api/v1/users/second-user/password-reset").with(adminJwt()))
+                .andExpect(status().isOk()).andReturn();
+        String issued = objectMapper.readTree(reset.getResponse().getContentAsString()).get("temporaryPassword").asText();
+        mvc.perform(get("/api/v1/auth/me").header("Authorization", "Bearer " + oldAccess))
+                .andExpect(status().isUnauthorized()).andExpect(jsonPath("$.code").value("SESSION_INVALID"));
+        mvc.perform(get("/api/v1/auth/me").cookie(login.getResponse().getCookie("cc_access_token")))
+                .andExpect(status().isUnauthorized()).andExpect(jsonPath("$.code").value("SESSION_INVALID"));
+        assertThat(jdbc.queryForObject("SELECT \"credentialVersion\" FROM campuscore_auth.\"User\" WHERE \"id\"='second-user'",
+                Long.class)).isEqualTo(1L);
+        assertThat(jdbc.queryForObject("SELECT \"consumedAt\" FROM campuscore_auth.\"TwoFactorChallenge\" WHERE \"id\"='admin-reset-pending-login'",
+                Object.class)).isNotNull();
+        MvcResult fresh = mvc.perform(post("/api/v1/auth/login").contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"email\":\"second@campuscore.edu\",\"password\":\"" + issued + "\"}"))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.user.mustChangePassword").value(true)).andReturn();
+        String currentAccess = objectMapper.readTree(fresh.getResponse().getContentAsString()).get("accessToken").asText();
+        mvc.perform(get("/api/v1/auth/me").header("Authorization", "Bearer " + currentAccess)).andExpect(status().isOk());
+        mvc.perform(put("/api/v1/auth/profile").header("Authorization", "Bearer " + currentAccess)
+                        .contentType(MediaType.APPLICATION_JSON).content("{\"phone\":\"0900000000\"}"))
+                .andExpect(status().isForbidden()).andExpect(jsonPath("$.code").value("PASSWORD_CHANGE_REQUIRED"));
+    }
+
+    @Test
     void passwordResetClearsTheLoginLockoutSoTheIssuedCredentialWorks() throws Exception {
         // An admin-issued credential must be usable even while the account is
         // locked out from failed logins — otherwise the reset hands back a
@@ -1113,6 +1145,10 @@ class AdminUserMutationPersistenceTest {
                     "firstName" VARCHAR(120) NOT NULL,
                     "lastName" VARCHAR(120) NOT NULL,
                     "phone" VARCHAR(80),
+                    "gender" VARCHAR(40),
+                    "dateOfBirth" TIMESTAMP,
+                    "address" VARCHAR(500),
+                    "avatar" TEXT,
                     "status" VARCHAR(40) NOT NULL,
                     "mustChangePassword" BOOLEAN NOT NULL DEFAULT FALSE,
                     "refreshToken" VARCHAR(200),
@@ -1120,10 +1156,15 @@ class AdminUserMutationPersistenceTest {
                     "isSuperAdmin" BOOLEAN NOT NULL,
                     "failedLoginAttempts" INTEGER NOT NULL,
                     "lockedUntil" TIMESTAMP,
+                    "lastLoginAt" TIMESTAMP,
+                    "passwordChangedAt" TIMESTAMP,
+                    "twoFactorEnabled" BOOLEAN NOT NULL DEFAULT FALSE,
                     "createdAt" TIMESTAMP NOT NULL,
                     "updatedAt" TIMESTAMP NOT NULL
                 )
                 """);
+        io.campuscore.restfulapi.testsupport.AccountAuthorityFixture.ensureCredentialReplacementSchema(jdbc);
+        jdbc.update("DELETE FROM campuscore_auth.\"TwoFactorChallenge\"");
         jdbc.execute("""
                 CREATE TABLE IF NOT EXISTS "campuscore_auth"."Role" (
                     "id" VARCHAR(120) PRIMARY KEY,

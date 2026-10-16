@@ -91,7 +91,8 @@ public class AccountStateFilter extends OncePerRequestFilter {
 
     private static boolean matchesCurrentAuthorization(org.springframework.security.oauth2.jwt.Jwt token,
             AuthUserRepository.AccountAuthorization state) {
-        if (!matchesSet(token.getClaims().get("roles"), state.roles())
+        if (!matchesCredentialVersion(token, state.credentialVersion())
+                || !matchesSet(token.getClaims().get("roles"), state.roles())
                 || !matchesSet(token.getClaims().get("permissions"), state.permissions())
                 || !java.util.Objects.equals(token.getClaims().get("studentId"), state.studentId())
                 || !java.util.Objects.equals(token.getClaims().get("lecturerId"), state.lecturerId())) {
@@ -103,6 +104,19 @@ public class AccountStateFilter extends OncePerRequestFilter {
         return year == null ? state.studentYear() == null
                 : year instanceof Number number && state.studentYear() != null
                         && number.doubleValue() == state.studentYear().doubleValue();
+    }
+
+    private static boolean matchesCredentialVersion(org.springframework.security.oauth2.jwt.Jwt token, long current) {
+        // Only untouched revision-zero accounts accept a pre-upgrade token.
+        // Signed JWT numeric integers decode as Integer/Long; reject decimal,
+        // string, null and negative claims rather than coercing them.
+        if (!token.getClaims().containsKey("credentialVersion")) {
+            return current == 0;
+        }
+        Object claim = token.getClaims().get("credentialVersion");
+        return (claim instanceof Long || claim instanceof Integer)
+                && ((Number) claim).longValue() >= 0
+                && ((Number) claim).longValue() == current;
     }
 
     private static boolean matchesSet(Object claim, java.util.Set<String> current) {

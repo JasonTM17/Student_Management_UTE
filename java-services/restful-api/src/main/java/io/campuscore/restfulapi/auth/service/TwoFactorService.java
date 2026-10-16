@@ -256,10 +256,14 @@ public class TwoFactorService {
         return createAndDeliverChallenge(user.id(), TwoFactorChallengeRepository.PURPOSE_LOGIN);
     }
 
+    /** Resolve the owner without taking a Challenge lock; caller locks User first. */
+    public String loginChallengeUserId(String challengeId) {
+        return requireUsableChallenge(challengeId, TwoFactorChallengeRepository.PURPOSE_LOGIN, null).userId();
+    }
+
     /**
-     * Validates the LOGIN second factor and returns the account id that owns
-     * the challenge. The caller re-checks account state and issues the same
-     * session as a normal login.
+     * Validates the LOGIN second factor under the caller's User lock. The
+     * caller re-checks account state before issuing a session.
      */
     @Transactional(noRollbackFor = AppException.class)
     public String consumeLoginChallenge(String challengeId, String code) {

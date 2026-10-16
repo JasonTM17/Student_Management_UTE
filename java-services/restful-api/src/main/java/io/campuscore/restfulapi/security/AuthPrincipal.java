@@ -16,5 +16,6 @@ public record AuthPrincipal(
         List<String> permissions,
         String studentId,
         Integer studentYear,
-        String lecturerId) {
+        String lecturerId,
+        long credentialVersion) {
 }

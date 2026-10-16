@@ -205,10 +205,12 @@ public class AdminUserMutationService {
         int updated = jdbc.update(
                 "UPDATE " + USER + " SET \"password\" = :password, \"mustChangePassword\" = TRUE,"
                         + " \"lockedUntil\" = NULL, \"failedLoginAttempts\" = 0,"
+                        + " \"credentialVersion\" = \"credentialVersion\" + 1, \"passwordChangedAt\" = CURRENT_TIMESTAMP,"
                         + " \"updatedAt\" = CURRENT_TIMESTAMP WHERE \"id\" = :id",
                 new MapSqlParameterSource().addValue("id", id)
                         .addValue("password", passwordEncoder.encode(temporaryPassword)));
         if (updated == 0) throw problem(HttpStatus.NOT_FOUND, "USER_NOT_FOUND", "User not found");
+        authUsers.invalidateLoginChallenges(id);
         revokeSessions(id);
         // Recorded as an event, never as state: the new credential must not reach
         // the audit table, and a password reset is exactly the operation whose

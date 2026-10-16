@@ -76,6 +76,9 @@ public class AuthTokenService {
         Objects.requireNonNull(principal, "principal");
         requireText(principal.id(), "subject");
         requireText(principal.email(), "email");
+        if (principal.credentialVersion() < 0) {
+            throw new BadCredentialsException("Invalid credential revision");
+        }
         List<String> roles = values(principal.roles(), "roles");
         List<String> permissions = values(principal.permissions(), "permissions");
 
@@ -92,7 +95,8 @@ public class AuthTokenService {
                 // the Authorization header even when both secrets are identical.
                 .claim("tokenType", "access")
                 .claim("roles", roles)
-                .claim("permissions", permissions);
+                .claim("permissions", permissions)
+                .claim("credentialVersion", principal.credentialVersion());
 
         claimIfPresent(claims, "firstName", principal.firstName());
         claimIfPresent(claims, "lastName", principal.lastName());

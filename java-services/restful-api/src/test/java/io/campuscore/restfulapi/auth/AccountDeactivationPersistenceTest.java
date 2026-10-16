@@ -62,6 +62,7 @@ class AccountDeactivationPersistenceTest {
         jdbc.execute("CREATE SCHEMA IF NOT EXISTS \"campuscore_auth\"");
         jdbc.execute("CREATE SCHEMA IF NOT EXISTS campuscore_audit");
         createTables();
+        io.campuscore.restfulapi.testsupport.AccountAuthorityFixture.ensureCredentialReplacementSchema(jdbc);
         clearTables();
         insertManagedUser("student-user", "student@campuscore.edu", "password123", "STUDENT", "role-student");
         insertManagedUser("admin-user", "admin@campuscore.edu", "admin-secret", "ADMIN", "role-admin");
