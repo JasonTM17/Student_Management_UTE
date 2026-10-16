@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { Calendar, Camera, Eye, EyeOff, KeyRound, Mail, MapPin, Phone, Save, ShieldCheck, ShieldOff, User } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import { authApi } from '@/lib/api';
@@ -161,8 +162,9 @@ function PasswordField({
 }
 
 export default function ProfilePage() {
-  const { user, refreshUser } = useAuth();
-  const { messages, locale } = useI18n();
+  const { user, refreshUser, logout } = useAuth();
+  const { messages, locale, href } = useI18n();
+  const router = useRouter();
   const [isLoading, setIsLoading] = useState(false);
   const [isUpdatingPassword, setIsUpdatingPassword] = useState(false);
   const [profileError, setProfileError] = useState('');
@@ -466,6 +468,8 @@ export default function ProfilePage() {
         confirmPassword: false,
         twoFactorPassword: false,
       });
+      await logout({ redirect: false });
+      router.replace(href('/login?reason=password-rotated'));
     } catch (error: any) {
       // The inline error sits directly under the form, so a toast with the
       // same copy read as a duplicated message.

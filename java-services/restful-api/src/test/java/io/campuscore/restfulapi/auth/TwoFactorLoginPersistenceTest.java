@@ -132,6 +132,7 @@ class TwoFactorLoginPersistenceTest {
                     "updatedAt" TIMESTAMP NOT NULL
                 )
                 """);
+        io.campuscore.restfulapi.testsupport.AccountAuthorityFixture.ensureCredentialReplacementSchema(jdbc);
         jdbc.execute("""
                 CREATE TABLE IF NOT EXISTS "campuscore_auth"."TwoFactorChallenge" (
                     "id" VARCHAR(120) PRIMARY KEY,
@@ -678,6 +679,40 @@ class TwoFactorLoginPersistenceTest {
                 "SELECT \"twoFactorEnabled\" FROM \"campuscore_auth\".\"User\" WHERE \"id\" = 'student-user'",
                 Boolean.class);
         assertTrue(flag);
+    }
+
+    @Test
+    void passwordReplacementInvalidatesPendingLoginChallengeAndFreshChallengeStillWorks() throws Exception {
+        MvcResult original = loginStudent().andExpect(status().isOk()).andReturn();
+        String originalAccess = objectMapper.readTree(original.getResponse().getContentAsString()).get("accessToken").asText();
+        enableTwoFactorDirectly();
+        MvcResult pending = loginStudent().andExpect(status().isOk())
+                .andExpect(jsonPath("$.twoFactorRequired").value(true)).andReturn();
+        String oldChallenge = objectMapper.readTree(pending.getResponse().getContentAsString()).get("challengeId").asText();
+        String oldCode = latestCode();
+        String replacement = "rotated-" + java.util.UUID.randomUUID();
+        mvc.perform(post("/api/v1/auth/change-password").header("Authorization", "Bearer " + originalAccess)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"oldPassword\":\"" + STUDENT_PASSWORD + "\",\"newPassword\":\"" + replacement + "\"}"))
+                .andExpect(status().isOk());
+        assertNotNull(jdbc.queryForObject("SELECT \"consumedAt\" FROM campuscore_auth.\"TwoFactorChallenge\" WHERE \"id\"=?",
+                Object.class, oldChallenge));
+        mvc.perform(post("/api/v1/auth/two-factor/verify").contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"challengeId\":\"" + oldChallenge + "\",\"code\":\"" + oldCode + "\"}"))
+                .andExpect(status().isBadRequest()).andExpect(jsonPath("$.code").value("TWO_FACTOR_CHALLENGE_INVALID"));
+        assertEquals(0, sessionCount());
+        MvcResult fresh = mvc.perform(post("/api/v1/auth/login").contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"email\":\"" + STUDENT_EMAIL + "\",\"password\":\"" + replacement + "\"}"))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.twoFactorRequired").value(true)).andReturn();
+        String freshChallenge = objectMapper.readTree(fresh.getResponse().getContentAsString()).get("challengeId").asText();
+        String freshCode = latestCode();
+        MvcResult verified = mvc.perform(post("/api/v1/auth/two-factor/verify").contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"challengeId\":\"" + freshChallenge + "\",\"code\":\"" + freshCode + "\"}"))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.accessToken").isString()).andReturn();
+        String access = objectMapper.readTree(verified.getResponse().getContentAsString()).get("accessToken").asText();
+        mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get("/api/v1/auth/me")
+                        .header("Authorization", "Bearer " + access)).andExpect(status().isOk());
+        assertEquals(1, sessionCount());
     }
 
     /** A browser session issued by a real login: refresh token + its CSRF pair. */

@@ -32,9 +32,30 @@ rotation exception exists only to let the user inspect the account and change
 the password; it does not exempt those requests from current-account checks.
 The exact exceptions and error contract belong to `AccountStateFilter`.
 
-Snapshot equality is a current-state policy, not a permanent access-token
-revocation history. Restoring exactly the same account authority can make an
-unexpired snapshot match again; refresh-session revocation is a separate boundary.
+Role/profile snapshot equality is a current-state policy, not a permanent
+revocation history. Restoring exactly those authorities can make their snapshot
+match again. Credential replacement has a separate durable boundary: password
+changes must require fresh authentication, even when roles and profiles stay the
+same. See the credential revision in `AuthUserRepository`, `AuthTokenService`
+and `AccountStateFilter`, and the executable cases in
+[AuthLoginPersistenceTest](../../java-services/restful-api/src/test/java/io/campuscore/restfulapi/auth/AuthLoginPersistenceTest.java),
+[PasswordResetPersistenceTest](../../java-services/restful-api/src/test/java/io/campuscore/restfulapi/auth/PasswordResetPersistenceTest.java)
+and [AdminUserMutationPersistenceTest](../../java-services/restful-api/src/test/java/io/campuscore/restfulapi/auth/AdminUserMutationPersistenceTest.java).
+
+The revision avoids JWT timestamp precision and clock-skew ambiguity; the
+[PostgreSQL schedules](../../java-services/restful-api/src/test/java/io/campuscore/restfulapi/auth/AuthCredentialRevocationPostgresIT.java)
+own the stale-authentication interleavings. A request already authorized before
+replacement commits may finish. This boundary does not promise cancellation of
+in-flight work, recovery of past side effects, or access-token blacklisting on
+single-session logout.
+
+Apply the forward
+[V121 migration](../../java-services/restful-api/src/main/resources/db/migration/V121__revoke_access_on_credential_rotation.sql)
+with enforcing backend code. Do not serve a mixture of enforcing and older
+backends while claiming immediate credential revocation. Rolling back the code
+can retain the column but reopens the old access window. Revision-zero legacy
+compatibility preserves unaffected sessions during rollout; it cannot
+retroactively identify password changes made before the revision existed.
 
 ## Public, shared, and private data
 

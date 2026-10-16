@@ -85,6 +85,7 @@ class TwoFactorMailDisabledDeliveryTest {
                     "updatedAt" TIMESTAMP NOT NULL
                 )
                 """);
+        io.campuscore.restfulapi.testsupport.AccountAuthorityFixture.ensureCredentialReplacementSchema(jdbc);
         jdbc.execute("""
                 CREATE TABLE IF NOT EXISTS "campuscore_auth"."TwoFactorChallenge" (
                     "id" VARCHAR(120) PRIMARY KEY,

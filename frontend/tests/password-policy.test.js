@@ -3,8 +3,85 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 const ts = require('typescript');
+const vm = require('node:vm');
 
 const root = path.resolve(__dirname, '..');
+
+async function profilePasswordHandler({ rejectChange = false, newPassword = 'SafeReplacement9', waitForLogout = false } = {}) {
+  const sourcePath = process.env.CAMPUSCORE_PROFILE_ROTATION_SOURCE
+    || path.join(root, 'src/app/dashboard/profile/page.tsx');
+  const source = fs.readFileSync(sourcePath, 'utf8');
+  const parsed = ts.createSourceFile(sourcePath, source, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX);
+  let handler;
+  function visit(node) {
+    if (ts.isVariableDeclaration(node) && node.name.getText(parsed) === 'handlePasswordSubmit') {
+      handler = node.initializer;
+    }
+    ts.forEachChild(node, visit);
+  }
+  visit(parsed);
+  assert.ok(handler && ts.isArrowFunction(handler), 'Actual profile submit handler required');
+  const events = [];
+  let releaseLogout;
+  const { checkPasswordPolicy } = await loadPolicyModule();
+  const values = { oldPassword: 'BeforeLocal9', newPassword, confirmPassword: newPassword };
+  const form = { elements: { namedItem: name => ({ value: values[name] }) }, reset: () => events.push('reset') };
+  const globals = {
+    checkPasswordPolicy,
+    user: { email: 'synthetic-profile@example.invalid' },
+    setPasswordError: value => events.push(['error', value]),
+    setIsUpdatingPassword: value => events.push(['saving', value]),
+    setVisiblePasswordFields: () => events.push('hide-fields'),
+    authApi: { changePassword: async () => { events.push('change'); if (rejectChange) throw new Error('Synthetic rejection'); } },
+    messages: { profile: { passwordUpdated: 'Changed', passwordUpdateFailed: 'Failed' }, common: { campusErrors: { codes: { PASSWORD_TOO_SHORT: 'Too short' } } } },
+    toast: { success: () => events.push('success') },
+    campusCodeMessage: () => 'Translated rejection',
+    logout: options => {
+      assert.equal(options.redirect, false);
+      events.push('logout');
+      return waitForLogout ? new Promise(resolve => { releaseLogout = resolve; }) : Promise.resolve();
+    },
+    href: value => '/vi' + value,
+    router: { replace: value => events.push(['redirect', value]) },
+  };
+  const { outputText } = ts.transpileModule('(' + handler.getText(parsed) + ')', {
+    compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.None },
+  });
+  const invoke = vm.runInNewContext(outputText, globals, { filename: 'profile-password-handler.js' });
+  return { events, submit: () => invoke({ preventDefault() {}, currentTarget: form }), release: () => releaseLogout() };
+}
+
+test('profile password success waits for sign-out before localized login navigation', async () => {
+  const scenario = await profilePasswordHandler({ waitForLogout: true });
+  const pending = scenario.submit();
+  await new Promise(resolve => setImmediate(resolve));
+  assert.ok(scenario.events.includes('logout'), 'Successful credential replacement must sign out');
+  assert.equal(scenario.events.some(event => Array.isArray(event) && event[0] === 'redirect'), false);
+  scenario.release();
+  await pending;
+  assert.ok(scenario.events.indexOf('change') < scenario.events.indexOf('logout'));
+  assert.deepEqual(scenario.events.find(event => Array.isArray(event) && event[0] === 'redirect'), ['redirect', '/vi/login?reason=password-rotated']);
+  assert.deepEqual(scenario.events.at(-1), ['saving', false]);
+});
+
+test('profile password server rejection keeps the current session and inline failure', async () => {
+  const scenario = await profilePasswordHandler({ rejectChange: true });
+  await scenario.submit();
+  assert.ok(scenario.events.includes('change'));
+  assert.equal(scenario.events.includes('logout'), false);
+  assert.equal(scenario.events.some(event => Array.isArray(event) && event[0] === 'redirect'), false);
+  assert.ok(scenario.events.some(event => Array.isArray(event) && event[0] === 'error' && event[1] === 'Translated rejection'));
+  assert.deepEqual(scenario.events.at(-1), ['saving', false]);
+});
+
+test('profile password client validation keeps the current session without a request', async () => {
+  const scenario = await profilePasswordHandler({ newPassword: 'short' });
+  await scenario.submit();
+  assert.equal(scenario.events.includes('change'), false);
+  assert.equal(scenario.events.includes('logout'), false);
+  assert.ok(scenario.events.some(event => Array.isArray(event) && event[0] === 'error' && event[1] === 'Too short'));
+  assert.deepEqual(scenario.events.at(-1), ['saving', false]);
+});
 
 async function loadPolicyModule() {
   const source = fs.readFileSync(path.join(root, 'src/lib/password-policy.ts'), 'utf8');

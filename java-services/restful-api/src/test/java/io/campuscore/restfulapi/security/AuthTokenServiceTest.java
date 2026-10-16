@@ -47,12 +47,13 @@ class AuthTokenServiceTest {
                 List.of("thesis:read"),
                 "student-1",
                 2,
-                null));
+                null, 0L));
 
         Jwt decoded = config.jwtDecoder(SECRET, true).decode(issued.accessToken());
         assertEquals("user-1", decoded.getSubject());
         assertEquals("student@campuscore.edu", decoded.getClaimAsString("email"));
         assertEquals("access", decoded.getClaimAsString("tokenType"));
+        assertEquals(0L, ((Number) decoded.getClaim("credentialVersion")).longValue());
         assertEquals(List.of("STUDENT"), decoded.getClaimAsStringList("roles"));
         assertEquals(List.of("thesis:read"), decoded.getClaimAsStringList("permissions"));
         assertEquals("student-1", decoded.getClaimAsString("studentId"));
@@ -86,7 +87,7 @@ class AuthTokenServiceTest {
                 List.of("thesis:read"),
                 "student-1",
                 2,
-                null));
+                null, 0L));
 
         // The shared jwtDecoder bean is access-only now, so inspect refresh
         // claims through the same plain decoder the service's refresh path uses.
@@ -128,7 +129,7 @@ class AuthTokenServiceTest {
                 List.of(),
                 "student-1",
                 2,
-                null));
+                null, 0L));
 
         // The signature validates (same secret), so without the decoder-side
         // tokenType check this decode succeeds and the refresh token rides the
@@ -157,7 +158,7 @@ class AuthTokenServiceTest {
                 List.of(),
                 null,
                 null,
-                null));
+                null, 0L));
 
         Jwt decoded = config.jwtDecoder(SECRET, true).decode(issued.accessToken());
         assertEquals("user-1", decoded.getSubject());
@@ -184,7 +185,7 @@ class AuthTokenServiceTest {
                 List.of(),
                 null,
                 null,
-                null)));
+                null, 0L)));
 
         assertThrows(BadCredentialsException.class, () -> service.issueAccessToken(new AuthPrincipal(
                 "user-1",
@@ -196,7 +197,7 @@ class AuthTokenServiceTest {
                 List.of(),
                 null,
                 null,
-                null)));
+                null, 0L)));
     }
 
     @Test
@@ -218,5 +219,22 @@ class AuthTokenServiceTest {
                 Clock.fixed(NOW, ZoneOffset.UTC),
                 Duration.ofMinutes(15),
                 Duration.ZERO));
+    }
+
+    @Test
+    void rotationsWithinTheSameIssuanceSecondCarryDistinctCredentialEpochs() {
+        SecurityConfig config = new SecurityConfig();
+        AuthTokenService service = new AuthTokenService(config.jwtEncoder(SECRET, true), config.jwtEncoder(REFRESH_SECRET, true),
+                config.jwtDecoder(REFRESH_SECRET, true), Clock.fixed(NOW, ZoneOffset.UTC), Duration.ofMinutes(15), Duration.ofDays(7));
+        String first = service.issueAccessToken(new AuthPrincipal("user-1", "student@campuscore.edu", "Student", "One",
+                "ACTIVE", List.of("STUDENT"), List.of(), null, null, null, 0L)).accessToken();
+        String second = service.issueAccessToken(new AuthPrincipal("user-1", "student@campuscore.edu", "Student", "One",
+                "ACTIVE", List.of("STUDENT"), List.of(), null, null, null, 1L)).accessToken();
+        Jwt firstJwt = config.jwtDecoder(SECRET, true).decode(first);
+        Jwt secondJwt = config.jwtDecoder(SECRET, true).decode(second);
+        assertEquals(firstJwt.getIssuedAt(), secondJwt.getIssuedAt());
+        assertEquals(0L, ((Number) firstJwt.getClaim("credentialVersion")).longValue());
+        assertEquals(1L, ((Number) secondJwt.getClaim("credentialVersion")).longValue());
+        org.junit.jupiter.api.Assertions.assertNotEquals(first, second);
     }
 }

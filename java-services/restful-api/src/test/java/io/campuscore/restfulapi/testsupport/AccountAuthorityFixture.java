@@ -24,6 +24,7 @@ public final class AccountAuthorityFixture {
                 + " \"mustChangePassword\" BOOLEAN NOT NULL DEFAULT FALSE, \"twoFactorEnabled\" BOOLEAN NOT NULL DEFAULT FALSE,"
                 + " \"emailVerified\" BOOLEAN NOT NULL DEFAULT TRUE, \"isSuperAdmin\" BOOLEAN NOT NULL DEFAULT FALSE,"
                 + " \"failedLoginAttempts\" INTEGER NOT NULL DEFAULT 0)");
+        ensureCredentialVersion(jdbc);
         jdbc.execute("CREATE TABLE IF NOT EXISTS campuscore_auth.\"Role\" (\"id\" VARCHAR(120) PRIMARY KEY,"
                 + " \"name\" VARCHAR(80) UNIQUE, \"description\" VARCHAR(500), \"isSystem\" BOOLEAN DEFAULT TRUE,"
                 + " \"createdAt\" TIMESTAMP DEFAULT CURRENT_TIMESTAMP, \"updatedAt\" TIMESTAMP DEFAULT CURRENT_TIMESTAMP)");
@@ -41,6 +42,7 @@ public final class AccountAuthorityFixture {
      */
     public static void prepare(JdbcTemplate jdbc) {
         jdbc.execute("CREATE SCHEMA IF NOT EXISTS campuscore_auth");
+        ensureCredentialVersion(jdbc);
         jdbc.execute("CREATE TABLE IF NOT EXISTS campuscore_auth.\"Role\" (\"id\" VARCHAR(120) PRIMARY KEY,"
                 + " \"name\" VARCHAR(80) UNIQUE, \"description\" VARCHAR(500), \"isSystem\" BOOLEAN DEFAULT TRUE,"
                 + " \"createdAt\" TIMESTAMP DEFAULT CURRENT_TIMESTAMP, \"updatedAt\" TIMESTAMP DEFAULT CURRENT_TIMESTAMP)");
@@ -49,6 +51,30 @@ public final class AccountAuthorityFixture {
         jdbc.execute("CREATE TABLE IF NOT EXISTS campuscore_auth.\"RolePermission\" (\"id\" VARCHAR(120) PRIMARY KEY, \"roleId\" VARCHAR(120), \"permissionId\" VARCHAR(120))");
         jdbc.execute("CREATE VIEW IF NOT EXISTS campuscore_auth.\"Student\" AS SELECT \"id\", \"userId\", \"year\" FROM academic.\"Student\"");
         jdbc.execute("CREATE TABLE IF NOT EXISTS campuscore_auth.\"Lecturer\" (\"id\" VARCHAR(120) PRIMARY KEY, \"userId\" VARCHAR(120) UNIQUE)");
+    }
+
+    /** Forward-column fixture for hand-created stores with Flyway disabled. */
+    public static void ensureCredentialVersion(JdbcTemplate jdbc) {
+        jdbc.execute("ALTER TABLE campuscore_auth.\"User\" ADD COLUMN IF NOT EXISTS"
+                + " \"credentialVersion\" BIGINT NOT NULL DEFAULT 0 CHECK (\"credentialVersion\" >= 0)");
+    }
+
+    /** Real persisted challenge boundary used by password-replacement fixtures. */
+    public static void ensureCredentialReplacementSchema(JdbcTemplate jdbc) {
+        ensureCredentialVersion(jdbc);
+        jdbc.execute("CREATE TABLE IF NOT EXISTS campuscore_auth.\"TwoFactorChallenge\" ("
+                + " \"id\" VARCHAR(120) PRIMARY KEY, \"userId\" VARCHAR(120) NOT NULL,"
+                + " \"purpose\" VARCHAR(16) NOT NULL, \"codeHash\" VARCHAR(64) NOT NULL,"
+                + " \"expiresAt\" TIMESTAMP WITH TIME ZONE NOT NULL, \"consumedAt\" TIMESTAMP WITH TIME ZONE,"
+                + " \"attempts\" INTEGER NOT NULL DEFAULT 0,"
+                + " \"createdAt\" TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP)");
+    }
+
+    /** Seeds one pending LOGIN row so replacement tests verify durable invalidation. */
+    public static void pendingLoginChallenge(JdbcTemplate jdbc, String id, String userId) {
+        jdbc.update("INSERT INTO campuscore_auth.\"TwoFactorChallenge\""
+                + " (\"id\", \"userId\", \"purpose\", \"codeHash\", \"expiresAt\")"
+                + " VALUES (?, ?, 'LOGIN', ?, CURRENT_TIMESTAMP + INTERVAL '1' HOUR)", id, userId, "0".repeat(64));
     }
 
     /** Inserts a current active user only when the fixture has not already created one. */

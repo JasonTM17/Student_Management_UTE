@@ -17,6 +17,7 @@ import org.springframework.jdbc.core.RowMapper;
 import org.springframework.jdbc.core.namedparam.MapSqlParameterSource;
 import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
 import org.springframework.stereotype.Repository;
+import org.springframework.transaction.annotation.Transactional;
 
 /** JDBC adapter for the Prisma-owned auth schema. */
 @Repository
@@ -44,7 +45,7 @@ public class AuthUserRepository {
         List<AuthUserRecord> matches = jdbc.query(
                 "SELECT u.\"id\", u.\"email\", u.\"password\", u.\"firstName\", u.\"lastName\","
                         + " u.\"phone\", u.\"gender\", u.\"dateOfBirth\", u.\"address\", u.\"avatar\","
-                        + " u.\"status\", u.\"mustChangePassword\", u.\"failedLoginAttempts\", u.\"lockedUntil\", u.\"createdAt\","
+                        + " u.\"status\", u.\"mustChangePassword\", u.\"credentialVersion\", u.\"failedLoginAttempts\", u.\"lockedUntil\", u.\"createdAt\","
                         + " s.\"id\" AS student_id, s.\"year\" AS student_year,"
                         + " l.\"id\" AS lecturer_id"
                         + " FROM " + USER_TABLE + " u"
@@ -62,7 +63,7 @@ public class AuthUserRepository {
         List<AuthUserRecord> matches = jdbc.query(
                 "SELECT u.\"id\", u.\"email\", u.\"password\", u.\"firstName\", u.\"lastName\","
                         + " u.\"phone\", u.\"gender\", u.\"dateOfBirth\", u.\"address\", u.\"avatar\","
-                        + " u.\"status\", u.\"mustChangePassword\", u.\"failedLoginAttempts\", u.\"lockedUntil\", u.\"createdAt\","
+                        + " u.\"status\", u.\"mustChangePassword\", u.\"credentialVersion\", u.\"failedLoginAttempts\", u.\"lockedUntil\", u.\"createdAt\","
                         + " s.\"id\" AS student_id, s.\"year\" AS student_year,"
                         + " l.\"id\" AS lecturer_id"
                         + " FROM " + USER_TABLE + " u"
@@ -92,7 +93,7 @@ public class AuthUserRepository {
         List<AuthUserRecord> matches = jdbc.query(
                 "SELECT u.\"id\", u.\"email\", u.\"password\", u.\"firstName\", u.\"lastName\","
                         + " u.\"phone\", u.\"gender\", u.\"dateOfBirth\", u.\"address\", u.\"avatar\","
-                        + " u.\"status\", u.\"mustChangePassword\", u.\"failedLoginAttempts\", u.\"lockedUntil\", u.\"createdAt\","
+                        + " u.\"status\", u.\"mustChangePassword\", u.\"credentialVersion\", u.\"failedLoginAttempts\", u.\"lockedUntil\", u.\"createdAt\","
                         + " st.\"id\" AS student_id, st.\"year\" AS student_year,"
                         + " l.\"id\" AS lecturer_id"
                         + " FROM " + SESSION_TABLE + " se"
@@ -176,7 +177,7 @@ public class AuthUserRepository {
 
     /** One statement snapshot of the current authority; excludes credentials and personal data. */
     public Optional<AccountAuthorization> findAccountAuthorization(String userId) {
-        return jdbc.query("SELECT u.\"status\", u.\"mustChangePassword\","
+        return jdbc.query("SELECT u.\"status\", u.\"mustChangePassword\", u.\"credentialVersion\","
                         + " s.\"id\" AS student_id, s.\"year\" AS student_year, l.\"id\" AS lecturer_id,"
                         + " r.\"name\" AS role_name, p.\"module\" AS permission_module, p.\"action\" AS permission_action"
                         + " FROM " + USER_TABLE + " u"
@@ -190,6 +191,7 @@ public class AuthUserRepository {
                     if (!resultSet.next()) return Optional.empty();
                     String status = resultSet.getString("status");
                     boolean mustChangePassword = resultSet.getBoolean("mustChangePassword");
+                    long credentialVersion = resultSet.getLong("credentialVersion");
                     String studentId = resultSet.getString("student_id");
                     Integer studentYear = nullableInteger(resultSet, "student_year");
                     String lecturerId = resultSet.getString("lecturer_id");
@@ -203,12 +205,14 @@ public class AuthUserRepository {
                         if (module != null && action != null) permissions.add(module + ":" + action);
                     } while (resultSet.next());
                     return Optional.of(new AccountAuthorization(status, mustChangePassword, studentId, studentYear,
-                            lecturerId, java.util.Set.copyOf(roles), java.util.Set.copyOf(permissions)));
+                            lecturerId, java.util.Set.copyOf(roles), java.util.Set.copyOf(permissions),
+                            credentialVersion));
                 });
     }
 
     public record AccountAuthorization(String status, boolean mustChangePassword, String studentId,
-            Integer studentYear, String lecturerId, java.util.Set<String> roles, java.util.Set<String> permissions) {
+            Integer studentYear, String lecturerId, java.util.Set<String> roles, java.util.Set<String> permissions,
+            long credentialVersion) {
     }
 
     /** Opt-in email OTP switch added by V85; read per login, never cached. */
@@ -239,15 +243,27 @@ public class AuthUserRepository {
     }
 
     /** Office-issued credential rotation: replace the hash and force first-login rotation. */
+    @Transactional
     public void adminSetPassword(String userId, String encodedPassword, boolean mustChangePassword) {
         jdbc.update(
                 "UPDATE " + USER_TABLE + " SET \"password\" = :password,"
-                        + " \"mustChangePassword\" = :flag, \"updatedAt\" = CURRENT_TIMESTAMP"
+                        + " \"mustChangePassword\" = :flag, \"updatedAt\" = CURRENT_TIMESTAMP,"
+                        + " \"passwordChangedAt\" = CURRENT_TIMESTAMP,"
+                        + " \"credentialVersion\" = \"credentialVersion\" + 1"
                         + " WHERE \"id\" = :id",
                 new MapSqlParameterSource()
                         .addValue("id", userId)
                         .addValue("password", encodedPassword)
                         .addValue("flag", mustChangePassword));
+        invalidateLoginChallenges(userId);
+    }
+
+    /** Called under the credential writer's User lock and transaction. */
+    public void invalidateLoginChallenges(String userId) {
+        jdbc.update("UPDATE " + SCHEMA + "\"TwoFactorChallenge\""
+                        + " SET \"consumedAt\" = CURRENT_TIMESTAMP"
+                        + " WHERE \"userId\" = :id AND \"purpose\" = 'LOGIN' AND \"consumedAt\" IS NULL",
+                new MapSqlParameterSource("id", userId));
     }
 
     public record AccountState(String status, boolean mustChangePassword) {
@@ -368,11 +384,13 @@ public class AuthUserRepository {
                         .addValue("avatar", avatar));
     }
 
+    @Transactional
     public void changePassword(String userId, String passwordHash, Instant passwordChangedAt) {
         jdbc.update(
                 "UPDATE " + USER_TABLE
                         + " SET \"password\" = :password,"
                         + " \"passwordChangedAt\" = :passwordChangedAt,"
+                        + " \"credentialVersion\" = \"credentialVersion\" + 1,"
                         + " \"refreshToken\" = NULL,"
                         + " \"updatedAt\" = CURRENT_TIMESTAMP"
                         + " WHERE \"id\" = :userId",
@@ -380,6 +398,7 @@ public class AuthUserRepository {
                         .addValue("userId", userId)
                         .addValue("password", passwordHash)
                         .addValue("passwordChangedAt", localDateTime(passwordChangedAt)));
+        invalidateLoginChallenges(userId);
     }
 
     /**
@@ -387,11 +406,13 @@ public class AuthUserRepository {
      * clears the must-change flag and any lockout state, and drops the cached
      * refresh token (refresh sessions are deleted separately by the service).
      */
+    @Transactional
     public void resetPassword(String userId, String passwordHash, Instant passwordChangedAt) {
         jdbc.update(
                 "UPDATE " + USER_TABLE
                         + " SET \"password\" = :password,"
                         + " \"passwordChangedAt\" = :passwordChangedAt,"
+                        + " \"credentialVersion\" = \"credentialVersion\" + 1,"
                         + " \"mustChangePassword\" = FALSE,"
                         + " \"failedLoginAttempts\" = 0,"
                         + " \"lockedUntil\" = NULL,"
@@ -402,6 +423,7 @@ public class AuthUserRepository {
                         .addValue("userId", userId)
                         .addValue("password", passwordHash)
                         .addValue("passwordChangedAt", localDateTime(passwordChangedAt)));
+        invalidateLoginChallenges(userId);
     }
 
     private List<String> findRoles(String userId) {
@@ -449,7 +471,8 @@ public class AuthUserRepository {
                 studentYear,
                 resultSet.getString("lecturer_id"),
                 List.of(),
-                List.of());
+                List.of(),
+                resultSet.getLong("credentialVersion"));
     }
 
     private static Integer nullableInteger(ResultSet resultSet, String column) throws SQLException {
@@ -489,7 +512,8 @@ public class AuthUserRepository {
             Integer studentYear,
             String lecturerId,
             List<String> roles,
-            List<String> permissions) {
+            List<String> permissions,
+            long credentialVersion) {
 
         AuthUserRecord withAuthorities(List<String> roles, List<String> permissions) {
             return new AuthUserRecord(
@@ -512,7 +536,8 @@ public class AuthUserRepository {
                     studentYear,
                     lecturerId,
                     List.copyOf(Objects.requireNonNullElse(roles, List.of())),
-                    List.copyOf(Objects.requireNonNullElse(permissions, List.of())));
+                    List.copyOf(Objects.requireNonNullElse(permissions, List.of())),
+                    credentialVersion);
         }
 
         public AuthUserResponse toResponse() {

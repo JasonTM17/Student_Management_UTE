@@ -12,6 +12,7 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -122,6 +123,8 @@ class PasswordResetPersistenceTest {
                     "updatedAt" TIMESTAMP NOT NULL
                 )
                 """);
+        io.campuscore.restfulapi.testsupport.AccountAuthorityFixture.ensureCredentialReplacementSchema(jdbc);
+        jdbc.update("DELETE FROM campuscore_auth.\"TwoFactorChallenge\"");
         jdbc.execute("""
                 CREATE TABLE IF NOT EXISTS "campuscore_auth"."Role" (
                     "id" VARCHAR(120) PRIMARY KEY,
@@ -334,6 +337,11 @@ class PasswordResetPersistenceTest {
 
     @Test
     void validTokenRotatesTheCredentialAndRevokesEverything() throws Exception {
+        var mapper = new com.fasterxml.jackson.databind.ObjectMapper();
+        var oldLogin = mvc.perform(post("/api/v1/auth/login").contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"email\":\"" + USER_EMAIL + "\",\"password\":\"initial-9pwd\"}"))
+                .andExpect(status().isOk()).andReturn();
+        String oldAccess = mapper.readTree(oldLogin.getResponse().getContentAsString()).get("accessToken").asText();
         // Start from the worst account state: locked out and flagged for
         // mandatory rotation, with a live refresh session. A reset must fix all of it.
         jdbc.update(
@@ -351,6 +359,7 @@ class PasswordResetPersistenceTest {
                 localDateTime(BASE_TIME));
 
         String token = issueTokenViaEndpoint();
+        io.campuscore.restfulapi.testsupport.AccountAuthorityFixture.pendingLoginChallenge(jdbc, "reset-pending-login", USER_ID);
         mvc.perform(post("/api/v1/auth/reset-password")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"token\":\"" + token + "\",\"newPassword\":\"NewC0rrectHorse\"}"))
@@ -372,15 +381,26 @@ class PasswordResetPersistenceTest {
                 "SELECT \"usedAt\" FROM \"campuscore_auth\".\"PasswordResetToken\" WHERE \"userId\" = ?",
                 Object.class, USER_ID));
 
+        mvc.perform(get("/api/v1/auth/me").header("Authorization", "Bearer " + oldAccess))
+                .andExpect(status().isUnauthorized()).andExpect(jsonPath("$.code").value("SESSION_INVALID"));
+        mvc.perform(get("/api/v1/auth/me").cookie(oldLogin.getResponse().getCookie("cc_access_token")))
+                .andExpect(status().isUnauthorized()).andExpect(jsonPath("$.code").value("SESSION_INVALID"));
+        assertEquals(1L, jdbc.queryForObject("SELECT \"credentialVersion\" FROM campuscore_auth.\"User\" WHERE \"id\"=?",
+                Long.class, USER_ID));
+        assertNotNull(jdbc.queryForObject("SELECT \"consumedAt\" FROM campuscore_auth.\"TwoFactorChallenge\" WHERE \"id\"='reset-pending-login'",
+                Object.class));
+
         // Only the new credential authenticates.
         mvc.perform(post("/api/v1/auth/login")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"email\":\"" + USER_EMAIL + "\",\"password\":\"initial-9pwd\"}"))
                 .andExpect(status().isUnauthorized());
-        mvc.perform(post("/api/v1/auth/login")
+        var freshLogin = mvc.perform(post("/api/v1/auth/login")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"email\":\"" + USER_EMAIL + "\",\"password\":\"NewC0rrectHorse\"}"))
-                .andExpect(status().isOk());
+                .andExpect(status().isOk()).andReturn();
+        String freshAccess = mapper.readTree(freshLogin.getResponse().getContentAsString()).get("accessToken").asText();
+        mvc.perform(get("/api/v1/auth/me").header("Authorization", "Bearer " + freshAccess)).andExpect(status().isOk());
 
         // No session was issued by the reset itself: the reply is a bare message.
         assertAudit(USER_ID, "PASSWORD_RESET_COMPLETED");

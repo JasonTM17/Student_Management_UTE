@@ -47,6 +47,7 @@ class AccountAuthorityPersistenceTest {
         jdbc.execute("CREATE TABLE campuscore_auth.\"Permission\" (\"id\" VARCHAR, \"module\" VARCHAR, \"action\" VARCHAR)");
         jdbc.execute("CREATE TABLE campuscore_auth.\"RolePermission\" (\"roleId\" VARCHAR, \"permissionId\" VARCHAR)");
         jdbc.update("INSERT INTO campuscore_auth.\"User\" VALUES ('user','ACTIVE',FALSE)");
+        io.campuscore.restfulapi.testsupport.AccountAuthorityFixture.ensureCredentialVersion(jdbc);
         jdbc.update("INSERT INTO campuscore_auth.\"Role\" VALUES ('role','ADMIN')");
         jdbc.update("INSERT INTO campuscore_auth.\"UserRole\" VALUES ('user','role')");
         var repository = new AuthUserRepository(new NamedParameterJdbcTemplate(jdbc));
