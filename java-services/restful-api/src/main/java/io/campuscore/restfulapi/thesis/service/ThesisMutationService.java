@@ -438,7 +438,7 @@ public class ThesisMutationService {
     @Transactional
     public RoundResponse extendReportDeadline(UUID id, Instant newDeadline, Jwt actor) {
         Map<String, Object> current = one(
-                "SELECT status, thesis_type, report_deadline FROM thesis.thesis_registration_round "
+                "SELECT status, thesis_type, report_deadline, gvpb_deadline FROM thesis.thesis_registration_round "
                         + "WHERE id = :id FOR UPDATE",
                 params().addValue("id", id), "ROUND_NOT_FOUND", "Thesis registration round not found");
         if (!RoundStatus.REGISTRATION_CLOSED.name().equals(current.get("status"))) {
@@ -451,6 +451,13 @@ public class ThesisMutationService {
         }
         if (newDeadline == null || !newDeadline.isAfter(Instant.now())) {
             throw invalid("reportDeadline must be in the future");
+        }
+        Instant effectiveDeadline = instantOf(current.get("report_deadline"));
+        if (effectiveDeadline == null) {
+            effectiveDeadline = instantOf(current.get("gvpb_deadline"));
+        }
+        if (effectiveDeadline != null && newDeadline.isBefore(effectiveDeadline)) {
+            throw invalid("reportDeadline must not be earlier than the current report deadline");
         }
         Map<String, Object> beforeState = new LinkedHashMap<>();
         beforeState.put("report_deadline", instantOf(current.get("report_deadline")));

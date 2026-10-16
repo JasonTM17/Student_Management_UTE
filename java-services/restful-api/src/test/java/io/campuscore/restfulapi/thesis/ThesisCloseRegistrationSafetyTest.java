@@ -178,6 +178,56 @@ class ThesisCloseRegistrationSafetyTest {
     }
 
     @Test
+    void extendingTheDeadlineCannotShortenTheEffectiveFutureWindow() throws Exception {
+        Instant now = Instant.now().truncatedTo(java.time.temporal.ChronoUnit.MILLIS);
+        for (String type : new String[] {"KLTN", "TLCN"}) {
+            for (boolean hasOverride : new boolean[] {false, true}) {
+                Instant gvpb = now.plusSeconds(3 * 86_400L);
+                Instant effective = hasOverride ? now.plusSeconds(4 * 86_400L) : gvpb;
+                UUID roundId = insertRound(type, "REGISTRATION_CLOSED", gvpb);
+                if (hasOverride) {
+                    jdbc.update("UPDATE thesis.thesis_registration_round SET report_deadline = ? WHERE id = ?",
+                            Timestamp.from(effective), roundId);
+                }
+                Number originalVersion = jdbc.queryForObject(
+                        "SELECT version FROM thesis.thesis_registration_round WHERE id = ?", Number.class, roundId);
+                int originalAuditCount = auditCount();
+
+                mvc.perform(put("/api/v1/thesis/rounds/{id}/report-deadline", roundId)
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content("{\"reportDeadline\":\"" + effective.minusSeconds(86_400) + "\"}")
+                                .with(adminJwt()))
+                        .andExpect(status().isBadRequest())
+                        .andExpect(jsonPath("$.code").value("VALIDATION_ERROR"));
+
+                Timestamp storedOverride = jdbc.queryForObject(
+                        "SELECT report_deadline FROM thesis.thesis_registration_round WHERE id = ?", Timestamp.class, roundId);
+                assertThat(storedOverride).isEqualTo(hasOverride ? Timestamp.from(effective) : null);
+                assertThat(jdbc.queryForObject("SELECT gvpb_deadline FROM thesis.thesis_registration_round WHERE id = ?",
+                        Timestamp.class, roundId).toInstant()).isEqualTo(gvpb);
+                assertThat(jdbc.queryForObject("SELECT version FROM thesis.thesis_registration_round WHERE id = ?",
+                        Number.class, roundId).longValue()).isEqualTo(originalVersion.longValue());
+                assertThat(auditCount()).isEqualTo(originalAuditCount);
+
+                for (Instant compatible : new Instant[] {effective, effective.plusSeconds(86_400)}) {
+                    mvc.perform(put("/api/v1/thesis/rounds/{id}/report-deadline", roundId)
+                                    .contentType(MediaType.APPLICATION_JSON)
+                                    .content("{\"reportDeadline\":\"" + compatible + "\"}")
+                                    .with(adminJwt()))
+                            .andExpect(status().isOk());
+                    assertThat(jdbc.queryForObject("SELECT report_deadline FROM thesis.thesis_registration_round WHERE id = ?",
+                            Timestamp.class, roundId).toInstant()).isEqualTo(compatible);
+                    assertThat(jdbc.queryForObject("SELECT gvpb_deadline FROM thesis.thesis_registration_round WHERE id = ?",
+                            Timestamp.class, roundId).toInstant()).isEqualTo(gvpb);
+                }
+                assertThat(auditCount()).isEqualTo(originalAuditCount + 2);
+                assertThat(jdbc.queryForObject("SELECT version FROM thesis.thesis_registration_round WHERE id = ?",
+                        Number.class, roundId).longValue()).isEqualTo(originalVersion.longValue() + 2);
+            }
+        }
+    }
+
+    @Test
     void extendingTheDeadlineRejectsRoundsWithoutAGvpbDeadline() throws Exception {
         UUID monHoc = insertRound("MON_HOC", "REGISTRATION_CLOSED", null);
         mvc.perform(put("/api/v1/thesis/rounds/{id}/report-deadline", monHoc)
