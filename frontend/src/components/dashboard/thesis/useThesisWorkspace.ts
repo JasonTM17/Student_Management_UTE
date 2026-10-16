@@ -1,8 +1,9 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type SetStateAction } from 'react';
 import { useAuth } from '@/context/AuthContext';
 import { useI18n } from '@/i18n';
+import { pickPreferredThesisRound } from '@/lib/thesis-round';
 import {
   thesisApi,
   type ThesisGroup,
@@ -19,7 +20,7 @@ export function useThesisWorkspace(
   // told not to fetch topics at all.
   const topicsEnabled = options?.topicsEnabled ?? true;
   const groupsEnabled = options?.groupsEnabled ?? true;
-  const { user } = useAuth();
+  const { user, isStudent } = useAuth();
   const { messages } = useI18n();
   const loadFailedMessage = messages.thesis.loadFailed;
   const thesisStatus = messages.thesis.status;
@@ -27,17 +28,39 @@ export function useThesisWorkspace(
   const [rounds, setRounds] = useState<ThesisRound[]>([]);
   const [topics, setTopics] = useState<ThesisTopic[]>([]);
   const [groups, setGroups] = useState<ThesisGroup[]>([]);
-  const [selectedRoundId, setSelectedRoundId] = useState(initialRoundId);
+  const [selectedRoundId, setRoundId] = useState(initialRoundId);
+  const appliedInitialRoundRef = useRef(initialRoundId);
+  const manualSelectionRef = useRef(false);
+  const membershipSelectedRef = useRef(false);
+  const [myGroups, setMyGroups] = useState<ThesisGroup[] | null>(null);
+  const [membershipError, setMembershipError] = useState('');
+  const [membershipLoading, setMembershipLoading] = useState(isStudent);
+  const [membershipReloadToken, setMembershipReloadToken] = useState(0);
+  const roundsRequestRef = useRef(0);
+  const workspaceRequestRef = useRef(0);
+  const identity = `${user?.id ?? ''}:${user?.studentId ?? ''}`;
+  const currentScopeRef = useRef({ selectedRoundId, identity });
+  currentScopeRef.current = { selectedRoundId, identity };
+  const setSelectedRoundId = useCallback((value: SetStateAction<string>) => {
+    const roundId = typeof value === 'function' ? value(currentScopeRef.current.selectedRoundId) : value;
+    manualSelectionRef.current = true;
+    // Invalidate synchronously, including mutation callbacks holding old closures.
+    workspaceRequestRef.current += 1;
+    currentScopeRef.current.selectedRoundId = roundId;
+    setRoundId(roundId);
+  }, []);
   const [roundsLoading, setRoundsLoading] = useState(true);
   const [workspaceLoading, setWorkspaceLoading] = useState(false);
   const [error, setError] = useState('');
   const topicCacheRef = useState(() => new Map<string, ThesisTopic[]>())[0];
 
   const loadRounds = useCallback(async () => {
+    const requestId = ++roundsRequestRef.current;
     setRoundsLoading(true);
     setError('');
     try {
       const nextRounds = await thesisApi.listRounds();
+      if (requestId !== roundsRequestRef.current) return;
       const sortedRounds = [...nextRounds].sort((a, b) => {
         // Academic rule priority: OPEN registration > KLTN thesis type > newest start date
         const isOpenA = a.status === 'REGISTRATION_OPEN' ? 0 : 1;
@@ -49,12 +72,17 @@ export function useThesisWorkspace(
         return (b.registrationStart || '').localeCompare(a.registrationStart || '');
       });
       setRounds(sortedRounds);
-      setSelectedRoundId((current) => {
-        if (initialRoundId && sortedRounds.some((round) => round.id === initialRoundId)) {
+      const explicitRoundChanged = appliedInitialRoundRef.current !== initialRoundId;
+      appliedInitialRoundRef.current = initialRoundId;
+      setRoundId((current) => {
+        if (explicitRoundChanged && initialRoundId && sortedRounds.some((round) => round.id === initialRoundId)) {
           return initialRoundId;
         }
         if (current && sortedRounds.some((round) => round.id === current)) {
           return current;
+        }
+        if (initialRoundId && sortedRounds.some((round) => round.id === initialRoundId)) {
+          return initialRoundId;
         }
         const preferred =
           sortedRounds.find((r) => r.status === 'REGISTRATION_OPEN' && r.thesisType === 'KLTN') ||
@@ -63,26 +91,63 @@ export function useThesisWorkspace(
         return preferred?.id || '';
       });
     } catch {
-      setError(loadFailedMessage);
+      if (requestId === roundsRequestRef.current) setError(loadFailedMessage);
     } finally {
-      setRoundsLoading(false);
+      if (requestId === roundsRequestRef.current) setRoundsLoading(false);
     }
   }, [initialRoundId, loadFailedMessage]);
 
   useEffect(() => {
     void loadRounds();
+    return () => { roundsRequestRef.current += 1; };
   }, [loadRounds]);
 
+  useEffect(() => {
+    membershipSelectedRef.current = false;
+    manualSelectionRef.current = false;
+    topicCacheRef.clear();
+  }, [identity, isStudent, topicCacheRef]);
+
+  useEffect(() => {
+    let cancelled = false;
+    setMyGroups(null);
+    setMembershipError('');
+    setMembershipLoading(isStudent);
+    if (isStudent) {
+      void thesisApi.myGroups().then((mine) => {
+        if (!cancelled) setMyGroups(mine);
+      }).catch(() => {
+        if (!cancelled) setMembershipError(loadFailedMessage);
+      }).finally(() => {
+        if (!cancelled) setMembershipLoading(false);
+      });
+    }
+    return () => { cancelled = true; };
+  }, [identity, isStudent, loadFailedMessage, membershipReloadToken, topicCacheRef]);
+
+  useEffect(() => {
+    if (!isStudent || initialRoundId || manualSelectionRef.current || membershipSelectedRef.current) return;
+    const preferred = pickPreferredThesisRound(rounds, myGroups);
+    if (preferred) {
+      membershipSelectedRef.current = true;
+      setRoundId(preferred);
+    }
+  }, [initialRoundId, isStudent, myGroups, rounds]);
+
   const refreshWorkspace = useCallback(async () => {
+    if (currentScopeRef.current.selectedRoundId !== selectedRoundId || currentScopeRef.current.identity !== identity) return;
+    const requestId = ++workspaceRequestRef.current;
+    const isCurrent = () => requestId === workspaceRequestRef.current
+      && currentScopeRef.current.selectedRoundId === selectedRoundId
+      && currentScopeRef.current.identity === identity;
     if (!selectedRoundId) {
       setTopics([]);
       setGroups([]);
+      setWorkspaceLoading(false);
       return;
     }
-    // Fast path: render cached topics instantly if available
-    if (topicsEnabled && topicCacheRef.has(selectedRoundId)) {
-      setTopics(topicCacheRef.get(selectedRoundId)!);
-    }
+    setTopics(topicsEnabled ? topicCacheRef.get(selectedRoundId) ?? [] : []);
+    setGroups([]);
     setWorkspaceLoading(true);
     setError('');
     try {
@@ -90,28 +155,32 @@ export function useThesisWorkspace(
         groupsEnabled ? thesisApi.listGroups(selectedRoundId) : Promise.resolve([]),
         topicsEnabled ? thesisApi.listTopics(selectedRoundId) : Promise.resolve([]),
       ]);
+      if (!isCurrent()) return;
       if (topicsEnabled) {
         topicCacheRef.set(selectedRoundId, nextTopics);
       }
       setTopics(nextTopics);
-      if (groupsEnabled) {
-        setGroups(nextGroups);
-      }
+      setGroups(nextGroups);
     } catch {
-      setError(loadFailedMessage);
+      if (isCurrent()) setError(loadFailedMessage);
     } finally {
-      setWorkspaceLoading(false);
+      if (isCurrent()) setWorkspaceLoading(false);
     }
-  }, [groupsEnabled, loadFailedMessage, selectedRoundId, topicCacheRef, topicsEnabled]);
+  }, [groupsEnabled, identity, loadFailedMessage, selectedRoundId, topicCacheRef, topicsEnabled]);
 
   useEffect(() => {
     void refreshWorkspace();
+    return () => { workspaceRequestRef.current += 1; };
   }, [refreshWorkspace]);
 
   const selectedRound = useMemo(
     () => rounds.find((round) => round.id === selectedRoundId),
     [rounds, selectedRoundId],
   );
+  const reload = useCallback(() => {
+    setMembershipReloadToken((token) => token + 1);
+    return loadRounds();
+  }, [loadRounds]);
   const studentId = user?.studentId ?? '';
   const currentGroup = useMemo(
     () =>
@@ -157,11 +226,11 @@ export function useThesisWorkspace(
     selectedRound,
     currentGroup,
     statusLabel,
-    isLoading: roundsLoading || workspaceLoading,
+    isLoading: roundsLoading || workspaceLoading || membershipLoading,
     roundsLoading,
     workspaceLoading,
-    error,
-    reload: loadRounds,
+    error: membershipError || error,
+    reload,
     refreshWorkspace,
   };
 }

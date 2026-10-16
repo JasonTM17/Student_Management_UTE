@@ -144,6 +144,9 @@ export default function ThesisPage() {
   const [groups, setGroups] = useState<ThesisGroup[]>([]);
   const [departments, setDepartments] = useState<Department[]>([]);
   const [selectedRoundId, setSelectedRoundId] = useState('');
+  const topicRequestRef = useRef(0);
+  const selectedRoundRef = useRef(selectedRoundId);
+  selectedRoundRef.current = selectedRoundId;
   const [viewingTopic, setViewingTopic] = useState<ThesisTopic | null>(null);
   const [topicActionError, setTopicActionError] = useState('');
   const [isArchiveConfirmationOpen, setIsArchiveConfirmationOpen] = useState(false);
@@ -648,28 +651,34 @@ export default function ThesisPage() {
 
   const refreshTopics = useCallback(
     async (roundId: string) => {
-      if (!roundId) return;
-      if (isSupervisorOrAdmin) {
-        const [published, drafts] = await Promise.all([
-          thesisApi.listTopics(roundId, 'PUBLISHED'),
-          thesisApi.listTopics(roundId, 'DRAFT'),
-        ]);
-        const map = new Map<string, ThesisTopic>();
-        for (const t of [...published, ...drafts]) {
-          map.set(t.id, t);
+      if (!roundId || roundId !== selectedRoundRef.current) return;
+      const requestId = ++topicRequestRef.current;
+      const isCurrent = () => requestId === topicRequestRef.current && roundId === selectedRoundRef.current;
+      try {
+        let next: ThesisTopic[];
+        if (isSupervisorOrAdmin) {
+          const [published, drafts] = await Promise.all([
+            thesisApi.listTopics(roundId, 'PUBLISHED'),
+            thesisApi.listTopics(roundId, 'DRAFT'),
+          ]);
+          const map = new Map<string, ThesisTopic>();
+          for (const topic of [...published, ...drafts]) map.set(topic.id, topic);
+          next = Array.from(map.values());
+        } else {
+          next = await thesisApi.listTopics(roundId, 'PUBLISHED');
         }
-        setTopics(Array.from(map.values()));
-      } else {
-        setTopics(await thesisApi.listTopics(roundId, 'PUBLISHED'));
+        if (isCurrent()) setTopics(next);
+      } catch (caught) {
+        if (isCurrent()) throw caught;
       }
     },
     [isSupervisorOrAdmin],
   );
 
   useEffect(() => {
+    setTopics([]);
+    setGroups([]);
     if (!selectedRoundId) {
-      setTopics([]);
-      setGroups([]);
       return;
     }
 
@@ -721,6 +730,7 @@ export default function ThesisPage() {
     void loadWorkspace();
     return () => {
       cancelled = true;
+      topicRequestRef.current += 1;
     };
   }, [canLoadStaffRelations, isStudent, loadCouncilDetails, messages.thesis.loadFailed, refreshTopics, selectedRoundId]);
 
@@ -806,6 +816,9 @@ export default function ThesisPage() {
       return;
     }
     let cancelled = false;
+    setGroupReport(null);
+    setGroupReportLoadError(null);
+    setIsReportFormOpen(false);
     setIsReportLoading(true);
     const loadReport = async () => {
       try {
@@ -1811,14 +1824,7 @@ export default function ThesisPage() {
   // the leader-only rights it renders. A group that is not approved yet still
   // owns its report row — say so instead of rendering nothing and looking
   // like the data vanished.
-  const studentReportSection = !currentGroup ? null : currentGroup.approvalStatus !== 'APPROVED' ? (
-    <div className="rounded-xl border border-border/70 bg-card p-4">
-      <p className="flex items-start gap-2 text-xs text-muted-foreground">
-        <Info className="mt-0.5 h-4 w-4 shrink-0 text-primary" aria-hidden="true" />
-        <span>{messages.thesis.report.pendingApproval}</span>
-      </p>
-    </div>
-  ) : (
+  const studentReportSection = !currentGroup ? null : (
       <div className="rounded-xl border border-border/70 bg-card p-4">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex items-center gap-2">
@@ -1827,7 +1833,12 @@ export default function ThesisPage() {
               {messages.thesis.report.title} {pageCopy.articleR5Suffix}
             </span>
           </div>
-          {isGroupLeader ? (
+          {currentGroup.approvalStatus !== 'APPROVED' ? (
+            <p className="flex items-start gap-2 text-xs text-muted-foreground">
+              <Info className="mt-0.5 h-4 w-4 shrink-0 text-primary" aria-hidden="true" />
+              <span>{messages.thesis.report.pendingApproval}</span>
+            </p>
+          ) : isGroupLeader ? (
             reportWindowState === 'deadlinePassed' ? (
               <span className="inline-flex shrink-0 items-center gap-1.5 rounded-md border border-amber-300 bg-amber-50 px-2.5 py-1 text-xs font-semibold text-amber-800 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-300">
                 <Lock className="h-3.5 w-3.5" aria-hidden="true" />
@@ -1943,7 +1954,7 @@ export default function ThesisPage() {
                     {messages.thesis.report.downloadFile}
                     <FileDown className="ml-1.5 h-3.5 w-3.5" aria-hidden="true" />
                   </Button>
-                  {isGroupLeader && reportWindowState === 'open' ? (
+                  {isGroupLeader && currentGroup.approvalStatus === 'APPROVED' && reportWindowState === 'open' ? (
                     // The only destructive report action left: detach the
                     // stored document while the link/metadata survive.
                     <Button
@@ -2002,7 +2013,7 @@ export default function ThesisPage() {
           </p>
         )}
 
-        {isGroupLeader && isReportFormOpen ? (
+        {isGroupLeader && currentGroup.approvalStatus === 'APPROVED' && isReportFormOpen ? (
           <form
             onSubmit={(e) => void handleSubmitReport(e)}
             className="mt-4 space-y-3 border-t border-border/60 pt-4"
@@ -2323,7 +2334,12 @@ export default function ThesisPage() {
               <Select
                 label={messages.thesis.selectRound}
                 value={selectedRoundId}
-                onChange={(event) => setSelectedRoundId(event.target.value)}
+                onChange={(event) => {
+                  hasAutoSelectedStudentRoundRef.current = true;
+                  hasAutoSelectedRoundRef.current = true;
+                  selectedRoundRef.current = event.target.value;
+                  setSelectedRoundId(event.target.value);
+                }}
                 aria-label={messages.thesis.selectRound}
                 groups={roundGroups}
                 options={rounds.map((round) => ({

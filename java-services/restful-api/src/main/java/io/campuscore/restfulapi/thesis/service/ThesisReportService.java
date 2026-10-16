@@ -48,7 +48,7 @@ public class ThesisReportService {
 
     @Transactional
     public ReportResponse submit(UUID groupId, String title, String url, String note, Jwt actor) {
-        GroupContext group = loadGroup(groupId);
+        GroupContext group = lockGroupForWrite(groupId);
         requireWriteAccess(group, actor);
         requireText(url, "url");
         String trimmedUrl = url.trim();
@@ -93,7 +93,7 @@ public class ThesisReportService {
     /** Feedback item 7: the leader may attach the report document itself. */
     @Transactional
     public ReportResponse submitFile(UUID groupId, MultipartFile file, String title, String note, Jwt actor) {
-        GroupContext group = loadGroup(groupId);
+        GroupContext group = lockGroupForWrite(groupId);
         requireWriteAccess(group, actor);
         ReportFilePolicy.ValidatedFile validated = ReportFilePolicy.validate(file);
         requireReportWritable(group);
@@ -106,10 +106,11 @@ public class ThesisReportService {
                 ? null
                 : "thesis-reports/" + groupId + "/" + UUID.randomUUID() + "." + validated.extension();
         String checksum = sha256(validated.data());
-        if (!inDatabase) {
-            storage.put(storageKey, validated.contentType(), validated.data());
-        }
+        boolean cleanupOnRollback = registerNewObjectRollbackCleanup(storageKey);
         try {
+            if (!inDatabase) {
+                storage.put(storageKey, validated.contentType(), validated.data());
+            }
             // Upsert: replace only the file/storage/checksum columns. A prior
             // link (url), the submission identity and submitted_at survive an
             // upload; title/note are overwritten only when the caller sent a
@@ -163,7 +164,9 @@ public class ThesisReportService {
                                 .addValue("fileSha256", checksum));
             }
         } catch (RuntimeException exception) {
-            deleteNewObjectAfterFailure(storageKey);
+            if (!cleanupOnRollback) {
+                deleteNewObjectAfterFailure(storageKey);
+            }
             throw exception;
         }
         // The previous object is replaced only when the row actually carried a
@@ -181,7 +184,7 @@ public class ThesisReportService {
      */
     @Transactional
     public ReportResponse updateReport(UUID groupId, ReportUpdateRequest request, Jwt actor) {
-        GroupContext group = loadGroup(groupId);
+        GroupContext group = lockGroupForWrite(groupId);
         requireWriteAccess(group, actor);
         requireReportWritable(group);
         requireApproved(groupId);
@@ -216,7 +219,7 @@ public class ThesisReportService {
                 "UPDATE thesis.thesis_group_report SET "
                         + "title = CASE WHEN :titlePresent THEN :title ELSE title END, "
                         + "note = CASE WHEN :notePresent THEN :note ELSE note END, "
-                        + "url = :url, "
+                        + "url = CASE WHEN :urlPresent THEN :url ELSE url END, "
                         + "updated_at = CURRENT_TIMESTAMP "
                         + "WHERE group_id = :groupId",
                 params().addValue("groupId", groupId)
@@ -224,6 +227,7 @@ public class ThesisReportService {
                         .addValue("title", titlePresent ? blankToNull(request.title(), 240) : null)
                         .addValue("notePresent", notePresent)
                         .addValue("note", notePresent ? blankToNull(request.note(), 500) : null)
+                        .addValue("urlPresent", requestSetsUrl || requestClearsUrl)
                         .addValue("url", newUrl));
         return get(groupId, actor);
     }
@@ -236,7 +240,7 @@ public class ThesisReportService {
      */
     @Transactional
     public ReportResponse removeReportFile(UUID groupId, Jwt actor) {
-        GroupContext group = loadGroup(groupId);
+        GroupContext group = lockGroupForWrite(groupId);
         requireWriteAccess(group, actor);
         requireReportWritable(group);
         requireApproved(groupId);
@@ -522,6 +526,18 @@ public class ThesisReportService {
             }
             throw exception;
         }
+    }
+
+    /** Match roster mutations' group-before-round order; publication owns the round fence. */
+    private GroupContext lockGroupForWrite(UUID groupId) {
+        Map<String, Object> group = one(
+                "SELECT round_id FROM thesis.thesis_group WHERE id = :groupId FOR UPDATE",
+                params().addValue("groupId", groupId), "GROUP_NOT_FOUND", "Thesis group not found");
+        one("SELECT id FROM thesis.thesis_registration_round WHERE id = :roundId FOR UPDATE",
+                params().addValue("roundId", group.get("round_id")), "ROUND_NOT_FOUND", "Thesis round not found");
+        // Re-read eligibility only after both locks: an in-flight publication,
+        // roster change or deadline extension must not leave stale authority.
+        return loadGroup(groupId);
     }
 
     private GroupContext loadGroup(UUID groupId) {
@@ -841,6 +857,25 @@ public class ThesisReportService {
             // a failure because an old object was already missing.
             log.warn("Unable to remove replaced thesis report object");
         }
+    }
+
+    private boolean registerNewObjectRollbackCleanup(String key) {
+        if (!StringUtils.hasText(key) || !TransactionSynchronizationManager.isSynchronizationActive()) {
+            return false;
+        }
+        TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+            @Override
+            public void afterCompletion(int status) {
+                if (status == STATUS_ROLLED_BACK) {
+                    deleteNewObjectAfterFailure(key);
+                } else if (status == STATUS_UNKNOWN) {
+                    // An uncertain commit may already reference this object;
+                    // retaining it is safer than deleting committed bytes.
+                    log.warn("Thesis report upload transaction outcome is unknown; object retained");
+                }
+            }
+        });
+        return true;
     }
 
     private void deleteNewObjectAfterFailure(String key) {

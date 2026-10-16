@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Archive,
   CalendarDays,
@@ -29,6 +29,7 @@ import { AdminMetricCard } from '@/components/admin/AdminSurface';
 import { useConfirmationDialog } from '@/components/ui/use-confirmation-dialog';
 import { metricToneClass, statusToneClass } from '@/components/ui/status';
 import { cn } from '@/lib/utils';
+import { toThesisLocalInput as toLocalInput } from '@/lib/thesis-datetime';
 import {
   EmptyState,
   ForbiddenState,
@@ -95,6 +96,9 @@ export default function AdminThesisPage() {
   const [success, setSuccess] = useState('');
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [expandedRoundId, setExpandedRoundId] = useState<string | null>(null);
+  const expandedRoundRef = useRef<string | null>(null);
+  const detailRequestRef = useRef(0);
+  const [detailLoading, setDetailLoading] = useState(false);
 
   // Create round form state
   const [formName, setFormName] = useState('');
@@ -169,22 +173,38 @@ export default function AdminThesisPage() {
   };
 
   const loadRoundDetail = async (roundId: string) => {
+    if (expandedRoundRef.current !== roundId) return;
+    const requestId = ++detailRequestRef.current;
+    const isCurrent = () => requestId === detailRequestRef.current && expandedRoundRef.current === roundId;
+    setDetailLoading(true);
+    setTopics([]);
+    setGroups([]);
+    setCouncils([]);
+    setError('');
     try {
       const [t, g, c] = await Promise.all([
         thesisApi.listTopics(roundId),
         thesisApi.listGroups(roundId),
         thesisApi.listCouncils(roundId),
       ]);
+      if (!isCurrent()) return;
       setTopics(t);
       setGroups(g);
-      setCouncils(c);
+      if (expandedRoundRef.current === roundId) setCouncils(c);
       if (lecturers.length === 0) {
         await loadLecturers();
       }
     } catch {
-      setError(messages.thesis.loadFailed);
+      if (isCurrent()) setError(messages.thesis.loadFailed);
+    } finally {
+      if (isCurrent()) setDetailLoading(false);
     }
   };
+
+  useEffect(() => () => {
+    detailRequestRef.current += 1;
+    expandedRoundRef.current = null;
+  }, []);
 
   /**
    * A round transition can fail with a domain the admin has to see: closing
@@ -217,7 +237,7 @@ export default function AdminThesisPage() {
       setCouncilNameInput('');
       setShowCreateCouncilModal(false);
       const c = await thesisApi.listCouncils(roundId);
-      setCouncils(c);
+      if (expandedRoundRef.current === roundId) setCouncils(c);
     } catch (err: unknown) {
       setError(transitionErrorMessage(err));
     } finally {
@@ -244,7 +264,7 @@ export default function AdminThesisPage() {
       setSelectedLecturerId('');
       setShowAddMemberModal(false);
       const c = await thesisApi.listCouncils(roundId);
-      setCouncils(c);
+      if (expandedRoundRef.current === roundId) setCouncils(c);
     } catch (err: unknown) {
       setError(transitionErrorMessage(err));
     } finally {
@@ -260,7 +280,7 @@ export default function AdminThesisPage() {
       await thesisApi.removeCouncilMember(councilId, lecturerId);
       setSuccess(messages.thesis.councils.memberRemovedSuccess);
       const c = await thesisApi.listCouncils(roundId);
-      setCouncils(c);
+      if (expandedRoundRef.current === roundId) setCouncils(c);
     } catch {
       setError(messages.thesis.actionFailed);
     } finally {
@@ -279,7 +299,7 @@ export default function AdminThesisPage() {
       setSelectedTopicIdToAssign('');
       setShowAssignTopicModal(false);
       const c = await thesisApi.listCouncils(roundId);
-      setCouncils(c);
+      if (expandedRoundRef.current === roundId) setCouncils(c);
     } catch {
       setError(messages.thesis.actionFailed);
     } finally {
@@ -289,8 +309,12 @@ export default function AdminThesisPage() {
 
   const toggleExpand = (roundId: string) => {
     if (expandedRoundId === roundId) {
+      expandedRoundRef.current = null;
+      detailRequestRef.current += 1;
+      setDetailLoading(false);
       setExpandedRoundId(null);
     } else {
+      expandedRoundRef.current = roundId;
       setExpandedRoundId(roundId);
       void loadRoundDetail(roundId);
     }
@@ -429,7 +453,6 @@ export default function AdminThesisPage() {
     return copy.publishResults;
   };
 
-  const toLocalInput = (iso?: string | null) => (iso ? iso.slice(0, 16) : '');
 
   /** Opens the deadline-extension modal prefilled with the current deadline. */
   const openExtendDeadlineModal = (round: ThesisRound) => {
@@ -672,7 +695,7 @@ export default function AdminThesisPage() {
                 ? messages.thesis.admin.topicsForRound.replace('{round}', detailRound.name)
                 : messages.thesis.topics
             }
-            value={detailRound ? totalTopics : '—'}
+            value={detailRound && !detailLoading ? totalTopics : '—'}
             icon={<FileStack className="h-5 w-5" />}
             toneClassName={metricToneClass('warning')}
           />
@@ -682,7 +705,7 @@ export default function AdminThesisPage() {
                 ? messages.thesis.admin.groupsForRound.replace('{round}', detailRound.name)
                 : messages.thesis.groups
             }
-            value={detailRound ? totalGroups : '—'}
+            value={detailRound && !detailLoading ? totalGroups : '—'}
             icon={<UsersRound className="h-5 w-5" />}
             toneClassName={metricToneClass('neutral')}
           />
@@ -728,6 +751,7 @@ export default function AdminThesisPage() {
                   </CardHeader>
                   {isExpanded ? (
                     <CardContent className="space-y-4 border-t border-border/60 bg-secondary/20">
+                      {detailLoading ? <p role="status" className="pt-4 text-sm text-muted-foreground">{messages.common.states.loading}</p> : null}
                       <div className="flex flex-wrap items-center justify-between gap-2 pt-2">
                         <div className="flex flex-wrap gap-2">
                           {round.status === 'DRAFT' ? (
@@ -1121,11 +1145,11 @@ export default function AdminThesisPage() {
           <div className="grid gap-4 sm:grid-cols-2">
             <label className="flex flex-col gap-2 text-sm font-medium text-foreground">
               {messages.thesis.admin.registrationStart}
-              <Input type="datetime-local" value={formStart} onChange={(e) => setFormStart(e.target.value)} />
+              <Input type="datetime-local" step="0.001" value={formStart} onChange={(e) => setFormStart(e.target.value)} />
             </label>
             <label className="flex flex-col gap-2 text-sm font-medium text-foreground">
               {messages.thesis.admin.registrationEnd}
-              <Input type="datetime-local" value={formEnd} onChange={(e) => setFormEnd(e.target.value)} />
+              <Input type="datetime-local" step="0.001" value={formEnd} onChange={(e) => setFormEnd(e.target.value)} />
             </label>
           </div>
           <div>
@@ -1133,34 +1157,34 @@ export default function AdminThesisPage() {
             <div className="mt-2 grid gap-4 sm:grid-cols-2">
               <label className="flex flex-col gap-2 text-sm font-medium text-foreground">
                 {messages.thesis.admin.lecturerSubmitStart}
-                <Input type="datetime-local" value={formLecturerStart} onChange={(e) => setFormLecturerStart(e.target.value)} />
+                <Input type="datetime-local" step="0.001" value={formLecturerStart} onChange={(e) => setFormLecturerStart(e.target.value)} />
               </label>
               <label className="flex flex-col gap-2 text-sm font-medium text-foreground">
                 {messages.thesis.admin.lecturerSubmitEnd}
-                <Input type="datetime-local" value={formLecturerEnd} onChange={(e) => setFormLecturerEnd(e.target.value)} />
+                <Input type="datetime-local" step="0.001" value={formLecturerEnd} onChange={(e) => setFormLecturerEnd(e.target.value)} />
               </label>
             </div>
           </div>
           <label className="flex flex-col gap-2 text-sm font-medium text-foreground">
             {messages.thesis.admin.proposalPublishAt}
-            <Input type="datetime-local" value={formProposal} onChange={(e) => setFormProposal(e.target.value)} />
+            <Input type="datetime-local" step="0.001" value={formProposal} onChange={(e) => setFormProposal(e.target.value)} />
           </label>
           {needsGvpb ? (
             <label className="flex flex-col gap-2 text-sm font-medium text-foreground">
               {messages.thesis.admin.gvpbDeadline} <span className="text-destructive">*</span>
-              <Input type="datetime-local" value={formGvpb} onChange={(e) => setFormGvpb(e.target.value)} required />
+              <Input type="datetime-local" step="0.001" value={formGvpb} onChange={(e) => setFormGvpb(e.target.value)} required />
             </label>
           ) : null}
           {needsGvpb ? (
             <label className="flex flex-col gap-2 text-sm font-medium text-foreground">
               {messages.thesis.admin.reportDate} <span className="text-destructive">*</span>
-              <Input type="datetime-local" value={formReportDate} onChange={(e) => setFormReportDate(e.target.value)} required />
+              <Input type="datetime-local" step="0.001" value={formReportDate} onChange={(e) => setFormReportDate(e.target.value)} required />
             </label>
           ) : null}
           {needsDefense ? (
             <label className="flex flex-col gap-2 text-sm font-medium text-foreground">
               {messages.thesis.admin.defenseDate} <span className="text-destructive">*</span>
-              <Input type="datetime-local" value={formDefenseDate} onChange={(e) => setFormDefenseDate(e.target.value)} required />
+              <Input type="datetime-local" step="0.001" value={formDefenseDate} onChange={(e) => setFormDefenseDate(e.target.value)} required />
             </label>
           ) : null}
           <div className="flex justify-end gap-2 pt-2">
@@ -1321,11 +1345,11 @@ export default function AdminThesisPage() {
           <div className="grid gap-4 sm:grid-cols-2">
             <label className="flex flex-col gap-2 text-sm font-medium text-foreground">
               {messages.thesis.admin.registrationStart}
-              <Input type="datetime-local" value={formStart} onChange={(e) => setFormStart(e.target.value)} />
+              <Input type="datetime-local" step="0.001" value={formStart} onChange={(e) => setFormStart(e.target.value)} />
             </label>
             <label className="flex flex-col gap-2 text-sm font-medium text-foreground">
               {messages.thesis.admin.registrationEnd}
-              <Input type="datetime-local" value={formEnd} onChange={(e) => setFormEnd(e.target.value)} />
+              <Input type="datetime-local" step="0.001" value={formEnd} onChange={(e) => setFormEnd(e.target.value)} />
             </label>
           </div>
           <div>
@@ -1333,34 +1357,34 @@ export default function AdminThesisPage() {
             <div className="mt-2 grid gap-4 sm:grid-cols-2">
               <label className="flex flex-col gap-2 text-sm font-medium text-foreground">
                 {messages.thesis.admin.lecturerSubmitStart}
-                <Input type="datetime-local" value={formLecturerStart} onChange={(e) => setFormLecturerStart(e.target.value)} />
+                <Input type="datetime-local" step="0.001" value={formLecturerStart} onChange={(e) => setFormLecturerStart(e.target.value)} />
               </label>
               <label className="flex flex-col gap-2 text-sm font-medium text-foreground">
                 {messages.thesis.admin.lecturerSubmitEnd}
-                <Input type="datetime-local" value={formLecturerEnd} onChange={(e) => setFormLecturerEnd(e.target.value)} />
+                <Input type="datetime-local" step="0.001" value={formLecturerEnd} onChange={(e) => setFormLecturerEnd(e.target.value)} />
               </label>
             </div>
           </div>
           <label className="flex flex-col gap-2 text-sm font-medium text-foreground">
             {messages.thesis.admin.proposalPublishAt}
-            <Input type="datetime-local" value={formProposal} onChange={(e) => setFormProposal(e.target.value)} />
+            <Input type="datetime-local" step="0.001" value={formProposal} onChange={(e) => setFormProposal(e.target.value)} />
           </label>
           {needsGvpb ? (
             <label className="flex flex-col gap-2 text-sm font-medium text-foreground">
               {messages.thesis.admin.gvpbDeadline} <span className="text-destructive">*</span>
-              <Input type="datetime-local" value={formGvpb} onChange={(e) => setFormGvpb(e.target.value)} required />
+              <Input type="datetime-local" step="0.001" value={formGvpb} onChange={(e) => setFormGvpb(e.target.value)} required />
             </label>
           ) : null}
           {needsGvpb ? (
             <label className="flex flex-col gap-2 text-sm font-medium text-foreground">
               {messages.thesis.admin.reportDate} <span className="text-destructive">*</span>
-              <Input type="datetime-local" value={formReportDate} onChange={(e) => setFormReportDate(e.target.value)} required />
+              <Input type="datetime-local" step="0.001" value={formReportDate} onChange={(e) => setFormReportDate(e.target.value)} required />
             </label>
           ) : null}
           {needsDefense ? (
             <label className="flex flex-col gap-2 text-sm font-medium text-foreground">
               {messages.thesis.admin.defenseDate} <span className="text-destructive">*</span>
-              <Input type="datetime-local" value={formDefenseDate} onChange={(e) => setFormDefenseDate(e.target.value)} required />
+              <Input type="datetime-local" step="0.001" value={formDefenseDate} onChange={(e) => setFormDefenseDate(e.target.value)} required />
             </label>
           ) : null}
           <div className="flex justify-end gap-2 pt-2">
@@ -1456,7 +1480,7 @@ export default function AdminThesisPage() {
           <label className="flex flex-col gap-2 text-sm font-medium text-foreground">
             {messages.thesis.admin.reportDeadline}
             <Input
-              type="datetime-local"
+              type="datetime-local" step="0.001"
               value={extendDeadlineValue}
               onChange={(e) => setExtendDeadlineValue(e.target.value)}
               required
