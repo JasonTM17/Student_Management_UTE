@@ -26,9 +26,13 @@ function generateNonce(): string {
 }
 
 function buildContentSecurityPolicy(nonce: string): string {
+  // Dev mode keeps the same enforced shape but must additionally allow
+  // webpack/react-refresh eval chunks and the HMR websocket, otherwise the
+  // dev server hydrates nothing (CI portal-shell runs `next dev`).
+  const dev = process.env.NODE_ENV === 'development';
   return [
     "default-src 'self'",
-    `script-src 'self' 'nonce-${nonce}' 'strict-dynamic'`,
+    `script-src 'self' 'nonce-${nonce}' 'strict-dynamic'${dev ? " 'unsafe-eval'" : ''}`,
     // Next injects inline styles; TinyMCE composes with inline content_style.
     "style-src 'self' 'unsafe-inline'",
     // Announcements may embed https images and the editor inlines data:/blob:.
@@ -37,6 +41,7 @@ function buildContentSecurityPolicy(nonce: string): string {
     "media-src 'self' data: blob: https:",
     "frame-src 'self' blob:",
     "worker-src 'self' blob:",
+    `connect-src 'self'${dev ? ' ws: wss:' : ''}`,
     "object-src 'none'",
     "base-uri 'self'",
     "form-action 'self'",
