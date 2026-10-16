@@ -974,13 +974,39 @@ class ThesisGovernanceIntegrationTest {
     }
 
     @Test
-    void facultyHeadCanReadThesisGroupsAcrossTheRound() throws Exception {
+    void facultyHeadReadsOnlyOwnFacultyThesisGroups() throws Exception {
+        // TRUONG_KHOA reads are scoped to the dean's faculty, resolved through
+        // the caller's lecturer profile; member contacts are withheld and a
+        // governance caller without a profile fails closed (covered by
+        // ThesisGroupFacultyScopeTest).
+        String deanUser = "gov-faculty-reader-user";
+        jdbc.update(
+                "INSERT INTO campuscore_auth.\"User\" (\"id\", \"email\", \"password\", \"firstName\", \"lastName\", \"status\", \"emailVerified\", \"isSuperAdmin\", \"failedLoginAttempts\", \"createdAt\", \"updatedAt\") "
+                        + "VALUES (?, ?, 'test-password', 'Gov', 'Dean', 'ACTIVE', FALSE, FALSE, 0, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)",
+                deanUser, "gov-faculty-reader@campuscore.edu");
+        jdbc.update(
+                "INSERT INTO campuscore_auth.\"Lecturer\" (\"id\", \"userId\", \"departmentId\", \"employeeId\", \"isActive\") "
+                        + "VALUES (?, ?, 'department-demo', 'GV-gov-faculty-reader', TRUE)",
+                "gov-faculty-reader-lecturer", deanUser);
         UUID roundId = insertRound("Gov Faculty Head Group Read", "REGISTRATION_OPEN",
                 Instant.now().minusSeconds(3_600), Instant.now().plusSeconds(3_600));
+        ensureStudent("gov-faculty-reader-leader", "gov-faculty-reader-leader-user",
+                "gov-faculty-reader-leader@campuscore.edu");
+        UUID ownTopic = UUID.randomUUID();
+        jdbc.update(
+                "INSERT INTO thesis.thesis_topic (id, round_id, department_id, title, description, max_groups, status, created_by) "
+                        + "VALUES (?, ?, 'department-demo', 'Gov Faculty Topic', 'fixture', 1, 'PUBLISHED', ?)",
+                ownTopic, roundId, UUID.randomUUID());
+        UUID ownGroup = insertGroup(roundId, "gov-faculty-reader-leader", ownTopic, "APPROVED");
+        insertMember(ownGroup, roundId, "gov-faculty-reader-leader", 1);
+
         mvc.perform(get("/api/v1/thesis/groups")
                         .queryParam("roundId", roundId.toString())
-                        .with(truongKhoaJwt()))
-                .andExpect(status().isOk());
+                        .with(ThesisAuthorityFixture.role(jdbc, deanUser, "TRUONG_KHOA")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[?(@.id == '%s')]".formatted(ownGroup)).isNotEmpty())
+                .andExpect(jsonPath("$[*].members[*].contact")
+                        .value(org.hamcrest.Matchers.everyItem(org.hamcrest.Matchers.nullValue())));
     }
 
     @Test
