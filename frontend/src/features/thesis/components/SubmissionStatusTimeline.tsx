@@ -99,7 +99,7 @@ export default function SubmissionStatusTimeline({
   copy,
   locale,
 }: SubmissionStatusTimelineProps) {
-  // `updatedAt` drifting away from `submittedAt` is the only version evidence
+  // `updatedAt` drifting away from `submittedAt` is the only update evidence
   // the API exposes, so the second node appears only after a real update.
   const isUpdated = Boolean(report?.updatedAt && report.updatedAt !== report.submittedAt);
   const documentName = report?.fileName ?? null;
@@ -122,7 +122,7 @@ export default function SubmissionStatusTimeline({
               {
                 key: 'latest-update',
                 icon: UploadCloud,
-                label: fillCopy(copy.latestUpdateLabel, { version: 2 }),
+                label: copy.latestUpdateLabel,
                 chipLabel: copy.updatedChip,
                 tone: 'info' as StatusTone,
                 timestamp: report.updatedAt,

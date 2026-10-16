@@ -11,6 +11,53 @@ const page = read('src/app/dashboard/thesis/page.tsx');
 const adminPage = read('src/app/admin/thesis/page.tsx');
 const messages = read('src/i18n/messages.ts');
 
+// Render the real component and copy; substitute only class-name formatting.
+// This follows the Node/TypeScript SSR harness used by announcement tests.
+function loadTimelineModule(relative, aliases = {}) {
+  const ts = require('typescript');
+  const output = ts.transpileModule(read(relative), {
+    compilerOptions: {
+      module: ts.ModuleKind.CommonJS,
+      target: ts.ScriptTarget.ES2020,
+      jsx: ts.JsxEmit.ReactJSX,
+      esModuleInterop: true,
+    },
+    fileName: relative,
+  }).outputText;
+  const moduleRecord = { exports: {} };
+  const resolve = (name) => Object.prototype.hasOwnProperty.call(aliases, name)
+    ? aliases[name]
+    : require(name);
+  Function('module', 'exports', 'require', output)(moduleRecord, moduleRecord.exports, resolve);
+  return moduleRecord.exports;
+}
+
+for (const locale of ['en', 'vi']) {
+  test(`report timeline never invents a revision from timestamps (${locale})`, () => {
+    const React = require('react');
+    const { renderToStaticMarkup } = require('react-dom/server');
+    const helpers = loadTimelineModule('src/features/thesis/components/thesis-helpers.tsx');
+    const copy = loadTimelineModule('src/i18n/messages-thesis-workflow.ts');
+    const Timeline = loadTimelineModule('src/features/thesis/components/SubmissionStatusTimeline.tsx', {
+      '@/lib/utils': { cn: (...values) => values.filter(Boolean).join(' ') },
+      '@/features/thesis/components/thesis-helpers': helpers,
+    }).default;
+    const submittedAt = '2026-10-01T02:00:00Z';
+    const updatedAt = '2026-10-10T06:00:00Z';
+    const html = renderToStaticMarkup(React.createElement(Timeline, {
+      report: { submittedAt, updatedAt, fileName: 'synthetic-report.pdf', fileSize: 2048 },
+      formatDateTime: (value) => value,
+      copy: (locale === 'vi' ? copy.thesisWorkflowVi : copy.thesisWorkflowEn).page.submissionStatus,
+      locale,
+    }));
+    assert.ok(html.includes(submittedAt), 'keep the actual first submission timestamp');
+    assert.ok(html.includes(updatedAt), 'keep the actual latest update timestamp');
+    assert.ok(html.includes('synthetic-report.pdf'), 'keep the submitted document identity');
+    assert.equal(/\(v\d+\)/.test(html), false,
+      'Report timestamps do not reveal an edit count; no numbered revision may be invented');
+  });
+}
+
 test('report editing uses the non-destructive PATCH and detach endpoints', () => {
   // PATCH metadata/link edit + DELETE file detach — the file bytes and the
   // submitted_* audit stamp survive both (pinned contract, F4/F7).
