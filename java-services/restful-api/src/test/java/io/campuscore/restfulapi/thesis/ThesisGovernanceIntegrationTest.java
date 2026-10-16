@@ -1844,6 +1844,14 @@ class ThesisGovernanceIntegrationTest {
         return ThesisAuthorityFixture.role(jdbc, "truongkhoa-user", "TRUONG_KHOA");
     }
 
+    /** Group governance requires a live faculty profile before testing round-state guards. */
+    private org.springframework.test.web.servlet.request.RequestPostProcessor scopedTruongKhoaJwt(String lecturerId) {
+        ensureLecturer(lecturerId);
+        String userId = jdbc.queryForObject(
+                "SELECT \"userId\" FROM campuscore_auth.\"Lecturer\" WHERE \"id\" = ?", String.class, lecturerId);
+        return ThesisAuthorityFixture.role(jdbc, userId, "TRUONG_KHOA");
+    }
+
     private org.springframework.test.web.servlet.request.RequestPostProcessor adminJwt() {
         return ThesisAuthorityFixture.role(jdbc, "admin-user", "ADMIN");
     }
@@ -1987,7 +1995,7 @@ class ThesisGovernanceIntegrationTest {
             mvc.perform(patch("/api/v1/thesis/groups/{id}/progress", groupId)
                             .contentType(MediaType.APPLICATION_JSON)
                             .content("{\"status\":\"DRAFT\"}")
-                            .with(truongKhoaJwt()))
+                            .with(scopedTruongKhoaJwt(tag + "-dean")))
                     .andExpect(status().isConflict())
                     .andExpect(jsonPath("$.code").value("ROUND_STATE_CONFLICT"));
 
@@ -2035,7 +2043,7 @@ class ThesisGovernanceIntegrationTest {
             mvc.perform(post("/api/v1/thesis/groups/{id}/reject", groupId)
                             .contentType(MediaType.APPLICATION_JSON)
                             .content("{\"reason\":\"Synthetic rejection\"}")
-                            .with(truongKhoaJwt()))
+                            .with(scopedTruongKhoaJwt(tag + "-dean")))
                     .andExpect(status().isConflict())
                     .andExpect(jsonPath("$.code").value("ROUND_STATE_CONFLICT"));
 
