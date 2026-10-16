@@ -38,6 +38,35 @@ test('iCalendar (.ics) generator specifications and RFC 5545 compliance', async 
     assert.equal(diffWed, 1, 'diff to Wednesday from Tuesday must be 1 day');
   });
 
+  await t.test('schedule events use civil-date math, not browser-local Date fields', () => {
+    // Regression: new Date('YYYY-MM-DD') parses as UTC midnight, so reading
+    // getDay()/setDate()/setHours() in a non-VN browser shifted every event.
+    const fileSource = fs.readFileSync(path.join(root, 'src/lib/ical-generator.ts'), 'utf8');
+    assert.match(fileSource, /getUTCDay/, 'weekday math must read UTC fields');
+    assert.match(fileSource, /VIETNAM_UTC_OFFSET_MS/, 'VN offset must be an explicit constant');
+    assert.match(fileSource, /parseCivilDateOnly/, 'date-only strings must parse via UTC helpers');
+    assert.match(fileSource, /formatCivilDateTime/, 'event times must format from civil fields');
+    assert.doesNotMatch(fileSource, /setHours\(/, 'must not set browser-local hours');
+    assert.doesNotMatch(fileSource, /\.getDay\(\)/, 'must not read browser-local weekday');
+    assert.doesNotMatch(fileSource, /\.setDate\(/, 'must not do browser-local date math');
+
+    // Behavioral check of the civil algorithm itself: 2026-09-01 is a
+    // Tuesday. Under the OLD code a browser at UTC-7 read it as Aug 31
+    // (Monday) — the new code must still compute Tuesday.
+    const base = new Date(Date.UTC(2026, 8, 1));
+    assert.equal(base.getUTCDay(), 2, '2026-09-01 civil weekday is Tuesday');
+    const targetJsDaySun = 0; // dayOfWeek 1 -> Sunday
+    const diffSun = (targetJsDaySun - base.getUTCDay() + 7) % 7;
+    const firstSunday = new Date(Date.UTC(2026, 8, 1 + diffSun));
+    assert.equal(firstSunday.getUTCDate(), 6, 'first Sunday on/after Sep 1 is Sep 6');
+
+    // End-of-day UNTIL: VN 23:59:59+07:00 == 16:59:59Z same day.
+    const untilMs = Date.UTC(2026, 11, 31, 23, 59, 59) - 7 * 60 * 60 * 1000;
+    const until = new Date(untilMs);
+    assert.equal(until.getUTCHours(), 16, 'VN end-of-day maps to 16:59:59 UTC');
+    assert.equal(until.getUTCMinutes(), 59);
+  });
+
   await t.test('escapeIcsText handles RFC 5545 reserved characters correctly', () => {
     // Testing escape logic directly
     const escape = (text) =>

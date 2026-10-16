@@ -145,8 +145,13 @@ export default function LecturerAnnouncementsPage() {
       const response = await announcementsApi.getMy({ page: nextPage, limit: 25 });
       const data = response.data ?? [];
       // Page 1 replaces the feed; later pages append so the reader keeps what
-      // is already on screen.
-      setItems((current) => (nextPage === 1 ? data : [...current, ...data]));
+      // is already on screen. Dedupe by id — offset pagination shifts when a
+      // new notice lands between page fetches.
+      setItems((current) => {
+        if (nextPage === 1) return data;
+        const seen = new Set(current.map((item) => item.id));
+        return [...current, ...data.filter((item) => !seen.has(item.id))];
+      });
       setTotalPages(Math.max(response.meta?.totalPages ?? 1, 1));
       setPage(nextPage);
     } catch {

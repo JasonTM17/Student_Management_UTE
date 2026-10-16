@@ -23,7 +23,11 @@ export default function ThesisTopicDetailPage() {
   const searchParams = useSearchParams();
   const topicId = Array.isArray(params.id) ? params.id[0] : params.id;
   const workspace = useThesisWorkspace(searchParams.get('roundId') ?? '');
-  const [directTopic, setDirectTopic] = useState<ThesisTopic | null>(null);
+  // The fetched topic is paired with the id it was fetched for: without that,
+  // navigating /topics/<A> → /topics/<B> kept rendering A's content under B's
+  // URL while the Choose button assigned B (route id), so a student could read
+  // one topic and commit to another.
+  const [directTopic, setDirectTopic] = useState<{ id: string; topic: ThesisTopic | null } | null>(null);
   const [directLoading, setDirectLoading] = useState(false);
   const [isChoosing, setIsChoosing] = useState(false);
   const [actionError, setActionError] = useState('');
@@ -71,14 +75,14 @@ export default function ThesisTopicDetailPage() {
       .getTopic(topicId)
       .then((t) => {
         if (!cancelled) {
-          setDirectTopic(t);
+          setDirectTopic({ id: topicId, topic: t });
           if (t?.roundId && t.roundId !== selectedRoundId) {
             setSelectedRoundId(t.roundId);
           }
         }
       })
       .catch(() => {
-        if (!cancelled) setDirectTopic(null);
+        if (!cancelled) setDirectTopic({ id: topicId, topic: null });
       })
       .finally(() => {
         if (!cancelled) setDirectLoading(false);
@@ -95,7 +99,8 @@ export default function ThesisTopicDetailPage() {
     }
   }, [topicId, topics, selectedRoundId, setSelectedRoundId]);
 
-  const topic = topics.find((item) => item.id === topicId) ?? directTopic;
+  const topic = topics.find((item) => item.id === topicId)
+    ?? (directTopic !== null && directTopic.id === topicId ? directTopic.topic : null);
 
   if (authLoading) {
     return <LoadingState label={messages.thesis.loading} />;

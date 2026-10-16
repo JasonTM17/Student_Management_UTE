@@ -55,6 +55,9 @@ import {
   ClassScheduleDetailModal,
   ScheduleDetailData,
 } from '@/components/schedule/ClassScheduleDetailModal';
+import { useRovingTabs } from '@/components/ui/use-roving-tabs';
+
+const SCHEDULE_VIEW_MODES = ['grid', 'day', 'list'] as const;
 
 type DayAgendaItem = {
   id: string;
@@ -87,6 +90,7 @@ export default function SchedulePage() {
 
   // Enhanced view options: 'grid' (Lưới tuần), 'day' (Theo ngày), 'list' (Danh sách)
   const [viewMode, setViewMode] = useState<'grid' | 'day' | 'list'>('grid');
+  const viewModeTabs = useRovingTabs(SCHEDULE_VIEW_MODES, viewMode, setViewMode);
   const [selectedDetail, setSelectedDetail] = useState<ScheduleDetailData | null>(null);
 
   const [semestersLoaded, setSemestersLoaded] = useState(false);
@@ -110,15 +114,6 @@ export default function SchedulePage() {
     }
     setSemestersLoaded(true);
   }, []);
-
-  /** Loads the student's enrollment records whose section schedules form the timetable. */
-  const fetchEnrollments = useCallback(
-    async (semesterId?: string) => {
-      const response = await enrollmentsApi.getMyEnrollments(semesterId);
-      setEnrollments(response);
-    },
-    [],
-  );
 
   /** Loads schedule filters and maps failures to the page's truthful unavailable state. */
   const loadData = useCallback(async () => {
@@ -169,7 +164,14 @@ export default function SchedulePage() {
       setError('');
 
       try {
-        await fetchEnrollments(selectedSemester || undefined);
+        // The response is captured here, not inside fetchEnrollments, so the
+        // cancelled flag actually protects the write — an unguarded
+        // setEnrollments let a stale semester's timetable land on top of the
+        // newly selected one (and leaked into the ICS export).
+        const response = await enrollmentsApi.getMyEnrollments(selectedSemester || undefined);
+        if (!cancelled) {
+          setEnrollments(response);
+        }
       } catch {
         if (!cancelled) {
           setError(
@@ -189,7 +191,7 @@ export default function SchedulePage() {
     return () => {
       cancelled = true;
     };
-  }, [fetchEnrollments, hasAccess, locale, selectedSemester, semestersLoaded, retryTick]);
+  }, [hasAccess, locale, selectedSemester, semestersLoaded, retryTick]);
 
   /** Projects active enrollments into sorted weekday meeting cards for the selected term. */
   const agenda = useMemo(() => {
@@ -534,8 +536,13 @@ export default function SchedulePage() {
               className="flex items-center gap-1 rounded-lg bg-secondary/60 p-1"
             >
               <Button
+                ref={viewModeTabs.tabRef('grid')}
                 role="tab"
+                id="schedule-tab-grid"
+                aria-controls="schedule-panel-grid"
                 aria-selected={viewMode === 'grid'}
+                tabIndex={viewModeTabs.tabIndex('grid')}
+                onKeyDown={(event) => viewModeTabs.onKeyDown(event, 0)}
                 variant={viewMode === 'grid' ? 'default' : 'ghost'}
                 size="sm"
                 onClick={() => setViewMode('grid')}
@@ -545,8 +552,13 @@ export default function SchedulePage() {
                 {copy.viewGrid}
               </Button>
               <Button
+                ref={viewModeTabs.tabRef('day')}
                 role="tab"
+                id="schedule-tab-day"
+                aria-controls="schedule-panel-day"
                 aria-selected={viewMode === 'day'}
+                tabIndex={viewModeTabs.tabIndex('day')}
+                onKeyDown={(event) => viewModeTabs.onKeyDown(event, 1)}
                 variant={viewMode === 'day' ? 'default' : 'ghost'}
                 size="sm"
                 onClick={() => setViewMode('day')}
@@ -556,8 +568,13 @@ export default function SchedulePage() {
                 {copy.viewDay}
               </Button>
               <Button
+                ref={viewModeTabs.tabRef('list')}
                 role="tab"
+                id="schedule-tab-list"
+                aria-controls="schedule-panel-list"
                 aria-selected={viewMode === 'list'}
+                tabIndex={viewModeTabs.tabIndex('list')}
+                onKeyDown={(event) => viewModeTabs.onKeyDown(event, 2)}
                 variant={viewMode === 'list' ? 'default' : 'ghost'}
                 size="sm"
                 onClick={() => setViewMode('list')}
@@ -600,7 +617,7 @@ export default function SchedulePage() {
 
           {/* MAIN SCHEDULE VIEW AREA */}
           {viewMode === 'grid' && (
-            <div className="space-y-6">
+            <div id="schedule-panel-grid" role="tabpanel" aria-labelledby="schedule-tab-grid" className="space-y-6">
               <Card variant="muted" className="min-w-0 overflow-hidden border-border/80 shadow-sm">
                 <CardHeader className="border-b border-border/70 bg-card/50 pb-4">
                   <div className="flex flex-wrap items-center justify-between gap-3">
@@ -638,7 +655,7 @@ export default function SchedulePage() {
 
           {/* DAY VIEW AREA */}
           {viewMode === 'day' && (
-            <div className="space-y-6">
+            <div id="schedule-panel-day" role="tabpanel" aria-labelledby="schedule-tab-day" className="space-y-6">
               {/* Day Selector Pills */}
               <div className="flex flex-wrap items-center gap-2">
                 {ORDERED_DAYS.map((dayNum) => {
@@ -762,6 +779,7 @@ export default function SchedulePage() {
 
           {/* LIST VIEW AREA: Executive Academic Timetable Table */}
           {viewMode === 'list' && (
+            <div id="schedule-panel-list" role="tabpanel" aria-labelledby="schedule-tab-list">
             <Card variant="muted" className="border-border/80 shadow-sm overflow-hidden">
               <CardHeader className="border-b border-border/70 bg-card/60 pb-4">
                 <div className="flex flex-wrap items-center justify-between gap-3">
@@ -945,6 +963,7 @@ export default function SchedulePage() {
                 </div>
               </CardContent>
             </Card>
+            </div>
           )}
         </div>
       )}

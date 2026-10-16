@@ -970,6 +970,7 @@ export const enrollmentsApi = {
     semesterId?: string;
     studentId?: string;
     courseId?: string;
+    sectionId?: string;
   }): Promise<string> => {
     const response = await api.get<string>('/enrollments/export/csv', {
       params,
@@ -1321,6 +1322,11 @@ export const announcementsApi = {
       '/announcements',
       { params },
     );
+    return response.data;
+  },
+  /** Role-aware single-record read — the backend applies the caller's feed visibility. */
+  getById: async (id: string): Promise<AnnouncementRecord> => {
+    const response = await api.get<AnnouncementRecord>(`/announcements/${id}`);
     return response.data;
   },
   create: async (data: AnnouncementMutation): Promise<AnnouncementRecord> => {

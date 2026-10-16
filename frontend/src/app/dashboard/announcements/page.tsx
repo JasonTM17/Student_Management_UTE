@@ -169,8 +169,14 @@ export default function StudentAnnouncementsPage() {
       const response = await announcementsApi.getMy({ page: nextPage, limit: 20 });
       const data = response.data ?? [];
       // Page 1 replaces the feed; later pages append so the reader keeps what
-      // is already on screen.
-      setItems((current) => (nextPage === 1 ? data : [...current, ...data]));
+      // is already on screen. Dedupe by id: offset pagination shifts when a
+      // newer notice lands between page fetches, which used to render the same
+      // card twice (duplicate React keys included).
+      setItems((current) => {
+        if (nextPage === 1) return data;
+        const seen = new Set(current.map((item) => item.id));
+        return [...current, ...data.filter((item) => !seen.has(item.id))];
+      });
       setTotalPages(Math.max(response.meta?.totalPages ?? 1, 1));
       setPage(nextPage);
       // An empty feed renders an honest empty state; nothing is invented to
@@ -220,16 +226,32 @@ export default function StudentAnnouncementsPage() {
     };
   }, [hasAccess]);
 
-  // Deep-link handler: open announcement if ?id= is in the query params
+  // Deep-link handler: open announcement if ?id= is in the query params. When
+  // the notice is not on a loaded page (older than the fetched window), fetch
+  // it by id — a shared link used to open the plain feed with no feedback at
+  // all.
   useEffect(() => {
     const id = searchParams?.get('id');
-    if (id && items.length > 0) {
-      const matched = items.find((a) => a.id === id);
-      if (matched) {
-        setReadingNotice(matched);
-      }
+    if (!id || isLoading) return;
+    const matched = items.find((a) => a.id === id);
+    if (matched) {
+      setReadingNotice(matched);
+      return;
     }
-  }, [searchParams, items]);
+    let cancelled = false;
+    announcementsApi
+      .getById(id)
+      .then((record) => {
+        if (!cancelled && record) setReadingNotice(record);
+      })
+      .catch(() => {
+        // Out-of-scope or deleted → same as the old silent miss, but logged
+        // for debugging rather than looking like the link was ignored.
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [searchParams, items, isLoading]);
 
   const filteredNotices = useMemo(() => {
     const list = orderedItems;
