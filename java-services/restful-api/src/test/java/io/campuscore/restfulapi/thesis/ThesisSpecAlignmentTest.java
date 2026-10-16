@@ -246,7 +246,9 @@ class ThesisSpecAlignmentTest {
                         .content("{\"topicId\":\"" + topicId + "\"}")
                         .with(studentJwt("sa-leader-1")))
                 .andExpect(status().isOk());
-        mvc.perform(post("/api/v1/thesis/groups/{id}/approve", groupId).with(truongKhoaJwt()))
+        ensureLecturer("sa-dean-group-approval");
+        mvc.perform(post("/api/v1/thesis/groups/{id}/approve", groupId)
+                        .with(ThesisAuthorityFixture.role(jdbc, "sa-user-sa-dean-group-approval", "TRUONG_KHOA")))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.approvalStatus").value("APPROVED"));
 

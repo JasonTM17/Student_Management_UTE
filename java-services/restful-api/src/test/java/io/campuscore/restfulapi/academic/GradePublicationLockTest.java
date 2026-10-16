@@ -54,6 +54,19 @@ class GradePublicationLockTest {
     void prepareFixture() {
         jdbc.execute("CREATE SCHEMA IF NOT EXISTS \"campuscore_auth\"");
         jdbc.execute("CREATE SCHEMA IF NOT EXISTS \"academic\"");
+        // Grade writes and their audit record share a transaction, including in this standalone fixture.
+        jdbc.execute("CREATE SCHEMA IF NOT EXISTS \"campuscore_audit\"");
+        jdbc.execute("""
+                CREATE TABLE IF NOT EXISTS campuscore_audit."AdminAudit" (
+                    "id" VARCHAR(120) PRIMARY KEY,
+                    "actorId" VARCHAR(120), "actorLabel" VARCHAR(240),
+                    "action" VARCHAR(48) NOT NULL, "entityType" VARCHAR(48) NOT NULL,
+                    "entityId" VARCHAR(120), "summary" VARCHAR(500),
+                    "beforeState" TEXT, "afterState" TEXT,
+                    "createdAt" TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP
+                )
+                """);
+        jdbc.update("DELETE FROM campuscore_audit.\"AdminAudit\"");
         createTables();
         AccountAuthorityFixture.ensureSchema(jdbc);
         clearTables();
@@ -72,6 +85,10 @@ class GradePublicationLockTest {
                         .content(payload))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.message").value("Grades saved as draft"));
+
+        org.assertj.core.api.Assertions.assertThat(jdbc.queryForObject(
+                "SELECT COUNT(*) FROM campuscore_audit.\"AdminAudit\" WHERE \"action\"='GRADE_UPDATE'",
+                Integer.class)).isEqualTo(1);
 
         mvc.perform(post("/api/v1/sections/section-1/grades/publish")
                         .with(lecturerJwt("lecturer-1")))

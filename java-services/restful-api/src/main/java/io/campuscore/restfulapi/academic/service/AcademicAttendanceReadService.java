@@ -15,8 +15,6 @@ import io.campuscore.restfulapi.academic.web.AcademicAttendanceReadDtos.StudentA
 import io.campuscore.restfulapi.academic.web.AcademicAttendanceReadDtos.StudentSummary;
 import io.campuscore.restfulapi.academic.web.AcademicAttendanceReadDtos.UserSummary;
 import java.time.Instant;
-import java.time.LocalDate;
-import java.time.ZoneOffset;
 import java.time.format.DateTimeParseException;
 import java.util.List;
 import java.util.Objects;
@@ -246,13 +244,9 @@ public class AcademicAttendanceReadService {
             return null;
         }
         try {
-            return Instant.parse(normalized).truncatedTo(java.time.temporal.ChronoUnit.DAYS);
-        } catch (DateTimeParseException ignored) {
-            try {
-                return LocalDate.parse(normalized).atStartOfDay().toInstant(ZoneOffset.UTC);
-            } catch (DateTimeParseException dateOnlyFailure) {
-                throw new IllegalArgumentException("date must be an ISO-8601 instant or yyyy-MM-dd");
-            }
+            return AttendanceDay.parse(normalized);
+        } catch (DateTimeParseException invalidDate) {
+            throw new IllegalArgumentException("date must be an ISO-8601 instant or yyyy-MM-dd");
         }
     }
 

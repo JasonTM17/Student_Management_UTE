@@ -85,6 +85,32 @@ class AcademicAttendanceMutationPersistenceTest {
     }
 
     @Test
+    void lateHourInstantReadsAndResetsTheSameCampusDayWithoutTouchingThePreviousDay() throws Exception {
+        for (String[] entry : new String[][] {{"2026-08-25", "PRESENT"}, {"2026-08-25T23:00:00Z", "ABSENT"}}) {
+            mvc.perform(put("/api/v1/attendance/sections/section-1")
+                            .with(lecturerJwt("lecturer-1")).contentType(MediaType.APPLICATION_JSON)
+                            .content("{\"date\":\"" + entry[0] + "\",\"records\":[{\"studentId\":\"student-1\",\"status\":\"" + entry[1] + "\"}]}"))
+                    .andExpect(status().isOk());
+        }
+        mvc.perform(get("/api/v1/attendance/section/section-1").param("date", "2026-08-25T23:00:00Z")
+                        .with(lecturerJwt("lecturer-1")))
+                .andExpect(status().isOk()).andExpect(jsonPath("$[0].status").value("ABSENT"));
+        mvc.perform(get("/api/v1/attendance/section/section-1").param("date", "2026-08-26")
+                        .with(lecturerJwt("lecturer-1")))
+                .andExpect(status().isOk()).andExpect(jsonPath("$[0].status").value("ABSENT"));
+        mvc.perform(put("/api/v1/attendance/sections/section-1")
+                        .with(lecturerJwt("lecturer-1")).contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"date\":\"2026-08-25T23:00:00Z\",\"records\":[{\"studentId\":\"student-1\",\"status\":\"RESET\"}]}"))
+                .andExpect(status().isOk());
+        mvc.perform(get("/api/v1/attendance/section/section-1").param("date", "2026-08-26")
+                        .with(lecturerJwt("lecturer-1")))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.length()").value(0));
+        mvc.perform(get("/api/v1/attendance/section/section-1").param("date", "2026-08-25")
+                        .with(lecturerJwt("lecturer-1")))
+                .andExpect(status().isOk()).andExpect(jsonPath("$[0].status").value("PRESENT"));
+    }
+
+    @Test
     void duplicateStudentIdInOnePayloadIsDedupedLastWriteWins() throws Exception {
         // A payload naming the same student twice used to hit the unique key
         // and surface as a 500. The contract is JSON-object semantics: the
@@ -118,7 +144,7 @@ class AcademicAttendanceMutationPersistenceTest {
     }
 
     @Test
-    void isoInstantAndDateOnlyReferToOneUtcAttendanceDayIncludingLegacyRows() throws Exception {
+    void isoInstantAndDateOnlyReferToOneCampusDayIncludingLegacyUtcKeys() throws Exception {
         mvc.perform(put("/api/v1/attendance/sections/section-1").with(lecturerJwt("lecturer-1"))
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("{\"date\":\"2026-08-25T07:00:00Z\",\"records\":[{\"studentId\":\"student-1\",\"status\":\"PRESENT\"}]}"))
@@ -130,6 +156,10 @@ class AcademicAttendanceMutationPersistenceTest {
         jdbc.update("UPDATE \"academic\".\"Attendance\" SET \"date\"=? WHERE \"sectionId\"='section-1'",
                 java.time.OffsetDateTime.parse("2026-08-25T18:30:00Z"));
         mvc.perform(get("/api/v1/attendance/section/section-1").param("date", "2026-08-25T23:00:00Z")
+                .with(lecturerJwt("lecturer-1")))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.length()").value(0));
+        // This instant belongs to Aug25 in the campus timezone, so its legacy key remains readable.
+        mvc.perform(get("/api/v1/attendance/section/section-1").param("date", "2026-08-25T07:00:00Z")
                 .with(lecturerJwt("lecturer-1")))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.length()").value(1));
         mvc.perform(put("/api/v1/attendance/sections/section-1").with(lecturerJwt("lecturer-1"))

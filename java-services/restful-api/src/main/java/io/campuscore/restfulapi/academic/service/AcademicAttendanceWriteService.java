@@ -8,8 +8,6 @@ import io.campuscore.restfulapi.academic.web.AcademicAttendanceMutationDtos.Stud
 import io.campuscore.restfulapi.web.DomainException;
 import java.time.Duration;
 import java.time.Instant;
-import java.time.LocalDate;
-import java.time.ZoneOffset;
 import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
 import java.util.List;
@@ -135,23 +133,16 @@ public class AcademicAttendanceWriteService {
      * keyed evening classes (17:00Z–23:59Z = the next local day) to the wrong
      * calendar date and split same-day records across two keys.
      */
-    private static final java.time.ZoneId CAMPUS_ZONE = java.time.ZoneId.of("Asia/Ho_Chi_Minh");
-
     private static Instant parseAndNormalizeDate(String value) {
         if (value == null || value.isBlank()) {
             throw new DomainException(HttpStatus.BAD_REQUEST, "INVALID_ATTENDANCE_DATE", "date is required");
         }
         String trimmed = value.trim();
         try {
-            LocalDate localDate = LocalDate.ofInstant(Instant.parse(trimmed), CAMPUS_ZONE);
-            return localDate.atStartOfDay().toInstant(ZoneOffset.UTC);
-        } catch (DateTimeParseException ignored) {
-            try {
-                return LocalDate.parse(trimmed).atStartOfDay().toInstant(ZoneOffset.UTC);
-            } catch (DateTimeParseException dateOnlyFailure) {
-                throw new DomainException(HttpStatus.BAD_REQUEST, "INVALID_ATTENDANCE_DATE",
-                        "date must be an ISO-8601 instant or YYYY-MM-DD");
-            }
+            return AttendanceDay.parse(trimmed);
+        } catch (DateTimeParseException invalidDate) {
+            throw new DomainException(HttpStatus.BAD_REQUEST, "INVALID_ATTENDANCE_DATE",
+                    "date must be an ISO-8601 instant or YYYY-MM-DD");
         }
     }
 }
