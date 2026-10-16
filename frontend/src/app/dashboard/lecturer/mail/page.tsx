@@ -1250,7 +1250,8 @@ export default function LecturerMailComposePage() {
             ))}
           </dl>
           {template === 'registration' && courses.length > 0 ? (
-            <table className="w-full text-left text-xs">
+            <div className="overflow-x-auto">
+            <table className="w-full min-w-[28rem] text-left text-xs">
               <thead className="text-muted-foreground">
                 <tr>
                   <th className="py-1 pr-2 font-medium">{copy.fields.code}</th>
@@ -1270,9 +1271,11 @@ export default function LecturerMailComposePage() {
                 ))}
               </tbody>
             </table>
+            </div>
           ) : null}
           {template === 'grade-alert' && grades.length > 0 ? (
-            <table className="w-full text-left text-xs">
+            <div className="overflow-x-auto">
+            <table className="w-full min-w-[28rem] text-left text-xs">
               <thead className="text-muted-foreground">
                 <tr>
                   <th className="py-1 pr-2 font-medium">{copy.fields.code}</th>
@@ -1292,6 +1295,7 @@ export default function LecturerMailComposePage() {
                 ))}
               </tbody>
             </table>
+            </div>
           ) : null}
           <a
             href={previewHref}

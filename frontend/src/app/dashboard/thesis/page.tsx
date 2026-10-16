@@ -39,6 +39,7 @@ import { Modal } from '@/components/ui/modal';
 import { RichTextEditor } from '@/components/ui/rich-text-editor';
 import { RichContentRenderer } from '@/components/ui/rich-content-renderer';
 import { useConfirmationDialog } from '@/components/ui/use-confirmation-dialog';
+import { useRovingTabs } from '@/components/ui/use-roving-tabs';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { EmptyState, ErrorState, LoadingState } from '@/components/ui/state-block';
 import { PageHeader, SectionEyebrow } from '@/components/ui/page-header';
@@ -103,6 +104,9 @@ type GradeBand =
   | 'BELOW_AVERAGE'
   | 'PASS'
   | 'RETAKE';
+
+const THESIS_LECTURER_TABS = ['supervision', 'defense', 'repository'] as const;
+const THESIS_SUPERVISION_TAB_ONLY = ['supervision'] as const;
 
 // Feedback item 2: one classification source. The 10-point bands live in
 // grade-scale.ts now, matching the official conversion table end to end.
@@ -256,6 +260,13 @@ export default function ThesisPage() {
 
   // Lecturer navigation tab (supervision vs council defense vs repository)
   const [lecturerTab, setLecturerTab] = useState<'supervision' | 'defense' | 'repository'>('supervision');
+  const chooseLecturerTab = useCallback(
+    (tab: 'supervision' | 'defense' | 'repository') => {
+      userChoseTabRef.current = true;
+      setLecturerTab(tab);
+    },
+    [],
+  );
 
   // Thesis Repository State (Faculty archive of submitted theses)
   const [repositoryReports, setRepositoryReports] = useState<ThesisRepositoryReport[]>([]);
@@ -1037,6 +1048,11 @@ export default function ThesisPage() {
   // Once the reader picks a tab by hand, background refreshes and round
   // changes must not snap them back to an auto-selected tab.
   const userChoseTabRef = useRef(false);
+  const lecturerTabs = useRovingTabs(
+    canLoadStaffRelations ? THESIS_LECTURER_TABS : THESIS_SUPERVISION_TAB_ONLY,
+    lecturerTab,
+    chooseLecturerTab,
+  );
 
   useEffect(() => {
     if (!canLoadStaffRelations) {
@@ -2490,13 +2506,13 @@ export default function ThesisPage() {
               <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border/70 pb-3">
                 <div className="flex flex-wrap items-center gap-2" role="tablist" aria-label={pageCopy.tabTopicsAndSupervisors}>
                   <button
+                    ref={lecturerTabs.tabRef('supervision')}
                     type="button"
                     role="tab"
                     aria-selected={lecturerTab === 'supervision'}
-                    onClick={() => {
-                      userChoseTabRef.current = true;
-                      setLecturerTab('supervision');
-                    }}
+                    tabIndex={lecturerTabs.tabIndex('supervision')}
+                    onKeyDown={(event) => lecturerTabs.onKeyDown(event, 0)}
+                    onClick={() => chooseLecturerTab('supervision')}
                     className={cn(
                       'inline-flex items-center gap-2 rounded-xl px-4 py-2.5 text-xs font-bold transition-all border',
                       lecturerTab === 'supervision'
@@ -2522,13 +2538,13 @@ export default function ThesisPage() {
                   {canLoadStaffRelations ? (
                   <>
                   <button
+                    ref={lecturerTabs.tabRef('defense')}
                     type="button"
                     role="tab"
                     aria-selected={lecturerTab === 'defense'}
-                    onClick={() => {
-                      userChoseTabRef.current = true;
-                      setLecturerTab('defense');
-                    }}
+                    tabIndex={lecturerTabs.tabIndex('defense')}
+                    onKeyDown={(event) => lecturerTabs.onKeyDown(event, 1)}
+                    onClick={() => chooseLecturerTab('defense')}
                     className={cn(
                       'inline-flex items-center gap-2 rounded-xl px-4 py-2.5 text-xs font-bold transition-all border',
                       lecturerTab === 'defense'
@@ -2550,13 +2566,13 @@ export default function ThesisPage() {
                     </span>
                   </button>
                   <button
+                    ref={lecturerTabs.tabRef('repository')}
                     type="button"
                     role="tab"
                     aria-selected={lecturerTab === 'repository'}
-                    onClick={() => {
-                      userChoseTabRef.current = true;
-                      setLecturerTab('repository');
-                    }}
+                    tabIndex={lecturerTabs.tabIndex('repository')}
+                    onKeyDown={(event) => lecturerTabs.onKeyDown(event, 2)}
+                    onClick={() => chooseLecturerTab('repository')}
                     className={cn(
                       'inline-flex items-center gap-2 rounded-xl px-4 py-2.5 text-xs font-bold transition-all border',
                       lecturerTab === 'repository'
@@ -2970,10 +2986,11 @@ export default function ThesisPage() {
             </div>
           ) : null}
           <div>
-            <label className="mb-1 block text-sm font-medium text-foreground">
+            <label htmlFor="thesis-propose-title" className="mb-1 block text-sm font-medium text-foreground">
               {messages.thesis.topicTitleLabel}
             </label>
             <Input
+              id="thesis-propose-title"
               value={proposeTitle}
               onChange={(e) => setProposeTitle(e.target.value)}
               placeholder={messages.thesis.topicTitleLabel}
@@ -2997,10 +3014,11 @@ export default function ThesisPage() {
                 />
               ) : (
                 <div>
-                  <label className="mb-1 block text-sm font-medium text-foreground">
+                  <label htmlFor="thesis-propose-dept" className="mb-1 block text-sm font-medium text-foreground">
                     {messages.thesis.topicDepartmentLabel}
                   </label>
                   <Input
+                    id="thesis-propose-dept"
                     value={proposeDepartmentId}
                     onChange={(e) => setProposeDepartmentId(e.target.value)}
                     placeholder={departments[0]?.id || 'FIT'}
@@ -3011,10 +3029,11 @@ export default function ThesisPage() {
               )}
             </div>
             <div>
-              <label className="mb-1 block text-sm font-medium text-foreground">
+              <label htmlFor="thesis-propose-max-groups" className="mb-1 block text-sm font-medium text-foreground">
                 {messages.thesis.topicMaxGroupsLabel} (1-20)
               </label>
               <Input
+                id="thesis-propose-max-groups"
                 type="number"
                 min={1}
                 max={20}
@@ -3077,6 +3096,8 @@ export default function ThesisPage() {
               {messages.thesis.topicDescriptionLabel}
             </label>
             <RichTextEditor
+              id="thesis-propose-desc"
+              aria-label={messages.thesis.topicDescriptionLabel}
               value={proposeDescription}
               onChange={setProposeDescription}
               placeholder={messages.thesis.topicDescriptionLabel}
@@ -3150,10 +3171,11 @@ export default function ThesisPage() {
             </div>
           ) : null}
           <div>
-            <label className="mb-1 block text-sm font-medium text-foreground">
+            <label htmlFor="thesis-reject-reason" className="mb-1 block text-sm font-medium text-foreground">
               {messages.thesis.rejectionReason}
             </label>
             <Textarea
+              id="thesis-reject-reason"
               value={rejectReason}
               onChange={(e) => setRejectReason(e.target.value)}
               placeholder={messages.thesis.rejectionReasonPlaceholder}
@@ -3511,10 +3533,11 @@ export default function ThesisPage() {
             </div>
           ) : null}
           <div>
-            <label className="mb-1 block text-sm font-medium text-foreground">
+            <label htmlFor="thesis-edit-title" className="mb-1 block text-sm font-medium text-foreground">
               {messages.thesis.topicTitleLabel}
             </label>
             <Input
+              id="thesis-edit-title"
               value={editTitle}
               onChange={(e) => setEditTitle(e.target.value)}
               placeholder={messages.thesis.topicTitleLabel}
@@ -3538,10 +3561,11 @@ export default function ThesisPage() {
                 />
               ) : (
                 <div>
-                  <label className="mb-1 block text-sm font-medium text-foreground">
+                  <label htmlFor="thesis-edit-dept" className="mb-1 block text-sm font-medium text-foreground">
                     {messages.thesis.topicDepartmentLabel}
                   </label>
                   <Input
+                    id="thesis-edit-dept"
                     value={editDepartmentId}
                     onChange={(e) => setEditDepartmentId(e.target.value)}
                     placeholder={departments[0]?.id || 'FIT'}
@@ -3552,10 +3576,11 @@ export default function ThesisPage() {
               )}
             </div>
             <div>
-              <label className="mb-1 block text-sm font-medium text-foreground">
+              <label htmlFor="thesis-edit-max-groups" className="mb-1 block text-sm font-medium text-foreground">
                 {messages.thesis.topicMaxGroupsLabel} (1-20)
               </label>
               <Input
+                id="thesis-edit-max-groups"
                 type="number"
                 min={1}
                 max={20}
@@ -3571,6 +3596,8 @@ export default function ThesisPage() {
               {messages.thesis.topicDescriptionLabel}
             </label>
             <RichTextEditor
+              id="thesis-edit-desc"
+              aria-label={messages.thesis.topicDescriptionLabel}
               value={editDescription}
               onChange={setEditDescription}
               placeholder={messages.thesis.topicDescriptionLabel}

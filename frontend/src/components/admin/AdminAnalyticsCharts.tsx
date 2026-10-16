@@ -346,7 +346,7 @@ export function AdminAnalyticsCharts({ stats, className }: AdminAnalyticsChartsP
                           : copy.sectionsShort;
 
                     return (
-                      <g key={dept.code} className="group cursor-pointer">
+                      <g key={dept.code} className="group">
                         <rect
                           x={x}
                           y={y}

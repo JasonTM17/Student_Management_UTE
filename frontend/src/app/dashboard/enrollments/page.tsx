@@ -36,6 +36,9 @@ import { campusErrorMessage } from '@/lib/campus-error';
 import { formatOptionalDate } from '@/lib/format-display';
 import { dayLabel } from '@/components/schedule/weekly-grid';
 import { toast } from 'sonner';
+import { useRovingTabs } from '@/components/ui/use-roving-tabs';
+
+const ENROLLMENT_TABS = ['curriculum', 'enrollments'] as const;
 
 const statusTone: Record<string, string> = {
   CONFIRMED: metricToneClass('success'),
@@ -67,6 +70,7 @@ export default function EnrollmentsPage() {
   const [enrollments, setEnrollments] = useState<Enrollment[]>([]);
   const [curriculumData, setCurriculumData] = useState<MyCurriculumResponse | null>(null);
   const [activeTab, setActiveTab] = useState<'curriculum' | 'enrollments'>('curriculum');
+  const mainTabs = useRovingTabs(ENROLLMENT_TABS, activeTab, setActiveTab);
   const [curriculumError, setCurriculumError] = useState('');
   const [isCurriculumLoading, setIsCurriculumLoading] = useState(false);
   const [statusFilter, setStatusFilter] = useState<'ALL' | 'COMPLETED' | 'IN_PROGRESS' | 'NOT_STARTED'>('ALL');
@@ -556,9 +560,14 @@ export default function EnrollmentsPage() {
           <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border/70 pb-3">
             <div className="grid grid-cols-2 gap-2 sm:flex sm:items-center" role="tablist" aria-label={copy.tabCurriculum}>
               <button
+                ref={mainTabs.tabRef('curriculum')}
                 type="button"
                 role="tab"
+                id="enrollments-tab-curriculum"
+                aria-controls="enrollments-panel-curriculum"
                 aria-selected={activeTab === 'curriculum'}
+                tabIndex={mainTabs.tabIndex('curriculum')}
+                onKeyDown={(event) => mainTabs.onKeyDown(event, 0)}
                 onClick={() => setActiveTab('curriculum')}
                 className={`flex min-h-10 items-center justify-center gap-2 rounded-lg px-3 py-2 text-sm font-semibold transition sm:px-4 ${
                   activeTab === 'curriculum'
@@ -576,9 +585,14 @@ export default function EnrollmentsPage() {
                 )}
               </button>
               <button
+                ref={mainTabs.tabRef('enrollments')}
                 type="button"
                 role="tab"
+                id="enrollments-tab-enrollments"
+                aria-controls="enrollments-panel-enrollments"
                 aria-selected={activeTab === 'enrollments'}
+                tabIndex={mainTabs.tabIndex('enrollments')}
+                onKeyDown={(event) => mainTabs.onKeyDown(event, 1)}
                 onClick={() => setActiveTab('enrollments')}
                 className={`flex min-h-10 items-center justify-center gap-2 rounded-lg px-3 py-2 text-sm font-semibold transition sm:px-4 ${
                   activeTab === 'enrollments'
@@ -623,13 +637,13 @@ export default function EnrollmentsPage() {
             )}
           </div>
 
-          {activeTab === 'curriculum' && isCurriculumLoading && (
-            <LoadingState label={locale === 'vi' ? 'Đang tải chương trình đào tạo' : 'Loading curriculum'} />
-          )}
-          {activeTab === 'curriculum' && !isCurriculumLoading && curriculumError && (
-            <ErrorState title={copy.unavailableTitle} description={curriculumError} onRetry={() => void fetchCurriculum()} />
-          )}
-          {activeTab === 'curriculum' && !isCurriculumLoading && !curriculumError && (
+          {activeTab === 'curriculum' && (
+            <div id="enrollments-panel-curriculum" role="tabpanel" aria-labelledby="enrollments-tab-curriculum">
+              {isCurriculumLoading ? (
+                <LoadingState label={locale === 'vi' ? 'Đang tải chương trình đào tạo' : 'Loading curriculum'} />
+              ) : curriculumError ? (
+                <ErrorState title={copy.unavailableTitle} description={curriculumError} onRetry={() => void fetchCurriculum()} />
+              ) : (
             <div className="space-y-8">
               {curriculumData?.curriculum && (
                 <div className="rounded-xl border border-border/70 bg-card/60 p-4 sm:p-5">
@@ -820,10 +834,12 @@ export default function EnrollmentsPage() {
                 })
               )}
             </div>
+              )}
+            </div>
           )}
 
           {activeTab === 'enrollments' && (
-            <div className="space-y-6">
+            <div id="enrollments-panel-enrollments" role="tabpanel" aria-labelledby="enrollments-tab-enrollments" className="space-y-6">
               {enrollments.length === 0 ? (
                 <EmptyState
                   icon={BookOpen}

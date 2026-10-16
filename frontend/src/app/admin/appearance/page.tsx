@@ -13,6 +13,7 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { LinkButton } from '@/components/ui/link-button';
 import { EmptyState, ErrorState, LoadingState } from '@/components/ui/state-block';
+import { useRovingTabs } from '@/components/ui/use-roving-tabs';
 import { useI18n } from '@/i18n';
 import {
   DEFAULT_SITE_APPEARANCE,
@@ -42,6 +43,7 @@ export default function AdminAppearancePage() {
   const copy = messages.admin.appearance;
   const [draft, setDraft] = useState<SiteAppearance>(DEFAULT_SITE_APPEARANCE);
   const [copyLocale, setCopyLocale] = useState<'en' | 'vi'>(locale);
+  const copyLocaleTabs = useRovingTabs(['en', 'vi'], copyLocale, setCopyLocale);
   const [posts, setPosts] = useState<AnnouncementRow[]>([]);
   const [postsLoadFailed, setPostsLoadFailed] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
@@ -223,12 +225,15 @@ export default function AdminAppearancePage() {
               <div className="flex min-w-0 flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                 <h2 className="text-lg font-semibold text-foreground">{copy.heroTitle}</h2>
                 <div className="grid w-full grid-cols-2 rounded-md border border-border/80 p-1 sm:inline-flex sm:w-auto" role="tablist">
-                  {(['en', 'vi'] as const).map((item) => (
+                  {(['en', 'vi'] as const).map((item, index) => (
                     <button
                       key={item}
+                      ref={copyLocaleTabs.tabRef(item)}
                       type="button"
                       role="tab"
                       aria-selected={copyLocale === item}
+                      tabIndex={copyLocaleTabs.tabIndex(item)}
+                      onKeyDown={(event) => copyLocaleTabs.onKeyDown(event, index)}
                       onClick={() => setCopyLocale(item)}
                       className={cn(
                         'min-h-11 rounded-sm px-3 text-sm font-semibold',

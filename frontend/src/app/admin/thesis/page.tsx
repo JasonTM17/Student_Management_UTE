@@ -724,8 +724,17 @@ export default function AdminThesisPage() {
               return (
                 <Card key={round.id} className="overflow-hidden">
                   <CardHeader
-                    className="cursor-pointer transition-colors hover:bg-secondary/30"
+                    className="cursor-pointer transition-colors hover:bg-secondary/30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                    role="button"
+                    tabIndex={0}
+                    aria-expanded={isExpanded}
                     onClick={() => toggleExpand(round.id)}
+                    onKeyDown={(event) => {
+                      if (event.key === 'Enter' || event.key === ' ') {
+                        event.preventDefault();
+                        toggleExpand(round.id);
+                      }
+                    }}
                   >
                     <div className="flex items-center justify-between gap-4">
                       <div className="flex items-center gap-4">

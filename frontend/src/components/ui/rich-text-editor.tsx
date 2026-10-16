@@ -39,6 +39,7 @@ import {
 import { cn } from '@/lib/utils';
 import { en } from '@/i18n/messages';
 import { RichContentRenderer } from './rich-content-renderer';
+import { useRovingTabs } from './use-roving-tabs';
 
 // Single brand source: every visible mention reads the canonical site name
 // from the dictionary instead of a literal.
@@ -60,6 +61,7 @@ export interface RichTextEditorProps {
 }
 
 type EditorViewMode = 'write' | 'split' | 'preview';
+const EDITOR_VIEW_MODES: readonly EditorViewMode[] = ['write', 'split', 'preview'];
 
 interface AcademicTemplate {
   nameVi: string;
@@ -194,6 +196,7 @@ export function RichTextEditor({
 
   // States
   const [viewMode, setViewMode] = useState<EditorViewMode>('write');
+  const viewModeTabs = useRovingTabs(EDITOR_VIEW_MODES, viewMode, setViewMode);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [templatesOpen, setTemplatesOpen] = useState(false);
   const [linkDialogOpen, setLinkDialogOpen] = useState(false);
@@ -676,9 +679,12 @@ export function RichTextEditor({
           {/* Mode Switcher */}
           <div className="flex items-center rounded-md border border-border/70 bg-background/80 p-0.5" role="tablist">
             <button
+              ref={viewModeTabs.tabRef('write')}
               type="button"
               role="tab"
               aria-selected={viewMode === 'write'}
+              tabIndex={viewModeTabs.tabIndex('write')}
+              onKeyDown={(event) => viewModeTabs.onKeyDown(event, 0)}
               onClick={() => setViewMode('write')}
               title={isVi ? 'Chỉ soạn thảo' : 'Write only'}
               className={cn(
@@ -690,9 +696,12 @@ export function RichTextEditor({
               <span className="hidden md:inline">{isVi ? 'Soạn thảo' : 'Write'}</span>
             </button>
             <button
+              ref={viewModeTabs.tabRef('split')}
               type="button"
               role="tab"
               aria-selected={viewMode === 'split'}
+              tabIndex={viewModeTabs.tabIndex('split')}
+              onKeyDown={(event) => viewModeTabs.onKeyDown(event, 1)}
               onClick={() => setViewMode('split')}
               title={isVi ? 'Chia đôi trực tiếp (Split preview)' : 'Split live preview'}
               className={cn(
@@ -704,9 +713,12 @@ export function RichTextEditor({
               <span className="hidden md:inline">{isVi ? 'Chia đôi' : 'Split'}</span>
             </button>
             <button
+              ref={viewModeTabs.tabRef('preview')}
               type="button"
               role="tab"
               aria-selected={viewMode === 'preview'}
+              tabIndex={viewModeTabs.tabIndex('preview')}
+              onKeyDown={(event) => viewModeTabs.onKeyDown(event, 2)}
               onClick={() => setViewMode('preview')}
               title={isVi ? 'Chỉ xem trước' : 'Preview only'}
               className={cn(
