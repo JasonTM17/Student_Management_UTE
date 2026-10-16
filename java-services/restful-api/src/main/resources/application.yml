@@ -57,7 +57,12 @@ thesis:
 
 server:
   port: ${PORT:${SERVER_PORT:4010}}
-  forward-headers-strategy: framework
+  # Deliberately no forward-headers-strategy: "framework" rewrites
+  # getRemoteAddr() from client-controlled X-Forwarded-For entries, which made
+  # every IP-keyed control (login rate limit, session/reset audit IPs)
+  # spoofable by any client that could reach the service directly. The shared
+  # ClientIpResolver owns forwarded-header handling behind a trusted proxy.
+  forward-headers-strategy: ${SERVER_FORWARD_HEADERS_STRATEGY:none}
   error:
     include-message: never
     include-stacktrace: never

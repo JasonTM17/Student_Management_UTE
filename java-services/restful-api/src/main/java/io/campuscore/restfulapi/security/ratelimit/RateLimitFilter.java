@@ -25,14 +25,17 @@ public class RateLimitFilter extends OncePerRequestFilter {
     private final RateLimiterService rateLimiterService;
     private final RateLimitProperties properties;
     private final ApiErrorWriter errorWriter;
+    private final ClientIpResolver clientIpResolver;
 
     public RateLimitFilter(
             RateLimiterService rateLimiterService,
             RateLimitProperties properties,
-            ApiErrorWriter errorWriter) {
+            ApiErrorWriter errorWriter,
+            ClientIpResolver clientIpResolver) {
         this.rateLimiterService = rateLimiterService;
         this.properties = properties;
         this.errorWriter = errorWriter;
+        this.clientIpResolver = clientIpResolver;
     }
 
     private static final Set<String> MUTATING_METHODS = Set.of("POST", "PUT", "PATCH", "DELETE");
@@ -125,7 +128,7 @@ public class RateLimitFilter extends OncePerRequestFilter {
     }
 
     private String resolveClientKey(HttpServletRequest request, RateLimitCategory category) {
-        String clientIp = resolveClientIp(request);
+        String clientIp = clientIpResolver.resolve(request);
 
         // Authentication endpoints (login) are always strictly bound to IP to prevent brute-force
         if (category == RateLimitCategory.AUTH_LOGIN) {
@@ -139,45 +142,6 @@ public class RateLimitFilter extends OncePerRequestFilter {
         }
 
         return "ip:" + clientIp + ":" + category.name();
-    }
-
-    /**
-     * Client-controlled forwarded headers are honored only behind a trusted
-     * reverse proxy, and even then the RIGHTMOST X-Forwarded-For element is
-     * used: proxies append the address they saw, so the rightmost entry is the
-     * one the trusted proxy added and the leftmost entries are whatever the
-     * client spoofed. Render appends the real client IP last. X-Real-IP is a
-     * single overwrite-style header, so it is trusted only when the deployment
-     * additionally opts in via {@code app.rate-limit.trust-real-ip}. When
-     * proxy-header trust is disabled (the default for direct deployments and
-     * local dev), fall back to the socket address so attackers cannot rotate
-     * spoofed forwarded headers to evade IP-keyed limits.
-     */
-    String resolveClientIp(HttpServletRequest request) {
-        if (properties.isTrustProxyHeaders()) {
-            // Explicit opt-in: the operator vouches that X-Real-IP is
-            // overwritten by the trusted proxy, so it is authoritative.
-            if (properties.isTrustRealIp()) {
-                String xRealIp = request.getHeader("X-Real-IP");
-                if (xRealIp != null && !xRealIp.isBlank()) {
-                    return xRealIp.trim();
-                }
-            }
-
-            String xForwardedFor = request.getHeader("X-Forwarded-For");
-            if (xForwardedFor != null && !xForwardedFor.isBlank()) {
-                String[] parts = xForwardedFor.split(",");
-                for (int index = parts.length - 1; index >= 0; index--) {
-                    String candidate = parts[index].trim();
-                    if (!candidate.isEmpty()) {
-                        return candidate;
-                    }
-                }
-            }
-        }
-
-        String remoteAddr = request.getRemoteAddr();
-        return (remoteAddr != null && !remoteAddr.isBlank()) ? remoteAddr : "unknown";
     }
 
     private RateLimitPolicy resolvePolicy(String uri) {

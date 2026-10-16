@@ -40,14 +40,17 @@ public class TwoFactorController {
     private final TwoFactorService twoFactor;
     private final AuthLoginService auth;
     private final SessionCookieService cookies;
+    private final io.campuscore.restfulapi.security.ratelimit.ClientIpResolver clientIps;
 
     public TwoFactorController(
             TwoFactorService twoFactor,
             AuthLoginService auth,
-            SessionCookieService cookies) {
+            SessionCookieService cookies,
+            io.campuscore.restfulapi.security.ratelimit.ClientIpResolver clientIps) {
         this.twoFactor = twoFactor;
         this.auth = auth;
         this.cookies = cookies;
+        this.clientIps = clientIps;
     }
 
     @GetMapping("me/two-factor")
@@ -135,7 +138,7 @@ public class TwoFactorController {
         LoginResult result = auth.completeLogin(
                 request.challengeId(),
                 request.code(),
-                servletRequest.getRemoteAddr(),
+                clientIps.resolve(servletRequest),
                 servletRequest.getHeader("User-Agent"));
         cookies.issue(
                 servletRequest,

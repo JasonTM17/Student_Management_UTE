@@ -33,7 +33,7 @@ class RateLimitFilterTest {
         // matching direct (non-proxied) request handling in these tests.
         properties = new RateLimitProperties(true, false, false, 5, 40, 60);
         errorWriter = new ApiErrorWriter(new ObjectMapper());
-        filter = new RateLimitFilter(limiterService, properties, errorWriter);
+        filter = new RateLimitFilter(limiterService, properties, errorWriter, new ClientIpResolver(properties));
         SecurityContextHolder.clearContext();
     }
 
@@ -137,38 +137,38 @@ class RateLimitFilterTest {
     @Test
     void trustedProxyUsesTheRightmostForwardedForEntry() {
         RateLimitProperties proxyTrusted = new RateLimitProperties(true, true, false, 5, 40, 60);
-        RateLimitFilter proxyFilter = new RateLimitFilter(limiterService, proxyTrusted, errorWriter);
+        ClientIpResolver resolver = new ClientIpResolver(proxyTrusted);
 
         MockHttpServletRequest request = new MockHttpServletRequest("POST", "/api/v1/auth/login");
         request.addHeader("X-Forwarded-For", "1.2.3.4, 5.6.7.8, 203.0.113.9");
         request.setRemoteAddr("10.0.0.1");
 
-        assertEquals("203.0.113.9", proxyFilter.resolveClientIp(request));
+        assertEquals("203.0.113.9", resolver.resolve(request));
     }
 
     /** Audit S1: a spoofed X-Real-IP is ignored unless explicitly opted in. */
     @Test
     void realIpIsIgnoredUnlessExplicitlyTrusted() {
         RateLimitProperties proxyTrusted = new RateLimitProperties(true, true, false, 5, 40, 60);
-        RateLimitFilter proxyFilter = new RateLimitFilter(limiterService, proxyTrusted, errorWriter);
+        ClientIpResolver resolver = new ClientIpResolver(proxyTrusted);
 
         MockHttpServletRequest request = new MockHttpServletRequest("POST", "/api/v1/auth/login");
         request.addHeader("X-Real-IP", "6.6.6.6");
         request.addHeader("X-Forwarded-For", "1.2.3.4, 203.0.113.9");
         request.setRemoteAddr("10.0.0.1");
 
-        assertEquals("203.0.113.9", proxyFilter.resolveClientIp(request));
+        assertEquals("203.0.113.9", resolver.resolve(request));
 
         RateLimitProperties realIpTrusted = new RateLimitProperties(true, true, true, 5, 40, 60);
         assertEquals("6.6.6.6",
-                new RateLimitFilter(limiterService, realIpTrusted, errorWriter).resolveClientIp(request));
+                new ClientIpResolver(realIpTrusted).resolve(request));
     }
 
     /** Audit S1: spoofed first entries must not open extra IP buckets. */
     @Test
     void spoofedForwardedPrefixesShareOneBucketWhileDistinctRealIpsDoNot() throws Exception {
         RateLimitProperties proxyTrusted = new RateLimitProperties(true, true, false, 5, 40, 60);
-        RateLimitFilter proxyFilter = new RateLimitFilter(limiterService, proxyTrusted, errorWriter);
+        RateLimitFilter proxyFilter = new RateLimitFilter(limiterService, proxyTrusted, errorWriter, new ClientIpResolver(proxyTrusted));
 
         for (int i = 1; i <= 3; i++) {
             MockHttpServletRequest request = new MockHttpServletRequest("POST", "/api/v1/auth/login");

@@ -931,6 +931,79 @@ class AuthLoginPersistenceTest {
                 .andExpect(jsonPath("$.message", containsString("Authentication")));
     }
 
+    @Test
+    void lockedAccountWithLiveSessionFromSameIpCanStillLogin() throws Exception {
+        Instant now = Instant.now();
+        insertStudentUser("trusted-ip-user", "trusted@campuscore.edu", "password123", 5,
+                now.plusSeconds(3600));
+        insertSession("session-trusted", "trusted-ip-user", "203.0.113.10", now.plusSeconds(7200));
+
+        mvc.perform(post("/api/v1/auth/login")
+                        .with(request -> {
+                            request.setRemoteAddr("203.0.113.10");
+                            return request;
+                        })
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"email":"trusted@campuscore.edu","password":"password123"}
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.accessToken").isString());
+    }
+
+    @Test
+    void lockedAccountWithSessionFromDifferentIpStaysLocked() throws Exception {
+        Instant now = Instant.now();
+        insertStudentUser("foreign-ip-user", "foreign@campuscore.edu", "password123", 5,
+                now.plusSeconds(3600));
+        insertSession("session-foreign", "foreign-ip-user", "198.51.100.7", now.plusSeconds(7200));
+
+        mvc.perform(post("/api/v1/auth/login")
+                        .with(request -> {
+                            request.setRemoteAddr("203.0.113.99");
+                            return request;
+                        })
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"email":"foreign@campuscore.edu","password":"password123"}
+                                """))
+                .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void lockedAccountWithExpiredSessionFromSameIpStaysLocked() throws Exception {
+        Instant now = Instant.now();
+        insertStudentUser("expired-ip-user", "expired@campuscore.edu", "password123", 5,
+                now.plusSeconds(3600));
+        insertSession("session-expired", "expired-ip-user", "203.0.113.10", now.minusSeconds(60));
+
+        mvc.perform(post("/api/v1/auth/login")
+                        .with(request -> {
+                            request.setRemoteAddr("203.0.113.10");
+                            return request;
+                        })
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"email":"expired@campuscore.edu","password":"password123"}
+                                """))
+                .andExpect(status().isUnauthorized());
+    }
+
+    private void insertSession(String sessionId, String userId, String ipAddress, Instant expiresAt) {
+        jdbc.update(
+                "INSERT INTO \"campuscore_auth\".\"Session\""
+                        + " (\"id\", \"userId\", \"refreshToken\", \"userAgent\", \"ipAddress\","
+                        + " \"expiresAt\", \"createdAt\")"
+                        + " VALUES (?, ?, ?, ?, ?, ?, ?)",
+                sessionId,
+                userId,
+                "refresh-" + sessionId,
+                "test-agent",
+                ipAddress,
+                localDateTime(expiresAt),
+                localDateTime(BASE_TIME));
+    }
+
     private void insertStudentUser(
             String userId,
             String email,

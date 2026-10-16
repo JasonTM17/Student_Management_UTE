@@ -4,6 +4,7 @@ import io.campuscore.restfulapi.auth.service.AuthLoginService;
 import io.campuscore.restfulapi.auth.service.AuthLoginService.LoginResult;
 import io.campuscore.restfulapi.auth.service.PasswordResetRequestDispatcher;
 import io.campuscore.restfulapi.auth.service.PasswordResetService;
+import io.campuscore.restfulapi.security.ratelimit.ClientIpResolver;
 import io.campuscore.restfulapi.auth.web.AuthDtos.AuthUserResponse;
 import io.campuscore.restfulapi.auth.web.AuthDtos.ChangePasswordRequest;
 import io.campuscore.restfulapi.auth.web.AuthDtos.ForgotPasswordRequest;
@@ -43,16 +44,19 @@ public class AuthLoginController {
     private final SessionCookieService cookies;
     private final PasswordResetService passwordResets;
     private final PasswordResetRequestDispatcher passwordResetRequests;
+    private final ClientIpResolver clientIps;
 
     public AuthLoginController(
             AuthLoginService auth,
             SessionCookieService cookies,
             PasswordResetService passwordResets,
-            PasswordResetRequestDispatcher passwordResetRequests) {
+            PasswordResetRequestDispatcher passwordResetRequests,
+            ClientIpResolver clientIps) {
         this.auth = auth;
         this.cookies = cookies;
         this.passwordResets = passwordResets;
         this.passwordResetRequests = passwordResetRequests;
+        this.clientIps = clientIps;
     }
 
     @PostMapping("login")
@@ -69,7 +73,7 @@ public class AuthLoginController {
         LoginResult result = auth.login(
                 request.email(),
                 request.password(),
-                servletRequest.getRemoteAddr(),
+                clientIps.resolve(servletRequest),
                 servletRequest.getHeader("User-Agent"));
         // Two-factor accounts get a challenge, not a session: no tokens and
         // deliberately no auth cookies. The client finishes via
@@ -105,7 +109,7 @@ public class AuthLoginController {
             HttpServletResponse servletResponse) {
         LoginResult result = auth.refresh(
                 cookies.refreshToken(servletRequest, request == null ? null : request.refreshToken()),
-                servletRequest.getRemoteAddr(),
+                clientIps.resolve(servletRequest),
                 servletRequest.getHeader("User-Agent"));
         cookies.issue(
                 servletRequest,
@@ -157,7 +161,7 @@ public class AuthLoginController {
             HttpServletRequest servletRequest) {
         // Enqueued, not awaited: the reply must cost the same whether the
         // mailbox exists or not — the work runs on the shared async executor.
-        passwordResetRequests.requestResetAsync(request.email(), servletRequest.getRemoteAddr());
+        passwordResetRequests.requestResetAsync(request.email(), clientIps.resolve(servletRequest));
         return new MessageResponse(PasswordResetService.GENERIC_RESPONSE_MESSAGE);
     }
 
