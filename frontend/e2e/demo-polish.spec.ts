@@ -209,7 +209,13 @@ async function mockStudent(page: Page, singleTerm = false, overrides: Record<str
   const errors: string[] = [];
   page.on('pageerror', (error) => errors.push(error.message));
   page.on('console', (message) => {
-    if (message.type() === 'error') errors.push(message.text());
+    if (message.type() !== 'error') return;
+    // Chromium logs any 4xx API answer as a console resource error; the
+    // report probe's 404 REPORT_NOT_FOUND is an expected domain signal
+    // ("not submitted yet"), not a page defect.
+    const expected404 = message.text().includes('status of 404')
+      && /\/api\/v1\/thesis\/groups\/[^/]+\/report$/.test(message.location()?.url ?? '');
+    if (!expected404) errors.push(message.text());
   });
   await page.context().addCookies([{
     name: 'cc_csrf', value: 'demo-render-fixture',
@@ -356,6 +362,14 @@ async function mockStudent(page: Page, singleTerm = false, overrides: Record<str
       // The student group card resolves the topic's supervisors on mount.
       '/api/v1/thesis/topics/thesis-topic-demo/supervisors': [],
       '/api/v1/thesis/groups': [thesisGroup],
+      // Membership-aware round selection asks for the caller's groups across
+      // every round, and the report card now loads whenever a group exists —
+      // 404 REPORT_NOT_FOUND keeps the fixture at "no report submitted yet".
+      '/api/v1/thesis/groups/mine': [thesisGroup],
+      '/api/v1/thesis/groups/thesis-group-demo/report': {
+        __status: 404,
+        body: { code: 'REPORT_NOT_FOUND', message: 'The group has not submitted a report yet' },
+      },
       '/api/v1/enrollments/my': [1, 7, 1].map((day, index) => ({
         id: `meeting-${index}`, sectionId: index === 0 ? 'section-se101-01' : `weekend-${index}`, status: 'CONFIRMED',
         section: {
@@ -371,7 +385,13 @@ async function mockStudent(page: Page, singleTerm = false, overrides: Record<str
       await route.abort();
       return;
     }
-    await route.fulfill({ json: payloads[pathname] });
+    const payload = payloads[pathname];
+    if (payload && typeof payload === 'object' && '__status' in payload) {
+      const { __status: status, body } = payload as { __status: number; body?: unknown };
+      await route.fulfill({ status, json: body ?? {} });
+      return;
+    }
+    await route.fulfill({ json: payload });
   });
   return errors;
 }
