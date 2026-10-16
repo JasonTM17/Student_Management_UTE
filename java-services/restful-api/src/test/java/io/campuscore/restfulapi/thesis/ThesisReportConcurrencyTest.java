@@ -293,6 +293,74 @@ class ThesisReportConcurrencyTest {
     }
 
     @Test
+    void rosterCommitMustFenceAReportWriterAndPreserveTheExistingArtifact() throws Exception {
+        Fixture fx = transaction().execute(status -> seedFixture(4));
+        reports.submitFile(fx.groupId(), file(OLD_BYTES), "Original title", "Original note", fx.actor());
+        Map<String, Object> before = row(fx);
+        Map<String, byte[]> beforeObjects = Map.copyOf(objects);
+        CountDownLatch rosterChanged = new CountDownLatch(1);
+        CountDownLatch writerReachedBoundary = new CountDownLatch(1);
+        CountDownLatch commitRoster = new CountDownLatch(1);
+        CountDownLatch rosterCommitted = new CountDownLatch(1);
+        AtomicInteger writerPid = new AtomicInteger();
+        AtomicInteger rosterPid = new AtomicInteger();
+        Jwt admin = Jwt.withTokenValue("test-only").header("alg", "none").subject("admin-user")
+                .claim("roles", List.of("ADMIN")).build();
+
+        doAnswer(invocation -> {
+            String sql = invocation.getArgument(0);
+            boolean writer = Thread.currentThread().getName().equals("report-after-roster");
+            if (writer && sql.contains("thesis_group") && sql.contains("FOR UPDATE")) {
+                if (postgres()) writerPid.set(jdbc.queryForObject("SELECT pg_backend_pid()", Integer.class));
+                writerReachedBoundary.countDown();
+                return invocation.callRealMethod();
+            }
+            Object result = invocation.callRealMethod();
+            if (writer && sql.contains("r.status AS round_status")) {
+                writerReachedBoundary.countDown();
+                await(rosterCommitted, "roster commit before stale report write");
+            }
+            return result;
+        }).when(namedJdbc).queryForMap(anyString(), any(SqlParameterSource.class));
+
+        ExecutorService pool = Executors.newFixedThreadPool(2);
+        try {
+            Future<?> roster = pool.submit(() -> {
+                transaction().executeWithoutResult(status -> {
+                    jdbc.queryForObject("SELECT id FROM thesis.thesis_group WHERE id = ? FOR UPDATE", UUID.class, fx.groupId());
+                    // Roster management is legal only in REGISTRATION_OPEN;
+                    // reopen inside this transaction, retaining group→round order.
+                    jdbc.update("UPDATE thesis.thesis_registration_round SET status = 'REGISTRATION_OPEN' WHERE id = ?", fx.roundId());
+                    mutations.removeMember(fx.groupId(), fx.actor().getClaimAsString("studentId") + "-4", admin);
+                    if (postgres()) rosterPid.set(jdbc.queryForObject("SELECT pg_backend_pid()", Integer.class));
+                    rosterChanged.countDown();
+                    await(commitRoster, "permission to commit roster removal");
+                });
+                rosterCommitted.countDown();
+            });
+            await(rosterChanged, "roster transaction holding group and round");
+            Future<Throwable> writer = pool.submit(() -> capture("report-after-roster", () ->
+                    reports.submitFile(fx.groupId(), file(NEW_BYTES), "Changed", "Changed", fx.actor())));
+            await(writerReachedBoundary, "report writer group boundary");
+            if (postgres() && writerPid.get() > 0) assertBlockedBy(writerPid.get(), rosterPid.get());
+            commitRoster.countDown();
+            roster.get(WAIT_SECONDS, TimeUnit.SECONDS);
+            Throwable failure = writer.get(WAIT_SECONDS, TimeUnit.SECONDS);
+            assertThat(failure).isInstanceOf(DomainException.class);
+            assertThat(((DomainException) failure).code()).isEqualTo("REPORT_WINDOW_CLOSED");
+            assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM thesis.thesis_group_member WHERE group_id = ?",
+                    Integer.class, fx.groupId())).isEqualTo(3);
+            assertThat(row(fx)).isEqualTo(before);
+            assertThat(objects.keySet()).isEqualTo(beforeObjects.keySet());
+            beforeObjects.forEach((key, bytes) -> assertThat(objects.get(key)).containsExactly(bytes));
+        } finally {
+            commitRoster.countDown();
+            rosterCommitted.countDown();
+            close(pool);
+        }
+    }
+
+    @Test
     void outerRollbackMustDeleteTheNewObjectAndKeepThePreviousCommittedArtifact() {
         Fixture fx = fixture();
         reports.submitFile(fx.groupId(), file(OLD_BYTES), "Original title", "Original note", fx.actor());
