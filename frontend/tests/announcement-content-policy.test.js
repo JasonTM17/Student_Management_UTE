@@ -246,14 +246,25 @@ test('RT-P3-4 showWordCount toggles the wordcount toolbar control', () => {
   assert.match(source, /showWordCount \? 'wordcount' : null/);
 });
 
-test('RT-P2-4 staging ships CSP in Report-Only mode, not enforced', () => {
+test('RT-P2-4 CSP is enforced with a per-request nonce in middleware', () => {
+  const mw = read('src/middleware.ts');
+  // Enforced policy: nonce + strict-dynamic on script-src, set on the
+  // response, and mirrored onto request headers so Next.js threads the nonce
+  // into its own framework scripts.
+  assert.match(mw, /script-src 'self' 'nonce-\$\{nonce\}' 'strict-dynamic'/);
+  assert.match(mw, /requestHeaders\.set\('Content-Security-Policy', csp\)/);
+  assert.match(mw, /response\.headers\.set\('Content-Security-Policy', csp\)/);
+  assert.match(mw, /requestHeaders\.set\('x-nonce', nonce\)/);
+  assert.match(mw, /frame-src 'self' blob:/);
+  assert.match(mw, /crypto\.getRandomValues/);
+  // No staged Report-Only header may remain anywhere.
   const config = read('next.config.mjs');
-  assert.match(config, /Content-Security-Policy-Report-Only/);
-  assert.match(config, /headers\(\)/);
-  // Enforcement is deliberately not switched on (see the config's comment
-  // block): the inline theme bootstrap, Next flight-data scripts and the
-  // TinyMCE iframe would break under `script-src 'self'`.
-  assert.match(config, /script-src 'self'/);
-  assert.match(config, /frame-src 'self' blob:/);
-  assert.doesNotMatch(config, /key: 'Content-Security-Policy'/);
+  assert.doesNotMatch(config, /Content-Security-Policy-Report-Only/);
+  assert.doesNotMatch(mw, /Report-Only/);
+  // Hand-written inline scripts must consume the nonce.
+  const layout = read('src/app/layout.tsx');
+  assert.match(layout, /headers\(\)\)\.get\('x-nonce'\)/);
+  assert.match(layout, /<script\s+nonce=\{nonce\}/);
+  const jsonld = read('src/components/seo/JsonLd.tsx');
+  assert.equal((jsonld.match(/nonce=\{nonce\}/g) || []).length, 3);
 });

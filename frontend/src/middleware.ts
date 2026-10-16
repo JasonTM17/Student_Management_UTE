@@ -9,6 +9,41 @@ import {
 const LOCALE_COOKIE = 'cc_locale';
 const COOKIE_MAX_AGE = 60 * 60 * 24 * 365;
 
+// RT-P2-4 graduation: the report-only CSP is now enforced with a per-request
+// nonce. Setting the policy on the *request* headers is what lets Next.js
+// thread the nonce into its own scripts (flight data, webpack bootstrap);
+// the response header is what the browser enforces. 'strict-dynamic' extends
+// trust to scripts created by already-nonced code (TinyMCE's ScriptLoader);
+// 'self' remains as the fallback for browsers that predate strict-dynamic.
+function generateNonce(): string {
+  const bytes = new Uint8Array(16);
+  crypto.getRandomValues(bytes);
+  let binary = '';
+  for (const byte of bytes) {
+    binary += String.fromCharCode(byte);
+  }
+  return btoa(binary);
+}
+
+function buildContentSecurityPolicy(nonce: string): string {
+  return [
+    "default-src 'self'",
+    `script-src 'self' 'nonce-${nonce}' 'strict-dynamic'`,
+    // Next injects inline styles; TinyMCE composes with inline content_style.
+    "style-src 'self' 'unsafe-inline'",
+    // Announcements may embed https images and the editor inlines data:/blob:.
+    "img-src 'self' data: blob: https:",
+    "font-src 'self' data:",
+    "media-src 'self' data: blob: https:",
+    "frame-src 'self' blob:",
+    "worker-src 'self' blob:",
+    "object-src 'none'",
+    "base-uri 'self'",
+    "form-action 'self'",
+    "frame-ancestors 'self'",
+  ].join('; ');
+}
+
 const DOCUMENT_FETCH_DESTINATIONS = new Set([
   'document',
   'frame',
@@ -59,12 +94,20 @@ export function middleware(request: NextRequest) {
     withRequestLocaleCookie(request, locale),
   );
 
+  const nonce = generateNonce();
+  const csp = buildContentSecurityPolicy(nonce);
+  // x-nonce is consumed by layout.tsx for hand-written inline scripts; the CSP
+  // request header is what Next.js parses to nonce its own framework scripts.
+  requestHeaders.set('x-nonce', nonce);
+  requestHeaders.set('Content-Security-Policy', csp);
+
   if (localeMatch.locale) {
     const response = NextResponse.next({
       request: {
         headers: requestHeaders,
       },
     });
+    response.headers.set('Content-Security-Policy', csp);
 
     const isPrefetch =
       request.headers.has('rsc') ||
@@ -86,11 +129,13 @@ export function middleware(request: NextRequest) {
     return response;
   }
 
-  return NextResponse.next({
+  const response = NextResponse.next({
     request: {
       headers: requestHeaders,
     },
   });
+  response.headers.set('Content-Security-Policy', csp);
+  return response;
 }
 
 export const config = {

@@ -2,9 +2,10 @@ import { getSiteUrl } from '@/lib/site';
 
 interface JsonLdProps {
   locale?: string;
+  nonce?: string;
 }
 
-export function JsonLd({ locale = 'vi' }: JsonLdProps) {
+export function JsonLd({ locale = 'vi', nonce }: JsonLdProps) {
   const siteUrl = getSiteUrl();
   const isVi = locale === 'vi';
   const organizationName = isVi
@@ -71,14 +72,17 @@ export function JsonLd({ locale = 'vi' }: JsonLdProps) {
     <>
       <script
         type="application/ld+json"
+        nonce={nonce}
         dangerouslySetInnerHTML={{ __html: JSON.stringify(organizationSchema) }}
       />
       <script
         type="application/ld+json"
+        nonce={nonce}
         dangerouslySetInnerHTML={{ __html: JSON.stringify(webAppSchema) }}
       />
       <script
         type="application/ld+json"
+        nonce={nonce}
         dangerouslySetInnerHTML={{ __html: JSON.stringify(webSiteSchema) }}
       />
     </>

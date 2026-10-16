@@ -7,6 +7,7 @@ import "@fontsource/noto-serif/400.css";
 import "@fontsource/noto-serif/600.css";
 import "@fontsource/noto-serif/700.css";
 import type { Viewport } from "next";
+import { headers } from "next/headers";
 import { AuthProvider } from "@/context/AuthContext";
 import { ThemeProvider } from "@/components/ThemeProvider";
 import { QueryProvider } from "@/components/providers/query-provider";
@@ -59,12 +60,16 @@ export default async function RootLayout({
   const locale = routeLocale ?? requestLocale;
   const htmlLang = routeLocale ?? requestHtmlLang;
   const prefixed = routeLocale ? true : requestPrefixed;
+  // Per-request CSP nonce minted by middleware; required on every
+  // hand-written inline <script> now that script-src is enforced.
+  const nonce = (await headers()).get('x-nonce') ?? undefined;
 
   return (
     <html lang={htmlLang} suppressHydrationWarning>
       <head>
-        <JsonLd locale={locale} />
+        <JsonLd locale={locale} nonce={nonce} />
         <script
+          nonce={nonce}
           dangerouslySetInnerHTML={{
             // Pre-hydration theme bootstrap: stored choice wins, otherwise the
             // OS preference applies, so dark-mode visitors never get a white

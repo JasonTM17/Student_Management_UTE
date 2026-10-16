@@ -12,9 +12,7 @@ import { SectionEyebrow } from '@/components/ui/page-header';
 import { metricToneClass } from '@/components/ui/status';
 import { HomeIdentityBoard } from '@/components/home/HomeIdentityBoard';
 import { HomeNewsSection } from '@/components/home/HomeNewsSection';
-import { buildSiteUrl } from '@/lib/site';
 import { useI18n } from '@/i18n';
-import { buildCanonicalPath } from '@/i18n/paths';
 import { useSiteAppearance } from '@/components/providers/SiteAppearanceProvider';
 import { cn } from '@/lib/utils';
 
@@ -66,30 +64,8 @@ export default function HomePage() {
   const primaryLabel = user
     ? messages.common.actions.openDashboard
     : messages.common.actions.signIn;
-  const homepageStructuredData = {
-    '@context': 'https://schema.org',
-    '@type': 'SoftwareApplication',
-    name: messages.meta.defaults.siteName,
-    applicationCategory: 'BusinessApplication',
-    operatingSystem: 'Web',
-    url: buildSiteUrl(buildCanonicalPath('/', locale)),
-    description: messages.meta.home.description,
-    offers: {
-      '@type': 'Offer',
-      price: '0',
-      priceCurrency: 'USD',
-    },
-  };
-
   return (
     <div className="marketing-shell min-h-dvh bg-background">
-      <script
-        type="application/ld+json"
-        suppressHydrationWarning
-        dangerouslySetInnerHTML={{
-          __html: JSON.stringify(homepageStructuredData),
-        }}
-      />
       <a href="#main-content" className="portal-skip-link">
         {messages.home.skipToContent}
       </a>
