@@ -73,16 +73,19 @@ export function JsonLd({ locale = 'vi', nonce }: JsonLdProps) {
       <script
         type="application/ld+json"
         nonce={nonce}
+        suppressHydrationWarning
         dangerouslySetInnerHTML={{ __html: JSON.stringify(organizationSchema) }}
       />
       <script
         type="application/ld+json"
         nonce={nonce}
+        suppressHydrationWarning
         dangerouslySetInnerHTML={{ __html: JSON.stringify(webAppSchema) }}
       />
       <script
         type="application/ld+json"
         nonce={nonce}
+        suppressHydrationWarning
         dangerouslySetInnerHTML={{ __html: JSON.stringify(webSiteSchema) }}
       />
     </>

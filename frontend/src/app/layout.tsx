@@ -70,6 +70,9 @@ export default async function RootLayout({
         <JsonLd locale={locale} nonce={nonce} />
         <script
           nonce={nonce}
+          // The nonce differs per request by design; React's dev-mode
+          // hydration diff would otherwise flag it on every page.
+          suppressHydrationWarning
           dangerouslySetInnerHTML={{
             // Pre-hydration theme bootstrap: stored choice wins, otherwise the
             // OS preference applies, so dark-mode visitors never get a white
