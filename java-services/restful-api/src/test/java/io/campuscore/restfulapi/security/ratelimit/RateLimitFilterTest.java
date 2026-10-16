@@ -31,7 +31,7 @@ class RateLimitFilterTest {
         limiterService = new RateLimiterService();
         // trustProxyHeaders=false keeps the default socket-address client key,
         // matching direct (non-proxied) request handling in these tests.
-        properties = new RateLimitProperties(true, false, false, 5, 40, 60);
+        properties = new RateLimitProperties(true, false, false, "", 5, 40, 60);
         errorWriter = new ApiErrorWriter(new ObjectMapper());
         filter = new RateLimitFilter(limiterService, properties, errorWriter, new ClientIpResolver(properties));
         SecurityContextHolder.clearContext();
@@ -136,7 +136,7 @@ class RateLimitFilterTest {
      */
     @Test
     void trustedProxyUsesTheRightmostForwardedForEntry() {
-        RateLimitProperties proxyTrusted = new RateLimitProperties(true, true, false, 5, 40, 60);
+        RateLimitProperties proxyTrusted = new RateLimitProperties(true, true, false, "", 5, 40, 60);
         ClientIpResolver resolver = new ClientIpResolver(proxyTrusted);
 
         MockHttpServletRequest request = new MockHttpServletRequest("POST", "/api/v1/auth/login");
@@ -149,7 +149,7 @@ class RateLimitFilterTest {
     /** Audit S1: a spoofed X-Real-IP is ignored unless explicitly opted in. */
     @Test
     void realIpIsIgnoredUnlessExplicitlyTrusted() {
-        RateLimitProperties proxyTrusted = new RateLimitProperties(true, true, false, 5, 40, 60);
+        RateLimitProperties proxyTrusted = new RateLimitProperties(true, true, false, "", 5, 40, 60);
         ClientIpResolver resolver = new ClientIpResolver(proxyTrusted);
 
         MockHttpServletRequest request = new MockHttpServletRequest("POST", "/api/v1/auth/login");
@@ -159,7 +159,7 @@ class RateLimitFilterTest {
 
         assertEquals("203.0.113.9", resolver.resolve(request));
 
-        RateLimitProperties realIpTrusted = new RateLimitProperties(true, true, true, 5, 40, 60);
+        RateLimitProperties realIpTrusted = new RateLimitProperties(true, true, true, "", 5, 40, 60);
         assertEquals("6.6.6.6",
                 new ClientIpResolver(realIpTrusted).resolve(request));
     }
@@ -167,7 +167,7 @@ class RateLimitFilterTest {
     /** Audit S1: spoofed first entries must not open extra IP buckets. */
     @Test
     void spoofedForwardedPrefixesShareOneBucketWhileDistinctRealIpsDoNot() throws Exception {
-        RateLimitProperties proxyTrusted = new RateLimitProperties(true, true, false, 5, 40, 60);
+        RateLimitProperties proxyTrusted = new RateLimitProperties(true, true, false, "", 5, 40, 60);
         RateLimitFilter proxyFilter = new RateLimitFilter(limiterService, proxyTrusted, errorWriter, new ClientIpResolver(proxyTrusted));
 
         for (int i = 1; i <= 3; i++) {
@@ -189,6 +189,39 @@ class RateLimitFilterTest {
         // A different real (rightmost) client gets a fresh bucket of 5.
         assertEquals("4", otherResponse.getHeader("X-RateLimit-Remaining"));
         assertEquals(2, limiterService.getActiveKeyCount());
+    }
+
+    /**
+     * The first-party edge proxy adds a second hop: Render appends the edge's
+     * egress IP after the sanitized client entry, so rightmost-XFF alone would
+     * collapse every user into one shared bucket. A matching shared token
+     * promotes X-Campuscore-Client-Ip; anything else falls back to rightmost.
+     */
+    @Test
+    void edgeProxyTokenPromotesTheDedicatedClientIpHeader() {
+        RateLimitProperties tokenTrusted =
+                new RateLimitProperties(true, true, false, "edge-secret", 5, 40, 60);
+        ClientIpResolver resolver = new ClientIpResolver(tokenTrusted);
+
+        MockHttpServletRequest proxied = new MockHttpServletRequest("POST", "/api/v1/auth/login");
+        proxied.addHeader("X-Campuscore-Proxy-Token", "edge-secret");
+        proxied.addHeader("X-Campuscore-Client-Ip", "203.0.113.9");
+        proxied.addHeader("X-Forwarded-For", "203.0.113.9, 10.200.0.4");
+        proxied.setRemoteAddr("10.200.0.4");
+        assertEquals("203.0.113.9", resolver.resolve(proxied));
+
+        MockHttpServletRequest wrongToken = new MockHttpServletRequest("POST", "/api/v1/auth/login");
+        wrongToken.addHeader("X-Campuscore-Proxy-Token", "not-the-secret");
+        wrongToken.addHeader("X-Campuscore-Client-Ip", "6.6.6.6");
+        wrongToken.addHeader("X-Forwarded-For", "6.6.6.6, 198.51.100.7");
+        wrongToken.setRemoteAddr("10.200.0.4");
+        assertEquals("198.51.100.7", resolver.resolve(wrongToken));
+
+        MockHttpServletRequest noToken = new MockHttpServletRequest("POST", "/api/v1/auth/login");
+        noToken.addHeader("X-Campuscore-Client-Ip", "6.6.6.6");
+        noToken.addHeader("X-Forwarded-For", "6.6.6.6, 198.51.100.7");
+        noToken.setRemoteAddr("10.200.0.4");
+        assertEquals("198.51.100.7", resolver.resolve(noToken));
     }
 
     @Test

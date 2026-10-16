@@ -36,6 +36,16 @@ async function handle(request: NextRequest, context: RouteContext) {
   headers.delete('x-forwarded-for');
   headers.set('x-forwarded-for', clientIp);
 
+  // Extra hop marker: Render appends this function's egress IP after our XFF
+  // entry, so the backend's rightmost-XFF rule would see the edge, not the
+  // user. A shared token authenticates the edge and lets the backend trust
+  // this dedicated client-IP header instead.
+  const proxyToken = process.env.CAMPUSCORE_PROXY_TOKEN;
+  if (proxyToken) {
+    headers.set('x-campuscore-proxy-token', proxyToken);
+    headers.set('x-campuscore-client-ip', clientIp);
+  }
+
   const upstreamUrl = buildApiProxyUrl(origin, path, request.nextUrl.search);
 
   const response = await fetch(upstreamUrl, {

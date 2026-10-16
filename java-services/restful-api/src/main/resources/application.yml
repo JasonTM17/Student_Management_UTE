@@ -262,6 +262,11 @@ app:
     # supplying it). Leave false unless the proxy is known to sanitize the
     # header; X-Forwarded-For's rightmost entry is always preferred instead.
     trust-real-ip: ${RATE_LIMIT_TRUST_REAL_IP:false}
+    # Shared secret for the first-party edge proxy (the Next.js same-origin
+    # API route). When it matches X-Campuscore-Proxy-Token, the companion
+    # X-Campuscore-Client-Ip header is the real client address — the edge saw
+    # the client, so rightmost XFF is the edge's own egress IP, not the user.
+    proxy-token: ${RATE_LIMIT_PROXY_TOKEN:}
     login-limit: ${RATE_LIMIT_LOGIN:15}
     default-limit: ${RATE_LIMIT_DEFAULT:40}
     default-window-seconds: ${RATE_LIMIT_WINDOW_SECONDS:60}

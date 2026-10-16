@@ -42,6 +42,18 @@ public class ClientIpResolver {
      *                   request's remote address.
      */
     public String resolve(HttpServletRequest request, String socketAddr) {
+        // First-party edge proxy: the Next.js API route authenticates itself
+        // with a shared token and carries the client address it computed from
+        // its own peer metadata. A missing or mismatched token silently falls
+        // through to the generic forwarded-header / socket paths below.
+        String token = properties.getProxyToken();
+        if (!token.isEmpty()
+                && token.equals(request.getHeader("X-Campuscore-Proxy-Token"))) {
+            String clientIp = request.getHeader("X-Campuscore-Client-Ip");
+            if (clientIp != null && !clientIp.isBlank()) {
+                return clientIp.trim();
+            }
+        }
         if (properties.isTrustProxyHeaders()) {
             // Explicit opt-in: the operator vouches that X-Real-IP is
             // overwritten by the trusted proxy, so it is authoritative.

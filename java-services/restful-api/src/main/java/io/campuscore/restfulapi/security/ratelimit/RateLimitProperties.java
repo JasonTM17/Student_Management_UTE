@@ -12,6 +12,7 @@ public class RateLimitProperties {
     private final boolean enabled;
     private final boolean trustProxyHeaders;
     private final boolean trustRealIp;
+    private final String proxyToken;
     private final int loginLimit;
     private final int defaultLimit;
     private final int defaultWindowSeconds;
@@ -20,12 +21,14 @@ public class RateLimitProperties {
             @Value("${app.rate-limit.enabled:true}") boolean enabled,
             @Value("${app.rate-limit.trust-proxy-headers:false}") boolean trustProxyHeaders,
             @Value("${app.rate-limit.trust-real-ip:false}") boolean trustRealIp,
+            @Value("${app.rate-limit.proxy-token:}") String proxyToken,
             @Value("${app.rate-limit.login-limit:15}") int loginLimit,
             @Value("${app.rate-limit.default-limit:40}") int defaultLimit,
             @Value("${app.rate-limit.default-window-seconds:60}") int defaultWindowSeconds) {
         this.enabled = enabled;
         this.trustProxyHeaders = trustProxyHeaders;
         this.trustRealIp = trustRealIp;
+        this.proxyToken = proxyToken == null ? "" : proxyToken.trim();
         this.loginLimit = loginLimit;
         this.defaultLimit = defaultLimit;
         this.defaultWindowSeconds = defaultWindowSeconds;
@@ -51,6 +54,17 @@ public class RateLimitProperties {
      */
     public boolean isTrustRealIp() {
         return trustRealIp;
+    }
+
+    /**
+     * Shared secret presented by the first-party edge proxy (the Next.js
+     * same-origin API route) in {@code X-Campuscore-Proxy-Token}. When the
+     * token matches, {@code X-Campuscore-Client-Ip} carries the client address
+     * the edge computed from its own peer metadata — one extra proxy hop that
+     * plain rightmost-XFF would mistake for the client.
+     */
+    public String getProxyToken() {
+        return proxyToken;
     }
 
     public int getLoginLimit() {
