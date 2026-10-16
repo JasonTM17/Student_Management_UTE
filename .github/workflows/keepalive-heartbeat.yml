@@ -1,4 +1,4 @@
-name: Supabase & Render Keep-Alive Heartbeat
+name: Production Keep-Alive Heartbeat
 
 on:
   schedule:
@@ -22,20 +22,11 @@ jobs:
           echo "Pinging Render Backend (campuscore-backend)..."
           bash scripts/keepalive-ping.sh "Render actuator" https://campuscore-backend-p4em.onrender.com/actuator/health
           bash scripts/keepalive-ping.sh "Render liveness" https://campuscore-backend-p4em.onrender.com/api/v1/health/liveness
-      - name: Ping Supabase Gateway & Database
-        env:
-          SUPABASE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
-        run: |
-          echo "Pinging Supabase REST Gateway (mjodncaunvjekwlgyclg)..."
-          # The gateway answers 401 when reachable without credentials, which is a
-          # healthy probe result; only connection failure/5xx should fail the job.
-          export OK_CODES="200 204 401"
-          if [ -n "$SUPABASE_KEY" ]; then
-            bash scripts/keepalive-ping.sh "Supabase REST" https://mjodncaunvjekwlgyclg.supabase.co/rest/v1/ \
-              -H "apikey: $SUPABASE_KEY" -H "Authorization: Bearer $SUPABASE_KEY"
-          else
-            bash scripts/keepalive-ping.sh "Supabase REST" https://mjodncaunvjekwlgyclg.supabase.co/rest/v1/
-          fi
+      # The former Supabase project (mjodncaunvjekwlgyclg) was retired after the
+      # Neon cutover — its hostname no longer resolves, so a keep-alive ping can
+      # never succeed. Production data now lives on Neon, which wakes
+      # automatically on connection; the Render service's connection pool keeps
+      # it warm between these runs.
       - name: Ping Frontend Production (Vercel)
         run: |
           echo "Pinging Vercel Frontend (campusute.io.vn)..."
