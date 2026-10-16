@@ -1773,12 +1773,13 @@ export default function ThesisPage() {
     : '';
 
   // The round that owns the group carries the countdown the submission-status
-  // timeline shows. `gvpbDeadline` is the field the workflow stepper already
-  // labels as the report deadline, so the two never disagree.
+  // timeline shows. `reportDeadline` is the audited override the escape-hatch
+  // endpoint writes; when absent the window still falls back to
+  // `gvpbDeadline`, matching the server's COALESCE.
   const reportDeadlineRound = currentGroup
     ? rounds.find((round) => round.id === currentGroup.roundId)
     : selectedRound;
-  const reportDeadlineAt = reportDeadlineRound?.gvpbDeadline ?? null;
+  const reportDeadlineAt = reportDeadlineRound?.reportDeadline ?? reportDeadlineRound?.gvpbDeadline ?? null;
   const reportDeadlineMs = reportDeadlineAt ? Date.parse(reportDeadlineAt) : Number.NaN;
   const reportDaysRemaining = Number.isFinite(reportDeadlineMs)
     ? Math.ceil((reportDeadlineMs - Date.now()) / 86_400_000)

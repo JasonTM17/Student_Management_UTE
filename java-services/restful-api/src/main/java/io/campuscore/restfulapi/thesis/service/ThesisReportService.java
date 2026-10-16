@@ -37,10 +37,13 @@ public class ThesisReportService {
     private static final Logger log = LoggerFactory.getLogger(ThesisReportService.class);
     private final NamedParameterJdbcTemplate jdbc;
     private final ThesisReportStorage storage;
+    private final ThesisReportStorageProperties storageProperties;
 
-    public ThesisReportService(NamedParameterJdbcTemplate jdbc, ThesisReportStorage storage) {
+    public ThesisReportService(NamedParameterJdbcTemplate jdbc, ThesisReportStorage storage,
+            ThesisReportStorageProperties storageProperties) {
         this.jdbc = jdbc;
         this.storage = storage;
+        this.storageProperties = storageProperties;
     }
 
     @Transactional
@@ -524,7 +527,9 @@ public class ThesisReportService {
     private GroupContext loadGroup(UUID groupId) {
         Map<String, Object> group = one(
                 "SELECT g.id, g.round_id, g.leader_student_id, g.topic_id, g.status, g.approval_status, "
-                        + "t.department_id AS topic_department_id, r.gvpb_deadline, r.status AS round_status "
+                        + "t.department_id AS topic_department_id, "
+                        + "COALESCE(r.report_deadline, r.gvpb_deadline) AS report_deadline, "
+                        + "r.status AS round_status "
                         + "FROM thesis.thesis_group g JOIN thesis.thesis_registration_round r ON r.id = g.round_id "
                         + "LEFT JOIN thesis.thesis_topic t ON t.id = g.topic_id "
                         + "WHERE g.id = :groupId",
@@ -534,7 +539,7 @@ public class ThesisReportService {
                 (UUID) group.get("round_id"),
                 (String) group.get("leader_student_id"),
                 (UUID) group.get("topic_id"),
-                group.get("gvpb_deadline") == null ? null : instantOf(group.get("gvpb_deadline")),
+                group.get("report_deadline") == null ? null : instantOf(group.get("report_deadline")),
                 roundStatusOf(group.get("round_status")),
                 (String) group.get("status"),
                 (String) group.get("approval_status"),
@@ -589,7 +594,7 @@ public class ThesisReportService {
         return true;
     }
 
-    private record GroupContext(UUID id, UUID roundId, String leaderStudentId, UUID topicId, Instant gvpbDeadline,
+    private record GroupContext(UUID id, UUID roundId, String leaderStudentId, UUID topicId, Instant reportDeadline,
                                 RoundStatus roundStatus, String status, String approvalStatus,
                                 String topicDepartmentId) { }
 
@@ -724,10 +729,10 @@ public class ThesisReportService {
      * closes, and never after the round's results are official.
      */
     private void requireReportWritable(GroupContext group) {
-        Instant gradingDeadline = group.gvpbDeadline();
-        if (gradingDeadline != null && !Instant.now().isBefore(gradingDeadline)) {
+        Instant reportDeadline = group.reportDeadline();
+        if (reportDeadline != null && !Instant.now().isBefore(reportDeadline)) {
             throw conflict("REPORT_DEADLINE_PASSED",
-                    "The GVPB grading deadline for this round has passed; reports are frozen");
+                    "The report submission deadline for this round has passed; reports are frozen");
         }
         if (group.roundStatus() != RoundStatus.REGISTRATION_CLOSED) {
             throw conflict("REPORT_WINDOW_CLOSED",
@@ -767,12 +772,13 @@ public class ThesisReportService {
             String storedProvider = rs.getString("storage_provider");
             String storedBucket = rs.getString("storage_bucket");
             if (!storage.provider().equals(storedProvider) || !storage.bucket().equals(storedBucket)) {
-                throw storageUnavailable();
-            }
-            try {
-                data = storage.read(key);
-            } catch (ThesisReportStorageException exception) {
-                throw storageUnavailable();
+                data = readOrphanedLocalObject(key, storedProvider);
+            } else {
+                try {
+                    data = storage.read(key);
+                } catch (ThesisReportStorageException exception) {
+                    throw storageUnavailable();
+                }
             }
             String checksum = rs.getString("file_sha256");
             if (StringUtils.hasText(checksum) && !sha256(data).equalsIgnoreCase(checksum)) {
@@ -783,6 +789,26 @@ public class ThesisReportService {
             throw notFound("REPORT_FILE_NOT_FOUND", "The current report is a link, not an attached document");
         }
         return new StoredReport(rs.getString("file_name"), rs.getString("file_type"), data);
+    }
+
+    /**
+     * Provider-switch tolerance for rows written while the {@code local}
+     * provider was active (e.g. before a move to {@code database} on an
+     * ephemeral host). The local root is a fixed configuration property, so
+     * the row's object stays readable while the file still exists under it —
+     * a bucket label difference does not move the file. Every other provider
+     * mismatch stays a loud {@code REPORT_STORAGE_UNAVAILABLE}: a remote
+     * object's bytes cannot be re-derived without its original credentials.
+     */
+    private byte[] readOrphanedLocalObject(String key, String storedProvider) {
+        if (!"local".equals(storedProvider)) {
+            throw storageUnavailable();
+        }
+        try {
+            return new LocalThesisReportStorage(storageProperties).read(key);
+        } catch (RuntimeException exception) {
+            throw storageUnavailable();
+        }
     }
 
     private void cleanupStoredObject(StoredObjectRef previous) {

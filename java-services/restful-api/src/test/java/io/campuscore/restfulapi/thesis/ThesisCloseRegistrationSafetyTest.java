@@ -80,7 +80,7 @@ class ThesisCloseRegistrationSafetyTest {
                 .andExpect(jsonPath("$.approvedGroupCount").value(2))
                 .andExpect(jsonPath("$.pendingGroupCount").value(1))
                 .andExpect(jsonPath("$.reportCount").value(1))
-                .andExpect(jsonPath("$.gvpbDeadline").isNotEmpty())
+                .andExpect(jsonPath("$.reportDeadline").isNotEmpty())
                 .andExpect(jsonPath("$.reportDeadlinePassed").value(false));
 
         // A round whose authored deadline already passed warns the admin but
@@ -109,7 +109,7 @@ class ThesisCloseRegistrationSafetyTest {
 
     @Test
     void extendingTheDeadlineReopensAFrozenReportWindow() throws Exception {
-        Instant now = Instant.now();
+        Instant now = Instant.now().truncatedTo(java.time.temporal.ChronoUnit.MILLIS);
         UUID roundId = insertRound("KLTN", "REGISTRATION_CLOSED", now.minusSeconds(3_600));
         UUID groupId = insertGroup(roundId, "cs-leader-frozen", "SUBMITTED", "APPROVED");
 
@@ -124,10 +124,10 @@ class ThesisCloseRegistrationSafetyTest {
         Instant newDeadline = now.plusSeconds(7L * 24 * 60 * 60);
         mvc.perform(put("/api/v1/thesis/rounds/{id}/report-deadline", roundId)
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"gvpbDeadline\":\"" + newDeadline + "\"}")
+                        .content("{\"reportDeadline\":\"" + newDeadline + "\"}")
                         .with(adminJwt()))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.gvpbDeadline").isNotEmpty());
+                .andExpect(jsonPath("$.reportDeadline").isNotEmpty());
 
         // The escape hatch is audited like every other schedule mutation.
         Integer auditRows = jdbc.queryForObject(
@@ -135,6 +135,18 @@ class ThesisCloseRegistrationSafetyTest {
                         + "WHERE \"action\" = 'THESIS_ROUND_REPORT_DEADLINE_EXTENDED' AND \"entityId\" = ?",
                 Integer.class, roundId.toString());
         assertThat(auditRows).isEqualTo(1);
+
+        // R4 regression: the extension writes only report_deadline — the
+        // shared gvpb_deadline stays frozen in the past, so the GVPB scoring
+        // window is not silently reopened by a report-window rescue.
+        Timestamp storedGvpb = jdbc.queryForObject(
+                "SELECT gvpb_deadline FROM thesis.thesis_registration_round WHERE id = ?",
+                Timestamp.class, roundId);
+        assertThat(storedGvpb.toInstant()).isEqualTo(now.minusSeconds(3_600));
+        Timestamp storedReportDeadline = jdbc.queryForObject(
+                "SELECT report_deadline FROM thesis.thesis_registration_round WHERE id = ?",
+                Timestamp.class, roundId);
+        assertThat(storedReportDeadline.toInstant()).isEqualTo(newDeadline);
 
         // The same report write now passes the window gate.
         mvc.perform(post("/api/v1/thesis/groups/{id}/report", groupId)
@@ -150,7 +162,7 @@ class ThesisCloseRegistrationSafetyTest {
         Instant now = Instant.now();
         UUID open = insertRound("KLTN", "REGISTRATION_OPEN", now.plusSeconds(86_400));
         UUID published = insertRound("KLTN", "RESULTS_PUBLISHED", now.plusSeconds(86_400));
-        String body = "{\"gvpbDeadline\":\"" + now.plusSeconds(172_800) + "\"}";
+        String body = "{\"reportDeadline\":\"" + now.plusSeconds(172_800) + "\"}";
 
         mvc.perform(put("/api/v1/thesis/rounds/{id}/report-deadline", open)
                         .contentType(MediaType.APPLICATION_JSON).content(body).with(adminJwt()))
@@ -170,7 +182,7 @@ class ThesisCloseRegistrationSafetyTest {
         UUID monHoc = insertRound("MON_HOC", "REGISTRATION_CLOSED", null);
         mvc.perform(put("/api/v1/thesis/rounds/{id}/report-deadline", monHoc)
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"gvpbDeadline\":\"" + Instant.now().plusSeconds(86_400) + "\"}")
+                        .content("{\"reportDeadline\":\"" + Instant.now().plusSeconds(86_400) + "\"}")
                         .with(adminJwt()))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value("VALIDATION_ERROR"));
@@ -183,14 +195,14 @@ class ThesisCloseRegistrationSafetyTest {
 
         mvc.perform(put("/api/v1/thesis/rounds/{id}/report-deadline", roundId)
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"gvpbDeadline\":\"" + now.minusSeconds(60) + "\"}")
+                        .content("{\"reportDeadline\":\"" + now.minusSeconds(60) + "\"}")
                         .with(adminJwt()))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value("VALIDATION_ERROR"));
 
         mvc.perform(put("/api/v1/thesis/rounds/{id}/report-deadline", roundId)
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"gvpbDeadline\":\"" + now.plusSeconds(86_400) + "\"}")
+                        .content("{\"reportDeadline\":\"" + now.plusSeconds(86_400) + "\"}")
                         .with(studentJwt("cs-student")))
                 .andExpect(status().isForbidden());
     }

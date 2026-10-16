@@ -152,17 +152,18 @@ public class ThesisMutationController {
 
     /**
      * Escape hatch for the report-window dead-end (plan F1): while the round
-     * is REGISTRATION_CLOSED the GVPB report deadline may be extended forward;
-     * roster mutation stays closed. The change is audited.
+     * is REGISTRATION_CLOSED the report deadline may be extended forward;
+     * roster mutation and the GVPB scoring window stay closed. The change is
+     * audited.
      */
-    @Operation(summary = "Gia hạn nộp báo cáo", description = "Dời hạn nộp báo cáo (gvpbDeadline) của đợt đang REGISTRATION_CLOSED sang thời điểm mới; thao tác được ghi audit")
+    @Operation(summary = "Gia hạn nộp báo cáo", description = "Dời hạn nộp báo cáo (reportDeadline) của đợt đang REGISTRATION_CLOSED sang thời điểm mới; không đổi hạn chấm GVPB; thao tác được ghi audit")
     @PutMapping("/rounds/{id}/report-deadline")
     @PreAuthorize("hasAnyRole('ADMIN','TRUONG_KHOA','SUPER_ADMIN')")
     public RoundResponse extendReportDeadline(
             @Parameter(description = "Mã UUID của đợt", required = true) @PathVariable UUID id,
             @RequestBody ReportDeadlineUpdateRequest request,
             @AuthenticationPrincipal Jwt actor) {
-        return mutations.extendReportDeadline(id, request == null ? null : request.gvpbDeadline(), actor);
+        return mutations.extendReportDeadline(id, request == null ? null : request.reportDeadline(), actor);
     }
 
     /** Brief R9: publish graded results to the students of the round. */

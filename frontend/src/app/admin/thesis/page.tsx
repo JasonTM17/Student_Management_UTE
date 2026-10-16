@@ -434,7 +434,7 @@ export default function AdminThesisPage() {
   /** Opens the deadline-extension modal prefilled with the current deadline. */
   const openExtendDeadlineModal = (round: ThesisRound) => {
     setExtendDeadlineRoundId(round.id);
-    setExtendDeadlineValue(toLocalInput(round.gvpbDeadline));
+    setExtendDeadlineValue(toLocalInput(round.reportDeadline ?? round.gvpbDeadline));
     setExtendDeadlineError('');
     setShowExtendDeadlineModal(true);
   };
@@ -1454,7 +1454,7 @@ export default function AdminThesisPage() {
             </div>
           ) : null}
           <label className="flex flex-col gap-2 text-sm font-medium text-foreground">
-            {messages.thesis.admin.gvpbDeadline}
+            {messages.thesis.admin.reportDeadline}
             <Input
               type="datetime-local"
               value={extendDeadlineValue}

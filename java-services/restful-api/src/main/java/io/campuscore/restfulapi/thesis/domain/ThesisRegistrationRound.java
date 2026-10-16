@@ -43,6 +43,14 @@ public class ThesisRegistrationRound {
     @Column(name = "gvpb_deadline")
     private Instant gvpbDeadline;
 
+    /**
+     * Optional report-submission deadline override. Written only by the
+     * report-deadline escape hatch; when set it replaces {@code gvpbDeadline}
+     * as the report freeze bound without reopening the GVPB scoring window.
+     */
+    @Column(name = "report_deadline")
+    private Instant reportDeadline;
+
     @Column(name = "report_date")
     private Instant reportDate;
 
@@ -65,6 +73,7 @@ public class ThesisRegistrationRound {
     public Instant getLecturerSubmitStart() { return lecturerSubmitStart; }
     public Instant getLecturerSubmitEnd() { return lecturerSubmitEnd; }
     public Instant getGvpbDeadline() { return gvpbDeadline; }
+    public Instant getReportDeadline() { return reportDeadline; }
     public Instant getReportDate() { return reportDate; }
     public Instant getDefenseDate() { return defenseDate; }
     public RoundStatus getStatus() { return status; }

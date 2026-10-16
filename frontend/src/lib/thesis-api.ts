@@ -37,6 +37,10 @@ export interface ThesisRound {
   lecturerSubmitEnd: string;
   proposalPublishAt?: string | null;
   gvpbDeadline?: string | null;
+  /** Report-window override set by the escape-hatch endpoint; when present it
+   * supersedes gvpbDeadline for report submission only (GVPB scoring still
+   * reads gvpbDeadline). */
+  reportDeadline?: string | null;
   reportDate?: string | null;
   defenseDate?: string | null;
   status: ThesisRoundStatus;
@@ -94,7 +98,7 @@ export interface ThesisCloseRegistrationPreview {
   approvedGroupCount: number;
   pendingGroupCount: number;
   reportCount: number;
-  gvpbDeadline: string | null;
+  reportDeadline: string | null;
   reportDeadlinePassed: boolean;
 }
 
@@ -630,15 +634,16 @@ export const thesisApi = {
 
   /**
    * Escape hatch for a closed round whose report deadline already passed:
-   * extends `gvpbDeadline` while REGISTRATION_CLOSED (audited server-side).
+   * sets the `report_deadline` override while REGISTRATION_CLOSED (audited
+   * server-side). The GVPB scoring deadline stays untouched.
    */
   extendReportDeadline: async (
     roundId: string,
-    gvpbDeadline: string,
+    reportDeadline: string,
   ): Promise<ThesisRound> => {
     const response = await api.put<ThesisRound>(
       '/thesis/rounds/' + roundId + '/report-deadline',
-      { gvpbDeadline },
+      { reportDeadline },
     );
     return response.data;
   },

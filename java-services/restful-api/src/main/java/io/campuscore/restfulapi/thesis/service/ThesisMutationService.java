@@ -400,7 +400,8 @@ public class ThesisMutationService {
     @Transactional(readOnly = true)
     public CloseRegistrationPreviewResponse closeRegistrationPreview(UUID roundId) {
         Map<String, Object> round = one(
-                "SELECT gvpb_deadline FROM thesis.thesis_registration_round WHERE id = :id",
+                "SELECT COALESCE(report_deadline, gvpb_deadline) AS report_deadline "
+                        + "FROM thesis.thesis_registration_round WHERE id = :id",
                 params().addValue("id", roundId), "ROUND_NOT_FOUND", "Thesis registration round not found");
         Map<String, Object> counts = jdbc.queryForMap(
                 "SELECT COUNT(*) AS group_count, "
@@ -411,32 +412,33 @@ public class ThesisMutationService {
         Long reportRows = jdbc.queryForObject(
                 "SELECT COUNT(*) FROM thesis.thesis_group_report WHERE round_id = :roundId",
                 params().addValue("roundId", roundId), Long.class);
-        Instant gvpbDeadline = instantOf(round.get("gvpb_deadline"));
-        boolean deadlinePassed = gvpbDeadline != null && !Instant.now().isBefore(gvpbDeadline);
+        Instant reportDeadline = instantOf(round.get("report_deadline"));
+        boolean deadlinePassed = reportDeadline != null && !Instant.now().isBefore(reportDeadline);
         return new CloseRegistrationPreviewResponse(
                 ((Number) counts.get("group_count")).longValue(),
                 ((Number) counts.get("approved_count")).longValue(),
                 ((Number) counts.get("pending_count")).longValue(),
                 reportRows == null ? 0 : reportRows,
-                gvpbDeadline,
+                reportDeadline,
                 deadlinePassed);
     }
 
     /**
      * The report-window escape hatch (plan F1): a REGISTRATION_CLOSED round
-     * whose GVPB deadline already passed used to freeze its reports forever —
+     * whose report deadline already passed used to freeze its reports forever —
      * no transition reopened them and {@code updateRound} is locked once
-     * registration opens. This audited mutation moves {@code gvpb_deadline}
-     * forward, reopening report submission only; roster and registration stay
-     * closed. MON_HOC/NCKH rounds deliberately have no escape hatch: their
-     * freeze is the RESULTS_PUBLISHED lifecycle, which is terminal by design.
-     * The shared column also bounds GVPB scoring, so extending it reopens that
-     * window too (documented in plan risk R4).
+     * registration opens. This audited mutation moves the {@code
+     * report_deadline} override forward — the write window reads
+     * COALESCE(report_deadline, gvpb_deadline), so report submission reopens
+     * while {@code gvpb_deadline} keeps bounding the GVPB scoring window
+     * untouched (fixes plan risk R4). Roster and registration stay closed.
+     * MON_HOC/NCKH rounds deliberately have no escape hatch: their freeze is
+     * the RESULTS_PUBLISHED lifecycle, which is terminal by design.
      */
     @Transactional
     public RoundResponse extendReportDeadline(UUID id, Instant newDeadline, Jwt actor) {
         Map<String, Object> current = one(
-                "SELECT status, thesis_type, gvpb_deadline FROM thesis.thesis_registration_round "
+                "SELECT status, thesis_type, report_deadline FROM thesis.thesis_registration_round "
                         + "WHERE id = :id FOR UPDATE",
                 params().addValue("id", id), "ROUND_NOT_FOUND", "Thesis registration round not found");
         if (!RoundStatus.REGISTRATION_CLOSED.name().equals(current.get("status"))) {
@@ -448,16 +450,16 @@ public class ThesisMutationService {
             throw invalid(roundType + " rounds carry no GVPB deadline; their report window ends at results publication");
         }
         if (newDeadline == null || !newDeadline.isAfter(Instant.now())) {
-            throw invalid("gvpbDeadline must be in the future");
+            throw invalid("reportDeadline must be in the future");
         }
         Map<String, Object> beforeState = new LinkedHashMap<>();
-        beforeState.put("gvpb_deadline", instantOf(current.get("gvpb_deadline")));
+        beforeState.put("report_deadline", instantOf(current.get("report_deadline")));
         jdbc.update(
-                "UPDATE thesis.thesis_registration_round SET gvpb_deadline = :gvpbDeadline, "
+                "UPDATE thesis.thesis_registration_round SET report_deadline = :reportDeadline, "
                         + "updated_at = CURRENT_TIMESTAMP, version = version + 1 WHERE id = :id",
-                params().addValue("id", id).addValue("gvpbDeadline", tsOf(newDeadline)));
+                params().addValue("id", id).addValue("reportDeadline", tsOf(newDeadline)));
         Map<String, Object> afterState = new LinkedHashMap<>();
-        afterState.put("gvpb_deadline", newDeadline);
+        afterState.put("report_deadline", newDeadline);
         audit.record(subject(actor), null, "THESIS_ROUND_REPORT_DEADLINE_EXTENDED", "THESIS_ROUND", id.toString(),
                 "Report submission deadline extended", beforeState, afterState);
         return roundReads.get(id);

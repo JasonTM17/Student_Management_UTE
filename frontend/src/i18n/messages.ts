@@ -2504,10 +2504,11 @@ export const en = {
       closePreviewReports: 'Reports already submitted: {count}.',
       closePreviewDeadlinePassed:
         'The report deadline has already passed — groups cannot submit until you extend it with “Extend report deadline”.',
+      reportDeadline: 'Report submission deadline',
       reportDeadlineExtend: 'Extend report deadline',
       reportDeadlineModalTitle: 'Extend report submission deadline',
       reportDeadlineModalDescription:
-        'Groups can submit or update their report until this time. Extending the deadline also reopens the GVPB counter-review window for this round.',
+        'Groups can submit or update their report until this time. This does not change the GVPB counter-review deadline of the round.',
       reportDeadlineInvalid: 'Choose a deadline in the future.',
       reportDeadlineSuccess: 'Report deadline extended.',
     },
@@ -5330,10 +5331,11 @@ export const vi: I18nMessages = {
       closePreviewReports: 'Báo cáo đã nộp: {count}.',
       closePreviewDeadlinePassed:
         'Hạn nộp báo cáo đã qua — nhóm sẽ không nộp được cho tới khi bạn gia hạn bằng “Gia hạn hạn nộp báo cáo”.',
+      reportDeadline: 'Hạn nộp báo cáo',
       reportDeadlineExtend: 'Gia hạn hạn nộp báo cáo',
       reportDeadlineModalTitle: 'Gia hạn hạn nộp báo cáo',
       reportDeadlineModalDescription:
-        'Nhóm có thể nộp hoặc cập nhật báo cáo đến thời điểm này. Gia hạn cũng mở lại cửa sổ chấm phản biện (GVPB) của đợt.',
+        'Nhóm có thể nộp hoặc cập nhật báo cáo đến thời điểm này. Gia hạn không thay đổi hạn chấm phản biện (GVPB) của đợt.',
       reportDeadlineInvalid: 'Hãy chọn thời điểm trong tương lai.',
       reportDeadlineSuccess: 'Đã gia hạn hạn nộp báo cáo.',
     },

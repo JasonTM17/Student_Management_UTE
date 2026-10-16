@@ -19,6 +19,7 @@ public final class ThesisRoundDtos {
             Instant registrationStart,
             Instant registrationEnd,
             Instant gvpbDeadline,
+            Instant reportDeadline,
             Instant proposalPublishAt,
             Instant reportDate,
             Instant defenseDate,
@@ -29,7 +30,7 @@ public final class ThesisRoundDtos {
                     round.getId(), round.getName(), round.getThesisType(),
                     round.getLecturerSubmitStart(), round.getLecturerSubmitEnd(),
                     round.getRegistrationStart(), round.getRegistrationEnd(),
-                    round.getGvpbDeadline(), round.getProposalPublishAt(),
+                    round.getGvpbDeadline(), round.getReportDeadline(), round.getProposalPublishAt(),
                     round.getReportDate(), round.getDefenseDate(), round.getStatus());
         }
     }

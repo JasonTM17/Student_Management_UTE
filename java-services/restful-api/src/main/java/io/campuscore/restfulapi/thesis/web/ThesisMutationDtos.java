@@ -65,21 +65,22 @@ public final class ThesisMutationDtos {
     }
 
     /** The audited report-deadline escape hatch for a REGISTRATION_CLOSED round. */
-    public record ReportDeadlineUpdateRequest(Instant gvpbDeadline) {
+    public record ReportDeadlineUpdateRequest(Instant reportDeadline) {
     }
 
     /**
      * Consequence preview the admin reviews before confirming
      * close-registration: non-cancelled group counts by approval state, the
-     * number of report rows already submitted in the round, and whether the
-     * GVPB report deadline has already passed.
+     * number of report rows already submitted in the round, and the effective
+     * report deadline ({@code report_deadline} override, else
+     * {@code gvpb_deadline}) with its passed state.
      */
     public record CloseRegistrationPreviewResponse(
             long groupCount,
             long approvedGroupCount,
             long pendingGroupCount,
             long reportCount,
-            Instant gvpbDeadline,
+            Instant reportDeadline,
             boolean reportDeadlinePassed) {
     }
 

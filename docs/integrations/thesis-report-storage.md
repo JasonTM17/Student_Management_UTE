@@ -58,6 +58,23 @@ provider instead of growing the primary table.
 THESIS_REPORT_STORAGE_PROVIDER=database
 ```
 
+## Switching providers
+
+Rows record the provider and bucket that stored them. On read the API serves
+only the provider that owns the row; a mismatch returns
+`REPORT_STORAGE_UNAVAILABLE` rather than silently answering with the wrong
+object.
+
+There is one deliberate exception: rows written by the `local` provider stay
+readable after a provider switch as long as the file still exists under the
+configured `THESIS_REPORT_STORAGE_LOCAL_ROOT`. The read is a filesystem lookup
+on this API host, so on ephemeral platforms (e.g. Render) the file is already
+gone and the row correctly reports `REPORT_STORAGE_UNAVAILABLE`; on hosts with
+a persistent volume the migration to `database` is transparent and nothing
+needs to be re-uploaded. Rows written by `supabase` are not recoverable from
+another provider — move the objects into the bucket the API now serves before
+switching.
+
 ## Rendering and lifecycle
 
 The thesis page renders the stored filename, MIME type, size, submission time,

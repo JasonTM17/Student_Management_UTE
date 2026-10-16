@@ -39,7 +39,8 @@ import org.springframework.test.web.servlet.request.RequestPostProcessor;
         "spring.datasource.password=",
         "spring.flyway.enabled=true",
         "spring.flyway.locations=classpath:db/migration-h2",
-        "thesis.report.storage.provider=database"
+        "thesis.report.storage.provider=database",
+        "thesis.report.storage.local-root=target/test-report-storage-db"
 })
 class ThesisReportDatabaseStorageTest {
 
@@ -149,6 +150,46 @@ class ThesisReportDatabaseStorageTest {
                                 .authorities(new org.springframework.security.core.authority
                                         .SimpleGrantedAuthority("ROLE_GUEST"))))
                 .andExpect(status().isUnauthorized());
+    }
+
+    /**
+     * Provider-switch tolerance: a row written while the storage provider was
+     * {@code local} keeps serving its bytes from the configured local root even
+     * after the active provider became {@code database} — as long as the file
+     * exists on disk. A row owned by any other provider still fails loudly.
+     */
+    @Test
+    void orphanedLocalRowsReadFromDiskWhileRemoteProviderRowsStayUnavailable() throws Exception {
+        UUID groupId = seedApprovedGroup();
+        UUID roundId = jdbc.queryForObject(
+                "SELECT round_id FROM thesis.thesis_group WHERE id = ?", UUID.class, groupId);
+
+        byte[] legacyBytes = {'o', 'r', 'p', 'h', 'a', 'n', 'e', 'd'};
+        java.nio.file.Path legacyPath = java.nio.file.Paths.get(
+                "target", "test-report-storage-db", "legacy", "legacy.docx").toAbsolutePath();
+        java.nio.file.Files.createDirectories(legacyPath.getParent());
+        java.nio.file.Files.write(legacyPath, legacyBytes);
+
+        jdbc.update(
+                "INSERT INTO thesis.thesis_group_report (id, group_id, round_id, submitted_by, title, "
+                        + "file_name, file_type, file_size, storage_provider, storage_bucket, storage_key) "
+                        + "VALUES (?, ?, ?, 'db-leader', 'Legacy report', 'legacy.docx', "
+                        + "'application/octet-stream', ?, 'local', 'legacy-bucket', 'legacy/legacy.docx')",
+                UUID.randomUUID(), groupId, roundId, (long) legacyBytes.length);
+
+        mvc.perform(get("/api/v1/thesis/groups/{id}/report/file", groupId).with(studentJwt("db-leader")))
+                .andExpect(status().isOk())
+                .andExpect(content().bytes(legacyBytes));
+
+        // A row owned by a remote provider cannot be re-derived locally: the
+        // honest storage-unavailable error stands.
+        jdbc.update(
+                "UPDATE thesis.thesis_group_report SET storage_provider = 'supabase', storage_bucket = 'thesis-reports', storage_key = 'remote/x.docx' WHERE group_id = ?",
+                groupId);
+
+        mvc.perform(get("/api/v1/thesis/groups/{id}/report/file", groupId).with(studentJwt("db-leader")))
+                .andExpect(status().is5xxServerError())
+                .andExpect(jsonPath("$.code").value("REPORT_STORAGE_UNAVAILABLE"));
     }
 
     private UUID seedApprovedGroup() {
