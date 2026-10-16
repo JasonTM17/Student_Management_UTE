@@ -29,6 +29,7 @@ interface AuthContextType {
   isAdmin: boolean;
   isSuperAdmin: boolean;
   isFacultyHead: boolean;
+  isDepartmentHead: boolean;
   login: (
     email: string,
     password: string,
@@ -453,6 +454,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const isAdmin = user?.roles?.includes('ADMIN') ?? false;
   const isSuperAdmin = user?.roles?.includes('SUPER_ADMIN') ?? false;
   const isFacultyHead = user?.roles?.includes('TRUONG_KHOA') ?? false;
+  const isDepartmentHead = user?.roles?.includes('TRUONG_BO_MON') ?? false;
 
   return (
     <AuthContext.Provider
@@ -465,6 +467,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         isAdmin,
         isSuperAdmin,
         isFacultyHead,
+        isDepartmentHead,
         login,
         verifyTwoFactor,
         logout,
@@ -495,9 +498,11 @@ function identitySignature(user: User): string {
   ]);
 }
 
+type AppRole = 'STUDENT' | 'LECTURER' | 'ADMIN' | 'SUPER_ADMIN' | 'TRUONG_KHOA' | 'TRUONG_BO_MON';
+
 function userHasRequiredRole(
   user: User | null,
-  requiredRoles: ('STUDENT' | 'LECTURER' | 'ADMIN' | 'SUPER_ADMIN')[],
+  requiredRoles: AppRole[],
 ) {
   if (!user) {
     return false;
@@ -516,7 +521,7 @@ function userHasRequiredRole(
 }
 
 export function useRequireAuth(
-  requiredRoles?: ('STUDENT' | 'LECTURER' | 'ADMIN' | 'SUPER_ADMIN')[],
+  requiredRoles?: AppRole[],
 ) {
   const { user, isLoading, isLoggingOut } = useAuth();
   const router = useRouter();
@@ -525,7 +530,7 @@ export function useRequireAuth(
   const requiredRolesList = useMemo(
     () =>
       rolesKey
-        ? (rolesKey.split(',') as ('STUDENT' | 'LECTURER' | 'ADMIN' | 'SUPER_ADMIN')[])
+        ? (rolesKey.split(',') as AppRole[])
         : [],
     [rolesKey],
   );

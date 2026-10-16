@@ -28,7 +28,7 @@ import {
   type StudentAttendanceEntry,
 } from '@/lib/api';
 import { getLocalizedFlatLabel, getLocalizedName } from '@/lib/academic-content';
-import { GradingSection, SectionGrades, Semester } from '@/types/api';
+import { GradingSection, Semester } from '@/types/api';
 import { PageHeader, SectionEyebrow } from '@/components/ui/page-header';
 import { Select } from '@/components/ui/select';
 import { Input } from '@/components/ui/input';
@@ -80,6 +80,7 @@ export default function LecturerAttendancePage() {
   const [isLoadingRoster, setIsLoadingRoster] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState('');
+  const [sectionsLoadFailed, setSectionsLoadFailed] = useState(false);
 
   const [roster, setRoster] = useState<StudentRowState[]>([]);
   // Rows cleared via Reset whose RESET entry has not been saved yet.
@@ -100,7 +101,7 @@ export default function LecturerAttendancePage() {
   // 2. Fetch lecturer's assigned sections
   const fetchSections = useCallback(async () => {
     setIsLoadingSections(true);
-    setError('');
+    setSectionsLoadFailed(false);
     try {
       const data = await sectionsApi.getMyGradingSections(
         selectedSemester || undefined,
@@ -115,11 +116,14 @@ export default function LecturerAttendancePage() {
         setSelectedSectionId('');
       }
     } catch {
-      setError(copy.saveFailed);
+      // A failed load must not render as "no classes assigned": flag it so the
+      // roster area shows an error + retry instead of a false empty state.
+      setSections([]);
+      setSectionsLoadFailed(true);
     } finally {
       setIsLoadingSections(false);
     }
-  }, [copy.saveFailed, selectedSemester]);
+  }, [selectedSemester]);
 
   // 3. Fetch roster and existing attendance records for the selected section and date
   const fetchRosterAndAttendance = useCallback(async (sectionId: string, date: string) => {
@@ -136,8 +140,11 @@ export default function LecturerAttendancePage() {
 
     let existingReadFailedNow = false;
     try {
-      const [gradesData, existingAttendance, summary] = await Promise.all([
-        sectionsApi.getSectionGrades(sectionId),
+      const [rosterEntries, existingAttendance, summary] = await Promise.all([
+        // The markable roster comes from the attendance API, not the grading
+        // read model: PENDING enrollments are still attending students the
+        // write path accepts, and the grades view deliberately hides them.
+        attendanceApi.getSectionRoster(sectionId),
         // A failed read must NOT render as "nothing saved yet": defaulting a
         // full roster to PRESENT and saving would mass-overwrite real
         // ABSENT/LATE records. Flag it and lock the save instead.
@@ -159,17 +166,12 @@ export default function LecturerAttendancePage() {
         }
       }
 
-      const grades = gradesData as SectionGrades;
-      const activeEnrollments = (grades?.enrollments ?? []).filter(
-        (e: SectionGrades['enrollments'][number]) => e.enrollmentStatus !== 'DROPPED' && e.enrollmentStatus !== 'CANCELLED',
-      );
-
-      const rows: StudentRowState[] = activeEnrollments.map((enrollment: SectionGrades['enrollments'][number]) => {
-        const existing = attendanceMap.get(enrollment.studentId);
+      const rows: StudentRowState[] = rosterEntries.map((entry) => {
+        const existing = attendanceMap.get(entry.studentId);
         return {
-          studentId: enrollment.studentId,
-          studentCode: enrollment.studentCode,
-          studentName: enrollment.studentName,
+          studentId: entry.studentId,
+          studentCode: entry.studentCode,
+          studentName: `${entry.lastName} ${entry.firstName}`.trim(),
           status: existing ? existing.status : 'PRESENT', // default to PRESENT for convenient roll call
           notes: existing?.notes ?? '',
         };
@@ -179,11 +181,11 @@ export default function LecturerAttendancePage() {
       setResetStudentIds(new Set());
       setSectionSummary(summary);
     } catch {
-      setError(copy.saveFailed);
+      setError(copy.rosterLoadErrorDescription);
     } finally {
       setIsLoadingRoster(false);
     }
-  }, [copy.saveFailed]);
+  }, [copy.rosterLoadErrorDescription]);
 
   useEffect(() => {
     if (hasAccess) {
@@ -478,14 +480,14 @@ export default function LecturerAttendancePage() {
           <WorkspaceMetricCard
             label={copy.statuses.PRESENT}
             value={formatNumber(presentCount)}
-            detail={markedCount > 0 ? `${Math.round((presentCount / markedCount) * 100)}% hôm nay` : undefined}
+            detail={markedCount > 0 ? `${Math.round((presentCount / markedCount) * 100)}${copy.statPresentTodaySuffix}` : undefined}
             icon={<CheckCircle2 className="h-5 w-5" aria-hidden="true" />}
             toneClassName={metricToneClass('success')}
           />
           <WorkspaceMetricCard
             label={copy.statuses.ABSENT}
             value={formatNumber(absentCount)}
-            detail={excusedCount > 0 ? `${excusedCount} có phép` : undefined}
+            detail={excusedCount > 0 ? `${excusedCount} ${copy.statExcusedSuffix}` : undefined}
             icon={<XCircle className="h-5 w-5" aria-hidden="true" />}
             toneClassName={metricToneClass('danger')}
           />
@@ -496,7 +498,7 @@ export default function LecturerAttendancePage() {
                 ? `${formatNumber(sectionSummary.attendanceRate)}%`
                 : '—'
             }
-            detail={sectionSummary ? `${sectionSummary.totalSessions} buổi đã học` : undefined}
+            detail={sectionSummary ? `${sectionSummary.totalSessions} ${copy.statSessionsHeldSuffix}` : undefined}
             icon={<CalendarCheck className="h-5 w-5" aria-hidden="true" />}
             toneClassName={metricToneClass('info')}
           />
@@ -506,6 +508,12 @@ export default function LecturerAttendancePage() {
       {/* Roster & Attendance Sheet */}
       {isLoadingSections ? (
         <LoadingState label={copy.loadingSections} />
+      ) : sectionsLoadFailed ? (
+        <ErrorState
+          title={copy.sectionsLoadError}
+          description={copy.sectionsLoadErrorDescription}
+          onRetry={() => void fetchSections()}
+        />
       ) : sections.length === 0 ? (
         <EmptyState
           icon={Users}
@@ -534,7 +542,11 @@ export default function LecturerAttendancePage() {
               {copy.printOfficialHeader}
             </div>
             <div className="text-sm font-extrabold text-foreground">
-              {copy.printDepartment}
+              {(locale === 'vi'
+                ? selectedSection?.departmentNameVi
+                : selectedSection?.departmentNameEn) ||
+                selectedSection?.departmentName ||
+                copy.printDepartment}
             </div>
             <h1 className="text-xl font-black text-primary mt-2 uppercase tracking-wide">
               {copy.printReportTitle}

@@ -26,6 +26,7 @@ import { useRequireAuth } from '@/context/AuthContext';
 import { enrollmentsApi, semestersApi } from '@/lib/api';
 import { getLocalizedCourseLabel, getLocalizedName } from '@/lib/academic-content';
 import { isActiveEnrollment } from '@/lib/enrollment-status';
+import { displayLabel } from '@/lib/format-display';
 import { pickPreferredSemesterId } from '@/lib/semesters';
 import { Enrollment, Semester } from '@/types/api';
 import {
@@ -139,6 +140,14 @@ export default function SchedulePage() {
       setIsLoading(false);
     }
   }, [fetchSemesters, locale]);
+
+  // The JWT user.studentId is the opaque profile PK, not the MSSV — the real
+  // code rides on each enrollment's Student record (student.studentId is the
+  // MSSV column; enrollment.studentId is the profile PK).
+  const printableStudentCode = useMemo(
+    () => enrollments.find((enrollment) => enrollment.student?.studentId)?.student?.studentId,
+    [enrollments],
+  );
 
   const [retryTick, setRetryTick] = useState(0);
 
@@ -507,7 +516,7 @@ export default function SchedulePage() {
               {user ? (
                 <>
                   <span><strong>{locale === 'vi' ? 'Sinh viên:' : 'Student:'}</strong> {user.lastName} {user.firstName}</span>
-                  <span><strong>{locale === 'vi' ? 'MSSV:' : 'Student ID:'}</strong> {user.studentId ?? '—'}</span>
+                  <span><strong>{locale === 'vi' ? 'MSSV:' : 'Student ID:'}</strong> {displayLabel(printableStudentCode)}</span>
                 </>
               ) : null}
               <span><strong>{copy.totalCourses}:</strong> {uniqueCoursesCount}</span>

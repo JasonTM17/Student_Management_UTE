@@ -84,6 +84,109 @@ public class ThesisGroupReadRepository {
         return hydrate(rows);
     }
 
+    /** A governance reader's live scope: their own department and its faculty. */
+    public record LecturerScope(String departmentId, String facultyId) { }
+
+    /** Mirrors ThesisDeanOverviewRepository.findDeanFaculty: dept + faculty of an active lecturer. */
+    public LecturerScope findLecturerScope(String lecturerId, String subject) {
+        List<LecturerScope> rows = jdbc.query(
+                "SELECT d.\"id\" AS department_id, f.\"id\" AS faculty_id "
+                        + "FROM campuscore_auth.\"Lecturer\" l "
+                        + "JOIN campuscore_auth.\"User\" u ON u.\"id\" = l.\"userId\" "
+                        + "JOIN academic.\"Department\" d ON d.\"id\" = l.\"departmentId\" "
+                        + "JOIN academic.\"Faculty\" f ON f.\"id\" = d.\"facultyId\" "
+                        + "WHERE l.\"id\" = :lecturerId AND l.\"userId\" = :subject "
+                        + "AND l.\"isActive\" = TRUE AND u.\"status\" = 'ACTIVE' AND d.\"isActive\" = TRUE "
+                        + "AND f.\"isActive\" = TRUE",
+                new MapSqlParameterSource("lecturerId", lecturerId).addValue("subject", subject),
+                (rs, ignored) -> new LecturerScope(rs.getString("department_id"), rs.getString("faculty_id")));
+        return rows.stream().findFirst().orElse(null);
+    }
+
+    /**
+     * Groups of the round inside one faculty — same derivation the dean
+     * overview applies: the assigned topic's department, or a topicless
+     * group's member curriculum department.
+     */
+    public List<GroupResponse> findByRoundIdAndFacultyId(UUID roundId, String facultyId) {
+        List<GroupRow> rows = jdbc.query(
+                "SELECT g.id, g.round_id, g.leader_student_id, g.topic_id, g.status, "
+                        + "g.approval_status, g.rejection_reason FROM thesis.thesis_group g "
+                        + "LEFT JOIN thesis.thesis_topic t ON t.id = g.topic_id "
+                        + "LEFT JOIN academic.\"Department\" dept ON dept.\"id\" = t.department_id "
+                        + "WHERE g.round_id = :roundId AND ("
+                        + "  dept.\"facultyId\" = :facultyId "
+                        + "  OR (g.topic_id IS NULL AND EXISTS ("
+                        + "    SELECT 1 FROM thesis.thesis_group_member m "
+                        + "    JOIN campuscore_auth.\"Student\" s ON s.\"id\" = m.student_id "
+                        + "    JOIN academic.\"Curriculum\" c ON c.\"id\" = s.\"curriculumId\" "
+                        + "    JOIN academic.\"Department\" md ON md.\"id\" = c.\"departmentId\" "
+                        + "    WHERE m.group_id = g.id AND md.\"facultyId\" = :facultyId)) "
+                        + ") ORDER BY g.created_at DESC",
+                new MapSqlParameterSource("roundId", roundId).addValue("facultyId", facultyId),
+                ThesisGroupReadRepository::row);
+        return hydrate(rows);
+    }
+
+    /** Same derivation narrowed to one department, for a department head. */
+    public List<GroupResponse> findByRoundIdAndDepartmentId(UUID roundId, String departmentId) {
+        List<GroupRow> rows = jdbc.query(
+                "SELECT g.id, g.round_id, g.leader_student_id, g.topic_id, g.status, "
+                        + "g.approval_status, g.rejection_reason FROM thesis.thesis_group g "
+                        + "LEFT JOIN thesis.thesis_topic t ON t.id = g.topic_id "
+                        + "LEFT JOIN academic.\"Department\" dept ON dept.\"id\" = t.department_id "
+                        + "WHERE g.round_id = :roundId AND ("
+                        + "  dept.\"id\" = :departmentId "
+                        + "  OR (g.topic_id IS NULL AND EXISTS ("
+                        + "    SELECT 1 FROM thesis.thesis_group_member m "
+                        + "    JOIN campuscore_auth.\"Student\" s ON s.\"id\" = m.student_id "
+                        + "    JOIN academic.\"Curriculum\" c ON c.\"id\" = s.\"curriculumId\" "
+                        + "    JOIN academic.\"Department\" md ON md.\"id\" = c.\"departmentId\" "
+                        + "    WHERE m.group_id = g.id AND md.\"id\" = :departmentId)) "
+                        + ") ORDER BY g.created_at DESC",
+                new MapSqlParameterSource("roundId", roundId).addValue("departmentId", departmentId),
+                ThesisGroupReadRepository::row);
+        return hydrate(rows);
+    }
+
+    /** Whether one group sits inside the faculty (topic department or member curriculum). */
+    public boolean groupInFaculty(UUID groupId, String facultyId) {
+        Integer count = jdbc.queryForObject(
+                "SELECT COUNT(*) FROM thesis.thesis_group g "
+                        + "LEFT JOIN thesis.thesis_topic t ON t.id = g.topic_id "
+                        + "LEFT JOIN academic.\"Department\" dept ON dept.\"id\" = t.department_id "
+                        + "WHERE g.id = :groupId AND ("
+                        + "  dept.\"facultyId\" = :facultyId "
+                        + "  OR (g.topic_id IS NULL AND EXISTS ("
+                        + "    SELECT 1 FROM thesis.thesis_group_member m "
+                        + "    JOIN campuscore_auth.\"Student\" s ON s.\"id\" = m.student_id "
+                        + "    JOIN academic.\"Curriculum\" c ON c.\"id\" = s.\"curriculumId\" "
+                        + "    JOIN academic.\"Department\" md ON md.\"id\" = c.\"departmentId\" "
+                        + "    WHERE m.group_id = g.id AND md.\"facultyId\" = :facultyId)))",
+                new MapSqlParameterSource("groupId", groupId).addValue("facultyId", facultyId),
+                Integer.class);
+        return count != null && count > 0;
+    }
+
+    /** Whether one group sits inside the department, for a department head. */
+    public boolean groupInDepartment(UUID groupId, String departmentId) {
+        Integer count = jdbc.queryForObject(
+                "SELECT COUNT(*) FROM thesis.thesis_group g "
+                        + "LEFT JOIN thesis.thesis_topic t ON t.id = g.topic_id "
+                        + "LEFT JOIN academic.\"Department\" dept ON dept.\"id\" = t.department_id "
+                        + "WHERE g.id = :groupId AND ("
+                        + "  dept.\"id\" = :departmentId "
+                        + "  OR (g.topic_id IS NULL AND EXISTS ("
+                        + "    SELECT 1 FROM thesis.thesis_group_member m "
+                        + "    JOIN campuscore_auth.\"Student\" s ON s.\"id\" = m.student_id "
+                        + "    JOIN academic.\"Curriculum\" c ON c.\"id\" = s.\"curriculumId\" "
+                        + "    JOIN academic.\"Department\" md ON md.\"id\" = c.\"departmentId\" "
+                        + "    WHERE m.group_id = g.id AND md.\"id\" = :departmentId)))",
+                new MapSqlParameterSource("groupId", groupId).addValue("departmentId", departmentId),
+                Integer.class);
+        return count != null && count > 0;
+    }
+
     public boolean isTopicSupervisedBy(UUID topicId, String lecturerId) {
         Integer count = jdbc.queryForObject(
                 "SELECT COUNT(*) FROM thesis.thesis_topic_supervisor "

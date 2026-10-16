@@ -137,6 +137,8 @@ const ACADEMIC_STANDINGS = [
 
 const INVALID_BORDER = 'border-destructive focus-visible:ring-destructive';
 
+const MAIL_SEND_LOG_KEY = 'lecturer.mail.sendLog';
+
 function emptyNoticeForm(): NoticeForm {
   return {
     to: '',
@@ -290,7 +292,22 @@ export default function LecturerMailComposePage() {
   const [attemptedSend, setAttemptedSend] = useState(false);
   const [isSending, setIsSending] = useState(false);
   const [errorKind, setErrorKind] = useState<MailErrorKind | null>(null);
-  const [sentThisSession, setSentThisSession] = useState(0);
+  // The campus quota is 5 emails/hour/account, enforced server-side. The badge
+  // counts THIS browser session's sends inside a rolling hour — persisted in
+  // sessionStorage so a page reload does not reset the display back to 0.
+  const [sentThisSession, setSentThisSession] = useState(() => {
+    if (typeof window === 'undefined') return 0;
+    try {
+      const raw = window.sessionStorage.getItem(MAIL_SEND_LOG_KEY);
+      const log: unknown[] = raw ? JSON.parse(raw) : [];
+      const hourAgo = Date.now() - 3_600_000;
+      return Array.isArray(log)
+        ? log.filter((t) => typeof t === 'number' && t > hourAgo).length
+        : 0;
+    } catch {
+      return 0;
+    }
+  });
   const [sent, setSent] = useState<SentRecord | null>(null);
   const [previewOpen, setPreviewOpen] = useState(false);
   const successRef = useRef<HTMLDivElement>(null);
@@ -510,7 +527,22 @@ export default function LecturerMailComposePage() {
         template: templateTitle(template),
         dispatchedAt: response.dispatchedAt,
       });
-      setSentThisSession((current) => current + 1);
+      setSentThisSession((current) => {
+        const next = current + 1;
+        try {
+          const raw = window.sessionStorage.getItem(MAIL_SEND_LOG_KEY);
+          const log: unknown[] = raw ? JSON.parse(raw) : [];
+          const hourAgo = Date.now() - 3_600_000;
+          const pruned = Array.isArray(log)
+            ? log.filter((t) => typeof t === 'number' && t > hourAgo)
+            : [];
+          pruned.push(Date.now());
+          window.sessionStorage.setItem(MAIL_SEND_LOG_KEY, JSON.stringify(pruned));
+        } catch {
+          // Badge display only — the server enforces the real quota.
+        }
+        return next;
+      });
       setAttemptedSend(false);
       // A dispatched draft is done — clear the form so a second send never
       // silently reuses the previous recipient's fields.

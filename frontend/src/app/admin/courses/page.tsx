@@ -344,7 +344,11 @@ export default function AdminCoursesPage() {
     try {
       await coursesApi.delete(course.id);
       toast.success(copy.deleted);
-      await fetchCourses();
+      if (courses.length === 1 && page > 1) {
+        setPage((prev) => prev - 1);
+      } else {
+        await fetchCourses();
+      }
     } catch {
       toast.error(copy.deleteFailed);
     }

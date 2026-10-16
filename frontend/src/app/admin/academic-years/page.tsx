@@ -258,7 +258,13 @@ export default function AdminAcademicYearsPage() {
     try {
       await academicYearsApi.delete(record.id);
       toast.success(copy.deleted);
-      await fetchAcademicYears();
+      // Deleting the last row of a later page leaves a stale empty view;
+      // step back so the page-effect refetches real content.
+      if (academicYears.length === 1 && page > 1) {
+        setPage((prev) => prev - 1);
+      } else {
+        await fetchAcademicYears();
+      }
     } catch {
       toast.error(copy.deleteFailed);
     }

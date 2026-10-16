@@ -43,6 +43,7 @@ export default function AdminAppearancePage() {
   const [draft, setDraft] = useState<SiteAppearance>(DEFAULT_SITE_APPEARANCE);
   const [copyLocale, setCopyLocale] = useState<'en' | 'vi'>(locale);
   const [posts, setPosts] = useState<AnnouncementRow[]>([]);
+  const [postsLoadFailed, setPostsLoadFailed] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [savedLocally, setSavedLocally] = useState(false);
@@ -64,16 +65,37 @@ export default function AdminAppearancePage() {
     }
   }, [href, isAdmin, isSuperAdmin, isAuthLoading, isLoggingOut, router, user]);
 
+  // The pinned-order editor needs the whole catalog — a limit-20 page made
+  // announcements 21+ unreachable, and a swallowed fetch error rendered the
+  // same "no announcements" empty state as an actually empty catalog.
+  const fetchAllAnnouncementRows = useCallback(async (): Promise<AnnouncementRow[]> => {
+    const first = await announcementsApi.getAll({ page: 1, limit: 100 });
+    const totalPages = first.meta?.totalPages ?? 1;
+    if (totalPages <= 1) {
+      return first.data ?? [];
+    }
+    const rest = await Promise.all(
+      Array.from({ length: totalPages - 1 }, (_, index) =>
+        announcementsApi.getAll({ page: index + 2, limit: 100 })),
+    );
+    return [first.data ?? [], ...rest.map((page) => page.data ?? [])].flat();
+  }, []);
+
   const load = useCallback(async () => {
     setIsLoading(true);
     setError('');
+    setPostsLoadFailed(false);
 
+    let postsFailed = false;
     try {
       const [appearance, announcements] = await Promise.all([
         fetchSiteAppearance(),
-        announcementsApi.getAll({ page: 1, limit: 20 }).catch(() => ({ data: [] as AnnouncementRow[] })),
+        fetchAllAnnouncementRows().catch(() => {
+          postsFailed = true;
+          return [] as AnnouncementRow[];
+        }),
       ]);
-      const rows = (announcements.data ?? []).map((item) => ({
+      const rows = announcements.map((item) => ({
         id: item.id,
         title: item.title,
       }));
@@ -85,13 +107,14 @@ export default function AdminAppearancePage() {
       // the `orderedPosts` rank map instead, and a broadcast only happens on
       // an explicit save (persist/reorder).
       setPosts(rows);
+      setPostsLoadFailed(postsFailed);
       setDraft(sanitizeSiteAppearance(appearance));
     } catch {
       setError(copy.loadFailed);
     } finally {
       setIsLoading(false);
     }
-  }, [copy.loadFailed]);
+  }, [copy.loadFailed, fetchAllAnnouncementRows]);
 
   useEffect(() => {
     if (canAccess) {
@@ -372,7 +395,13 @@ export default function AdminAppearancePage() {
                 <h2 className="text-lg font-semibold text-foreground">{copy.postsTitle}</h2>
                 <p className="mt-1 text-sm text-muted-foreground">{copy.postsDescription}</p>
               </div>
-              {orderedPosts.length === 0 ? (
+              {postsLoadFailed ? (
+                <ErrorState
+                  title={copy.loadFailed}
+                  description={copy.postsLoadFailed}
+                  onRetry={() => void load()}
+                />
+              ) : orderedPosts.length === 0 ? (
                 <EmptyState
                   icon={Palette}
                   title={copy.postsEmpty}

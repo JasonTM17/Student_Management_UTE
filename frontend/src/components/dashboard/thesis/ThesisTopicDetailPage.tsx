@@ -18,7 +18,7 @@ import { useThesisWorkspace } from './useThesisWorkspace';
 
 export default function ThesisTopicDetailPage() {
   const { user, isLoading: authLoading, hasAccess, isForbidden } = useRequireAuth();
-  const { messages } = useI18n();
+  const { messages, locale } = useI18n();
   const params = useParams<{ id: string }>();
   const searchParams = useSearchParams();
   const topicId = Array.isArray(params.id) ? params.id[0] : params.id;
@@ -173,7 +173,7 @@ export default function ThesisTopicDetailPage() {
             />
             <div className="absolute inset-0 bg-gradient-to-t from-black/50 via-transparent to-transparent lg:hidden" />
             <div className="absolute bottom-2 left-3 rounded-md bg-background/85 px-2 py-0.5 text-[11px] font-semibold text-foreground backdrop-blur-xs">
-              Hội đồng Đánh giá Khóa luận HCMUTE
+              {locale === 'vi' ? 'Hội đồng Đánh giá Khóa luận HCMUTE' : 'HCMUTE Thesis Evaluation Council'}
             </div>
           </div>
         </div>

@@ -143,6 +143,34 @@ class AcademicAttendanceReadPersistenceTest {
     }
 
     @Test
+    void attendanceRosterIncludesPendingExcludesDroppedAndStaysOwned() throws Exception {
+        // Owning lecturer: ENROLLED + PENDING markable, DROPPED/CANCELLED gone.
+        mvc.perform(get("/api/v1/attendance/section/section-1/roster")
+                        .with(lecturerJwt("lecturer-1")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(2))
+                .andExpect(jsonPath("$[0].studentId").value("student-1"))
+                .andExpect(jsonPath("$[1].studentId").value("student-2"))
+                .andExpect(jsonPath("$[?(@.studentId == 'student-3')]").isEmpty())
+                .andExpect(jsonPath("$[0].enrollmentStatus").value("ENROLLED"))
+                .andExpect(jsonPath("$[1].studentCode").value("S002"))
+                .andExpect(jsonPath("$[1].enrollmentStatus").value("PENDING"));
+
+        // Admin sees the same markable population on another lecturer's section.
+        mvc.perform(get("/api/v1/attendance/section/section-1/roster").with(adminJwt()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(2));
+
+        // Non-owning lecturer and students are denied.
+        mvc.perform(get("/api/v1/attendance/section/section-1/roster")
+                        .with(lecturerJwt("lecturer-2")))
+                .andExpect(status().isForbidden());
+        mvc.perform(get("/api/v1/attendance/section/section-1/roster")
+                        .with(studentJwt("student-user-1", "student-1")))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
     void detailNotFoundAndReadBoundaryFailuresStayExplicit() throws Exception {
         mvc.perform(get("/api/v1/attendance/attendance-1").with(adminJwt()))
                 .andExpect(status().isOk())
@@ -274,6 +302,16 @@ class AcademicAttendanceReadPersistenceTest {
                 )
                 """);
         jdbc.execute("""
+                CREATE TABLE IF NOT EXISTS "academic"."Enrollment" (
+                    "id" VARCHAR(120) PRIMARY KEY,
+                    "studentId" VARCHAR(120) NOT NULL,
+                    "sectionId" VARCHAR(120) NOT NULL,
+                    "semesterId" VARCHAR(120) NOT NULL,
+                    "status" VARCHAR(40) NOT NULL,
+                    "enrolledAt" TIMESTAMP NOT NULL
+                )
+                """);
+        jdbc.execute("""
                 CREATE TABLE IF NOT EXISTS "academic"."Attendance" (
                     "id" VARCHAR(120) PRIMARY KEY,
                     "studentId" VARCHAR(120) NOT NULL,
@@ -288,6 +326,7 @@ class AcademicAttendanceReadPersistenceTest {
 
     private void clearTables() {
         jdbc.update("DELETE FROM \"academic\".\"Attendance\"");
+        jdbc.update("DELETE FROM \"academic\".\"Enrollment\"");
         jdbc.update("DELETE FROM \"academic\".\"Section\"");
         jdbc.update("DELETE FROM \"academic\".\"Course\"");
         jdbc.update("DELETE FROM \"academic\".\"Student\"");
@@ -315,6 +354,12 @@ class AcademicAttendanceReadPersistenceTest {
         insertAttendance("attendance-section-an", "student-3", "section-1", BASE_TIME, "LATE", null);
         insertAttendance("attendance-section2", "student-2", "section-2", BASE_TIME.plusSeconds(7200), "PRESENT", null);
         insertAttendance("attendance-other-lecturer", "student-2", "section-other", BASE_TIME, "PRESENT", null);
+        // Roster fixture: the markable population for section-1 is every
+        // enrollment except DROPPED/CANCELLED — PENDING must appear.
+        insertEnrollment("enroll-1", "student-1", "section-1", "semester-1", "ENROLLED");
+        insertEnrollment("enroll-2", "student-2", "section-1", "semester-1", "PENDING");
+        insertEnrollment("enroll-3", "student-3", "section-1", "semester-1", "DROPPED");
+        insertEnrollment("enroll-other", "student-2", "section-other", "semester-1", "ENROLLED");
     }
 
     private void insertUser(String id, String email, String firstName, String lastName) {
@@ -348,6 +393,14 @@ class AcademicAttendanceReadPersistenceTest {
                         + " (\"id\", \"sectionNumber\", \"courseId\", \"semesterId\", \"lecturerId\", \"capacity\", \"enrolledCount\", \"status\")"
                         + " VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
                 id, sectionNumber, courseId, semesterId, lecturerId, 30, 12, "OPEN");
+    }
+
+    private void insertEnrollment(String id, String studentId, String sectionId, String semesterId, String status) {
+        jdbc.update(
+                "INSERT INTO \"academic\".\"Enrollment\""
+                        + " (\"id\", \"studentId\", \"sectionId\", \"semesterId\", \"status\", \"enrolledAt\")"
+                        + " VALUES (?, ?, ?, ?, ?, ?)",
+                id, studentId, sectionId, semesterId, status, Timestamp.from(BASE_TIME));
     }
 
     private void insertAttendance(

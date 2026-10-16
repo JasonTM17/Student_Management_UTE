@@ -29,6 +29,7 @@ import {
 } from '@/lib/api';
 import { pickPreferredSemesterId } from '@/lib/semesters';
 import { getLocalizedName } from '@/lib/academic-content';
+import { displayLabel, formatOptionalDate } from '@/lib/format-display';
 import type { Semester } from '@/types/api';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -375,7 +376,7 @@ export default function StudentConductPage() {
     title: activity.title,
     category: activity.category,
     organizer: activity.organizer,
-    date: formatDate(activity.activityDate),
+    date: formatOptionalDate(formatDate, activity.activityDate),
   });
 
   if (authLoading || loading) {
@@ -431,7 +432,7 @@ export default function StudentConductPage() {
         <div className="flex flex-wrap justify-center gap-6 mt-3 text-xs text-foreground font-medium">
           <span><strong>{copy.historySemester}:</strong> {formatSemesterName(activeSemesterScore?.semesterName)}</span>
           <span><strong>{vi ? 'Sinh viên' : 'Student'}:</strong> {summary?.fullName || (user ? `${user.lastName ?? ''} ${user.firstName ?? ''}`.trim() : '')}</span>
-          <span><strong>{copy.studentId}</strong> {summary?.studentCode || user?.studentId}</span>
+          <span><strong>{copy.studentId}</strong> {displayLabel(summary?.studentCode)}</span>
           <span><strong>{copy.totalScore}:</strong> {activeSemesterScore ? formatNumber(activeSemesterScore.totalScore) : '—'} / 100</span>
           <span><strong>{copy.historyRank}:</strong> {rankLabel(activeSemesterScore?.classification, activeSemesterScore?.classificationVi)}</span>
         </div>
@@ -1048,7 +1049,7 @@ export default function StudentConductPage() {
                 <div>
                   <span className="text-xs text-muted-foreground">{copy.studentId}</span>
                   <p className="font-bold font-mono text-foreground text-sm">
-                    {summary?.studentCode || '—'}
+                    {displayLabel(summary?.studentCode)}
                   </p>
                 </div>
               </div>

@@ -224,8 +224,8 @@ class RbacAndApiErrorSecurityChallengeTest {
                     GroupStatus.DRAFT, ApprovalStatus.PENDING, null,
                     List.of(), List.of());
 
-            when(groupReadService.list(eq(ROUND_ID), any(), any(), any())).thenReturn(List.of(dummy));
-            when(groupReadService.get(eq(GROUP_ID), any(), any(), any())).thenReturn(dummy);
+            when(groupReadService.list(eq(ROUND_ID), any(), any(), any(), any())).thenReturn(List.of(dummy));
+            when(groupReadService.get(eq(GROUP_ID), any(), any(), any(), any())).thenReturn(dummy);
 
             mvc.perform(get("/api/v1/thesis/groups")
                             .param("roundId", ROUND_ID.toString())

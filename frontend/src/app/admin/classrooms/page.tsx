@@ -298,7 +298,11 @@ export default function AdminClassroomsPage() {
     try {
       await classroomsApi.delete(room.id);
       toast.success(copy.deleted);
-      await fetchClassrooms();
+      if (classrooms.length === 1 && page > 1) {
+        setPage((prev) => prev - 1);
+      } else {
+        await fetchClassrooms();
+      }
     } catch {
       toast.error(copy.deleteFailed);
     }

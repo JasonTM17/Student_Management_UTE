@@ -33,6 +33,7 @@ import {
 import { useConfirmationDialog } from '@/components/ui/use-confirmation-dialog';
 import { useI18n } from '@/i18n';
 import { campusErrorMessage } from '@/lib/campus-error';
+import { formatOptionalDate } from '@/lib/format-display';
 import { dayLabel } from '@/components/schedule/weekly-grid';
 import { toast } from 'sonner';
 
@@ -996,7 +997,7 @@ export default function EnrollmentsPage() {
                                 <div className="mt-2 flex items-center gap-3 text-[11px] text-muted-foreground">
                                   <span className="inline-flex items-center gap-1.5">
                                     <Calendar className="h-3 w-3" />
-                                    {copy.enrolledOn} {formatDate(enrollment.enrolledAt)}
+                                    {copy.enrolledOn} {formatOptionalDate(formatDate, enrollment.enrolledAt)}
                                   </span>
                                   {lecturerName(enrollment) && (
                                     <span className="inline-flex items-center gap-1.5">

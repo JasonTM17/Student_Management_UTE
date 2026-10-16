@@ -14,6 +14,7 @@ import io.campuscore.restfulapi.engagement.service.AnnouncementStudentNotifier;
 import io.campuscore.restfulapi.engagement.service.AnnouncementWriteService;
 import io.campuscore.restfulapi.engagement.web.AnnouncementReadDtos.AnnouncementResponse;
 import io.campuscore.restfulapi.engagement.web.AnnouncementWriteDtos.CreateAnnouncementRequest;
+import io.campuscore.restfulapi.engagement.web.AnnouncementWriteDtos.LifecycleRequest;
 import io.campuscore.restfulapi.engagement.web.AnnouncementWriteDtos.UpdateAnnouncementRequest;
 import io.campuscore.restfulapi.web.DomainException;
 import java.time.Instant;
@@ -81,6 +82,58 @@ class AnnouncementWriteServiceLecturerTest {
                 "user-1", "Lecturer", List.of("LECTURER"), "lecturer-1", "notice-1", request);
 
         verify(fixture.announcements).update(any());
+    }
+
+    @Test
+    void lecturerCanArchiveAndDeleteOwnAnnouncement() throws Exception {
+        Fixture fixture = fixture();
+        AnnouncementResponse own = announcement("lecturer-1");
+        when(fixture.announcements.findByIdForUpdate("notice-1")).thenReturn(Optional.of(own));
+        when(fixture.announcements.archive(any())).thenReturn(1);
+        when(fixture.announcements.findById("notice-1")).thenReturn(Optional.of(own));
+        LifecycleRequest lifecycle = new LifecycleRequest("Done", 0);
+
+        fixture.service.archive("user-1", "Lecturer", List.of("LECTURER"), "lecturer-1", "notice-1", lifecycle);
+        fixture.service.delete("user-1", "Lecturer", List.of("LECTURER"), "lecturer-1", "notice-1");
+
+        verify(fixture.announcements, org.mockito.Mockito.times(2)).archive(any());
+    }
+
+    @Test
+    void lecturerCannotArchiveRestoreOrDeleteAnotherLecturersAnnouncement() throws Exception {
+        Fixture fixture = fixture();
+        when(fixture.announcements.findByIdForUpdate("notice-1"))
+                .thenReturn(Optional.of(announcement("lecturer-2")));
+        AnnouncementResponse archived = announcement("lecturer-2");
+        when(fixture.announcements.findByIdForUpdate("notice-arc"))
+                .thenReturn(Optional.of(archived));
+        LifecycleRequest lifecycle = new LifecycleRequest("Done", 0);
+
+        assertThrows(DomainException.class, () -> fixture.service.archive(
+                "user-1", "Lecturer", List.of("LECTURER"), "lecturer-1", "notice-1", lifecycle));
+        assertThrows(DomainException.class, () -> fixture.service.restore(
+                "user-1", "Lecturer", List.of("LECTURER"), "lecturer-1", "notice-arc", lifecycle));
+        assertThrows(DomainException.class, () -> fixture.service.delete(
+                "user-1", "Lecturer", List.of("LECTURER"), "lecturer-1", "notice-1"));
+        // A lecturer without a bound profile can never claim ownership.
+        assertThrows(DomainException.class, () -> fixture.service.archive(
+                "user-1", "Lecturer", List.of("LECTURER"), null, "notice-1", lifecycle));
+    }
+
+    @Test
+    void adminLifecycleCallsKeepWorkingThroughTheLegacySignatures() throws Exception {
+        Fixture fixture = fixture();
+        AnnouncementResponse notice = announcement("lecturer-2");
+        when(fixture.announcements.findByIdForUpdate("notice-1")).thenReturn(Optional.of(notice));
+        when(fixture.announcements.archive(any())).thenReturn(1);
+        when(fixture.announcements.findById("notice-1")).thenReturn(Optional.of(notice));
+        LifecycleRequest lifecycle = new LifecycleRequest("Done", 0);
+
+        // Admin lifecycle over another lecturer's notice stays allowed.
+        fixture.service.archive("admin-1", "Admin", "notice-1", lifecycle);
+        fixture.service.delete("admin-1", "Admin", "notice-1");
+
+        verify(fixture.announcements, org.mockito.Mockito.times(2)).archive(any());
     }
 
     @Test

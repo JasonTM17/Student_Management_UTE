@@ -120,7 +120,7 @@ test('student enrollments use complete mobile cards and a separate desktop table
   assert.match(mobileCards, /getDayName\(schedule\.dayOfWeek, locale\)/);
   assert.match(mobileCards, /lecturerName\(enrollment\)/);
   assert.match(mobileCards, /classroomLabel\(/);
-  assert.match(mobileCards, /formatDate\(enrollment\.enrolledAt\)/);
+  assert.match(mobileCards, /formatOptionalDate\(formatDate, enrollment\.enrolledAt\)/);
   assert.match(mobileCards, /messages\.common\.statuses\.UNKNOWN/);
   assert.match(mobileCards, /isDroppableEnrollment\(enrollment\.status\)/);
   assert.match(mobileCards, /onClick=\{\(\) => void handleDrop\(enrollment\.id, courseLabel\)\}/);

@@ -276,7 +276,11 @@ export default function AdminNotificationsPage() {
     try {
       await adminNotificationsApi.adminDelete(record.id);
       toast.success(copy.deleted);
-      await loadSent();
+      if (rows.length === 1 && page > 1) {
+        setPage((prev) => prev - 1);
+      } else {
+        await loadSent();
+      }
     } catch {
       toast.error(copy.deleteFailed);
     }

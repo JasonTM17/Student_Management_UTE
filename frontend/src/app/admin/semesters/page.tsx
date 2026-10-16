@@ -369,7 +369,11 @@ export default function AdminSemestersPage() {
     try {
       await adminSemestersApi.delete(semester.id);
       toast.success(copy.deleted);
-      await fetchSemesters();
+      if (semesters.length === 1 && page > 1) {
+        setPage((prev) => prev - 1);
+      } else {
+        await fetchSemesters();
+      }
     } catch {
       toast.error(copy.deleteFailed);
     }

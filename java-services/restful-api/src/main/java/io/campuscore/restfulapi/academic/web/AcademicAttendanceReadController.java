@@ -3,6 +3,7 @@ package io.campuscore.restfulapi.academic.web;
 import io.campuscore.restfulapi.academic.service.AcademicAttendanceReadService;
 import io.campuscore.restfulapi.academic.web.AcademicAttendanceReadDtos.AttendanceListResponse;
 import io.campuscore.restfulapi.academic.web.AcademicAttendanceReadDtos.AttendanceResponse;
+import io.campuscore.restfulapi.academic.web.AcademicAttendanceReadDtos.AttendanceRosterEntry;
 import io.campuscore.restfulapi.academic.web.AcademicAttendanceReadDtos.SectionAttendanceSummaryResponse;
 import io.campuscore.restfulapi.academic.web.AcademicAttendanceReadDtos.StudentAttendanceSummaryResponse;
 import java.util.List;
@@ -114,6 +115,23 @@ public class AcademicAttendanceReadController {
         return academic.findSectionAttendance(
                 sectionId,
                 date,
+                jwt.getClaimAsStringList("roles"),
+                jwt.getClaimAsString("lecturerId"));
+    }
+
+    @Operation(summary = "Danh sách sinh viên có thể điểm danh của lớp", description = "Roster của lớp theo điều kiện ghi điểm danh: mọi ghi danh trừ DROPPED/CANCELLED, gồm cả PENDING")
+    @ApiResponses({
+        @ApiResponse(responseCode = "200", description = "Truy vấn thành công")
+    })
+    @GetMapping("section/{sectionId}/roster")
+    @PreAuthorize("hasAnyRole('ADMIN', 'SUPER_ADMIN', 'LECTURER')")
+    public List<AttendanceRosterEntry> getSectionAttendanceRoster(
+            @AuthenticationPrincipal Jwt jwt,
+            @Parameter(description = "Mã định danh lớp học phần (UUID)", required = true) @PathVariable String sectionId,
+            @RequestParam MultiValueMap<String, String> queryParameters) {
+        requireAllowedQuery(queryParameters, Set.of());
+        return academic.findSectionAttendanceRoster(
+                sectionId,
                 jwt.getClaimAsStringList("roles"),
                 jwt.getClaimAsString("lecturerId"));
     }

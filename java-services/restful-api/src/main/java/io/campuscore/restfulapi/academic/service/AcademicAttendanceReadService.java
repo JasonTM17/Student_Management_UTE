@@ -6,6 +6,7 @@ import io.campuscore.restfulapi.academic.repository.AcademicAttendanceReadReposi
 import io.campuscore.restfulapi.academic.repository.AcademicAttendanceReadRepository.StudentSummaryRow;
 import io.campuscore.restfulapi.academic.web.AcademicAttendanceReadDtos.AttendanceListResponse;
 import io.campuscore.restfulapi.academic.web.AcademicAttendanceReadDtos.AttendanceResponse;
+import io.campuscore.restfulapi.academic.web.AcademicAttendanceReadDtos.AttendanceRosterEntry;
 import io.campuscore.restfulapi.academic.web.AcademicAttendanceReadDtos.CourseSummary;
 import io.campuscore.restfulapi.academic.web.AcademicAttendanceReadDtos.PageMeta;
 import io.campuscore.restfulapi.academic.web.AcademicAttendanceReadDtos.SectionAttendanceSummaryResponse;
@@ -96,6 +97,24 @@ public class AcademicAttendanceReadService {
         return attendanceResponses(attendance.findSectionAttendance(
                 normalizedSectionId,
                 normalizeDate(date)));
+    }
+
+    @Transactional(readOnly = true)
+    public List<AttendanceRosterEntry> findSectionAttendanceRoster(
+            String sectionId,
+            List<String> roles,
+            String lecturerId) {
+        String normalizedSectionId = normalizeRequired("sectionId", sectionId);
+        requireSectionAccess(normalizedSectionId, roles, lecturerId);
+        return attendance.findSectionAttendanceRoster(normalizedSectionId).stream()
+                .map(row -> new AttendanceRosterEntry(
+                        row.studentId(),
+                        row.studentNumber(),
+                        row.studentEmail(),
+                        row.studentFirstName(),
+                        row.studentLastName(),
+                        row.enrollmentStatus()))
+                .toList();
     }
 
     @Transactional(readOnly = true)

@@ -494,8 +494,20 @@ export default function CurriculumPage() {
           {grouped.length === 0 ? (
             <EmptyState
               icon={BookOpen}
-              title={copy.filterAvailable}
-              description={copy.availableEmpty}
+              title={{
+                ALL: copy.filterAll,
+                AVAILABLE: copy.filterAvailable,
+                COMPLETED: copy.filterCompleted,
+                IN_PROGRESS: copy.filterInProgress,
+                NOT_STARTED: copy.filterNotStarted,
+              }[statusFilter]}
+              description={{
+                ALL: copy.allEmpty,
+                AVAILABLE: copy.availableEmpty,
+                COMPLETED: copy.completedEmpty,
+                IN_PROGRESS: copy.inProgressEmpty,
+                NOT_STARTED: copy.notStartedEmpty,
+              }[statusFilter]}
             />
           ) : (
             grouped.map(([year, semesters]) => (

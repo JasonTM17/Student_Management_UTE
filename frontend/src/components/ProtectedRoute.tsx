@@ -12,7 +12,7 @@ export function WorkspaceForbiddenState({
 }: {
   signedIn?: boolean;
 }) {
-  const { isLecturer, isAdmin, isSuperAdmin, isFacultyHead } = useAuth();
+  const { isLecturer, isAdmin, isSuperAdmin, isFacultyHead, isDepartmentHead } = useAuth();
   const { messages } = useI18n();
   const copy = messages.workspaceForbidden;
   const title = copy.title;
@@ -22,7 +22,7 @@ export function WorkspaceForbiddenState({
       ? '/admin'
       : isFacultyHead
         ? '/dashboard/dean'
-        : isLecturer
+        : isLecturer || isDepartmentHead
           ? '/dashboard/lecturer'
           : '/dashboard'
     : '/login';

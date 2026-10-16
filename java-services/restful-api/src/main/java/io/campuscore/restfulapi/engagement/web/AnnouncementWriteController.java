@@ -122,12 +122,13 @@ public class AnnouncementWriteController {
         @ApiResponse(responseCode = "200", description = "Lưu trữ thông báo thành công")
     })
     @PostMapping("{id}/archive")
-    @org.springframework.security.access.prepost.PreAuthorize("hasAnyRole('ADMIN', 'SUPER_ADMIN')")
+    @org.springframework.security.access.prepost.PreAuthorize("hasAnyRole('LECTURER', 'ADMIN', 'SUPER_ADMIN')")
     public AnnouncementResponse archive(
             @Parameter(description = "Mã định danh thông báo (UUID)", required = true) @PathVariable String id,
             @AuthenticationPrincipal Jwt jwt,
             @RequestBody JsonNode request) {
-        return announcements.archive(subject(jwt), actorLabel(jwt), id, LifecycleRequest.from(request));
+        return announcements.archive(subject(jwt), actorLabel(jwt), jwt.getClaimAsStringList("roles"),
+                jwt.getClaimAsString("lecturerId"), id, LifecycleRequest.from(request));
     }
 
     @Operation(summary = "Khôi phục thông báo từ lưu trữ", description = "Khôi phục trạng thái hoạt động bình thường của thông báo đã lưu trữ")
@@ -135,12 +136,13 @@ public class AnnouncementWriteController {
         @ApiResponse(responseCode = "200", description = "Khôi phục thành công")
     })
     @PostMapping("{id}/restore")
-    @org.springframework.security.access.prepost.PreAuthorize("hasAnyRole('ADMIN', 'SUPER_ADMIN')")
+    @org.springframework.security.access.prepost.PreAuthorize("hasAnyRole('LECTURER', 'ADMIN', 'SUPER_ADMIN')")
     public AnnouncementResponse restore(
             @Parameter(description = "Mã định danh thông báo (UUID)", required = true) @PathVariable String id,
             @AuthenticationPrincipal Jwt jwt,
             @RequestBody JsonNode request) {
-        return announcements.restore(subject(jwt), actorLabel(jwt), id, LifecycleRequest.from(request));
+        return announcements.restore(subject(jwt), actorLabel(jwt), jwt.getClaimAsStringList("roles"),
+                jwt.getClaimAsString("lecturerId"), id, LifecycleRequest.from(request));
     }
 
     /**
@@ -152,11 +154,12 @@ public class AnnouncementWriteController {
         @ApiResponse(responseCode = "200", description = "Xóa thành công")
     })
     @DeleteMapping("{id}")
-    @org.springframework.security.access.prepost.PreAuthorize("hasAnyRole('ADMIN', 'SUPER_ADMIN')")
+    @org.springframework.security.access.prepost.PreAuthorize("hasAnyRole('LECTURER', 'ADMIN', 'SUPER_ADMIN')")
     public DeleteAnnouncementResponse delete(
             @Parameter(description = "Mã định danh thông báo (UUID)", required = true) @PathVariable String id,
             @AuthenticationPrincipal Jwt jwt) {
-        return announcements.delete(subject(jwt), actorLabel(jwt), id);
+        return announcements.delete(subject(jwt), actorLabel(jwt), jwt.getClaimAsStringList("roles"),
+                jwt.getClaimAsString("lecturerId"), id);
     }
 
     private static void requireAllowedQuery(

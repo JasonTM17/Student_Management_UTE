@@ -545,7 +545,11 @@ export default function AdminSectionsPage() {
     try {
       await adminSectionsApi.delete(section.id);
       toast.success(copy.deleted);
-      await fetchSections();
+      if (sections.length === 1 && page > 1) {
+        setPage((prev) => prev - 1);
+      } else {
+        await fetchSections();
+      }
     } catch {
       toast.error(copy.deleteFailed);
     }

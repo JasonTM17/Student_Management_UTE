@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
+  Archive,
   ArrowRight,
   Bell,
   BookOpen,
@@ -11,10 +12,12 @@ import {
   RefreshCw,
   Search,
 } from 'lucide-react';
+import { toast } from 'sonner';
 import { useRequireAuth } from '@/context/AuthContext';
 import { announcementsApi, type AnnouncementMutation, type AnnouncementRecord } from '@/lib/api';
 import { AnnouncementReaderModal } from '@/components/announcements/AnnouncementReaderModal';
 import { LecturerAnnouncementCreateModal } from '@/components/announcements/LecturerAnnouncementCreateModal';
+import { useConfirmationDialog } from '@/components/ui/use-confirmation-dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { LinkButton } from '@/components/ui/link-button';
@@ -67,6 +70,8 @@ export default function LecturerAnnouncementsPage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [readingNotice, setReadingNotice] = useState<AnnouncementRecord | null>(null);
   const [isComposerOpen, setIsComposerOpen] = useState(false);
+  const [archivingId, setArchivingId] = useState<string | null>(null);
+  const { confirm, confirmationDialog } = useConfirmationDialog();
 
   const copy =
     locale === 'vi'
@@ -164,6 +169,30 @@ export default function LecturerAnnouncementsPage() {
       void fetchFeed();
     }
   }, [fetchFeed, hasAccess]);
+
+  const handleArchiveOwn = async (announcement: AnnouncementRecord) => {
+    const isVi = locale === 'vi';
+    const confirmed = await confirm({
+      title: isVi ? 'Lưu trữ thông báo?' : 'Archive this notice?',
+      message: isVi
+        ? 'Thông báo sẽ được đưa vào lưu trữ và sinh viên không còn thấy trên bảng tin.'
+        : 'The notice will be archived and students will no longer see it in the feed.',
+      confirmText: isVi ? 'Lưu trữ' : 'Archive',
+      cancelText: isVi ? 'Hủy' : 'Cancel',
+      variant: 'destructive',
+    });
+    if (!confirmed) return;
+    setArchivingId(announcement.id);
+    try {
+      await announcementsApi.delete(announcement.id);
+      toast.success(isVi ? 'Đã lưu trữ thông báo' : 'Notice archived');
+      await fetchFeed(1);
+    } catch {
+      toast.error(isVi ? 'Không thể lưu trữ thông báo. Vui lòng thử lại.' : 'Could not archive the notice. Please try again.');
+    } finally {
+      setArchivingId(null);
+    }
+  };
 
   const filteredNotices = useMemo(() => {
     return orderedItems.filter((item) => {
@@ -390,11 +419,29 @@ export default function LecturerAnnouncementsPage() {
                         </span>
                       </div>
 
-                      <span className="inline-flex items-center gap-1.5 text-xs font-bold text-primary group-hover:underline">
-                        <BookOpen className="h-3.5 w-3.5" />
-                        {copy.readFull}
-                        <ArrowRight className="h-3.5 w-3.5 transition-transform group-hover:translate-x-1" />
-                      </span>
+                      <div className="inline-flex items-center gap-3">
+                        {announcement.lecturerId && announcement.lecturerId === user?.lecturerId ? (
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              void handleArchiveOwn(announcement);
+                            }}
+                            disabled={archivingId === announcement.id}
+                            className="inline-flex items-center gap-1.5 text-xs font-bold text-destructive/80 hover:text-destructive hover:underline disabled:opacity-50"
+                          >
+                            <Archive className="h-3.5 w-3.5" />
+                            {archivingId === announcement.id
+                              ? (locale === 'vi' ? 'Đang lưu trữ…' : 'Archiving…')
+                              : (locale === 'vi' ? 'Lưu trữ' : 'Archive')}
+                          </button>
+                        ) : null}
+                        <span className="inline-flex items-center gap-1.5 text-xs font-bold text-primary group-hover:underline">
+                          <BookOpen className="h-3.5 w-3.5" />
+                          {copy.readFull}
+                          <ArrowRight className="h-3.5 w-3.5 transition-transform group-hover:translate-x-1" />
+                        </span>
+                      </div>
                     </div>
                   </div>
                 </article>
@@ -424,6 +471,8 @@ export default function LecturerAnnouncementsPage() {
           ) : null}
         </div>
       ) : null}
+
+      {confirmationDialog}
 
       {/* Official Stationery Reader Modal */}
       <AnnouncementReaderModal

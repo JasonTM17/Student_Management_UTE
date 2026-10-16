@@ -43,6 +43,8 @@ function proposalFixture(roles, overrides = {}) {
       publishedSuccess: 'Approved', proposeSuccess: 'Waiting for department approval',
       supervisorAssignFailed: 'Supervisor assignment failed', supervisorInvalid: 'Invalid supervisor',
       actionFailed: 'Action failed', topicApprovalForbidden: 'Approval permission missing',
+      createdAsDraftNotice: 'Saved as draft — assign a supervisor before publishing',
+      loadFailed: 'Load failed',
     } },
     departments: [{ id: 'department' }],
     thesisApi: {
@@ -59,7 +61,7 @@ function proposalFixture(roles, overrides = {}) {
     setProposeSupervisorId: () => {}, setProposeSecondSupervisorId: () => {},
     setActionError: () => {}, topicActionErrorMessage: () => 'Approval failed',
     setError: () => {},
-    toast: { error: () => {} }, getThesisErrorCode: error => error.response?.data?.code || '',
+    toast: { error: () => {}, warning: () => {} }, getThesisErrorCode: error => error.response?.data?.code || '',
     ...overrides,
   };
   const submit = executeDeclaration('app/dashboard/thesis/page.tsx', 'handleProposeTopic', dependencies);

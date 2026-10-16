@@ -30,10 +30,25 @@ public class ThesisGroupReadService {
             UUID roundId,
             List<String> roles,
             String studentId,
-            String lecturerId) {
+            String lecturerId,
+            String subject) {
         rounds.requireExisting(roundId);
         if (isFacultyAdmin(roles)) {
             return groups.findByRoundId(roundId);
+        }
+        // Governance readers are scoped like the dean overview: a faculty
+        // head sees only their faculty, a department head only their
+        // department — and member contacts (emails, declared externals) stay
+        // withheld on this surface as well.
+        if (roles.contains("TRUONG_KHOA") || roles.contains("TRUONG_BO_MON")) {
+            ThesisGroupReadRepository.LecturerScope scope = lecturerScope(roles, lecturerId, subject);
+            if (scope == null) {
+                return List.of();
+            }
+            List<GroupResponse> scoped = roles.contains("TRUONG_KHOA")
+                    ? groups.findByRoundIdAndFacultyId(roundId, scope.facultyId())
+                    : groups.findByRoundIdAndDepartmentId(roundId, scope.departmentId());
+            return scoped.stream().map(ThesisGroupReadService::withoutContacts).toList();
         }
         if (roles.contains("LECTURER")) {
             // External members declare an email/phone in `contact`, so a
@@ -70,10 +85,17 @@ public class ThesisGroupReadService {
             UUID id,
             List<String> roles,
             String studentId,
-            String lecturerId) {
+            String lecturerId,
+            String subject) {
         GroupResponse group;
         if (isFacultyAdmin(roles)) {
             group = groups.findById(id);
+        } else if (roles.contains("TRUONG_KHOA") || roles.contains("TRUONG_BO_MON")) {
+            ThesisGroupReadRepository.LecturerScope scope = lecturerScope(roles, lecturerId, subject);
+            boolean inScope = scope != null && (roles.contains("TRUONG_KHOA")
+                    ? groups.groupInFaculty(id, scope.facultyId())
+                    : groups.groupInDepartment(id, scope.departmentId()));
+            group = inScope ? withoutContacts(groups.findById(id)) : null;
         } else if (roles.contains("LECTURER")) {
             group = supervisedGroup(id, requireLecturerId(lecturerId));
         } else {
@@ -86,6 +108,37 @@ public class ThesisGroupReadService {
                     "Thesis group not found");
         }
         return group;
+    }
+
+    /** A governance scope requires a lecturer profile bound to the caller. */
+    private ThesisGroupReadRepository.LecturerScope lecturerScope(
+            List<String> roles, String lecturerId, String subject) {
+        if (subject == null || subject.isBlank()) {
+            return null;
+        }
+        String id = requireLecturerId(lecturerId);
+        return groups.findLecturerScope(id, subject);
+    }
+
+    /** Dean/department-head reads never carry member contacts. */
+    private static GroupResponse withoutContacts(GroupResponse group) {
+        if (group == null) {
+            return null;
+        }
+        return new GroupResponse(
+                group.id(),
+                group.roundId(),
+                group.leaderStudentId(),
+                group.topicId(),
+                group.status(),
+                group.approvalStatus(),
+                group.rejectionReason(),
+                group.memberStudentIds(),
+                group.members().stream()
+                        .map(m -> new io.campuscore.restfulapi.thesis.web.ThesisGroupReadDtos.GroupMemberResponse(
+                                m.studentId(), m.studentNumber(), m.displayName(), null,
+                                m.isExternal(), m.isLeader(), m.memberOrder()))
+                        .toList());
     }
 
     private GroupResponse supervisedGroup(UUID id, String lecturerId) {
@@ -130,6 +183,6 @@ public class ThesisGroupReadService {
     }
 
     private static boolean isFacultyAdmin(List<String> roles) {
-        return roles.contains("ADMIN") || roles.contains("SUPER_ADMIN") || roles.contains("TRUONG_KHOA");
+        return roles.contains("ADMIN") || roles.contains("SUPER_ADMIN");
     }
 }

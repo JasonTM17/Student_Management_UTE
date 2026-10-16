@@ -268,7 +268,18 @@ public class AnnouncementWriteService {
             String actorLabel,
             String announcementId,
             LifecycleRequest request) {
-        return transition(actorId, actorLabel, announcementId, request, true);
+        return transition(actorId, actorLabel, List.of("ADMIN"), null, announcementId, request, true);
+    }
+
+    @Transactional
+    public AnnouncementResponse archive(
+            String actorId,
+            String actorLabel,
+            List<String> roles,
+            String lecturerId,
+            String announcementId,
+            LifecycleRequest request) {
+        return transition(actorId, actorLabel, roles, lecturerId, announcementId, request, true);
     }
 
     @Transactional
@@ -277,15 +288,37 @@ public class AnnouncementWriteService {
             String actorLabel,
             String announcementId,
             LifecycleRequest request) {
-        return transition(actorId, actorLabel, announcementId, request, false);
+        return transition(actorId, actorLabel, List.of("ADMIN"), null, announcementId, request, false);
+    }
+
+    @Transactional
+    public AnnouncementResponse restore(
+            String actorId,
+            String actorLabel,
+            List<String> roles,
+            String lecturerId,
+            String announcementId,
+            LifecycleRequest request) {
+        return transition(actorId, actorLabel, roles, lecturerId, announcementId, request, false);
     }
 
     @Transactional
     public DeleteAnnouncementResponse delete(String actorId, String actorLabel, String announcementId) {
+        return delete(actorId, actorLabel, List.of("ADMIN"), null, announcementId);
+    }
+
+    @Transactional
+    public DeleteAnnouncementResponse delete(
+            String actorId,
+            String actorLabel,
+            List<String> roles,
+            String lecturerId,
+            String announcementId) {
         String actor = requireText(actorId, "actor");
         String label = requireActorLabel(actorLabel, "actorLabel");
         String id = requireText(announcementId, "announcement id");
         AnnouncementResponse before = requireAnnouncementForUpdate(id);
+        requireAnnouncementOwner(roles, lecturerId, before);
         if (before.archivedAt() != null) {
             return new DeleteAnnouncementResponse("Announcement deleted successfully");
         }
@@ -381,9 +414,19 @@ public class AnnouncementWriteService {
         return roles != null && (roles.contains("ADMIN") || roles.contains("SUPER_ADMIN"));
     }
 
+    /** Lecturers may only archive/restore/delete announcements they authored. */
+    private static void requireAnnouncementOwner(List<String> roles, String lecturerId, AnnouncementResponse before) {
+        if (isLecturerOnly(roles)
+                && (lecturerId == null || lecturerId.isBlank() || !lecturerId.equals(before.lecturerId()))) {
+            throw forbiddenLecturer();
+        }
+    }
+
     private AnnouncementResponse transition(
             String actorId,
             String actorLabel,
+            List<String> roles,
+            String lecturerId,
             String announcementId,
             LifecycleRequest request,
             boolean archive) {
@@ -393,6 +436,7 @@ public class AnnouncementWriteService {
         String reason = requireReason(request.reason());
         int expectedVersion = requireVersion(request.expectedVersion());
         AnnouncementResponse before = requireAnnouncementForUpdate(id);
+        requireAnnouncementOwner(roles, lecturerId, before);
         if (archive && before.archivedAt() != null) {
             throw conflict("ANNOUNCEMENT_ALREADY_ARCHIVED", "Announcement is already archived");
         }

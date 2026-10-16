@@ -38,13 +38,13 @@ public class ThesisGroupReadController {
         @ApiResponse(responseCode = "403", description = "Không có quyền truy cập")
     })
     @GetMapping
-    @PreAuthorize("hasAnyRole('STUDENT','LECTURER','ADMIN','SUPER_ADMIN','TRUONG_KHOA')")
+    @PreAuthorize("hasAnyRole('STUDENT','LECTURER','ADMIN','SUPER_ADMIN','TRUONG_KHOA','TRUONG_BO_MON')")
     public List<GroupResponse> list(
             @Parameter(description = "Mã UUID của đợt khóa luận", required = true)
             @RequestParam UUID roundId,
             @AuthenticationPrincipal Jwt actor) {
         return groups.list(roundId, roles(actor), actor.getClaimAsString("studentId"),
-                actor.getClaimAsString("lecturerId"));
+                actor.getClaimAsString("lecturerId"), actor.getSubject());
     }
 
     @Operation(summary = "Lấy các nhóm của người gọi trên mọi đợt", description = "Sinh viên thấy nhóm mình là thành viên/nhóm trưởng, giảng viên thấy nhóm thuộc đề tài mình hướng dẫn — dùng để tự chọn đợt chứa nhóm thay vì đợt mới nhất")
@@ -54,7 +54,7 @@ public class ThesisGroupReadController {
         @ApiResponse(responseCode = "403", description = "Không có hồ sơ sinh viên/giảng viên")
     })
     @GetMapping("/mine")
-    @PreAuthorize("hasAnyRole('STUDENT','LECTURER','ADMIN','SUPER_ADMIN','TRUONG_KHOA')")
+    @PreAuthorize("hasAnyRole('STUDENT','LECTURER','ADMIN','SUPER_ADMIN','TRUONG_KHOA','TRUONG_BO_MON')")
     public List<GroupResponse> mine(@AuthenticationPrincipal Jwt actor) {
         return groups.listMine(roles(actor), actor.getClaimAsString("studentId"),
                 actor.getClaimAsString("lecturerId"));
@@ -66,13 +66,13 @@ public class ThesisGroupReadController {
         @ApiResponse(responseCode = "404", description = "Không tìm thấy nhóm với UUID tương ứng")
     })
     @GetMapping("/{id}")
-    @PreAuthorize("hasAnyRole('STUDENT','LECTURER','ADMIN','SUPER_ADMIN','TRUONG_KHOA')")
+    @PreAuthorize("hasAnyRole('STUDENT','LECTURER','ADMIN','SUPER_ADMIN','TRUONG_KHOA','TRUONG_BO_MON')")
     public GroupResponse get(
             @Parameter(description = "Mã UUID của nhóm", required = true)
             @PathVariable UUID id,
             @AuthenticationPrincipal Jwt actor) {
         return groups.get(id, roles(actor), actor.getClaimAsString("studentId"),
-                actor.getClaimAsString("lecturerId"));
+                actor.getClaimAsString("lecturerId"), actor.getSubject());
     }
 
     private static List<String> roles(Jwt actor) {

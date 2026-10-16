@@ -821,6 +821,10 @@ export const en = {
       'Prerequisites satisfied — these courses are open for you. Sections offered this term link straight to registration.',
     availableEmpty:
       'No unblocked courses left — every remaining course still waits on a prerequisite or you have finished the plan.',
+    completedEmpty: 'No completed courses yet — finished courses will appear here.',
+    inProgressEmpty: 'No courses in progress right now.',
+    notStartedEmpty: 'No not-started courses remain in this plan.',
+    allEmpty: 'No courses in this curriculum yet.',
     openSections: '{count} sections open this term',
     noOpenSection: 'No section offered this term',
     registerCta: 'Register',
@@ -1179,6 +1183,8 @@ export const en = {
       saveNotDurable:
         'Saved to this web server only. The central API is unreachable, so other visitors will not see this until it is saved again.',
       loadFailed: 'The campus look could not be loaded right now.',
+      postsLoadFailed:
+        'The announcement list could not be loaded — pinned ordering is unavailable until it loads.',
       heroEyebrow: 'Home eyebrow',
       heroTitle: 'Home title',
       heroDescription: 'Home description',
@@ -1504,7 +1510,7 @@ export const en = {
       'Compose official academic emails from campus templates: notices, registration confirmations, and grade alerts. Each account is limited to 5 emails per hour.',
     quotaBadge: 'Sent this session: {count}',
     quotaNote: 'Campus limit: 5 emails per hour per account',
-    quotaLeft: '{count} of 5 left this hour',
+    quotaLeft: 'about {count} of 5 left this hour in this session',
     templatesLabel: 'Email type',
     templates: {
       notice: {
@@ -2177,6 +2183,10 @@ export const en = {
       'Every published topic lives in the topic catalog. Open it to compare topics and pick one for your group.',
     groupCreated: 'Thesis group created.',
     actionFailed: 'This action could not be completed.',
+    groupsRefreshFailed:
+      'Saved, but the group list could not be reloaded — it may be out of date.',
+    createdAsDraftNotice:
+      'Topic saved as a draft — publishing requires an assigned supervisor.',
     proposeTopic: 'Propose a topic',
     proposeTopicTitle: 'Propose a new thesis topic',
     proposeTopicDescription: 'Add the topic brief and supervisors, then submit it for department approval.',
@@ -2817,10 +2827,16 @@ export const en = {
     exportCsvEmpty: 'No student attendance records to export.',
     printRoster: 'Print attendance sheet',
     printOfficialHeader: 'HO CHI MINH CITY UNIVERSITY OF TECHNOLOGY AND ENGINEERING',
-    printDepartment: 'FACULTY OF INFORMATION TECHNOLOGY — CAMPUSUTE',
+    printDepartment: 'CAMPUSUTE',
     printReportTitle: 'CLASS SECTION ATTENDANCE ROSTER',
     printInstructorSignature: 'Instructor signature (Full name)',
     rosterLoadError: 'Could not load the attendance roster',
+    rosterLoadErrorDescription: 'The student roster could not be retrieved — please retry.',
+    sectionsLoadError: 'Could not load your class sections',
+    sectionsLoadErrorDescription: 'The class section list could not be retrieved — please retry.',
+    statPresentTodaySuffix: '% today',
+    statExcusedSuffix: 'excused',
+    statSessionsHeldSuffix: 'sessions held',
     sheetTitle: 'Class section attendance sheet',
   },
 } as const;
@@ -3652,6 +3668,10 @@ export const vi: I18nMessages = {
       'Bạn đã đủ điều kiện tiên quyết cho các môn dưới đây. Môn đang mở lớp trong kỳ này có nút chuyển thẳng sang trang đăng ký.',
     availableEmpty:
       'Không còn môn nào được mở khóa — các môn còn lại đều chờ học phần tiên quyết hoặc bạn đã hoàn thành chương trình.',
+    completedEmpty: 'Chưa có môn hoàn tất — các môn đã qua sẽ hiện ở đây.',
+    inProgressEmpty: 'Không có môn nào đang học.',
+    notStartedEmpty: 'Không còn môn chưa học nào trong chương trình.',
+    allEmpty: 'Chương trình đào tạo chưa có môn nào.',
     openSections: 'Đang mở {count} lớp trong kỳ này',
     noOpenSection: 'Kỳ này chưa mở lớp',
     registerCta: 'Đăng ký',
@@ -4010,6 +4030,8 @@ export const vi: I18nMessages = {
       saveNotDurable:
         'Chỉ vừa lưu trên web server này. API trung tâm đang không kết nối được, nên người dùng khác sẽ chưa thấy thay đổi cho tới khi lưu lại.',
       loadFailed: 'Hiện chưa thể tải giao diện cổng.',
+      postsLoadFailed:
+        'Không tải được danh sách thông báo — chưa thể sắp xếp ghim cho tới khi tải lại.',
       heroEyebrow: 'Dòng dẫn trang chủ',
       heroTitle: 'Tiêu đề trang chủ',
       heroDescription: 'Mô tả trang chủ',
@@ -4332,7 +4354,7 @@ export const vi: I18nMessages = {
       'Soạn email học vụ chính thức theo mẫu của nhà trường: thông báo học vụ, xác nhận đăng ký và cảnh báo điểm. Mỗi tài khoản giới hạn 5 email mỗi giờ.',
     quotaBadge: 'Đã gửi trong phiên: {count}',
     quotaNote: 'Hạn mức: 5 email/giờ mỗi tài khoản',
-    quotaLeft: 'Còn {count}/5 email trong giờ này',
+    quotaLeft: 'Còn khoảng {count}/5 email trong phiên này',
     templatesLabel: 'Loại email',
     templates: {
       notice: {
@@ -5004,6 +5026,10 @@ export const vi: I18nMessages = {
       'Toàn bộ đề tài đã công bố nằm trong danh mục đề tài. Mở danh mục để so sánh và chọn đề tài cho nhóm.',
     groupCreated: 'Đã tạo nhóm đề tài.',
     actionFailed: 'Không thể hoàn tất tác vụ này.',
+    groupsRefreshFailed:
+      'Đã lưu, nhưng không tải lại được danh sách nhóm — dữ liệu có thể chưa mới nhất.',
+    createdAsDraftNotice:
+      'Đề tài đã lưu ở dạng nháp — xuất bản cần có giảng viên hướng dẫn.',
     proposeTopic: 'Đề xuất đề tài',
     proposeTopicTitle: 'Đề xuất đề tài mới',
     proposeTopicDescription: 'Nhập mô tả và giảng viên hướng dẫn, sau đó gửi đề tài để bộ môn xét duyệt.',
@@ -5644,10 +5670,16 @@ export const vi: I18nMessages = {
     exportCsvEmpty: 'Không có dữ liệu điểm danh sinh viên để xuất.',
     printRoster: 'In bảng điểm danh',
     printOfficialHeader: 'TRƯỜNG ĐẠI HỌC CÔNG NGHỆ KỸ THUẬT TP. HỒ CHÍ MINH',
-    printDepartment: 'KHOA CÔNG NGHỆ THÔNG TIN — HỆ THỐNG CAMPUSUTE',
+    printDepartment: 'HỆ THỐNG CAMPUSUTE',
     printReportTitle: 'BẢNG ĐIỂM DANH LỚP HỌC PHẦN',
     printInstructorSignature: 'Giảng viên phụ trách (Ký và ghi rõ họ tên)',
     rosterLoadError: 'Không thể tải danh sách điểm danh',
+    rosterLoadErrorDescription: 'Danh sách sinh viên chưa tải được — vui lòng thử lại.',
+    sectionsLoadError: 'Không tải được danh sách lớp học phần',
+    sectionsLoadErrorDescription: 'Danh sách lớp học phần chưa tải được — vui lòng thử lại.',
+    statPresentTodaySuffix: '% hôm nay',
+    statExcusedSuffix: 'có phép',
+    statSessionsHeldSuffix: 'buổi đã học',
     sheetTitle: 'Bảng điểm danh lớp học phần',
   },
 };

@@ -104,8 +104,8 @@ test('conduct activity record uses only real fields and claims no issuance', () 
   assert.doesNotMatch(source, /digitallyVerified/);
   assert.doesNotMatch(source, /ĐÃ XÁC THỰC ĐIỆN TỬ/);
 
-  // Real fields only, em-dash otherwise.
-  assert.match(source, /summary\?\.studentCode \|\| '—'/);
+  // Real fields only, guarded em-dash otherwise.
+  assert.match(source, /displayLabel\(summary\?\.studentCode\)/);
   // Explicitly labelled as a preview record.
   assert.match(source, /copy\.previewTitle/);
   assert.match(source, /copy\.previewNote/);

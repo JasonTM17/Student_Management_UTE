@@ -1729,6 +1729,17 @@ export type SectionAttendanceSummary = {
   attendanceRate: number;
 };
 
+// Attendance roster entry — the markable population (every enrollment except
+// DROPPED/CANCELLED, including PENDING), matching the write path's rule.
+export type AttendanceRosterEntry = {
+  studentId: string;
+  studentCode: string;
+  studentEmail?: string;
+  firstName: string;
+  lastName: string;
+  enrollmentStatus: string;
+};
+
 // Mail API — lecturer/admin academic email dispatch (Java MailController).
 // Wire contract mirrors MailDtos.java: field-for-field, no client-side
 // renames. GET /mail/preview/{templateName} is opened directly in a new tab
@@ -1838,6 +1849,14 @@ export const attendanceApi = {
   ): Promise<SectionAttendanceSummary> => {
     const response = await api.get<SectionAttendanceSummary>(
       `/attendance/section/${sectionId}/summary`,
+    );
+    return response.data;
+  },
+  getSectionRoster: async (
+    sectionId: string,
+  ): Promise<AttendanceRosterEntry[]> => {
+    const response = await api.get<AttendanceRosterEntry[]>(
+      `/attendance/section/${sectionId}/roster`,
     );
     return response.data;
   },

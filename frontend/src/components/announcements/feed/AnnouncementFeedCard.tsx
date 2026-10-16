@@ -15,6 +15,7 @@ import {
   FlaskConical,
   Share2,
   Sparkles,
+  X,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { AnnouncementRecord } from '@/lib/api';
@@ -51,6 +52,7 @@ export function AnnouncementFeedCard({
 }: AnnouncementFeedCardProps) {
   const isVi = locale === 'vi';
   const [copied, setCopied] = useState(false);
+  const [shareFailed, setShareFailed] = useState(false);
   const { categories } = useArticleTaxonomy();
   const showViBadge = !isVi && isVietnameseText(announcement.title);
 
@@ -71,16 +73,31 @@ export function AnnouncementFeedCard({
 
   const handleShare = async (e: React.MouseEvent) => {
     e.stopPropagation();
+    if (typeof window === 'undefined') return;
+    const url = `${window.location.origin}/dashboard/announcements?id=${encodeURIComponent(announcement.id)}`;
     try {
-      if (typeof window !== 'undefined') {
-        const url = `${window.location.origin}/dashboard/announcements?id=${encodeURIComponent(announcement.id)}`;
-        await navigator.clipboard.writeText(url);
-        setCopied(true);
-        setTimeout(() => setCopied(false), 2000);
-      }
-    } catch {
+      await navigator.clipboard.writeText(url);
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
+    } catch {
+      // The Clipboard API can be denied (permissions policy, insecure context).
+      // Fall back to the legacy selection path; never show a false ✓.
+      const fallback = document.createElement('textarea');
+      fallback.value = url;
+      fallback.setAttribute('readonly', '');
+      fallback.style.position = 'fixed';
+      fallback.style.opacity = '0';
+      document.body.appendChild(fallback);
+      fallback.select();
+      const copiedFallback = document.execCommand('copy');
+      document.body.removeChild(fallback);
+      if (copiedFallback) {
+        setCopied(true);
+        setTimeout(() => setCopied(false), 2000);
+      } else {
+        setShareFailed(true);
+        setTimeout(() => setShareFailed(false), 2000);
+      }
     }
   };
 
@@ -226,7 +243,7 @@ export function AnnouncementFeedCard({
                 title={isVi ? 'Sao chép liên kết' : 'Copy link'}
                 aria-label={isVi ? 'Chia sẻ' : 'Share'}
               >
-                {copied ? <Check className="h-3.5 w-3.5 text-emerald-500" /> : <Share2 className="h-3.5 w-3.5" />}
+                {copied ? <Check className="h-3.5 w-3.5 text-emerald-500" /> : shareFailed ? <X className="h-3.5 w-3.5 text-destructive" /> : <Share2 className="h-3.5 w-3.5" />}
               </button>
 
               <span className="inline-flex items-center gap-1 rounded-lg bg-primary/10 px-3.5 py-1.5 text-xs font-bold text-primary group-hover:bg-primary group-hover:text-primary-foreground transition-all">
@@ -350,7 +367,7 @@ export function AnnouncementFeedCard({
               title={isVi ? 'Sao chép liên kết' : 'Copy link'}
               aria-label={isVi ? 'Chia sẻ' : 'Share'}
             >
-              {copied ? <Check className="h-3 w-3 text-emerald-500" /> : <Share2 className="h-3 w-3" />}
+              {copied ? <Check className="h-3 w-3 text-emerald-500" /> : shareFailed ? <X className="h-3 w-3 text-destructive" /> : <Share2 className="h-3 w-3" />}
             </button>
 
             <span className="inline-flex items-center gap-0.5 font-bold text-primary group-hover:translate-x-0.5 transition-transform text-xs">

@@ -161,6 +161,7 @@ export default function AdminUsersPage() {
   const [curricula, setCurricula] = useState<Curriculum[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState('');
+  const [referenceError, setReferenceError] = useState('');
   const [search, setSearch] = useState('');
   const [searchInput, setSearchInput] = useState('');
   const [page, setPage] = useState(1);
@@ -264,35 +265,37 @@ export default function AdminUsersPage() {
     }
   }, [locale, page, search, roleFilter]);
 
-  const fetchDepartments = useCallback(async () => {
+  // Department + curriculum options power every create/edit form; when their
+  // fetch fails there is no fallback list, so the failure must be visible and
+  // retryable instead of silently leaving the selects empty.
+  const fetchReferenceData = useCallback(async () => {
+    setReferenceError('');
     try {
-      const res = await departmentsApi.getAll({ limit: 100 });
-      if (res.data) {
-        setDepartments(res.data);
+      const [departmentsRes, curriculaRes] = await Promise.all([
+        departmentsApi.getAll({ limit: 100 }),
+        curriculaApi.getAll({ limit: 100 }),
+      ]);
+      if (departmentsRes.data) {
+        setDepartments(departmentsRes.data);
+      }
+      if (curriculaRes.data) {
+        setCurricula(curriculaRes.data);
       }
     } catch {
-      // Departments fallback list already available
+      setReferenceError(
+        locale === 'vi'
+          ? 'Hiện chưa thể tải dữ liệu khoa và chương trình đào tạo cho biểu mẫu.'
+          : 'Department and curriculum options could not be loaded.',
+      );
     }
-  }, []);
-
-  const fetchCurricula = useCallback(async () => {
-    try {
-      const res = await curriculaApi.getAll({ limit: 100 });
-      if (res.data) {
-        setCurricula(res.data);
-      }
-    } catch {
-      // Curricula fallback
-    }
-  }, []);
+  }, [locale]);
 
   useEffect(() => {
     if (canAccess) {
       void fetchUsers();
-      void fetchDepartments();
-      void fetchCurricula();
+      void fetchReferenceData();
     }
-  }, [canAccess, fetchUsers, fetchDepartments, fetchCurricula]);
+  }, [canAccess, fetchUsers, fetchReferenceData]);
 
   const pageSummary = useMemo(() => {
     if (totalItems === 0) {
@@ -1149,6 +1152,14 @@ export default function AdminUsersPage() {
             </form>
           </div>
         </AdminToolbarCard>
+
+        {referenceError ? (
+          <ErrorState
+            title={copy.unavailableTitle}
+            description={referenceError}
+            onRetry={() => void fetchReferenceData()}
+          />
+        ) : null}
 
         {error ? (
           <ErrorState

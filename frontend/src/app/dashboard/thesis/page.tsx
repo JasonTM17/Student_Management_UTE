@@ -1144,7 +1144,13 @@ export default function ThesisPage() {
 
   const refreshGroups = async () => {
     if (!selectedRoundId) return;
-    setGroups(await thesisApi.listGroups(selectedRoundId));
+    try {
+      setGroups(await thesisApi.listGroups(selectedRoundId));
+    } catch {
+      // The preceding mutation already succeeded — a failed roster reload must
+      // not be reported as "action failed" by the caller's catch block.
+      toast.warning(messages.thesis.groupsRefreshFailed);
+    }
   };
 
   const createGroup = async () => {
@@ -1581,16 +1587,23 @@ export default function ThesisPage() {
         }
       }
       let publishCreated = false;
-      if (isTopicApprover && proposePublishImmediately && supervisorsAssigned) {
-        try {
-          await thesisApi.publishTopic(created.id);
-          publishCreated = true;
-        } catch (caught) {
-          // A rejected approval leaves the saved draft available for review;
-          // retrying the create form would otherwise create a second proposal.
-          const message = topicActionErrorMessage(caught);
-          setActionError(message);
-          toast.error(message);
+      if (isTopicApprover && proposePublishImmediately) {
+        if (supervisorsAssigned) {
+          try {
+            await thesisApi.publishTopic(created.id);
+            publishCreated = true;
+          } catch (caught) {
+            // A rejected approval leaves the saved draft available for review;
+            // retrying the create form would otherwise create a second proposal.
+            const message = topicActionErrorMessage(caught);
+            setActionError(message);
+            toast.error(message);
+          }
+        } else {
+          // "Publish immediately" was checked but publishing requires an
+          // assigned supervisor — the topic silently became a draft without
+          // this notice.
+          toast.warning(messages.thesis.createdAsDraftNotice);
         }
       }
       if (selectedRoundId !== targetRoundId) {

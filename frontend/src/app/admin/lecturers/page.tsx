@@ -331,7 +331,11 @@ export default function AdminLecturersPage() {
     try {
       await lecturersApi.delete(lecturer.id);
       toast.success(copy.deleted);
-      await fetchLecturers();
+      if (lecturers.length === 1 && page > 1) {
+        setPage((prev) => prev - 1);
+      } else {
+        await fetchLecturers();
+      }
     } catch {
       toast.error(copy.deleteFailed);
     }

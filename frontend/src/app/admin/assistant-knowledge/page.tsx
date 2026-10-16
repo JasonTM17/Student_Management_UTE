@@ -313,6 +313,7 @@ interface GuidanceFormModalProps {
   isSaving: boolean;
   editing: boolean;
   form: AssistantKnowledgeRequest;
+  formError: string;
   onChange: (patch: Partial<AssistantKnowledgeRequest>) => void;
   onClose: () => void;
   onSave: () => void;
@@ -324,6 +325,7 @@ function GuidanceFormModal({
   isSaving,
   editing,
   form,
+  formError,
   onChange,
   onClose,
   onSave,
@@ -345,6 +347,14 @@ function GuidanceFormModal({
       className="max-w-4xl"
     >
       <div className="space-y-4">
+        {formError ? (
+          <div
+            role="alert"
+            className="rounded-lg border border-destructive/40 bg-destructive/10 px-3 py-2.5 text-sm leading-6 text-destructive"
+          >
+            {formError}
+          </div>
+        ) : null}
         <div className="grid gap-4 sm:grid-cols-3">
           <AdminFormField label={vi ? 'Mã nội dung' : 'Guidance code'}>
             <Input
@@ -432,6 +442,10 @@ export default function AdminAssistantKnowledgePage() {
   const [editing, setEditing] = useState<AssistantKnowledgeDocument | null>(null);
   const [form, setForm] = useState<AssistantKnowledgeRequest>(blankForm);
   const [archiveTarget, setArchiveTarget] = useState<AssistantKnowledgeDocument | null>(null);
+  // Save/validation failures render inside the open modals — the page-level
+  // banner sits behind the dialog so callers never saw them.
+  const [formError, setFormError] = useState('');
+  const [archiveError, setArchiveError] = useState('');
 
   const load = useCallback(async () => {
     setIsLoading(true);
@@ -487,6 +501,7 @@ export default function AdminAssistantKnowledgePage() {
     setForm({ ...blankForm });
     setNotice('');
     setError('');
+    setFormError('');
     setFormOpen(true);
   };
 
@@ -494,6 +509,7 @@ export default function AdminAssistantKnowledgePage() {
     setEditing(document);
     setNotice('');
     setError('');
+    setFormError('');
     try {
       const fullDoc = await assistantKnowledgeApi.get(document.documentId);
       setEditing(fullDoc);
@@ -521,11 +537,11 @@ export default function AdminAssistantKnowledgePage() {
 
   const save = async () => {
     if (!form.slug.trim() || !form.title.trim() || !form.content.trim() || !form.source.trim()) {
-      setError(vi ? 'Vui lòng điền mã nội dung, tiêu đề, nội dung và nguồn tham chiếu.' : 'Guidance code, title, content, and reference are required.');
+      setFormError(vi ? 'Vui lòng điền mã nội dung, tiêu đề, nội dung và nguồn tham chiếu.' : 'Guidance code, title, content, and reference are required.');
       return;
     }
     setIsSaving(true);
-    setError('');
+    setFormError('');
     try {
       if (editing) await assistantKnowledgeApi.update(editing.documentId, form);
       else await assistantKnowledgeApi.create(form);
@@ -533,7 +549,7 @@ export default function AdminAssistantKnowledgePage() {
       setNotice(vi ? 'Đã lưu bản nháp.' : 'Draft saved.');
       await load();
     } catch (saveError) {
-      setError(actionError(saveError, locale));
+      setFormError(actionError(saveError, locale));
     } finally {
       setIsSaving(false);
     }
@@ -565,7 +581,7 @@ export default function AdminAssistantKnowledgePage() {
   const archive = async () => {
     if (!archiveTarget) return;
     setIsSaving(true);
-    setError('');
+    setArchiveError('');
     try {
       const sync = await assistantKnowledgeApi.archive(archiveTarget.documentId);
       const pendingProjection = sync && (sync.degraded || (archiveTarget.state === 'PUBLISHED' && sync.status !== 'ACTIVATED'));
@@ -574,8 +590,8 @@ export default function AdminAssistantKnowledgePage() {
         ? (vi ? 'Đã lưu trữ trong kho quản trị; trợ lý chưa cập nhật. Hãy kiểm tra trạng thái đồng bộ.' : 'Archived in administration; the assistant has not updated yet. Check sync status.')
         : (vi ? 'Đã lưu trữ nội dung. Lịch sử thay đổi vẫn được giữ.' : 'Guidance archived. Its change history remains available.'));
       await load();
-    } catch (archiveError) {
-      setError(actionError(archiveError, locale));
+    } catch (caught) {
+      setArchiveError(actionError(caught, locale));
     } finally {
       setIsSaving(false);
     }
@@ -716,7 +732,10 @@ export default function AdminAssistantKnowledgePage() {
               vi={vi}
               onEdit={(document) => void openEdit(document)}
               onTransition={(document, operation) => void transition(document, operation)}
-              onArchiveRequest={setArchiveTarget}
+              onArchiveRequest={(document) => {
+                setArchiveError('');
+                setArchiveTarget(document);
+              }}
             />
           )}
         </AdminTableCard>
@@ -727,14 +746,21 @@ export default function AdminAssistantKnowledgePage() {
         isSaving={isSaving}
         editing={Boolean(editing)}
         form={form}
+        formError={formError}
         onChange={updateForm}
-        onClose={() => setFormOpen(false)}
+        onClose={() => {
+          setFormError('');
+          setFormOpen(false);
+        }}
         onSave={() => void save()}
         vi={vi}
       />
       <ConfirmModal
         isOpen={Boolean(archiveTarget)}
-        onClose={() => setArchiveTarget(null)}
+        onClose={() => {
+          setArchiveError('');
+          setArchiveTarget(null);
+        }}
         onConfirm={() => void archive()}
         title={vi ? 'Lưu trữ nội dung?' : 'Archive guidance?'}
         message={
@@ -745,6 +771,7 @@ export default function AdminAssistantKnowledgePage() {
         confirmText={vi ? 'Lưu trữ' : 'Archive'}
         variant="destructive"
         isLoading={isSaving}
+        error={archiveError}
       />
     </AdminFrame>
   );

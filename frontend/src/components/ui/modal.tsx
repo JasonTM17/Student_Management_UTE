@@ -203,6 +203,8 @@ interface ConfirmModalProps {
   isLoading?: boolean;
   /** Optional amber caution banner rendered above the actions (soft warnings). */
   warning?: string;
+  /** Optional destructive alert rendered above the actions (failed confirms). */
+  error?: string;
 }
 
 export function ConfirmModal({
@@ -216,6 +218,7 @@ export function ConfirmModal({
   variant = 'default',
   isLoading = false,
   warning,
+  error,
 }: ConfirmModalProps) {
   const { messages } = useI18n();
 
@@ -229,6 +232,14 @@ export function ConfirmModal({
             className="rounded-lg border border-status-warning/40 bg-status-warning/10 px-3 py-2.5 text-sm leading-6 text-status-warning-foreground"
           >
             {warning}
+          </div>
+        ) : null}
+        {error ? (
+          <div
+            role="alert"
+            className="rounded-lg border border-destructive/40 bg-destructive/10 px-3 py-2.5 text-sm leading-6 text-destructive"
+          >
+            {error}
           </div>
         ) : null}
         <div className="flex flex-wrap justify-end gap-2">

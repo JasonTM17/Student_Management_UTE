@@ -111,13 +111,10 @@ function getStudentCodeLabel(enrollment: Enrollment) {
   if (enrollment.studentId && !enrollment.studentId.startsWith('student-profile')) {
     return enrollment.studentId;
   }
-  if (enrollment.studentId === 'student-profile') {
-    // Never surface another student's code: leave the cell unresolved.
+  // The backend id is an opaque profile key ('student-profile' / 'student-profile-N'),
+  // never an MSSV — never fabricate a code from its suffix, leave the cell unresolved.
+  if (enrollment.studentId?.startsWith('student-profile')) {
     return '';
-  }
-  const match = enrollment.studentId?.match(/student-profile-(\d+)/);
-  if (match) {
-    return `24110${match[1]}`;
   }
   return candidate || enrollment.studentId;
 }
@@ -510,7 +507,11 @@ export default function AdminEnrollmentsPage() {
     try {
       await enrollmentsApi.delete(enrollment.id);
       toast.success(copy.deleted);
-      await fetchEnrollments();
+      if (enrollments.length === 1 && page > 1) {
+        setPage((prev) => prev - 1);
+      } else {
+        await fetchEnrollments();
+      }
     } catch {
       toast.error(copy.deleteFailed);
     }
@@ -690,7 +691,7 @@ export default function AdminEnrollmentsPage() {
                           title={copy.viewStudentLabel(learnerLabel)}
                         >
                           <p className="text-xs font-semibold uppercase tracking-[0.16em] text-primary">
-                            {studentCodeLabel}
+                            {studentCodeLabel || '—'}
                           </p>
                           <h3 className="mt-1 break-words font-semibold text-foreground">
                             {learnerLabel}
@@ -820,7 +821,7 @@ export default function AdminEnrollmentsPage() {
                                 {enrollment.student?.user?.email || copy.noEmail}
                               </p>
                               <p className="inline-flex rounded-md bg-secondary px-2 py-0.5 text-[11px] font-semibold text-foreground">
-                                {getStudentCodeLabel(enrollment)}
+                                {getStudentCodeLabel(enrollment) || '—'}
                               </p>
                             </button>
                           </td>
@@ -923,7 +924,7 @@ export default function AdminEnrollmentsPage() {
                     {copy.detail.studentCode}
                   </dt>
                   <dd className="mt-1 break-words font-semibold text-foreground">
-                    {getStudentCodeLabel(selectedEnrollment)}
+                    {getStudentCodeLabel(selectedEnrollment) || '—'}
                   </dd>
                 </div>
                 <div>

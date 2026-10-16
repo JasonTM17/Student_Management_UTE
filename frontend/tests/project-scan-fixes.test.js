@@ -89,7 +89,7 @@ test('grade score inputs use canonical 50-50 components and derive the letter gr
   const page = read('src/app/dashboard/lecturer/grades/[id]/page.tsx');
 
   assert.match(page, /'processScore' \| 'finalExamScore'/);
-  assert.match(page, /\(update!\.processScore! \+ update!\.finalExamScore!\) \/ 2/);
+  assert.match(page, /Math\.round\(\(Math\.round\(update!\.processScore! \* 100\) \+ Math\.round\(update!\.finalExamScore! \* 100\)\) \/ 2\) \/ 100/);
   assert.match(page, /calculateGrade\(totalScore\(current\)!\)/);
   assert.doesNotMatch(page, /letterGrades/);
   assert.match(page, /step="0\.1"/);
@@ -553,7 +553,7 @@ test('schedule page keeps badges padded and never prints a UUID as the student I
   // A printed UUID fragment presented as an MSSV is fabricated identity data;
   // unknown student codes print an honest em-dash instead.
   assert.doesNotMatch(page, /user\.id\?\.slice\(0, 10\)/);
-  assert.match(page, /user\.studentId \?\? '—'/);
+  assert.match(page, /displayLabel\(printableStudentCode\)/);
 });
 
 test('announcements banner names the live semester instead of a hardcoded term', () => {

@@ -18,6 +18,7 @@ import org.springframework.stereotype.Repository;
 @Profile("persistence")
 public class AcademicAttendanceReadRepository {
     private static final String ATTENDANCE = "\"academic\".\"Attendance\"";
+    private static final String ENROLLMENT = "\"academic\".\"Enrollment\"";
     private static final String STUDENT = "\"academic\".\"Student\"";
     private static final String USER = "\"campuscore_auth\".\"User\"";
     private static final String SECTION = "\"academic\".\"Section\"";
@@ -133,6 +134,29 @@ public class AcademicAttendanceReadRepository {
                 AcademicAttendanceReadRepository::mapSectionSummary);
     }
 
+    /**
+     * Attendance roster uses the write path's markable predicate: every
+     * enrollment except DROPPED/CANCELLED. The grading read model deliberately
+     * excludes PENDING (publishing completeness), but a still-pending
+     * enrollment is an actively attending student who must be markable.
+     */
+    public List<RosterRow> findSectionAttendanceRoster(String sectionId) {
+        return jdbc.query(
+                "SELECT student.\"id\" AS student_id, student.\"studentId\" AS student_number,"
+                        + " student_user.\"email\" AS student_email,"
+                        + " student_user.\"firstName\" AS student_first_name,"
+                        + " student_user.\"lastName\" AS student_last_name,"
+                        + " enrollment.\"status\" AS enrollment_status"
+                        + " FROM " + ENROLLMENT + " enrollment"
+                        + " JOIN " + STUDENT + " student ON student.\"id\" = enrollment.\"studentId\""
+                        + " JOIN " + USER + " student_user ON student_user.\"id\" = student.\"userId\""
+                        + " WHERE enrollment.\"sectionId\" = :sectionId"
+                        + " AND enrollment.\"status\" NOT IN ('DROPPED', 'CANCELLED')"
+                        + " ORDER BY student_user.\"firstName\" ASC, student_user.\"lastName\" ASC, enrollment.\"id\" ASC",
+                new MapSqlParameterSource("sectionId", sectionId),
+                AcademicAttendanceReadRepository::mapRoster);
+    }
+
     public Optional<AttendanceRow> findById(String id) {
         return jdbc.query(attendanceSelect() + " WHERE a.\"id\" = :id",
                         new MapSqlParameterSource("id", id),
@@ -219,6 +243,16 @@ public class AcademicAttendanceReadRepository {
                 rs.getString("nameVi"));
     }
 
+    private static RosterRow mapRoster(ResultSet rs, int ignored) throws SQLException {
+        return new RosterRow(
+                rs.getString("student_id"),
+                rs.getString("student_number"),
+                rs.getString("student_email"),
+                rs.getString("student_first_name"),
+                rs.getString("student_last_name"),
+                rs.getString("enrollment_status"));
+    }
+
     private static StudentSummaryRow mapStudentSummary(ResultSet rs, int ignored) throws SQLException {
         return new StudentSummaryRow(
                 rs.getString("sectionId"),
@@ -279,6 +313,15 @@ public class AcademicAttendanceReadRepository {
             String courseName,
             String courseNameEn,
             String courseNameVi) {
+    }
+
+    public record RosterRow(
+            String studentId,
+            String studentNumber,
+            String studentEmail,
+            String studentFirstName,
+            String studentLastName,
+            String enrollmentStatus) {
     }
 
     public record StudentSummaryRow(

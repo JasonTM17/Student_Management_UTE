@@ -291,7 +291,11 @@ export default function AdminDepartmentsPage() {
     try {
       await departmentsApi.delete(department.id);
       toast.success(copy.deleted);
-      await fetchDepartments();
+      if (departments.length === 1 && page > 1) {
+        setPage((prev) => prev - 1);
+      } else {
+        await fetchDepartments();
+      }
     } catch {
       toast.error(copy.deleteFailed);
     }

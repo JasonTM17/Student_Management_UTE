@@ -49,9 +49,12 @@ function isGradeComplete(update: GradeUpdate | undefined) {
   return hasCompletedGrade(update);
 }
 
+// Integer-cent average of two stored NUMERIC(4,2) scores: matches the
+// backend's BigDecimal HALF_UP-at-2dp exactly (float (p+f)/2 lands just
+// below a .005 tie and flips the letter grade, e.g. 3.99+4.00).
 function totalScore(update: GradeUpdate | undefined) {
   return hasCompletedGrade(update)
-    ? Math.round(((update!.processScore! + update!.finalExamScore!) / 2) * 100) / 100
+    ? Math.round((Math.round(update!.processScore! * 100) + Math.round(update!.finalExamScore! * 100)) / 2) / 100
     : null;
 }
 
@@ -185,7 +188,7 @@ export default function SectionGradingPage() {
           exportCsvSuccess: 'Đã xuất bảng điểm CSV thành công.',
           printRoster: 'In bảng điểm',
           printOfficialHeader: 'TRƯỜNG ĐẠI HỌC CÔNG NGHỆ KỸ THUẬT TP. HỒ CHÍ MINH — CAMPUSUTE',
-          printDepartment: 'KHOA CÔNG NGHỆ THÔNG TIN',
+          printDepartment: 'HỆ THỐNG CAMPUSUTE',
           printReportTitle: 'BẢNG ĐIỂM TỔNG KẾT HỌC PHẦN',
           printInstructorSignature: 'GIẢNG VIÊN CHẤM ĐIỂM',
           printDepartmentHeadSignature: 'TRƯỞNG BỘ MÔN DUYỆT',
@@ -257,7 +260,7 @@ export default function SectionGradingPage() {
           exportCsvSuccess: 'Grade roster CSV exported successfully.',
           printRoster: 'Print grade sheet',
           printOfficialHeader: 'HO CHI MINH CITY UNIVERSITY OF TECHNOLOGY AND ENGINEERING — CAMPUSUTE',
-          printDepartment: 'FACULTY OF INFORMATION TECHNOLOGY',
+          printDepartment: 'CAMPUSUTE',
           printReportTitle: 'COURSE SECTION FINAL GRADE ROSTER',
           printInstructorSignature: 'COURSE INSTRUCTOR',
           printDepartmentHeadSignature: 'DEPARTMENT HEAD',
@@ -270,6 +273,19 @@ export default function SectionGradingPage() {
     messages.common.statuses[
       (status ?? 'UNKNOWN').toUpperCase() as keyof typeof messages.common.statuses
     ] ?? messages.common.statuses.UNKNOWN;
+
+  // The letterhead must carry the section's real department — a hardcoded
+  // faculty name printed the wrong institution on non-IT rosters.
+  const printDepartmentName = useMemo(() => {
+    if (!sectionData) return copy.printDepartment;
+    return getLocalizedFlatLabel(
+      locale,
+      sectionData.departmentName,
+      sectionData.departmentNameEn,
+      sectionData.departmentNameVi,
+      copy.printDepartment,
+    );
+  }, [locale, sectionData, copy.printDepartment]);
 
   const fetchSectionGrades = useCallback(
     async (options?: { silent?: boolean; preserveLocalRows?: GradeUpdate[] }) => {
@@ -873,7 +889,7 @@ export default function SectionGradingPage() {
                 {copy.printOfficialHeader}
               </div>
               <div className="text-sm font-extrabold uppercase tracking-wide text-foreground">
-                {copy.printDepartment}
+                {printDepartmentName}
               </div>
               <h1 className="text-xl font-black text-primary mt-2 uppercase tracking-wide">
                 {copy.printReportTitle}

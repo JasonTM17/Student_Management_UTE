@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   AlertCircle,
   BookOpen,
@@ -12,11 +12,13 @@ import {
   GraduationCap,
   ImageIcon,
   Loader2,
+  RefreshCw,
   Send,
   Sparkles,
   X,
 } from 'lucide-react';
-import { announcementsApi, type AnnouncementMutation } from '@/lib/api';
+import { announcementsApi, sectionsApi, type AnnouncementMutation } from '@/lib/api';
+import type { GradingSection } from '@/types/api';
 import {
   announcementLengthViolationMessage,
   findAnnouncementLengthViolation,
@@ -207,6 +209,29 @@ export function LecturerAnnouncementCreateModal({
   const [editorMode, setEditorMode] = useState<'visual' | 'code' | 'preview'>('visual');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [validationError, setValidationError] = useState('');
+  const [sections, setSections] = useState<GradingSection[]>([]);
+  const [sectionsState, setSectionsState] = useState<'idle' | 'loading' | 'error' | 'ready'>('idle');
+  const [selectedSectionId, setSelectedSectionId] = useState('');
+
+  // The backend hard-rejects lecturer announcements without an owned
+  // sectionId (LECTURER_ANNOUNCEMENT_FORBIDDEN), so the picker is loaded
+  // whenever the composer opens rather than trusting props to arrive.
+  const loadSections = () => {
+    setSectionsState('loading');
+    sectionsApi
+      .getMyGradingSections()
+      .then((list) => {
+        setSections(Array.isArray(list) ? list : []);
+        setSectionsState('ready');
+      })
+      .catch(() => setSectionsState('error'));
+  };
+
+  useEffect(() => {
+    if (isOpen && sectionsState === 'idle') {
+      loadSections();
+    }
+  }, [isOpen]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Active cover image detection from content
   const activeCoverUrl =
@@ -287,6 +312,10 @@ export function LecturerAnnouncementCreateModal({
       setValidationError(isVi ? 'Vui lòng nhập nội dung thông báo' : 'Please enter notice content');
       return;
     }
+    if (!selectedSectionId) {
+      setValidationError(isVi ? 'Vui lòng chọn lớp học phần nhận thông báo' : 'Please select the class section for this notice');
+      return;
+    }
     // A fourth authoring surface: this modal writes announcements directly, so it
     // must consult the same length contract as the editor page rather than letting
     // the server answer with an opaque 400.
@@ -308,6 +337,7 @@ export function LecturerAnnouncementCreateModal({
         priority,
         targetRoles: ['STUDENT'],
         isGlobal: false,
+        sectionId: selectedSectionId,
       };
 
       await announcementsApi.create(payload);
@@ -371,6 +401,61 @@ export function LecturerAnnouncementCreateModal({
               );
             })}
           </div>
+        </div>
+
+        {/* Target section — required by the backend guard */}
+        <div className="space-y-1.5">
+          <label
+            htmlFor="lecturer-announcement-section"
+            className="text-xs font-semibold text-foreground"
+          >
+            {isVi ? 'Lớp học phần nhận thông báo *' : 'Target class section *'}
+          </label>
+          {sectionsState === 'loading' ? (
+            <div className="flex items-center gap-2 rounded-md border border-border/80 bg-secondary/20 px-3 py-2 text-sm text-muted-foreground">
+              <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
+              {isVi ? 'Đang tải danh sách lớp học phần...' : 'Loading your class sections...'}
+            </div>
+          ) : sectionsState === 'error' ? (
+            <div className="flex items-center justify-between gap-2 rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm">
+              <span className="text-destructive">
+                {isVi ? 'Không tải được danh sách lớp học phần.' : 'Could not load your class sections.'}
+              </span>
+              <button
+                type="button"
+                onClick={loadSections}
+                className="inline-flex items-center gap-1 text-xs font-semibold text-primary hover:underline"
+              >
+                <RefreshCw className="h-3.5 w-3.5" aria-hidden="true" />
+                {isVi ? 'Thử lại' : 'Retry'}
+              </button>
+            </div>
+          ) : sectionsState === 'ready' && sections.length === 0 ? (
+            <div className="rounded-md border border-border/80 bg-secondary/20 px-3 py-2 text-sm text-muted-foreground">
+              {isVi
+                ? 'Bạn chưa được phân công lớp học phần nào — chưa thể đăng thông báo.'
+                : 'You have no assigned class sections — posting is unavailable.'}
+            </div>
+          ) : (
+            <select
+              id="lecturer-announcement-section"
+              value={selectedSectionId}
+              onChange={(e) => setSelectedSectionId(e.target.value)}
+              className="w-full rounded-md border border-border/80 bg-background px-3 py-2 text-sm text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+            >
+              <option value="">
+                {isVi ? '— Chọn lớp học phần —' : '— Select a class section —'}
+              </option>
+              {sections.map((section) => (
+                <option key={section.id} value={section.id}>
+                  {(isVi ? section.courseNameVi : section.courseNameEn) || section.courseName}
+                  {' · '}
+                  {isVi ? 'Lớp' : 'Section'} {section.sectionNumber}
+                  {section.semesterName ? ` · ${section.semesterName}` : ''}
+                </option>
+              ))}
+            </select>
+          )}
         </div>
 
         {/* Priority & Target Audience */}

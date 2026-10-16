@@ -31,7 +31,7 @@ public class AdminUserMutationService {
     private static final String USER_ROLE = "\"campuscore_auth\".\"UserRole\"";
     private static final String STUDENT = "\"campuscore_auth\".\"Student\"";
     private static final String LECTURER = "\"campuscore_auth\".\"Lecturer\"";
-    private static final Set<String> SYSTEM_ROLES = Set.of("STUDENT", "LECTURER", "ADMIN", "TRUONG_KHOA", "SUPER_ADMIN");
+    private static final Set<String> SYSTEM_ROLES = Set.of("STUDENT", "LECTURER", "ADMIN", "TRUONG_KHOA", "TRUONG_BO_MON", "SUPER_ADMIN");
     private static final String ACADEMIC_DEPARTMENT = "academic.\"Department\"";
     private static final String ACADEMIC_CURRICULUM = "academic.\"Curriculum\"";
     /**
@@ -47,7 +47,7 @@ public class AdminUserMutationService {
      *
      * <p>Ordered so the refusal message names the same role every time.
      */
-    private static final List<String> SUPER_ADMIN_ONLY_ROLES = List.of("ADMIN", "SUPER_ADMIN", "TRUONG_KHOA");
+    private static final List<String> SUPER_ADMIN_ONLY_ROLES = List.of("ADMIN", "SUPER_ADMIN", "TRUONG_KHOA", "TRUONG_BO_MON");
     /** Lifecycle values the account-state filter and the UI understand. */
     private static final Set<String> ACCOUNT_STATUSES = Set.of("ACTIVE", "PENDING", "SUSPENDED", "LOCKED", "DISABLED");
     private static final String TEMP_PASSWORD_ALPHABET =
@@ -495,14 +495,14 @@ public class AdminUserMutationService {
      * Every other request maps to itself.
      */
     private static Set<String> desiredSystemRoles(String roleName) {
-        return "TRUONG_KHOA".equals(roleName)
-                ? Set.of("LECTURER", "TRUONG_KHOA")
+        return ("TRUONG_KHOA".equals(roleName) || "TRUONG_BO_MON".equals(roleName))
+                ? Set.of("LECTURER", roleName)
                 : Set.of(roleName);
     }
 
-    /** Both members of the dean pair are bound to the lecturer profile. */
+    /** Dean and department-head pairs are bound to the lecturer profile. */
     private static boolean usesLecturerProfile(String roleName) {
-        return "LECTURER".equals(roleName) || "TRUONG_KHOA".equals(roleName);
+        return "LECTURER".equals(roleName) || "TRUONG_KHOA".equals(roleName) || "TRUONG_BO_MON".equals(roleName);
     }
 
     private Set<String> systemRoleNames(String userId) {
@@ -603,12 +603,12 @@ public class AdminUserMutationService {
         // not a grant, though: the admin edit form echoes the unchanged role back,
         // and refusing that would make every other field on the account unsavable.
         if (!canManageSuperAdmin
-                && "TRUONG_KHOA".equals(roleName)
-                && !(userId != null && hasRole(userId, "TRUONG_KHOA"))) {
+                && ("TRUONG_KHOA".equals(roleName) || "TRUONG_BO_MON".equals(roleName))
+                && !(userId != null && hasRole(userId, roleName))) {
             throw problem(
                     HttpStatus.FORBIDDEN,
                     "ROLE_ESCALATION",
-                    "Only a super administrator can assign the faculty head role");
+                    "Only a super administrator can assign governance roles");
         }
         // Re-assigning a system role to a custom-role holder is still a take-over
         // of an account whose powers the caller may not grant.

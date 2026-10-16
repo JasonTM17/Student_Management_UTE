@@ -69,4 +69,13 @@ public final class AcademicAttendanceReadDtos {
             long excused,
             int attendanceRate) {
     }
+
+    public record AttendanceRosterEntry(
+            String studentId,
+            String studentCode,
+            String studentEmail,
+            String firstName,
+            String lastName,
+            String enrollmentStatus) {
+    }
 }

@@ -69,7 +69,9 @@ export function calculateTotalScore(processScore: number | null, finalExamScore:
   if (processScore === null || finalExamScore === null || !Number.isFinite(processScore) || !Number.isFinite(finalExamScore)) {
     return null;
   }
-  return Math.round(((processScore + finalExamScore) / 2) * 100) / 100;
+  // Integer-cent average: identical to the backend's BigDecimal HALF_UP on
+  // NUMERIC(4,2) scores — float (p+f)/2 can land just below a .005 tie.
+  return Math.round((Math.round(processScore * 100) + Math.round(finalExamScore * 100)) / 2) / 100;
 }
 
 /**
