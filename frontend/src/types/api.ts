@@ -166,7 +166,7 @@ export interface Semester {
   registrationEnd?: string;
   addDropStart?: string;
   addDropEnd?: string;
-  status: 'DRAFT' | 'ACTIVE' | 'REGISTRATION_OPEN' | 'ADD_DROP_OPEN' | 'IN_PROGRESS' | 'CLOSED' | 'ARCHIVED';
+  status: 'DRAFT' | 'OPEN' | 'ACTIVE' | 'REGISTRATION_OPEN' | 'ADD_DROP_OPEN' | 'IN_PROGRESS' | 'CLOSED' | 'ARCHIVED';
   createdAt: string;
   academicYear?: AcademicYear;
 }
