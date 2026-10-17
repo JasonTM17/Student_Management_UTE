@@ -37,7 +37,7 @@ async function profilePasswordHandler({ rejectChange = false, newPassword = 'Saf
     toast: { success: () => events.push('success') },
     campusCodeMessage: () => 'Translated rejection',
     logout: options => {
-      assert.equal(options.redirect, false);
+      assert.equal(options.redirect, '/vi/login?reason=password-rotated');
       events.push('logout');
       return waitForLogout ? new Promise(resolve => { releaseLogout = resolve; }) : Promise.resolve();
     },
@@ -51,7 +51,7 @@ async function profilePasswordHandler({ rejectChange = false, newPassword = 'Saf
   return { events, submit: () => invoke({ preventDefault() {}, currentTarget: form }), release: () => releaseLogout() };
 }
 
-test('profile password success waits for sign-out before localized login navigation', async () => {
+test('profile password success hands the rotated login target to logout atomically', async () => {
   const scenario = await profilePasswordHandler({ waitForLogout: true });
   const pending = scenario.submit();
   await new Promise(resolve => setImmediate(resolve));
@@ -60,8 +60,33 @@ test('profile password success waits for sign-out before localized login navigat
   scenario.release();
   await pending;
   assert.ok(scenario.events.indexOf('change') < scenario.events.indexOf('logout'));
-  assert.deepEqual(scenario.events.find(event => Array.isArray(event) && event[0] === 'redirect'), ['redirect', '/vi/login?reason=password-rotated']);
+  // The handler must not router.replace after logout resolves: that second
+  // navigation raced the dashboard shell's own !user redirect and landed
+  // users on reason=unauthorized instead of password-rotated.
+  assert.equal(
+    scenario.events.some(event => Array.isArray(event) && event[0] === 'redirect'),
+    false,
+    'the rotation redirect belongs inside logout, not a caller-side router.replace',
+  );
   assert.deepEqual(scenario.events.at(-1), ['saving', false]);
+});
+
+test('both rotation callers pass the login target into logout atomically', () => {
+  for (const rel of [
+    'src/app/dashboard/profile/page.tsx',
+    'src/components/auth/ForcedPasswordRotationGate.tsx',
+  ]) {
+    const source = fs.readFileSync(path.join(root, rel), 'utf8');
+    assert.ok(
+      source.includes("logout({ redirect: href('/login?reason=password-rotated') })"),
+      `${rel} must hand the rotated login target to logout`,
+    );
+    assert.equal(
+      source.includes("router.replace(href('/login?reason=password-rotated')"),
+      false,
+      `${rel} must not navigate separately after logout`,
+    );
+  }
 });
 
 test('profile password server rejection keeps the current session and inline failure', async () => {

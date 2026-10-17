@@ -1,7 +1,6 @@
 'use client';
 
 import { useState } from 'react';
-import { useRouter } from 'next/navigation';
 import { ShieldCheck } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import { authApi } from '@/lib/api';
@@ -21,7 +20,6 @@ import { Input } from '@/components/ui/input';
 export function ForcedPasswordRotationGate() {
   const { user, logout } = useAuth();
   const { href, locale, messages } = useI18n();
-  const router = useRouter();
   const [oldPassword, setOldPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -75,8 +73,7 @@ export function ForcedPasswordRotationGate() {
     setIsSaving(true);
     try {
       await authApi.changePassword(oldPassword, newPassword);
-      await logout({ redirect: false });
-      router.replace(href('/login?reason=password-rotated'));
+      await logout({ redirect: href('/login?reason=password-rotated') });
     } catch (error: unknown) {
       setError(campusCodeMessage(error, messages.common.campusErrors, copy.failed));
     } finally {
