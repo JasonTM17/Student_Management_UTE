@@ -8,6 +8,7 @@ const preferredSemesterStatuses = [
   'ADD_DROP_OPEN',
   'REGISTRATION_OPEN',
   'ACTIVE',
+  'OPEN',
 ] as const;
 
 export function pickPreferredSemesterId<T extends SemesterLike>(
