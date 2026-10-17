@@ -485,6 +485,7 @@ export default function DashboardLayout({
     if (
       fullAdminAccess &&
       pathname !== '/dashboard/editor' &&
+      pathname !== '/dashboard/sign-out' &&
       !pathname.startsWith('/dashboard/thesis')
     ) {
       router.replace(href('/admin'));

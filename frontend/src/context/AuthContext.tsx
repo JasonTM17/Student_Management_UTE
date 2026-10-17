@@ -15,7 +15,7 @@ import { useI18n } from '@/i18n';
 import { User, TwoFactorChallengeResponse } from '@/types/api';
 import { authApi, refreshSessionSingleFlight, waitForPendingSessionRefresh, SessionVerificationError } from '@/lib/api';
 import { isTwoFactorChallenge } from '@/lib/two-factor';
-import { hasCsrfSessionHint, readCsrfSessionHint } from '@/lib/session-hint';
+import { clearLogoutInProgress, hasCsrfSessionHint, markLogoutInProgress, readCsrfSessionHint } from '@/lib/session-hint';
 import { loginHref, portalFromPathname, portalFromUser } from '@/lib/login-portal';
 import { getBrowserQueryClient } from '@/lib/query';
 import { publishSessionChange, subscribeSessionChanges, type SessionChangeKind } from '@/lib/session-sync';
@@ -65,6 +65,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const sessionMutationPendingRef = useRef(false);
   const logoutPendingRef = useRef(false);
   const logoutPathnameRef = useRef<string | null>(null);
+  const logoutTargetPathRef = useRef<string | null>(null);
   const sessionReloadPendingRef = useRef(false);
   const bootstrapPendingRef = useRef(true);
   const latestIdentityRef = useRef<User | null>(null);
@@ -164,6 +165,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const generation = ++sessionGenerationRef.current;
     sessionMutationPendingRef.current = true;
     logoutPendingRef.current = false;
+    clearLogoutInProgress();
     const isCurrent = () =>
       generation === sessionGenerationRef.current &&
       !sessionReloadPendingRef.current;
@@ -254,6 +256,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const generation = ++sessionGenerationRef.current;
     sessionMutationPendingRef.current = true;
     logoutPendingRef.current = false;
+    clearLogoutInProgress();
     const isCurrent = () =>
       generation === sessionGenerationRef.current &&
       !sessionReloadPendingRef.current;
@@ -311,6 +314,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const logout = useCallback(async (options?: { redirect?: boolean | string }) => {
     const generation = ++sessionGenerationRef.current;
     logoutPendingRef.current = true;
+    markLogoutInProgress();
     sessionMutationPendingRef.current = false;
     setIsLoggingOut(true);
     const recordedPath = pathname;
@@ -329,7 +333,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         publishSessionChange('signed-out');
         if (options?.redirect === false) {
           logoutPathnameRef.current = null;
+          logoutTargetPathRef.current = null;
           setIsLoggingOut(false);
+          clearLogoutInProgress();
           return;
         }
 
@@ -342,19 +348,26 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         const target = typeof options?.redirect === 'string'
           ? options.redirect
           : loginHref(href, portalFromUser(user), 'signed-out');
+        logoutTargetPathRef.current = target.split('?')[0];
         router.replace(target);
         // Same-path navigation never fires the pathname effect below — clear
         // inline or isLoggingOut stays stuck when logout starts on /login.
         if (target.split('?')[0] === pathname) {
           logoutPathnameRef.current = null;
+          logoutTargetPathRef.current = null;
           setIsLoggingOut(false);
+          clearLogoutInProgress();
         }
       } else if (logoutPathnameRef.current === recordedPath) {
         // A newer login/verify superseded this logout. If it has not claimed
         // the flag (its success path clears it, but a failed call never gets
         // there), this call still owns isLoggingOut and must release it or
-        // every protected page spins forever.
+        // every protected page spins forever. The shared logout marker is
+        // deliberately not cleared here: the superseding call manages it —
+        // clearing would unguard the interceptor while that logout is still
+        // in flight.
         logoutPathnameRef.current = null;
+        logoutTargetPathRef.current = null;
         setIsLoggingOut(false);
       }
     }
@@ -370,8 +383,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       sessionMutationPendingRef.current = false;
       logoutPendingRef.current = false;
       logoutPathnameRef.current = null;
+      logoutTargetPathRef.current = null;
       setIsLoading(true);
       setIsLoggingOut(false);
+      clearLogoutInProgress();
       clearSessionState();
       if (kind === 'signed-out') {
         window.location.replace(
@@ -462,10 +477,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (
       isLoggingOut &&
       logoutPathnameRef.current !== null &&
-      pathname !== logoutPathnameRef.current
+      pathname !== logoutPathnameRef.current &&
+      pathname === logoutTargetPathRef.current
     ) {
+      // Only the logout's own destination releases the flag. An unrelated
+      // navigation landing mid-logout (e.g. a role-bounce layout effect)
+      // must not unguard the interceptor or re-arm page guards.
       logoutPathnameRef.current = null;
+      logoutTargetPathRef.current = null;
       setIsLoggingOut(false);
+      clearLogoutInProgress();
     }
   }, [isLoggingOut, pathname]);
 

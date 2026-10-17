@@ -271,6 +271,13 @@ function mountAuthProvider(options = {}) {
         const match = /(?:^|; )cc_csrf=([^;]*)/.exec(raw);
         return match ? match[1] : null;
       },
+      markLogoutInProgress: () => {
+        sessionHint.logoutInProgress = true;
+      },
+      clearLogoutInProgress: () => {
+        sessionHint.logoutInProgress = false;
+      },
+      isLogoutInProgress: () => sessionHint.logoutInProgress === true,
     },
     '@/lib/login-portal': {
       loginHref: () => '/en/login',
@@ -335,6 +342,10 @@ function mountAuthProvider(options = {}) {
     sessionSync,
     setSessionHint: (value) => {
       sessionHint.value = value;
+    },
+    isLogoutInProgress: () => sessionHint.logoutInProgress === true,
+    setLogoutInProgress: (value) => {
+      sessionHint.logoutInProgress = value;
     },
     setPathname: (value) => {
       pathname.value = value;
@@ -769,9 +780,120 @@ test('session race: explicit session mutations wait out a pending refresh', asyn
   assert.equal(mounted.render().user, null);
 });
 
+test('session race: logout marks the shared logout window while in flight and clears it on teardown', async () => {
+  const mounted = mountAuthProvider();
+  mounted.meCalls[0].resolve(USER_A);
+  await settle();
+  assert.equal(mounted.render().user?.id, USER_A.id);
+  assert.equal(mounted.isLogoutInProgress(), false);
+
+  const logoutPromise = mounted.context.logout({ redirect: false });
+  await settle();
+  assert.equal(
+    mounted.isLogoutInProgress(),
+    true,
+    'the marker must be visible to the axios interceptor before identity teardown',
+  );
+  mounted.refreshWaiterCalls[0].resolve();
+  await settle();
+  mounted.logoutCalls[0].resolve({});
+  await logoutPromise;
+  await settle();
+  assert.equal(mounted.render().user, null);
+  assert.equal(
+    mounted.isLogoutInProgress(),
+    false,
+    'a redirect:false logout clears the marker inline when teardown commits',
+  );
+});
+
+test('session race: an explicit logout navigation holds the marker until the pathname changes', async () => {
+  const mounted = mountAuthProvider();
+  mounted.meCalls[0].resolve(USER_A);
+  await settle();
+
+  const logoutPromise = mounted.context.logout({
+    redirect: '/en/login?reason=signed-out',
+  });
+  await settle();
+  mounted.refreshWaiterCalls[0].resolve();
+  await settle();
+  mounted.logoutCalls[0].resolve({});
+  await logoutPromise;
+  await settle();
+  assert.equal(
+    mounted.isLogoutInProgress(),
+    true,
+    'the marker must outlive logout() while the navigation to the login page is pending',
+  );
+});
+
+test('session race: a role-bounce navigation mid-logout cannot release the suppress flag early', async () => {
+  const mounted = mountAuthProvider();
+  mounted.meCalls[0].resolve(USER_A);
+  await settle();
+
+  const logoutPromise = mounted.context.logout();
+  await settle();
+  mounted.refreshWaiterCalls[0].resolve();
+  await settle();
+  mounted.logoutCalls[0].resolve({});
+  await logoutPromise;
+  await settle();
+  assert.equal(mounted.render().isLoggingOut, true);
+
+  // A layout guard bounces the user somewhere else before the login commit
+  // (observed: the dashboard layout redirected an admin to /admin mid-logout
+  // and the page's !user guard then won with reason=session-expired).
+  mounted.setPathname('/en/admin');
+  mounted.render();
+  mounted.runLastPendingEffect();
+  await settle();
+  assert.equal(
+    mounted.render().isLoggingOut,
+    true,
+    'only the logout destination may release the suppress flag',
+  );
+  assert.equal(
+    mounted.isLogoutInProgress(),
+    true,
+    'the interceptor stays guarded until the login commit',
+  );
+
+  mounted.setPathname('/en/login');
+  mounted.render();
+  mounted.runLastPendingEffect();
+  await settle();
+  assert.equal(mounted.render().isLoggingOut, false);
+  assert.equal(mounted.isLogoutInProgress(), false);
+});
+
+test('login clears a stale shared logout marker before starting', async () => {
+  const mounted = mountAuthProvider();
+  mounted.meCalls[0].resolve(USER_A);
+  await settle();
+  mounted.setLogoutInProgress(true);
+
+  const loginPromise = mounted.context.login(USER_B.email, 'pw-irrelevant');
+  await settle();
+  assert.equal(
+    mounted.isLogoutInProgress(),
+    false,
+    'starting a new login must clear the marker so a post-login 401 is not misclassified',
+  );
+  mounted.refreshWaiterCalls[0].resolve();
+  await settle();
+  mounted.loginCalls[0].resolve(loginResponse(USER_B));
+  await settle();
+  mounted.meCalls[1].resolve(USER_B);
+  await loginPromise;
+  await settle();
+});
+
 function loadApiModule() {
   const postCalls = [];
   const getCalls = [];
+  const logoutInProgress = { value: false };
   const apiCalls = [];
   const timers = [];
   const sessionSyncPublished = [];
@@ -839,7 +961,10 @@ function loadApiModule() {
       },
     },
     '@/lib/public-api-url': { resolvePublicApiBaseUrl: () => '/api/v1' },
-    '@/lib/session-hint': { CSRF_COOKIE_NAME: 'cc_csrf' },
+    '@/lib/session-hint': {
+      CSRF_COOKIE_NAME: 'cc_csrf',
+      isLogoutInProgress: () => logoutInProgress.value,
+    },
     '@/lib/session-sync': {
       publishSessionChange: (kind) => sessionSyncPublished.push(kind),
     },
@@ -867,7 +992,18 @@ function loadApiModule() {
     fakeSetTimeout,
     fakeClearTimeout,
   );
-  return { exports: moduleRecord.exports, postCalls, getCalls, apiCalls, interceptors, fireTimers, sessionSyncPublished };
+  return {
+    exports: moduleRecord.exports,
+    postCalls,
+    getCalls,
+    apiCalls,
+    interceptors,
+    fireTimers,
+    sessionSyncPublished,
+    setLogoutInProgress: (value) => {
+      logoutInProgress.value = value;
+    },
+  };
 }
 
 test('waitForPendingSessionRefresh waits on an existing refresh only and never starts one', async () => {
@@ -2561,6 +2697,42 @@ test('api 401: a dead shared cookie publishes signed-out and navigates once unde
     assert.equal(env.navigations.length, 1, 'concurrent 401s share one redirect');
     assert.match(env.navigations[0], /\/login/);
     assert.match(env.navigations[0], /reason=unauthorized/);
+  } finally {
+    env.restore();
+  }
+});
+
+test('api 401: a dead shared cookie during an in-flight logout never hijacks the explicit redirect', async () => {
+  const env = mountApiBrowserGlobals();
+  try {
+    const { interceptors, getCalls, sessionSyncPublished, setLogoutInProgress } =
+      loadApiModule();
+    setLogoutInProgress(true);
+    const rejection = interceptors
+      .responseError({
+        response: { status: 401 },
+        config: { url: '/sections', method: 'get', skipAuthRefresh: true },
+      })
+      .catch((error) => error);
+    await settle();
+    const settled = await rejection;
+    assert.equal(settled.response.status, 401);
+    await settle();
+    assert.equal(
+      getCalls.filter((call) => call.args[0] === '/auth/me').length,
+      0,
+      'an explicit logout owns the teardown — no confirmation probe may run',
+    );
+    assert.deepEqual(
+      sessionSyncPublished,
+      [],
+      'logout publishes its own signed-out event; the interceptor must stay silent',
+    );
+    assert.equal(
+      env.navigations.length,
+      0,
+      'the generic session-expired/unauthorized redirect must not overwrite the signed-out navigation',
+    );
   } finally {
     env.restore();
   }

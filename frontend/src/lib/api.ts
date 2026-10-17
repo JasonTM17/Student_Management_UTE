@@ -31,7 +31,7 @@ import {
 } from '@/types/api';
 import { addLocalePrefix, stripLocaleFromPathname } from '@/i18n/paths';
 import { resolvePublicApiBaseUrl } from '@/lib/public-api-url';
-import { CSRF_COOKIE_NAME } from '@/lib/session-hint';
+import { CSRF_COOKIE_NAME, isLogoutInProgress } from '@/lib/session-hint';
 import { publishSessionChange } from '@/lib/session-sync';
 
 export const API_BASE_URL = resolvePublicApiBaseUrl(process.env.NEXT_PUBLIC_API_URL);
@@ -242,6 +242,12 @@ function redirectToLogin(reason: 'session-expired' | 'unauthorized') {
   if (!isBrowser()) {
     return;
   }
+  // A caller-initiated logout owns the post-teardown redirect (signed-out,
+  // password-rotated, or a custom target). A stray in-flight request that
+  // 401s during that window must not race it with a session-death redirect.
+  if (isLogoutInProgress()) {
+    return;
+  }
   if (sessionDeathConfirmationPromise) {
     return;
   }
@@ -255,6 +261,11 @@ function redirectToLogin(reason: 'session-expired' | 'unauthorized') {
         confirmationError as { response?: { status?: number } } | undefined
       )?.response?.status;
       const csrfHintAfter = getCookie(CSRF_COOKIE_NAME);
+      // Re-check inside the async confirm: a logout may have started while
+      // the probe was in flight (marker was still false at entry).
+      if (isLogoutInProgress()) {
+        return;
+      }
       if (status === 401 && csrfHintAfter === csrfHintBefore) {
         // A 401 means the shared session cookie is dead for every tab — tell
         // siblings so they converge to login instead of idling on a revoked
