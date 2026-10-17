@@ -881,9 +881,10 @@ export default function AdminUsersPage() {
           lastName: formData.lastName.trim(),
           status: formData.status,
         };
-        // A custom-only role set is not representable in this editor: omit the
-        // field so the update preserves the record's roles untouched.
-        if (!roleUnsupported) {
+        // Sending the displayed primary role replaces the complete system-role
+        // set. Preserve companion roles (such as TRUONG_BO_MON + LECTURER)
+        // on ordinary edits; only an explicit selector change is a conversion.
+        if (!roleUnsupported && formData.role !== editingPrimaryRole) {
           payload.role = formData.role;
         }
         if (editNeedsStudentFields) {
