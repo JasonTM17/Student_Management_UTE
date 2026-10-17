@@ -438,3 +438,87 @@ test('department heads retain the lecturer portal for session redirects', () => 
   assert.equal(portal({ roles: ['TRUONG_BO_MON', 'ADMIN'] }), 'admin');
   assert.equal(portal({ roles: ['STUDENT'] }), 'student');
 });
+
+function topicChoiceFixture({ locale = 'en', failure, group = { id: 'own-draft' } } = {}) {
+  const source = fs.readFileSync(path.join(__dirname, '../src/i18n/messages.ts'), 'utf8');
+  const tree = ts.createSourceFile('messages.ts', source, ts.ScriptTarget.Latest, true);
+  let copy;
+  function visit(node) {
+    if (ts.isVariableDeclaration(node) && node.name.getText(tree) === locale) {
+      const dictionary = ts.isAsExpression(node.initializer) ? node.initializer.expression : node.initializer;
+      assert.ok(ts.isObjectLiteralExpression(dictionary), `actual ${locale} object dictionary required`);
+      const thesis = dictionary.properties.find(item => item.name?.getText(tree) === 'thesis');
+      copy = Object.fromEntries(thesis.initializer.properties
+        .filter(item => ts.isPropertyAssignment(item) && ts.isStringLiteral(item.initializer))
+        .map(item => [item.name.getText(tree), item.initializer.text]));
+    }
+    ts.forEachChild(node, visit);
+  }
+  visit(tree);
+  assert.ok(copy?.actionFailed, `actual ${locale} thesis dictionary required`);
+
+  const errorModule = { exports: {} };
+  const errorSource = fs.readFileSync(path.join(__dirname, '../src/lib/campus-error.ts'), 'utf8');
+  const errorOutput = ts.transpileModule(errorSource, {
+    compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2020 },
+  }).outputText;
+  Function('module', 'exports', errorOutput)(errorModule, errorModule.exports);
+
+  const events = [];
+  const choose = executeDeclaration('components/dashboard/thesis/ThesisTopicDetailPage.tsx', 'chooseThisTopic', {
+    myGroup: group, topicId: 'full-topic', messages: { thesis: copy },
+    campusErrorCode: errorModule.exports.campusErrorCode,
+    setIsChoosing: value => events.push(['choosing', value]),
+    setActionError: value => events.push(['error', value]),
+    thesisApi: { assignTopic: async (...args) => {
+      events.push(['assign', ...args]);
+      if (failure) throw failure;
+    } },
+    workspace: { refreshWorkspace: async () => events.push(['refresh']) },
+  });
+  return { choose, events, copy };
+}
+
+for (const [locale, expected] of [
+  ['en', 'This topic has reached its group limit. Please choose another topic.'],
+  ['vi', 'Đề tài đã đủ số nhóm đăng ký. Vui lòng chọn đề tài khác.'],
+]) {
+  test(`topic selection explains TOPIC_FULL in ${locale} without refreshing or exposing server text`, async () => {
+    const scenario = topicChoiceFixture({ locale, failure: {
+      response: { status: 409, data: { code: 'TOPIC_FULL', message: 'Private internal capacity details' } },
+    } });
+    await scenario.choose();
+    assert.deepEqual(scenario.events, [
+      ['choosing', true], ['error', ''], ['assign', 'own-draft', 'full-topic'],
+      ['error', expected], ['choosing', false],
+    ]);
+  });
+}
+
+for (const [name, failure] of [
+  ['unknown business code', { response: { status: 409, data: { code: 'UNRECOGNIZED', message: 'Private server details' } } }],
+  ['network failure', new Error('Private transport details')],
+]) {
+  test(`topic selection retains safe generic feedback for ${name}`, async () => {
+    const scenario = topicChoiceFixture({ failure });
+    await scenario.choose();
+    assert.deepEqual(scenario.events.at(-2), ['error', scenario.copy.actionFailed]);
+    assert.deepEqual(scenario.events.at(-1), ['choosing', false]);
+    assert.equal(scenario.events.some(event => event[0] === 'refresh'), false);
+  });
+}
+
+test('successful topic selection clears feedback, assigns once and refreshes the workspace', async () => {
+  const scenario = topicChoiceFixture();
+  await scenario.choose();
+  assert.deepEqual(scenario.events, [
+    ['choosing', true], ['error', ''], ['assign', 'own-draft', 'full-topic'],
+    ['refresh'], ['choosing', false],
+  ]);
+});
+
+test('topic selection without a group does not issue an assignment', async () => {
+  const scenario = topicChoiceFixture({ group: null });
+  await scenario.choose();
+  assert.deepEqual(scenario.events, []);
+});

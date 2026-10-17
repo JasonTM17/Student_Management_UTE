@@ -2187,6 +2187,7 @@ export const en = {
       'Every published topic lives in the topic catalog. Open it to compare topics and pick one for your group.',
     groupCreated: 'Thesis group created.',
     actionFailed: 'This action could not be completed.',
+    topicFull: 'This topic has reached its group limit. Please choose another topic.',
     groupsRefreshFailed:
       'Saved, but the group list could not be reloaded — it may be out of date.',
     createdAsDraftNotice:
@@ -5028,6 +5029,7 @@ export const vi: I18nMessages = {
     maxMembersReached: 'Nhóm đã đạt số lượng tối đa 5 thành viên.',
     membersClosedRound: 'Đợt đăng ký đã đóng — chỉ có thể thêm/xoá thành viên khi đăng ký đang mở.',
     chooseTopic: 'Chọn đề tài',
+    topicFull: 'Đề tài đã đủ số nhóm đăng ký. Vui lòng chọn đề tài khác.',
     choosingTopic: 'Đang chọn…',
     topicAlreadyChosen: 'Nhóm của bạn đang thực hiện đề tài này',
     openCatalogHint:

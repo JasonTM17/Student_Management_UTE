@@ -14,6 +14,7 @@ import { WorkspaceForbiddenState } from '@/components/ProtectedRoute';
 import { EmptyState, ErrorState, LoadingState } from '@/components/ui/state-block';
 import { StatusBadge } from '@/components/thesis/StatusBadge';
 import { thesisApi, type ThesisTopic } from '@/lib/thesis-api';
+import { campusErrorCode } from '@/lib/campus-error';
 import { useThesisWorkspace } from './useThesisWorkspace';
 
 export default function ThesisTopicDetailPage() {
@@ -56,8 +57,10 @@ export default function ThesisTopicDetailPage() {
     try {
       await thesisApi.assignTopic(myGroup.id, topicId);
       await workspace.refreshWorkspace();
-    } catch {
-      setActionError(messages.thesis.actionFailed);
+    } catch (error) {
+      setActionError(campusErrorCode(error) === 'TOPIC_FULL'
+        ? messages.thesis.topicFull
+        : messages.thesis.actionFailed);
     } finally {
       setIsChoosing(false);
     }
