@@ -993,6 +993,72 @@ test('session race: a redirecting logout clears the suppress flag only after nav
       'the flag must clear once the logout navigation has committed');
 });
 
+test('session race: password-rotated custom logout preserves its target until navigation commits', async () => {
+  const mounted = mountAuthProvider();
+  const replacements = [];
+  mounted.router.replace = (target) => replacements.push(target);
+  mounted.meCalls[0].resolve(USER_A);
+  await settle();
+  const target = '/en/login?reason=password-rotated';
+
+  const logoutPromise = mounted.render().logout({ redirect: target });
+  await settle();
+  mounted.refreshWaiterCalls[0].resolve();
+  await settle();
+  assert.equal(mounted.render().isLoggingOut, true);
+  assert.deepEqual(replacements, []);
+  mounted.logoutCalls[0].resolve({});
+  await logoutPromise;
+  await settle();
+
+  const signedOut = mounted.render();
+  assert.equal(signedOut.user, null);
+  assert.deepEqual(replacements, [target]);
+  assert.equal(signedOut.isLoggingOut, true,
+    'protected shells must remain suppressed while the custom redirect is in flight');
+
+  mounted.setPathname('/en/login');
+  mounted.render();
+  mounted.runLastPendingEffect();
+  await settle();
+  assert.equal(mounted.render().isLoggingOut, false);
+  assert.deepEqual(replacements, [target], 'pathname commit must not replace the custom target');
+});
+
+test('session race: a superseded password-rotated custom logout cannot redirect a newer session', async () => {
+  const mounted = mountAuthProvider();
+  const replacements = [];
+  mounted.router.replace = (target) => replacements.push(target);
+  mounted.meCalls[0].resolve(USER_A);
+  await settle();
+
+  const logoutPromise = mounted.render().logout({ redirect: '/en/login?reason=password-rotated' });
+  await settle();
+  mounted.refreshWaiterCalls[0].resolve();
+  await settle();
+  assert.equal(mounted.logoutCalls.length, 1);
+
+  const loginPromise = mounted.render().login(USER_B.email, 'pw-irrelevant');
+  await settle();
+  mounted.refreshWaiterCalls[1].resolve();
+  await settle();
+  mounted.loginCalls[0].resolve(loginResponse(USER_B));
+  await settle();
+  mounted.meCalls[1].resolve(USER_B);
+  await loginPromise;
+  await settle();
+  const clearsAfterLogin = mounted.queryClient.clearCount;
+
+  mounted.logoutCalls[0].resolve({});
+  await logoutPromise;
+  await settle();
+  const current = mounted.render();
+  assert.equal(current.user?.id, USER_B.id);
+  assert.equal(current.isLoggingOut, false);
+  assert.equal(mounted.queryClient.clearCount, clearsAfterLogin);
+  assert.deepEqual(replacements, [], 'stale logout must never navigate away from the newer session');
+});
+
 test('session race: two-factor sign-in verifies the session cookie before committing', async () => {
   const mounted = mountAuthProvider({ sessionHint: false });
   assert.equal(mounted.meCalls.length, 0, 'no session hint means no bootstrap /me');

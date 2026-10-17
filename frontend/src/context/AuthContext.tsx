@@ -35,7 +35,7 @@ interface AuthContextType {
     password: string,
   ) => Promise<User | TwoFactorChallengeResponse>;
   verifyTwoFactor: (challengeId: string, code: string) => Promise<User>;
-  logout: (options?: { redirect?: boolean }) => Promise<void>;
+  logout: (options?: { redirect?: boolean | string }) => Promise<void>;
   refreshUser: () => Promise<void>;
 }
 
@@ -308,7 +308,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, [clearSessionState, setUserIdentity]);
 
-  const logout = useCallback(async (options?: { redirect?: boolean }) => {
+  const logout = useCallback(async (options?: { redirect?: boolean | string }) => {
     const generation = ++sessionGenerationRef.current;
     logoutPendingRef.current = true;
     sessionMutationPendingRef.current = false;
@@ -333,7 +333,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           return;
         }
 
-        const target = loginHref(href, portalFromUser(user), 'signed-out');
+        // A string redirect keeps the navigation inside this finally, atomic
+        // with the user-clear commit — a caller-side router.replace after
+        // logout resolves lets guarded shells see !user && !isLoggingOut and
+        // overwrite the intended target with their own session-death redirect
+        // (profile rotation landed on reason=unauthorized instead of
+        // password-rotated).
+        const target = typeof options?.redirect === 'string'
+          ? options.redirect
+          : loginHref(href, portalFromUser(user), 'signed-out');
         router.replace(target);
         // Same-path navigation never fires the pathname effect below — clear
         // inline or isLoggingOut stays stuck when logout starts on /login.
