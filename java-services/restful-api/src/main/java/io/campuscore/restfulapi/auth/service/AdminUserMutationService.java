@@ -377,6 +377,8 @@ public class AdminUserMutationService {
             if (roleChanged) {
                 revokeSessions(id);
             }
+        } else {
+            completeMissingProfiles(id, input);
         }
         // Records the transition, not the payload: the request map can carry a
         // credential, and a role or status change is what an investigation looks for.
@@ -750,6 +752,23 @@ public class AdminUserMutationService {
                 .stream()
                 .findFirst()
                 .orElseThrow(() -> problem(HttpStatus.BAD_REQUEST, "ROLE_NOT_FOUND", "Role not found"));
+    }
+
+    /** Complete an already-held role's missing profile without converting any roles. */
+    private void completeMissingProfiles(String userId, Map<String, Object> input) {
+        Set<String> heldRoles = systemRoleNames(userId);
+        boolean studentFields = input.containsKey("studentId") || input.containsKey("curriculumId")
+                || input.containsKey("year");
+        boolean lecturerFields = input.containsKey("employeeId") || input.containsKey("departmentId");
+        if (studentFields && heldRoles.contains("STUDENT") && !profileExists(userId, "STUDENT")) {
+            preflightProfileConflicts("STUDENT", input);
+            ensureProfile(userId, "STUDENT", input);
+        }
+        if (lecturerFields && heldRoles.stream().anyMatch(AdminUserMutationService::usesLecturerProfile)
+                && !profileExists(userId, "LECTURER")) {
+            preflightProfileConflicts("LECTURER", input);
+            ensureProfile(userId, "LECTURER", input);
+        }
     }
 
     private void ensureProfile(String userId, String roleName, Map<String, Object> input) {

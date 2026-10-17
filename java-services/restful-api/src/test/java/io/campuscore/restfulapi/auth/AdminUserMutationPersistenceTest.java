@@ -1136,6 +1136,147 @@ class AdminUserMutationPersistenceTest {
         assertThat(roleNames("dean-self")).containsExactlyInAnyOrder("LECTURER", "TRUONG_KHOA");
     }
 
+    static java.util.stream.Stream<List<String>> unchangedProfileRoles() {
+        return java.util.stream.Stream.of(List.of("STUDENT"), List.of("LECTURER"),
+                List.of("LECTURER", "TRUONG_BO_MON"), List.of("LECTURER", "TRUONG_KHOA"), List.of("TRUONG_BO_MON"));
+    }
+
+    @ParameterizedTest
+    @MethodSource("unchangedProfileRoles")
+    void omittedRoleCompletesMissingProfileWithoutReplacingRolesOrSessions(List<String> roles) throws Exception {
+        insertProfileGap(roles);
+        boolean student = roles.contains("STUDENT");
+        if (student) {
+            jdbc.update("INSERT INTO campuscore_auth.\"Lecturer\" (\"id\",\"userId\",\"employeeId\",\"departmentId\",\"isActive\")"
+                    + " VALUES ('gap-counterpart','profile-gap','GV-COUNTERPART','department-demo',TRUE)");
+        } else {
+            jdbc.update("INSERT INTO campuscore_auth.\"Student\" (\"id\",\"userId\",\"studentId\",\"curriculumId\",\"year\",\"status\",\"admissionDate\",\"createdAt\",\"updatedAt\")"
+                    + " VALUES ('gap-counterpart','profile-gap','SV-COUNTERPART','curriculum-demo',2,'ACTIVE',CURRENT_TIMESTAMP,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP)");
+        }
+        String counterpartTable = student ? "Lecturer" : "Student";
+        Map<String, Object> counterpartBefore = jdbc.queryForMap("SELECT * FROM campuscore_auth.\"" + counterpartTable
+                + "\" WHERE \"id\"='gap-counterpart'");
+        Map<String, Object> fields = student
+                ? Map.of("firstName", "Completed", "studentId", "SV-GAP", "curriculumId", "curriculum-demo", "year", 3)
+                : Map.of("firstName", "Completed", "employeeId", "GV-GAP", "departmentId", "department-demo");
+        mvc.perform(put("/api/v1/users/profile-gap").with(superJwt())
+                        .contentType(MediaType.APPLICATION_JSON).content(objectMapper.writeValueAsBytes(fields)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath(student ? "$.hasStudentProfile" : "$.hasLecturerProfile").value(true));
+        assertThat(roleNames("profile-gap")).containsExactlyInAnyOrderElementsOf(
+                java.util.stream.Stream.concat(roles.stream(), java.util.stream.Stream.of("AUDITOR")).toList());
+        String table = student ? "Student" : "Lecturer";
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM campuscore_auth.\"" + table
+                + "\" WHERE \"userId\"='profile-gap'", Integer.class)).isEqualTo(1);
+        assertThat(jdbc.queryForObject("SELECT \"" + (student ? "studentId" : "employeeId") + "\" FROM campuscore_auth.\"" + table
+                + "\" WHERE \"userId\"='profile-gap'", String.class)).isEqualTo(student ? "SV-GAP" : "GV-GAP");
+        assertThat(jdbc.queryForObject("SELECT \"" + (student ? "curriculumId" : "departmentId") + "\" FROM campuscore_auth.\"" + table
+                + "\" WHERE \"userId\"='profile-gap'", String.class)).isEqualTo(student ? "curriculum-demo" : "department-demo");
+        if (student) assertThat(jdbc.queryForObject("SELECT \"year\" FROM campuscore_auth.\"Student\" WHERE \"userId\"='profile-gap'", Integer.class)).isEqualTo(3);
+        assertThat(jdbc.queryForMap("SELECT * FROM campuscore_auth.\"" + counterpartTable
+                + "\" WHERE \"id\"='gap-counterpart'")).isEqualTo(counterpartBefore);
+        String createdId = jdbc.queryForObject("SELECT \"id\" FROM campuscore_auth.\"" + table + "\" WHERE \"userId\"='profile-gap'", String.class);
+        mvc.perform(put("/api/v1/users/profile-gap").with(superJwt())
+                        .contentType(MediaType.APPLICATION_JSON).content(objectMapper.writeValueAsBytes(fields)))
+                .andExpect(status().isOk());
+        assertThat(jdbc.queryForList("SELECT \"id\" FROM campuscore_auth.\"" + table + "\" WHERE \"userId\"='profile-gap'", String.class)).containsExactly(createdId);
+        assertProfileGapSessionAndName("Completed");
+    }
+
+    static java.util.stream.Stream<String> invalidUnchangedProfileInputs() {
+        return java.util.stream.Stream.of("student-partial", "lecturer-partial", "student-duplicate",
+                "lecturer-duplicate", "student-inactive", "lecturer-inactive", "student-year");
+    }
+
+    @ParameterizedTest
+    @MethodSource("invalidUnchangedProfileInputs")
+    void omittedRoleRejectsInvalidProfileAndRollsBackTheName(String scenario) throws Exception {
+        boolean student = scenario.startsWith("student");
+        List<String> roles = student ? List.of("STUDENT") : List.of("LECTURER", "TRUONG_BO_MON");
+        insertProfileGap(roles);
+        Map<String, Object> fields = new java.util.LinkedHashMap<>();
+        fields.put("firstName", "Must roll back");
+        fields.put(student ? "studentId" : "employeeId", scenario.endsWith("duplicate")
+                ? student ? "SV-TARGET" : "GV-TARGET" : student ? "SV-GAP" : "GV-GAP");
+        if (!scenario.endsWith("partial")) {
+            fields.put(student ? "curriculumId" : "departmentId", scenario.endsWith("inactive")
+                    ? student ? "curriculum-inactive" : "department-inactive"
+                    : student ? "curriculum-demo" : "department-demo");
+        }
+        if (student) fields.put("year", scenario.endsWith("year") ? 0 : 2);
+        mvc.perform(put("/api/v1/users/profile-gap").with(superJwt())
+                        .contentType(MediaType.APPLICATION_JSON).content(objectMapper.writeValueAsBytes(fields)))
+                .andExpect(status().is(scenario.endsWith("duplicate") ? 409 : 400));
+        assertThat(roleNames("profile-gap")).containsExactlyInAnyOrderElementsOf(
+                java.util.stream.Stream.concat(roles.stream(), java.util.stream.Stream.of("AUDITOR")).toList());
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM campuscore_auth.\"Student\" WHERE \"userId\"='profile-gap'", Integer.class)).isZero();
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM campuscore_auth.\"Lecturer\" WHERE \"userId\"='profile-gap'", Integer.class)).isZero();
+        assertProfileGapSessionAndName("Before");
+    }
+
+    @Test
+    void omittedRoleNameOnlyDoesNotRequireOrInventMissingProfiles() throws Exception {
+        insertProfileGap(List.of("LECTURER", "TRUONG_BO_MON"));
+        mvc.perform(put("/api/v1/users/profile-gap").with(superJwt())
+                        .contentType(MediaType.APPLICATION_JSON).content("{\"firstName\":\"Renamed\"}"))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.hasLecturerProfile").value(false));
+        assertThat(roleNames("profile-gap")).containsExactlyInAnyOrder("AUDITOR", "LECTURER", "TRUONG_BO_MON");
+        assertProfileGapSessionAndName("Renamed");
+    }
+
+    @Test
+    void omittedRoleProfileFieldsCannotGrantAnUnheldAcademicRole() throws Exception {
+        insertProfileGap(List.of());
+        mvc.perform(put("/api/v1/users/profile-gap").with(superJwt())
+                        .contentType(MediaType.APPLICATION_JSON).content("""
+                                {"studentId":"SV-GAP","curriculumId":"curriculum-demo","year":2,
+                                 "employeeId":"GV-GAP","departmentId":"department-demo"}
+                                """))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.hasLecturerProfile").value(false))
+                .andExpect(jsonPath("$.hasStudentProfile").value(false));
+        assertThat(roleNames("profile-gap")).containsExactly("AUDITOR");
+        assertProfileGapSessionAndName("Before");
+    }
+
+    @Test
+    void omittedRoleKeepsExistingProfileIdentifiersAndProtectedTargetCeiling() throws Exception {
+        insertProfileGap(List.of("LECTURER", "TRUONG_KHOA"));
+        String fields = "{\"firstName\":\"Must roll back\",\"employeeId\":\"GV-GAP\",\"departmentId\":\"department-demo\"}";
+        mvc.perform(put("/api/v1/users/profile-gap").with(adminJwt())
+                        .contentType(MediaType.APPLICATION_JSON).content(fields))
+                .andExpect(status().isForbidden()).andExpect(jsonPath("$.code").value("ROLE_ESCALATION"));
+        assertProfileGapSessionAndName("Before");
+        jdbc.update("INSERT INTO campuscore_auth.\"Lecturer\" (\"id\",\"userId\",\"employeeId\",\"departmentId\",\"isActive\")"
+                + " VALUES ('gap-existing','profile-gap','GV-KEEP-GAP','department-demo',TRUE)");
+        mvc.perform(put("/api/v1/users/profile-gap").with(superJwt())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"employeeId\":\"GV-TARGET\",\"departmentId\":\"department-inactive\"}"))
+                .andExpect(status().isOk());
+        assertThat(jdbc.queryForMap("SELECT \"id\",\"employeeId\",\"departmentId\" FROM campuscore_auth.\"Lecturer\" WHERE \"userId\"='profile-gap'"))
+                .containsEntry("id", "gap-existing").containsEntry("employeeId", "GV-KEEP-GAP").containsEntry("departmentId", "department-demo");
+        assertThat(roleNames("profile-gap")).containsExactlyInAnyOrder("AUDITOR", "LECTURER", "TRUONG_KHOA");
+        assertProfileGapSessionAndName("Before");
+    }
+
+    private void insertProfileGap(List<String> roles) {
+        // This legacy fixture resets accounts but retains Session rows between
+        // cases; remove only this synthetic session before reusing its id.
+        jdbc.update("DELETE FROM campuscore_auth.\"Session\" WHERE \"id\"='gap-session'");
+        insertUser("profile-gap", "profile.gap@fixture.invalid", "Before", "Synthetic");
+        insertRole("role-gap-head", "TRUONG_BO_MON", true);
+        Map<String, String> ids = Map.of("STUDENT", "role-student", "LECTURER", "role-lecturer",
+                "TRUONG_BO_MON", "role-gap-head", "TRUONG_KHOA", "role-truong-khoa");
+        for (String role : roles) insertUserRole("gap-" + role, "profile-gap", ids.get(role));
+        insertUserRole("gap-custom", "profile-gap", "role-auditor");
+        jdbc.update("INSERT INTO campuscore_auth.\"Session\" (\"id\",\"userId\",\"refreshToken\",\"expiresAt\",\"createdAt\")"
+                + " VALUES ('gap-session','profile-gap','hashed',CURRENT_TIMESTAMP + INTERVAL '1' HOUR,CURRENT_TIMESTAMP)");
+    }
+
+    private void assertProfileGapSessionAndName(String name) {
+        assertThat(jdbc.queryForObject("SELECT \"firstName\" FROM campuscore_auth.\"User\" WHERE \"id\"='profile-gap'", String.class)).isEqualTo(name);
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM campuscore_auth.\"Session\" WHERE \"id\"='gap-session'", Integer.class)).isEqualTo(1);
+    }
+
     private void createTables() {
         jdbc.execute("""
                 CREATE TABLE IF NOT EXISTS "campuscore_auth"."User" (

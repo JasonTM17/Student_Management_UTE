@@ -67,7 +67,8 @@ public final class AdminUserRequestDtos {
     /**
      * Profile/role/status payload. Absent fields keep their current value. The
      * profile fields match {@link AdminUserCreateRequest}: they are only read
-     * when a role conversion must mint a new official profile, so an existing
+     * when a conversion needs a new official profile, or when completing a
+     * missing profile for an already-held role without a conversion. An existing
      * profile is never reassigned by a generic edit.
      */
     public record AdminUserUpdateRequest(

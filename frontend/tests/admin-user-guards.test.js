@@ -80,3 +80,105 @@ test('primaryManagedRole returns null for custom-only or empty role sets', async
   assert.equal(primaryManagedRole(null), null);
   assert.equal(primaryManagedRole(undefined), null);
 });
+
+async function submitExistingUser({ roles, nextRole, self = false, needsLecturerProfile = false, needsStudentProfile = false, fields = {} }) {
+  const { primaryManagedRole } = await loadGuardsModule();
+  const primary = primaryManagedRole(roles);
+  const source = fs.readFileSync(path.join(root, 'src/app/admin/users/page.tsx'), 'utf8');
+  const tree = ts.createSourceFile('page.tsx', source, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX);
+  let handler;
+  function visit(node) {
+    if (ts.isVariableDeclaration(node) && node.name.getText(tree) === 'handleSubmit') handler = node.initializer;
+    ts.forEachChild(node, visit);
+  }
+  visit(tree);
+  assert.ok(handler && ts.isArrowFunction(handler), 'Actual account submit handler required');
+  const updates = [];
+  const errors = [];
+  const noop = () => {};
+  const dependencies = {
+    editingUser: { id: 'target', email: 'target@example.invalid', roles },
+    user: { id: self ? 'target' : 'actor', email: self ? 'target@example.invalid' : 'actor@example.invalid' },
+    formData: { firstName: 'Renamed', lastName: 'Synthetic', status: 'ACTIVE', role: nextRole ?? primary ?? 'STUDENT', employeeId: '', departmentId: '', studentId: '', curriculumId: '', year: 2, ...fields },
+    editingPrimaryRole: primary, roleUnsupported: primary === null,
+    editNeedsStudentFields: needsStudentProfile, editNeedsLecturerFields: needsLecturerProfile,
+    setFormError: value => { if (value) errors.push(value); },
+    setIsSaving: noop, setFieldErrors: value => { if (Object.keys(value).length) errors.push(value); },
+    usersApi: { update: async (id, payload) => updates.push({ id, payload }) },
+    toast: { success: noop, error: noop },
+    copy: { updated: 'Updated', saveFailed: 'Failed', errors: { employeeIdRequired: 'Employee ID required', departmentRequired: 'Department required' } },
+    locale: 'en', departments: [], curricula: [], closeFormModal: noop, fetchUsers: async () => {},
+    campusErrorMessage: () => 'Failed', messages: { common: { campusErrors: {} } },
+  };
+  const output = ts.transpileModule(`(${handler.getText(tree)})`, {
+    compilerOptions: { target: ts.ScriptTarget.ES2020, module: ts.ModuleKind.None },
+  }).outputText;
+  const submit = Function(...Object.keys(dependencies), `return ${output}`)(...Object.values(dependencies));
+  await submit({ preventDefault() {} });
+  return { updates, errors };
+}
+
+for (const [name, roles] of [
+  ['department head', ['LECTURER', 'TRUONG_BO_MON']],
+  ['reversed department head', ['TRUONG_BO_MON', 'LECTURER']],
+  ['mixed managed roles', ['LECTURER', 'ADMIN']],
+  ['dean', ['LECTURER', 'TRUONG_KHOA']],
+]) {
+  test(`name-only account edit preserves unchanged ${name} roles by omitting a conversion`, async () => {
+    const { updates, errors } = await submitExistingUser({ roles });
+    assert.deepEqual(errors, []);
+    assert.deepEqual(updates, [{ id: 'target', payload: {
+      firstName: 'Renamed', lastName: 'Synthetic', status: 'ACTIVE',
+    } }]);
+  });
+}
+
+test('custom-only account edit still omits unsupported role conversion', async () => {
+  const { updates, errors } = await submitExistingUser({ roles: ['TRUONG_BO_MON'] });
+  assert.deepEqual(errors, []);
+  assert.equal(updates.length, 1);
+  assert.equal(Object.hasOwn(updates[0].payload, 'role'), false);
+});
+
+test('explicit account role change still sends the selected conversion', async () => {
+  const { updates, errors } = await submitExistingUser({ roles: ['LECTURER'], nextRole: 'ADMIN' });
+  assert.deepEqual(errors, []);
+  assert.equal(updates.length, 1);
+  assert.equal(updates[0].payload.role, 'ADMIN');
+});
+
+test('role conversion missing official lecturer fields stays blocked before update', async () => {
+  const { updates, errors } = await submitExistingUser({ roles: ['STUDENT'], nextRole: 'LECTURER', needsLecturerProfile: true });
+  assert.deepEqual(updates, []);
+  assert.deepEqual(errors, [{ employeeId: 'Employee ID required', departmentId: 'Department required' }]);
+});
+
+test('self role change stays blocked before update', async () => {
+  const { updates, errors } = await submitExistingUser({ roles: ['ADMIN'], nextRole: 'SUPER_ADMIN', self: true });
+  assert.deepEqual(updates, []);
+  assert.deepEqual(errors, ['You cannot change your own system role.']);
+});
+
+test('unchanged head role carries valid missing lecturer profile without a conversion', async () => {
+  const { updates, errors } = await submitExistingUser({
+    roles: ['LECTURER', 'TRUONG_BO_MON'], needsLecturerProfile: true,
+    fields: { employeeId: 'SYNTHETIC-EMPLOYEE', departmentId: 'synthetic-department' },
+  });
+  assert.deepEqual(errors, []);
+  assert.deepEqual(updates, [{ id: 'target', payload: {
+    firstName: 'Renamed', lastName: 'Synthetic', status: 'ACTIVE',
+    employeeId: 'SYNTHETIC-EMPLOYEE', departmentId: 'synthetic-department',
+  } }]);
+});
+
+test('unchanged student role carries valid missing student profile without a conversion', async () => {
+  const { updates, errors } = await submitExistingUser({
+    roles: ['STUDENT'], needsStudentProfile: true,
+    fields: { studentId: 'SYNTHETIC-STUDENT', curriculumId: 'synthetic-curriculum', year: 3 },
+  });
+  assert.deepEqual(errors, []);
+  assert.deepEqual(updates, [{ id: 'target', payload: {
+    firstName: 'Renamed', lastName: 'Synthetic', status: 'ACTIVE',
+    studentId: 'SYNTHETIC-STUDENT', curriculumId: 'synthetic-curriculum', year: 3,
+  } }]);
+});
