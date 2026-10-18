@@ -187,7 +187,7 @@ export default function SectionGradingPage() {
           exportCsv: 'Xuất CSV',
           exportCsvSuccess: 'Đã xuất bảng điểm CSV thành công.',
           printRoster: 'In bảng điểm',
-          printOfficialHeader: 'TRƯỜNG ĐẠI HỌC CÔNG NGHỆ KỸ THUẬT TP. HỒ CHÍ MINH — CAMPUSUTE',
+          printOfficialHeader: 'TRƯỜNG ĐẠI HỌC CÔNG NGHỆ KĨ THUẬT TP.HCM — CAMPUSUTE',
           printDepartment: 'HỆ THỐNG CAMPUSUTE',
           printReportTitle: 'BẢNG ĐIỂM TỔNG KẾT HỌC PHẦN',
           printInstructorSignature: 'GIẢNG VIÊN CHẤM ĐIỂM',

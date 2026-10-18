@@ -92,7 +92,7 @@ export default function StudentAnnouncementsPage() {
   const copy =
     locale === 'vi'
       ? {
-          eyebrow: 'ĐẠI HỌC CÔNG NGHỆ KỸ THUẬT TP.HCM • CỔNG THÔNG TIN HỌC VỤ',
+          eyebrow: 'TRƯỜNG ĐẠI HỌC CÔNG NGHỆ KĨ THUẬT TP.HCM • CỔNG THÔNG TIN HỌC VỤ',
           title: 'Bảng Tin & Thông Báo Đại Học',
           tabLabel: 'Thông báo',
           description:

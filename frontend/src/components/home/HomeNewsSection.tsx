@@ -153,7 +153,7 @@ export function HomeNewsSection() {
             </h2>
             <p className="text-sm text-muted-foreground max-w-2xl">
               {isVi
-                ? 'Thông báo học vụ, sự kiện học thuật, thành tựu nghiên cứu khoa học và chính sách đào tạo chính thức từ Trường Đại học Công nghệ Kỹ thuật TP.HCM.'
+                ? 'Thông báo học vụ, sự kiện học thuật, thành tựu nghiên cứu khoa học và chính sách đào tạo chính thức từ Trường Đại học Công nghệ kĩ thuật TP.HCM.'
                 : 'Official academic announcements, research breakthroughs, student initiatives, and university governance updates.'}
             </p>
           </div>

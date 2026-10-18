@@ -9,7 +9,7 @@ export function JsonLd({ locale = 'vi', nonce }: JsonLdProps) {
   const siteUrl = getSiteUrl();
   const isVi = locale === 'vi';
   const organizationName = isVi
-    ? 'Trường Đại học Công nghệ Kỹ thuật TP.HCM'
+    ? 'Trường Đại học Công nghệ kĩ thuật TP.HCM'
     : 'Ho Chi Minh City University of Technology and Engineering';
 
   const organizationSchema = {
@@ -21,7 +21,7 @@ export function JsonLd({ locale = 'vi', nonce }: JsonLdProps) {
     logo: `${siteUrl}/icon.png`,
     image: `${siteUrl}/icon.png`,
     description: isVi
-      ? 'Cổng thông tin đào tạo và học vụ trực tuyến CampusUTE - Trường Đại học Công nghệ Kỹ thuật TP.HCM.'
+      ? 'Cổng thông tin đào tạo và học vụ trực tuyến CampusUTE - Trường Đại học Công nghệ kĩ thuật TP.HCM.'
       : 'CampusUTE online academic portal of Ho Chi Minh City University of Technology and Engineering.',
     address: {
       '@type': 'PostalAddress',

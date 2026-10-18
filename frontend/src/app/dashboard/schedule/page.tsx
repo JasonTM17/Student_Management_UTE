@@ -502,7 +502,7 @@ export default function SchedulePage() {
           <div className="hidden print:block mb-6 border-b-2 border-primary/40 pb-4 text-center">
             <div className="text-xs uppercase font-bold tracking-wider text-muted-foreground">
               {locale === 'vi'
-                ? 'ĐẠI HỌC CÔNG NGHỆ KỸ THUẬT THÀNH PHỐ HỒ CHÍ MINH'
+                ? 'TRƯỜNG ĐẠI HỌC CÔNG NGHỆ KĨ THUẬT TP.HCM'
                 : 'HO CHI MINH CITY UNIVERSITY OF TECHNOLOGY AND ENGINEERING'}
             </div>
             <div className="text-sm font-extrabold text-foreground">

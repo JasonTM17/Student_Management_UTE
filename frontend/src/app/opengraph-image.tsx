@@ -86,7 +86,7 @@ export default function OpenGraphImage() {
                 maxWidth: 860,
               }}
             >
-              Trường Đại học Công nghệ Kỹ thuật TP.HCM — Đăng ký học phần, thời khóa biểu, điểm số, và đồ án tốt nghiệp.
+              Trường Đại học Công nghệ kĩ thuật TP.HCM — Đăng ký học phần, thời khóa biểu, điểm số, và đồ án tốt nghiệp.
             </div>
           </div>
 

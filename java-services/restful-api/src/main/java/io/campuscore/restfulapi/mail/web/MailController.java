@@ -244,7 +244,7 @@ public class MailController {
             case "academic-announcement" -> {
                 data.put("category", "THÔNG BÁO HỌC VỤ");
                 data.put("title", "Kế hoạch Tổ chức Đăng ký Học phần Học kỳ 1 Năm học 2026-2027");
-                data.put("author", "Phòng Đào tạo - Đại học Công Nghệ Kĩ thuật TP.HCM");
+                data.put("author", "Phòng Đào tạo - Trường Đại học Công nghệ kĩ thuật TP.HCM");
                 data.put("publishDate", dateStr);
                 data.put("recipientName", "Toàn thể Sinh viên Đại học Chính quy");
                 data.put("content", "Phòng Đào tạo thông báo kế hoạch mở cổng đăng ký học phần đợt 1 cho các khóa 2023, 2024, 2025. Sinh viên lưu ý kiểm tra chuẩn đầu vào môn tiên quyết và hoàn thành nghĩa vụ học phí đúng hạn.");

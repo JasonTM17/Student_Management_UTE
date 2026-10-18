@@ -21,7 +21,7 @@ export type EditorBlockType = (typeof EDITOR_BLOCK_TYPES)[number];
 
 export const EDITOR_BLOCK_HTML: Record<EditorBlockType, string> = {
   header: `  <div style="text-align: center; border-bottom: 2px solid #0284c7; padding-bottom: 12px; margin-bottom: 20px;">
-    <h4 style="margin: 0; text-transform: uppercase; color: #64748b; font-size: 13px; letter-spacing: 1px;">ĐẠI HỌC CÔNG NGHỆ KỸ THUẬT THÀNH PHỐ HỒ CHÍ MINH</h4>
+    <h4 style="margin: 0; text-transform: uppercase; color: #64748b; font-size: 13px; letter-spacing: 1px;">TRƯỜNG ĐẠI HỌC CÔNG NGHỆ KĨ THUẬT TP.HCM</h4>
     <h2 style="margin: 8px 0 0 0; color: #0f172a; font-size: 22px; font-weight: 700;">THÔNG BÁO HỌC VỤ & HƯỚNG DẪN ĐÀO TẠO</h2>
     <p style="margin: 4px 0 0 0; color: #64748b; font-size: 13px;">[Học kỳ ... - Năm học ...] | [Đơn vị ban hành]</p>
   </div>`,
@@ -89,7 +89,7 @@ export const EDITOR_SEED_HTML = {
   vi: `
 <div style="font-family: Arial, sans-serif; line-height: 1.6; color: #1e293b;">
   <div style="text-align: center; border-bottom: 2px solid #0284c7; padding-bottom: 12px; margin-bottom: 20px;">
-    <h4 style="margin: 0; text-transform: uppercase; color: #64748b; font-size: 13px; letter-spacing: 1px;">ĐẠI HỌC CÔNG NGHỆ KỸ THUẬT THÀNH PHỐ HỒ CHÍ MINH</h4>
+    <h4 style="margin: 0; text-transform: uppercase; color: #64748b; font-size: 13px; letter-spacing: 1px;">TRƯỜNG ĐẠI HỌC CÔNG NGHỆ KĨ THUẬT TP.HCM</h4>
     <h2 style="margin: 8px 0 0 0; color: #0f172a; font-size: 22px; font-weight: 700;">THÔNG BÁO HỌC VỤ & HƯỚNG DẪN ĐÀO TẠO</h2>
     <p style="margin: 4px 0 0 0; color: #64748b; font-size: 13px;">[Học kỳ ... - Năm học ...] | [Đơn vị ban hành]</p>
   </div>
@@ -204,11 +204,11 @@ export const EDITOR_TEMPLATE_HTML: Record<EditorTemplateId, string> = {
   'council-decision': `
 <div style="font-family: Arial, sans-serif; line-height: 1.6; color: #1e293b;">
   <div style="text-align: center; border-bottom: 2px solid #0d509d; padding-bottom: 12px; margin-bottom: 20px;">
-    <h4 style="margin: 0; text-transform: uppercase; color: #64748b; font-size: 13px;">ĐẠI HỌC CÔNG NGHỆ KỸ THUẬT THÀNH PHỐ HỒ CHÍ MINH</h4>
+    <h4 style="margin: 0; text-transform: uppercase; color: #64748b; font-size: 13px;">TRƯỜNG ĐẠI HỌC CÔNG NGHỆ KĨ THUẬT TP.HCM</h4>
     <h2 style="margin: 8px 0 0 0; color: #0d509d; font-size: 20px; font-weight: bold;">QUYẾT ĐỊNH THÀNH LẬP HỘI ĐỒNG CHẤM BẢO VỆ KHÓA LUẬN TỐT NGHIỆP</h2>
     <p style="margin: 4px 0 0 0; color: #64748b; font-size: 13px;">Căn cứ Quy chế đào tạo đại học và Đề án tổ chức đánh giá tốt nghiệp</p>
   </div>
-  <p><strong>HIỆU TRƯỞNG TRƯỜNG ĐẠI HỌC CÔNG NGHỆ KỸ THUẬT TP. HỒ CHÍ MINH QUYẾT ĐỊNH:</strong></p>
+  <p><strong>HIỆU TRƯỞNG TRƯỜNG ĐẠI HỌC CÔNG NGHỆ KĨ THUẬT TP.HCM QUYẾT ĐỊNH:</strong></p>
   <p><strong>Điều 1.</strong> Thành lập Hội đồng chấm bảo vệ Khóa luận tốt nghiệp chuyên ngành Kỹ thuật Phần mềm gồm các thành viên:</p>
   <ul>
     <li><strong>Ghế 1 (Chủ tịch):</strong> [Họ tên - học hàm, chức danh giảng dạy]</li>
@@ -235,7 +235,7 @@ export const EDITOR_TEMPLATE_HTML: Record<EditorTemplateId, string> = {
   'scholarship-notice': `
 <div style="font-family: Arial, sans-serif; line-height: 1.6; color: #1e293b;">
   <div style="text-align: center; border-bottom: 2px solid #16a34a; padding-bottom: 12px; margin-bottom: 20px;">
-    <h4 style="margin: 0; text-transform: uppercase; color: #64748b; font-size: 13px;">ĐẠI HỌC CÔNG NGHỆ KỸ THUẬT THÀNH PHỐ HỒ CHÍ MINH</h4>
+    <h4 style="margin: 0; text-transform: uppercase; color: #64748b; font-size: 13px;">TRƯỜNG ĐẠI HỌC CÔNG NGHỆ KĨ THUẬT TP.HCM</h4>
     <h2 style="margin: 8px 0 0 0; color: #15803d; font-size: 20px; font-weight: bold;">THÔNG BÁO XÉT CẤP HỌC BỔNG KHUYẾN KHÍCH HỌC TẬP</h2>
     <p style="margin: 4px 0 0 0; color: #64748b; font-size: 13px;">Học kỳ [ ... ] - Năm học [ ... ]</p>
   </div>

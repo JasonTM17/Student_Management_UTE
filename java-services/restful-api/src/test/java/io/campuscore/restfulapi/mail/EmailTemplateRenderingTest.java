@@ -58,7 +58,9 @@ class EmailTemplateRenderingTest {
         assertTrue(html.contains("Nguyễn Tiến Sơn"));
         assertTrue(html.contains("KẾT NỐI SMTP THÀNH CÔNG"));
         assertTrue(html.contains("no-reply@campuscore.local"));
-        assertTrue(html.contains("TRƯỜNG ĐẠI HỌC CÔNG NGHỆ KĨ THUẬT TP. HỒ CHÍ MINH") || html.contains("CÔNG NGHỆ KĨ THUẬT"));
+        assertTrue(html.contains("TRƯỜNG ĐẠI HỌC CÔNG NGHỆ KĨ THUẬT TP.HCM"));
+        assertTrue(html.contains("Trường Đại học Công nghệ kĩ thuật TP.HCM"));
+        assertFalse(html.contains("SƯ PHẠM"));
     }
 
     @Test

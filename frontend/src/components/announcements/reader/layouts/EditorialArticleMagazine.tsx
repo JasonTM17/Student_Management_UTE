@@ -177,7 +177,7 @@ export function EditorialArticleMagazine({
               {publisher}
             </p>
             <p className="text-[11px] text-muted-foreground">
-              {isVi ? 'Trường Đại học Công nghệ Kỹ thuật TP.HCM' : 'Ho Chi Minh City University of Technology and Engineering'}
+              {isVi ? 'Trường Đại học Công nghệ kĩ thuật TP.HCM' : 'Ho Chi Minh City University of Technology and Engineering'}
             </p>
           </div>
         </div>

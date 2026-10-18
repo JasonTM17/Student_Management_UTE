@@ -31,7 +31,7 @@ test('Lecturer attendance sheet CSV and print export integrity', async (t) => {
   await t.test('generateAttendanceCsv outputs UTF-8 BOM and correct metadata and student rows', () => {
     const fileSource = fs.readFileSync(path.join(root, 'src/lib/attendance-export.ts'), 'utf8');
     assert.match(fileSource, /\\uFEFF/, 'must include UTF-8 BOM prefix for Excel');
-    assert.match(fileSource, /TRƯỜNG ĐẠI HỌC SƯ PHẠM KỸ THUẬT TP\. HỒ CHÍ MINH/, 'must include university name');
+    assert.match(fileSource, /TRƯỜNG ĐẠI HỌC CÔNG NGHỆ KĨ THUẬT TP\.HCM/, 'must include the requested institution name');
     assert.match(fileSource, /BẢNG ĐIỂM DANH LỚP HỌC PHẦN/, 'must include official report title');
     assert.match(fileSource, /Tỷ lệ chuyên cần:/, 'must include attendance rate metric');
     assert.match(fileSource, /Mã sinh viên/, 'must include student ID column');

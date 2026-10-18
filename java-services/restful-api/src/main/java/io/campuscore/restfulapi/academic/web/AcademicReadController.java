@@ -69,7 +69,7 @@ public class AcademicReadController {
 
     @GetMapping("faculties")
     @PreAuthorize("isAuthenticated()")
-    @Operation(summary = "Danh sách Khoa đào tạo", description = "Tra cứu danh mục các Khoa / Viện đào tạo trực thuộc Trường ĐH Sư phạm Kỹ thuật TP.HCM.")
+    @Operation(summary = "Danh sách Khoa đào tạo", description = "Tra cứu danh mục các Khoa / Viện đào tạo trực thuộc Trường Đại học Công nghệ kĩ thuật TP.HCM.")
     @ApiResponse(responseCode = "200", description = "Danh sách Khoa đào tạo")
     public FacultyListResponse getFaculties(
             @Parameter(description = "Số thứ tự trang") @RequestParam(defaultValue = "1") int page,

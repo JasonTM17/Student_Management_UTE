@@ -82,7 +82,7 @@ export function generateAttendanceCsv(options: AttendanceCsvOptions): string {
   rows.push(
     escapeCsvField(
       isVi
-        ? 'TRƯỜNG ĐẠI HỌC SƯ PHẠM KỸ THUẬT TP. HỒ CHÍ MINH — CAMPUSUTE'
+        ? 'TRƯỜNG ĐẠI HỌC CÔNG NGHỆ KĨ THUẬT TP.HCM — CAMPUSUTE'
         : 'HO CHI MINH CITY UNIVERSITY OF TECHNOLOGY AND ENGINEERING — CAMPUSUTE',
     ),
   );

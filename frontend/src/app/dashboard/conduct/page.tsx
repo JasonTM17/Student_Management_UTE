@@ -131,7 +131,7 @@ const conductCopy = {
     loadErrorTitle: 'Could not load conduct data',
   },
   vi: {
-    institution: 'TRƯỜNG ĐẠI HỌC CÔNG NGHỆ KỸ THUẬT TP. HỒ CHÍ MINH',
+    institution: 'TRƯỜNG ĐẠI HỌC CÔNG NGHỆ KĨ THUẬT TP.HCM',
     office: 'PHÒNG CÔNG TÁC SINH VIÊN • CAMPUSUTE',
     printTitle: 'PHIẾU ĐÁNH GIÁ KẾT QUẢ RÈN LUYỆN SINH VIÊN',
     pageEyebrow: 'HCM-UTE • PHÒNG CTSV',

@@ -29,10 +29,10 @@ public class OpenApiConfig {
 
         return new OpenAPI()
                 .info(new Info()
-                        .title("TRƯỜNG ĐẠI HỌC CÔNG NGHỆ KỸ THUẬT TP. HỒ CHÍ MINH (HCM-UTE) - RESTful API")
+                        .title("TRƯỜNG ĐẠI HỌC CÔNG NGHỆ KĨ THUẬT TP.HCM (HCM-UTE) - RESTful API")
                         .description("""
                                 ### Hệ thống Quản trị Đào tạo & Khóa luận Tốt nghiệp CampusUTE
-                                Tài liệu đặc tả kỹ thuật RESTful API theo tiêu chuẩn đào tạo và quy chế quản lý khóa luận của Trường Đại học Công nghệ Kỹ thuật TP.HCM.
+                                Tài liệu đặc tả kỹ thuật RESTful API theo tiêu chuẩn đào tạo và quy chế quản lý khóa luận của Trường Đại học Công nghệ kĩ thuật TP.HCM.
 
                                 #### Các phân hệ nghiệp vụ chính:
                                 - **Xác thực & Định danh (Auth)**: JWT Token, đăng nhập đa vai trò (Sinh viên, Giảng viên, Phòng Đào tạo).
@@ -56,7 +56,7 @@ public class OpenApiConfig {
                                 """)
                         .version("2.4.0 (Enterprise Architecture)")
                         .contact(new Contact()
-                                .name("Phòng Đào tạo - Trường ĐH Công nghệ Kỹ thuật TP.HCM")
+                                .name("Phòng Đào tạo - Trường Đại học Công nghệ kĩ thuật TP.HCM")
                                 .email("daotao@ute.edu.vn")
                                 .url("https://ute.edu.vn"))
                         .license(new License()
