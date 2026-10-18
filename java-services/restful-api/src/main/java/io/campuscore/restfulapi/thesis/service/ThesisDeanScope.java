@@ -88,4 +88,37 @@ final class ThesisDeanScope {
         }
         throw new DomainException(HttpStatus.NOT_FOUND, "TOPIC_NOT_FOUND", "Thesis topic not found");
     }
+
+    /**
+     * Read-side counterpart to {@link #requireTopicAccess}: true when the topic
+     * belongs to the dean's active faculty or the dean personally supervises it.
+     */
+    static boolean canAccessTopic(NamedParameterJdbcTemplate jdbc, Jwt actor, UUID topicId, String departmentId) {
+        if (isGlobalAdmin(actor)) {
+            return true;
+        }
+        if (!isFacultyHead(actor) || topicId == null) {
+            return false;
+        }
+        String facultyId = facultyId(jdbc, actor);
+        if (facultyId != null && departmentId != null && !departmentId.isBlank()) {
+            Integer inFaculty = jdbc.queryForObject(
+                    "SELECT COUNT(*) FROM academic.\"Department\" WHERE \"id\" = :departmentId AND \"facultyId\" = :facultyId",
+                    new MapSqlParameterSource("departmentId", departmentId).addValue("facultyId", facultyId),
+                    Integer.class);
+            if (inFaculty != null && inFaculty > 0) {
+                return true;
+            }
+        }
+        String lecturerId = actor == null ? null : actor.getClaimAsString("lecturerId");
+        if (lecturerId == null || lecturerId.isBlank()) {
+            return false;
+        }
+        Integer supervised = jdbc.queryForObject(
+                "SELECT COUNT(*) FROM thesis.thesis_topic_supervisor "
+                        + "WHERE topic_id = :topicId AND lecturer_id = :lecturerId",
+                new MapSqlParameterSource("topicId", topicId).addValue("lecturerId", lecturerId.trim()),
+                Integer.class);
+        return supervised != null && supervised > 0;
+    }
 }

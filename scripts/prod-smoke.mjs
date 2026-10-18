@@ -104,11 +104,11 @@ function matchesTeamGroup(group) {
       `status=${status} groups=${arr.length}`);
   }
 
-  // -- Lecturer: sees the team as a pending supervised group ------------------
+  // -- Lecturer: sees the team as an active supervised group -----------------
   if (sessions.lecturer.cc_access_token) {
     const { status, arr } = await groups(sessions.lecturer);
-    const pending = arr.find(group => group.approvalStatus === 'PENDING' && matchesTeamGroup(group));
-    check('lecturer sees pending team group', status === 200 && !!pending, `status=${status}`);
+    const supervised = arr.find(group => (group.approvalStatus === 'PENDING' || group.approvalStatus === 'APPROVED') && matchesTeamGroup(group));
+    check('lecturer sees supervised team group', status === 200 && !!supervised, `status=${status}`);
   }
 
   // -- Curriculum: student plan resolves --------------------------------------

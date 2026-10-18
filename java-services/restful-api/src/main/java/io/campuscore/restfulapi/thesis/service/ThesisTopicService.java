@@ -39,7 +39,8 @@ public class ThesisTopicService {
         rounds.requireExisting(roundId);
         TopicStatus requestedStatus = status == null ? TopicStatus.PUBLISHED : status;
         List<ThesisTopic> result;
-        if (requestedStatus == TopicStatus.PUBLISHED || requestedStatus == TopicStatus.APPROVED || isAdmin(actor)) {
+        if (requestedStatus == TopicStatus.PUBLISHED || requestedStatus == TopicStatus.APPROVED
+                || isAdmin(actor) || ThesisDeanScope.isFacultyHead(actor)) {
             if (requestedStatus == TopicStatus.PUBLISHED) {
                 List<ThesisTopic> published = topics.findAllByRoundIdAndStatusOrderByTitle(roundId, TopicStatus.PUBLISHED);
                 List<ThesisTopic> approved = topics.findAllByRoundIdAndStatusOrderByTitle(roundId, TopicStatus.APPROVED);
@@ -60,8 +61,32 @@ public class ThesisTopicService {
                     .filter(topic -> topic.getCreatedBy().equals(actorId))
                     .toList();
         }
-        // Department governance queues follow the caller's live active profile.
-        if (!isAdmin(actor) && ThesisDepartmentScope.isDepartmentHead(actor)) {
+        // Faculty and department governance queues follow the caller's live active profile.
+        java.util.Set<String> deanFacultyDepts = java.util.Set.of();
+        java.util.Set<UUID> deanSupervisedIds = java.util.Set.of();
+        if (!isAdmin(actor) && ThesisDeanScope.isFacultyHead(actor)) {
+            String facultyId = ThesisDeanScope.facultyId(jdbc, actor);
+            deanFacultyDepts = facultyId == null ? java.util.Set.of() : new java.util.HashSet<>(
+                    jdbc.queryForList(
+                            "SELECT \"id\" FROM academic.\"Department\" WHERE \"facultyId\" = :facultyId",
+                            new org.springframework.jdbc.core.namedparam.MapSqlParameterSource("facultyId", facultyId),
+                            String.class));
+            String deanLecturerId = normalize(actor == null ? null : actor.getClaimAsString("lecturerId"));
+            deanSupervisedIds = deanLecturerId.isEmpty() || result.isEmpty() ? java.util.Set.of() : new java.util.HashSet<>(
+                    jdbc.queryForList(
+                            "SELECT topic_id FROM thesis.thesis_topic_supervisor WHERE lecturer_id = :lecturerId AND topic_id IN (:topicIds)",
+                            new org.springframework.jdbc.core.namedparam.MapSqlParameterSource()
+                                    .addValue("lecturerId", deanLecturerId)
+                                    .addValue("topicIds", result.stream().map(ThesisTopic::getId).toList()),
+                            UUID.class));
+            java.util.Set<String> inFacultyDepts = deanFacultyDepts;
+            java.util.Set<UUID> supervisedByDean = deanSupervisedIds;
+            result = result.stream()
+                    .filter(topic -> inFacultyDepts.contains(topic.getDepartmentId())
+                            || isOwner(topic, actor)
+                            || supervisedByDean.contains(topic.getId()))
+                    .toList();
+        } else if (!isAdmin(actor) && ThesisDepartmentScope.isDepartmentHead(actor)) {
             String departmentId = ThesisDepartmentScope.departmentId(jdbc, actor);
             result = result.stream().filter(topic -> topic.getDepartmentId().equals(departmentId)).toList();
         }
@@ -81,11 +106,15 @@ public class ThesisTopicService {
                     UUID.class));
         }
         boolean adminCaller = isAdmin(actor);
+        java.util.Set<String> inFacultyDepts = deanFacultyDepts;
+        java.util.Set<UUID> supervisedByDean = deanSupervisedIds;
         String callerLecturerId = lecturerId;
         return result.stream()
                 .map(TopicResponse::from)
                 .map(topic -> maskScoreIfNeeded(topic, published,
-                        adminCaller || gradingTopicIds.contains(topic.id()),
+                        adminCaller || inFacultyDepts.contains(topic.departmentId())
+                                || supervisedByDean.contains(topic.id())
+                                || gradingTopicIds.contains(topic.id()),
                         callerLecturerId))
                 .toList();
     }
@@ -99,13 +128,14 @@ public class ThesisTopicService {
         ThesisTopic topic = topics.findById(id)
                 .orElseThrow(() -> new ResponseStatusException(
                         HttpStatus.NOT_FOUND, "Thesis topic not found"));
+        boolean deanInScope = ThesisDeanScope.canAccessTopic(jdbc, actor, topic.getId(), topic.getDepartmentId());
         if (topic.getStatus() != TopicStatus.PUBLISHED && topic.getStatus() != TopicStatus.APPROVED
-                && !isAdmin(actor) && !isOwner(topic, actor)
+                && !isAdmin(actor) && !deanInScope && !isOwner(topic, actor)
                 && !ThesisDepartmentScope.owns(jdbc, actor, topic.getDepartmentId())) {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Thesis topic not found");
         }
         return maskScoreIfNeeded(TopicResponse.from(topic), isRoundResultsPublished(topic.getRoundId()),
-                isCouncilGraderOf(topic.getId(), actor),
+                deanInScope || isCouncilGraderOf(topic.getId(), actor),
                 normalize(actor == null ? null : actor.getClaimAsString("lecturerId")));
     }
 
@@ -191,7 +221,7 @@ public class ThesisTopicService {
             return false;
         }
         List<String> roles = actor.getClaimAsStringList("roles");
-        return roles != null && (roles.contains("ADMIN") || roles.contains("TRUONG_KHOA") || roles.contains("SUPER_ADMIN"));
+        return roles != null && (roles.contains("ADMIN") || roles.contains("SUPER_ADMIN"));
     }
 
     private static boolean isLecturer(Jwt actor) {

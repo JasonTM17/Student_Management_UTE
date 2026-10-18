@@ -218,12 +218,13 @@ public class ThesisSupervisorService {
         return topic.getStatus() == TopicStatus.PUBLISHED
                 || topic.getStatus() == TopicStatus.APPROVED
                 || isStaff(actor)
+                || ThesisDeanScope.canAccessTopic(jdbc, actor, topic.getId(), topic.getDepartmentId())
                 || ThesisDepartmentScope.owns(jdbc, actor, topic.getDepartmentId())
                 || isOwner(topic, actor);
     }
 
     private static boolean isStaff(Jwt actor) {
-        return hasRole(actor, "ADMIN") || hasRole(actor, "TRUONG_KHOA") || hasRole(actor, "SUPER_ADMIN");
+        return hasRole(actor, "ADMIN") || hasRole(actor, "SUPER_ADMIN");
     }
 
     private static boolean isOwner(ThesisTopic topic, Jwt actor) {
@@ -240,6 +241,7 @@ public class ThesisSupervisorService {
 
     private boolean maySeeContactDetails(ThesisTopic topic, Jwt actor) {
         return isStaff(actor) || isOwner(topic, actor)
+                || ThesisDeanScope.canAccessTopic(jdbc, actor, topic.getId(), topic.getDepartmentId())
                 || ThesisDepartmentScope.owns(jdbc, actor, topic.getDepartmentId());
     }
 

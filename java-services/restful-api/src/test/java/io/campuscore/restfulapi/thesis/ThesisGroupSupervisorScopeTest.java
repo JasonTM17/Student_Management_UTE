@@ -371,6 +371,21 @@ class ThesisGroupSupervisorScopeTest {
                 "INSERT INTO thesis.thesis_topic_supervisor (id, topic_id, lecturer_id, supervisor_order)"
                         + " VALUES (?, ?, 'scope-lecturer-peer4', 1)",
                 UUID.randomUUID(), ownTarget);
+
+        // Read parity: foreign DRAFT topics and their supervisors are invisible
+        // (404/excluded) to a foreign dean, while in-faculty drafts remain visible.
+        mvc.perform(get("/api/v1/thesis/topics")
+                        .queryParam("roundId", roundId.toString())
+                        .queryParam("status", "DRAFT")
+                        .with(deanJwt))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(1))
+                .andExpect(jsonPath("$[0].id").value(ownTarget.toString()));
+        mvc.perform(get("/api/v1/thesis/topics/{id}", publishTarget).with(deanJwt))
+                .andExpect(status().isNotFound());
+        mvc.perform(get("/api/v1/thesis/topics/{id}/supervisors", publishTarget).with(deanJwt))
+                .andExpect(status().isNotFound());
+
         mvc.perform(post("/api/v1/thesis/topics/{id}/publish", ownTarget).with(deanJwt))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.status").value("PUBLISHED"));
