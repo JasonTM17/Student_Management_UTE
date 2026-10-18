@@ -244,7 +244,11 @@ public class ThesisSupervisorService {
     }
 
     private void authorize(ThesisTopic topic, Jwt actor) {
-        if (hasRole(actor, "ADMIN") || hasRole(actor, "TRUONG_KHOA") || hasRole(actor, "SUPER_ADMIN")) {
+        if (hasRole(actor, "ADMIN") || hasRole(actor, "SUPER_ADMIN")) {
+            return;
+        }
+        if (ThesisDeanScope.isFacultyHead(actor)) {
+            ThesisDeanScope.requireTopicAccess(jdbc, actor, topic.getId());
             return;
         }
         String actorId = subject(actor);

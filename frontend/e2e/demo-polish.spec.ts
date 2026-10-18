@@ -156,8 +156,11 @@ const thesisRound = {
   id: 'thesis-round-demo',
   name: 'Thesis registration 2026',
   thesisType: 'Capstone',
-  registrationStart: '2026-09-01T00:00:00Z',
-  registrationEnd: '2026-09-30T00:00:00Z',
+  // The member CTA is window-gated (canManageMembers); fixed past dates hide
+  // the add-member button the test clicks, so keep the window relative to now
+  // like the registration round above.
+  registrationStart: new Date(Date.now() - 30 * 86_400_000).toISOString(),
+  registrationEnd: new Date(Date.now() + 30 * 86_400_000).toISOString(),
   // ThesisRound (thesis-api.ts) requires the Phase 1 lecturer window;
   // RoundMilestoneCard formats it unconditionally.
   lecturerSubmitStart: '2026-08-15T00:00:00Z',

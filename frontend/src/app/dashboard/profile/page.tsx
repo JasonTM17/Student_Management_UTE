@@ -10,7 +10,7 @@ import { PageHeader, SectionEyebrow } from '@/components/ui/page-header';
 import { LoadingState } from '@/components/ui/state-block';
 import { WorkspacePanel } from '@/components/dashboard/WorkspaceSurface';
 import { useI18n } from '@/i18n';
-import { isDemoUser } from '@/lib/login-portal';
+import { isDemoUser, loginHref, portalFromUser } from '@/lib/login-portal';
 import { campusCodeMessage, type CampusErrorCopy } from '@/lib/campus-error';
 import { checkPasswordPolicy } from '@/lib/password-policy';
 import { maskEmail, normalizeOtpCode } from '@/lib/two-factor';
@@ -466,7 +466,7 @@ export default function ProfilePage() {
         confirmPassword: false,
         twoFactorPassword: false,
       });
-      await logout({ redirect: href('/login?reason=password-rotated') });
+      await logout({ redirect: loginHref(href, portalFromUser(user), 'password-rotated') });
     } catch (error: any) {
       // The inline error sits directly under the form, so a toast with the
       // same copy read as a duplicated message.

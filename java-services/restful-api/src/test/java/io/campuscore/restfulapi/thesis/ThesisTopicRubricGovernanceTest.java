@@ -110,7 +110,10 @@ class ThesisTopicRubricGovernanceTest {
         mvc.perform(post("/api/v1/thesis/topics/{id}/publish", id).with(head)).andExpect(status().isForbidden());
         UUID own = topic("department-demo", "DRAFT");
         jdbc.update("UPDATE campuscore_auth.\"Lecturer\" SET \"isActive\"=FALSE WHERE \"id\"='rtg-head'");
-        mvc.perform(post("/api/v1/thesis/topics/{id}/publish", own).with(head)).andExpect(status().isForbidden());
+        // A deactivated profile revokes the token itself: the lecturerId claim
+        // no longer matches, so the account-state filter rejects before the
+        // publish gate is ever reached.
+        mvc.perform(post("/api/v1/thesis/topics/{id}/publish", own).with(head)).andExpect(status().isUnauthorized());
         assertThat(topicStatus(id)).isEqualTo("DRAFT");
         assertThat(topicStatus(own)).isEqualTo("DRAFT");
     }

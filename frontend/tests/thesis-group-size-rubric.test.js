@@ -198,14 +198,21 @@ test('student authority gates still depend on leader, round and approval status'
   const rule = ts.transpileModule(initializer.getText(ast), {
     compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2020 },
   }).outputText;
-  const evaluate = Function('currentGroup', 'user', 'selectedRound', 'useMemo', `return ${rule}`);
-  for (const [studentId, status, approvalStatus, expected] of [
-    ['student-0', 'REGISTRATION_OPEN', 'PENDING', true],
-    ['student-1', 'REGISTRATION_OPEN', 'PENDING', false],
-    ['student-0', 'REGISTRATION_CLOSED', 'PENDING', false],
-    ['student-0', 'REGISTRATION_OPEN', 'APPROVED', false],
+  const evaluate = Function('currentGroup', 'user', 'isRegistrationWindowOpen', 'useMemo', `return ${rule}`);
+  const openWindow = true;
+  const closedWindow = false;
+  for (const [studentId, windowOpen, approvalStatus, groupStatus, expected] of [
+    ['student-0', openWindow, 'PENDING', 'SUBMITTED', true],
+    ['student-1', openWindow, 'PENDING', 'SUBMITTED', false],
+    ['student-0', closedWindow, 'PENDING', 'SUBMITTED', false],
+    ['student-0', openWindow, 'APPROVED', 'SUBMITTED', false],
+    ['student-0', openWindow, 'PENDING', 'CANCELLED', false],
   ]) {
-    const canManageMembers = evaluate(groupOf(4, approvalStatus), { studentId }, { status }, fn => fn());
+    const canManageMembers = evaluate(
+      { ...groupOf(4, approvalStatus), status: groupStatus },
+      { studentId },
+      windowOpen,
+      fn => fn());
     assert.equal(canManageMembers, expected);
     const student = studentFixture(4, 'en', { canManageMembers });
     assert.equal(Boolean(button(student.tree, student.messages.thesis.addMember)), expected);

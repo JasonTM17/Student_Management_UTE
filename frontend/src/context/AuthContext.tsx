@@ -593,6 +593,10 @@ export function useRequireAuth(
     if (!hasRole) {
       if (user.roles?.includes('ADMIN') || user.roles?.includes('SUPER_ADMIN')) {
         router.push(href('/admin'));
+      } else if (user.roles?.includes('TRUONG_KHOA')) {
+        router.push(href('/dashboard/dean'));
+      } else if (user.roles?.includes('TRUONG_BO_MON')) {
+        router.push(href('/dashboard/thesis'));
       } else if (user.roles?.includes('LECTURER')) {
         router.push(href('/dashboard/lecturer'));
       } else {

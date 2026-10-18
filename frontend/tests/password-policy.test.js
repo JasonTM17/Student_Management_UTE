@@ -36,8 +36,15 @@ async function profilePasswordHandler({ rejectChange = false, newPassword = 'Saf
     messages: { profile: { passwordUpdated: 'Changed', passwordUpdateFailed: 'Failed' }, common: { campusErrors: { codes: { PASSWORD_TOO_SHORT: 'Too short' } } } },
     toast: { success: () => events.push('success') },
     campusCodeMessage: () => 'Translated rejection',
+    loginHref: (localize, portal, reason) => {
+      const params = new URLSearchParams();
+      params.set('portal', portal);
+      if (reason) params.set('reason', reason);
+      return `${localize('/login')}?${params.toString()}`;
+    },
+    portalFromUser: () => 'student',
     logout: options => {
-      assert.equal(options.redirect, '/vi/login?reason=password-rotated');
+      assert.equal(options.redirect, '/vi/login?portal=student&reason=password-rotated');
       events.push('logout');
       return waitForLogout ? new Promise(resolve => { releaseLogout = resolve; }) : Promise.resolve();
     },
@@ -78,8 +85,8 @@ test('both rotation callers pass the login target into logout atomically', () =>
   ]) {
     const source = fs.readFileSync(path.join(root, rel), 'utf8');
     assert.ok(
-      source.includes("logout({ redirect: href('/login?reason=password-rotated') })"),
-      `${rel} must hand the rotated login target to logout`,
+      source.includes("logout({ redirect: loginHref(href, portalFromUser(user), 'password-rotated') })"),
+      `${rel} must hand the rotated login target for the caller's portal to logout`,
     );
     assert.equal(
       source.includes("router.replace(href('/login?reason=password-rotated')"),

@@ -233,6 +233,7 @@ public class ThesisCouncilService {
         Map<String, Object> topic = one(
                 "SELECT id, round_id, status, final_score FROM thesis.thesis_topic WHERE id = :topicId",
                 params().addValue("topicId", topicId), "TOPIC_NOT_FOUND", "Thesis topic not found");
+        ThesisDeanScope.requireTopicAccess(jdbc, actor, topicId);
         if (!"PUBLISHED".equals(topic.get("status")) && !"APPROVED".equals(topic.get("status"))) {
             throw conflict("TOPIC_NOT_PUBLISHED",
                     "Only a published topic can be assigned to a defense council");
@@ -500,6 +501,7 @@ public class ThesisCouncilService {
                         + "JOIN thesis.thesis_registration_round r ON r.id = t.round_id "
                         + "WHERE t.id = :topicId FOR UPDATE OF t",
                 params().addValue("topicId", topicId), "TOPIC_NOT_FOUND", "Thesis topic not found");
+        ThesisDeanScope.requireTopicAccess(jdbc, actor, topicId);
         if (RoundStatus.CANCELLED.name().equals(topic.get("round_status"))
                 || RoundStatus.RESULTS_PUBLISHED.name().equals(topic.get("round_status"))) {
             throw conflict("ROUND_STATE_CONFLICT", "The round no longer accepts a counter-reviewer assignment");

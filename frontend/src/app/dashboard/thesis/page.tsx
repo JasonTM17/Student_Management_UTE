@@ -843,14 +843,6 @@ export default function ThesisPage() {
     }));
   }, [currentGroup]);
 
-  const canManageMembers = useMemo(() => {
-    if (!currentGroup || !user?.studentId) return false;
-    const isLeader = currentGroup.leaderStudentId === user.studentId;
-    const isRoundOpen = selectedRound?.status === 'REGISTRATION_OPEN';
-    const isNotApproved = currentGroup.approvalStatus !== 'APPROVED';
-    return isLeader && isRoundOpen && isNotApproved;
-  }, [currentGroup, user, selectedRound]);
-
   // The backend also rejects group/topic actions outside the registration
   // window dates, so the CTA must not invite a doomed request after the end.
   const isRegistrationWindowOpen = useMemo(() => {
@@ -860,6 +852,14 @@ export default function ThesisPage() {
     const end = Date.parse(selectedRound.registrationEnd);
     return (Number.isNaN(start) || now >= start) && (Number.isNaN(end) || now <= end);
   }, [selectedRound]);
+
+  const canManageMembers = useMemo(() => {
+    if (!currentGroup || !user?.studentId) return false;
+    const isLeader = currentGroup.leaderStudentId === user.studentId;
+    const isNotCancelled = currentGroup.status !== 'CANCELLED';
+    const isNotApproved = currentGroup.approvalStatus !== 'APPROVED';
+    return isLeader && isRegistrationWindowOpen && isNotCancelled && isNotApproved;
+  }, [currentGroup, user, isRegistrationWindowOpen]);
 
   const reportGroupId = currentGroup?.id;
   const reportApprovalStatus = currentGroup?.approvalStatus;
@@ -2535,7 +2535,9 @@ export default function ThesisPage() {
                 // (STUDENT is pinned to 403 by PeopleRead boundary tests), so
                 // students see the catalog and progress cards only.
                 ...(canLoadStaffRelations ? ([['advisors', '/dashboard/thesis/advisors']] as const) : []),
-                ['progress', '/dashboard/thesis/progress'],
+                // The progress view is a student-only surface; staff roles
+                // would hit its forbidden state.
+                ...(isStudent ? ([['progress', '/dashboard/thesis/progress']] as const) : []),
               ] as const).map(([key, href]) => (
                 <LocalizedLink
                   key={key}

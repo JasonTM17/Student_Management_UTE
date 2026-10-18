@@ -333,6 +333,18 @@ class ThesisSpecAlignmentTest {
     }
 
     private RequestPostProcessor truongKhoaJwt() {
+        // The dean scope resolves the faculty through a live lecturer profile;
+        // a bare TRUONG_KHOA token without one fails closed. ensureUser runs
+        // inside role() first, so the Lecturer row can reference it; the
+        // second role() call rebuilds the JWT with the lecturerId claim.
+        ThesisAuthorityFixture.role(jdbc, "sa-tk-user", "TRUONG_KHOA");
+        Integer bound = jdbc.queryForObject(
+                "SELECT COUNT(*) FROM campuscore_auth.\"Lecturer\" WHERE \"id\" = 'sa-tk-lecturer'",
+                Integer.class);
+        if (bound == null || bound == 0) {
+            jdbc.update("INSERT INTO campuscore_auth.\"Lecturer\" (\"id\", \"userId\", \"departmentId\", \"employeeId\", \"isActive\") "
+                    + "VALUES ('sa-tk-lecturer', 'sa-tk-user', 'department-demo', 'GV-sa-tk', TRUE)");
+        }
         return ThesisAuthorityFixture.role(jdbc, "sa-tk-user", "TRUONG_KHOA");
     }
 }

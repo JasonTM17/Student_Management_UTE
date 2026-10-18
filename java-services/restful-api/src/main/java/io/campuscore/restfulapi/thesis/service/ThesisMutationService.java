@@ -658,12 +658,16 @@ public class ThesisMutationService {
         Map<String, Object> gate = one(
                 "SELECT round_id, created_by, department_id FROM thesis.thesis_topic WHERE id = :id",
                 params().addValue("id", id), "TOPIC_NOT_FOUND", "Thesis topic not found");
-        authorizeTopicOwner(String.valueOf(gate.get("created_by")), actor);
+        // A department head curates draft topics in their own department;
+        // everyone else still needs to be the owner or a global admin. The
+        // DRAFT-only rule below stays authoritative for the actual write.
+        authorizeTopicOwnerOrDepartmentHead(
+                String.valueOf(gate.get("created_by")), String.valueOf(gate.get("department_id")), actor);
         // A faculty head may only edit topics already inside their faculty;
         // a foreign topic cannot be claimed by rewriting it onto an in-faculty
         // department. The helper is a no-op for global admins and non-deans,
         // and keeps the personally-supervised exception.
-        requireDeanTopicAccess(id, String.valueOf(gate.get("department_id")), actor);
+        ThesisDeanScope.requireTopicAccess(jdbc, actor, id);
         requireMutableRound(UUID.fromString(String.valueOf(gate.get("round_id"))));
         lockTopicForGovernance(id);
         ThesisTopic topic = topics.findById(id).orElseThrow(() -> notFound("TOPIC_NOT_FOUND", "Thesis topic not found"));
@@ -719,6 +723,7 @@ public class ThesisMutationService {
         Integer supervisorCount = jdbc.queryForObject(
                 "SELECT COUNT(*) FROM thesis.thesis_topic_supervisor WHERE topic_id = :topicId",
                 params().addValue("topicId", id), Integer.class);
+        ThesisDeanScope.requireTopicAccess(jdbc, actor, id);
         if (supervisorCount == null || supervisorCount < 1 || supervisorCount > 2) {
             throw conflict("TOPIC_SUPERVISOR_REQUIRED",
                     "A topic must have one or two active supervisors before it can be published");
@@ -763,6 +768,7 @@ public class ThesisMutationService {
             }
             authorizeTopicOwner(topic, actor);
         }
+        ThesisDeanScope.requireTopicAccess(jdbc, actor, id);
         if (topic.getFinalScore() != null || topic.getResultStatus() != null || topic.getGvpbLecturerId() != null
                 || count("SELECT COUNT(*) FROM thesis.thesis_group WHERE topic_id = :topicId", "topicId", id) > 0
                 || count("SELECT COUNT(*) FROM thesis.thesis_council_topic WHERE topic_id = :topicId", "topicId", id) > 0
@@ -949,7 +955,7 @@ public class ThesisMutationService {
             throw conflict("GROUP_STATE_CONFLICT", "An approved group cannot change its topic");
         }
         Map<String, Object> topic = one("SELECT id, round_id, status, max_groups, department_id FROM thesis.thesis_topic WHERE id = :id FOR UPDATE", params().addValue("id", topicId), "TOPIC_NOT_FOUND", "Thesis topic not found");
-        requireDeanTopicAccess(topicId, String.valueOf(topic.get("department_id")), actor);
+        ThesisDeanScope.requireTopicAccess(jdbc, actor, topicId);
         if (!group.roundId().equals(topic.get("round_id"))) {
             throw conflict("TOPIC_ROUND_MISMATCH", "Topic belongs to another registration round");
         }
@@ -1279,14 +1285,9 @@ public class ThesisMutationService {
     }
 
     /** Check the destination too: an own-faculty group cannot confer access to a foreign topic. */
-    private void requireDeanTopicAccess(UUID topicId, String departmentId, Jwt actor) {
-        if (isGlobalAdmin(actor) || !hasRole(actor, "TRUONG_KHOA")) return;
-        ThesisGroupReadRepository.LecturerScope scope = requireDeanScope(actor);
-        Integer matches = jdbc.queryForObject(
-                "SELECT COUNT(*) FROM academic.\"Department\" WHERE \"id\" = :departmentId AND \"facultyId\" = :facultyId",
-                params().addValue("departmentId", departmentId).addValue("facultyId", scope.facultyId()), Integer.class);
-        if ((matches != null && matches > 0) || isDeanSupervisor(topicId, actor)) return;
-        throw notFound("TOPIC_NOT_FOUND", "Thesis topic not found");
+    private void authorizeTopicOwnerOrDepartmentHead(String createdBy, String departmentId, Jwt actor) {
+        if (isAdmin(actor) || ThesisDepartmentScope.owns(jdbc, actor, departmentId)) return;
+        authorizeTopicOwner(createdBy, actor);
     }
 
     private boolean isDeanSupervisor(UUID topicId, Jwt actor) {

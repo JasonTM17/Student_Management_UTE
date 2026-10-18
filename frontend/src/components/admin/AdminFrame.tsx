@@ -164,8 +164,8 @@ export function AdminFrame({
     },
   ];
 
-  // Faculty heads see only what their role can open: the thesis administration
-  // console and the notification centre. Everything else is ADMIN/SUPER_ADMIN
+  // Faculty heads see only what their role can open: the thesis workspace and
+  // the thesis administration console. Everything else is ADMIN/SUPER_ADMIN
   // staff surface, and following it dead-ends in a forbidden state.
   const visibleMenuSections = fullAdminAccess
     ? adminMenuSections

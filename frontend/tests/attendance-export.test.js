@@ -18,7 +18,8 @@ test('Lecturer attendance sheet CSV and print export integrity', async (t) => {
     const escapeCsv = (val) => {
       if (val === null || val === undefined) return '""';
       const str = String(val);
-      return `"${str.replace(/"/g, '""')}"`;
+      const safe = /^[=+\-@\t]/.test(str) ? `'${str}` : str;
+      return `"${safe.replace(/"/g, '""')}"`;
     };
 
     assert.equal(escapeCsv('Nguyen Van A'), '"Nguyen Van A"');
@@ -26,6 +27,23 @@ test('Lecturer attendance sheet CSV and print export integrity', async (t) => {
     assert.equal(escapeCsv('He said "Hello"'), '"He said ""Hello"""');
     assert.equal(escapeCsv(123), '"123"');
     assert.equal(escapeCsv(null), '""');
+  });
+
+  await t.test('escapeCsvField neutralizes spreadsheet formula cells', () => {
+    const fileSource = fs.readFileSync(path.join(root, 'src/lib/attendance-export.ts'), 'utf8');
+    assert.ok(fileSource.includes('^[=+\\-@\\t]'), 'implementation must guard leading formula characters');
+    const escapeCsv = (val) => {
+      if (val === null || val === undefined) return '""';
+      const str = String(val);
+      const safe = /^[=+\-@\t]/.test(str) ? `'${str}` : str;
+      return `"${safe.replace(/"/g, '""')}"`;
+    };
+    assert.equal(escapeCsv('=1+1'), '"\'=1+1"');
+    assert.equal(escapeCsv('+SUM(A1:A2)'), '"\'+SUM(A1:A2)"');
+    assert.equal(escapeCsv('-10'), '"\'-10"');
+    assert.equal(escapeCsv('@mention'), '"\'@mention"');
+    // Negative numbers from real data still export; only the leading char is prefixed.
+    assert.equal(escapeCsv('safe text'), '"safe text"');
   });
 
   await t.test('generateAttendanceCsv outputs UTF-8 BOM and correct metadata and student rows', () => {
