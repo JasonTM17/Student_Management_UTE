@@ -17,6 +17,12 @@ export default function DashboardSignOutPage() {
     }
 
     if (!user) {
+      // A requested logout already owns the navigation with the correct
+      // portal — firing a second replace here would race it with a
+      // pathname-derived portal that may not match the user who signed out.
+      if (didRequestLogout.current) {
+        return;
+      }
       router.replace(
         `${href('/login')}?portal=${window.location.pathname.includes('/lecturer') ? 'lecturer' : 'student'}&reason=signed-out`,
       );
