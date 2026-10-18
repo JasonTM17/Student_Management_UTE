@@ -50,7 +50,7 @@ class InstitutionNameMigrationTest {
             Map<String, Object> original = jdbc.queryForMap("SELECT * FROM engagement.\"Announcement\" WHERE id='changed-0'");
             var unchanged = jdbc.queryForList("SELECT * FROM engagement.\"Announcement\" WHERE id IN ('current','other','nullable') ORDER BY id");
 
-            ScriptUtils.executeSqlScript(connection, new ClassPathResource("db/migration-h2/V122__standardize_current_institution_name.sql"));
+            ScriptUtils.executeSqlScript(connection, new ClassPathResource("db/migration-h2/V123__standardize_current_institution_name.sql"));
 
             assertThat(jdbc.queryForObject("SELECT count(*) FROM engagement.\"Announcement\"", Integer.class)).isEqualTo(6);
             assertThat(jdbc.queryForObject("SELECT count(*) FROM engagement.\"AnnouncementAudit\"", Integer.class)).isEqualTo(4);
@@ -71,7 +71,7 @@ class InstitutionNameMigrationTest {
             assertThat(jdbc.queryForList("SELECT * FROM engagement.\"Announcement\" WHERE id IN ('current','other','nullable') ORDER BY id")).isEqualTo(unchanged);
             assertThat(jdbc.queryForObject("SELECT reason FROM engagement.\"AnnouncementAudit\" WHERE id='prior'", String.class)).isEqualTo("Retained history");
             var after = jdbc.queryForList("SELECT * FROM engagement.\"Announcement\" ORDER BY id");
-            ScriptUtils.executeSqlScript(connection, new ClassPathResource("db/migration-h2/V122__standardize_current_institution_name.sql"));
+            ScriptUtils.executeSqlScript(connection, new ClassPathResource("db/migration-h2/V123__standardize_current_institution_name.sql"));
             assertThat(jdbc.queryForList("SELECT * FROM engagement.\"Announcement\" ORDER BY id")).isEqualTo(after);
             assertThat(jdbc.queryForObject("SELECT count(*) FROM engagement.\"AnnouncementAudit\"", Integer.class)).isEqualTo(4);
         }

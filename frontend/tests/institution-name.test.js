@@ -27,7 +27,7 @@ for (const [name, generate] of [['grade', grade], ['attendance', attendance]]) {
     const csv = generate('vi');
     assert.ok(csv.startsWith('\uFEFF'));
     assert.equal(csv.slice(1).split(/\r?\n/)[0],
-      '"TRƯỜNG ĐẠI HỌC CÔNG NGHỆ KỸ THUẬT TP.HCM — CAMPUSUTE"');
+      '"TRƯỜNG ĐẠI HỌC CÔNG NGHỆ KỸ THUẬT TP. HỒ CHÍ MINH — CAMPUSUTE"');
     assert.doesNotMatch(csv, /SƯ PHẠM/iu);
   });
   test(`${name} CSV retains its existing English institution and valid format`, () => {
