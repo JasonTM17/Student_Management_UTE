@@ -632,6 +632,14 @@ public class RegistrationService {
                 "UPDATE " + SECTION + " SET \"enrolledCount\" = CASE WHEN \"enrolledCount\" > 0 THEN \"enrolledCount\" - 1 ELSE 0 END,"
                         + " \"updatedAt\" = CURRENT_TIMESTAMP WHERE \"id\" = :sectionId",
                 new MapSqlParameterSource("sectionId", enrollment.get("section_id")));
+        // Persisted slips are snapshots of the active registration set. A drop
+        // must invalidate them in the same transaction, otherwise the next slip
+        // download keeps claiming the dropped course as a valid enrollment.
+        jdbc.update(
+                "DELETE FROM " + SLIP + " WHERE \"studentId\" = :studentId AND \"semesterId\" = :semesterId",
+                new MapSqlParameterSource()
+                        .addValue("studentId", targetStudentId)
+                        .addValue("semesterId", String.valueOf(enrollment.get("semester_id"))));
         jdbc.update(
                 "INSERT INTO " + EVENT
                         + " (\"id\", \"enrollmentId\", \"studentId\", \"sectionId\", \"action\", \"actorId\", \"requestHash\")"
