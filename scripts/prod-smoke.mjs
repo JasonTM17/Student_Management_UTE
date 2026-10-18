@@ -75,7 +75,14 @@ function matchesTeamGroup(group) {
 (async () => {
   console.log(`Smoke: ${BASE}`);
 
-  // -- Auth: every demo account logs in --------------------------------------
+  // -- Auth: every demo account logs in with its expected role/profile -------
+  const STAFF = {
+    lecturer: { email: 'lecturer@campuscore.edu', roles: ['LECTURER'], requiresLecturerId: true },
+    truongbomon: { email: 'truongbomon@campuscore.demo', roles: ['LECTURER', 'TRUONG_BO_MON'], requiresLecturerId: true },
+    truongkhoa: { email: 'truongkhoa@campuscore.demo', roles: ['LECTURER', 'TRUONG_KHOA'], requiresLecturerId: true },
+    admin: { email: 'admin@campuscore.edu', roles: ['ADMIN'], requiresLecturerId: false },
+    admin002: { email: 'admin002@campuscore.demo', roles: ['ADMIN'], requiresLecturerId: false },
+  };
   const sessions = {};
   for (const [key, email] of Object.entries({
     student: 'student@campuscore.edu',
@@ -90,13 +97,22 @@ function matchesTeamGroup(group) {
   })) {
     const r = await login(email);
     sessions[key] = r.jar;
-    const expected = TEAM.find(member => member.key === key);
+    const expectedStudent = TEAM.find(member => member.key === key);
+    const expectedStaff = STAFF[key];
     const user = r.body.user;
-    const identityMatches = !expected || (user?.id === expected.userId
-      && user.email === expected.email
-      && `${user.lastName} ${user.firstName}`.trim() === expected.name
-      && user.status === 'ACTIVE' && user.roles?.length === 1 && user.roles[0] === 'STUDENT');
-    check(`login ${key}`, r.status === 200 && r.jar.cc_access_token && identityMatches, `status=${r.status}`);
+    const actualRoles = [...(user?.roles || [])].sort().join(',');
+    const identityMatches = expectedStudent
+      ? (user?.id === expectedStudent.userId
+        && user.email === expectedStudent.email
+        && `${user.lastName} ${user.firstName}`.trim() === expectedStudent.name
+        && user.status === 'ACTIVE'
+        && actualRoles === 'STUDENT')
+      : Boolean(expectedStaff
+        && user?.email === expectedStaff.email
+        && user.status === 'ACTIVE'
+        && actualRoles === [...expectedStaff.roles].sort().join(',')
+        && (!expectedStaff.requiresLecturerId || (typeof user.lecturerId === 'string' && user.lecturerId.length > 0)));
+    check(`login ${key}`, r.status === 200 && r.jar.cc_access_token && identityMatches, `status=${r.status} roles=${actualRoles}`);
   }
 
   // -- Thesis team: leader + all members see the same roster -----------------
@@ -118,7 +134,11 @@ function matchesTeamGroup(group) {
   if (sessions.truongkhoa?.cc_access_token) {
     const res = await fetch(`${API}/thesis/dean/overview?roundId=${ROUND_ID}`, { headers: headers(sessions.truongkhoa) });
     const j = await res.json().catch(() => ({}));
-    check('dean overview resolves faculty scope', res.status === 200 && Boolean(j.faculty?.facultyId), `status=${res.status}`);
+    check(
+      'dean overview resolves faculty scope',
+      res.status === 200 && j.faculty?.facultyId === 'faculty-demo' && Array.isArray(j.groups),
+      `status=${res.status} faculty=${j.faculty?.facultyId || ''}`,
+    );
   }
 
   // -- Curriculum: student plan resolves --------------------------------------

@@ -31,6 +31,8 @@ class DemoAccountGateRunbookParityTest {
             Path.of("src/main/resources/db/migration/V116__align_four_member_demo_team.sql");
     private static final Path V124 =
             Path.of("src/main/resources/db/migration/V124__reconcile_demo_role_accounts_and_hygiene.sql");
+    private static final Path V125 =
+            Path.of("src/main/resources/db/migration/V125__revoke_reconciled_demo_sessions.sql");
     private static final Pattern EMAIL = Pattern.compile("'([A-Za-z0-9._-]+@campuscore\\.(?:demo|edu))'");
 
     @Test
@@ -70,6 +72,12 @@ class DemoAccountGateRunbookParityTest {
                 "truongkhoa@campuscore.demo",
                 "truongbomon@campuscore.demo");
         assertThat(reconciled).allMatch(DemoAccountGate.DEMO_EMAILS::contains);
+        assertThat(quotedEmails(V125)).isEqualTo(reconciled);
+        String revocationSql = Files.readString(V125);
+        assertThat(revocationSql)
+                .contains("\"credentialVersion\" = \"credentialVersion\" + 1")
+                .contains("DELETE FROM campuscore_auth.\"Session\"")
+                .contains("UPDATE campuscore_auth.\"TwoFactorChallenge\"");
     }
 
     private static Set<String> quotedEmails(Path migration) throws Exception {

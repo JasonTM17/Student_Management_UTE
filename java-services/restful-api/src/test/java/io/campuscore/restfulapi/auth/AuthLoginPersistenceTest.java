@@ -856,6 +856,54 @@ class AuthLoginPersistenceTest {
         }
     }
 
+    @Test
+    void reconciledDemoRoleMigrationsRevokePreexistingAccessAndRefreshSessions() throws Exception {
+        String user = "admin-user-002";
+        String initialSecret = "PreMigration-" + UUID.randomUUID();
+        io.campuscore.restfulapi.testsupport.AccountAuthorityFixture.ensureUser(jdbc, user);
+        io.campuscore.restfulapi.testsupport.AccountAuthorityFixture.ensureCredentialReplacementSchema(jdbc);
+        io.campuscore.restfulapi.testsupport.AccountAuthorityFixture.role(jdbc, user, "ADMIN");
+        jdbc.update("UPDATE campuscore_auth.\"User\""
+                + " SET \"email\"='admin002@campuscore.demo', \"password\"=? WHERE \"id\"=?",
+                passwordEncoder.encode(initialSecret), user);
+        jdbc.execute("CREATE TABLE IF NOT EXISTS academic.\"Lecturer\""
+                + " (\"userId\" VARCHAR(120), \"isActive\" BOOLEAN DEFAULT TRUE, \"updatedAt\" TIMESTAMP)");
+        io.campuscore.restfulapi.testsupport.AccountAuthorityFixture.pendingLoginChallenge(
+                jdbc, "challenge-pre-v125", user);
+
+        MvcResult login = mvc.perform(post("/api/v1/auth/login")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"email\":\"admin002@campuscore.demo\",\"password\":\"" + initialSecret + "\"}"))
+                .andExpect(status().isOk())
+                .andReturn();
+        JsonNode body = objectMapper.readTree(login.getResponse().getContentAsString());
+        String oldAccess = body.get("accessToken").asText();
+        String oldRefresh = body.get("refreshToken").asText();
+
+        try (var connection = jdbc.getDataSource().getConnection()) {
+            org.springframework.jdbc.datasource.init.ScriptUtils.executeSqlScript(
+                    connection,
+                    new org.springframework.core.io.ClassPathResource(
+                            "db/migration/V124__reconcile_demo_role_accounts_and_hygiene.sql"));
+            org.springframework.jdbc.datasource.init.ScriptUtils.executeSqlScript(
+                    connection,
+                    new org.springframework.core.io.ClassPathResource(
+                            "db/migration/V125__revoke_reconciled_demo_sessions.sql"));
+        }
+
+        mvc.perform(get("/api/v1/auth/me").header("Authorization", "Bearer " + oldAccess))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.code").value("SESSION_INVALID"));
+        mvc.perform(post("/api/v1/auth/refresh")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"refreshToken\":\"" + oldRefresh + "\"}"))
+                .andExpect(status().isUnauthorized());
+        org.junit.jupiter.api.Assertions.assertEquals(0, jdbc.queryForObject(
+                "SELECT COUNT(*) FROM campuscore_auth.\"TwoFactorChallenge\""
+                        + " WHERE \"userId\"=? AND \"purpose\"='LOGIN' AND \"consumedAt\" IS NULL",
+                Integer.class, user));
+    }
+
     private void assertPolicyRejection(String accessToken, String oldSecret, String candidate, String code)
             throws Exception {
         mvc.perform(post("/api/v1/auth/change-password")

@@ -4,20 +4,33 @@
  * account holding one of these roles — the row actions stay disabled and
  * the API independently enforces the same limit with 403 ROLE_ESCALATION.
  */
-const SUPER_ADMIN_ONLY_ROLES = new Set(['ADMIN', 'SUPER_ADMIN', 'TRUONG_KHOA']);
+const SUPER_ADMIN_ONLY_ROLES = new Set([
+  'ADMIN',
+  'SUPER_ADMIN',
+  'TRUONG_KHOA',
+  'TRUONG_BO_MON',
+]);
 
-export type ManagedRole = 'STUDENT' | 'LECTURER' | 'ADMIN' | 'TRUONG_KHOA' | 'SUPER_ADMIN';
+export type ManagedRole =
+  | 'STUDENT'
+  | 'LECTURER'
+  | 'ADMIN'
+  | 'TRUONG_KHOA'
+  | 'TRUONG_BO_MON'
+  | 'SUPER_ADMIN';
 
 /**
  * Highest managed role wins, independent of array order or letter case: a dean
- * pair (TRUONG_KHOA + LECTURER) reads as TRUONG_KHOA, mixed legacy data surfaces
- * the most privileged supported role, and custom-only sets return null so the
- * caller disables role editing instead of guessing a STUDENT default.
+ * or department-head pair (TRUONG_KHOA/TRUONG_BO_MON + LECTURER) reads as the
+ * head role, mixed legacy data surfaces the most privileged supported role,
+ * and custom-only sets return null so the caller disables role editing instead
+ * of guessing a STUDENT default.
  */
 const MANAGED_ROLE_PRIORITY: readonly ManagedRole[] = [
   'SUPER_ADMIN',
   'ADMIN',
   'TRUONG_KHOA',
+  'TRUONG_BO_MON',
   'LECTURER',
   'STUDENT',
 ];

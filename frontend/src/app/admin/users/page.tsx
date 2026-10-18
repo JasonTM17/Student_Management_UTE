@@ -72,7 +72,11 @@ const ACCOUNT_STATUSES = ['ACTIVE', 'PENDING', 'SUSPENDED', 'LOCKED', 'DISABLED'
 
 function usesLecturerProfileRole(role: string): boolean {
   const normalized = role.trim().toUpperCase();
-  return normalized === 'LECTURER' || normalized === 'TRUONG_KHOA';
+  return (
+    normalized === 'LECTURER' ||
+    normalized === 'TRUONG_KHOA' ||
+    normalized === 'TRUONG_BO_MON'
+  );
 }
 
 function isRecordSuperAdmin(u: UserRecord): boolean {
@@ -207,7 +211,9 @@ export default function AdminUsersPage() {
     const roleParam = searchParams.get('role');
     if (
       roleParam &&
-      ['STUDENT', 'LECTURER', 'ADMIN', 'TRUONG_KHOA', 'SUPER_ADMIN'].includes(roleParam.toUpperCase())
+      ['STUDENT', 'LECTURER', 'ADMIN', 'TRUONG_KHOA', 'TRUONG_BO_MON', 'SUPER_ADMIN'].includes(
+        roleParam.toUpperCase(),
+      )
     ) {
       setRoleFilter(roleParam.toUpperCase() as ManagedRole);
     }
@@ -390,6 +396,7 @@ export default function AdminUsersPage() {
             LECTURER: 'Giảng viên',
             ADMIN: 'Quản trị viên',
             TRUONG_KHOA: 'Trưởng khoa',
+            TRUONG_BO_MON: 'Trưởng bộ môn',
             SUPER_ADMIN: 'Siêu quản trị viên',
           },
           saving: 'Đang lưu dữ liệu...',
@@ -409,6 +416,7 @@ export default function AdminUsersPage() {
           rolesShort: {
             ADMIN: 'Quản trị',
             TRUONG_KHOA: 'Trưởng khoa',
+            TRUONG_BO_MON: 'Trưởng BM',
             SUPER_ADMIN: 'Siêu QTV',
           },
           accountSectionTitle: '1. Thông tin tài khoản & đăng nhập',
@@ -426,6 +434,7 @@ export default function AdminUsersPage() {
             STUDENT: 'Thông tin hồ sơ đào tạo sinh viên chính quy',
             LECTURER: 'Thông tin học hàm và bộ môn giảng dạy',
             TRUONG_KHOA: 'Hồ sơ giảng viên chính thức gắn với vai trò trưởng khoa',
+            TRUONG_BO_MON: 'Hồ sơ giảng viên chính thức gắn với vai trò trưởng bộ môn',
             ADMIN: 'Phân quyền quản trị hệ thống',
             SUPER_ADMIN: 'Phân quyền siêu quản trị toàn hệ thống',
           },
@@ -555,6 +564,7 @@ export default function AdminUsersPage() {
             LECTURER: 'Lecturer',
             ADMIN: 'Administrator',
             TRUONG_KHOA: 'Dean',
+            TRUONG_BO_MON: 'Department head',
             SUPER_ADMIN: 'Super administrator',
           },
           saving: 'Saving...',
@@ -574,6 +584,7 @@ export default function AdminUsersPage() {
           rolesShort: {
             ADMIN: 'Admin',
             TRUONG_KHOA: 'Dean',
+            TRUONG_BO_MON: 'Dept head',
             SUPER_ADMIN: 'Super admin',
           },
           accountSectionTitle: '1. Account & Sign-in Details',
@@ -591,6 +602,7 @@ export default function AdminUsersPage() {
             STUDENT: 'Academic profile details for the enrolled student',
             LECTURER: 'Academic title and teaching department details',
             TRUONG_KHOA: 'Official lecturer profile attached to the dean role',
+            TRUONG_BO_MON: 'Official lecturer profile attached to the department-head role',
             ADMIN: 'System administration permissions',
             SUPER_ADMIN: 'Full super-administration permissions',
           },
@@ -1294,7 +1306,9 @@ export default function AdminUsersPage() {
                           <span className={`inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-xs font-medium ${roleToneClass(primary ?? '')}`}>
                             {primary === 'STUDENT' ? (
                               <GraduationCap className="h-3 w-3" />
-                            ) : primary === 'LECTURER' || primary === 'TRUONG_KHOA' ? (
+                            ) : primary === 'LECTURER' ||
+                              primary === 'TRUONG_KHOA' ||
+                              primary === 'TRUONG_BO_MON' ? (
                               <School className="h-3 w-3" />
                             ) : (
                               <ShieldCheck className="h-3 w-3" />
@@ -1548,6 +1562,7 @@ export default function AdminUsersPage() {
                             ? [
                                 { value: 'ADMIN', label: copy.roles.ADMIN },
                                 { value: 'TRUONG_KHOA', label: copy.roles.TRUONG_KHOA },
+                                { value: 'TRUONG_BO_MON', label: copy.roles.TRUONG_BO_MON },
                                 { value: 'SUPER_ADMIN', label: copy.roles.SUPER_ADMIN },
                               ]
                             : []),

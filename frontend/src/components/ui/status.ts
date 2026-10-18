@@ -24,13 +24,20 @@ export function metricToneClass(kind: StatusTone): string {
   return METRIC_TONE_CLASS[kind] ?? METRIC_TONE_CLASS.neutral;
 }
 
-export type PortalRole = 'STUDENT' | 'LECTURER' | 'ADMIN' | 'TRUONG_KHOA' | 'SUPER_ADMIN';
+export type PortalRole =
+  | 'STUDENT'
+  | 'LECTURER'
+  | 'ADMIN'
+  | 'TRUONG_KHOA'
+  | 'TRUONG_BO_MON'
+  | 'SUPER_ADMIN';
 
 const ROLE_TONE_CLASS: Record<PortalRole, string> = {
   STUDENT: 'bg-role-student/10 text-role-student',
   LECTURER: 'bg-role-lecturer/10 text-role-lecturer',
   ADMIN: 'bg-role-admin/10 text-role-admin',
   TRUONG_KHOA: 'bg-role-lecturer/10 text-role-lecturer',
+  TRUONG_BO_MON: 'bg-role-lecturer/10 text-role-lecturer',
   SUPER_ADMIN: 'bg-role-super-admin/10 text-role-super-admin',
 };
 
@@ -39,6 +46,7 @@ const ROLE_SOLID_CLASS: Record<PortalRole, string> = {
   LECTURER: 'bg-role-lecturer-solid text-white shadow-xs hover:bg-role-lecturer-solid/90',
   ADMIN: 'bg-role-admin-solid text-white shadow-xs hover:bg-role-admin-solid/90',
   TRUONG_KHOA: 'bg-role-lecturer-solid text-white shadow-xs hover:bg-role-lecturer-solid/90',
+  TRUONG_BO_MON: 'bg-role-lecturer-solid text-white shadow-xs hover:bg-role-lecturer-solid/90',
   SUPER_ADMIN: 'bg-role-super-admin-solid text-white shadow-xs hover:bg-role-super-admin-solid/90',
 };
 

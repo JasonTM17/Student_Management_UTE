@@ -27,17 +27,19 @@ test('student and lecturer accounts are manageable by a plain administrator', as
   assert.equal(isPrivilegedAccountTarget(undefined), false);
 });
 
-test('ADMIN, SUPER_ADMIN and TRUONG_KHOA targets are privileged', async () => {
+test('ADMIN, SUPER_ADMIN, TRUONG_KHOA and TRUONG_BO_MON targets are privileged', async () => {
   const { isPrivilegedAccountTarget } = await loadGuardsModule();
   // Mirrors AdminUserMutationService.SUPER_ADMIN_ONLY_ROLES.
   assert.equal(isPrivilegedAccountTarget(['ADMIN']), true);
   assert.equal(isPrivilegedAccountTarget(['SUPER_ADMIN']), true);
   assert.equal(isPrivilegedAccountTarget(['TRUONG_KHOA']), true);
+  assert.equal(isPrivilegedAccountTarget(['TRUONG_BO_MON']), true);
 });
 
 test('privilege wins over any unprivileged role on the same account', async () => {
   const { isPrivilegedAccountTarget } = await loadGuardsModule();
   assert.equal(isPrivilegedAccountTarget(['LECTURER', 'TRUONG_KHOA']), true);
+  assert.equal(isPrivilegedAccountTarget(['LECTURER', 'TRUONG_BO_MON']), true);
   assert.equal(isPrivilegedAccountTarget(['STUDENT', 'ADMIN']), true);
 });
 
@@ -59,6 +61,8 @@ test('primaryManagedRole picks the highest managed role regardless of array orde
   const { primaryManagedRole } = await loadGuardsModule();
   assert.equal(primaryManagedRole(['STUDENT']), 'STUDENT');
   assert.equal(primaryManagedRole(['LECTURER']), 'LECTURER');
+  assert.equal(primaryManagedRole(['LECTURER', 'TRUONG_BO_MON']), 'TRUONG_BO_MON');
+  assert.equal(primaryManagedRole(['TRUONG_BO_MON', 'LECTURER']), 'TRUONG_BO_MON');
   assert.equal(primaryManagedRole(['LECTURER', 'TRUONG_KHOA']), 'TRUONG_KHOA');
   assert.equal(primaryManagedRole(['TRUONG_KHOA', 'LECTURER']), 'TRUONG_KHOA');
   assert.equal(primaryManagedRole(['LECTURER', 'ADMIN']), 'ADMIN');
@@ -134,7 +138,7 @@ for (const [name, roles] of [
 }
 
 test('custom-only account edit still omits unsupported role conversion', async () => {
-  const { updates, errors } = await submitExistingUser({ roles: ['TRUONG_BO_MON'] });
+  const { updates, errors } = await submitExistingUser({ roles: ['AUDITOR'] });
   assert.deepEqual(errors, []);
   assert.equal(updates.length, 1);
   assert.equal(Object.hasOwn(updates[0].payload, 'role'), false);
