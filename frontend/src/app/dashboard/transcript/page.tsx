@@ -535,7 +535,7 @@ export default function TranscriptPage() {
           <div className="hidden print:block mb-6 border-b-2 border-primary/40 pb-4 text-center">
             <div className="text-xs uppercase font-bold tracking-wider text-muted-foreground">
               {locale === 'vi'
-                ? 'BỘ GIÁO DỤC VÀ ĐÀO TẠO — ĐẠI HỌC CÔNG NGHỆ KỸ THUẬT THÀNH PHỐ HỒ CHÍ MINH'
+                ? 'BỘ GIÁO DỤC VÀ ĐÀO TẠO — TRƯỜNG ĐẠI HỌC CÔNG NGHỆ KỸ THUẬT TP.HCM'
                 : 'MINISTRY OF EDUCATION AND TRAINING — HCMC UNIVERSITY OF TECHNOLOGY AND ENGINEERING'}
             </div>
             <div className="text-sm font-extrabold text-foreground">

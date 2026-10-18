@@ -14,7 +14,7 @@ import org.springframework.scheduling.annotation.EnableAsync;
 public class MailConfig {
 
     private String from = "no-reply@campuscore.local";
-    private String senderName = "CampusUTE - Đại học Công Nghệ Kĩ thuật TP.HCM";
+    private String senderName = "CampusUTE - Trường Đại học Công nghệ Kỹ thuật TP.HCM";
     private boolean enabled = true;
 
     public String getFrom() {

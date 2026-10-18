@@ -41,6 +41,7 @@ class RegistrationPdfRendererTest {
         assertThat(pdfString).contains("sec-xyz");
         assertThat(pdfString).contains("CampusUTE registration slip student=student-123 semester=sem-2026-1 enrollment=enr-abc section=sec-xyz");
         assertThat(pdfString).contains("TRUONG DAI HOC CONG NGHE KY THUAT TP. HO CHI MINH");
+        assertThat(pdfString).doesNotContain("TRUONG DAI HOC SU PHAM");
 
         // Standard xref table and trailer checks
         assertThat(pdfString).contains("xref\r\n0 7\r\n");

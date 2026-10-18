@@ -544,7 +544,7 @@ export const thesisWorkflowVi: Widen<typeof thesisWorkflowEn> = {
         callout:
           '**Công thức tính:** Điểm cuối cùng của đề tài = **Trung bình cộng số học** của các điểm thành phần hợp lệ do các thành viên Hội đồng chấm (thang điểm 10, làm tròn đến 2 chữ số thập phân).',
         tail:
-          'Điểm số sau đó được quy đổi sang điểm chữ (A, B+, B, C+, C, D+, D, F) và xếp loại tốt nghiệp chính thức theo thang điểm tín chỉ của Trường ĐH Công nghệ Kỹ thuật TP.HCM.',
+          'Điểm số sau đó được quy đổi sang điểm chữ (A, B+, B, C+, C, D+, D, F) và xếp loại tốt nghiệp chính thức theo thang điểm tín chỉ của Trường Đại học Công nghệ Kỹ thuật TP.HCM.',
       },
       {
         number: 'Điều R8',
@@ -667,7 +667,7 @@ export const thesisWorkflowVi: Widen<typeof thesisWorkflowEn> = {
     graduationClassification: 'Xếp loại tốt nghiệp',
     creditScaleNote: 'Theo thang điểm tín chỉ',
     evaluationCouncil: 'Hội đồng đánh giá',
-    universityName: 'Trường ĐH Công nghệ Kỹ thuật TP.HCM',
+    universityName: 'Trường Đại học Công nghệ Kỹ thuật TP.HCM',
     yourRoleLabel: 'Vai trò của bạn:',
     roleGroupLeaderReport: 'Nhóm trưởng (Đại diện nộp báo cáo - R5)',
     roleMember: 'Thành viên',

@@ -3063,7 +3063,7 @@ export const vi: I18nMessages = {
         'HCMUTE',
         'HCM-UTE',
         'UTE',
-        'Đại học Công nghệ Kỹ thuật',
+        'Trường Đại học Công nghệ Kỹ thuật TP.HCM',
         'cổng thông tin học vụ',
         'quản lý sinh viên',
         'đăng ký học phần UTE',
@@ -3079,7 +3079,7 @@ export const vi: I18nMessages = {
     home: {
       title: 'CampusUTE - Cổng Thông Tin Đào Tạo & Quản Lý Sinh Viên HCM-UTE',
       description:
-        'CampusUTE mang đến một cổng đào tạo hiện đại, ổn định cho sinh viên, giảng viên và cán bộ quản trị Trường ĐH Công nghệ Kỹ thuật TP.HCM.',
+        'CampusUTE mang đến một cổng đào tạo hiện đại, ổn định cho sinh viên, giảng viên và cán bộ quản trị Trường Đại học Công nghệ Kỹ thuật TP.HCM.',
     },
     login: {
       title: 'Đăng nhập | CampusUTE',
@@ -3123,7 +3123,7 @@ export const vi: I18nMessages = {
     navSubtitle: 'Cổng học vụ CampusUTE',
     logoAlt: 'Logo Trường Đại học Công nghệ Kỹ thuật TP.HCM',
     schoolName: 'Trường Đại học Công nghệ Kỹ thuật TP.HCM • HCM-UTE',
-    eyebrow: 'ĐẠI HỌC CÔNG NGHỆ KỸ THUẬT THÀNH PHỐ HỒ CHÍ MINH',
+    eyebrow: 'TRƯỜNG ĐẠI HỌC CÔNG NGHỆ KỸ THUẬT TP.HCM',
     title: 'Cổng Thông Tin Đào Tạo & Học Vụ Trực Tuyến',
     description:
       'Hệ thống quản lý học vụ số tập trung dành cho Sinh viên, Giảng viên và Cán bộ Quản trị.',
@@ -4605,7 +4605,7 @@ export const vi: I18nMessages = {
     docSubtitle:
       '(Bố cục xem trước dành cho sinh viên đang theo học hệ chính quy tại Trường Đại học Công nghệ Kỹ thuật TP.HCM)',
     declarationIntro:
-      'HIỆU TRƯỞNG TRƯỜNG ĐẠI HỌC CÔNG NGHỆ KỸ THUẬT THÀNH PHỐ HỒ CHÍ MINH SẼ XÁC NHẬN (bản xem trước):',
+      'HIỆU TRƯỞNG TRƯỜNG ĐẠI HỌC CÔNG NGHỆ KỸ THUẬT TP.HCM SẼ XÁC NHẬN (bản xem trước):',
     nameLabel: 'Họ và tên sinh viên: ',
     idLabel: 'Mã số sinh viên (MSSV): ',
     dobLabel: 'Ngày sinh: ',
@@ -4678,7 +4678,7 @@ export const vi: I18nMessages = {
       header: {
         title: '1. Tiêu ngữ Quốc hiệu & Tên Trường',
         description:
-          'Header chính thức: ĐẠI HỌC CÔNG NGHỆ KỸ THUẬT TP. HỒ CHÍ MINH, Tiêu đề thông báo học vụ',
+          'Header chính thức: TRƯỜNG ĐẠI HỌC CÔNG NGHỆ KỸ THUẬT TP.HCM, Tiêu đề thông báo học vụ',
       },
       recipient: {
         title: '2. Dòng Kính gửi Tiếp nhận',
@@ -4773,7 +4773,7 @@ export const vi: I18nMessages = {
     removeBanner: 'Gỡ ảnh bìa',
     heroCardTitle: 'Cấu Hình Banner & Tên Trường Trên Trang Chủ',
     heroEyebrowLabel: 'Tên trường / Nhãn Eyebrow (Hiển thị đầu trang chủ)',
-    heroEyebrowDefault: 'ĐẠI HỌC CÔNG NGHỆ KỸ THUẬT THÀNH PHỐ HỒ CHÍ MINH',
+    heroEyebrowDefault: 'TRƯỜNG ĐẠI HỌC CÔNG NGHỆ KỸ THUẬT TP.HCM',
     heroTitleLabel: 'Tiêu đề chính (Hero Title)',
     heroTitleDefault: 'Cổng Thông Tin Đào Tạo & Học Vụ Trực Tuyến',
     heroDescriptionLabel: 'Đoạn giới thiệu (Hero Description)',
@@ -5687,7 +5687,7 @@ export const vi: I18nMessages = {
     exportCsvSuccess: 'Đã xuất bảng điểm danh dạng CSV thành công.',
     exportCsvEmpty: 'Không có dữ liệu điểm danh sinh viên để xuất.',
     printRoster: 'In bảng điểm danh',
-    printOfficialHeader: 'TRƯỜNG ĐẠI HỌC CÔNG NGHỆ KỸ THUẬT TP. HỒ CHÍ MINH',
+    printOfficialHeader: 'TRƯỜNG ĐẠI HỌC CÔNG NGHỆ KỸ THUẬT TP.HCM',
     printDepartment: 'HỆ THỐNG CAMPUSUTE',
     printReportTitle: 'BẢNG ĐIỂM DANH LỚP HỌC PHẦN',
     printInstructorSignature: 'Giảng viên phụ trách (Ký và ghi rõ họ tên)',

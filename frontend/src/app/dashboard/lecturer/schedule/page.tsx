@@ -339,7 +339,7 @@ export default function LecturerSchedulePage() {
       <div className="hidden print:block text-center border-b-2 border-primary pb-4 mb-6">
         <div className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
           {locale === 'vi'
-            ? 'ĐẠI HỌC CÔNG NGHỆ KỸ THUẬT THÀNH PHỐ HỒ CHÍ MINH'
+            ? 'TRƯỜNG ĐẠI HỌC CÔNG NGHỆ KỸ THUẬT TP.HCM'
             : 'HO CHI MINH CITY UNIVERSITY OF TECHNOLOGY AND ENGINEERING'}
         </div>
         <div className="text-sm font-extrabold text-foreground">
