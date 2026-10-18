@@ -251,6 +251,28 @@ class AcademicEnrollmentMutationPersistenceTest {
     }
 
     @Test
+    void slipResolvesSemesterWithActiveEnrollmentOverLexicallyLaterHistory() throws Exception {
+        // "semester-9" sorts after "semester-1" lexically; the default slip
+        // lookup must resolve the semester holding active enrollments, not the
+        // newest id across all history — otherwise the slip download 404s even
+        // though a valid registration exists.
+        seedActiveEnrollment("enrollment-slip-current", "section-open", "course-open");
+        jdbc.update(
+                "INSERT INTO \"academic\".\"Enrollment\""
+                        + " (\"id\", \"studentId\", \"sectionId\", \"semesterId\", \"status\", \"enrolledAt\","
+                        + " \"gradeStatus\", \"courseId\", \"letterGrade\", \"creditsSnapshot\", \"version\")"
+                        + " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                "enrollment-slip-history", "student-1", "section-open", "semester-9", "COMPLETED",
+                localDateTime(BASE_TIME.minusSeconds(86400)), "PUBLISHED", "course-open", "B", 3, 0);
+
+        mvc.perform(get("/api/v1/me/registration/slip")
+                        .with(studentJwt("student-user-1", "student-1")))
+                .andExpect(status().isOk())
+                .andExpect(header().exists("X-Content-SHA256"))
+                .andExpect(content().contentType(MediaType.APPLICATION_PDF));
+    }
+
+    @Test
     void prerequisiteGateBlocksRegistrationUntilTheRequiredCourseIsCompleted() throws Exception {
         // course-open (SE402) requires course-overlap (SE403) as a PREREQ.
         jdbc.update(
