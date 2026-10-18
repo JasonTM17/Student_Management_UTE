@@ -384,8 +384,13 @@ public class RegistrationService {
         // When no valid pre-persisted slip exists, dynamically generate and store a slip for active enrollments
         String targetSemesterId = semesterId;
         if (targetSemesterId == null || targetSemesterId.isBlank()) {
+            // Resolve the semester of the student's latest active enrollment.
+            // Ordering raw semester ids lexically can pick a historical semester
+            // whose rows are all COMPLETED/DROPPED and produce a false 404.
             List<String> semesters = jdbc.queryForList(
-                    "SELECT DISTINCT \"semesterId\" FROM " + ENROLLMENT + " WHERE \"studentId\" = :studentId ORDER BY \"semesterId\" DESC",
+                    "SELECT \"semesterId\" FROM " + ENROLLMENT + " WHERE \"studentId\" = :studentId"
+                            + " AND \"status\" IN ('ENROLLED', 'PENDING', 'CONFIRMED')"
+                            + " ORDER BY \"enrolledAt\" DESC LIMIT 1",
                     new MapSqlParameterSource("studentId", studentId), String.class);
             if (!semesters.isEmpty()) {
                 targetSemesterId = semesters.get(0);
