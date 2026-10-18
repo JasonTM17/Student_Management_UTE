@@ -7,13 +7,16 @@ const STUDENT = { id: 'integrity-user', studentId: 'integrity-student', email: '
 const ADMIN = { ...STUDENT, studentId: undefined, roles: ['ADMIN'] };
 const ROUND_A = {
   id: 'integrity-a', name: 'Integrity Round A', thesisType: 'MON_HOC', status: 'PROPOSAL_OPEN',
-  registrationStart: '2026-10-16T10:23:45.123Z', registrationEnd: '2026-10-25T10:23:45.456Z',
+  registrationStart: new Date(Date.now() - 7 * 86_400_000).toISOString(), registrationEnd: new Date(Date.now() + 7 * 86_400_000).toISOString(),
   lecturerSubmitStart: '2026-10-01T10:23:45.123Z', lecturerSubmitEnd: '2026-10-15T10:23:45.789Z',
 };
 const ROUND_B = { ...ROUND_A, id: 'integrity-b', name: 'Integrity Round B' };
 const GROUP = { id: 'integrity-group', roundId: ROUND_A.id, leaderStudentId: STUDENT.studentId, memberStudentIds: [STUDENT.studentId], status: 'SUBMITTED', approvalStatus: 'PENDING' };
 const REPORT = { groupId: GROUP.id, title: 'PRESERVED_REPORT', url: 'https://example.test/retained.pdf', note: 'Retained metadata', submittedBy: STUDENT.id, submittedAt: '2026-10-12T00:00:00Z', updatedAt: '2026-10-12T00:00:00Z' };
 const json = (route: Route, body: unknown, status = 200) => route.fulfill({ status, contentType: 'application/json', body: JSON.stringify(body) });
+// datetime-local inputs render the instant in the browser timezone; this spec
+// pins Asia/Bangkok (+07:00), so shift the UTC instant before comparing.
+const bangkok = (iso: string) => new Date(new Date(iso).getTime() + 7 * 3_600_000).toISOString().slice(0, -1);
 function gate() {
   let release!: () => void;
   const promise = new Promise<void>((resolve) => { release = resolve; });
@@ -78,7 +81,7 @@ test('admin unchanged schedule save retains every timestamp and supported precis
   await page.getByText(ROUND_A.name, { exact: true }).click();
   await page.getByRole('button', { name: 'Edit schedule', exact: true }).click();
   const modal = page.getByRole('dialog');
-  await expect(modal.locator('input[type="datetime-local"]').first()).toHaveValue('2026-10-16T17:23:45.123');
+  await expect(modal.locator('input[type="datetime-local"]').first()).toHaveValue(bangkok(ROUND_A.registrationStart));
   await modal.getByRole('button', { name: 'Edit schedule', exact: true }).click();
   await expect.poll(() => patch).not.toBeNull();
   for (const field of ['registrationStart', 'registrationEnd', 'lecturerSubmitStart', 'lecturerSubmitEnd'] as const) {
