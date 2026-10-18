@@ -63,6 +63,7 @@ export default function StudentGroupCard({
   submissionStatusSection,
 }: StudentGroupCardProps) {
   const pageCopy = messages.thesisWorkflow.page;
+  const isCancelled = group?.status === 'CANCELLED';
 
   return (
     <Card variant="muted" className="h-full">
@@ -104,16 +105,19 @@ export default function StudentGroupCard({
                   </span>
                 </div>
                 <h4 className="text-sm font-semibold text-foreground truncate" title={topicTitle ?? undefined}>
-                  {topicTitle ?? (
-                    // Selection lives in the catalog now, so the empty
-                    // state is an actionable link rather than a label.
-                    <LocalizedLink
-                      href="/dashboard/thesis/topics"
-                      className="text-primary hover:underline"
-                    >
-                      {messages.thesis.chooseTopic}
-                    </LocalizedLink>
-                  )}
+                  {topicTitle ??
+                    (isCancelled ? (
+                      <span className="text-muted-foreground">{groupStatusLabel}</span>
+                    ) : (
+                      // Selection lives in the catalog now, so the empty
+                      // state is an actionable link rather than a label.
+                      <LocalizedLink
+                        href="/dashboard/thesis/topics"
+                        className="text-primary hover:underline"
+                      >
+                        {messages.thesis.chooseTopic}
+                      </LocalizedLink>
+                    ))}
                 </h4>
               </div>
 
@@ -132,7 +136,7 @@ export default function StudentGroupCard({
             </div>
 
             {/* Supervisor Info (Rule R3) */}
-            {supervisors.length > 0 && (
+            {!isCancelled && supervisors.length > 0 && (
               <div className="flex flex-wrap items-center gap-2 rounded-lg border border-primary/20 bg-primary/[0.04] px-3 py-2 text-xs">
                 <span className="font-bold text-foreground">{pageCopy.supervisorLabel}</span>
                 <span className="font-semibold text-primary">{supervisors.join(' · ')}</span>
@@ -140,7 +144,20 @@ export default function StudentGroupCard({
             )}
 
             {/* Approval Status Guidance (Rule R4) */}
-            {group.approvalStatus === 'APPROVED' ? (
+            {isCancelled ? (
+              <div className="rounded-lg border border-muted-foreground/30 bg-muted/50 p-3 text-xs text-muted-foreground flex items-start gap-2">
+                <CircleDot className="h-4 w-4 shrink-0 mt-0.5" />
+                <div>
+                  <div>{messages.thesis.groupCancelledNotice}</div>
+                  {canCreateGroup ? (
+                    <Button type="button" size="sm" onClick={onCreateGroup} disabled={isActionPending} className="mt-2 gap-1.5">
+                      {messages.thesis.createGroup}
+                      <ArrowUpRight className="h-4 w-4" />
+                    </Button>
+                  ) : null}
+                </div>
+              </div>
+            ) : group.approvalStatus === 'APPROVED' ? (
               <div className="rounded-lg border border-emerald-500/30 bg-emerald-500/10 p-3 text-xs text-emerald-800 dark:text-emerald-300 flex items-start gap-2">
                 <Check className="h-4 w-4 shrink-0 text-emerald-600 dark:text-emerald-400 mt-0.5" />
                 <div>
@@ -243,9 +260,9 @@ export default function StudentGroupCard({
               </div>
             </div>
 
-            {reportSection}
+            {!isCancelled && reportSection}
 
-            {submissionStatusSection}
+            {!isCancelled && submissionStatusSection}
           </div>
         )}
       </CardContent>

@@ -35,7 +35,8 @@ public class ThesisGroupReadRepository {
                         + "g.approval_status, g.rejection_reason FROM thesis.thesis_group g "
                         + "JOIN thesis.thesis_group_member m ON m.group_id = g.id "
                         + "WHERE g.round_id = :roundId AND m.student_id = :studentId "
-                        + "ORDER BY g.created_at DESC",
+                        + "ORDER BY CASE WHEN g.status = 'CANCELLED' THEN 1 ELSE 0 END, "
+                        + "g.created_at DESC",
                 new MapSqlParameterSource("roundId", roundId).addValue("studentId", studentId),
                 ThesisGroupReadRepository::row);
         return hydrate(rows);
@@ -48,7 +49,8 @@ public class ThesisGroupReadRepository {
                         + "g.approval_status, g.rejection_reason FROM thesis.thesis_group g "
                         + "JOIN thesis.thesis_group_member m ON m.group_id = g.id "
                         + "WHERE m.student_id = :studentId "
-                        + "ORDER BY g.created_at DESC",
+                        + "ORDER BY CASE WHEN g.status = 'CANCELLED' THEN 1 ELSE 0 END, "
+                        + "g.created_at DESC",
                 new MapSqlParameterSource("studentId", studentId),
                 ThesisGroupReadRepository::row);
         return hydrate(rows);

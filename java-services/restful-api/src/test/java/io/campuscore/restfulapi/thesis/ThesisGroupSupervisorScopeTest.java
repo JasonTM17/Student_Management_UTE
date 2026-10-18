@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -70,6 +71,8 @@ class ThesisGroupSupervisorScopeTest {
         jdbc.update("DELETE FROM campuscore_auth.\"User\" WHERE \"id\" LIKE 'scope-user-%'");
         jdbc.update("DELETE FROM campuscore_auth.\"Lecturer\" WHERE \"id\" LIKE 'scope-lecturer-%'");
         jdbc.update("DELETE FROM campuscore_auth.\"User\" WHERE \"id\" LIKE 'scope-lecturer-user-%'");
+        jdbc.update("DELETE FROM academic.\"Department\" WHERE \"id\" LIKE 'scope-department-%'");
+        jdbc.update("DELETE FROM academic.\"Faculty\" WHERE \"id\" LIKE 'scope-faculty-%'");
     }
 
     @Test
@@ -164,10 +167,165 @@ class ThesisGroupSupervisorScopeTest {
                 .isEqualTo(1);
     }
 
+    /**
+     * GOV-P2-1: a TRUONG_KHOA account always carries the companion LECTURER
+     * role, and create/updateTopic used to run the lecturer-department check
+     * first — so a dean could not curate topics for other departments inside
+     * their own faculty. The faculty scope now wins; an out-of-faculty
+     * department still rejects.
+     */
+    @Test
+    void facultyHeadWithCompanionLecturerRoleScopesTopicsByFacultyNotOwnDepartment() throws Exception {
+        UUID roundId = insertRound("Dean Topic Scope Round", "PROPOSAL_OPEN");
+        ensureLecturer("scope-lecturer-dean");
+        String deanUser = "scope-lecturer-user-scope-lecturer-dean";
+        ThesisAuthorityFixture.role(jdbc, deanUser, "LECTURER");
+        RequestPostProcessor deanJwt = ThesisAuthorityFixture.role(jdbc, deanUser, "TRUONG_KHOA");
+        ensureForeignDepartment();
+
+        // department-other shares the dean's faculty-demo while sitting
+        // outside their own department-demo.
+        mvc.perform(post("/api/v1/thesis/topics")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(topicBody(roundId, "Dean Cross-Department Topic", "department-other"))
+                        .with(deanJwt))
+                .andExpect(status().isOk());
+        UUID topicId = jdbc.queryForObject(
+                "SELECT id FROM thesis.thesis_topic WHERE title = 'Dean Cross-Department Topic'",
+                UUID.class);
+        assertThat(topicId).isNotNull();
+
+        mvc.perform(post("/api/v1/thesis/topics")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(topicBody(roundId, "Dean Foreign-Faculty Topic", "scope-department-foreign"))
+                        .with(deanJwt))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("TOPIC_DEPARTMENT_FORBIDDEN"));
+
+        mvc.perform(put("/api/v1/thesis/topics/{id}", topicId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(topicBody(roundId, "Dean Cross-Department Topic (moved)", "department-demo"))
+                        .with(deanJwt))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.departmentId").value("department-demo"));
+    }
+
+    /**
+     * GOV-P2-2: the governance read branch used to strip member contacts from
+     * every group — even ones the dean personally supervises — and hid
+     * supervised groups outside the faculty scope entirely. A supervised
+     * group now keeps its contacts regardless of scope; other groups stay
+     * contact-free.
+     */
+    @Test
+    void facultyHeadKeepsContactsOnPersonallySupervisedGroupsOutsideTheirFaculty() throws Exception {
+        UUID roundId = insertRound("Dean Supervised Read Round", "REGISTRATION_OPEN");
+        ensureLecturer("scope-lecturer-dean2");
+        String deanUser = "scope-lecturer-user-scope-lecturer-dean2";
+        ThesisAuthorityFixture.role(jdbc, deanUser, "LECTURER");
+        RequestPostProcessor deanJwt = ThesisAuthorityFixture.role(jdbc, deanUser, "TRUONG_KHOA");
+
+        UUID inFacultyTopic = insertPublishedTopic(roundId);
+        ensureForeignDepartment();
+        UUID foreignTopic = insertPublishedTopic(roundId, "scope-department-foreign");
+        jdbc.update(
+                "INSERT INTO thesis.thesis_topic_supervisor (id, topic_id, lecturer_id, supervisor_order)"
+                        + " VALUES (?, ?, 'scope-lecturer-dean2', 1)",
+                UUID.randomUUID(), foreignTopic);
+        UUID inFacultyGroup = insertGroupWithExternalMember(roundId, inFacultyTopic, "scope-member-10", "in-faculty@school.edu");
+        UUID foreignGroup = insertGroupWithExternalMember(roundId, foreignTopic, "scope-member-11", "foreign@school.edu");
+
+        mvc.perform(get("/api/v1/thesis/groups")
+                        .queryParam("roundId", roundId.toString())
+                        .with(deanJwt))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(2))
+                .andExpect(jsonPath("$[?(@.id == '%s')].members[?(@.isExternal == true)].contact"
+                                .formatted(foreignGroup.toString()),
+                        org.hamcrest.Matchers.hasItem("foreign@school.edu")))
+                .andExpect(jsonPath("$[?(@.id == '%s')].members[*].contact"
+                                .formatted(inFacultyGroup.toString()),
+                        org.hamcrest.Matchers.not(org.hamcrest.Matchers.hasItem("in-faculty@school.edu"))));
+
+        mvc.perform(get("/api/v1/thesis/groups/{id}", foreignGroup).with(deanJwt))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.members[?(@.isExternal == true)].contact",
+                        org.hamcrest.Matchers.hasItem("foreign@school.edu")));
+    }
+
+    /**
+     * GOV-P2-3: updateTopic used to scope only the *request's* departmentId —
+     * a dean could rewrite a foreign-faculty topic and pull it into their own
+     * faculty by supplying an in-faculty departmentId. The topic's current
+     * department must already be inside the dean's faculty (or personally
+     * supervised) before the edit is allowed.
+     */
+    @Test
+    void facultyHeadCannotClaimAForeignFacultyTopicThroughAnEdit() throws Exception {
+        UUID roundId = insertRound("Dean Foreign Edit Round", "PROPOSAL_OPEN");
+        ensureLecturer("scope-lecturer-dean3");
+        String deanUser = "scope-lecturer-user-scope-lecturer-dean3";
+        ThesisAuthorityFixture.role(jdbc, deanUser, "LECTURER");
+        RequestPostProcessor deanJwt = ThesisAuthorityFixture.role(jdbc, deanUser, "TRUONG_KHOA");
+        ensureForeignDepartment();
+
+        UUID foreignTopic = insertPublishedTopic(roundId, "scope-department-foreign");
+        // DRAFT is the only editable state; demote the fixture directly.
+        jdbc.update("UPDATE thesis.thesis_topic SET status = 'DRAFT' WHERE id = ?", foreignTopic);
+
+        mvc.perform(put("/api/v1/thesis/topics/{id}", foreignTopic)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(topicBody(roundId, "Claimed Topic", "department-demo"))
+                        .with(deanJwt))
+                .andExpect(status().isNotFound());
+
+        // The same dean still edits a topic already inside their faculty.
+        UUID ownTopic = insertPublishedTopic(roundId, "department-other");
+        jdbc.update("UPDATE thesis.thesis_topic SET status = 'DRAFT' WHERE id = ?", ownTopic);
+        mvc.perform(put("/api/v1/thesis/topics/{id}", ownTopic)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(topicBody(roundId, "Own Faculty Topic (edited)", "department-other"))
+                        .with(deanJwt))
+                .andExpect(status().isOk());
+    }
+
+    /**
+     * AGG-P3-1: the workload aggregation joined every group on a supervised
+     * topic, so a cancelled group still inflated group_count and pending_count.
+     * Cancelled groups must not count as active workload.
+     */
+    @Test
+    void lecturerWorkloadExcludesCancelledGroupsFromCounts() throws Exception {
+        UUID roundId = insertRound("Workload Round", "REGISTRATION_OPEN");
+        ensureLecturer("scope-lecturer-workload");
+        UUID topicId = insertPublishedTopic(roundId);
+        jdbc.update(
+                "INSERT INTO thesis.thesis_topic_supervisor (id, topic_id, lecturer_id, supervisor_order)"
+                        + " VALUES (?, ?, 'scope-lecturer-workload', 1)",
+                UUID.randomUUID(), topicId);
+        jdbc.update(
+                "INSERT INTO thesis.thesis_group (id, round_id, leader_student_id, topic_id, status, approval_status) "
+                        + "VALUES (?, ?, 'scope-member-w1', ?, 'SUBMITTED', 'PENDING')",
+                UUID.randomUUID(), roundId, topicId);
+        jdbc.update(
+                "INSERT INTO thesis.thesis_group (id, round_id, leader_student_id, topic_id, status, approval_status) "
+                        + "VALUES (?, ?, 'scope-member-w2', ?, 'CANCELLED', 'PENDING')",
+                UUID.randomUUID(), roundId, topicId);
+
+        mvc.perform(get("/api/v1/thesis/me/workload").with(lecturerJwt("scope-lecturer-workload")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.topics[0].groupCount").value(1))
+                .andExpect(jsonPath("$.topics[0].pendingGroupCount").value(1));
+    }
+
     // ---------- fixtures ----------
 
     private String topicBody(UUID roundId, String title) {
-        return "{\"roundId\":\"" + roundId + "\",\"departmentId\":\"department-demo\","
+        return topicBody(roundId, title, "department-demo");
+    }
+
+    private String topicBody(UUID roundId, String title, String departmentId) {
+        return "{\"roundId\":\"" + roundId + "\",\"departmentId\":\"" + departmentId + "\","
                 + "\"title\":\"" + title + "\",\"description\":\"Supervisor scope fixture topic\",\"maxGroups\":2}";
     }
 
@@ -195,12 +353,26 @@ class ThesisGroupSupervisorScopeTest {
         return roundId;
     }
 
+    /** An active department in a faculty other than the dean's faculty-demo. */
+    private void ensureForeignDepartment() {
+        jdbc.update(
+                "INSERT INTO academic.\"Faculty\" (\"id\", \"name\", \"isActive\") "
+                        + "VALUES ('scope-faculty-foreign', 'Foreign Faculty', TRUE)");
+        jdbc.update(
+                "INSERT INTO academic.\"Department\" (\"id\", \"name\", \"facultyId\", \"isActive\") "
+                        + "VALUES ('scope-department-foreign', 'Foreign Department', 'scope-faculty-foreign', TRUE)");
+    }
+
     private UUID insertPublishedTopic(UUID roundId) {
+        return insertPublishedTopic(roundId, "department-demo");
+    }
+
+    private UUID insertPublishedTopic(UUID roundId, String departmentId) {
         UUID topicId = UUID.randomUUID();
         jdbc.update(
                 "INSERT INTO thesis.thesis_topic (id, round_id, department_id, title, description, max_groups, status, created_by) "
-                        + "VALUES (?, ?, 'department-demo', ?, 'scope fixture topic', 1, 'PUBLISHED', ?)",
-                topicId, roundId, "Scope Topic " + topicId, UUID.randomUUID());
+                        + "VALUES (?, ?, ?, ?, 'scope fixture topic', 1, 'PUBLISHED', ?)",
+                topicId, roundId, departmentId, "Scope Topic " + topicId, UUID.randomUUID());
         return topicId;
     }
 

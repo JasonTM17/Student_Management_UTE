@@ -11,6 +11,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { PageHeader } from '@/components/ui/page-header';
 import { Select } from '@/components/ui/select';
 import { EmptyState, ErrorState, ForbiddenState, LoadingState } from '@/components/ui/state-block';
+import { LocalizedLink } from '@/components/LocalizedLink';
 import { StatusPill } from '@/components/ui/status-pill';
 import type { StatusTone } from '@/components/ui/status';
 
@@ -269,13 +270,21 @@ export default function DeanOverviewPage() {
           </div>
         }
         actions={
-          <Select
-            aria-label={copy.roundLabel}
-            value={selectedRoundId}
-            onChange={(event) => setSelectedRoundId(event.target.value)}
-            options={rounds.map((round) => ({ value: round.id, label: round.name }))}
-            className="min-w-[220px]"
-          />
+          <div className="flex flex-wrap items-center gap-2">
+            <LocalizedLink
+              href="/admin/thesis"
+              className="inline-flex min-h-10 items-center gap-2 rounded-md border border-border/70 bg-card px-3 text-sm font-semibold text-primary transition-colors hover:bg-primary/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            >
+              {copy.adminLink}
+            </LocalizedLink>
+            <Select
+              aria-label={copy.roundLabel}
+              value={selectedRoundId}
+              onChange={(event) => setSelectedRoundId(event.target.value)}
+              options={rounds.map((round) => ({ value: round.id, label: round.name }))}
+              className="min-w-[220px]"
+            />
+          </div>
         }
       />
 

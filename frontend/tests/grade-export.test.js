@@ -79,7 +79,7 @@ test('Lecturer grade sheet CSV export and print roster integrity', async (t) => 
   await t.test('generateGradeCsv contains UTF-8 BOM, UTE institutional headers and RFC 4180 columns', () => {
     const fileSource = fs.readFileSync(path.join(root, 'src/lib/grade-export.ts'), 'utf8');
     assert.match(fileSource, /\\uFEFF/, 'must include UTF-8 BOM prefix for Excel');
-    assert.match(fileSource, /TRƯỜNG ĐẠI HỌC SƯ PHẠM KỸ THUẬT TP\. HỒ CHÍ MINH/, 'must include university name');
+    assert.match(fileSource, /TRƯỜNG ĐẠI HỌC CÔNG NGHỆ KỸ THUẬT TP\. HỒ CHÍ MINH/, 'must include university name');
     assert.match(fileSource, /BẢNG ĐIỂM TỔNG KẾT HỌC PHẦN/, 'must include official report title');
     assert.match(fileSource, /THỐNG KÊ KẾT QUẢ ĐÁNH GIÁ/, 'must include statistics summary block');
     assert.match(fileSource, /Điểm quá trình \(50%\)/, 'must include process score column');

@@ -148,6 +148,25 @@ class ThesisNotificationServiceTest {
     }
 
     @Test
+    void scoreFinalizedOnlyReachesApprovedGroupMembers() {
+        UUID roundId = insertRound("tn-round", "REGISTRATION_CLOSED");
+        UUID topicId = insertTopic(roundId, "Đề tài demo Zeta");
+        UUID approvedGroup = insertGroup(roundId, "tn-student-1", topicId, "APPROVED");
+        insertMember(approvedGroup, roundId, "tn-student-1", 1);
+        UUID rejectedGroup = insertGroup(roundId, "tn-student-3", topicId, "REJECTED");
+        insertMember(rejectedGroup, roundId, "tn-student-3", 1);
+        UUID cancelledGroup = insertCancelledGroup(roundId, "tn-student-4", topicId, "APPROVED");
+        insertMember(cancelledGroup, roundId, "tn-student-4", 1);
+
+        int written = notifier.notifyScoreFinalized(topicId);
+
+        assertThat(written).isEqualTo(1);
+        List<String> userIds = jdbc.queryForList(
+                "SELECT user_id FROM notifications.notification ORDER BY user_id", String.class);
+        assertThat(userIds).containsExactly("tn-user-1");
+    }
+
+    @Test
     void supervisorAssignmentNotifiesOnlyAssignedLecturers() {
         UUID roundId = insertRound("tn-round", "REGISTRATION_OPEN");
         UUID topicId = insertTopic(roundId, "Đề tài demo Epsilon");
@@ -196,6 +215,16 @@ class ThesisNotificationServiceTest {
         jdbc.update(
                 "INSERT INTO thesis.thesis_group (id, round_id, leader_student_id, topic_id, status, approval_status) "
                         + "VALUES (?, ?, ?, ?, 'SUBMITTED', ?)",
+                groupId, roundId, leaderStudentId, topicId, approvalStatus);
+        return groupId;
+    }
+
+    private UUID insertCancelledGroup(UUID roundId, String leaderStudentId, UUID topicId, String approvalStatus) {
+        ensureStudent(leaderStudentId);
+        UUID groupId = UUID.randomUUID();
+        jdbc.update(
+                "INSERT INTO thesis.thesis_group (id, round_id, leader_student_id, topic_id, status, approval_status) "
+                        + "VALUES (?, ?, ?, ?, 'CANCELLED', ?)",
                 groupId, roundId, leaderStudentId, topicId, approvalStatus);
         return groupId;
     }

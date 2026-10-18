@@ -1073,6 +1073,55 @@ class ThesisGovernanceIntegrationTest {
     }
 
     @Test
+    void personalProgressAndGroupListPreferActiveMembershipOverNewerCancelledGroup() throws Exception {
+        // A student who cancels a newer group and keeps an older active
+        // membership in the same round must not be shadowed by the cancelled
+        // row just because it was created later.
+        ensureStudent("gov-progress-multi-leader", "gov-progress-multi-leader-user",
+                "gov-progress-multi-leader@campuscore.edu");
+        UUID roundId = insertRound("Gov Progress Multi Group Round", "REGISTRATION_OPEN",
+                Instant.now().minusSeconds(3_600), Instant.now().plusSeconds(3_600));
+        UUID topicId = insertPublishedTopic(roundId);
+
+        UUID olderActiveGroup = insertGroup(roundId, "gov-progress-multi-leader", topicId, "PENDING");
+        insertMember(olderActiveGroup, roundId, "gov-progress-multi-leader", 1);
+        jdbc.update(
+                "UPDATE thesis.thesis_group SET created_at = ? WHERE id = ?",
+                Timestamp.from(Instant.now().minusSeconds(7_200)), olderActiveGroup);
+
+        // The unique active-membership index only counts rows whose
+        // active_participation marker is TRUE; a cancelled membership keeps a
+        // FALSE marker, so the member row is written directly to reflect the
+        // historical roster left behind by cancellation.
+        UUID newerCancelledGroup = insertGroup(roundId, "gov-progress-multi-leader", topicId, "PENDING");
+        jdbc.update(
+                "UPDATE thesis.thesis_group SET status = 'CANCELLED', created_at = ? WHERE id = ?",
+                Timestamp.from(Instant.now()), newerCancelledGroup);
+        jdbc.update(
+                "INSERT INTO thesis.thesis_group_member (id, group_id, round_id, student_id, member_order, is_leader, active_participation) "
+                        + "VALUES (?, ?, ?, ?, ?, ?, FALSE)",
+                UUID.randomUUID(), newerCancelledGroup, roundId, "gov-progress-multi-leader", 1, true);
+
+        mvc.perform(get("/api/v1/thesis/me/progress")
+                        .queryParam("roundId", roundId.toString())
+                        .with(studentJwt("gov-progress-multi-leader")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.participationState").value("PARTICIPATING"))
+                .andExpect(jsonPath("$.groupId").value(olderActiveGroup.toString()))
+                .andExpect(jsonPath("$.groupStatus").value("SUBMITTED"))
+                .andExpect(jsonPath("$.attentionState").value("NONE"));
+
+        mvc.perform(get("/api/v1/thesis/groups")
+                        .queryParam("roundId", roundId.toString())
+                        .with(studentJwt("gov-progress-multi-leader")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].id").value(olderActiveGroup.toString()))
+                .andExpect(jsonPath("$[0].status").value("SUBMITTED"))
+                .andExpect(jsonPath("$[1].id").value(newerCancelledGroup.toString()))
+                .andExpect(jsonPath("$[1].status").value("CANCELLED"));
+    }
+
+    @Test
     void personalProgressStopsAtMissingApprovalWhenLaterReportEvidenceExists() throws Exception {
         ensureStudent("gov-progress-inconsistent-leader", "gov-progress-inconsistent-leader-user",
                 "gov-progress-inconsistent-leader@campuscore.edu");

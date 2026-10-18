@@ -109,6 +109,18 @@ class AcademicAdminAuditPersistenceTest {
             )
         """);
         jdbc.execute("""
+            CREATE TABLE "academic"."RegistrationSlip" (
+                "id" VARCHAR(120) PRIMARY KEY,
+                "studentId" VARCHAR(120) NOT NULL,
+                "semesterId" VARCHAR(120) NOT NULL,
+                "roundId" VARCHAR(120) NOT NULL,
+                "sha256" CHAR(64) NOT NULL,
+                "byteSize" INTEGER NOT NULL,
+                "payload" BYTEA NOT NULL,
+                "createdAt" TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        """);
+        jdbc.execute("""
             CREATE TABLE "academic"."GradeItem" (
                 "id" VARCHAR(128) PRIMARY KEY,
                 "sectionId" VARCHAR(64),

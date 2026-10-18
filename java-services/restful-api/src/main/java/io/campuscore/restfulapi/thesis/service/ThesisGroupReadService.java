@@ -5,6 +5,7 @@ import io.campuscore.restfulapi.thesis.repository.ThesisRoundReadPort;
 import io.campuscore.restfulapi.thesis.web.ThesisGroupReadDtos.GroupResponse;
 import io.campuscore.restfulapi.web.DomainException;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import org.springframework.context.annotation.Profile;
 import org.springframework.http.HttpStatus;
@@ -39,7 +40,9 @@ public class ThesisGroupReadService {
         // Governance readers are scoped like the dean overview: a faculty
         // head sees only their faculty, a department head only their
         // department — and member contacts (emails, declared externals) stay
-        // withheld on this surface as well.
+        // withheld on this surface as well. A dean/department head who also
+        // supervises keeps full visibility on their own supervised groups,
+        // including groups outside the governance scope.
         if (roles.contains("TRUONG_KHOA") || roles.contains("TRUONG_BO_MON")) {
             ThesisGroupReadRepository.LecturerScope scope = lecturerScope(roles, lecturerId, subject);
             if (scope == null) {
@@ -48,7 +51,10 @@ public class ThesisGroupReadService {
             List<GroupResponse> scoped = roles.contains("TRUONG_KHOA")
                     ? groups.findByRoundIdAndFacultyId(roundId, scope.facultyId())
                     : groups.findByRoundIdAndDepartmentId(roundId, scope.departmentId());
-            return scoped.stream().map(ThesisGroupReadService::withoutContacts).toList();
+            List<GroupResponse> supervised = lecturerId == null || lecturerId.isBlank()
+                    ? List.of()
+                    : groups.findByRoundIdAndSupervisorId(roundId, lecturerId);
+            return mergeScopedWithSupervised(scoped, supervised, lecturerId);
         }
         if (roles.contains("LECTURER")) {
             // External members declare an email/phone in `contact`, so a
@@ -91,11 +97,13 @@ public class ThesisGroupReadService {
         if (isFacultyAdmin(roles)) {
             group = groups.findById(id);
         } else if (roles.contains("TRUONG_KHOA") || roles.contains("TRUONG_BO_MON")) {
+            GroupResponse found = groups.findById(id);
+            boolean supervised = isSupervisedGroup(found, lecturerId);
             ThesisGroupReadRepository.LecturerScope scope = lecturerScope(roles, lecturerId, subject);
-            boolean inScope = scope != null && (roles.contains("TRUONG_KHOA")
+            boolean inScope = scope != null && found != null && (roles.contains("TRUONG_KHOA")
                     ? groups.groupInFaculty(id, scope.facultyId())
                     : groups.groupInDepartment(id, scope.departmentId()));
-            group = inScope ? withoutContacts(groups.findById(id)) : null;
+            group = (inScope || supervised) ? (supervised ? found : withoutContacts(found)) : null;
         } else if (roles.contains("LECTURER")) {
             group = supervisedGroup(id, requireLecturerId(lecturerId));
         } else {
@@ -108,6 +116,27 @@ public class ThesisGroupReadService {
                     "Thesis group not found");
         }
         return group;
+    }
+
+    /** Merge the governance-scoped groups with any group the caller supervises. */
+    private List<GroupResponse> mergeScopedWithSupervised(
+            List<GroupResponse> scoped, List<GroupResponse> supervised, String lecturerId) {
+        Map<UUID, GroupResponse> merged = new java.util.LinkedHashMap<>();
+        for (GroupResponse group : scoped) {
+            merged.put(group.id(), group);
+        }
+        for (GroupResponse group : supervised) {
+            merged.putIfAbsent(group.id(), group);
+        }
+        return merged.values().stream()
+                .map(group -> isSupervisedGroup(group, lecturerId) ? group : withoutContacts(group))
+                .toList();
+    }
+
+    private boolean isSupervisedGroup(GroupResponse group, String lecturerId) {
+        return group != null && lecturerId != null && !lecturerId.isBlank()
+                && group.topicId() != null
+                && groups.isTopicSupervisedBy(group.topicId(), lecturerId);
     }
 
     /** A governance scope requires a lecturer profile bound to the caller. */

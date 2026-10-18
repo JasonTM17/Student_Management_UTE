@@ -124,6 +124,41 @@ class ThesisDeanOverviewScopeTest {
     }
 
     @Test
+    void cancelledGroupsStayVisibleButLeaveTheActiveCounters() throws Exception {
+        UUID roundId = insertRound("Dean Cancelled Round", "REGISTRATION_OPEN");
+        String deanUser = ensureDean("deanscope-dean-cancel");
+        ThesisAuthorityFixture.lecturer(jdbc, "deanscope-supervisor-cancel");
+
+        UUID liveTopic = insertTopic(roundId, "department-demo", "Live topic");
+        UUID cancelledTopic = insertTopic(roundId, "department-demo", "Cancelled topic");
+        jdbc.update("INSERT INTO thesis.thesis_topic_supervisor (id, topic_id, lecturer_id, supervisor_order)"
+                        + " VALUES (?, ?, 'deanscope-supervisor-cancel', 1)",
+                UUID.randomUUID(), liveTopic);
+        jdbc.update("INSERT INTO thesis.thesis_topic_supervisor (id, topic_id, lecturer_id, supervisor_order)"
+                        + " VALUES (?, ?, 'deanscope-supervisor-cancel', 1)",
+                UUID.randomUUID(), cancelledTopic);
+
+        UUID liveGroup = insertGroup(roundId, liveTopic, "SUBMITTED", "PENDING");
+        insertMember(liveGroup, roundId, ensureStudent("deanscope-member-live", "curriculum-demo"), 1, true);
+        UUID cancelledGroup = insertGroup(roundId, cancelledTopic, "CANCELLED", "PENDING");
+        insertMember(cancelledGroup, roundId, ensureStudent("deanscope-member-cxl", "curriculum-demo"), 1, true);
+
+        mvc.perform(get("/api/v1/thesis/dean/overview")
+                        .queryParam("roundId", roundId.toString())
+                        .with(ThesisAuthorityFixture.role(jdbc, deanUser, "TRUONG_KHOA")))
+                .andExpect(status().isOk())
+                // The cancelled row stays in the historical group list…
+                .andExpect(jsonPath("$.groups[?(@.id == '%s')].status".formatted(cancelledGroup))
+                        .value(org.hamcrest.Matchers.hasItem("CANCELLED")))
+                // …but leaves every active counter.
+                .andExpect(jsonPath("$.stats.groupsPendingApproval").value(1))
+                .andExpect(jsonPath("$.stats.groupsWithoutTopic").value(0))
+                .andExpect(jsonPath("$.stats.totalMembers").value(1))
+                .andExpect(jsonPath("$.supervisors[?(@.lecturerId == 'deanscope-supervisor-cancel')].supervisedGroups")
+                        .value(org.hamcrest.Matchers.hasItem(1)));
+    }
+
+    @Test
     void nonDeanRolesAndDeanWithoutLecturerProfileAreRefused() throws Exception {
         UUID roundId = insertRound("Dean Refusal Round", "REGISTRATION_OPEN");
 

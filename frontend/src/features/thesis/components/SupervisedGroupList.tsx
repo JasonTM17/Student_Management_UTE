@@ -102,7 +102,7 @@ export default function SupervisedGroupList({
 
                     <SupervisedGroupMembers
                       group={group}
-                      roundOpen={isRoundOpen(group)}
+                      roundOpen={isRoundOpen(group) && group.status !== 'CANCELLED'}
                       onChanged={onGroupUpdated}
                     />
 

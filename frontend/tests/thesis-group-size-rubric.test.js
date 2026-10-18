@@ -259,3 +259,10 @@ test('workflow guidance uses the approved three-to-five policy and allows incomp
     assert.match(workflow.stepper.authorityNote, locale === 'en' ? /project policy/ : /chính sách dự án/);
   }
 });
+
+test('supervised group roster controls stay closed on cancelled groups', () => {
+  const source = fs.readFileSync(
+    path.join(root, 'src/features/thesis/components/SupervisedGroupList.tsx'), 'utf8');
+  assert.match(source, /roundOpen=\{isRoundOpen\(group\)\s*&&\s*group\.status\s*!==\s*'CANCELLED'\}/,
+    'SupervisedGroupMembers must not offer add/remove controls on a cancelled group');
+});

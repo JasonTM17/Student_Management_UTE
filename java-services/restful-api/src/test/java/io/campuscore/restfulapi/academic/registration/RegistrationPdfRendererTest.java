@@ -40,7 +40,7 @@ class RegistrationPdfRendererTest {
         assertThat(pdfString).contains("enr-abc");
         assertThat(pdfString).contains("sec-xyz");
         assertThat(pdfString).contains("CampusUTE registration slip student=student-123 semester=sem-2026-1 enrollment=enr-abc section=sec-xyz");
-        assertThat(pdfString).contains("TRUONG DAI HOC SU PHAM KY THUAT TP. HO CHI MINH");
+        assertThat(pdfString).contains("TRUONG DAI HOC CONG NGHE KY THUAT TP. HO CHI MINH");
 
         // Standard xref table and trailer checks
         assertThat(pdfString).contains("xref\r\n0 7\r\n");
@@ -83,7 +83,7 @@ class RegistrationPdfRendererTest {
                     "import pypdf; reader = pypdf.PdfReader('" + tempFile.toString().replace("\\", "/") + "'); "
                             + "assert len(reader.pages) == 1; "
                             + "text = reader.pages[0].extract_text(); "
-                            + "assert 'TRUONG DAI HOC SU PHAM KY THUAT' in text; "
+                            + "assert 'TRUONG DAI HOC CONG NGHE KY THUAT' in text; "
                             + "print('Parsed successfully!')")
                     .redirectErrorStream(true)
                     .start();

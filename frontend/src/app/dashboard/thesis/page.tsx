@@ -237,6 +237,52 @@ export default function ThesisPage() {
   // genuinely unpopulated directory.
   const [lecturers, setLecturers] = useState<Lecturer[]>([]);
   const [lecturersError, setLecturersError] = useState('');
+
+  // The propose/edit department pickers mirror the backend scope ladder: a
+  // global admin targets any active department, a faculty head any active
+  // department inside their own faculty, and a lecturer only their personal
+  // department. Falling back to the full list keeps the picker usable while
+  // the lecturer directory is still loading — the API still enforces scope.
+  const ownDepartmentId = useMemo(
+    () =>
+      user?.lecturerId
+        ? lecturers.find((lecturer) => lecturer.id === user.lecturerId)?.departmentId ?? ''
+        : '',
+    [lecturers, user?.lecturerId],
+  );
+  const scopedDepartments = useMemo(() => {
+    const activeDepartments = departments.filter((department) => department.isActive !== false);
+    if (isAdminRole || isSuperAdmin) {
+      return activeDepartments;
+    }
+    if (isFacultyHead) {
+      const ownFacultyId = departments.find((department) => department.id === ownDepartmentId)?.facultyId;
+      const facultyScoped = activeDepartments.filter(
+        (department) => ownFacultyId == null || department.facultyId === ownFacultyId,
+      );
+      return facultyScoped.length > 0 ? facultyScoped : activeDepartments;
+    }
+    if (ownDepartmentId) {
+      const own = departments.filter((department) => department.id === ownDepartmentId);
+      if (own.length > 0) return own;
+    }
+    return activeDepartments;
+  }, [departments, isAdminRole, isSuperAdmin, isFacultyHead, ownDepartmentId]);
+
+  // Default the proposal department to the signed-in lecturer's own
+  // department; only fall back to the first in-scope option when that
+  // profile link is missing or out of scope. Re-running on modal open also
+  // re-seeds the field after a submit reset to the unscoped list head.
+  useEffect(() => {
+    if (scopedDepartments.length === 0) return;
+    setProposeDepartmentId((current) => {
+      if (ownDepartmentId && scopedDepartments.some((department) => department.id === ownDepartmentId)) {
+        return ownDepartmentId;
+      }
+      if (current && scopedDepartments.some((department) => department.id === current)) return current;
+      return scopedDepartments[0].id;
+    });
+  }, [scopedDepartments, ownDepartmentId, isProposeModalOpen]);
   const [proposeSupervisorId, setProposeSupervisorId] = useState('');
   const [proposeSecondSupervisorId, setProposeSecondSupervisorId] = useState('');
 
@@ -773,12 +819,14 @@ export default function ThesisPage() {
     return Array.from(map.entries()).map(([label, opts]) => ({ label, options: opts }));
   }, [rounds]);
   const studentId = user?.studentId ?? '';
-  const currentGroup = groups.find(
+  const ownGroups = groups.filter(
     (group) =>
       group.leaderStudentId === studentId ||
       group.memberStudentIds.includes(studentId) ||
       Boolean(group.members?.some((m) => m.studentId === studentId)),
   );
+  // Prefer an active group over a newer cancelled membership in the same round.
+  const currentGroup = ownGroups.find((group) => group.status !== 'CANCELLED') ?? ownGroups[0];
   const isGroupLeader = Boolean(
     currentGroup && studentId && currentGroup.leaderStudentId === studentId,
   );
@@ -1652,6 +1700,8 @@ export default function ThesisPage() {
         setProposeError(messages.thesis.lecturerWindowNotOpen);
       } else if (code === 'LECTURER_WINDOW_CLOSED') {
         setProposeError(messages.thesis.lecturerWindowClosed);
+      } else if (code === 'TOPIC_DEPARTMENT_FORBIDDEN') {
+        setProposeError(messages.thesis.topicDepartmentForbidden);
       } else {
         setProposeError(messages.thesis.actionFailed);
       }
@@ -1704,6 +1754,8 @@ export default function ThesisPage() {
         setEditError(messages.thesis.lecturerWindowNotOpen);
       } else if (code === 'LECTURER_WINDOW_CLOSED') {
         setEditError(messages.thesis.lecturerWindowClosed);
+      } else if (code === 'TOPIC_DEPARTMENT_FORBIDDEN') {
+        setEditError(messages.thesis.topicDepartmentForbidden);
       } else {
         setEditError(messages.thesis.actionFailed);
       }
@@ -1720,6 +1772,7 @@ export default function ThesisPage() {
     if (code === 'ROUND_NOT_ACCEPTING_PROPOSALS') return messages.thesis.roundNotAcceptingProposals;
     if (code === 'LECTURER_WINDOW_NOT_OPEN') return messages.thesis.lecturerWindowNotOpen;
     if (code === 'LECTURER_WINDOW_CLOSED') return messages.thesis.lecturerWindowClosed;
+    if (code === 'TOPIC_DEPARTMENT_FORBIDDEN') return messages.thesis.topicDepartmentForbidden;
     if (code === 'FORBIDDEN' || status === 403) return messages.thesis.topicActionForbidden;
     return messages.thesis.actionFailed;
   };
@@ -3000,14 +3053,14 @@ export default function ThesisPage() {
           </div>
           <div className="grid gap-4 sm:grid-cols-2">
             <div>
-              {departments.length > 0 ? (
+              {scopedDepartments.length > 0 ? (
                 <Select
                   label={messages.thesis.topicDepartmentLabel}
                   value={proposeDepartmentId}
                   onChange={(e) => setProposeDepartmentId(e.target.value)}
                   required
                   disabled={isActionPending}
-                  options={departments.map((dept) => ({
+                  options={scopedDepartments.map((dept) => ({
                     value: dept.id,
                     label: `${dept.code} - ${getLocalizedName(locale, dept, dept.name)}`,
                   }))}
@@ -3547,14 +3600,14 @@ export default function ThesisPage() {
           </div>
           <div className="grid gap-4 sm:grid-cols-2">
             <div>
-              {departments.length > 0 ? (
+              {scopedDepartments.length > 0 ? (
                 <Select
                   label={messages.thesis.topicDepartmentLabel}
                   value={editDepartmentId}
                   onChange={(e) => setEditDepartmentId(e.target.value)}
                   required
                   disabled={isActionPending}
-                  options={departments.map((dept) => ({
+                  options={scopedDepartments.map((dept) => ({
                     value: dept.id,
                     label: `${dept.code} - ${getLocalizedName(locale, dept, dept.name)}`,
                   }))}
