@@ -218,6 +218,12 @@ jobs:
           test "$approver_status" = "ACTIVE"
           demo_login="$(curl --fail --silent --show-error -H 'Content-Type: application/json' -d '{"email":"admin002@campuscore.demo","password":"password123"}' http://127.0.0.1:4010/api/v1/auth/login)"
           DEMO_LOGIN="$demo_login" python3 -c 'import json, os; assert json.loads(os.environ["DEMO_LOGIN"])["accessToken"]'
+          dean_login="$(curl --fail --silent --show-error -H 'Content-Type: application/json' -d '{"email":"truongkhoa@campuscore.demo","password":"password123"}' http://127.0.0.1:4010/api/v1/auth/login)"
+          DEAN_LOGIN="$dean_login" python3 -c 'import json, os; body=json.loads(os.environ["DEAN_LOGIN"]); assert body["accessToken"]; assert "TRUONG_KHOA" in body["user"]["roles"] and "LECTURER" in body["user"]["roles"]'
+          tbm_login="$(curl --fail --silent --show-error -H 'Content-Type: application/json' -d '{"email":"truongbomon@campuscore.demo","password":"password123"}' http://127.0.0.1:4010/api/v1/auth/login)"
+          TBM_LOGIN="$tbm_login" python3 -c 'import json, os; body=json.loads(os.environ["TBM_LOGIN"]); assert body["accessToken"]; assert "TRUONG_BO_MON" in body["user"]["roles"] and "LECTURER" in body["user"]["roles"]'
+          admin_dean_roles="$(docker compose exec -T postgres psql -U campuscore -d campuscore_restful -Atc "SELECT COUNT(*) FROM campuscore_auth.\"UserRole\" ur JOIN campuscore_auth.\"Role\" r ON r.\"id\" = ur.\"roleId\" WHERE ur.\"userId\" = 'admin-user' AND r.\"name\" = 'TRUONG_KHOA'")"
+          test "$admin_dean_roles" = "0"
           # V82 is exact-address, not a pattern unlock: a seeded persona outside
           # the runbook set stays LOCKED even with the gate enabled.
           persona_status="$(docker compose exec -T postgres psql -U campuscore -d campuscore_restful -Atc "SELECT \"status\" FROM campuscore_auth.\"User\" WHERE \"email\" = 'an.hnt@campuscore.demo'")"

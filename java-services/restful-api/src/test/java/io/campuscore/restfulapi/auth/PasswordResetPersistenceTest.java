@@ -279,13 +279,17 @@ class PasswordResetPersistenceTest {
         // mailbox were unknown.
         insertRole("role-admin", "ADMIN", true);
         insertRole("role-faculty-head", "TRUONG_KHOA", true);
+        insertRole("role-department-head", "TRUONG_BO_MON", true);
         insertUser("admin-user", "admin.user@campuscore.edu", "initial-9pwd", "ACTIVE", false, 0, null);
         insertUser("head-user", "head.user@campuscore.edu", "initial-9pwd", "ACTIVE", false, 0, null);
+        insertUser("dept-head-user", "depthead.user@campuscore.edu", "initial-9pwd", "ACTIVE", false, 0, null);
         grantRole("admin-user", "role-admin");
         grantRole("head-user", "role-faculty-head");
+        grantRole("dept-head-user", "role-department-head");
 
         requestReset("admin.user@campuscore.edu");
         requestReset("head.user@campuscore.edu");
+        requestReset("depthead.user@campuscore.edu");
 
         assertEquals(0, tokenCount());
         assertEquals(0, auditCount("PASSWORD_RESET_REQUESTED"));

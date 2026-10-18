@@ -904,6 +904,45 @@ class AuthLoginPersistenceTest {
                 Integer.class, user));
     }
 
+    @Test
+    void deactivatedLecturerLoginAndRefreshOmitLecturerIdClaimAndPassCurrentAccountFilter() throws Exception {
+        String userId = "inactive-lec-user";
+        io.campuscore.restfulapi.testsupport.AccountAuthorityFixture.ensureUser(jdbc, userId);
+        io.campuscore.restfulapi.testsupport.AccountAuthorityFixture.role(jdbc, userId, "LECTURER");
+        jdbc.update("UPDATE campuscore_auth.\"User\""
+                + " SET \"email\"='inactive.lecturer@campuscore.edu', \"password\"=? WHERE \"id\"=?",
+                passwordEncoder.encode("password123"), userId);
+        jdbc.update("INSERT INTO campuscore_auth.\"Lecturer\""
+                + " (\"id\", \"userId\", \"departmentId\", \"employeeId\", \"isActive\")"
+                + " VALUES ('lecturer-inactive-001', ?, 'department-demo', 'EMP-INACTIVE-001', FALSE)",
+                userId);
+
+        MvcResult login = mvc.perform(post("/api/v1/auth/login")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"email\":\"inactive.lecturer@campuscore.edu\",\"password\":\"password123\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.user.lecturerId").doesNotExist())
+                .andReturn();
+        JsonNode body = objectMapper.readTree(login.getResponse().getContentAsString());
+        String access = body.get("accessToken").asText();
+        String refresh = body.get("refreshToken").asText();
+
+        mvc.perform(get("/api/v1/auth/me").header("Authorization", "Bearer " + access))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.lecturerId").doesNotExist());
+
+        MvcResult refreshed = mvc.perform(post("/api/v1/auth/refresh")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"refreshToken\":\"" + refresh + "\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.user.lecturerId").doesNotExist())
+                .andReturn();
+        String refreshedAccess = objectMapper.readTree(refreshed.getResponse().getContentAsString())
+                .get("accessToken").asText();
+        mvc.perform(get("/api/v1/auth/me").header("Authorization", "Bearer " + refreshedAccess))
+                .andExpect(status().isOk());
+    }
+
     private void assertPolicyRejection(String accessToken, String oldSecret, String candidate, String code)
             throws Exception {
         mvc.perform(post("/api/v1/auth/change-password")

@@ -135,10 +135,10 @@ export default function ThesisPage() {
   const { user, isStudent, isLecturer, isAdmin: isAdminRole, isSuperAdmin, isFacultyHead } = useAuth();
   const isAdmin = Boolean(isAdminRole || isSuperAdmin || isFacultyHead);
   const isDepartmentHead = Boolean(user?.roles?.includes('TRUONG_BO_MON'));
-  const canLoadStaffRelations = Boolean(isLecturer || isAdmin);
+  const canLoadStaffRelations = Boolean(isLecturer || isDepartmentHead || isAdmin);
   const canProposeTopics = canLoadStaffRelations;
   const isTopicApprover = Boolean(isAdmin || isDepartmentHead);
-  const isSupervisorOrAdmin = Boolean(canLoadStaffRelations || isDepartmentHead);
+  const isSupervisorOrAdmin = canLoadStaffRelations;
   const { locale, formatDateTime, messages } = useI18n();
   const pageCopy = messages.thesisWorkflow.page;
   const searchParams = useSearchParams();

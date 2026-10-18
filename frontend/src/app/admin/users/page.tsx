@@ -1128,6 +1128,17 @@ export default function AdminUsersPage() {
                 {copy.roles.TRUONG_KHOA}
               </RoleTabButton>
               <RoleTabButton
+                active={roleFilter === 'TRUONG_BO_MON'}
+                activeClassName="bg-status-success text-status-success-foreground shadow-xs hover:bg-status-success/90"
+                onClick={() => {
+                  setRoleFilter('TRUONG_BO_MON');
+                  setPage(1);
+                }}
+              >
+                <School className="h-3.5 w-3.5" />
+                {copy.roles.TRUONG_BO_MON}
+              </RoleTabButton>
+              <RoleTabButton
                 active={roleFilter === 'SUPER_ADMIN'}
                 activeClassName="bg-status-warning text-status-warning-foreground shadow-xs hover:bg-status-warning/90"
                 onClick={() => {
@@ -1437,6 +1448,18 @@ export default function AdminUsersPage() {
                   >
                     <School className="h-3.5 w-3.5" />
                     {copy.rolesShort.TRUONG_KHOA}
+                  </RoleTabButton>
+                  <RoleTabButton
+                    className="rounded-md font-semibold"
+                    inactiveClassName="bg-transparent text-muted-foreground hover:bg-transparent hover:text-foreground"
+                    active={formData.role === 'TRUONG_BO_MON'}
+                    activeClassName={roleSolidClass('TRUONG_BO_MON')}
+                    onClick={() => setFormData((c) => ({ ...c, role: 'TRUONG_BO_MON' }))}
+                    disabled={!isSuperAdmin}
+                    title={!isSuperAdmin ? copy.errors.adminReserved : undefined}
+                  >
+                    <School className="h-3.5 w-3.5" />
+                    {copy.rolesShort.TRUONG_BO_MON}
                   </RoleTabButton>
                   <RoleTabButton
                     className="rounded-md font-semibold"

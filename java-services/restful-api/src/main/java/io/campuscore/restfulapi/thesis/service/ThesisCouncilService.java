@@ -566,7 +566,7 @@ public class ThesisCouncilService {
     @Transactional
     public ScoreResponse submitReviewerScore(UUID topicId, BigDecimal score, String comment, Jwt actor) {
         String lecturerId = normalize(actor == null ? null : actor.getClaimAsString("lecturerId"));
-        if (!StringUtils.hasText(lecturerId)) {
+        if (!StringUtils.hasText(lecturerId) || !lecturerExists(lecturerId)) {
             throw new DomainException(HttpStatus.FORBIDDEN, "LECTURER_PROFILE_REQUIRED",
                     "An active lecturer profile is required to submit a counter-review score");
         }
@@ -905,14 +905,18 @@ public class ThesisCouncilService {
 
     private boolean hasMember(UUID councilId, String lecturerId) {
         Integer count = count(
-                "SELECT COUNT(*) FROM thesis.thesis_council_member WHERE council_id = :councilId AND lecturer_id = :lecturerId",
+                "SELECT COUNT(*) FROM thesis.thesis_council_member m "
+                        + "JOIN campuscore_auth.\"Lecturer\" l ON l.\"id\" = m.lecturer_id AND l.\"isActive\" = TRUE "
+                        + "WHERE m.council_id = :councilId AND m.lecturer_id = :lecturerId",
                 params().addValue("councilId", councilId).addValue("lecturerId", lecturerId));
         return count != null && count > 0;
     }
 
     private boolean hasCouncilRole(UUID councilId, String lecturerId, String role) {
         Integer count = count(
-                "SELECT COUNT(*) FROM thesis.thesis_council_member WHERE council_id = :councilId AND lecturer_id = :lecturerId AND member_role = :role",
+                "SELECT COUNT(*) FROM thesis.thesis_council_member m "
+                        + "JOIN campuscore_auth.\"Lecturer\" l ON l.\"id\" = m.lecturer_id AND l.\"isActive\" = TRUE "
+                        + "WHERE m.council_id = :councilId AND m.lecturer_id = :lecturerId AND m.member_role = :role",
                 params().addValue("councilId", councilId).addValue("lecturerId", lecturerId).addValue("role", role));
         return count != null && count > 0;
     }

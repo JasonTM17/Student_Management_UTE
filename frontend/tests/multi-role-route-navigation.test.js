@@ -57,3 +57,17 @@ test('dashboard upcoming schedule displays standardized room formatting', () => 
   assert.match(dashboard, /Phòng \$\{meeting\.building\}-\$\{meeting\.roomNumber\}/);
   assert.match(dashboard, /Room \$\{meeting\.building\}-\$\{meeting\.roomNumber\}/);
 });
+
+test('department-head and admin shell navigation stay aligned across layout, thesis, and admin users', () => {
+  const layout = readSource('src/app/dashboard/layout.tsx');
+  const thesis = readSource('src/app/dashboard/thesis/page.tsx');
+  const adminUsers = readSource('src/app/admin/users/page.tsx');
+
+  assert.match(layout, /isDepartmentHead\s*\?\s*messages\.common\.roles\.TRUONG_BO_MON/);
+  assert.match(layout, /\/admin\/attendance/);
+  assert.match(layout, /\/admin\/notifications/);
+  assert.match(layout, /\/admin\/audit/);
+  assert.match(thesis, /canLoadStaffRelations\s*=\s*Boolean\(isLecturer\s*\|\|\s*isDepartmentHead\s*\|\|\s*isAdmin\)/);
+  assert.match(adminUsers, /setRoleFilter\('TRUONG_BO_MON'\)/);
+  assert.match(adminUsers, /copy\.rolesShort\.TRUONG_BO_MON/);
+});

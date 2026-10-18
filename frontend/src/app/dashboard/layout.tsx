@@ -248,7 +248,7 @@ export default function DashboardLayout({
 }: {
   children: React.ReactNode;
 }) {
-  const { user, isLoading, isLoggingOut, isLecturer, isAdmin, isSuperAdmin, isFacultyHead } = useAuth();
+  const { user, isLoading, isLoggingOut, isLecturer, isAdmin, isSuperAdmin, isFacultyHead, isDepartmentHead } = useAuth();
   const { href, messages, locale } = useI18n();
   const router = useRouter();
   const visiblePathname = usePathname();
@@ -311,6 +311,7 @@ export default function DashboardLayout({
           { href: '/admin/courses', icon: BookOpen, label: messages.admin.menuItems[3]?.[0] },
           { href: '/admin/sections', icon: BookMarked, label: messages.admin.menuItems[4]?.[0] },
           { href: '/admin/enrollments', icon: FileText, label: messages.admin.menuItems[5]?.[0] },
+          { href: '/admin/attendance', icon: CalendarCheck, label: messages.adminShell.menuAttendance },
           { href: '/admin/semesters', icon: GraduationCap, label: messages.admin.menuItems[6]?.[0] },
           { href: '/admin/academic-years', icon: CalendarRange, label: messages.adminShell.academicYears },
           { href: '/admin/departments', icon: Building2, label: messages.admin.menuItems[7]?.[0] },
@@ -324,9 +325,11 @@ export default function DashboardLayout({
           { href: '/admin/thesis', icon: GraduationCap, label: messages.admin.menuItems[0]?.[0] },
           { href: '/dashboard/editor', icon: FileEdit, label: locale === 'vi' ? 'Trình soạn thảo website' : 'Site Editor & CMS' },
           { href: '/admin/announcements', icon: Megaphone, label: messages.admin.menuItems[9]?.[0] },
+          { href: '/admin/notifications', icon: Bell, label: messages.adminShell.menuSystemNotifications },
           { href: '/admin/assistant-knowledge', icon: BrainCircuit, label: messages.admin.menuItems[10]?.[0] },
           { href: '/admin/appearance', icon: Palette, label: messages.admin.menuItems[11]?.[0] },
           { href: '/admin/credit-limit-applications', icon: ClipboardCheck, label: messages.admin.menuItems[12]?.[0] },
+          { href: '/admin/audit', icon: ScrollText, label: messages.adminShell.menuAuditTrail },
         ],
       },
     ],
@@ -335,16 +338,20 @@ export default function DashboardLayout({
       messages.admin.menuItems,
       messages.admin.title,
       messages.adminShell.academicYears,
+      messages.adminShell.menuAttendance,
+      messages.adminShell.menuAuditTrail,
       messages.adminShell.menuSections.academics,
       messages.adminShell.menuSections.campus,
       messages.adminShell.menuSections.overview,
       messages.adminShell.menuSections.people,
+      messages.adminShell.menuSystemNotifications,
     ],
   );
   const fullAdminAccess = isAdmin || isSuperAdmin;
+  const lecturerShellAccess = isLecturer || isDepartmentHead || isFacultyHead;
   const menuSections = fullAdminAccess
     ? adminMenuSections
-    : (isLecturer ? lecturerMenuSections : studentMenuSections).map((section) => ({
+    : (lecturerShellAccess ? lecturerMenuSections : studentMenuSections).map((section) => ({
         ...section,
         label: menuSectionLabels[section.sectionKey],
         items: [
@@ -361,7 +368,7 @@ export default function DashboardLayout({
       }));
   const mobileNavItems = fullAdminAccess
     ? []
-    : isLecturer
+    : lecturerShellAccess
       ? lecturerMobileNavItems
       : studentMobileNavItems;
 
@@ -802,9 +809,11 @@ export default function DashboardLayout({
       ? messages.adminShell.adminRole
       : isFacultyHead
         ? messages.common.roles.TRUONG_KHOA
-        : isLecturer
-          ? messages.dashboardShell.roles.lecturer
-          : messages.dashboardShell.roles.student;
+        : isDepartmentHead
+          ? messages.common.roles.TRUONG_BO_MON
+          : isLecturer
+            ? messages.dashboardShell.roles.lecturer
+            : messages.dashboardShell.roles.student;
 
   const fullName = user
     ? (`${user.lastName ?? ''} ${user.firstName ?? ''}`.trim() || `${user.firstName ?? ''} ${user.lastName ?? ''}`.trim() || user.email)

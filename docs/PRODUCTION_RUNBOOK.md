@@ -78,8 +78,9 @@ Adapted preflight for data-touching migrations:
    a consistent `pg_dump` of the affected schemas and a checksum manifest.
    Do not treat the frozen Supabase snapshot as a backup of new Neon writes. The
    reconciliation classes — `V108` (seat counts), `V111`/`V112` (demo dataset
-   parity) — mutate live rows and were verified locally before push; keep that
-   discipline.
+   parity), `V120`–`V125` (department-head role, credential revision, institution
+   naming, demo role password/session reconciliation) — mutate live rows and were
+   verified locally before push; keep that discipline.
 2. **Verify Flyway outcome, not just deploy status.** A `live` deploy means
    the container booted; confirm the migration landed and succeeded:
 

@@ -50,7 +50,7 @@ public class AuthUserRepository {
                         + " l.\"id\" AS lecturer_id"
                         + " FROM " + USER_TABLE + " u"
                         + " LEFT JOIN " + STUDENT_TABLE + " s ON s.\"userId\" = u.\"id\""
-                        + " LEFT JOIN " + LECTURER_TABLE + " l ON l.\"userId\" = u.\"id\""
+                        + " LEFT JOIN " + LECTURER_TABLE + " l ON l.\"userId\" = u.\"id\" AND l.\"isActive\" = TRUE"
                         + " WHERE u.\"email\" = :email",
                 new MapSqlParameterSource("email", email),
                 USER_MAPPER);
@@ -68,7 +68,7 @@ public class AuthUserRepository {
                         + " l.\"id\" AS lecturer_id"
                         + " FROM " + USER_TABLE + " u"
                         + " LEFT JOIN " + STUDENT_TABLE + " s ON s.\"userId\" = u.\"id\""
-                        + " LEFT JOIN " + LECTURER_TABLE + " l ON l.\"userId\" = u.\"id\""
+                        + " LEFT JOIN " + LECTURER_TABLE + " l ON l.\"userId\" = u.\"id\" AND l.\"isActive\" = TRUE"
                         + " WHERE u.\"id\" = :id",
                 new MapSqlParameterSource("id", userId),
                 USER_MAPPER);
@@ -99,7 +99,7 @@ public class AuthUserRepository {
                         + " FROM " + SESSION_TABLE + " se"
                         + " INNER JOIN " + USER_TABLE + " u ON u.\"id\" = se.\"userId\""
                         + " LEFT JOIN " + STUDENT_TABLE + " st ON st.\"userId\" = u.\"id\""
-                        + " LEFT JOIN " + LECTURER_TABLE + " l ON l.\"userId\" = u.\"id\""
+                        + " LEFT JOIN " + LECTURER_TABLE + " l ON l.\"userId\" = u.\"id\" AND l.\"isActive\" = TRUE"
                         + " WHERE se.\"refreshToken\" = :refreshToken"
                         + " AND se.\"expiresAt\" > :now FOR UPDATE OF se",
                 new MapSqlParameterSource()

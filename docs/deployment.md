@@ -128,9 +128,9 @@ Chỉ chuyển **database**; backend vẫn trên Render, frontend vẫn trên Ve
 
 Hai PR squash-merge kế tiếp chốt đợt audit toàn diện (cross-role thesis, auth lifecycle, export, runtime):
 
-- **Nguồn triển khai**: `dd92c747` (PR #62 — hợp nhất nội dung branch còn lại + `V123`) và `cd69c702` (PR #63 — dean faculty scope, thu hồi lecturer deactivate, vá CSV formula, vá race logout/rotation, compose `ASSISTANT_DB_*` + mail opt-in). CI branch 7/7 xanh ở cả hai; post-merge main CI `39126094894` **SUCCESS** trên `cd69c702`.
-- **Render Backend**: auto-deploy từ `main`; liveness `{"status":"ok"}`; round-trip xác thực thật (`login` student4 → `GET /thesis/groups/mine` 200, đầy đủ members) chứng minh join `Lecturer.isActive` mới phục vụ bình thường, không regression 401.
-- **Vercel Production**: chunk thesis deploy chứa đúng biểu thức `canManageMembers` mới (leader && window && !CANCELLED && !APPROVED) và precedence nhóm non-CANCELLED — bundle ≥ `cd69c702`.
+- **Nguồn triển khai**: `dd92c747` (PR #62 — hợp nhất nội dung branch còn lại + `V123`), `cd69c702` (PR #63 — dean faculty scope, thu hồi lecturer deactivate, vá CSV formula, vá race logout/rotation, compose `ASSISTANT_DB_*` + mail opt-in), `925aff5a` (đồng bộ chiều đọc đề tài/GVHD của Trưởng khoa), `05fe8300` + `fc5471ed` (`V124` + `V125` đồng bộ mật khẩu/session demo role `truongkhoa`/`truongbomon`/`admin002`, tách `TRUONG_KHOA` khỏi `admin-user`, hỗ trợ đầy đủ `TRUONG_BO_MON` trên `/admin/users` và siết `prod-smoke.mjs`).
+- **Render Backend**: auto-deploy từ `main`; liveness `{"status":"ok"}`; `node scripts/prod-smoke.mjs` đạt **20/20 PASS** (9 tài khoản demo, 4 thành viên nhóm KLTN, GVHD, `/thesis/dean/overview` của Trưởng khoa, phân cấp đề tài `Admin 41 > Dean 16 > TBM 11`, quy trình Four-Eyes duyệt tri thức RAG giữa `admin` và `admin002`).
+- **Vercel Production**: chunk thesis và `/admin/users?role=TRUONG_BO_MON` hiển thị đúng vai trò `Trưởng bộ môn` và các guard mới.
 - **Git hygiene**: 10 branch đã merge/patch-equivalent xóa local + remote (verify bằng `git cherry`/diff trước khi xóa); draft PR #60 đóng; repo chỉ còn `main`.
-- **Rollback**: giữ nguyên phương án Render manual rollback (deploy trước `dep-…` của `7cc71f6b`) và `vercel rollback` — **chưa thực thi**, `NOT_RUN`.
-- **Ranh giới honest**: dean/lecturer-scoped endpoints trên prod `NOT_RUN` (không có credential non-student); luồng mail 2FA/reset `NOT_RUN` (chưa cấu hình provider thật); đường compose `ASSISTANT_DB_*` là bề mặt self-hosted — Render đã mang env này từ cutover Neon; diff nội dung hàng V123 `NOT_RUN` (không có quyền đọc DB).
+- **Rollback**: giữ nguyên phương án Render manual rollback và `vercel rollback` — **chưa thực thi**, `NOT_RUN`.
+- **Ranh giới honest**: luồng mail 2FA/reset `NOT_RUN` trên prod (chưa cấu hình provider thật); đường compose `ASSISTANT_DB_*` là bề mặt self-hosted — Render đã mang env này từ cutover Neon; diff nội dung hàng V123 `NOT_RUN` (không có quyền đọc DB trực tiếp).

@@ -55,7 +55,7 @@ public class PasswordResetService {
 
     // Privileged accounts never get self-service resets — see class javadoc.
     private static final List<String> PRIVILEGED_ROLES =
-            List.of("ADMIN", "SUPER_ADMIN", "TRUONG_KHOA");
+            List.of("ADMIN", "SUPER_ADMIN", "TRUONG_KHOA", "TRUONG_BO_MON");
     private static final String MAIL_TEMPLATE = "password-reset";
     private static final String MAIL_SUBJECT = "Đặt lại mật khẩu CampusCore";
 

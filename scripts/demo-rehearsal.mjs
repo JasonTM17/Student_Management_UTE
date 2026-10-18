@@ -46,10 +46,20 @@ async function login(email) {
 async function main() {
   // 1. Runbook accounts sign in with the single published demo password.
   const student = await login('student@campuscore.edu');
-  const admin = await login('admin@campuscore.edu');
-  const admin002 = await login('admin002@campuscore.demo'); // V82
+  const adminRes = await api('/auth/login', {
+    method: 'POST',
+    body: JSON.stringify({ email: 'admin@campuscore.edu', password: PASSWORD }),
+  });
+  check('login admin@campuscore.edu', adminRes.status === 200, `(status ${adminRes.status})`);
+  check('admin does not carry TRUONG_KHOA (V89/V124 hygiene)', !(adminRes.body?.user?.roles || []).includes('TRUONG_KHOA'));
+  const admin = adminRes.body?.accessToken;
+  const admin002 = await login('admin002@campuscore.demo'); // V82/V124
+  const truongkhoa = await login('truongkhoa@campuscore.demo'); // V124
+  const truongbomon = await login('truongbomon@campuscore.demo'); // V124
   check('student token present', typeof student === 'string' && student.length > 20);
   check('admin002 (V82 approver) token present', typeof admin002 === 'string' && admin002.length > 20);
+  check('truongkhoa token present', typeof truongkhoa === 'string' && truongkhoa.length > 20);
+  check('truongbomon token present', typeof truongbomon === 'string' && truongbomon.length > 20);
 
   // 2. A seeded persona outside the runbook set stays locked out.
   const persona = await api('/auth/login', {
@@ -95,6 +105,12 @@ async function main() {
   });
   check('second admin publishes (four-eyes)', published.status === 200, `(status ${published.status} ${JSON.stringify(published.body).slice(0, 160)})`);
   check('state is PUBLISHED', published.body?.state === 'PUBLISHED' || published.body?.status === 'PUBLISHED', JSON.stringify(published.body).slice(0, 120));
+
+  const archived = await api(`/admin/assistant/knowledge/${documentId}`, {
+    method: 'DELETE',
+    headers: { Authorization: `Bearer ${admin002}` },
+  });
+  check('rehearsal document archived after verification', archived.status === 200, `(status ${archived.status})`);
 }
 
 main().catch((error) => {

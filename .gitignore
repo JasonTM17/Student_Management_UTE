@@ -106,3 +106,4 @@ scratch/
 
 # Devin agent runtime config (local-only)
 .devin/
+/.playwright-mcp/

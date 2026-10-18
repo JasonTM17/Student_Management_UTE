@@ -89,6 +89,7 @@ export const en = {
       ADMIN: 'Administrator',
       SUPER_ADMIN: 'Super administrator',
       TRUONG_KHOA: 'Dean',
+      TRUONG_BO_MON: 'Department head',
       USER: 'User',
     },
     campusErrors: {
@@ -2947,6 +2948,7 @@ export const vi: I18nMessages = {
       ADMIN: 'Quản trị viên',
       SUPER_ADMIN: 'Quản trị viên cấp cao',
       TRUONG_KHOA: 'Trưởng khoa',
+      TRUONG_BO_MON: 'Trưởng bộ môn',
       USER: 'Người dùng',
     },
     campusErrors: {
