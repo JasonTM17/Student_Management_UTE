@@ -182,16 +182,17 @@ export function useThesisWorkspace(
     return loadRounds();
   }, [loadRounds]);
   const studentId = user?.studentId ?? '';
-  const currentGroup = useMemo(
-    () =>
-      groups.find(
-        (group) =>
-          group.leaderStudentId === studentId ||
-          group.memberStudentIds.includes(studentId) ||
-          group.members?.some((m) => m.studentId === studentId),
-      ),
-    [groups, studentId],
-  );
+  const currentGroup = useMemo(() => {
+    const ownGroups = groups.filter(
+      (group) =>
+        group.leaderStudentId === studentId ||
+        group.memberStudentIds.includes(studentId) ||
+        group.members?.some((m) => m.studentId === studentId),
+    );
+    // A newer cancelled membership must never shadow an active group the
+    // student already belongs to in the same round.
+    return ownGroups.find((group) => group.status !== 'CANCELLED') ?? ownGroups[0];
+  }, [groups, studentId]);
   const statusLabel = useCallback(
     (status: string) =>
       thesisStatus[status as keyof typeof thesisStatus] ??

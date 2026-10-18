@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.doThrow;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
@@ -248,6 +249,37 @@ class AcademicEnrollmentMutationPersistenceTest {
         mvc.perform(get("/api/v1/me/registration/slip")
                         .with(studentJwt("student-user-1", "student-1")))
                 .andExpect(status().isNotFound());
+    }
+
+    @Test
+    void adminDeleteEnrollmentInvalidatesPersistedRegistrationSlip() throws Exception {
+        MvcResult enrolled = mvc.perform(post("/api/v1/enrollments/enroll")
+                        .with(studentJwt("student-user-1", "student-1"))
+                        .header("Idempotency-Key", "slip-admin-delete-enroll")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"sectionId\":\"section-open\"}"))
+                .andExpect(status().isOk())
+                .andReturn();
+
+        String enrollmentId = objectMapper.readTree(enrolled.getResponse().getContentAsString())
+                .get("id").asText();
+        assertThat(jdbc.queryForObject(
+                        "SELECT COUNT(*) FROM \"academic\".\"RegistrationSlip\" WHERE \"studentId\" = ?",
+                        Integer.class,
+                        "student-1"))
+                .isEqualTo(1);
+
+        mvc.perform(delete("/api/v1/enrollments/" + enrollmentId).with(adminJwt()))
+                .andExpect(status().isOk());
+
+        // An admin hard-delete removes the enrollment without a drop event;
+        // the persisted slip must be invalidated in the same transaction so
+        // the deleted course cannot still appear as a valid registration.
+        assertThat(jdbc.queryForObject(
+                        "SELECT COUNT(*) FROM \"academic\".\"RegistrationSlip\" WHERE \"studentId\" = ?",
+                        Integer.class,
+                        "student-1"))
+                .isEqualTo(0);
     }
 
     @Test

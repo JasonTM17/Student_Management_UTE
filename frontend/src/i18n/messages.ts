@@ -1001,6 +1001,7 @@ export const en = {
     toggleProfile: 'Toggle Academic Affairs Profile',
     demoTag: 'Demo',
     demoAccount: 'Demo experience account',
+    deanOverview: 'Faculty thesis overview',
   },
   admin: {
     title: 'Admin dashboard',
@@ -2213,6 +2214,7 @@ export const en = {
     viewTopic: 'View details',
     departmentHeadRole: 'Department head',
     topicActionForbidden: 'You do not have permission to manage this topic. Refresh the page to check your current access.',
+    topicDepartmentForbidden: 'Your role only allows topics inside your own department or faculty scope. Choose a department you govern.',
     archiveTopic: 'Archive topic',
     archiveTopicTitle: 'Archive this topic?',
     archiveTopicConfirm: 'Archive “{title}”? It will leave the available topic catalog. Topics with group, council or grading history must be preserved.',
@@ -2254,6 +2256,8 @@ export const en = {
     membersNeededForApproval: 'A draft with 1 or 2 members can be completed before approval. Add {count} more member(s) to reach the minimum of 3; approval requires 3 to 5 members.',
     noGroup: 'You do not have a group in this round yet.',
     noGroupDescription: 'Create a group when registration opens.',
+    groupCancelledNotice:
+      'Your previous group was cancelled. You can create a new group while registration is open.',
     membershipRoundHint:
       'Your group belongs to “{round}” — switch to that round to see its details and report.',
     membershipRoundOpen: 'Open my group’s round',
@@ -3854,6 +3858,7 @@ export const vi: I18nMessages = {
     toggleProfile: 'Mở thông tin Phòng Đào tạo',
     demoTag: 'Demo trải nghiệm',
     demoAccount: 'Tài khoản demo để trải nghiệm',
+    deanOverview: 'Quan sát khóa luận khoa',
   },
   admin: {
     title: 'Tổng quan quản trị',
@@ -5061,6 +5066,7 @@ export const vi: I18nMessages = {
     viewTopic: 'Xem chi tiết',
     departmentHeadRole: 'Trưởng bộ môn',
     topicActionForbidden: 'Bạn không có quyền quản lý đề tài này. Tải lại trang để kiểm tra quyền truy cập hiện tại.',
+    topicDepartmentForbidden: 'Vai trò của bạn chỉ cho phép đề tài thuộc bộ môn của mình hoặc trong phạm vi khoa phụ trách. Hãy chọn bộ môn bạn quản lý.',
     archiveTopic: 'Lưu trữ đề tài',
     archiveTopicTitle: 'Lưu trữ đề tài này?',
     archiveTopicConfirm: 'Lưu trữ “{title}”? Đề tài sẽ rời danh mục có thể đăng ký. Đề tài đã có lịch sử nhóm, hội đồng hoặc chấm điểm phải được giữ nguyên.',
@@ -5102,6 +5108,8 @@ export const vi: I18nMessages = {
     membersNeededForApproval: 'Nhóm nháp có 1 hoặc 2 thành viên có thể tiếp tục bổ sung trước khi duyệt. Cần thêm {count} thành viên để đủ mức tối thiểu 3; nhóm được duyệt phải có từ 3 đến 5 thành viên.',
     noGroup: 'Bạn chưa có nhóm trong đợt này.',
     noGroupDescription: 'Tạo nhóm khi đợt đăng ký mở.',
+    groupCancelledNotice:
+      'Nhóm trước đây của bạn đã bị hủy. Bạn có thể tạo nhóm mới khi đợt đăng ký đang mở.',
     membershipRoundHint:
       'Nhóm của bạn thuộc đợt “{round}” — hãy chuyển sang đợt đó để xem thông tin và báo cáo.',
     membershipRoundOpen: 'Mở đợt của nhóm tôi',

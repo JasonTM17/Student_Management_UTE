@@ -85,7 +85,7 @@ public class RegistrationPdfRenderer {
 
         // University & Department Titles
         streamLines.add("BT");
-        streamLines.add("/F2 13 Tf 54 738 Td (TRUONG DAI HOC SU PHAM KY THUAT TP. HO CHI MINH) Tj");
+        streamLines.add("/F2 13 Tf 54 738 Td (TRUONG DAI HOC CONG NGHE KY THUAT TP. HO CHI MINH) Tj");
         streamLines.add("ET");
         streamLines.add("BT");
         streamLines.add("/F1 9 Tf 54 723 Td (PHONG DAO TAO - CONG THONG TIN HOC VU CAMPUSCORE) Tj");

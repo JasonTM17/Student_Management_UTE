@@ -2,6 +2,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
+const ts = require('typescript');
 
 const root = path.resolve(__dirname, '..');
 const read = (relative) => fs.readFileSync(path.join(root, relative), 'utf8');
@@ -134,6 +135,41 @@ test('the advisor directory keeps the local design primitives instead of a vendo
   // The table is a real semantic table, not a div grid wearing a header row.
   assert.match(page, /<caption className="sr-only">/);
   assert.match(page, /scope="col"/);
+});
+
+test('advisor quota credits topic.createdBy through the lecturer owner lookup', () => {
+  const page = read('src/components/dashboard/thesis/ThesisAdvisorDirectoryPage.tsx');
+  const ast = ts.createSourceFile('advisor.tsx', page, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX);
+  let initializer;
+  const visit = (node) => {
+    if (ts.isVariableDeclaration(node) && node.name.getText(ast) === 'advisorWorkloadMap') {
+      initializer = node.initializer;
+    }
+    ts.forEachChild(node, visit);
+  };
+  visit(ast);
+  assert.ok(initializer, 'advisorWorkloadMap useMemo exists');
+  const callback = initializer.arguments[0];
+  const emitted = ts.transpileModule(`module.exports = (${callback.getText(ast)});`, {
+    compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2020 },
+  }).outputText;
+  const record = { exports: {} };
+  Function('Map', 'DEFAULT_MAX_TOPICS', 'topics', 'lecturers', 'module', emitted)(
+    Map, 5,
+    [
+      { id: 't1', createdBy: 'user-1' },
+      { id: 't2', createdBy: 'lec-2' },
+      { id: 't3', createdBy: 'someone-not-a-lecturer' },
+    ],
+    [
+      { id: 'lec-1', user: { id: 'user-1' } },
+      { id: 'lec-2', user: { id: 'user-2' } },
+    ],
+    record);
+  const map = record.exports();
+  assert.equal(map.get('lec-1').topicCount, 1, 'createdBy resolves via user.id');
+  assert.equal(map.get('lec-2').topicCount, 1, 'createdBy resolves via lecturer id');
+  assert.equal(map.size, 2, 'a creator outside the directory earns no quota');
 });
 
 // ---------------------------------------------------------------------------

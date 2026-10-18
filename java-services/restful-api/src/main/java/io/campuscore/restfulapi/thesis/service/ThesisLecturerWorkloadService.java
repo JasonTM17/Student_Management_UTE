@@ -35,7 +35,7 @@ public class ThesisLecturerWorkloadService {
                         + "FROM thesis.thesis_topic_supervisor ts "
                         + "JOIN thesis.thesis_topic t ON t.id = ts.topic_id "
                         + "JOIN thesis.thesis_registration_round r ON r.id = t.round_id "
-                        + "LEFT JOIN thesis.thesis_group g ON g.topic_id = t.id "
+                        + "LEFT JOIN thesis.thesis_group g ON g.topic_id = t.id AND g.status <> 'CANCELLED' "
                         + "WHERE ts.lecturer_id = :lecturerId "
                         + "GROUP BY ts.topic_id, t.title, t.status, t.round_id, r.name, r.status "
                         + "ORDER BY MAX(r.created_at) DESC, MAX(t.created_at) DESC LIMIT 100",

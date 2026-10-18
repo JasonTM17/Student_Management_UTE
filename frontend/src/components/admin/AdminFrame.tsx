@@ -55,7 +55,7 @@ export function AdminFrame({
   title,
   description,
   eyebrow,
-  backHref = '/admin',
+  backHref,
   backLabel,
   actions,
   children,
@@ -64,8 +64,11 @@ export function AdminFrame({
   // A faculty head (TRUONG_KHOA) owns the thesis round lifecycle but is not
   // administrative staff: the account-management, catalog and campus pages are
   // gated to ADMIN/SUPER_ADMIN on both the page and the API, and following any
-  // of them bounced this role into a permanent forbidden state.
+  // of them bounced this role into a permanent forbidden state. Their shell
+  // anchors (brand mark, default back link) therefore point at the dean
+  // dashboard instead of the forbidden /admin landing page.
   const fullAdminAccess = isAdmin || isSuperAdmin;
+  const resolvedBackHref = backHref ?? (fullAdminAccess ? '/admin' : '/dashboard/dean');
   const { messages } = useI18n();
   const pathname = stripLocaleFromPathname(usePathname() ?? '/').pathname;
   const [sidebarOpen, setSidebarOpen] = React.useState(false);
@@ -273,7 +276,7 @@ export function AdminFrame({
       >
         <div className="flex min-h-[4.25rem] items-center justify-between border-b border-white/10 px-5 py-3">
           <BrandMark
-            href="/admin"
+            href={fullAdminAccess ? '/admin' : '/dashboard/dean'}
             compact
             markClassName="border-0 bg-white p-1 shadow-none"
             titleClassName="text-portal-sidebar-text"
@@ -481,33 +484,47 @@ export function AdminFrame({
                       </div>
                     </div>
                     <div className="px-2 py-2">
-                      <LocalizedLink
-                        href="/admin"
-                        role="menuitem"
-                        className="flex items-center gap-3 rounded-lg px-3 py-2 text-sm text-muted-foreground transition-colors hover:bg-secondary/70 hover:text-foreground"
-                        onClick={() => setProfileOpen(false)}
-                      >
-                        <LayoutDashboard className="h-4 w-4" aria-hidden="true" />
-                        {messages.admin.title}
-                      </LocalizedLink>
-                      <LocalizedLink
-                        href="/dashboard/editor"
-                        role="menuitem"
-                        className="flex items-center gap-3 rounded-lg px-3 py-2 text-sm text-muted-foreground transition-colors hover:bg-secondary/70 hover:text-foreground"
-                        onClick={() => setProfileOpen(false)}
-                      >
-                        <Megaphone className="h-4 w-4" aria-hidden="true" />
-                        {messages.adminShell.menuAnnouncementsEditor}
-                      </LocalizedLink>
-                      <LocalizedLink
-                        href="/admin/users"
-                        role="menuitem"
-                        className="flex items-center gap-3 rounded-lg px-3 py-2 text-sm text-muted-foreground transition-colors hover:bg-secondary/70 hover:text-foreground"
-                        onClick={() => setProfileOpen(false)}
-                      >
-                        <Users className="h-4 w-4" aria-hidden="true" />
-                        {messages.adminShell.menuUserManagement}
-                      </LocalizedLink>
+                      {fullAdminAccess ? (
+                        <>
+                          <LocalizedLink
+                            href="/admin"
+                            role="menuitem"
+                            className="flex items-center gap-3 rounded-lg px-3 py-2 text-sm text-muted-foreground transition-colors hover:bg-secondary/70 hover:text-foreground"
+                            onClick={() => setProfileOpen(false)}
+                          >
+                            <LayoutDashboard className="h-4 w-4" aria-hidden="true" />
+                            {messages.admin.title}
+                          </LocalizedLink>
+                          <LocalizedLink
+                            href="/dashboard/editor"
+                            role="menuitem"
+                            className="flex items-center gap-3 rounded-lg px-3 py-2 text-sm text-muted-foreground transition-colors hover:bg-secondary/70 hover:text-foreground"
+                            onClick={() => setProfileOpen(false)}
+                          >
+                            <Megaphone className="h-4 w-4" aria-hidden="true" />
+                            {messages.adminShell.menuAnnouncementsEditor}
+                          </LocalizedLink>
+                          <LocalizedLink
+                            href="/admin/users"
+                            role="menuitem"
+                            className="flex items-center gap-3 rounded-lg px-3 py-2 text-sm text-muted-foreground transition-colors hover:bg-secondary/70 hover:text-foreground"
+                            onClick={() => setProfileOpen(false)}
+                          >
+                            <Users className="h-4 w-4" aria-hidden="true" />
+                            {messages.adminShell.menuUserManagement}
+                          </LocalizedLink>
+                        </>
+                      ) : (
+                        <LocalizedLink
+                          href="/dashboard/dean"
+                          role="menuitem"
+                          className="flex items-center gap-3 rounded-lg px-3 py-2 text-sm text-muted-foreground transition-colors hover:bg-secondary/70 hover:text-foreground"
+                          onClick={() => setProfileOpen(false)}
+                        >
+                          <LayoutDashboard className="h-4 w-4" aria-hidden="true" />
+                          {messages.adminShell.deanOverview}
+                        </LocalizedLink>
+                      )}
                       <div className="my-1 border-t border-border/70 pt-1 sm:hidden">
                         <div className="flex items-center justify-between px-3 py-1.5">
                           <span className="text-xs text-muted-foreground">{messages.adminShell.preferences}</span>
@@ -544,9 +561,9 @@ export function AdminFrame({
           tabIndex={-1}
           className="mx-auto min-w-0 max-w-[var(--content-max)] px-4 py-5 pb-28 focus:outline-none sm:px-6 lg:px-8 lg:pb-28"
         >
-          {pathname !== backHref ? (
+          {pathname !== resolvedBackHref ? (
             <LocalizedLink
-              href={backHref}
+              href={resolvedBackHref}
               className="mb-3 inline-flex min-h-11 items-center gap-2 rounded-md px-2 text-sm font-semibold text-primary transition-colors duration-150 hover:bg-primary/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
               aria-label={resolvedBackLabel}
             >

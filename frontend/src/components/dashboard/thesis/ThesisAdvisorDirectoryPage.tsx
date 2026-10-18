@@ -363,17 +363,36 @@ export default function ThesisAdvisorDirectoryPage() {
   // Advisor workload calculation (how many published topics each lecturer supervises)
   const advisorWorkloadMap = useMemo(() => {
     const map = new Map<string, AdvisorWorkload>();
+    // topic.createdBy is the creator's User id (a lecturerId-claim variant is
+    // possible), so resolve both identifiers back to the owning Lecturer row.
+    const ownerByCreator = new Map<string, string>();
+    lecturers.forEach((lec) => {
+      ownerByCreator.set(lec.id, lec.id);
+      if (lec.user?.id) {
+        ownerByCreator.set(lec.user.id, lec.id);
+      }
+    });
+    const credit = (creatorId: string | null | undefined) => {
+      const ownerId = creatorId ? ownerByCreator.get(creatorId) : undefined;
+      if (!ownerId) {
+        return;
+      }
+      const current = map.get(ownerId) || { topicCount: 0, maxTopics: DEFAULT_MAX_TOPICS };
+      map.set(ownerId, { ...current, topicCount: current.topicCount + 1 });
+    };
     topics.forEach((topic) => {
       // ThesisTopic payloads do not carry supervisors yet; the optional
-      // projection keeps the workload map honest (empty when absent).
-      (topic as ThesisTopic & { supervisors?: Array<{ lecturerId: string }> })
-        .supervisors?.forEach((sup) => {
-          const current = map.get(sup.lecturerId) || { topicCount: 0, maxTopics: DEFAULT_MAX_TOPICS };
-          map.set(sup.lecturerId, { ...current, topicCount: current.topicCount + 1 });
-        });
+      // projection credits every listed supervisor when it ever arrives.
+      const supervisors = (topic as ThesisTopic & { supervisors?: Array<{ lecturerId: string }> })
+        .supervisors;
+      if (supervisors && supervisors.length > 0) {
+        supervisors.forEach((sup) => credit(sup.lecturerId));
+      } else {
+        credit(topic.createdBy);
+      }
     });
     return map;
-  }, [topics]);
+  }, [topics, lecturers]);
 
   // Filtered lecturers list based on search, department, and quota
   const filteredLecturers = useMemo(() => {

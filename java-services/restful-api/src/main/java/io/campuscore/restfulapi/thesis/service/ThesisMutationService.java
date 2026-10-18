@@ -613,11 +613,7 @@ public class ThesisMutationService {
             throw invalid("A lecturerId claim is required to submit a topic as a lecturer");
         }
         String departmentId = request.departmentId().trim();
-        if (isLecturer(actor)) {
-            requireLecturerDepartment(actor, departmentId);
-        } else {
-            requireActiveDepartment(departmentId);
-        }
+        requireTopicDepartmentScope(actor, departmentId);
         ThesisTopic topic = topics.saveAndFlush(new ThesisTopic(
                 request.roundId(),
                 departmentId,
@@ -660,9 +656,14 @@ public class ThesisMutationService {
         // and locate the round before any lock; the DRAFT check must wait for
         // the locked entity load or a concurrent publish slips past it.
         Map<String, Object> gate = one(
-                "SELECT round_id, created_by FROM thesis.thesis_topic WHERE id = :id",
+                "SELECT round_id, created_by, department_id FROM thesis.thesis_topic WHERE id = :id",
                 params().addValue("id", id), "TOPIC_NOT_FOUND", "Thesis topic not found");
         authorizeTopicOwner(String.valueOf(gate.get("created_by")), actor);
+        // A faculty head may only edit topics already inside their faculty;
+        // a foreign topic cannot be claimed by rewriting it onto an in-faculty
+        // department. The helper is a no-op for global admins and non-deans,
+        // and keeps the personally-supervised exception.
+        requireDeanTopicAccess(id, String.valueOf(gate.get("department_id")), actor);
         requireMutableRound(UUID.fromString(String.valueOf(gate.get("round_id"))));
         lockTopicForGovernance(id);
         ThesisTopic topic = topics.findById(id).orElseThrow(() -> notFound("TOPIC_NOT_FOUND", "Thesis topic not found"));
@@ -677,11 +678,7 @@ public class ThesisMutationService {
             throw invalid("maxGroups must be between 1 and 20");
         }
         String departmentId = request.departmentId().trim();
-        if (isLecturer(actor)) {
-            requireLecturerDepartment(actor, departmentId);
-        } else {
-            requireActiveDepartment(departmentId);
-        }
+        requireTopicDepartmentScope(actor, departmentId);
         topic.update(departmentId, request.title().trim(), request.description().trim(), maxGroups);
         return TopicResponse.from(topics.save(topic));
     }
@@ -1514,6 +1511,38 @@ public class ThesisMutationService {
                 params().addValue("departmentId", departmentId), Integer.class);
         if (count == null || count == 0) {
             throw invalid("departmentId must reference an active department");
+        }
+    }
+
+    /**
+     * Topic curation scope by caller tier. A global admin may target any
+     * active department; a faculty head curates across every department in
+     * their own faculty; an ordinary lecturer stays within their personal
+     * department. Companion LECTURER roles on a dean/admin account must not
+     * narrow the wider governance scope.
+     */
+    private void requireTopicDepartmentScope(Jwt actor, String departmentId) {
+        if (isGlobalAdmin(actor)) {
+            requireActiveDepartment(departmentId);
+            return;
+        }
+        if (hasRole(actor, "TRUONG_KHOA")) {
+            requireDeanTopicDepartment(actor, departmentId);
+            return;
+        }
+        requireLecturerDepartment(actor, departmentId);
+    }
+
+    private void requireDeanTopicDepartment(Jwt actor, String departmentId) {
+        ThesisGroupReadRepository.LecturerScope scope = requireDeanScope(actor);
+        Integer matches = jdbc.queryForObject(
+                "SELECT COUNT(*) FROM academic.\"Department\" "
+                        + "WHERE \"id\" = :departmentId AND \"facultyId\" = :facultyId AND \"isActive\" = TRUE",
+                params().addValue("departmentId", departmentId).addValue("facultyId", scope.facultyId()),
+                Integer.class);
+        if (matches == null || matches == 0) {
+            throw new DomainException(HttpStatus.FORBIDDEN, "TOPIC_DEPARTMENT_FORBIDDEN",
+                    "A faculty head may submit topics only for departments in their own faculty");
         }
     }
 

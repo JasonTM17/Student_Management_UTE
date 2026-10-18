@@ -228,7 +228,8 @@ public class ThesisNotificationService {
                 "SELECT DISTINCT s.\"userId\" FROM thesis.thesis_group_member m"
                         + " JOIN thesis.thesis_group g ON g.id = m.group_id"
                         + " JOIN campuscore_auth.\"Student\" s ON s.\"id\" = m.student_id"
-                        + " WHERE g.topic_id = :topicId AND g.status <> 'CANCELLED'",
+                        + " WHERE g.topic_id = :topicId AND g.status <> 'CANCELLED'"
+                        + " AND g.approval_status = 'APPROVED'",
                 new MapSqlParameterSource("topicId", topicId), String.class);
     }
 

@@ -17,6 +17,7 @@ type Widen<T> = T extends string
 export const deanOverviewEn = {
   title: 'Faculty thesis observation',
   subtitle: 'Read-only overview of thesis groups, members and supervising lecturers inside {faculty}.',
+  adminLink: 'Open thesis administration',
   departmentLine: 'Your department: {department}',
   roundLabel: 'Thesis round',
   roundPlaceholder: 'Select a thesis round',
@@ -74,6 +75,7 @@ export const deanOverviewEn = {
 export const deanOverviewVi: Widen<typeof deanOverviewEn> = {
   title: 'Quan sát khóa luận toàn khoa',
   subtitle: 'Bảng xem chỉ-đọc các nhóm khóa luận, thành viên và giảng viên hướng dẫn trong {faculty}.',
+  adminLink: 'Mở quản trị đồ án',
   departmentLine: 'Bộ môn của bạn: {department}',
   roundLabel: 'Đợt khóa luận',
   roundPlaceholder: 'Chọn đợt khóa luận',

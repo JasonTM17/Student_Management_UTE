@@ -139,6 +139,14 @@ public class AcademicMutationService {
         jdbc.update(
                 "DELETE FROM " + ENROLLMENT + " WHERE \"id\" = :id",
                 new MapSqlParameterSource("id", enrollmentId));
+        // A persisted slip asserts the registration is still valid; a hard
+        // delete must retire it exactly like a student drop does.
+        jdbc.update(
+                "DELETE FROM \"academic\".\"RegistrationSlip\""
+                        + " WHERE \"studentId\" = :studentId AND \"semesterId\" = :semesterId",
+                new MapSqlParameterSource()
+                        .addValue("studentId", enrollment.get("student_id"))
+                        .addValue("semesterId", enrollment.get("semester_id")));
         if (List.of("ENROLLED", "PENDING", "CONFIRMED").contains(status)) {
             jdbc.update(
                     "UPDATE " + SECTION + " SET \"enrolledCount\" = GREATEST(0, \"enrolledCount\" - 1),"
@@ -592,7 +600,7 @@ public class AcademicMutationService {
         try {
             return jdbc.queryForMap(
                     "SELECT \"id\", \"studentId\" AS student_id, \"sectionId\" AS section_id, \"status\","
-                            + " \"gradeStatus\" AS grade_status"
+                            + " \"semesterId\" AS semester_id, \"gradeStatus\" AS grade_status"
                             + " FROM " + ENROLLMENT + " WHERE \"id\" = :id FOR UPDATE",
                     new MapSqlParameterSource("id", enrollmentId));
         } catch (EmptyResultDataAccessException exception) {

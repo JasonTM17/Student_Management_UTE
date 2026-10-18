@@ -512,7 +512,7 @@ test('dogfood audit: admin user management protects against self-deletion, self-
 test('dogfood audit: thesis topic proposal wires academic departments list', () => {
   const thesis = read('src/app/dashboard/thesis/page.tsx');
   assert.match(thesis, /departmentsApi\.getAll/);
-  assert.match(thesis, /departments\.map/);
+  assert.match(thesis, /scopedDepartments\.map/);
   assert.match(thesis, /getLocalizedName\(locale,\s*dept,\s*dept\.name\)/);
 });
 
