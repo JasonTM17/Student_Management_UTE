@@ -214,6 +214,43 @@ class AcademicEnrollmentMutationPersistenceTest {
     }
 
     @Test
+    void dropInvalidatesPersistedRegistrationSlip() throws Exception {
+        MvcResult enrolled = mvc.perform(post("/api/v1/enrollments/enroll")
+                        .with(studentJwt("student-user-1", "student-1"))
+                        .header("Idempotency-Key", "slip-drop-enroll")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"sectionId\":\"section-open\"}"))
+                .andExpect(status().isOk())
+                .andReturn();
+
+        String enrollmentId = objectMapper.readTree(enrolled.getResponse().getContentAsString())
+                .get("id").asText();
+        assertThat(jdbc.queryForObject(
+                        "SELECT COUNT(*) FROM \"academic\".\"RegistrationSlip\" WHERE \"studentId\" = ?",
+                        Integer.class,
+                        "student-1"))
+                .isEqualTo(1);
+
+        mvc.perform(post("/api/v1/enrollments/" + enrollmentId + "/drop")
+                        .with(studentJwt("student-user-1", "student-1"))
+                        .header("Idempotency-Key", "slip-drop-1"))
+                .andExpect(status().isOk());
+
+        // The persisted slip is a snapshot of active registrations; the drop
+        // transaction must invalidate it so the next download cannot present
+        // the dropped course as a valid enrollment.
+        assertThat(jdbc.queryForObject(
+                        "SELECT COUNT(*) FROM \"academic\".\"RegistrationSlip\" WHERE \"studentId\" = ?",
+                        Integer.class,
+                        "student-1"))
+                .isEqualTo(0);
+
+        mvc.perform(get("/api/v1/me/registration/slip")
+                        .with(studentJwt("student-user-1", "student-1")))
+                .andExpect(status().isNotFound());
+    }
+
+    @Test
     void prerequisiteGateBlocksRegistrationUntilTheRequiredCourseIsCompleted() throws Exception {
         // course-open (SE402) requires course-overlap (SE403) as a PREREQ.
         jdbc.update(
