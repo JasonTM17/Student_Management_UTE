@@ -79,7 +79,7 @@ export function AdministrativeDispatchSheet({
   const copy = isVi
     ? {
         ministryName: 'BỘ GIÁO DỤC VÀ ĐÀO TẠO',
-        universityName: 'TRƯỜNG ĐẠI HỌC CÔNG NGHỆ KỸ THUẬT TP. HỒ CHÍ MINH',
+        universityName: 'TRƯỜNG ĐẠI HỌC CÔNG NGHỆ KỸ THUẬT TP.HCM',
         departmentName: 'KHOA CÔNG NGHỆ THÔNG TIN & PHÒNG ĐÀO TẠO',
         nationalMotto1: 'CỘNG HÒA XÃ HỘI CHỦ NGHĨA VIỆT NAM',
         nationalMotto2: 'Độc lập - Tự do - Hạnh phúc',

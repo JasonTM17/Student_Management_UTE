@@ -200,7 +200,7 @@ academic:
 
 mail:
   from: ${MAIL_FROM:no-reply@campuscore.local}
-  sender-name: ${MAIL_SENDER_NAME:CampusUTE - Đại học Công Nghệ Kĩ thuật TP.HCM}
+  sender-name: ${MAIL_SENDER_NAME:CampusUTE - Trường Đại học Công nghệ Kỹ thuật TP.HCM}
   enabled: ${MAIL_ENABLED:true}
 
 ---

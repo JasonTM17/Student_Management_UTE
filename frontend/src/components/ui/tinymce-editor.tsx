@@ -397,10 +397,10 @@ const TINYMCE_TEMPLATES = [
         <div style="text-align: center; border-bottom: 2px solid #0d509d; padding-bottom: 12px; margin-bottom: 20px;">
           <h4 style="margin: 0; text-transform: uppercase; color: #64748b; font-size: 13px; letter-spacing: 1px;">TRƯỜNG ĐẠI HỌC CÔNG NGHỆ KỸ THUẬT TP.HCM</h4>
           <h2 style="margin: 8px 0 0 0; color: #0d509d; font-size: 20px; font-weight: 700;">QUYẾT ĐỊNH BAN HÀNH QUY CHẾ HỌC VỤ & ĐÀO TẠO</h2>
-          <p style="margin: 4px 0 0 0; color: #64748b; font-size: 13px;">Căn cứ Luật Giáo dục Đại học và Đề án phát triển Trường ĐH Công nghệ Kỹ thuật TP.HCM</p>
+          <p style="margin: 4px 0 0 0; color: #64748b; font-size: 13px;">Căn cứ Luật Giáo dục Đại học và Đề án phát triển Trường Đại học Công nghệ Kỹ thuật TP.HCM</p>
         </div>
 
-        <p><strong>HIỆU TRƯỞNG TRƯỜNG ĐẠI HỌC CÔNG NGHỆ KỸ THUẬT THÀNH PHỐ HỒ CHÍ MINH QUYẾT ĐỊNH:</strong></p>
+        <p><strong>HIỆU TRƯỞNG TRƯỜNG ĐẠI HỌC CÔNG NGHỆ KỸ THUẬT TP.HCM QUYẾT ĐỊNH:</strong></p>
 
         <p><strong>Điều 1.</strong> Ban hành kèm theo Quyết định này Quy định tổ chức đào tạo theo hệ thống tín chỉ và quy chế đánh giá điểm rèn luyện sinh viên.</p>
         <p><strong>Điều 2.</strong> Quyết định này có hiệu lực kể từ ngày ký và áp dụng cho toàn thể các khóa sinh viên hệ chính quy.</p>
