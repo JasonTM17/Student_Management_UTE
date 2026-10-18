@@ -78,8 +78,10 @@ $env:BASE_URL="http://localhost:3100"; node scripts/prod-smoke.mjs   # stack loc
 | **Sinh viên 2 (cùng nhóm KLTN)** | `student2@campuscore.edu` | `password123` | Huỳnh Hồng Thủy (24110345) — thành viên nhóm của Tiến Sơn: cùng thời khóa biểu 8 lớp, 18 môn đã hoàn tất, thấy chung thẻ nhóm KLTN |
 | **Sinh viên 3 (cùng nhóm KLTN)** | `student3@campuscore.edu` | `password123` | Trần Thị Ngọc Quyên (24110051) — thành viên nhóm của Tiến Sơn: cùng thời khóa biểu 8 lớp, 18 môn đã hoàn tất, thấy chung thẻ nhóm KLTN |
 | **Sinh viên 4 (cùng nhóm KLTN)** | `student4@campuscore.edu` | `password123` | Vũ Quốc Huy (24162050) — thành viên nhóm của Tiến Sơn: thấy chung thẻ nhóm KLTN |
-| **Giảng viên (GVHD nhóm KLTN)** | `lecturer@campuscore.edu` | `password123` | Giảng viên hướng dẫn đề tài "Cổng quản lý học vụ CampusCore" — mở Khu luận văn sẽ thấy nhóm 4 SV đang **Chờ xét duyệt** kèm nút **Duyệt / Từ chối** |
-| **Quản trị viên 1** | `admin@campuscore.edu` | `password123` | Điều hành toàn trường, mở lớp học phần, tạo bản thảo tri thức RAG (prod kiêm `TRUONG_KHOA`) |
+| **Giảng viên (GVHD nhóm KLTN)** | `lecturer@campuscore.edu` | `password123` | Giảng viên hướng dẫn đề tài "Cổng quản lý học vụ CampusCore" — mở Khu luận văn sẽ thấy nhóm 4 SV kèm nút **Duyệt / Từ chối** |
+| **Trưởng bộ môn CNTT** | `truongbomon@campuscore.demo` | `password123` | Giảng viên kiêm Trưởng bộ môn (`LECTURER` + `TRUONG_BO_MON`) — thẩm định/duyệt đề tài và xem nhóm trong phạm vi bộ môn |
+| **Trưởng khoa CNTT** | `truongkhoa@campuscore.demo` | `password123` | Giảng viên kiêm Trưởng khoa (`LECTURER` + `TRUONG_KHOA`) — tổng quan khoa (`/dashboard/dean`) và điều hành đợt/hội đồng/đề tài trong phạm vi khoa |
+| **Quản trị viên 1** | `admin@campuscore.edu` | `password123` | Điều hành toàn trường (`ADMIN`), mở lớp học phần, quản lý người dùng, tạo bản thảo tri thức RAG |
 | **Quản trị viên 2** | `admin002@campuscore.demo` | `password123` | Dùng để thực hiện nguyên tắc Four-Eyes duyệt bản nháp tri thức của Admin 1 |
 
 *Danh bạ giảng viên phụ `lecturer002@campuscore.demo` đến `lecturer012@campuscore.demo` cũng được seed sẵn để lịch dạy và hội đồng phản ánh quy mô trường thực tế.*

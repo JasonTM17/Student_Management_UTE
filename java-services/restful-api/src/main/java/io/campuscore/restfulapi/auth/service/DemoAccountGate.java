@@ -74,6 +74,8 @@ public class DemoAccountGate implements ApplicationRunner {
             "lecturer@campuscore.edu",
             "admin@campuscore.edu",
             "admin002@campuscore.demo",
+            "truongkhoa@campuscore.demo",
+            "truongbomon@campuscore.demo",
             "lecturer002@campuscore.demo",
             "lecturer003@campuscore.demo",
             "lecturer004@campuscore.demo",

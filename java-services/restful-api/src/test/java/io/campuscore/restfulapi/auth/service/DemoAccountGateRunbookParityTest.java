@@ -29,6 +29,8 @@ class DemoAccountGateRunbookParityTest {
             Path.of("src/main/resources/db/migration/V77__align_demo_account_passwords.sql");
     private static final Path V116 =
             Path.of("src/main/resources/db/migration/V116__align_four_member_demo_team.sql");
+    private static final Path V124 =
+            Path.of("src/main/resources/db/migration/V124__reconcile_demo_role_accounts_and_hygiene.sql");
     private static final Pattern EMAIL = Pattern.compile("'([A-Za-z0-9._-]+@campuscore\\.(?:demo|edu))'");
 
     @Test
@@ -58,6 +60,16 @@ class DemoAccountGateRunbookParityTest {
         Set<String> aligned = quotedEmails(V116);
         assertThat(aligned).isNotEmpty();
         assertThat(aligned).allMatch(DemoAccountGate.DEMO_EMAILS::contains);
+    }
+
+    @Test
+    void gateCoversEveryAccountV124Reconciles() throws Exception {
+        Set<String> reconciled = quotedEmails(V124);
+        assertThat(reconciled).containsExactlyInAnyOrder(
+                "admin002@campuscore.demo",
+                "truongkhoa@campuscore.demo",
+                "truongbomon@campuscore.demo");
+        assertThat(reconciled).allMatch(DemoAccountGate.DEMO_EMAILS::contains);
     }
 
     private static Set<String> quotedEmails(Path migration) throws Exception {

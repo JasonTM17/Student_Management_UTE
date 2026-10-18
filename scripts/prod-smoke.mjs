@@ -83,7 +83,10 @@ function matchesTeamGroup(group) {
     student3: 'student3@campuscore.edu',
     student4: 'student4@campuscore.edu',
     lecturer: 'lecturer@campuscore.edu',
+    truongbomon: 'truongbomon@campuscore.demo',
+    truongkhoa: 'truongkhoa@campuscore.demo',
     admin: 'admin@campuscore.edu',
+    admin002: 'admin002@campuscore.demo',
   })) {
     const r = await login(email);
     sessions[key] = r.jar;
@@ -109,6 +112,13 @@ function matchesTeamGroup(group) {
     const { status, arr } = await groups(sessions.lecturer);
     const supervised = arr.find(group => (group.approvalStatus === 'PENDING' || group.approvalStatus === 'APPROVED') && matchesTeamGroup(group));
     check('lecturer sees supervised team group', status === 200 && !!supervised, `status=${status}`);
+  }
+
+  // -- Faculty head (Dean): faculty-scoped overview resolves -----------------
+  if (sessions.truongkhoa?.cc_access_token) {
+    const res = await fetch(`${API}/thesis/dean/overview?roundId=${ROUND_ID}`, { headers: headers(sessions.truongkhoa) });
+    const j = await res.json().catch(() => ({}));
+    check('dean overview resolves faculty scope', res.status === 200 && Boolean(j.faculty?.facultyId), `status=${res.status}`);
   }
 
   // -- Curriculum: student plan resolves --------------------------------------
