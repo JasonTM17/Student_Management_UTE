@@ -14,6 +14,12 @@ Required files:
 - `rag_service_token`
 - `supabase_service_role_key` (required when `ASSISTANT_SUPABASE_ENABLED=true`)
 - `deepseek_api_key` (required only when `DEEPSEEK_ENABLED=true`)
+- `assistant_db_password` — password for the `campuscore_assistant_runtime`
+  database role; the Assistant API returns `503 ASSISTANT_RLS_UNAVAILABLE`
+  without it. The file must exist and be non-blank.
+- `spring_mail_password` — SMTP password for `SPRING_MAIL_USERNAME`; only
+  read when `MAIL_ENABLED=true`, so a placeholder file is acceptable while
+  mail stays disabled.
 
 Use a newly rotated provider key. A key pasted into a chat, ticket, shell
 history, image, or Git repository is considered compromised and must not be

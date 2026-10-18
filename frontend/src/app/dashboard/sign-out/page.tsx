@@ -4,6 +4,7 @@ import { useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
 import { useI18n } from '@/i18n';
+import { loginHref, portalFromPathname } from '@/lib/login-portal';
 
 export default function DashboardSignOutPage() {
   const { user, isLoading, logout } = useAuth();
@@ -24,7 +25,7 @@ export default function DashboardSignOutPage() {
         return;
       }
       router.replace(
-        `${href('/login')}?portal=${window.location.pathname.includes('/lecturer') ? 'lecturer' : 'student'}&reason=signed-out`,
+        loginHref(href, portalFromPathname(window.location.pathname), 'signed-out'),
       );
       return;
     }

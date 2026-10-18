@@ -66,6 +66,9 @@ class ThesisGroupSupervisorScopeTest {
         jdbc.update("DELETE FROM thesis.thesis_group");
         jdbc.update("DELETE FROM thesis.thesis_topic_supervisor");
         jdbc.update("DELETE FROM thesis.thesis_topic");
+        jdbc.update("DELETE FROM thesis.thesis_council_topic");
+        jdbc.update("DELETE FROM thesis.thesis_council_member");
+        jdbc.update("DELETE FROM thesis.thesis_council");
         jdbc.update("DELETE FROM thesis.thesis_registration_round");
         jdbc.update("DELETE FROM campuscore_auth.\"Student\" WHERE \"id\" LIKE 'scope-member-%'");
         jdbc.update("DELETE FROM campuscore_auth.\"User\" WHERE \"id\" LIKE 'scope-user-%'");
@@ -287,6 +290,90 @@ class ThesisGroupSupervisorScopeTest {
                         .content(topicBody(roundId, "Own Faculty Topic (edited)", "department-other"))
                         .with(deanJwt))
                 .andExpect(status().isOk());
+    }
+
+    /**
+     * GOV-AUDIT-1: isAdmin() used to include TRUONG_KHOA, so publish, archive,
+     * supervisor, council-assignment, and reviewer-assignment paths ignored
+     * the faculty scope that updateTopic already enforced. Every topic-level
+     * governance write a dean performs on a foreign-faculty topic must now
+     * return the same 404 the unscoped read path returns — while an
+     * in-faculty topic stays manageable.
+     */
+    @Test
+    void facultyHeadCannotGovernForeignFacultyTopicAcrossGovernancePaths() throws Exception {
+        UUID roundId = insertRound("Dean Foreign Governance Round", "PROPOSAL_OPEN");
+        ensureLecturer("scope-lecturer-dean4");
+        ensureLecturer("scope-lecturer-peer4");
+        ensureLecturer("scope-lecturer-chair4");
+        ensureLecturer("scope-lecturer-sec4");
+        String deanUser = "scope-lecturer-user-scope-lecturer-dean4";
+        ThesisAuthorityFixture.role(jdbc, deanUser, "LECTURER");
+        RequestPostProcessor deanJwt = ThesisAuthorityFixture.role(jdbc, deanUser, "TRUONG_KHOA");
+        ensureForeignDepartment();
+
+        // publish: a supervised foreign draft must not leave the draft state
+        // under a foreign dean (the dean is not a supervisor here).
+        UUID publishTarget = insertPublishedTopic(roundId, "scope-department-foreign");
+        jdbc.update("UPDATE thesis.thesis_topic SET status = 'DRAFT' WHERE id = ?", publishTarget);
+        jdbc.update(
+                "INSERT INTO thesis.thesis_topic_supervisor (id, topic_id, lecturer_id, supervisor_order)"
+                        + " VALUES (?, ?, 'scope-lecturer-peer4', 1)",
+                UUID.randomUUID(), publishTarget);
+        mvc.perform(post("/api/v1/thesis/topics/{id}/publish", publishTarget).with(deanJwt))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.code").value("TOPIC_NOT_FOUND"));
+
+        // archive: same 404 on a foreign topic even though it is unused.
+        UUID archiveTarget = insertPublishedTopic(roundId, "scope-department-foreign");
+        jdbc.update("UPDATE thesis.thesis_topic SET status = 'DRAFT' WHERE id = ?", archiveTarget);
+        mvc.perform(post("/api/v1/thesis/topics/{id}/archive", archiveTarget).with(deanJwt))
+                .andExpect(status().isNotFound());
+
+        // supervisor replacement on a foreign topic is forbidden too.
+        UUID supervisorTarget = insertPublishedTopic(roundId, "scope-department-foreign");
+        mvc.perform(put("/api/v1/thesis/topics/{id}/supervisors", supervisorTarget)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"supervisorIds\":[\"scope-lecturer-peer4\"]}")
+                        .with(deanJwt))
+                .andExpect(status().isNotFound());
+
+        // council assignment: a complete foreign-topic council assignment must
+        // not be claimed by a dean outside the topic's faculty.
+        UUID councilId = UUID.randomUUID();
+        jdbc.update(
+                "INSERT INTO thesis.thesis_council (id, round_id, name, status, created_by)"
+                        + " VALUES (?, ?, 'Scope Governance Council', 'ACTIVE', ?)",
+                councilId, roundId, deanUser);
+        jdbc.update(
+                "INSERT INTO thesis.thesis_council_member (id, council_id, lecturer_id, member_role)"
+                        + " VALUES (?, ?, 'scope-lecturer-chair4', 'CHAIR'),"
+                        + " (?, ?, 'scope-lecturer-sec4', 'SECRETARY'),"
+                        + " (?, ?, 'scope-lecturer-peer4', 'MEMBER')",
+                UUID.randomUUID(), councilId, UUID.randomUUID(), councilId, UUID.randomUUID(), councilId);
+        mvc.perform(post("/api/v1/thesis/councils/{id}/topics", councilId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"topicId\":\"" + supervisorTarget + "\"}")
+                        .with(deanJwt))
+                .andExpect(status().isNotFound());
+
+        // counter-reviewer assignment on a foreign topic is forbidden.
+        mvc.perform(post("/api/v1/thesis/topics/{id}/reviewer", supervisorTarget)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"lecturerId\":\"scope-lecturer-peer4\"}")
+                        .with(deanJwt))
+                .andExpect(status().isNotFound());
+
+        // Positive control: the same dean still publishes an in-faculty topic.
+        UUID ownTarget = insertPublishedTopic(roundId, "department-other");
+        jdbc.update("UPDATE thesis.thesis_topic SET status = 'DRAFT' WHERE id = ?", ownTarget);
+        jdbc.update(
+                "INSERT INTO thesis.thesis_topic_supervisor (id, topic_id, lecturer_id, supervisor_order)"
+                        + " VALUES (?, ?, 'scope-lecturer-peer4', 1)",
+                UUID.randomUUID(), ownTarget);
+        mvc.perform(post("/api/v1/thesis/topics/{id}/publish", ownTarget).with(deanJwt))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("PUBLISHED"));
     }
 
     /**

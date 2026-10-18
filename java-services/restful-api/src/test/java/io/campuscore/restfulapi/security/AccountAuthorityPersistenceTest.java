@@ -41,7 +41,7 @@ class AccountAuthorityPersistenceTest {
         jdbc.execute("CREATE SCHEMA campuscore_auth");
         jdbc.execute("CREATE TABLE campuscore_auth.\"User\" (\"id\" VARCHAR PRIMARY KEY, \"status\" VARCHAR, \"mustChangePassword\" BOOLEAN)");
         jdbc.execute("CREATE TABLE campuscore_auth.\"Student\" (\"id\" VARCHAR, \"userId\" VARCHAR, \"year\" INTEGER)");
-        jdbc.execute("CREATE TABLE campuscore_auth.\"Lecturer\" (\"id\" VARCHAR, \"userId\" VARCHAR)");
+        jdbc.execute("CREATE TABLE campuscore_auth.\"Lecturer\" (\"id\" VARCHAR, \"userId\" VARCHAR, \"isActive\" BOOLEAN)");
         jdbc.execute("CREATE TABLE campuscore_auth.\"Role\" (\"id\" VARCHAR, \"name\" VARCHAR)");
         jdbc.execute("CREATE TABLE campuscore_auth.\"UserRole\" (\"userId\" VARCHAR, \"roleId\" VARCHAR)");
         jdbc.execute("CREATE TABLE campuscore_auth.\"Permission\" (\"id\" VARCHAR, \"module\" VARCHAR, \"action\" VARCHAR)");
@@ -103,8 +103,22 @@ class AccountAuthorityPersistenceTest {
     void removedPermissionAndReassignedProfileInvalidateTheClaims() throws Exception {
         authenticate(List.of("ADMIN"), List.of("academic:write"), null);
         expect("/api/v1/admin/users", 401);
-        jdbc.update("INSERT INTO campuscore_auth.\"Lecturer\" VALUES ('new-profile','user')");
+        jdbc.update("INSERT INTO campuscore_auth.\"Lecturer\" VALUES ('new-profile','user',TRUE)");
         authenticate(List.of("ADMIN"), List.of(), "old-profile");
+        expect("/api/v1/thesis/councils", 401);
+    }
+
+    /**
+     * A deactivated lecturer profile must not keep matching a token's
+     * lecturerId claim — the authorization join now requires isActive=TRUE,
+     * so the stale token is rejected like any other profile reassignment.
+     */
+    @Test
+    void deactivatedLecturerProfileRevokesTheBoundToken() throws Exception {
+        jdbc.update("INSERT INTO campuscore_auth.\"Lecturer\" VALUES ('lecturer-profile','user',TRUE)");
+        authenticate(List.of("ADMIN"), List.of(), "lecturer-profile");
+        expect("/api/v1/thesis/councils", 200);
+        jdbc.update("UPDATE campuscore_auth.\"Lecturer\" SET \"isActive\"=FALSE WHERE \"id\"='lecturer-profile'");
         expect("/api/v1/thesis/councils", 401);
     }
 

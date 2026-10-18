@@ -1792,8 +1792,8 @@ class ThesisGovernanceIntegrationTest {
         UUID topicId = UUID.randomUUID();
         jdbc.update(
                 "INSERT INTO thesis.thesis_topic (id, round_id, department_id, title, description, max_groups, status, created_by) "
-                        + "VALUES (?, ?, ?, ?, ?, ?, 'PUBLISHED', ?)",
-                topicId, roundId, UUID.randomUUID(), "Gov Results Topic", "Results fixture topic", 1, UUID.randomUUID());
+                        + "VALUES (?, ?, 'department-demo', ?, ?, ?, 'PUBLISHED', ?)",
+                topicId, roundId, "Gov Results Topic", "Results fixture topic", 1, UUID.randomUUID());
         return topicId;
     }
 
@@ -1890,7 +1890,19 @@ class ThesisGovernanceIntegrationTest {
     }
 
     private org.springframework.test.web.servlet.request.RequestPostProcessor truongKhoaJwt() {
-        return ThesisAuthorityFixture.role(jdbc, "truongkhoa-user", "TRUONG_KHOA");
+        // A dean token without a bound, active lecturer profile fails closed
+        // on topic-level scope checks; give the fixture a live profile in
+        // department-demo so its faculty contains the fixture topics.
+        Integer bound = jdbc.queryForObject(
+                "SELECT COUNT(*) FROM campuscore_auth.\"Lecturer\" WHERE \"id\" = 'gov-truongkhoa'",
+                Integer.class);
+        if (bound == null || bound == 0) {
+            ensureLecturer("gov-truongkhoa");
+        }
+        String userId = jdbc.queryForObject(
+                "SELECT \"userId\" FROM campuscore_auth.\"Lecturer\" WHERE \"id\" = 'gov-truongkhoa'",
+                String.class);
+        return ThesisAuthorityFixture.role(jdbc, userId, "TRUONG_KHOA");
     }
 
     /** Group governance requires a live faculty profile before testing round-state guards. */

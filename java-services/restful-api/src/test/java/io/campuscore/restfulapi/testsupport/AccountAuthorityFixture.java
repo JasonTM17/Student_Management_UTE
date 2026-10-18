@@ -33,6 +33,7 @@ public final class AccountAuthorityFixture {
         jdbc.execute("CREATE TABLE IF NOT EXISTS campuscore_auth.\"RolePermission\" (\"id\" VARCHAR(120) PRIMARY KEY, \"roleId\" VARCHAR(120), \"permissionId\" VARCHAR(120))");
         jdbc.execute("CREATE TABLE IF NOT EXISTS campuscore_auth.\"Student\" (\"id\" VARCHAR(120) PRIMARY KEY, \"userId\" VARCHAR(120) UNIQUE, \"year\" INTEGER)");
         jdbc.execute("CREATE TABLE IF NOT EXISTS campuscore_auth.\"Lecturer\" (\"id\" VARCHAR(120) PRIMARY KEY, \"userId\" VARCHAR(120) UNIQUE)");
+        ensureLecturerActiveFlag(jdbc);
     }
 
     /**
@@ -51,6 +52,13 @@ public final class AccountAuthorityFixture {
         jdbc.execute("CREATE TABLE IF NOT EXISTS campuscore_auth.\"RolePermission\" (\"id\" VARCHAR(120) PRIMARY KEY, \"roleId\" VARCHAR(120), \"permissionId\" VARCHAR(120))");
         jdbc.execute("CREATE VIEW IF NOT EXISTS campuscore_auth.\"Student\" AS SELECT \"id\", \"userId\", \"year\" FROM academic.\"Student\"");
         jdbc.execute("CREATE TABLE IF NOT EXISTS campuscore_auth.\"Lecturer\" (\"id\" VARCHAR(120) PRIMARY KEY, \"userId\" VARCHAR(120) UNIQUE)");
+        ensureLecturerActiveFlag(jdbc);
+    }
+
+    /** Deactivation boundary: an inactive profile must stop matching the token's lecturerId claim. */
+    public static void ensureLecturerActiveFlag(JdbcTemplate jdbc) {
+        jdbc.execute("ALTER TABLE campuscore_auth.\"Lecturer\" ADD COLUMN IF NOT EXISTS"
+                + " \"isActive\" BOOLEAN NOT NULL DEFAULT TRUE");
     }
 
     /** Forward-column fixture for hand-created stores with Flyway disabled. */

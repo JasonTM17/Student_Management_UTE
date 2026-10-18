@@ -76,6 +76,22 @@ test('Lecturer grade sheet CSV export and print roster integrity', async (t) => 
     assert.equal(Math.round((totalSum / graded) * 100) / 100, 6.83);
   });
 
+  await t.test('escapeCsvField neutralizes spreadsheet formula cells', () => {
+    const fileSource = fs.readFileSync(path.join(root, 'src/lib/grade-export.ts'), 'utf8');
+    assert.ok(fileSource.includes('^[=+\\-@\\t]'), 'implementation must guard leading formula characters');
+    const escapeCsv = (val) => {
+      if (val === null || val === undefined) return '""';
+      const str = String(val);
+      const safe = /^[=+\-@\t]/.test(str) ? `'${str}` : str;
+      return `"${safe.replace(/"/g, '""')}"`;
+    };
+    assert.equal(escapeCsv('=1+1'), '"\'=1+1"');
+    assert.equal(escapeCsv('+cmd|\'/C calc\'!A0'), '"\'+cmd|\'/C calc\'!A0"');
+    assert.equal(escapeCsv('-2.5'), '"\'-2.5"');
+    assert.equal(escapeCsv('@cmd'), '"\'@cmd"');
+    assert.equal(escapeCsv(8.5), '"8.5"');
+  });
+
   await t.test('generateGradeCsv contains UTF-8 BOM, UTE institutional headers and RFC 4180 columns', () => {
     const fileSource = fs.readFileSync(path.join(root, 'src/lib/grade-export.ts'), 'utf8');
     assert.match(fileSource, /\\uFEFF/, 'must include UTF-8 BOM prefix for Excel');

@@ -50,6 +50,9 @@ services:
       SECURITY_JWT_REJECT_KNOWN_DEFAULTS: "true"
       HEALTH_READINESS_KEY_FILE: /run/secrets/readiness_key
       ASSISTANT_RAG_SERVICE_TOKEN_FILE: /run/secrets/rag_service_token
+      ASSISTANT_DB_URL: ${ASSISTANT_DB_URL:-jdbc:postgresql://postgres:5432/campuscore_restful}
+      ASSISTANT_DB_USERNAME: ${ASSISTANT_DB_USERNAME:-campuscore_assistant_runtime}
+      ASSISTANT_DB_PASSWORD_FILE: /run/secrets/assistant_db_password
       ASSISTANT_RAG_SERVICE_MODE: "true"
       ASSISTANT_KNOWLEDGE_AUTHORITY_MODE: "supabase"
       FLYWAY_ENABLED: "true"
@@ -74,6 +77,7 @@ services:
       - ./ops/secrets/jwt_refresh_secret:/run/secrets/jwt_refresh_secret:ro
       - ./ops/secrets/readiness_key:/run/secrets/readiness_key:ro
       - ./ops/secrets/rag_service_token:/run/secrets/rag_service_token:ro
+      - ./ops/secrets/assistant_db_password:/run/secrets/assistant_db_password:ro
       - ./ops/secrets/deepseek_api_key:/run/secrets/deepseek_api_key:ro
       - ./ops/secrets/supabase_service_role_key:/run/secrets/supabase_service_role_key:ro
     networks: [app, data]
@@ -123,8 +127,20 @@ services:
       RATE_LIMIT_TRUST_PROXY_HEADERS: "true"
       # rag-service is the single Flyway owner for the shared runtime DB.
       FLYWAY_ENABLED: "false"
-      MAIL_ENABLED: "false"
-      DEEPSEEK_ENABLED: "false"
+      # The Assistant runtime pool uses its own credentials, provisioned via
+      # the ops/secrets/assistant_db_password file; leaving them unset degrades
+      # /api/v1/assistant/* to 503 ASSISTANT_RLS_UNAVAILABLE by design.
+      ASSISTANT_DB_URL: ${ASSISTANT_DB_URL:-jdbc:postgresql://postgres:5432/campuscore_restful}
+      ASSISTANT_DB_USERNAME: ${ASSISTANT_DB_USERNAME:-campuscore_assistant_runtime}
+      ASSISTANT_DB_PASSWORD_FILE: /run/secrets/assistant_db_password
+      # Mail is opt-in: MAIL_ENABLED=true plus the spring_mail_password secret
+      # turns on 2FA and password-reset delivery; the default keeps it off.
+      MAIL_ENABLED: ${MAIL_ENABLED:-false}
+      SPRING_MAIL_HOST: ${SPRING_MAIL_HOST:-smtp.gmail.com}
+      SPRING_MAIL_PORT: ${SPRING_MAIL_PORT:-587}
+      SPRING_MAIL_USERNAME: ${SPRING_MAIL_USERNAME:-}
+      SPRING_MAIL_PASSWORD_FILE: /run/secrets/spring_mail_password
+      DEEPSEEK_ENABLED: ${DEEPSEEK_ENABLED:-false}
       # Thesis report uploads. The local provider writes under
       # /var/lib/campuscore/thesis-reports, which is a named volume below
       # because the container root filesystem is read-only. Set
@@ -148,6 +164,8 @@ services:
       - ./ops/secrets/jwt_refresh_secret:/run/secrets/jwt_refresh_secret:ro
       - ./ops/secrets/readiness_key:/run/secrets/readiness_key:ro
       - ./ops/secrets/rag_service_token:/run/secrets/rag_service_token:ro
+      - ./ops/secrets/assistant_db_password:/run/secrets/assistant_db_password:ro
+      - ./ops/secrets/spring_mail_password:/run/secrets/spring_mail_password:ro
       - campuscore_production_thesis_report_storage:/var/lib/campuscore/thesis-reports
     ports: !override []
     networks: [app, data]

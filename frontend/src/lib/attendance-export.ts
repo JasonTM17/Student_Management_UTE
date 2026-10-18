@@ -53,7 +53,10 @@ const STATUS_LABELS: Record<'vi' | 'en', Record<string, string>> = {
 export function escapeCsvField(value: unknown): string {
   if (value === null || value === undefined) return '""';
   const str = String(value);
-  return `"${str.replace(/"/g, '""')}"`;
+  // Quoting alone does not stop spreadsheet formula evaluation: a leading
+  // = + - @ or tab still runs as a formula, so neutralize it with a quote.
+  const safe = /^[=+\-@\t]/.test(str) ? `'${str}` : str;
+  return `"${safe.replace(/"/g, '""')}"`;
 }
 
 /**

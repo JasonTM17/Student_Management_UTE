@@ -26,6 +26,7 @@ public final class RuntimeSecretEnvironmentPostProcessor implements EnvironmentP
             Map.entry("JWT_REFRESH_SECRET_FILE", "security.jwt.refresh-secret"),
             Map.entry("HEALTH_READINESS_KEY_FILE", "health.readiness-key"),
             Map.entry("ASSISTANT_RAG_SERVICE_TOKEN_FILE", "assistant.rag.service-token"),
+            Map.entry("ASSISTANT_DB_PASSWORD_FILE", "assistant.datasource.password"),
             Map.entry("SUPABASE_SERVICE_ROLE_KEY_FILE", "assistant.supabase.service-role-key"),
             Map.entry("DEEPSEEK_API_KEY_FILE", "deepseek.api-key"),
             Map.entry("SPRING_MAIL_PASSWORD_FILE", "spring.mail.password"));

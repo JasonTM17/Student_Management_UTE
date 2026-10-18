@@ -182,7 +182,7 @@ public class AuthUserRepository {
                         + " r.\"name\" AS role_name, p.\"module\" AS permission_module, p.\"action\" AS permission_action"
                         + " FROM " + USER_TABLE + " u"
                         + " LEFT JOIN " + STUDENT_TABLE + " s ON s.\"userId\"=u.\"id\""
-                        + " LEFT JOIN " + LECTURER_TABLE + " l ON l.\"userId\"=u.\"id\""
+                        + " LEFT JOIN " + LECTURER_TABLE + " l ON l.\"userId\"=u.\"id\" AND l.\"isActive\" = TRUE"
                         + " LEFT JOIN " + USER_ROLE_TABLE + " ur ON ur.\"userId\"=u.\"id\""
                         + " LEFT JOIN " + ROLE_TABLE + " r ON r.\"id\"=ur.\"roleId\""
                         + " LEFT JOIN " + ROLE_PERMISSION_TABLE + " rp ON rp.\"roleId\"=ur.\"roleId\""

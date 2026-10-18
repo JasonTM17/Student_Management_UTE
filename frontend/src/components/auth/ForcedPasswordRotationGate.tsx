@@ -5,6 +5,7 @@ import { ShieldCheck } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import { authApi } from '@/lib/api';
 import { campusCodeMessage } from '@/lib/campus-error';
+import { loginHref, portalFromUser } from '@/lib/login-portal';
 import { checkPasswordPolicy } from '@/lib/password-policy';
 import { useI18n } from '@/i18n';
 import { Modal } from '@/components/ui/modal';
@@ -73,7 +74,7 @@ export function ForcedPasswordRotationGate() {
     setIsSaving(true);
     try {
       await authApi.changePassword(oldPassword, newPassword);
-      await logout({ redirect: href('/login?reason=password-rotated') });
+      await logout({ redirect: loginHref(href, portalFromUser(user), 'password-rotated') });
     } catch (error: unknown) {
       setError(campusCodeMessage(error, messages.common.campusErrors, copy.failed));
     } finally {
