@@ -240,7 +240,7 @@ public class AcademicReadRepository {
                         + " INNER JOIN \"academic\".\"AcademicYear\" ay"
                         + " ON ay.\"id\" = s.\"academicYearId\""
                         + searchWhere(parameters, search, SEMESTER_SEARCH_TERMS)
-                        + " ORDER BY s.\"startDate\" DESC LIMIT :limit OFFSET :offset",
+                        + " ORDER BY s.\"startDate\" DESC, s.\"id\" DESC LIMIT :limit OFFSET :offset",
                 parameters,
                 SEMESTER_ROW_MAPPER);
     }
@@ -277,7 +277,7 @@ public class AcademicReadRepository {
                 "SELECT " + ACADEMIC_YEAR_COLUMNS
                         + " FROM \"academic\".\"AcademicYear\" ay"
                         + searchWhere(parameters, search, likeTerms("CAST(ay.\"year\" AS VARCHAR)"))
-                        + " ORDER BY ay.\"startDate\" DESC LIMIT :limit OFFSET :offset",
+                        + " ORDER BY ay.\"startDate\" DESC, ay.\"id\" DESC LIMIT :limit OFFSET :offset",
                 parameters,
                 ACADEMIC_YEAR_ROW_MAPPER);
     }
@@ -327,7 +327,7 @@ public class AcademicReadRepository {
                         + " FROM \"academic\".\"Course\" c"
                         + " INNER JOIN \"academic\".\"Department\" d ON d.\"id\" = c.\"departmentId\""
                         + courseWhere(parameters, search, departmentId)
-                        + " ORDER BY c.\"code\" ASC LIMIT :limit OFFSET :offset",
+                        + " ORDER BY c.\"code\" ASC, c.\"id\" ASC LIMIT :limit OFFSET :offset",
                 parameters,
                 COURSE_ROW_MAPPER);
     }
@@ -409,7 +409,7 @@ public class AcademicReadRepository {
                                 likeTerms("cl.\"building\"", "cl.\"roomNumber\"",
                                         "cl.\"building\" || ' ' || cl.\"roomNumber\"",
                                         "cl.\"building\" || '-' || cl.\"roomNumber\""))
-                        + " ORDER BY cl.\"building\" ASC, cl.\"roomNumber\" ASC LIMIT :limit OFFSET :offset",
+                        + " ORDER BY cl.\"building\" ASC, cl.\"roomNumber\" ASC, cl.\"id\" ASC LIMIT :limit OFFSET :offset",
                 parameters,
                 CLASSROOM_ROW_MAPPER);
     }

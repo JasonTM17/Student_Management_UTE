@@ -299,10 +299,14 @@ test('Next metadata icons have one App Router owner and no public-file collision
   }
 });
 
-test('admin announcement reference lookup stays within the section API page limit', () => {
+test('admin announcement reference lookup walks every page within the section API page limit', () => {
   const page = fs.readFileSync(path.join(root, 'src/app/admin/announcements/page.tsx'), 'utf8');
-  assert.match(page, /sectionsApi\.getAll\(\{\s*page: 1, limit: 100\s*\}\)/);
+  // A single page-1 fetch silently truncated the audience pickers at row 100;
+  // fetchAllPages keeps every request inside the cap while covering the catalog.
+  assert.match(page, /fetchAllPages<Section>\([\s\S]{0,120}?sectionsApi\.getAll/);
+  assert.match(page, /fetchAllPages<Lecturer>\([\s\S]{0,120}?lecturersApi\.getAll/);
   assert.doesNotMatch(page, /sectionsApi\.getAll\(\{\s*page: 1, limit: 200\s*\}\)/);
+  assert.doesNotMatch(page, /sectionsApi\.getAll\(\{\s*page: 1, limit: 100\s*\}\)/);
 });
 
 test('deep persona route matrix has a bounded timeout large enough for cold compilation', () => {
@@ -418,9 +422,11 @@ test('conduct score page localizes dense records and gives mobile its own cards'
   assert.doesNotMatch(page, /selectedActivity\.(title|category|organizer|activityDate)/);
 });
 
-test('dogfood audit: admin enrollments section lookup respects the 100 cap', () => {
+test('dogfood audit: admin enrollments section lookup respects the 100 cap and covers all pages', () => {
   const page = read('src/app/admin/enrollments/page.tsx');
-  assert.match(page, /sectionsApi\.getAll\(\{\s*courseId,[\s\S]{0,300}?limit: 100,\s*\}\)/);
+  // Per-request the call still honors the /sections 100-row cap; fetchAllPages
+  // walks the remaining pages so the dropdown stops hiding sections >100.
+  assert.match(page, /fetchAllPages<Section>\([\s\S]{0,160}?sectionsApi\.getAll\(\{\s*courseId,\s*page: p, limit: l\s*\}\)/);
   assert.doesNotMatch(page, /sectionsApi\.getAll\(\{\s*courseId,\s*limit: ACADEMIC_REFERENCE_LIMIT/);
 });
 

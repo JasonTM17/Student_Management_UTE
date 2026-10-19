@@ -18,8 +18,8 @@ import {
   Users,
 } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
-import { curriculaApi, departmentsApi, usersApi } from '@/lib/api';
-import { Curriculum } from '@/types/api';
+import { curriculaApi, departmentsApi, fetchAllPages, usersApi } from '@/lib/api';
+import { Curriculum, type Department } from '@/types/api';
 import { AdminFrame } from '@/components/admin/AdminFrame';
 import {
   AdminDialogFooter,
@@ -278,15 +278,11 @@ export default function AdminUsersPage() {
     setReferenceError('');
     try {
       const [departmentsRes, curriculaRes] = await Promise.all([
-        departmentsApi.getAll({ limit: 100 }),
-        curriculaApi.getAll({ limit: 100 }),
+        fetchAllPages<Department>((p, l) => departmentsApi.getAll({ page: p, limit: l })),
+        fetchAllPages<Curriculum>((p, l) => curriculaApi.getAll({ page: p, limit: l })),
       ]);
-      if (departmentsRes.data) {
-        setDepartments(departmentsRes.data);
-      }
-      if (curriculaRes.data) {
-        setCurricula(curriculaRes.data);
-      }
+      setDepartments(departmentsRes);
+      setCurricula(curriculaRes);
     } catch {
       setReferenceError(
         locale === 'vi'

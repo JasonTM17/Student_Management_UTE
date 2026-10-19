@@ -9,6 +9,7 @@ import {
   coursesApi,
   enrollmentsApi,
   adminSemestersApi,
+  fetchAllPages,
   sectionsApi,
 } from '@/lib/api';
 import { AdminFrame } from '@/components/admin/AdminFrame';
@@ -193,13 +194,11 @@ export default function AdminEnrollmentsPage() {
 
     setSectionReferenceError('');
     try {
-      const response = await sectionsApi.getAll({
-        courseId,
-        // /sections caps page size at 100 (MAX_PAGE_SIZE); the 200 reference
-        // limit other catalogs accept is a guaranteed 400 for this endpoint.
-        limit: 100,
-      });
-      setSections(response.data || []);
+      // Page through the course's whole section list — a one-page pull hid
+      // every section beyond the first 100 from the filter dropdown.
+      const rows = await fetchAllPages<Section>((p, l) =>
+        sectionsApi.getAll({ courseId, page: p, limit: l }));
+      setSections(rows);
     } catch {
       setSections([]);
       setSectionReferenceError(

@@ -106,8 +106,11 @@ class ArticleTaxonomyControllerTest {
 
         when(mediaGalleryRepository.findByAnnouncementIdOrderByDisplayOrderAsc("ann-1"))
                 .thenReturn(List.of(gallery));
-        when(mediaGalleryRepository.findAllByOrderByDisplayOrderAsc())
-                .thenReturn(List.of(gallery));
+        // Legacy feed is bounded through the page query now — the unbounded
+        // findAll() used to dump the whole table to any authenticated caller.
+        when(mediaGalleryRepository.findAll(any(Pageable.class)))
+                .thenAnswer(invocation -> new PageImpl<>(
+                        List.of(gallery), invocation.getArgument(0, Pageable.class), 1));
 
         List<ArticleMediaGallery> filtered = controller.getMediaGalleries("ann-1");
         assertEquals(1, filtered.size());
@@ -129,8 +132,9 @@ class ArticleTaxonomyControllerTest {
         // non-public attachments cannot be enumerated by article id.
         when(attachmentRepository.findByAnnouncementIdAndIsPublicTrue("ann-1"))
                 .thenReturn(List.of(attachment));
-        when(attachmentRepository.findByIsPublicTrue())
-                .thenReturn(List.of(attachment));
+        when(attachmentRepository.findByIsPublicTrue(any(Pageable.class)))
+                .thenAnswer(invocation -> new PageImpl<>(
+                        List.of(attachment), invocation.getArgument(0, Pageable.class), 1));
 
         List<AttachmentDto> filtered = controller.getAttachments("ann-1");
         assertEquals(1, filtered.size());

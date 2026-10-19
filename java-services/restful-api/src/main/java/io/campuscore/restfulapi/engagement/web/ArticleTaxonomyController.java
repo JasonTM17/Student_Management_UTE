@@ -172,7 +172,11 @@ public class ArticleTaxonomyController {
         if (announcementId != null && !announcementId.isBlank()) {
             return mediaGalleryRepository.findByAnnouncementIdOrderByDisplayOrderAsc(announcementId);
         }
-        return mediaGalleryRepository.findAllByOrderByDisplayOrderAsc();
+        // Legacy feed stays list-shaped but bounded: unbounded findAll dumps the
+        // whole table to any authenticated caller (same bound the v2 route uses).
+        return mediaGalleryRepository
+                .findAll(PageRequest.of(0, MAX_PAGE_SIZE, Sort.by("displayOrder").ascending()))
+                .getContent();
     }
 
     /**
@@ -192,7 +196,7 @@ public class ArticleTaxonomyController {
             @RequestParam(required = false) String announcementId) {
         List<ArticleAttachment> rows = (announcementId != null && !announcementId.isBlank())
                 ? attachmentRepository.findByAnnouncementIdAndIsPublicTrue(announcementId)
-                : attachmentRepository.findByIsPublicTrue();
+                : attachmentRepository.findByIsPublicTrue(PageRequest.of(0, MAX_PAGE_SIZE)).getContent();
         // Same projection as v2: checksum, access flag, and audit columns stay server-side.
         return rows.stream().map(ArticleTaxonomyDtos.AttachmentDto::from).toList();
     }

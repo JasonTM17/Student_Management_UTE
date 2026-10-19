@@ -118,7 +118,7 @@ public class AdminUserMutationService {
                         + " AND (CAST(:role AS VARCHAR) IS NULL OR EXISTS (SELECT 1 FROM " + USER_ROLE + " fr JOIN " + ROLE + " g ON g.\"id\" = fr.\"roleId\""
                         + " WHERE fr.\"userId\" = u.\"id\" AND g.\"name\" = CAST(:role AS VARCHAR)))"
                         + searchClause
-                        + " ORDER BY u.\"createdAt\" DESC LIMIT :limit OFFSET :offset",
+                        + " ORDER BY u.\"createdAt\" DESC, u.\"id\" DESC LIMIT :limit OFFSET :offset",
                 params);
         Long total = jdbc.queryForObject(
                 "SELECT COUNT(*) FROM " + USER + " u WHERE (CAST(:status AS VARCHAR) IS NULL OR u.\"status\" = CAST(:status AS VARCHAR))"

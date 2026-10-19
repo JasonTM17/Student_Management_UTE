@@ -39,7 +39,7 @@ public class NotificationReadRepository {
         String sql = "SELECT " + SELECT_COLUMNS
                 + " FROM notifications.notification"
                 + whereClause(isRead)
-                + " ORDER BY created_at DESC"
+                + " ORDER BY created_at DESC, id DESC"
                 + " LIMIT :limit OFFSET :offset";
         return jdbc.query(
                 sql,
@@ -54,7 +54,7 @@ public class NotificationReadRepository {
         String sql = "SELECT " + SELECT_COLUMNS
                 + " FROM notifications.notification"
                 + adminWhereClause(userId)
-                + " ORDER BY created_at DESC"
+                + " ORDER BY created_at DESC, id DESC"
                 + " LIMIT :limit OFFSET :offset";
         return jdbc.query(
                 sql,

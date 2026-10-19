@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import { ClipboardCheck, RefreshCw } from 'lucide-react';
 
 import { useAuth } from '@/context/AuthContext';
-import { attendanceApi, sectionsApi, type AttendanceRecord } from '@/lib/api';
+import { attendanceApi, fetchAllPages, sectionsApi, type AttendanceRecord } from '@/lib/api';
 import { AdminFrame } from '@/components/admin/AdminFrame';
 import {
   AdminPaginationFooter,
@@ -27,8 +27,6 @@ import { getLocalizedFlatLabel } from '@/lib/academic-content';
 import type { Section } from '@/types/api';
 
 const PAGE_LIMIT = 20;
-const SECTION_PAGE_LIMIT = 100;
-
 // Statuses seen from the backend today; anything else falls back to a
 // neutral badge carrying the raw value.
 const STATUS_TONES: Record<string, StatusTone> = {
@@ -110,17 +108,13 @@ export default function AdminAttendancePage() {
     if (!canAccess) return;
     let cancelled = false;
     void (async () => {
-      const collected: Section[] = [];
-      for (let current = 1; current <= 3; current += 1) {
-        try {
-          const response = await sectionsApi.getAll({ page: current, limit: SECTION_PAGE_LIMIT });
-          collected.push(...(response.data ?? []));
-          if ((response.meta?.totalPages ?? 1) <= current) break;
-        } catch {
-          break;
-        }
+      try {
+        const collected = await fetchAllPages<Section>((p, l) =>
+          sectionsApi.getAll({ page: p, limit: l }));
+        if (!cancelled) setSections(collected);
+      } catch {
+        // Keep the last good option set; the filter just stays narrowed.
       }
-      if (!cancelled) setSections(collected);
     })();
     return () => {
       cancelled = true;

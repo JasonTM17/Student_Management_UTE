@@ -112,7 +112,8 @@ test('the advisor directory page renders honest failure and empty states', () =>
 test('the advisor directory consults only the real API surface', () => {
   const page = read('src/components/dashboard/thesis/ThesisAdvisorDirectoryPage.tsx');
 
-  assert.match(page, /lecturersApi\s*\.getAll\(\{ limit: 100 \}\)/);
+  // The directory must cover every lecturer, not just the first 100-row page.
+  assert.match(page, /fetchAllPages<Lecturer>\([\s\S]{0,120}?lecturersApi\.getAll/);
   assert.match(page, /departmentsApi\.getAll\(\{ limit: 50 \}\)/);
   assert.match(page, /thesisApi\.listRounds\(\)/);
   assert.match(page, /thesisApi\s*\.listTopics\(targetRound\.id, 'PUBLISHED'\)/);

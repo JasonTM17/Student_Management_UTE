@@ -32,7 +32,7 @@ import { statusToneClass, type StatusTone } from '@/components/ui/status';
 import { useAuth, useRequireAuth } from '@/context/AuthContext';
 import { useI18n } from '@/i18n';
 import { WorkspaceForbiddenState } from '@/components/ProtectedRoute';
-import { lecturersApi, departmentsApi } from '@/lib/api';
+import { lecturersApi, departmentsApi, fetchAllPages } from '@/lib/api';
 import { thesisApi, type ThesisRound, type ThesisTopic } from '@/lib/thesis-api';
 import type { Lecturer, Department } from '@/types/api';
 import { normalizeVietnameseText } from '@/lib/registration-browse';
@@ -318,12 +318,10 @@ export default function ThesisAdvisorDirectoryPage() {
       const [lecResult, deptRes, roundsList] = await Promise.all([
         // The directory is the one required input. Its failure is reported
         // below; it is never silently replaced with invented faculty.
-        lecturersApi
-          .getAll({ limit: 100 })
-          .then((res) => ({
-            ok: true as const,
-            data: Array.isArray(res?.data) ? res.data : [],
-          }))
+        // Walk every page: a limit-100 fetch truncated the directory at
+        // lecturer #100 so later advisors were unsearchable and unassignable.
+        fetchAllPages<Lecturer>((p, l) => lecturersApi.getAll({ page: p, limit: l }))
+          .then((data) => ({ ok: true as const, data }))
           .catch(() => ({ ok: false as const, data: [] as Lecturer[] })),
         // Departments, rounds and topics only enrich the directory; losing
         // them degrades the enrichment, it does not invent a person.

@@ -1,11 +1,13 @@
 package io.campuscore.restfulapi.audit;
 
 import io.campuscore.restfulapi.web.DomainException;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import org.springframework.context.annotation.Profile;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.util.MultiValueMap;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -44,15 +46,13 @@ public class AdminAuditReadController {
             @RequestParam(required = false) String entityId,
             @RequestParam(required = false) String actorId,
             @RequestParam(required = false) String search,
-            @RequestParam Map<String, String> queryParameters) {
-        Set<String> allowed = Set.of("page", "limit", "action", "entityType", "entityId", "actorId", "search");
-        for (String key : queryParameters.keySet()) {
-            if (!allowed.contains(key) && !"cacheBuster".equals(key)) {
-                throw new DomainException(HttpStatus.BAD_REQUEST, "INVALID_REQUEST",
-                        "Unsupported query parameter: " + key);
-            }
+            @RequestParam MultiValueMap<String, String> queryParameters) {
+        requireAllowedQuery(queryParameters,
+                Set.of("page", "limit", "action", "entityType", "entityId", "actorId", "search"));
+        if (page < 1) {
+            throw new DomainException(HttpStatus.BAD_REQUEST, "INVALID_REQUEST", "page must be at least 1");
         }
-        if (page < 1 || limit < 1 || limit > AdminAuditReadRepository.MAX_PAGE_SIZE) {
+        if (limit < 1 || limit > AdminAuditReadRepository.MAX_PAGE_SIZE) {
             throw new DomainException(HttpStatus.BAD_REQUEST, "INVALID_REQUEST",
                     "limit must be between 1 and " + AdminAuditReadRepository.MAX_PAGE_SIZE);
         }
@@ -64,5 +64,19 @@ public class AdminAuditReadController {
                 "limit", result.limit(),
                 "totalPages", result.totalPages());
         return Map.of("data", result.data(), "meta", meta);
+    }
+
+    private static void requireAllowedQuery(
+            MultiValueMap<String, String> queryParameters,
+            Set<String> allowed) {
+        for (Map.Entry<String, List<String>> entry : queryParameters.entrySet()) {
+            if ("_cc_nocache".equals(entry.getKey())) {
+                continue;
+            }
+            if (!allowed.contains(entry.getKey()) || entry.getValue().size() != 1) {
+                throw new DomainException(HttpStatus.BAD_REQUEST, "INVALID_REQUEST",
+                        "Unexpected or repeated query parameter: " + entry.getKey());
+            }
+        }
     }
 }

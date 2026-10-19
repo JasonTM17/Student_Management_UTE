@@ -49,7 +49,7 @@ public class PeopleReadRepository {
         return jdbc.query(
                 studentSelect()
                         + where
-                        + " ORDER BY student.\"createdAt\" DESC LIMIT :limit OFFSET :offset",
+                        + " ORDER BY student.\"createdAt\" DESC, student.\"id\" DESC LIMIT :limit OFFSET :offset",
                 parameters,
                 STUDENT_MAPPER);
     }
@@ -158,7 +158,7 @@ public class PeopleReadRepository {
         return jdbc.query(
                 lecturerSelect()
                         + searchWhere(parameters, search)
-                        + " ORDER BY lecturer.\"createdAt\" DESC LIMIT :limit OFFSET :offset",
+                        + " ORDER BY lecturer.\"createdAt\" DESC, lecturer.\"id\" DESC LIMIT :limit OFFSET :offset",
                 parameters,
                 LECTURER_MAPPER);
     }

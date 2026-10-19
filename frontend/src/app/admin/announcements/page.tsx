@@ -21,6 +21,7 @@ import { toast } from 'sonner';
 import { useAuth } from '@/context/AuthContext';
 import {
   announcementsApi,
+  fetchAllPages,
   lecturersApi,
   sectionsApi,
   semestersApi,
@@ -597,19 +598,18 @@ export default function AdminAnnouncementsPage() {
     setReferenceError('');
     void Promise.allSettled([
       semestersApi.getAll(),
-      // The section read contract caps a page at 100 rows. Keep the
-      // reference lookup inside that contract so the editor remains usable
-      // on the admin announcements route instead of surfacing a 400.
-      sectionsApi.getAll({ page: 1, limit: 100 }),
-      lecturersApi.getAll({ page: 1, limit: 100 }),
+      // The audience pickers need the full catalogs — a single 100-row page
+      // made later sections/lecturers untargetable. Page through instead.
+      fetchAllPages<Section>((p, l) => sectionsApi.getAll({ page: p, limit: l })),
+      fetchAllPages<Lecturer>((p, l) => lecturersApi.getAll({ page: p, limit: l })),
     ]).then(([semesterResult, sectionResult, lecturerResult]) => {
       if (cancelled) return;
       let failed = false;
       if (semesterResult.status === 'fulfilled') setSemesters(semesterResult.value.data ?? []);
       else failed = true;
-      if (sectionResult.status === 'fulfilled') setSections(sectionResult.value.data ?? []);
+      if (sectionResult.status === 'fulfilled') setSections(sectionResult.value);
       else failed = true;
-      if (lecturerResult.status === 'fulfilled') setLecturers(lecturerResult.value.data ?? []);
+      if (lecturerResult.status === 'fulfilled') setLecturers(lecturerResult.value);
       else failed = true;
       if (failed) setReferenceError(copy.referenceUnavailable);
     });

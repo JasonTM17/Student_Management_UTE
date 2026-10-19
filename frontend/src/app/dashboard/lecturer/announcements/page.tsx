@@ -175,6 +175,17 @@ export default function LecturerAnnouncementsPage() {
     }
   }, [fetchFeed, hasAccess]);
 
+  // Same fake-search guard as the student feed: while a keyword or category
+  // chip is active the feed walks itself to the last page so the filter
+  // actually covers the full notice list, not just the first loaded page.
+  const filterActive = selectedCategory !== 'ALL' || searchQuery.trim() !== '';
+  useEffect(() => {
+    // loadMoreError stops the walk — a failed page waits for an explicit
+    // "load more" press rather than spinning in a silent retry loop.
+    if (!filterActive || isLoading || isLoadingMore || loadMoreError || page >= totalPages) return;
+    void fetchFeed(page + 1);
+  }, [filterActive, isLoading, isLoadingMore, loadMoreError, page, totalPages, fetchFeed]);
+
   const handleArchiveOwn = async (announcement: AnnouncementRecord) => {
     const isVi = locale === 'vi';
     const confirmed = await confirm({

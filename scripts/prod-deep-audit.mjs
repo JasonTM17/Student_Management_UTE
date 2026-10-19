@@ -142,6 +142,54 @@ async function getAll(jar, base, label) {
     if (!c.nameEn) issues.push(`course ${c.code} missing nameEn`);
   }
 
+  // ---- cross-reference consistency ----
+  const enrollments = await getAll(admin, '/enrollments?status=ENROLLED', 'ADMIN-ENR');
+  // Offset pagination without a unique sort key re-shuffles between page
+  // fetches, so the same row can land on several pages. Track it separately
+  // from true duplicate rows — overlap is a server-side ordering defect, not
+  // duplicated data.
+  const seenEnr = new Set();
+  const overlapIds = new Set();
+  const uniqEnrollments = [];
+  for (const e of enrollments) {
+    if (seenEnr.has(e.id)) overlapIds.add(e.id);
+    else { seenEnr.add(e.id); uniqEnrollments.push(e); }
+  }
+  if (overlapIds.size > 0) issues.push(`enrollment pagination overlap: ${overlapIds.size} ids repeated across pages (nondeterministic ORDER BY)`);
+  console.log(`PAGE-OVERLAP enrollment ids repeated=${overlapIds.size} fetched=${enrollments.length} unique=${uniqEnrollments.length}`);
+  const secById = new Map(sections.map(s => [s.id, s]));
+  // enrolledCount vs actual ENROLLED rows
+  const cntBySection = {};
+  for (const e of uniqEnrollments) {
+    if (e.sectionId) cntBySection[e.sectionId] = (cntBySection[e.sectionId] || 0) + 1;
+    if (e.sectionId && !secById.has(e.sectionId)) issues.push(`enrollment ${e.id} -> orphan sectionId ${e.sectionId}`);
+    if (e.studentId == null && e.student?.id == null) issues.push(`enrollment ${e.id} missing student ref`);
+  }
+  let drift = 0;
+  for (const s of sections) {
+    const actual = cntBySection[s.id] || 0;
+    const stored = s.enrolledCount ?? 0;
+    if (stored !== actual && s.capacity && s.capacity > 0) {
+      drift++;
+      if (drift <= 20) issues.push(`section ${s.id} (${s.courseCode}-${s.sectionNumber}) enrolledCount=${stored} actual=${actual}`);
+    }
+  }
+  console.log(`ENROLLED-DRIFT sections_mismatch=${drift} (enrollees rows=${uniqEnrollments.length})`);
+  // duplicate enrollments (same student+section active)
+  const dup = {};
+  for (const e of uniqEnrollments) {
+    const k = `${e.student?.id ?? e.studentId}|${e.sectionId}`;
+    dup[k] = (dup[k] || 0) + 1;
+  }
+  const dups = Object.entries(dup).filter(([, n]) => n > 1);
+  for (const [k, n] of dups.slice(0, 20)) issues.push(`duplicate ENROLLED ${k} x${n}`);
+  console.log(`DUP-ENROLL ${dups.length}`);
+  // capacity violations
+  for (const s of sections) {
+    const actual = cntBySection[s.id] || 0;
+    if (s.capacity && actual > s.capacity) issues.push(`section ${s.id} (${s.courseCode}-${s.sectionNumber}) over capacity ${actual}/${s.capacity}`);
+  }
+
   // ---- student surfaces ----
   for (const s of ['student', 'student2', 'student3', 'student4']) {
     for (const p of ['/auth/me', '/me/curriculum', '/enrollments/my', '/enrollments/my/grades',

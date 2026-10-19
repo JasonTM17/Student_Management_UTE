@@ -4,6 +4,7 @@ import io.campuscore.restfulapi.academic.registration.RegistrationService;
 import io.campuscore.restfulapi.academic.web.AcademicEnrollmentReadDtos.EnrollmentResponse;
 import io.campuscore.restfulapi.academic.web.AcademicMutationDtos.GradeUpdate;
 import io.campuscore.restfulapi.audit.AdminAuditRecorder;
+import io.campuscore.restfulapi.common.LikePattern;
 import io.campuscore.restfulapi.engagement.service.GradePublishNotifier;
 import io.campuscore.restfulapi.web.DomainException;
 import java.sql.Timestamp;
@@ -183,6 +184,17 @@ public class AcademicMutationService {
             String studentId,
             String courseId,
             String sectionId) {
+        return exportEnrollments(status, semesterId, studentId, courseId, sectionId, null);
+    }
+
+    @Transactional(readOnly = true)
+    public String exportEnrollments(
+            String status,
+            String semesterId,
+            String studentId,
+            String courseId,
+            String sectionId,
+            String search) {
         MapSqlParameterSource parameters = new MapSqlParameterSource();
         List<String> filters = new ArrayList<>();
         addFilter(filters, parameters, "status", status, "e.\"status\" = :status");
@@ -190,6 +202,22 @@ public class AcademicMutationService {
         addFilter(filters, parameters, "studentId", studentId, "e.\"studentId\" = :studentId");
         addFilter(filters, parameters, "courseId", courseId, "section.\"courseId\" = :courseId");
         addFilter(filters, parameters, "sectionId", sectionId, "e.\"sectionId\" = :sectionId");
+        List<String> tokens = LikePattern.tokens(search);
+        if (!tokens.isEmpty()) {
+            parameters.addValue("foldFrom", LikePattern.FOLD_FROM);
+            parameters.addValue("foldTo", LikePattern.FOLD_TO);
+            for (int i = 0; i < tokens.size(); i++) {
+                String paramName = "searchToken" + i;
+                parameters.addValue(paramName, tokens.get(i));
+                filters.add("(TRANSLATE(LOWER(student.\"studentId\"), :foldFrom, :foldTo) LIKE :" + paramName + " ESCAPE '\\'"
+                        + " OR TRANSLATE(LOWER(student_user.\"firstName\"), :foldFrom, :foldTo) LIKE :" + paramName + " ESCAPE '\\'"
+                        + " OR TRANSLATE(LOWER(student_user.\"lastName\"), :foldFrom, :foldTo) LIKE :" + paramName + " ESCAPE '\\'"
+                        + " OR TRANSLATE(LOWER(student_user.\"email\"), :foldFrom, :foldTo) LIKE :" + paramName + " ESCAPE '\\'"
+                        + " OR TRANSLATE(LOWER(section.\"sectionNumber\"), :foldFrom, :foldTo) LIKE :" + paramName + " ESCAPE '\\'"
+                        + " OR TRANSLATE(LOWER(course.\"code\"), :foldFrom, :foldTo) LIKE :" + paramName + " ESCAPE '\\'"
+                        + " OR TRANSLATE(LOWER(course.\"name\"), :foldFrom, :foldTo) LIKE :" + paramName + " ESCAPE '\\')");
+            }
+        }
         String where = filters.isEmpty() ? "" : " WHERE " + String.join(" AND ", filters);
         // Unfiltered exports used to load the whole enrollment table into
         // memory. A CSV past this bound would be unusable anyway; the caller
@@ -207,7 +235,7 @@ public class AcademicMutationService {
                         + " JOIN " + SECTION + " section ON section.\"id\" = e.\"sectionId\""
                         + " JOIN " + COURSE + " course ON course.\"id\" = section.\"courseId\""
                         + " JOIN " + SEMESTER + " semester ON semester.\"id\" = e.\"semesterId\""
-                        + where + " ORDER BY e.\"enrolledAt\" DESC LIMIT :exportLimit",
+                        + where + " ORDER BY e.\"enrolledAt\" DESC, e.\"id\" DESC LIMIT :exportLimit",
                 parameters);
         StringBuilder csv = new StringBuilder(
                 "id,studentNumber,email,studentName,courseCode,courseName,section,semester,status,enrolledAt,finalGrade,letterGrade\r\n");

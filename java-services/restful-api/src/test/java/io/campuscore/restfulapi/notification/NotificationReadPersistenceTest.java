@@ -4,11 +4,15 @@ import static io.campuscore.restfulapi.testsupport.CurrentAccountJwt.fixtureJwt;
 
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import java.sql.Timestamp;
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -20,6 +24,7 @@ import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.MvcResult;
 import org.springframework.test.web.servlet.request.RequestPostProcessor;
 
 @SpringBootTest
@@ -89,6 +94,39 @@ class NotificationReadPersistenceTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.length()").value(1))
                 .andExpect(jsonPath("$.data[0].id").value("n-3"));
+    }
+
+    @Test
+    void sameTimestampPagesNeverRepeatOrSkipRows() throws Exception {
+        // Bulk-fanned notifications share one created_at; without an id
+        // tiebreak every page reorders and the reader saw dupes plus misses.
+        Instant stamp = Instant.parse("2026-08-19T10:00:00Z");
+        for (int i = 1; i <= 5; i++) {
+            insert("n-shared-" + i, STUDENT, false, stamp);
+        }
+
+        MvcResult firstPage = mvc.perform(get("/api/v1/notifications/my")
+                        .queryParam("page", "1")
+                        .queryParam("limit", "3")
+                        .with(fixtureJwt(jdbc, STUDENT, token -> token.subject(STUDENT))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.length()").value(3))
+                .andExpect(jsonPath("$.meta.total").value(5))
+                .andReturn();
+        MvcResult secondPage = mvc.perform(get("/api/v1/notifications/my")
+                        .queryParam("page", "2")
+                        .queryParam("limit", "3")
+                        .with(fixtureJwt(jdbc, STUDENT, token -> token.subject(STUDENT))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.length()").value(2))
+                .andReturn();
+
+        List<String> ids = new ArrayList<>();
+        for (MvcResult result : List.of(firstPage, secondPage)) {
+            JsonNode data = new ObjectMapper().readTree(result.getResponse().getContentAsString()).get("data");
+            data.forEach(node -> ids.add(node.get("id").asText()));
+        }
+        assertEquals(List.of("n-shared-5", "n-shared-4", "n-shared-3", "n-shared-2", "n-shared-1"), ids);
     }
 
     @Test

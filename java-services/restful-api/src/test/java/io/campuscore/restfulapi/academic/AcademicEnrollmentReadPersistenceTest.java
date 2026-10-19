@@ -96,6 +96,40 @@ class AcademicEnrollmentReadPersistenceTest {
     }
 
     @Test
+    void adminListPaginationIsStableAcrossIdenticalEnrolledAtTimestamps() throws Exception {
+        insertSection("section-3", "C", "course-1");
+        insertSection("section-4", "D", "course-2");
+        // Bulk seeders write identical enrolledAt values; without an id tiebreak an
+        // OFFSET window over the tied order duplicated ids across adjacent pages
+        // (observed on production: 158 duplicated ids in a 1000-row crawl).
+        insertEnrollment("enr-tie-a", "student-1", "section-3", "ENROLLED", "DRAFT", null, null, 10);
+        insertEnrollment("enr-tie-b", "student-2", "section-3", "ENROLLED", "DRAFT", null, null, 10);
+        insertEnrollment("enr-tie-c", "student-1", "section-4", "ENROLLED", "DRAFT", null, null, 10);
+
+        mvc.perform(get("/api/v1/enrollments")
+                        .queryParam("status", "ENROLLED")
+                        .with(adminJwt()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.length()").value(3))
+                .andExpect(jsonPath("$.data[0].id").value("enr-tie-c"))
+                .andExpect(jsonPath("$.data[1].id").value("enr-tie-b"))
+                .andExpect(jsonPath("$.data[2].id").value("enr-tie-a"));
+
+        java.util.Set<String> seen = new java.util.HashSet<>();
+        for (int page = 1; page <= 3; page++) {
+            var body = mvc.perform(get("/api/v1/enrollments")
+                            .queryParam("status", "ENROLLED")
+                            .queryParam("page", String.valueOf(page))
+                            .queryParam("limit", "1")
+                            .with(adminJwt()))
+                    .andExpect(status().isOk())
+                    .andReturn().getResponse().getContentAsString();
+            String id = com.jayway.jsonpath.JsonPath.read(body, "$.data[0].id");
+            org.assertj.core.api.Assertions.assertThat(seen.add(id)).as("page %s repeated id %s", page, id).isTrue();
+        }
+    }
+
+    @Test
     void adminStudentEnrollmentReadPreservesLegacyListAndSemesterFilter() throws Exception {
         mvc.perform(get("/api/v1/enrollments/student/student-1").with(adminJwt()))
                 .andExpect(status().isOk())

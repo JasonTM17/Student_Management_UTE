@@ -1907,4 +1907,34 @@ export const attendanceApi = {
   },
 };
 
+/**
+ * Walks every page of a paginated list endpoint and returns the full row set.
+ * Pickers/directories that only fetched page 1 silently truncated their
+ * options (a lecturer past row 100 was unassignable); dedupe by `id` guards
+ * against offset drift between page fetches.
+ */
+export async function fetchAllPages<T extends { id?: string }>(
+  fetchPage: (page: number, limit: number) => Promise<ApiResponse<T[]>>,
+  { limit = 100, maxPages = 20 }: { limit?: number; maxPages?: number } = {},
+): Promise<T[]> {
+  const first = await fetchPage(1, limit);
+  const totalPages = Math.min(Math.max(first.meta?.totalPages ?? 1, 1), maxPages);
+  const rest =
+    totalPages <= 1
+      ? []
+      : await Promise.all(
+          Array.from({ length: totalPages - 1 }, (_, index) => fetchPage(index + 2, limit)),
+        );
+  const seen = new Set<string>();
+  const rows: T[] = [];
+  for (const row of [first.data ?? [], ...rest.map((page) => page.data ?? [])].flat()) {
+    if (row.id != null) {
+      if (seen.has(row.id)) continue;
+      seen.add(row.id);
+    }
+    rows.push(row);
+  }
+  return rows;
+}
+
 export default api;

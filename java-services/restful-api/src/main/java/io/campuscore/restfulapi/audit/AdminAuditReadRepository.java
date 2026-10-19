@@ -1,5 +1,6 @@
 package io.campuscore.restfulapi.audit;
 
+import io.campuscore.restfulapi.common.LikePattern;
 import java.sql.Timestamp;
 import java.time.Instant;
 import java.util.List;
@@ -80,22 +81,21 @@ public class AdminAuditReadRepository {
         appendContainsFilter(where, parameters, "\"entityType\" ILIKE :entityType", "entityType", entityType);
         appendFilter(where, parameters, "\"entityId\" = :entityId", "entityId", entityId);
         appendFilter(where, parameters, "\"actorId\" = :actorId", "actorId", actorId);
-        if (search != null && !search.isBlank()) {
-            String[] tokens = search.trim().split("\\s+");
-            for (int i = 0; i < tokens.length; i++) {
-                if (tokens[i].isEmpty()) {
-                    continue;
-                }
+        List<String> tokens = LikePattern.tokens(search);
+        if (!tokens.isEmpty()) {
+            parameters.addValue("foldFrom", LikePattern.FOLD_FROM);
+            parameters.addValue("foldTo", LikePattern.FOLD_TO);
+            for (int i = 0; i < tokens.size(); i++) {
                 String param = "searchToken" + i;
                 if (where.length() > 0) {
                     where.append(" AND ");
                 }
-                where.append("(\"summary\" ILIKE :").append(param)
-                        .append(" OR \"actorLabel\" ILIKE :").append(param)
-                        .append(" OR \"entityId\" ILIKE :").append(param)
-                        .append(" OR \"action\" ILIKE :").append(param)
-                        .append(" OR \"entityType\" ILIKE :").append(param).append(")");
-                parameters.addValue(param, "%" + escapeLike(tokens[i]) + "%");
+                where.append("(TRANSLATE(LOWER(COALESCE(\"summary\", '')), :foldFrom, :foldTo) LIKE :").append(param).append(" ESCAPE '\\'")
+                        .append(" OR TRANSLATE(LOWER(COALESCE(\"actorLabel\", '')), :foldFrom, :foldTo) LIKE :").append(param).append(" ESCAPE '\\'")
+                        .append(" OR TRANSLATE(LOWER(COALESCE(\"entityId\", '')), :foldFrom, :foldTo) LIKE :").append(param).append(" ESCAPE '\\'")
+                        .append(" OR TRANSLATE(LOWER(COALESCE(\"action\", '')), :foldFrom, :foldTo) LIKE :").append(param).append(" ESCAPE '\\'")
+                        .append(" OR TRANSLATE(LOWER(COALESCE(\"entityType\", '')), :foldFrom, :foldTo) LIKE :").append(param).append(" ESCAPE '\\')");
+                parameters.addValue(param, tokens.get(i));
             }
         }
         String clause = where.length() == 0 ? "" : " WHERE " + where;

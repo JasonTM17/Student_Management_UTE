@@ -98,8 +98,22 @@ export default function NotificationsCenterPage() {
     setStatus('');
 
     try {
-      const response = await notificationsApi.getMy({ limit: 50 });
-      setItems(response.data ?? []);
+      // Page through the whole inbox: a single first-page fetch used to hide
+      // every notification (and every unread) older than the newest 50.
+      const first = await notificationsApi.getMy({ page: 1, limit: 100 });
+      const rows = [...(first.data ?? [])];
+      const seen = new Set(rows.map((item) => item.id));
+      const totalPages = Math.min(Math.max(first.meta?.totalPages ?? 1, 1), 10);
+      for (let p = 2; p <= totalPages; p++) {
+        const next = await notificationsApi.getMy({ page: p, limit: 100 });
+        for (const item of next.data ?? []) {
+          if (!seen.has(item.id)) {
+            seen.add(item.id);
+            rows.push(item);
+          }
+        }
+      }
+      setItems(rows);
     } catch {
       setError(copy.loadFailed);
     } finally {

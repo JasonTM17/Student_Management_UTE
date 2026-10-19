@@ -7,12 +7,15 @@ import io.campuscore.restfulapi.academic.web.AcademicMutationDtos.GradeUpdateReq
 import jakarta.validation.Valid;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import org.springframework.context.annotation.Profile;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.jwt.Jwt;
+import org.springframework.util.MultiValueMap;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -24,6 +27,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+import io.campuscore.restfulapi.web.DomainException;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
@@ -35,6 +39,9 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 @Profile("persistence")
 @RequestMapping("/api/v1")
 public class AcademicMutationController {
+
+    private static final Set<String> EXPORT_ALLOWED_QUERY =
+            Set.of("status", "semesterId", "studentId", "courseId", "sectionId", "search");
 
     private final AcademicMutationService mutations;
 
@@ -103,8 +110,19 @@ public class AcademicMutationController {
             @Parameter(description = "Mã định danh học kỳ (UUID)") @RequestParam(required = false) String semesterId,
             @Parameter(description = "Mã định danh sinh viên (UUID)") @RequestParam(required = false) String studentId,
             @Parameter(description = "Mã định danh môn học (UUID)") @RequestParam(required = false) String courseId,
-            @Parameter(description = "Mã định danh lớp học phần (UUID)") @RequestParam(required = false) String sectionId) {
-        return mutations.exportEnrollments(status, semesterId, studentId, courseId, sectionId);
+            @Parameter(description = "Mã định danh lớp học phần (UUID)") @RequestParam(required = false) String sectionId,
+            @Parameter(description = "Từ khóa tìm kiếm (tên/MSSV/email sinh viên, mã lớp hoặc môn học)") @RequestParam(required = false) String search,
+            @RequestParam MultiValueMap<String, String> queryParameters) {
+        for (Map.Entry<String, List<String>> entry : queryParameters.entrySet()) {
+            if ("_cc_nocache".equals(entry.getKey())) {
+                continue;
+            }
+            if (!EXPORT_ALLOWED_QUERY.contains(entry.getKey()) || entry.getValue().size() != 1) {
+                throw new DomainException(HttpStatus.BAD_REQUEST, "INVALID_REQUEST",
+                        "Unexpected or repeated query parameter: " + entry.getKey());
+            }
+        }
+        return mutations.exportEnrollments(status, semesterId, studentId, courseId, sectionId, search);
     }
 
     @Operation(summary = "Nhập hoặc cập nhật điểm học phần dạng bản nháp (Draft)", description = "Giảng viên lưu bảng điểm của lớp học phần dưới dạng bản nháp để chỉnh sửa trước khi công bố")

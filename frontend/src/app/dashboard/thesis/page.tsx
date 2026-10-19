@@ -64,7 +64,7 @@ import StudentGroupCard, {
 import SubmissionStatusTimeline from '@/features/thesis/components/SubmissionStatusTimeline';
 import SupervisedGroupList from '@/features/thesis/components/SupervisedGroupList';
 import ThesisRepositoryWorkspace from '@/features/thesis/components/ThesisRepositoryWorkspace';
-import { departmentsApi, lecturersApi } from '@/lib/api';
+import { departmentsApi, fetchAllPages, lecturersApi } from '@/lib/api';
 import { getLocalizedName } from '@/lib/academic-content';
 import type { Department, Lecturer } from '@/types/api';
 import {
@@ -689,9 +689,8 @@ export default function ThesisPage() {
   const loadLecturers = useCallback(async () => {
     setLecturersError('');
     try {
-      const response = await lecturersApi.getAll({ limit: 100 });
-      const list = Array.isArray(response?.data) ? response.data : [];
-      setLecturers(list);
+      // Fetch every page so a supervisor past row 100 can still be proposed.
+      setLecturers(await fetchAllPages<Lecturer>((p, l) => lecturersApi.getAll({ page: p, limit: l })));
     } catch {
       // Never substitute a fabricated directory: the modal says the directory
       // failed to load so the reader is not shown invented supervisors.

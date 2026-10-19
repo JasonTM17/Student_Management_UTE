@@ -47,7 +47,7 @@ public class AcademicEnrollmentReadRepository {
             sql.append(" AND e.\"semesterId\" = :semesterId");
             parameters.addValue("semesterId", semesterId);
         }
-        sql.append(" ORDER BY e.\"enrolledAt\" DESC");
+        sql.append(" ORDER BY e.\"enrolledAt\" DESC, e.\"id\" DESC");
         return jdbc.query(sql.toString(),
                 parameters,
                 AcademicEnrollmentReadRepository::mapEnrollment);
@@ -61,7 +61,7 @@ public class AcademicEnrollmentReadRepository {
         MapSqlParameterSource parameters = new MapSqlParameterSource();
         String where = enrollmentWhere(parameters, status, semesterId, studentId, courseId, sectionId, search);
         return jdbc.query(enrollmentSelect() + where
-                        + " ORDER BY e.\"enrolledAt\" DESC LIMIT :limit OFFSET :offset",
+                        + " ORDER BY e.\"enrolledAt\" DESC, e.\"id\" DESC LIMIT :limit OFFSET :offset",
                 parameters
                         .addValue("offset", offset)
                         .addValue("limit", limit),
@@ -126,14 +126,14 @@ public class AcademicEnrollmentReadRepository {
 
     public List<GradeItemRow> findGradeItemsByLecturer(String lecturerId) {
         return jdbc.query(gradeItemSelect()
-                        + " WHERE section.\"lecturerId\" = :lecturerId ORDER BY item.\"createdAt\" DESC",
+                        + " WHERE section.\"lecturerId\" = :lecturerId ORDER BY item.\"createdAt\" DESC, item.\"id\" ASC",
                 new MapSqlParameterSource("lecturerId", lecturerId),
                 AcademicEnrollmentReadRepository::mapGradeItem);
     }
 
     public List<GradeItemRow> findGradeItemsBySection(String sectionId) {
         return jdbc.query(gradeItemSelect()
-                        + " WHERE item.\"sectionId\" = :sectionId ORDER BY item.\"createdAt\" DESC",
+                        + " WHERE item.\"sectionId\" = :sectionId ORDER BY item.\"createdAt\" DESC, item.\"id\" ASC",
                 new MapSqlParameterSource("sectionId", sectionId),
                 AcademicEnrollmentReadRepository::mapGradeItem);
     }
@@ -141,7 +141,7 @@ public class AcademicEnrollmentReadRepository {
     public List<GradeItemRow> findGradeItemsBySectionAndLecturer(String sectionId, String lecturerId) {
         return jdbc.query(gradeItemSelect()
                         + " WHERE item.\"sectionId\" = :sectionId AND section.\"lecturerId\" = :lecturerId"
-                        + " ORDER BY item.\"createdAt\" DESC",
+                        + " ORDER BY item.\"createdAt\" DESC, item.\"id\" ASC",
                 new MapSqlParameterSource().addValue("sectionId", sectionId).addValue("lecturerId", lecturerId),
                 AcademicEnrollmentReadRepository::mapGradeItem);
     }
@@ -170,7 +170,7 @@ public class AcademicEnrollmentReadRepository {
         return jdbc.query(studentGradeSelect()
                         + " WHERE section.\"lecturerId\" = :lecturerId"
                         + sectionFilter
-                        + " ORDER BY section.\"sectionNumber\", student_user.\"lastName\", student_user.\"firstName\", item.\"createdAt\"",
+                        + " ORDER BY section.\"sectionNumber\", student_user.\"lastName\", student_user.\"firstName\", item.\"createdAt\", item.\"id\"",
                 parameters,
                 AcademicEnrollmentReadRepository::mapStudentGrade);
     }
@@ -178,7 +178,7 @@ public class AcademicEnrollmentReadRepository {
     public List<StudentGradeRow> findStudentGradesBySection(String sectionId) {
         return jdbc.query(studentGradeSelect()
                         + " WHERE e.\"sectionId\" = :sectionId"
-                        + " ORDER BY student_user.\"lastName\", student_user.\"firstName\", item.\"createdAt\"",
+                        + " ORDER BY student_user.\"lastName\", student_user.\"firstName\", item.\"createdAt\", item.\"id\"",
                 new MapSqlParameterSource("sectionId", sectionId),
                 AcademicEnrollmentReadRepository::mapStudentGrade);
     }
@@ -186,14 +186,14 @@ public class AcademicEnrollmentReadRepository {
     public List<StudentGradeRow> findStudentGradesBySectionAndLecturer(String sectionId, String lecturerId) {
         return jdbc.query(studentGradeSelect()
                         + " WHERE e.\"sectionId\" = :sectionId AND section.\"lecturerId\" = :lecturerId"
-                        + " ORDER BY student_user.\"lastName\", student_user.\"firstName\", item.\"createdAt\"",
+                        + " ORDER BY student_user.\"lastName\", student_user.\"firstName\", item.\"createdAt\", item.\"id\"",
                 new MapSqlParameterSource().addValue("sectionId", sectionId).addValue("lecturerId", lecturerId),
                 AcademicEnrollmentReadRepository::mapStudentGrade);
     }
 
     public List<StudentGradeRow> findStudentGradesByEnrollment(String enrollmentId) {
         return jdbc.query(studentGradeSelect()
-                        + " WHERE e.\"id\" = :enrollmentId ORDER BY item.\"createdAt\"",
+                        + " WHERE e.\"id\" = :enrollmentId ORDER BY item.\"createdAt\", item.\"id\"",
                 new MapSqlParameterSource("enrollmentId", enrollmentId),
                 AcademicEnrollmentReadRepository::mapStudentGrade);
     }
@@ -201,7 +201,7 @@ public class AcademicEnrollmentReadRepository {
     public List<StudentGradeRow> findStudentGradesByEnrollmentAndLecturer(String enrollmentId, String lecturerId) {
         return jdbc.query(studentGradeSelect()
                         + " WHERE e.\"id\" = :enrollmentId AND section.\"lecturerId\" = :lecturerId"
-                        + " ORDER BY item.\"createdAt\"",
+                        + " ORDER BY item.\"createdAt\", item.\"id\"",
                 new MapSqlParameterSource().addValue("enrollmentId", enrollmentId).addValue("lecturerId", lecturerId),
                 AcademicEnrollmentReadRepository::mapStudentGrade);
     }

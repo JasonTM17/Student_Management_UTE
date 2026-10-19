@@ -37,7 +37,7 @@ import {
 } from '@/components/ui/state-block';
 import { StatusBadge } from '@/components/thesis/StatusBadge';
 import { useI18n } from '@/i18n';
-import { lecturersApi } from '@/lib/api';
+import { fetchAllPages, lecturersApi } from '@/lib/api';
 import type { Lecturer } from '@/types/api';
 import {
   thesisApi,
@@ -164,8 +164,9 @@ export default function AdminThesisPage() {
   /** Council lecturer roster: a failure must surface with a retry, not an empty select. */
   const loadLecturers = async () => {
     try {
-      const res = await lecturersApi.getAll({ limit: 100 });
-      if (Array.isArray(res?.data)) setLecturers(res.data);
+      // Walk all pages — a single 100-row page made lecturers past that bound
+      // impossible to seat on a council or assign as supervisor.
+      setLecturers(await fetchAllPages<Lecturer>((p, l) => lecturersApi.getAll({ page: p, limit: l })));
       setLecturerLoadError(false);
     } catch {
       setLecturerLoadError(true);

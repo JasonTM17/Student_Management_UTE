@@ -117,22 +117,31 @@ export function I18nProvider({
         localizePathname(pathname, resolvedLocale, resolvedIsPrefixed),
       switchLocalePath: (pathname, nextLocale, search = '', hash = '') =>
         buildLocaleSwitchPath(pathname, nextLocale, search, hash),
-      formatDate: (value, options) =>
-        new Intl.DateTimeFormat(intlLocale, {
+      formatDate: (value, options) => {
+        const date = new Date(value);
+        // An unparseable API value used to throw RangeError out of Intl and
+        // blank the whole render — print the same em-dash the UI uses for a
+        // missing date instead.
+        if (Number.isNaN(date.getTime())) return '—';
+        return new Intl.DateTimeFormat(intlLocale, {
           year: 'numeric',
           month: resolvedLocale === 'vi' ? '2-digit' : 'short',
           day: resolvedLocale === 'vi' ? '2-digit' : 'numeric',
           ...options,
-        }).format(new Date(value)),
-      formatDateTime: (value, options) =>
-        new Intl.DateTimeFormat(intlLocale, {
+        }).format(date);
+      },
+      formatDateTime: (value, options) => {
+        const date = new Date(value);
+        if (Number.isNaN(date.getTime())) return '—';
+        return new Intl.DateTimeFormat(intlLocale, {
           year: 'numeric',
           month: resolvedLocale === 'vi' ? '2-digit' : 'short',
           day: resolvedLocale === 'vi' ? '2-digit' : 'numeric',
           hour: '2-digit',
           minute: '2-digit',
           ...options,
-        }).format(new Date(value)),
+        }).format(date);
+      },
       formatNumber: (value, options) =>
         new Intl.NumberFormat(intlLocale, options).format(value),
       formatCurrency: (value, currency = 'USD', options) =>

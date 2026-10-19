@@ -205,6 +205,17 @@ export default function StudentAnnouncementsPage() {
     }
   }, [fetchFeed, hasAccess]);
 
+  // Fake-search guard: the keyword box and category chips filter whatever is
+  // loaded, so while any of them is active the feed walks itself to the last
+  // page instead of reporting an empty result for a notice it never fetched.
+  const filterActive = selectedCategory !== 'ALL' || searchQuery.trim() !== '';
+  useEffect(() => {
+    // loadMoreError stops the walk: a failed page must wait for the reader to
+    // press "load more" again instead of retrying in a silent loop.
+    if (!filterActive || isLoading || isLoadingMore || loadMoreError || page >= totalPages) return;
+    void fetchFeed(page + 1);
+  }, [filterActive, isLoading, isLoadingMore, loadMoreError, page, totalPages, fetchFeed]);
+
   // Resolve the live current semester for the banner; an unknown calendar
   // prints an em-dash rather than an invented term.
   useEffect(() => {
