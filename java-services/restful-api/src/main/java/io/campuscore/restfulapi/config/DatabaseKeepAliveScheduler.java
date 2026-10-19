@@ -2,6 +2,7 @@ package io.campuscore.restfulapi.config;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Profile;
 import org.springframework.dao.DataAccessException;
 import org.springframework.jdbc.core.JdbcOperations;
@@ -15,6 +16,7 @@ import org.springframework.stereotype.Component;
  */
 @Component
 @Profile("persistence")
+@ConditionalOnProperty(prefix = "app.keepalive", name = "enabled", havingValue = "true", matchIfMissing = true)
 public class DatabaseKeepAliveScheduler {
 
     private static final Logger log = LoggerFactory.getLogger(DatabaseKeepAliveScheduler.class);
