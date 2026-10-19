@@ -19,6 +19,7 @@ import java.util.UUID;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledIf;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -31,7 +32,7 @@ import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
 
-/** Real service transactions against migrated PostgreSQL, including a deterministic Student-lock schedule. */
+/** Real service transactions against migrated PostgreSQL, including a deterministic round-lock schedule. */
 @EnabledIf("postgresTargetConfigured")
 @SpringBootTest(properties = { "spring.flyway.locations=classpath:db/migration", "deepseek.enabled=false" })
 @ActiveProfiles({"test", "persistence"})
@@ -66,11 +67,13 @@ class ThesisCancellationMembershipPostgresIT {
     }
 
     @Test
-    void sameStudentConcurrentCreatesWaitOnTheStudentRowThenOneReceivesTheBusinessConflict() throws Exception {
+    void sameStudentConcurrentCreatesWaitOnTheRoundLockThenOneReceivesTheBusinessConflict() throws Exception {
         Fixture fixture = fixture();
         CountDownLatch firstLocked = new CountDownLatch(1);
         CountDownLatch releaseFirst = new CountDownLatch(1);
-        CountDownLatch secondEnteringStudentCheck = new CountDownLatch(1);
+        CountDownLatch secondEnteringRoundCheck = new CountDownLatch(1);
+        AtomicInteger firstPid = new AtomicInteger();
+        AtomicInteger secondPid = new AtomicInteger();
         doAnswer(call -> {
             String sql = call.getArgument(0);
             String worker = Thread.currentThread().getName();
@@ -78,14 +81,24 @@ class ThesisCancellationMembershipPostgresIT {
                     && worker.startsWith("cancel-membership-")) {
                 if (worker.endsWith("first")) {
                     Object result = call.callRealMethod();
+                    firstPid.set(jdbc.getJdbcOperations().queryForObject("SELECT pg_backend_pid()", Integer.class));
                     firstLocked.countDown();
                     if (!releaseFirst.await(15, TimeUnit.SECONDS)) throw new IllegalStateException("student-lock barrier timeout");
                     return result;
                 }
-                secondEnteringStudentCheck.countDown();
             }
             return call.callRealMethod();
         }).when(jdbcSpy).queryForObject(anyString(), any(SqlParameterSource.class), any(Class.class));
+
+        doAnswer(call -> {
+            String sql = call.getArgument(0);
+            if (Thread.currentThread().getName().equals("cancel-membership-second")
+                    && sql.contains("FROM thesis.thesis_registration_round") && sql.contains("FOR UPDATE")) {
+                secondPid.set(jdbc.getJdbcOperations().queryForObject("SELECT pg_backend_pid()", Integer.class));
+                secondEnteringRoundCheck.countDown();
+            }
+            return call.callRealMethod();
+        }).when(jdbcSpy).queryForMap(anyString(), any(SqlParameterSource.class));
 
         var pool = Executors.newFixedThreadPool(2);
         try {
@@ -98,12 +111,26 @@ class ThesisCancellationMembershipPostgresIT {
                 Thread.currentThread().setName("cancel-membership-second");
                 return createCode(fixture);
             });
-            assertThat(secondEnteringStudentCheck.await(10, TimeUnit.SECONDS)).isTrue();
-            Thread.sleep(250);
-            assertThat(second.isDone()).as("second create waits for the first transaction's Student FOR UPDATE lock").isFalse();
+            // createGroup locks the round before the Student row. Observe the
+            // actual PostgreSQL wait instead of waiting for the later Student check.
+            assertThat(secondEnteringRoundCheck.await(10, TimeUnit.SECONDS)).isTrue();
+            boolean blocked = false;
+            long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(10);
+            while (!second.isDone() && !blocked && System.nanoTime() < deadline) {
+                blocked = Boolean.TRUE.equals(jdbc.queryForObject(
+                        "SELECT :owner = ANY(pg_blocking_pids(:waiter))",
+                        Map.of("owner", firstPid.get(), "waiter", secondPid.get()), Boolean.class));
+                if (!blocked && !second.isDone()) Thread.sleep(25);
+            }
+            assertThat(blocked).as("second create waits for the first transaction's round FOR UPDATE lock").isTrue();
+            assertThat(second.isDone()).isFalse();
             releaseFirst.countDown();
             assertThat(first.get(20, TimeUnit.SECONDS)).isEqualTo("CREATED");
             assertThat(second.get(20, TimeUnit.SECONDS)).isEqualTo("STUDENT_ALREADY_IN_GROUP");
+            assertThat(count("SELECT COUNT(*) FROM thesis.thesis_group WHERE round_id=:round AND leader_student_id=:student",
+                    Map.of("round", fixture.round(), "student", fixture.student()))).isEqualTo(1);
+            assertThat(count("SELECT COUNT(*) FROM thesis.thesis_group_member WHERE round_id=:round AND student_id=:student AND active_participation=TRUE",
+                    Map.of("round", fixture.round(), "student", fixture.student()))).isEqualTo(1);
         } finally {
             releaseFirst.countDown(); pool.shutdownNow();
             assertThat(pool.awaitTermination(10, TimeUnit.SECONDS)).isTrue();
