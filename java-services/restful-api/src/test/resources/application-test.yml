@@ -54,11 +54,3 @@ engagement:
 academic:
   enrolled-count:
     enabled: false
-
-auth:
-  two-factor:
-    retention:
-      enabled: false
-  password-reset:
-    retention:
-      enabled: false
