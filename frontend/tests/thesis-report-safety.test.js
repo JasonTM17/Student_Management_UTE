@@ -49,6 +49,7 @@ for (const locale of ['en', 'vi']) {
       formatDateTime: (value) => value,
       copy: (locale === 'vi' ? copy.thesisWorkflowVi : copy.thesisWorkflowEn).page.submissionStatus,
       locale,
+      reportWindowState: 'open',
     }));
     assert.ok(html.includes(submittedAt), 'keep the actual first submission timestamp');
     assert.ok(html.includes(updatedAt), 'keep the actual latest update timestamp');
@@ -57,6 +58,114 @@ for (const locale of ['en', 'vi']) {
       'Report timestamps do not reveal an edit count; no numbered revision may be invented');
   });
 }
+
+function renderTimeline(locale, props) {
+  const React = require('react');
+  const { renderToStaticMarkup } = require('react-dom/server');
+  const helpers = loadTimelineModule('src/features/thesis/components/thesis-helpers.tsx');
+  const dictionaries = loadTimelineModule('src/i18n/messages-thesis-workflow.ts');
+  const copy = (locale === 'vi' ? dictionaries.thesisWorkflowVi : dictionaries.thesisWorkflowEn).page.submissionStatus;
+  const Timeline = loadTimelineModule('src/features/thesis/components/SubmissionStatusTimeline.tsx', {
+    '@/lib/utils': { cn: (...values) => values.filter(Boolean).join(' ') },
+    '@/features/thesis/components/thesis-helpers': helpers,
+  }).default;
+  return {
+    copy,
+    html: renderToStaticMarkup(React.createElement(Timeline, {
+      report: null, formatDateTime: (value) => value, locale, copy, ...props,
+    })),
+  };
+}
+
+for (const locale of ['en', 'vi']) {
+  test(`report timeline shows an open window without an invented deadline (${locale})`, () => {
+    const { html, copy } = renderTimeline(locale, { reportWindowState: 'open', deadlineAt: null, daysRemaining: null });
+    assert.ok(html.includes(locale === 'vi' ? 'Đang mở · Chưa đặt hạn nộp' : 'Open · No deadline set'));
+    assert.equal(html.includes(copy.notOpenChip), false);
+    assert.equal(html.includes(copy.overdueChip), false);
+  });
+
+  test(`report timeline preserves unopened lifecycle despite a future deadline (${locale})`, () => {
+    const { html, copy } = renderTimeline(locale, {
+      reportWindowState: 'notYetOpen', deadlineAt: '2026-11-01T00:00:00Z', daysRemaining: 3,
+    });
+    assert.ok(html.includes(copy.notOpenChip));
+    assert.equal(html.includes(copy.deadlineChip.replace('{days}', '3')), false);
+  });
+
+  test(`report timeline labels exact and first-day overdue boundaries independently of rounded days (${locale})`, () => {
+    const deadlineMs = Date.parse('2026-10-19T12:00:00Z');
+    for (const elapsed of [0, 1, 3_600_000, 86_399_999]) {
+      const daysRemaining = Math.ceil(-elapsed / 86_400_000);
+      assert.equal(Math.abs(daysRemaining), 0, 'the rounded count cannot distinguish these boundaries');
+      const { html, copy } = renderTimeline(locale, {
+        reportWindowState: 'deadlinePassed', deadlineAt: new Date(deadlineMs).toISOString(), daysRemaining,
+      });
+      assert.ok(html.includes(copy.overdueChip), `overdue at +${elapsed}ms`);
+      assert.ok(html.includes('bg-status-danger/15'), 'overdue chip uses danger tone');
+      assert.equal(html.includes(copy.deadlineChip.replace('{days}', '0')), false);
+    }
+  });
+
+  test(`report timeline keeps terminal rounds closed with future or absent deadlines (${locale})`, () => {
+    for (const deadlineAt of ['2026-11-01T00:00:00Z', null]) {
+      const { html, copy } = renderTimeline(locale, {
+        reportWindowState: 'closedFinal', deadlineAt, daysRemaining: deadlineAt ? 3 : null,
+      });
+      assert.ok(html.includes(locale === 'vi' ? 'Đã đóng nộp báo cáo' : 'Submissions closed'));
+      assert.equal(html.includes(copy.notOpenChip), false);
+      assert.equal(html.includes(copy.deadlineChip.replace('{days}', '3')), false);
+    }
+  });
+
+  test(`report timeline keeps the localized countdown and published deadline while open (${locale})`, () => {
+    const deadlineAt = '2026-11-01T00:00:00Z';
+    const { html, copy } = renderTimeline(locale, { reportWindowState: 'open', deadlineAt, daysRemaining: 3 });
+    assert.ok(html.includes(copy.deadlineChip.replace('{days}', '3')));
+    assert.ok(html.includes(deadlineAt));
+    assert.ok(html.includes('bg-status-warning/15'));
+  });
+}
+
+test('the report timeline receives the form lifecycle authority from its parent', () => {
+  const ts = require('typescript');
+  const ast = ts.createSourceFile('page.tsx', page, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX);
+  let timeline;
+  const visit = (node) => {
+    if (ts.isJsxSelfClosingElement(node) && node.tagName.getText(ast) === 'SubmissionStatusTimeline') timeline = node;
+    ts.forEachChild(node, visit);
+  };
+  visit(ast);
+  const state = timeline.attributes.properties.find((attribute) => attribute.name?.getText(ast) === 'reportWindowState');
+  assert.equal(state?.initializer?.expression?.getText(ast), 'reportWindowState');
+});
+
+test('supervised topic titles use only the already-authorized workload as a directory fallback', () => {
+  const ts = require('typescript');
+  const ast = ts.createSourceFile('page.tsx', page, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX);
+  let resolver;
+  const visit = (node) => {
+    if (ts.isVariableDeclaration(node) && node.name.getText(ast) === 'getTopicTitle') resolver = node.initializer;
+    ts.forEachChild(node, visit);
+  };
+  visit(ast);
+  assert.ok(resolver, 'execute the actual page resolver');
+  const emitted = ts.transpileModule(`module.exports = (${resolver.getText(ast)});`, {
+    compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2020 },
+  }).outputText;
+  const load = (topics, lecturerWorkload) => {
+    const record = { exports: {} };
+    Function('topics', 'lecturerWorkload', 'module', emitted)(topics, lecturerWorkload, record);
+    return record.exports;
+  };
+  const workload = { topics: [{ topicId: 'own-topic', title: 'Đề tài hướng dẫn đã được cấp quyền' }] };
+  assert.equal(load([], workload)('own-topic'), workload.topics[0].title);
+  assert.equal(load([{ id: 'own-topic', title: 'Directory title' }], workload)('own-topic'), 'Directory title');
+  assert.equal(load([], workload)('unknown-topic'), 'unknown-topic');
+  assert.equal(load([], null)('unknown-topic'), 'unknown-topic');
+  assert.equal(load([], workload)(null), '—');
+  assert.equal(load([], workload)(undefined), '—');
+});
 
 test('report editing uses the non-destructive PATCH and detach endpoints', () => {
   // PATCH metadata/link edit + DELETE file detach — the file bytes and the
