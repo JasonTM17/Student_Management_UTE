@@ -82,7 +82,7 @@ export default function SupervisedGroupList({
                       <StatusBadge status={group.status} />
                       <StatusBadge status={group.approvalStatus} variant="approval" />
                     </div>
-                    <h4 className="truncate text-sm font-semibold text-foreground">
+                    <h4 className="truncate text-sm font-semibold text-foreground" title={topicTitle}>
                       {topicTitle}
                     </h4>
                     <div className="flex items-center gap-3 text-xs text-muted-foreground">

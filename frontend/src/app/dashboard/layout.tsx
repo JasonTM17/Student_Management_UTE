@@ -1335,11 +1335,11 @@ export default function DashboardLayout({
                     )}
                   </div>
                   <div className="hidden min-w-0 text-left md:block">
-                    <div className="truncate text-sm font-semibold text-foreground">
+                    <div className="truncate text-sm font-semibold text-foreground" title={fullName}>
                       {fullName}
                     </div>
                     <div className="text-xs text-muted-foreground flex items-center gap-1">
-                      <span className="min-w-0 truncate">{user.email}</span>
+                      <span className="min-w-0 truncate" title={user.email ?? undefined}>{user.email}</span>
                       {isDemoUser(user) && (
                         <span className="inline-flex items-center gap-1 text-[11px] font-medium text-muted-foreground">
                           <span
@@ -1374,10 +1374,10 @@ export default function DashboardLayout({
                         )}
                       </div>
                       <div className="min-w-0 flex-1">
-                        <p className="truncate font-semibold text-foreground">
+                        <p className="truncate font-semibold text-foreground" title={fullName}>
                           {fullName}
                         </p>
-                        <p className="truncate text-sm text-muted-foreground">
+                        <p className="truncate text-sm text-muted-foreground" title={user.email ?? undefined}>
                           {user.email}
                         </p>
                         <div className="mt-1.5 flex flex-wrap items-center gap-1.5">

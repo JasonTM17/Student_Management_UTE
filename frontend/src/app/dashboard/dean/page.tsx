@@ -73,7 +73,10 @@ function GroupRow({ group, copy }: { group: DeanGroup; copy: Record<string, stri
         className="flex w-full flex-wrap items-center gap-x-4 gap-y-2 px-4 py-3 text-left transition-colors hover:bg-muted/40 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
       >
         <div className="min-w-0 flex-1">
-          <p className="truncate text-sm font-semibold text-foreground">
+          <p
+            className="truncate text-sm font-semibold text-foreground"
+            title={group.topicTitle || copy.noTopic}
+          >
             {group.topicTitle || copy.noTopic}
           </p>
           <p className="mt-0.5 text-xs text-muted-foreground">
@@ -93,6 +96,9 @@ function GroupRow({ group, copy }: { group: DeanGroup; copy: Record<string, stri
       </button>
       {open ? (
         <div id={detailId} className="border-t border-border/60 px-4 py-3">
+          {group.topicTitle ? (
+            <p className="mb-4 text-sm font-semibold text-foreground">{group.topicTitle}</p>
+          ) : null}
           <div className="grid gap-4 md:grid-cols-2">
             <div>
               <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">

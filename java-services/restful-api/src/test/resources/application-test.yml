@@ -44,8 +44,7 @@ app:
   rate-limit:
     enabled: false
   keepalive:
-    db-interval-ms: 999999999
-    db-initial-delay-ms: 999999999
+    enabled: false
 
 engagement:
   announcement-notify:

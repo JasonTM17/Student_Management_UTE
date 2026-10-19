@@ -74,9 +74,9 @@ function workloadFor(map: Map<string, AdvisorWorkload>, lecturerId: string): Adv
 // Local presentation primitives (single design language, no vendor UI kit)
 // ---------------------------------------------------------------------------
 
-function StatusPill({ tone, children }: { tone: StatusTone; children: ReactNode }) {
+function StatusPill({ tone, children, className }: { tone: StatusTone; children: ReactNode; className?: string }) {
   return (
-    <span className={cn('inline-flex items-center rounded-md px-2 py-0.5 text-[11px] font-semibold', statusToneClass(tone))}>
+    <span className={cn('inline-flex items-center rounded-md px-2 py-0.5 text-[11px] font-semibold', statusToneClass(tone), className)}>
       {children}
     </span>
   );
@@ -867,7 +867,14 @@ export default function ThesisAdvisorDirectoryPage() {
                           {/* Research Specialization */}
                           <div className="mt-3 flex flex-wrap gap-1.5">
                             {lec.specialization ? (
-                              <StatusPill tone="neutral">{lec.specialization}</StatusPill>
+                              <StatusPill
+                                tone="neutral"
+                                className="max-w-full truncate"
+                              >
+                                <span className="truncate" title={lec.specialization}>
+                                  {lec.specialization}
+                                </span>
+                              </StatusPill>
                             ) : (
                               <span className="text-[11px] text-muted-foreground">—</span>
                             )}
@@ -889,18 +896,18 @@ export default function ThesisAdvisorDirectoryPage() {
                         </div>
 
                         {/* Card Actions */}
-                        <div className="mt-5 flex gap-2 border-t border-border/70 pt-3">
+                        <div className="mt-5 flex flex-wrap gap-2 border-t border-border/70 pt-3">
                           <Button
                             type="button"
                             variant="outline"
-                            className="h-9 flex-1 rounded-lg text-xs font-semibold"
+                            className="h-9 min-w-0 flex-1 basis-32 rounded-lg text-xs font-semibold"
                             onClick={() => openAdvisor(lec)}
                           >
                             {isVi ? 'Xem chi tiết' : 'View Bio'}
                           </Button>
                           <LinkButton
                             href={`/dashboard/thesis?advisorId=${lec.id}&action=propose`}
-                            className="h-9 flex-1 justify-center rounded-lg text-xs font-semibold"
+                            className="h-9 min-w-0 flex-1 basis-32 justify-center rounded-lg text-xs font-semibold"
                           >
                             {isVi ? 'Chọn hướng dẫn' : 'Select'}
                           </LinkButton>
