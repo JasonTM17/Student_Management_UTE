@@ -1,7 +1,10 @@
 package io.campuscore.restfulapi.common;
 
 import java.text.Normalizer;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Locale;
+import java.util.Set;
 
 /**
  * Shared escaping for the bounded, case-insensitive substring filters behind the
@@ -27,6 +30,11 @@ public final class LikePattern {
      * prefix search is still the closest honest answer.
      */
     public static final int MAX_TERM_LENGTH = 64;
+    public static final int MAX_TOKENS = 8;
+
+    private static final Set<String> HONORIFIC_TOKENS = Set.of(
+            "gs", "pgs", "ts", "ths", "ks", "cn", "gv",
+            "gsts", "pgsts", "thsks", "dr", "prof");
 
     /**
      * Vietnamese lowercase diacritic characters folded to their ASCII base
@@ -106,5 +114,93 @@ public final class LikePattern {
                 .replace("%", "\\%")
                 .replace("_", "\\_");
         return "%" + escaped + "%";
+    }
+
+    /**
+     * Splits an operator query into diacritic-folded, LIKE-escaped substring
+     * tokens ({@code "%token%"}) so multi-word searches such as
+     * {@code "Hoàng Thái Xuân Khoa"} or {@code "Trần Đình Khôi"} match across
+     * {@code firstName}/{@code lastName}/{@code email}/identifier columns even
+     * when the stored record splits surname, academic title, and given name
+     * across separate columns.
+     *
+     * <p>When a multi-word query includes Vietnamese academic honorifics
+     * ({@code GS.TS.}, {@code PGS.TS.}, {@code TS.}, {@code ThS.}), those
+     * prefixes are stripped so searching {@code "ThS. Trần Văn Bình"} still
+     * matches a user row whose honorific is stored on the Lecturer profile
+     * rather than in {@code User.lastName}. A single-token honorific query
+     * (e.g. {@code "PGS.TS."}) is preserved verbatim.
+     */
+    public static List<String> tokens(String term) {
+        if (term == null) {
+            return List.of();
+        }
+        String trimmed = term.trim();
+        if (trimmed.isEmpty()) {
+            return List.of();
+        }
+        String bounded = trimmed.length() > MAX_TERM_LENGTH
+                ? trimmed.substring(0, MAX_TERM_LENGTH)
+                : trimmed;
+        String[] rawParts = bounded.split("\\s+");
+        List<String> nonHonorific = new ArrayList<>(rawParts.length);
+        List<String> allTokens = new ArrayList<>(rawParts.length);
+        for (String raw : rawParts) {
+            if (raw.isEmpty()) {
+                continue;
+            }
+            String pattern = contains(raw);
+            if (pattern == null) {
+                continue;
+            }
+            allTokens.add(pattern);
+            String foldedAlpha = fold(raw.toLowerCase(Locale.ROOT)).replace(".", "");
+            if (!HONORIFIC_TOKENS.contains(foldedAlpha)) {
+                nonHonorific.add(pattern);
+            }
+            if (allTokens.size() >= MAX_TOKENS) {
+                break;
+            }
+        }
+        return nonHonorific.isEmpty() ? allTokens : nonHonorific;
+    }
+
+    /**
+     * Extracts individual {@code "%token%"} patterns from an already-wrapped
+     * {@link #contains(String)} pattern. Preserves single-token patterns byte
+     * for byte while allowing multi-word patterns to match across columns.
+     */
+    public static List<String> tokensFromContainsPattern(String containsPattern) {
+        if (containsPattern == null || containsPattern.isBlank()) {
+            return List.of();
+        }
+        String inner = containsPattern;
+        if (inner.startsWith("%") && inner.endsWith("%") && inner.length() >= 2) {
+            inner = inner.substring(1, inner.length() - 1).trim();
+        }
+        if (inner.isEmpty()) {
+            return List.of();
+        }
+        if (!inner.contains(" ")) {
+            return List.of("%" + inner + "%");
+        }
+        String[] parts = inner.split("\\s+");
+        List<String> nonHonorific = new ArrayList<>(parts.length);
+        List<String> allTokens = new ArrayList<>(parts.length);
+        for (String part : parts) {
+            if (part.isEmpty()) {
+                continue;
+            }
+            String tokenPattern = "%" + part + "%";
+            allTokens.add(tokenPattern);
+            String normalized = part.replace("\\", "").replace(".", "");
+            if (!HONORIFIC_TOKENS.contains(normalized)) {
+                nonHonorific.add(tokenPattern);
+            }
+            if (allTokens.size() >= MAX_TOKENS) {
+                break;
+            }
+        }
+        return nonHonorific.isEmpty() ? allTokens : nonHonorific;
     }
 }

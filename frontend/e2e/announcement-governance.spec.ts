@@ -77,9 +77,9 @@ test('admin manages a student and lecturer announcement without exposing service
   dialog = page.getByRole('dialog');
   await expect(dialog).toContainText(editReason);
   // AnnouncementWriteController.actorLabel renders '<lastName firstName> ·
-  // <email>' (Vietnamese order) from the JWT claims; V33 gave admin-user the
-  // identity 'Tiến Dũng' / 'ThS. Hoàng' (it replaced the earlier 'Demo Admin' seed).
-  await expect(dialog).toContainText('Changed by: ThS. Hoàng Tiến Dũng · admin@campuscore.edu');
+  // <email>' (Vietnamese order) from the JWT claims; V127 aligns admin-user
+  // with the Academic Affairs Office identity ('Phòng' / 'Đào tạo').
+  await expect(dialog).toContainText('Changed by: Phòng Đào tạo · admin@campuscore.edu');
   await dialog.getByRole('button', { name: 'Close' }).click();
 
   await card.getByRole('button', { name: `Archive: ${updatedTitle}`, exact: true }).click();

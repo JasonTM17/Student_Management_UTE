@@ -222,6 +222,24 @@ class PeopleReadPersistenceTest {
                 .andExpect(jsonPath("$.data.length()").value(2))
                 .andExpect(jsonPath("$.meta.total").value(2));
 
+        // Full Vietnamese name searches spanning lastName + firstName (with or
+        // without diacritics and academic honorifics) match the lecturer row.
+        jdbc.update("UPDATE \"campuscore_auth\".\"User\" SET \"firstName\" = 'Khoa', \"lastName\" = 'ThS. Hoàng Thái Xuân'"
+                + " WHERE \"id\" = 'user-lecturer-alpha'");
+        mvc.perform(get("/api/v1/lecturers")
+                        .queryParam("search", "Hoàng Thái Xuân Khoa")
+                        .with(adminJwt()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.length()").value(1))
+                .andExpect(jsonPath("$.data[0].id").value("lecturer-alpha"))
+                .andExpect(jsonPath("$.meta.total").value(1));
+        mvc.perform(get("/api/v1/lecturers")
+                        .queryParam("search", "hoang thai xuan khoa")
+                        .with(adminJwt()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.length()").value(1))
+                .andExpect(jsonPath("$.data[0].id").value("lecturer-alpha"));
+
         // "_" and "%" stay literal: an unescaped "GV_2026" would also match a
         // hypothetical "GVX2026", and "%" alone would return the whole directory.
         mvc.perform(get("/api/v1/lecturers")

@@ -103,6 +103,7 @@ public class AdminUserMutationService {
                 .addValue("search", LikePattern.contains(search), Types.VARCHAR)
                 .addValue("foldFrom", LikePattern.FOLD_FROM)
                 .addValue("foldTo", LikePattern.FOLD_TO);
+        String searchClause = buildUserSearchClause(params, search);
         List<Map<String, Object>> data = jdbc.queryForList(
                 "SELECT u.\"id\", u.\"email\", u.\"firstName\", u.\"lastName\", u.\"status\", u.\"phone\", u.\"createdAt\","
                         + " COALESCE((SELECT STRING_AGG(r.\"name\", ',') FROM " + USER_ROLE + " ur JOIN " + ROLE + " r ON r.\"id\" = ur.\"roleId\" WHERE ur.\"userId\" = u.\"id\"), '') AS roles,"
@@ -116,18 +117,14 @@ public class AdminUserMutationService {
                         + " FROM " + USER + " u WHERE (CAST(:status AS VARCHAR) IS NULL OR u.\"status\" = CAST(:status AS VARCHAR))"
                         + " AND (CAST(:role AS VARCHAR) IS NULL OR EXISTS (SELECT 1 FROM " + USER_ROLE + " fr JOIN " + ROLE + " g ON g.\"id\" = fr.\"roleId\""
                         + " WHERE fr.\"userId\" = u.\"id\" AND g.\"name\" = CAST(:role AS VARCHAR)))"
-                        + " AND (CAST(:search AS VARCHAR) IS NULL OR TRANSLATE(LOWER(u.\"email\"), :foldFrom, :foldTo) LIKE CAST(:search AS VARCHAR) ESCAPE '\\'"
-                        + " OR TRANSLATE(LOWER(u.\"firstName\"), :foldFrom, :foldTo) LIKE CAST(:search AS VARCHAR) ESCAPE '\\'"
-                        + " OR TRANSLATE(LOWER(u.\"lastName\"), :foldFrom, :foldTo) LIKE CAST(:search AS VARCHAR) ESCAPE '\\')"
+                        + searchClause
                         + " ORDER BY u.\"createdAt\" DESC LIMIT :limit OFFSET :offset",
                 params);
         Long total = jdbc.queryForObject(
                 "SELECT COUNT(*) FROM " + USER + " u WHERE (CAST(:status AS VARCHAR) IS NULL OR u.\"status\" = CAST(:status AS VARCHAR))"
                         + " AND (CAST(:role AS VARCHAR) IS NULL OR EXISTS (SELECT 1 FROM " + USER_ROLE + " fr JOIN " + ROLE + " g ON g.\"id\" = fr.\"roleId\""
                         + " WHERE fr.\"userId\" = u.\"id\" AND g.\"name\" = CAST(:role AS VARCHAR)))"
-                        + " AND (CAST(:search AS VARCHAR) IS NULL OR TRANSLATE(LOWER(u.\"email\"), :foldFrom, :foldTo) LIKE CAST(:search AS VARCHAR) ESCAPE '\\'"
-                        + " OR TRANSLATE(LOWER(u.\"firstName\"), :foldFrom, :foldTo) LIKE CAST(:search AS VARCHAR) ESCAPE '\\'"
-                        + " OR TRANSLATE(LOWER(u.\"lastName\"), :foldFrom, :foldTo) LIKE CAST(:search AS VARCHAR) ESCAPE '\\')",
+                        + searchClause,
                 params, Long.class);
         long totalItems = total == null ? 0 : total;
         int totalPages = (int) ((totalItems + limit - 1) / limit);
@@ -137,6 +134,30 @@ public class AdminUserMutationService {
                 "page", page,
                 "limit", limit,
                 "totalPages", totalPages));
+    }
+
+    private static String buildUserSearchClause(MapSqlParameterSource params, String search) {
+        List<String> tokens = LikePattern.tokens(search);
+        if (tokens.isEmpty()) {
+            return " AND (CAST(:search AS VARCHAR) IS NULL"
+                    + " OR TRANSLATE(LOWER(u.\"email\"), :foldFrom, :foldTo) LIKE CAST(:search AS VARCHAR) ESCAPE '\\'"
+                    + " OR TRANSLATE(LOWER(u.\"firstName\"), :foldFrom, :foldTo) LIKE CAST(:search AS VARCHAR) ESCAPE '\\'"
+                    + " OR TRANSLATE(LOWER(u.\"lastName\"), :foldFrom, :foldTo) LIKE CAST(:search AS VARCHAR) ESCAPE '\\')";
+        }
+        StringBuilder clause = new StringBuilder();
+        for (int i = 0; i < tokens.size(); i++) {
+            String paramName = "searchToken" + i;
+            params.addValue(paramName, tokens.get(i), Types.VARCHAR);
+            clause.append(" AND (TRANSLATE(LOWER(u.\"email\"), :foldFrom, :foldTo) LIKE CAST(:").append(paramName).append(" AS VARCHAR) ESCAPE '\\'")
+                    .append(" OR TRANSLATE(LOWER(u.\"firstName\"), :foldFrom, :foldTo) LIKE CAST(:").append(paramName).append(" AS VARCHAR) ESCAPE '\\'")
+                    .append(" OR TRANSLATE(LOWER(u.\"lastName\"), :foldFrom, :foldTo) LIKE CAST(:").append(paramName).append(" AS VARCHAR) ESCAPE '\\'")
+                    .append(" OR TRANSLATE(LOWER(COALESCE(u.\"phone\", '')), :foldFrom, :foldTo) LIKE CAST(:").append(paramName).append(" AS VARCHAR) ESCAPE '\\'")
+                    .append(" OR EXISTS (SELECT 1 FROM ").append(STUDENT).append(" sp WHERE sp.\"userId\" = u.\"id\"")
+                    .append(" AND TRANSLATE(LOWER(sp.\"studentId\"), :foldFrom, :foldTo) LIKE CAST(:").append(paramName).append(" AS VARCHAR) ESCAPE '\\')")
+                    .append(" OR EXISTS (SELECT 1 FROM ").append(LECTURER).append(" lp WHERE lp.\"userId\" = u.\"id\"")
+                    .append(" AND TRANSLATE(LOWER(lp.\"employeeId\"), :foldFrom, :foldTo) LIKE CAST(:").append(paramName).append(" AS VARCHAR) ESCAPE '\\'))");
+        }
+        return clause.toString();
     }
 
     @Transactional

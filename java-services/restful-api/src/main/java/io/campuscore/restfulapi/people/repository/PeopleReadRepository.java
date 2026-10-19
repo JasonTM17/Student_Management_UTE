@@ -202,15 +202,33 @@ public class PeopleReadRepository {
         if (search == null) {
             return "";
         }
-        parameters.addValue("search", search);
+        List<String> tokens = LikePattern.tokensFromContainsPattern(search);
+        if (tokens.isEmpty()) {
+            return "";
+        }
         parameters.addValue("foldFrom", LikePattern.FOLD_FROM);
         parameters.addValue("foldTo", LikePattern.FOLD_TO);
-        return " WHERE (TRANSLATE(LOWER(lecturer.\"employeeId\"), :foldFrom, :foldTo) LIKE :search ESCAPE '\\'"
-                + " OR EXISTS (SELECT 1 FROM " + USER_TABLE + " su"
-                + " WHERE su.\"id\" = lecturer.\"userId\""
-                + " AND (TRANSLATE(LOWER(su.\"firstName\"), :foldFrom, :foldTo) LIKE :search ESCAPE '\\'"
-                + " OR TRANSLATE(LOWER(su.\"lastName\"), :foldFrom, :foldTo) LIKE :search ESCAPE '\\'"
-                + " OR TRANSLATE(LOWER(su.\"email\"), :foldFrom, :foldTo) LIKE :search ESCAPE '\\')))";
+        StringBuilder where = new StringBuilder(" WHERE ");
+        for (int i = 0; i < tokens.size(); i++) {
+            if (i > 0) {
+                where.append(" AND ");
+            }
+            String paramName = "searchToken" + i;
+            parameters.addValue(paramName, tokens.get(i));
+            where.append("(TRANSLATE(LOWER(lecturer.\"employeeId\"), :foldFrom, :foldTo) LIKE :").append(paramName).append(" ESCAPE '\\'")
+                    .append(" OR TRANSLATE(LOWER(COALESCE(lecturer.\"title\", '')), :foldFrom, :foldTo) LIKE :").append(paramName).append(" ESCAPE '\\'")
+                    .append(" OR TRANSLATE(LOWER(COALESCE(lecturer.\"specialization\", '')), :foldFrom, :foldTo) LIKE :").append(paramName).append(" ESCAPE '\\'")
+                    .append(" OR EXISTS (SELECT 1 FROM ").append(USER_TABLE).append(" su")
+                    .append(" WHERE su.\"id\" = lecturer.\"userId\"")
+                    .append(" AND (TRANSLATE(LOWER(su.\"firstName\"), :foldFrom, :foldTo) LIKE :").append(paramName).append(" ESCAPE '\\'")
+                    .append(" OR TRANSLATE(LOWER(su.\"lastName\"), :foldFrom, :foldTo) LIKE :").append(paramName).append(" ESCAPE '\\'")
+                    .append(" OR TRANSLATE(LOWER(su.\"email\"), :foldFrom, :foldTo) LIKE :").append(paramName).append(" ESCAPE '\\'))")
+                    .append(" OR EXISTS (SELECT 1 FROM ").append(DEPARTMENT_TABLE).append(" sd")
+                    .append(" WHERE sd.\"id\" = lecturer.\"departmentId\"")
+                    .append(" AND (TRANSLATE(LOWER(sd.\"name\"), :foldFrom, :foldTo) LIKE :").append(paramName).append(" ESCAPE '\\'")
+                    .append(" OR TRANSLATE(LOWER(sd.\"code\"), :foldFrom, :foldTo) LIKE :").append(paramName).append(" ESCAPE '\\')))");
+        }
+        return where.toString();
     }
 
     private static String studentStatusFilter(MapSqlParameterSource parameters, String status) {

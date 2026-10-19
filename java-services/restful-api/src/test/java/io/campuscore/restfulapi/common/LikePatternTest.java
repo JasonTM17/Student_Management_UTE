@@ -53,4 +53,19 @@ class LikePatternTest {
                 .isEqualTo("%nguyen%")
                 .isEqualTo(LikePattern.contains("Nguyễn"));
     }
+
+    @Test
+    @DisplayName("multi-word terms split into diacritic-folded tokens and strip academic honorifics when name tokens are present")
+    void tokensSplitMultiWordTermsAndStripHonorificPrefixes() {
+        assertThat(LikePattern.tokens("Hoàng Thái Xuân Khoa"))
+                .containsExactly("%hoang%", "%thai%", "%xuan%", "%khoa%");
+        assertThat(LikePattern.tokens("PGS.TS. Trần Đình Khôi"))
+                .containsExactly("%tran%", "%dinh%", "%khoi%");
+        assertThat(LikePattern.tokens("PGS.TS."))
+                .containsExactly("%pgs.ts.%");
+        assertThat(LikePattern.tokensFromContainsPattern(LikePattern.contains("Hoàng Thái Xuân Khoa")))
+                .containsExactly("%hoang%", "%thai%", "%xuan%", "%khoa%");
+        assertThat(LikePattern.tokensFromContainsPattern(LikePattern.contains("GV_2026")))
+                .containsExactly("%gv\\_2026%");
+    }
 }

@@ -297,6 +297,23 @@ export default function AdminUsersPage() {
   }, [locale]);
 
   useEffect(() => {
+    const trimmed = searchInput.trim();
+    if (trimmed === search) {
+      return;
+    }
+    if (!trimmed) {
+      setSearch('');
+      setPage(1);
+      return;
+    }
+    const timer = window.setTimeout(() => {
+      setSearch(trimmed);
+      setPage(1);
+    }, 250);
+    return () => window.clearTimeout(timer);
+  }, [searchInput, search]);
+
+  useEffect(() => {
     if (canAccess) {
       void fetchUsers();
       void fetchReferenceData();
@@ -327,7 +344,7 @@ export default function AdminUsersPage() {
           createStudent: 'Thêm sinh viên',
           createLecturer: 'Thêm giảng viên',
           searchUsers: 'Tìm người dùng',
-          searchPlaceholder: 'Tìm theo email hoặc tên',
+          searchPlaceholder: 'Tìm theo họ tên, email, MSSV hoặc mã giảng viên',
           unavailableTitle: 'Hồ sơ người dùng chưa sẵn sàng',
           emptyTitle: 'Không có người dùng phù hợp',
           emptyDescription:
@@ -495,7 +512,7 @@ export default function AdminUsersPage() {
           createStudent: 'Add Student',
           createLecturer: 'Add Lecturer',
           searchUsers: 'Search users',
-          searchPlaceholder: 'Search by email or name',
+          searchPlaceholder: 'Search by full name, email, student ID, or employee ID',
           unavailableTitle: 'User records unavailable',
           emptyTitle: 'No matching users',
           emptyDescription:

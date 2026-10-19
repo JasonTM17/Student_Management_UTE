@@ -1165,7 +1165,22 @@ public class ThesisMutationService {
         if (liveRounds == null || liveRounds == 0) {
             return List.of();
         }
-        String pattern = "%" + normalized.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_") + "%";
+        List<String> tokens = io.campuscore.restfulapi.common.LikePattern.tokens(normalized);
+        if (tokens.isEmpty()) {
+            return List.of();
+        }
+        MapSqlParameterSource searchParams = params()
+                .addValue("foldFrom", io.campuscore.restfulapi.common.LikePattern.FOLD_FROM)
+                .addValue("foldTo", io.campuscore.restfulapi.common.LikePattern.FOLD_TO);
+        StringBuilder tokenPredicates = new StringBuilder();
+        for (int i = 0; i < tokens.size(); i++) {
+            String paramName = "token" + i;
+            searchParams.addValue(paramName, tokens.get(i));
+            tokenPredicates.append(" AND (TRANSLATE(LOWER(s.\"studentId\"), :foldFrom, :foldTo) LIKE :").append(paramName).append(" ESCAPE '\\'")
+                    .append(" OR TRANSLATE(LOWER(u.\"firstName\"), :foldFrom, :foldTo) LIKE :").append(paramName).append(" ESCAPE '\\'")
+                    .append(" OR TRANSLATE(LOWER(u.\"lastName\"), :foldFrom, :foldTo) LIKE :").append(paramName).append(" ESCAPE '\\'")
+                    .append(" OR TRANSLATE(LOWER(COALESCE(u.\"email\", '')), :foldFrom, :foldTo) LIKE :").append(paramName).append(" ESCAPE '\\')");
+        }
         return jdbc.query(
                 "SELECT s.\"id\", s.\"studentId\" AS student_number, u.\"firstName\", u.\"lastName\","
                         + " cur.\"code\" AS curriculum_code, cur.\"name\" AS curriculum_name"
@@ -1173,13 +1188,9 @@ public class ThesisMutationService {
                         + " JOIN campuscore_auth.\"User\" u ON u.\"id\" = s.\"userId\""
                         + " LEFT JOIN academic.\"Curriculum\" cur ON cur.\"id\" = s.\"curriculumId\""
                         + " WHERE s.\"status\" = 'ACTIVE'"
-                        + " AND (LOWER(s.\"studentId\") LIKE :pattern ESCAPE '\\'"
-                        + "   OR LOWER(u.\"firstName\" || ' ' || u.\"lastName\") LIKE :pattern ESCAPE '\\'"
-                        + "   OR LOWER(u.\"lastName\" || ' ' || u.\"firstName\") LIKE :pattern ESCAPE '\\'"
-                        + "   OR LOWER(u.\"lastName\") LIKE :pattern ESCAPE '\\'"
-                        + "   OR LOWER(u.\"firstName\") LIKE :pattern ESCAPE '\\')"
+                        + tokenPredicates
                         + " ORDER BY s.\"studentId\" LIMIT 8",
-                params().addValue("pattern", pattern),
+                searchParams,
                 (rs, ignored) -> new StudentSearchResponse(
                         rs.getString("id"),
                         rs.getString("student_number"),

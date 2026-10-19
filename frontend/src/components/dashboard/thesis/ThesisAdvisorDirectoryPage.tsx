@@ -35,6 +35,7 @@ import { WorkspaceForbiddenState } from '@/components/ProtectedRoute';
 import { lecturersApi, departmentsApi } from '@/lib/api';
 import { thesisApi, type ThesisRound, type ThesisTopic } from '@/lib/thesis-api';
 import type { Lecturer, Department } from '@/types/api';
+import { normalizeVietnameseText } from '@/lib/registration-browse';
 import { cn } from '@/lib/utils';
 
 /** Cards rendered before the reader asks for more. */
@@ -396,14 +397,23 @@ export default function ThesisAdvisorDirectoryPage() {
 
   // Filtered lecturers list based on search, department, and quota
   const filteredLecturers = useMemo(() => {
+    const normalizedQuery = normalizeVietnameseText(searchQuery.trim());
+    const queryTokens = normalizedQuery ? normalizedQuery.split(/\s+/).filter(Boolean) : [];
     return lecturers.filter((lec) => {
-      // 1. Search filter
-      const q = searchQuery.toLowerCase().trim();
-      const fullName = getAdvisorFullName(lec).toLowerCase();
-      const empId = (lec.employeeId || '').toLowerCase();
-      const email = (lec.user?.email || '').toLowerCase();
-      const spec = (lec.specialization || '').toLowerCase();
-      const matchQuery = !q || fullName.includes(q) || empId.includes(q) || email.includes(q) || spec.includes(q);
+      // 1. Multi-token diacritic-folded search filter across full name, title,
+      // employeeId, email, specialization, and department name.
+      const haystack = normalizeVietnameseText(
+        [
+          getAdvisorFullName(lec),
+          lec.title || '',
+          lec.employeeId || '',
+          lec.user?.email || '',
+          lec.specialization || '',
+          lec.department?.name || '',
+        ].join(' '),
+      );
+      const matchQuery =
+        queryTokens.length === 0 || queryTokens.every((token) => haystack.includes(token));
 
       // 2. Department filter
       const matchDept = selectedDepartmentId === 'all' || lec.departmentId === selectedDepartmentId;

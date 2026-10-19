@@ -941,6 +941,39 @@ class AdminUserMutationPersistenceTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.hasStudentProfile").value(true))
                 .andExpect(jsonPath("$.hasLecturerProfile").value(false));
+
+        // Multi-word full name search across lastName + firstName and official
+        // student/employee identifiers resolves the matching user account.
+        insertUser("khoa-lecturer", "lecturer@campuscore.edu", "Khoa", "ThS. Hoàng Thái Xuân");
+        insertUserRole("khoa-lecturer-role", "khoa-lecturer", "role-lecturer");
+        jdbc.update("INSERT INTO \"campuscore_auth\".\"Lecturer\""
+                + " (\"id\", \"userId\", \"departmentId\", \"employeeId\", \"isActive\")"
+                + " VALUES ('khoa-lecturer-profile', 'khoa-lecturer', 'department-demo', 'LEC-DEMO-001', TRUE)");
+
+        mvc.perform(get("/api/v1/users")
+                        .queryParam("role", "LECTURER")
+                        .queryParam("search", "Hoàng Thái Xuân Khoa")
+                        .with(adminJwt()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.length()").value(1))
+                .andExpect(jsonPath("$.data[0].id").value("khoa-lecturer"))
+                .andExpect(jsonPath("$.meta.total").value(1));
+
+        mvc.perform(get("/api/v1/users")
+                        .queryParam("role", "LECTURER")
+                        .queryParam("search", "hoang thai xuan khoa")
+                        .with(adminJwt()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.length()").value(1))
+                .andExpect(jsonPath("$.data[0].id").value("khoa-lecturer"));
+
+        mvc.perform(get("/api/v1/users")
+                        .queryParam("role", "LECTURER")
+                        .queryParam("search", "LEC-DEMO-001")
+                        .with(adminJwt()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.length()").value(1))
+                .andExpect(jsonPath("$.data[0].id").value("khoa-lecturer"));
     }
 
     @ParameterizedTest(name = "delete keeps a student whose only history is {0}")

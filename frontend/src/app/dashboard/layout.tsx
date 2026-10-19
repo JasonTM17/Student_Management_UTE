@@ -815,9 +815,11 @@ export default function DashboardLayout({
             ? messages.dashboardShell.roles.lecturer
             : messages.dashboardShell.roles.student;
 
-  const fullName = user
-    ? (`${user.lastName ?? ''} ${user.firstName ?? ''}`.trim() || `${user.firstName ?? ''} ${user.lastName ?? ''}`.trim() || user.email)
-    : '';
+  const fullName = fullAdminAccess
+    ? messages.adminShell.officeName
+    : user
+      ? (`${user.lastName ?? ''} ${user.firstName ?? ''}`.trim() || `${user.firstName ?? ''} ${user.lastName ?? ''}`.trim() || user.email)
+      : '';
 
   return (
     <div className="portal-shell">
@@ -940,8 +942,17 @@ export default function DashboardLayout({
                 sidebarCollapsed && 'justify-center',
               )}
             >
-              <div className="flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-md bg-white/10 text-xs font-bold text-portal-sidebar-text">
-                {avatarPhoto ? (
+              <div
+                className={cn(
+                  'flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-md text-xs font-bold',
+                  fullAdminAccess
+                    ? 'bg-portal-yellow text-portal-yellow-ink shadow-xs'
+                    : 'bg-white/10 text-portal-sidebar-text',
+                )}
+              >
+                {fullAdminAccess ? (
+                  messages.adminShell.officeBadge
+                ) : avatarPhoto ? (
                   // eslint-disable-next-line @next/next/no-img-element
                   <img src={avatarPhoto} alt="" className="h-full w-full object-cover" />
                 ) : (
@@ -1310,8 +1321,10 @@ export default function DashboardLayout({
                   aria-controls="dashboard-profile-menu"
                   aria-haspopup="menu"
                 >
-                  <div className="flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-full bg-primary text-sm font-semibold text-primary-foreground">
-                    {avatarPhoto ? (
+                  <div className="flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-full bg-primary text-xs font-bold text-primary-foreground">
+                    {fullAdminAccess ? (
+                      messages.adminShell.officeBadge
+                    ) : avatarPhoto ? (
                       // eslint-disable-next-line @next/next/no-img-element
                       <img src={avatarPhoto} alt="" className="h-full w-full object-cover" />
                     ) : (
@@ -1347,8 +1360,10 @@ export default function DashboardLayout({
                     className="absolute right-0 mt-2 w-[min(18rem,calc(100vw-2rem))] rounded-md border border-border/80 bg-card shadow-2xl"
                   >
                     <div className="flex items-center gap-3 border-b border-border/70 px-4 py-4">
-                      <div className="flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-full bg-primary text-base font-semibold text-primary-foreground">
-                        {avatarPhoto ? (
+                      <div className="flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-full bg-primary text-sm font-bold text-primary-foreground">
+                        {fullAdminAccess ? (
+                          messages.adminShell.officeBadge
+                        ) : avatarPhoto ? (
                           // eslint-disable-next-line @next/next/no-img-element
                           <img src={avatarPhoto} alt="" className="h-full w-full object-cover" />
                         ) : (

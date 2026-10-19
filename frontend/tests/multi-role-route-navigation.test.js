@@ -64,6 +64,8 @@ test('department-head and admin shell navigation stay aligned across layout, the
   const adminUsers = readSource('src/app/admin/users/page.tsx');
 
   assert.match(layout, /isDepartmentHead\s*\?\s*messages\.common\.roles\.TRUONG_BO_MON/);
+  assert.match(layout, /fullAdminAccess\s*\?\s*messages\.adminShell\.officeName/);
+  assert.match(layout, /fullAdminAccess\s*\?\s*\(\s*messages\.adminShell\.officeBadge/);
   assert.match(layout, /\/admin\/attendance/);
   assert.match(layout, /\/admin\/notifications/);
   assert.match(layout, /\/admin\/audit/);
