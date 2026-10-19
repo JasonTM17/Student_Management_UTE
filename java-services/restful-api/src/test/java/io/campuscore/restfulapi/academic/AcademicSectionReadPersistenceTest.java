@@ -1,5 +1,6 @@
 package io.campuscore.restfulapi.academic;
 
+import static org.hamcrest.Matchers.containsInAnyOrder;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -70,6 +71,29 @@ class AcademicSectionReadPersistenceTest {
                 .andExpect(jsonPath("$.meta.page").value(1))
                 .andExpect(jsonPath("$.meta.limit").value(1))
                 .andExpect(jsonPath("$.meta.totalPages").value(2));
+
+        mvc.perform(get("/api/v1/sections")
+                        .queryParam("search", "SE401")
+                        .with(studentJwt("student-user-1", "student-1")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.length()").value(2))
+                .andExpect(jsonPath("$.meta.total").value(2))
+                .andExpect(jsonPath("$.data[*].id", containsInAnyOrder("section-2", "section-spring")));
+
+        mvc.perform(get("/api/v1/sections")
+                        .queryParam("search", "CS101 Programming")
+                        .with(studentJwt("student-user-1", "student-1")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.length()").value(2))
+                .andExpect(jsonPath("$.meta.total").value(2))
+                .andExpect(jsonPath("$.data[*].id", containsInAnyOrder("section-1", "section-other")));
+
+        mvc.perform(get("/api/v1/sections")
+                        .queryParam("search", "Lecturer Lan")
+                        .with(studentJwt("student-user-1", "student-1")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.length()").value(3))
+                .andExpect(jsonPath("$.meta.total").value(3));
     }
 
     @Test

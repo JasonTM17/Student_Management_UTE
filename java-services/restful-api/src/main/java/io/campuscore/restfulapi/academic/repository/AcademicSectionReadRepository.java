@@ -169,7 +169,7 @@ public class AcademicSectionReadRepository {
                         .append(" OR TRANSLATE(LOWER(COALESCE(course.\"nameVi\", '')), :foldFrom, :foldTo) LIKE :").append(paramName).append(" ESCAPE '\\'")
                         .append(" OR TRANSLATE(LOWER(COALESCE(lecturer.\"employeeId\", '')), :foldFrom, :foldTo) LIKE :").append(paramName).append(" ESCAPE '\\'")
                         .append(" OR TRANSLATE(LOWER(COALESCE(lecturer_user.\"firstName\", '')), :foldFrom, :foldTo) LIKE :").append(paramName).append(" ESCAPE '\\'")
-                        .append(" OR TRANSLATE(LOWER(COALESCE(lecturer_user.\"lastName\", '')), :foldFrom, :foldTo) LIKE :").append(paramName).append(" ESCAPE '\\'))");
+                        .append(" OR TRANSLATE(LOWER(COALESCE(lecturer_user.\"lastName\", '')), :foldFrom, :foldTo) LIKE :").append(paramName).append(" ESCAPE '\\')");
             }
         }
         return where.toString();

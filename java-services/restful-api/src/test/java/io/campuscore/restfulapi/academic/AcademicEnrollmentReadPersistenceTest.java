@@ -196,6 +196,19 @@ class AcademicEnrollmentReadPersistenceTest {
         // Admin detail reads keep full visibility of drafts.
         mvc.perform(get("/api/v1/enrollments/enrollment-2").with(adminJwt()))
                 .andExpect(status().isOk());
+
+        mvc.perform(get("/api/v1/enrollments")
+                        .queryParam("search", "S001")
+                        .with(adminJwt()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.length()").value(2));
+
+        mvc.perform(get("/api/v1/enrollments")
+                        .queryParam("search", "Binh")
+                        .with(adminJwt()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.length()").value(1))
+                .andExpect(jsonPath("$.data[0].id").value("enrollment-3"));
     }
 
     @Test
