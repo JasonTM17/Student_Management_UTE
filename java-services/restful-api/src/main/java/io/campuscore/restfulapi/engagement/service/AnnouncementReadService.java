@@ -68,6 +68,18 @@ public class AnnouncementReadService {
             String sectionId,
             String priority,
             String status) {
+        return findAll(page, limit, semesterId, sectionId, priority, status, null);
+    }
+
+    @Transactional(readOnly = true)
+    public AnnouncementListResponse findAll(
+            int page,
+            int limit,
+            String semesterId,
+            String sectionId,
+            String priority,
+            String status,
+            String search) {
         requirePage(page, limit);
         if (priority != null && !PRIORITIES.contains(priority)) {
             throw new IllegalArgumentException("priority must be LOW, NORMAL, HIGH, or URGENT");
@@ -75,7 +87,7 @@ public class AnnouncementReadService {
         if (status == null || !STATUSES.contains(status)) {
             throw new IllegalArgumentException("status must be ACTIVE, ARCHIVED, or ALL");
         }
-        AnnouncementFilter filter = new AnnouncementFilter(semesterId, sectionId, priority, status);
+        AnnouncementFilter filter = new AnnouncementFilter(semesterId, sectionId, priority, status, search);
         long total = announcements.countAll(filter);
         List<AnnouncementResponse> data = announcements.findAll(filter, offset(page, limit), limit);
         return response(data, total, page, limit);

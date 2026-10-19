@@ -692,7 +692,7 @@ test('attendance ships both route twins on the attendance API', () => {
   // ...and the admin console pages the {data, meta} list route with a bounded
   // page size, never an unbounded pull.
   assert.match(adminPage, /const PAGE_LIMIT = \d+/);
-  assert.match(adminPage, /attendanceApi\.adminList\(\{ page, limit: PAGE_LIMIT \}\)/);
+  assert.match(adminPage, /attendanceApi\.adminList\(\{\s*page,\s*limit: PAGE_LIMIT/);
 
   const api = read('src/lib/api.ts');
   assert.match(api, /export const attendanceApi = \{/);

@@ -43,8 +43,9 @@ public class AdminAuditReadController {
             @RequestParam(required = false) String entityType,
             @RequestParam(required = false) String entityId,
             @RequestParam(required = false) String actorId,
+            @RequestParam(required = false) String search,
             @RequestParam Map<String, String> queryParameters) {
-        Set<String> allowed = Set.of("page", "limit", "action", "entityType", "entityId", "actorId");
+        Set<String> allowed = Set.of("page", "limit", "action", "entityType", "entityId", "actorId", "search");
         for (String key : queryParameters.keySet()) {
             if (!allowed.contains(key) && !"cacheBuster".equals(key)) {
                 throw new DomainException(HttpStatus.BAD_REQUEST, "INVALID_REQUEST",
@@ -56,7 +57,7 @@ public class AdminAuditReadController {
                     "limit must be between 1 and " + AdminAuditReadRepository.MAX_PAGE_SIZE);
         }
         AdminAuditReadRepository.AuditPage result =
-                audits.page(page, limit, action, entityType, entityId, actorId);
+                audits.page(page, limit, action, entityType, entityId, actorId, search);
         Map<String, Object> meta = Map.of(
                 "total", result.total(),
                 "page", result.page(),

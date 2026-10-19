@@ -17,12 +17,13 @@ export interface ReorderGuard {
  */
 export function canReorder(input: {
   page: number;
-  filters: { semesterId: string; priority: string; status: string };
+  filters: { semesterId: string; priority: string; status: string; search?: string };
 }): ReorderGuard {
   const blockedBy: ReorderBlockReason[] = [];
   const filtered =
     Boolean(input.filters?.semesterId?.trim()) ||
     Boolean(input.filters?.priority?.trim()) ||
+    Boolean(input.filters?.search?.trim()) ||
     (input.filters?.status ?? '') !== 'ALL';
   if (filtered) blockedBy.push('filtered');
   if (input.page !== 1) blockedBy.push('paged');

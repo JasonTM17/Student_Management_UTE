@@ -87,6 +87,7 @@ class AnnouncementReadPersistenceTest {
                     "id" VARCHAR(120) PRIMARY KEY,
                     "title" VARCHAR(240) NOT NULL,
                     "content" TEXT NOT NULL,
+                    "slug" VARCHAR(240),
                     "priority" VARCHAR(20) NOT NULL,
                     "targetRoles" VARCHAR ARRAY NOT NULL,
                     "targetYears" INTEGER ARRAY NOT NULL,
@@ -386,6 +387,59 @@ class AnnouncementReadPersistenceTest {
                                 .claim("email", "user@campuscore.edu"))))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value("INVALID_REQUEST"));
+    }
+
+    @Test
+    void adminSearchMatchesFoldedMultiTokenQueriesAcrossTitleAndContent() throws Exception {
+        insert(fixture("java-notice", false, new String[]{"STUDENT"}, new Integer[0], "2026-08-20T10:00:00Z")
+                .withAcademicContext("semester-1", "Semester 1", "section-1", "01", "SE401", "Lập trình Java nâng cao"));
+        insert(fixture("exam-notice", false, new String[]{"STUDENT"}, new Integer[0], "2026-08-20T11:00:00Z"));
+        jdbc.update("UPDATE \"engagement\".\"Announcement\" SET \"title\" = 'Lịch thi giữa kỳ' WHERE \"id\" = 'exam-notice'");
+
+        var admin = fixtureJwt(jdbc, "admin-user", token -> token
+                        .subject("admin-user")
+                        .claim("email", "admin@campuscore.edu")
+                        .claim("roles", List.of("ADMIN")), "ADMIN")
+                .authorities(new SimpleGrantedAuthority("ROLE_ADMIN"));
+
+        // Folded diacritics: "lich thi" matches the Vietnamese title.
+        mvc.perform(get("/api/v1/announcements")
+                        .queryParam("search", "lich thi")
+                        .with(admin))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.length()").value(1))
+                .andExpect(jsonPath("$.data[0].id").value("exam-notice"))
+                .andExpect(jsonPath("$.meta.total").value(1));
+
+        // Multi-token across snapshot columns: course code + course name token.
+        mvc.perform(get("/api/v1/announcements")
+                        .queryParam("search", "SE401 java")
+                        .with(admin))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.length()").value(1))
+                .andExpect(jsonPath("$.data[0].id").value("java-notice"))
+                .andExpect(jsonPath("$.meta.total").value(1));
+
+        // Content column is searchable too.
+        mvc.perform(get("/api/v1/announcements")
+                        .queryParam("search", "Content exam")
+                        .with(admin))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.length()").value(1))
+                .andExpect(jsonPath("$.data[0].id").value("exam-notice"));
+
+        // Unknown token matches nothing; empty search keeps the full listing.
+        mvc.perform(get("/api/v1/announcements")
+                        .queryParam("search", "tuyet-doi-khong-trung")
+                        .with(admin))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.length()").value(0))
+                .andExpect(jsonPath("$.meta.total").value(0));
+        mvc.perform(get("/api/v1/announcements")
+                        .queryParam("search", "")
+                        .with(admin))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.meta.total").value(2));
     }
 
     @Test

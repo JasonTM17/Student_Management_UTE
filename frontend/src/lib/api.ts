@@ -1331,6 +1331,7 @@ export const announcementsApi = {
     sectionId?: string;
     priority?: string;
     status?: 'ACTIVE' | 'ARCHIVED' | 'ALL';
+    search?: string;
   }): Promise<ApiResponse<AnnouncementRecord[]>> => {
     const response = await api.get<ApiResponse<AnnouncementRecord[]>>(
       '/announcements',
@@ -1594,6 +1595,7 @@ export const adminAuditApi = {
     entityType?: string;
     entityId?: string;
     actorId?: string;
+    search?: string;
   }): Promise<{ data: AdminAuditEntry[]; meta: AdminAuditMeta }> => {
     const response = await api.get<{ data: AdminAuditEntry[]; meta: AdminAuditMeta }>(
       '/admin/audit',
@@ -1893,6 +1895,9 @@ export const attendanceApi = {
   adminList: async (params: {
     page: number;
     limit: number;
+    sectionId?: string;
+    studentId?: string;
+    date?: string;
   }): Promise<ApiResponse<AttendanceRecord[]>> => {
     const response = await api.get<ApiResponse<AttendanceRecord[]>>(
       '/attendance',

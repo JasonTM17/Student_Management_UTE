@@ -57,6 +57,17 @@ public class AdminAuditReadRepository {
             String entityType,
             String entityId,
             String actorId) {
+        return page(page, limit, action, entityType, entityId, actorId, null);
+    }
+
+    public AuditPage page(
+            int page,
+            int limit,
+            String action,
+            String entityType,
+            String entityId,
+            String actorId,
+            String search) {
         int effectiveLimit = Math.max(1, Math.min(limit, MAX_PAGE_SIZE));
         int effectivePage = Math.max(1, page);
         StringBuilder where = new StringBuilder();
@@ -69,6 +80,24 @@ public class AdminAuditReadRepository {
         appendContainsFilter(where, parameters, "\"entityType\" ILIKE :entityType", "entityType", entityType);
         appendFilter(where, parameters, "\"entityId\" = :entityId", "entityId", entityId);
         appendFilter(where, parameters, "\"actorId\" = :actorId", "actorId", actorId);
+        if (search != null && !search.isBlank()) {
+            String[] tokens = search.trim().split("\\s+");
+            for (int i = 0; i < tokens.length; i++) {
+                if (tokens[i].isEmpty()) {
+                    continue;
+                }
+                String param = "searchToken" + i;
+                if (where.length() > 0) {
+                    where.append(" AND ");
+                }
+                where.append("(\"summary\" ILIKE :").append(param)
+                        .append(" OR \"actorLabel\" ILIKE :").append(param)
+                        .append(" OR \"entityId\" ILIKE :").append(param)
+                        .append(" OR \"action\" ILIKE :").append(param)
+                        .append(" OR \"entityType\" ILIKE :").append(param).append(")");
+                parameters.addValue(param, "%" + escapeLike(tokens[i]) + "%");
+            }
+        }
         String clause = where.length() == 0 ? "" : " WHERE " + where;
         Long total = jdbc.queryForObject(
                 "SELECT COUNT(*) FROM " + AUDIT + clause, parameters, Long.class);
@@ -128,12 +157,15 @@ public class AdminAuditReadRepository {
             where.append(" AND ");
         }
         where.append(predicate);
+        parameters.addValue(name, "%" + escapeLike(value.trim()) + "%");
+    }
+
+    private static String escapeLike(String raw) {
         // Escape LIKE metacharacters so a typed '%' is literal, not a wildcard.
-        String escaped = value.trim()
+        return raw
                 .replace("\\", "\\\\")
                 .replace("%", "\\%")
                 .replace("_", "\\_");
-        parameters.addValue(name, "%" + escaped + "%");
     }
 
     private static Instant toInstant(Timestamp timestamp) {

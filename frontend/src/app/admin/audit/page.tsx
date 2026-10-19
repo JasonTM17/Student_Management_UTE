@@ -45,7 +45,8 @@ export default function AdminAuditTrailPage() {
   const [error, setError] = useState('');
   const [actionFilter, setActionFilter] = useState('');
   const [entityFilter, setEntityFilter] = useState('');
-  const [applied, setApplied] = useState<{ action?: string; entityType?: string }>({});
+  const [searchFilter, setSearchFilter] = useState('');
+  const [applied, setApplied] = useState<{ action?: string; entityType?: string; search?: string }>({});
   const [expanded, setExpanded] = useState<string | null>(null);
 
   useEffect(() => {
@@ -83,12 +84,14 @@ export default function AdminAuditTrailPage() {
     setApplied({
       action: actionFilter.trim() || undefined,
       entityType: entityFilter.trim() || undefined,
+      search: searchFilter.trim() || undefined,
     });
   };
 
   const clearFilters = () => {
     setActionFilter('');
     setEntityFilter('');
+    setSearchFilter('');
     setPage(1);
     setApplied({});
   };
@@ -114,12 +117,21 @@ export default function AdminAuditTrailPage() {
       <div className="space-y-6">
         <AdminToolbarCard>
           <form
-            className="grid gap-3 md:grid-cols-[repeat(2,minmax(0,1fr))_auto]"
+            className="grid gap-3 md:grid-cols-[repeat(3,minmax(0,1fr))_auto]"
             onSubmit={(event) => {
               event.preventDefault();
               applyFilters();
             }}
           >
+            <label className="block text-sm">
+              <span className="mb-1 block font-medium text-foreground">{copy.filterSearch}</span>
+              <Input
+                value={searchFilter}
+                onChange={(event) => setSearchFilter(event.target.value)}
+                placeholder="Nguyễn Tiến Sơn, E2E PROBE…"
+                aria-label={copy.filterSearch}
+              />
+            </label>
             <label className="block text-sm">
               <span className="mb-1 block font-medium text-foreground">{copy.filterAction}</span>
               <Input

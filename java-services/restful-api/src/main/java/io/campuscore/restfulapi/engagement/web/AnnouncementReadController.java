@@ -126,11 +126,12 @@ public class AnnouncementReadController {
             @Parameter(description = "Mã định danh lớp học phần (UUID)") @RequestParam(required = false) String sectionId,
             @Parameter(description = "Mức độ ưu tiên (LOW, NORMAL, HIGH, URGENT)") @RequestParam(required = false) String priority,
             @Parameter(description = "Trạng thái thông báo (ACTIVE, ARCHIVED)") @RequestParam(defaultValue = "ACTIVE") String status,
+            @Parameter(description = "Từ khóa tìm kiếm (tiêu đề, nội dung, môn học, giảng viên)") @RequestParam(required = false) String search,
             @RequestParam MultiValueMap<String, String> queryParameters,
             @AuthenticationPrincipal Jwt jwt) {
         requireAllowedQuery(
                 queryParameters,
-                Set.of("page", "limit", "semesterId", "sectionId", "priority", "status"));
+                Set.of("page", "limit", "semesterId", "sectionId", "priority", "status", "search"));
         requireIdentity(jwt);
         return announcements.findAll(
                 page,
@@ -138,7 +139,8 @@ public class AnnouncementReadController {
                 normalizeOptional(semesterId),
                 normalizeOptional(sectionId),
                 priority,
-                status);
+                status,
+                normalizeOptional(search));
     }
 
     private static void requireAllowedQuery(

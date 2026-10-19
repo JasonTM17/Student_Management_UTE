@@ -1,5 +1,6 @@
 package io.campuscore.restfulapi.engagement.repository;
 
+import io.campuscore.restfulapi.common.LikePattern;
 import io.campuscore.restfulapi.engagement.web.AnnouncementReadDtos.AnnouncementResponse;
 import io.campuscore.restfulapi.engagement.web.AnnouncementReadDtos.CourseSummary;
 import io.campuscore.restfulapi.engagement.web.AnnouncementReadDtos.LecturerSummary;
@@ -235,6 +236,22 @@ public class AnnouncementReadRepository {
         } else if ("ARCHIVED".equals(filter.status())) {
             conditions.add("\"archivedAt\" IS NOT NULL");
         }
+        List<String> tokens = LikePattern.tokens(filter.search());
+        if (!tokens.isEmpty()) {
+            parameters.addValue("foldFrom", LikePattern.FOLD_FROM);
+            parameters.addValue("foldTo", LikePattern.FOLD_TO);
+            for (int i = 0; i < tokens.size(); i++) {
+                String paramName = "searchToken" + i;
+                parameters.addValue(paramName, tokens.get(i));
+                conditions.add("(TRANSLATE(LOWER(COALESCE(\"title\", '')), :foldFrom, :foldTo) LIKE :" + paramName + " ESCAPE '\\'"
+                        + " OR TRANSLATE(LOWER(COALESCE(\"content\", '')), :foldFrom, :foldTo) LIKE :" + paramName + " ESCAPE '\\'"
+                        + " OR TRANSLATE(LOWER(COALESCE(\"slug\", '')), :foldFrom, :foldTo) LIKE :" + paramName + " ESCAPE '\\'"
+                        + " OR TRANSLATE(LOWER(COALESCE(\"courseCode\", '')), :foldFrom, :foldTo) LIKE :" + paramName + " ESCAPE '\\'"
+                        + " OR TRANSLATE(LOWER(COALESCE(\"courseName\", '')), :foldFrom, :foldTo) LIKE :" + paramName + " ESCAPE '\\'"
+                        + " OR TRANSLATE(LOWER(COALESCE(\"semesterName\", '')), :foldFrom, :foldTo) LIKE :" + paramName + " ESCAPE '\\'"
+                        + " OR TRANSLATE(LOWER(COALESCE(\"lecturerDisplayName\", '')), :foldFrom, :foldTo) LIKE :" + paramName + " ESCAPE '\\')");
+            }
+        }
         return new SqlWhere(where(conditions), parameters);
     }
 
@@ -379,7 +396,7 @@ public class AnnouncementReadRepository {
         return value != null && !value.isEmpty();
     }
 
-    public record AnnouncementFilter(String semesterId, String sectionId, String priority, String status) {
+    public record AnnouncementFilter(String semesterId, String sectionId, String priority, String status, String search) {
     }
 
     public record UserVisibility(

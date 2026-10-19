@@ -5,14 +5,17 @@ import { useRouter } from 'next/navigation';
 import { ClipboardCheck, RefreshCw } from 'lucide-react';
 
 import { useAuth } from '@/context/AuthContext';
-import { attendanceApi, type AttendanceRecord } from '@/lib/api';
+import { attendanceApi, sectionsApi, type AttendanceRecord } from '@/lib/api';
 import { AdminFrame } from '@/components/admin/AdminFrame';
 import {
   AdminPaginationFooter,
   AdminTableCard,
   AdminTableScroll,
+  AdminToolbarCard,
 } from '@/components/admin/AdminSurface';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Select } from '@/components/ui/select';
 import { metricToneClass, type StatusTone } from '@/components/ui/status';
 import {
   EmptyState,
@@ -21,8 +24,10 @@ import {
 } from '@/components/ui/state-block';
 import { useI18n } from '@/i18n';
 import { getLocalizedFlatLabel } from '@/lib/academic-content';
+import type { Section } from '@/types/api';
 
 const PAGE_LIMIT = 20;
+const SECTION_PAGE_LIMIT = 100;
 
 // Statuses seen from the backend today; anything else falls back to a
 // neutral badge carrying the raw value.
@@ -47,11 +52,14 @@ export default function AdminAttendancePage() {
   const copy = messages.admin.attendance;
   const router = useRouter();
   const [records, setRecords] = useState<AttendanceRecord[]>([]);
+  const [sections, setSections] = useState<Section[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState('');
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [total, setTotal] = useState(0);
+  const [sectionFilter, setSectionFilter] = useState('');
+  const [dateFilter, setDateFilter] = useState('');
   const canAccess = Boolean(user && (isAdmin || isSuperAdmin));
 
   useEffect(() => {
@@ -74,7 +82,12 @@ export default function AdminAttendancePage() {
     setError('');
 
     try {
-      const response = await attendanceApi.adminList({ page, limit: PAGE_LIMIT });
+      const response = await attendanceApi.adminList({
+        page,
+        limit: PAGE_LIMIT,
+        ...(sectionFilter ? { sectionId: sectionFilter } : {}),
+        ...(dateFilter ? { date: dateFilter } : {}),
+      });
       setRecords(response.data || []);
       setTotalPages(response.meta?.totalPages || 1);
       setTotal(response.meta?.total || 0);
@@ -83,13 +96,50 @@ export default function AdminAttendancePage() {
     } finally {
       setIsLoading(false);
     }
-  }, [copy.errorDescription, page]);
+  }, [copy.errorDescription, dateFilter, page, sectionFilter]);
 
   useEffect(() => {
     if (canAccess) {
       void fetchRecords();
     }
   }, [canAccess, fetchRecords]);
+
+  // The section filter needs the full catalog (the read contract caps a page
+  // at 100 rows and the catalog already exceeds it), so page through.
+  useEffect(() => {
+    if (!canAccess) return;
+    let cancelled = false;
+    void (async () => {
+      const collected: Section[] = [];
+      for (let current = 1; current <= 3; current += 1) {
+        try {
+          const response = await sectionsApi.getAll({ page: current, limit: SECTION_PAGE_LIMIT });
+          collected.push(...(response.data ?? []));
+          if ((response.meta?.totalPages ?? 1) <= current) break;
+        } catch {
+          break;
+        }
+      }
+      if (!cancelled) setSections(collected);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [canAccess]);
+
+  const sectionOptions = [
+    { value: '', label: copy.allSections },
+    ...sections.map((section) => ({
+      value: section.id,
+      label: [
+        section.course?.code,
+        section.sectionNumber,
+        section.semester?.name ? `— ${section.semester.name}` : '',
+      ]
+        .filter(Boolean)
+        .join(' '),
+    })),
+  ];
 
   const statusLabel = (status: string | null | undefined) => {
     const key = (status ?? '').toUpperCase();
@@ -150,6 +200,53 @@ export default function AdminAttendancePage() {
             {copy.refresh}
           </Button>
         </div>
+
+        <AdminToolbarCard>
+          <div className="grid gap-4 md:grid-cols-[minmax(0,1fr)_minmax(0,220px)_auto] md:items-end">
+            <div>
+              <label htmlFor="attendance-filter-section" className="mb-1 block text-sm font-medium text-foreground">
+                {copy.filterSection}
+              </label>
+              <Select
+                id="attendance-filter-section"
+                aria-label={copy.filterSection}
+                value={sectionFilter}
+                onChange={(event) => {
+                  setSectionFilter(event.target.value);
+                  setPage(1);
+                }}
+                options={sectionOptions}
+              />
+            </div>
+            <div>
+              <label htmlFor="attendance-filter-date" className="mb-1 block text-sm font-medium text-foreground">
+                {copy.filterDate}
+              </label>
+              <Input
+                id="attendance-filter-date"
+                type="date"
+                aria-label={copy.filterDate}
+                value={dateFilter}
+                onChange={(event) => {
+                  setDateFilter(event.target.value);
+                  setPage(1);
+                }}
+              />
+            </div>
+            <Button
+              type="button"
+              variant="outline"
+              disabled={!sectionFilter && !dateFilter}
+              onClick={() => {
+                setSectionFilter('');
+                setDateFilter('');
+                setPage(1);
+              }}
+            >
+              {copy.clearFilters}
+            </Button>
+          </div>
+        </AdminToolbarCard>
 
         {error ? (
           <ErrorState

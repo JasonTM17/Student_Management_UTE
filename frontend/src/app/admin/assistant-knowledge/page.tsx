@@ -31,6 +31,7 @@ import { RichTextEditor } from '@/components/ui/rich-text-editor';
 import { EmptyState, ForbiddenState, LoadingState } from '@/components/ui/state-block';
 import { metricToneClass, statusToneClass } from '@/components/ui/status';
 import { LinkButton } from '@/components/ui/link-button';
+import { normalizeVietnameseText } from '@/lib/registration-browse';
 import {
   assistantKnowledgeApi,
   type AssistantCatalogCoverage,
@@ -165,8 +166,10 @@ function CatalogCoverageCard({ coverage, coverageError, vi }: CatalogCoverageCar
 interface GuidanceFiltersProps {
   domainFilter: '' | AssistantKnowledgeDomain;
   stateFilter: '' | AssistantKnowledgeState;
+  search: string;
   onDomainChange: (value: '' | AssistantKnowledgeDomain) => void;
   onStateChange: (value: '' | AssistantKnowledgeState) => void;
+  onSearchChange: (value: string) => void;
   onReload: () => void;
   isLoading: boolean;
   vi: boolean;
@@ -175,8 +178,10 @@ interface GuidanceFiltersProps {
 function GuidanceFilters({
   domainFilter,
   stateFilter,
+  search,
   onDomainChange,
   onStateChange,
+  onSearchChange,
   onReload,
   isLoading,
   vi,
@@ -200,6 +205,17 @@ function GuidanceFilters({
             onChange={(event) => onStateChange(event.target.value as '' | AssistantKnowledgeState)}
             options={localizedOptions(states, vi)}
             aria-label={vi ? 'Lọc trạng thái' : 'Filter status'}
+          />
+        </div>
+        <div className="w-64">
+          <label className="mb-1 block text-sm font-medium text-foreground">
+            {vi ? 'Tìm kiếm' : 'Search'}
+          </label>
+          <Input
+            value={search}
+            onChange={(event) => onSearchChange(event.target.value)}
+            placeholder={vi ? 'Slug hoặc tiêu đề…' : 'Slug or title…'}
+            aria-label={vi ? 'Tìm kiếm tài liệu' : 'Search documents'}
           />
         </div>
       </div>
@@ -434,6 +450,7 @@ export default function AdminAssistantKnowledgePage() {
   const [coverageError, setCoverageError] = useState(false);
   const [stateFilter, setStateFilter] = useState<'' | AssistantKnowledgeState>('');
   const [domainFilter, setDomainFilter] = useState<'' | AssistantKnowledgeDomain>('');
+  const [search, setSearch] = useState('');
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
@@ -481,16 +498,26 @@ export default function AdminAssistantKnowledgePage() {
   const [page, setPage] = useState(1);
   useEffect(() => {
     setPage(1);
-  }, [domainFilter, stateFilter]);
-  const totalPages = Math.max(1, Math.ceil(documents.length / PAGE_SIZE));
+  }, [domainFilter, stateFilter, search]);
+  const filteredDocuments = useMemo(() => {
+    const query = normalizeVietnameseText(search.trim());
+    if (!query) return documents;
+    return documents.filter((row) => {
+      const haystack = normalizeVietnameseText(
+        `${row.slug ?? ''} ${row.title ?? ''} ${row.source ?? ''} ${row.domain ?? ''} ${row.state ?? ''}`,
+      );
+      return query.split(/\s+/).filter(Boolean).every((token) => haystack.includes(token));
+    });
+  }, [documents, search]);
+  const totalPages = Math.max(1, Math.ceil(filteredDocuments.length / PAGE_SIZE));
   const currentPage = Math.min(page, totalPages);
   const pagedDocuments = useMemo(
-    () => documents.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE),
-    [documents, currentPage],
+    () => filteredDocuments.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE),
+    [filteredDocuments, currentPage],
   );
   const pageSummary = vi
-    ? `Hiển thị ${pagedDocuments.length} trên ${documents.length} mục`
-    : `Showing ${pagedDocuments.length} of ${documents.length} items`;
+    ? `Hiển thị ${pagedDocuments.length} trên ${filteredDocuments.length} mục`
+    : `Showing ${pagedDocuments.length} of ${filteredDocuments.length} items`;
 
   const updateForm = useCallback((patch: Partial<AssistantKnowledgeRequest>) => {
     setForm((current) => ({ ...current, ...patch }));
@@ -708,15 +735,17 @@ export default function AdminAssistantKnowledgePage() {
           <GuidanceFilters
             domainFilter={domainFilter}
             stateFilter={stateFilter}
+            search={search}
             onDomainChange={setDomainFilter}
             onStateChange={setStateFilter}
+            onSearchChange={setSearch}
             onReload={() => void load()}
             isLoading={isLoading}
             vi={vi}
           />
           {isLoading && documents.length === 0 ? (
             <LoadingState label={vi ? 'Đang tải nội dung...' : 'Loading guidance...'} />
-          ) : documents.length === 0 ? (
+          ) : filteredDocuments.length === 0 ? (
             <EmptyState
               title={vi ? 'Chưa có nội dung phù hợp.' : 'No matching guidance.'}
               description={

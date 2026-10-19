@@ -248,11 +248,13 @@ export default function AdminAnnouncementsPage() {
   const [error, setError] = useState('');
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
-  const [filters, setFilters] = useState<{ semesterId: string; priority: string; status: StatusFilter }>({
+  const [filters, setFilters] = useState<{ semesterId: string; priority: string; search: string; status: StatusFilter }>({
     semesterId: '',
     priority: '',
+    search: '',
     status: 'ACTIVE',
   });
+  const [searchInput, setSearchInput] = useState('');
   const [modal, setModal] = useState<ModalKind>(null);
   const [editorMode, setEditorMode] = useState<'create' | 'edit'>('create');
   const [selected, setSelected] = useState<AnnouncementRecord | null>(null);
@@ -557,6 +559,7 @@ export default function AdminAnnouncementsPage() {
         semesterId: filters.semesterId || undefined,
         priority: filters.priority || undefined,
         status: filters.status,
+        search: filters.search || undefined,
       });
       setItems(response.data ?? []);
       setTotalPages(Math.max(response.meta?.totalPages ?? 1, 1));
@@ -565,7 +568,24 @@ export default function AdminAnnouncementsPage() {
     } finally {
       setIsLoading(false);
     }
-  }, [filters.priority, filters.semesterId, filters.status, friendlyError, page]);
+  }, [filters.priority, filters.search, filters.semesterId, filters.status, friendlyError, page]);
+
+  useEffect(() => {
+    const trimmed = searchInput.trim();
+    if (trimmed === filters.search) {
+      return;
+    }
+    if (!trimmed) {
+      setFilters((current) => ({ ...current, search: '' }));
+      setPage(1);
+      return;
+    }
+    const timer = window.setTimeout(() => {
+      setFilters((current) => ({ ...current, search: trimmed }));
+      setPage(1);
+    }, 250);
+    return () => window.clearTimeout(timer);
+  }, [filters.search, searchInput]);
 
   useEffect(() => {
     if (canAccess) void fetchAnnouncements();
@@ -942,7 +962,17 @@ export default function AdminAnnouncementsPage() {
                 </div>
                 <p className="text-sm text-muted-foreground" aria-live="polite">{copy.page(page, totalPages)}</p>
               </div>
-              <div className="grid gap-4 md:grid-cols-2">
+              <div className="grid gap-4 md:grid-cols-3">
+                <div>
+                  <label htmlFor="announcement-filter-search" className="mb-1 block text-sm font-medium text-foreground">{vi ? 'Tìm kiếm' : 'Search'}</label>
+                  <Input
+                    id="announcement-filter-search"
+                    aria-label={vi ? 'Tìm kiếm' : 'Search'}
+                    value={searchInput}
+                    placeholder={vi ? 'Tiêu đề, nội dung, môn học, giảng viên…' : 'Title, content, course, lecturer…'}
+                    onChange={(event) => setSearchInput(event.target.value)}
+                  />
+                </div>
                 <div>
                   <label htmlFor="announcement-filter-semester" className="mb-1 block text-sm font-medium text-foreground">{copy.semester}</label>
                   <Select id="announcement-filter-semester" aria-label={copy.semester} value={filters.semesterId} onChange={(event) => { setFilters((current) => ({ ...current, semesterId: event.target.value })); setPage(1); }} options={semesterOptions} />
