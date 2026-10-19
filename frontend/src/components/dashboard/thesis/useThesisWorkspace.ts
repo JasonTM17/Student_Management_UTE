@@ -87,6 +87,8 @@ export function useThesisWorkspace(
         const preferred =
           sortedRounds.find((r) => r.status === 'REGISTRATION_OPEN' && r.thesisType === 'KLTN') ||
           sortedRounds.find((r) => r.status === 'REGISTRATION_OPEN') ||
+          sortedRounds.find((r) => r.status === 'REGISTRATION_CLOSED' && r.thesisType === 'KLTN') ||
+          sortedRounds.find((r) => r.status === 'REGISTRATION_CLOSED') ||
           sortedRounds[0];
         return preferred?.id || '';
       });

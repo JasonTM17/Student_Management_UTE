@@ -6,6 +6,7 @@ import { Building2, ChevronDown, Crown, Users } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import { useI18n } from '@/i18n';
 import { thesisApi, type DeanGroup, type DeanOverview, type ThesisRound } from '@/lib/thesis-api';
+import { sortThesisRoundsForOverview } from '@/lib/thesis-round';
 import { cn } from '@/lib/utils';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { PageHeader } from '@/components/ui/page-header';
@@ -187,9 +188,7 @@ export default function DeanOverviewPage() {
       .listRounds()
       .then((list) => {
         if (cancelled) return;
-        const sorted = [...list].sort(
-          (a, b) => new Date(b.registrationStart).getTime() - new Date(a.registrationStart).getTime(),
-        );
+        const sorted = sortThesisRoundsForOverview(list);
         setRounds(sorted);
         const preferred = explicitRoundId && sorted.some((r) => r.id === explicitRoundId)
           ? explicitRoundId
