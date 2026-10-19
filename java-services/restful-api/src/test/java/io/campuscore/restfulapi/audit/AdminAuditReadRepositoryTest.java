@@ -125,4 +125,64 @@ class AdminAuditReadRepositoryTest {
         assertThat(repository.page(1, 20, null, "SECTION", null, null, "student").total())
                 .isZero();
     }
+
+    @Test
+    void searchFoldsVietnameseAcrossFieldsAndKeepsCountAndPaginationAligned() {
+        insert("a1", "admin-user", "Nguyễn Tiến Sơn", "SECTION_UPDATE", "SECTION", "s-1", "Đã cập nhật lớp");
+        insert("a2", "admin-user", "Nguyễn Tiến Sơn", "SECTION_UPDATE", "SECTION", "s-2", "Đã cập nhật lớp");
+        insert("other", "other-user", "Nguyễn Văn Bình", "SECTION_UPDATE", "SECTION", "s-3", "Đã cập nhật lớp");
+
+        var first = repository.page(1, 1, "UPDATE", "SECTION", null, null, "NGUYEN son cap nhat");
+        var second = repository.page(2, 1, "UPDATE", "SECTION", null, null, "NGUYEN son cap nhat");
+        assertThat(first.total()).isEqualTo(2);
+        assertThat(first.totalPages()).isEqualTo(2);
+        assertThat(first.data()).hasSize(1);
+        assertThat(second.data()).hasSize(1);
+        assertThat(List.of(first.data().getFirst().id(), second.data().getFirst().id()))
+                .containsExactlyInAnyOrder("a1", "a2");
+    }
+
+    @Test
+    void searchMatchesTheDisplayedFallbackForLegacyActors() {
+        jdbc.update("INSERT INTO campuscore_auth.\"User\" (\"id\",\"email\",\"firstName\",\"lastName\") VALUES (?,?,?,?)",
+                "legacy-user", "legacy@example.invalid", "Tiến Sơn", "Nguyễn");
+        insert("missing", "legacy-user", null, "UPDATED", "USER", "u-1", "Profile updated");
+        insert("blank", "legacy-user", "   ", "UPDATED", "USER", "u-2", "Profile updated");
+        insert("snapshot", "legacy-user", "Trần Văn Bình", "UPDATED", "USER", "u-3", "Profile updated");
+        insert("removed", "deleted-actor-42", null, "UPDATED", "USER", "u-4", "Profile updated");
+
+        var result = repository.page(1, 20, null, null, null, null, "nguyen son legacy@example.invalid");
+        assertThat(result.total()).isEqualTo(2);
+        assertThat(result.data()).extracting(AdminAuditReadRepository.AuditEntry::id)
+                .containsExactlyInAnyOrder("missing", "blank");
+        assertThat(result.data()).extracting(AdminAuditReadRepository.AuditEntry::actorLabel)
+                .containsOnly("Nguyễn Tiến Sơn (legacy@example.invalid)");
+        assertThat(repository.page(1, 20, null, null, null, null, "deleted-actor-42").data())
+                .extracting(AdminAuditReadRepository.AuditEntry::id).containsExactly("removed");
+        assertThat(repository.page(1, 20, null, null, null, null, "tran binh").data())
+                .extracting(AdminAuditReadRepository.AuditEntry::id).containsExactly("snapshot");
+        assertThat(jdbc.queryForObject("SELECT \"actorLabel\" FROM campuscore_audit.\"AdminAudit\" WHERE \"id\"='snapshot'", String.class))
+                .isEqualTo("Trần Văn Bình");
+    }
+
+    @Test
+    void foldedSearchKeepsPercentUnderscoreAndBackslashLiteral() {
+        insert("literal", "admin-user", "Đào tạo", "UPDATED", "USER", "u-1", "Mã 50%_\\Sơn");
+        insert("wildcard", "admin-user", "Đào tạo", "UPDATED", "USER", "u-2", "Mã 500xxSon");
+        assertThat(repository.page(1, 20, null, null, null, null, "dao 50%_\\son").data())
+                .extracting(AdminAuditReadRepository.AuditEntry::id).containsExactly("literal");
+    }
+
+    @Test
+    void genericAuditSearchRequiresEveryLiteralTokenWithoutNameSearchTruncation() {
+        insert("cn", "admin-user", "Admin", "UPDATED", "COURSE", "c-1", "Updated CN course");
+        insert("se", "admin-user", "Admin", "UPDATED", "COURSE", "c-2", "Updated SE course");
+        assertThat(repository.page(1, 20, null, null, null, null, "CN updated").data())
+                .extracting(AdminAuditReadRepository.AuditEntry::id).containsExactly("cn");
+        String prefix = "x".repeat(64);
+        insert("long", "admin-user", "Admin", "UPDATED", "COURSE", "c-3", prefix + "a");
+        assertThat(repository.page(1, 20, null, null, null, null, prefix + "b").data()).isEmpty();
+        insert("many", "admin-user", "Admin", "UPDATED", "COURSE", "c-4", "one two three four five six seven eight nine");
+        assertThat(repository.page(1, 20, null, null, null, null, "one two three four five six seven eight missing").data()).isEmpty();
+    }
 }

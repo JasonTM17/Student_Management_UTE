@@ -139,6 +139,9 @@ public class AcademicAttendanceReadRepository {
      * enrollment except DROPPED/CANCELLED. The grading read model deliberately
      * excludes PENDING (publishing completeness), but a still-pending
      * enrollment is an actively attending student who must be markable.
+     * Historical/repeated enrollments must not duplicate a student in roll
+     * call, its counts or exports. Use the latest eligible row for status;
+     * enrollment and attendance history remain unchanged.
      */
     public List<RosterRow> findSectionAttendanceRoster(String sectionId) {
         return jdbc.query(
@@ -147,11 +150,15 @@ public class AcademicAttendanceReadRepository {
                         + " student_user.\"firstName\" AS student_first_name,"
                         + " student_user.\"lastName\" AS student_last_name,"
                         + " enrollment.\"status\" AS enrollment_status"
-                        + " FROM " + ENROLLMENT + " enrollment"
+                        + " FROM (SELECT \"id\", \"studentId\", \"status\","
+                        + " ROW_NUMBER() OVER (PARTITION BY \"studentId\""
+                        + " ORDER BY \"enrolledAt\" DESC, \"id\" DESC) AS roster_rank"
+                        + " FROM " + ENROLLMENT
+                        + " WHERE \"sectionId\" = :sectionId"
+                        + " AND \"status\" NOT IN ('DROPPED', 'CANCELLED')) enrollment"
                         + " JOIN " + STUDENT + " student ON student.\"id\" = enrollment.\"studentId\""
                         + " JOIN " + USER + " student_user ON student_user.\"id\" = student.\"userId\""
-                        + " WHERE enrollment.\"sectionId\" = :sectionId"
-                        + " AND enrollment.\"status\" NOT IN ('DROPPED', 'CANCELLED')"
+                        + " WHERE enrollment.roster_rank = 1"
                         + " ORDER BY student_user.\"firstName\" ASC, student_user.\"lastName\" ASC, enrollment.\"id\" ASC",
                 new MapSqlParameterSource("sectionId", sectionId),
                 AcademicAttendanceReadRepository::mapRoster);

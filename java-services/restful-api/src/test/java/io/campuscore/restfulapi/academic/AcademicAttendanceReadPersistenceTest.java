@@ -1,5 +1,6 @@
 package io.campuscore.restfulapi.academic;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -222,6 +223,62 @@ class AcademicAttendanceReadPersistenceTest {
                 .andExpect(jsonPath("$.code").value("INVALID_REQUEST"));
     }
 
+    @Test
+    void rosterDeduplicatesStudentsWithoutChangingHistory() throws Exception {
+        insertEnrollment("history-1", "student-1", "section-1", "semester-1", "COMPLETED");
+        insertEnrollment("history-2", "student-1", "section-1", "semester-1", "COMPLETED");
+        insertEnrollment("history-pending", "student-2", "section-1", "semester-1", "PENDING");
+        var enrollments = jdbc.queryForList("SELECT * FROM academic.\"Enrollment\" ORDER BY \"id\"");
+        var attendance = jdbc.queryForList("SELECT * FROM academic.\"Attendance\" ORDER BY \"id\"");
+        for (var identity : List.of(lecturerJwt("lecturer-1"), adminJwt())) {
+            mvc.perform(get("/api/v1/attendance/section/section-1/roster").with(identity))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.length()").value(2))
+                    .andExpect(jsonPath("$[?(@.studentId == 'student-1')].studentId").value(org.hamcrest.Matchers.contains("student-1")))
+                    .andExpect(jsonPath("$[?(@.studentId == 'student-2')].studentId").value(org.hamcrest.Matchers.contains("student-2")));
+        }
+        assertThat(jdbc.queryForList("SELECT * FROM academic.\"Enrollment\" ORDER BY \"id\""))
+                .isEqualTo(enrollments);
+        assertThat(jdbc.queryForList("SELECT * FROM academic.\"Attendance\" ORDER BY \"id\""))
+                .isEqualTo(attendance);
+    }
+
+    @Test
+    void rosterUsesLatestEligibleEnrollmentAndIdTiebreaker() throws Exception {
+        insertEnrollment("roster-old", "student-1", "section-1", "semester-1", "COMPLETED");
+        jdbc.update("UPDATE academic.\"Enrollment\" SET \"enrolledAt\"=? WHERE \"id\"=?",
+                Timestamp.from(BASE_TIME.minusSeconds(60)), "roster-old");
+        insertEnrollment("roster-a", "student-1", "section-1", "semester-1", "PENDING");
+        insertEnrollment("roster-z", "student-1", "section-1", "semester-1", "CONFIRMED");
+        insertEnrollment("roster-dropped", "student-1", "section-1", "semester-1", "DROPPED");
+        jdbc.update("UPDATE academic.\"Enrollment\" SET \"enrolledAt\"=? WHERE \"id\"=?",
+                Timestamp.from(BASE_TIME.plusSeconds(60)), "roster-dropped");
+        insertEnrollment("roster-completed", "student-3", "section-1", "semester-1", "COMPLETED");
+        mvc.perform(get("/api/v1/attendance/section/section-1/roster").with(lecturerJwt("lecturer-1")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(3))
+                .andExpect(jsonPath("$[?(@.studentId == 'student-1')].enrollmentStatus").value(org.hamcrest.Matchers.contains("CONFIRMED")))
+                .andExpect(jsonPath("$[?(@.studentId == 'student-3')].enrollmentStatus").value(org.hamcrest.Matchers.contains("COMPLETED")));
+    }
+
+    @Test
+    void rosterKeepsDistinctStudentsWithIdenticalNamesAndRetainsAccessGuards() throws Exception {
+        insertUser("student-user-homonym", "homonym@example.invalid", "Linh", "Nguyen");
+        insertStudent("student-homonym", "student-user-homonym", "S004");
+        insertEnrollment("enrollment-homonym", "student-homonym", "section-1", "semester-1", "ENROLLED");
+        mvc.perform(get("/api/v1/attendance/section/section-1/roster").with(lecturerJwt("lecturer-1")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(3))
+                .andExpect(jsonPath("$[?(@.studentCode == 'S001')].studentId").value(org.hamcrest.Matchers.contains("student-1")))
+                .andExpect(jsonPath("$[?(@.studentCode == 'S004')].studentId").value(org.hamcrest.Matchers.contains("student-homonym")));
+        mvc.perform(get("/api/v1/attendance/section/section-1/roster").with(lecturerJwt("lecturer-2")))
+                .andExpect(status().isForbidden());
+        mvc.perform(get("/api/v1/attendance/section/section-1/roster").with(studentJwt("student-user-1", "student-1")))
+                .andExpect(status().isForbidden());
+        mvc.perform(get("/api/v1/attendance/section/section-1/roster"))
+                .andExpect(status().isUnauthorized());
+    }
+
     private static RequestPostProcessor studentJwt(String subject, String studentId) {
         return jwt().jwt(token -> token
                         .subject(subject)
@@ -229,6 +286,39 @@ class AcademicAttendanceReadPersistenceTest {
                         .claim("student", java.util.Map.of("year", 3))
                         .claim("studentId", studentId))
                 .authorities(new SimpleGrantedAuthority("ROLE_STUDENT"));
+    }
+
+    @Test
+    void rosterSixRoleMatrixPreservesOwnershipForAcademicHeads() throws Exception {
+        for (String role : List.of("TRUONG_BO_MON", "TRUONG_KHOA")) {
+            String subject = "roster-" + role;
+            String profile = "profile-" + role;
+            io.campuscore.restfulapi.testsupport.AccountAuthorityFixture.ensureUser(jdbc, subject);
+            io.campuscore.restfulapi.testsupport.AccountAuthorityFixture.lecturer(jdbc, subject, profile);
+            io.campuscore.restfulapi.testsupport.AccountAuthorityFixture.role(jdbc, subject, role);
+            jdbc.update("UPDATE academic.\"Section\" SET \"lecturerId\"=? WHERE \"id\"='section-1'", profile);
+            RequestPostProcessor head = jwt().jwt(token -> token.subject(subject)
+                            .claim("roles", List.of("LECTURER", role)).claim("lecturerId", profile))
+                    .authorities(new SimpleGrantedAuthority("ROLE_LECTURER"), new SimpleGrantedAuthority("ROLE_" + role));
+            mvc.perform(get("/api/v1/attendance/section/section-1/roster").with(head))
+                    .andExpect(status().isOk()).andExpect(jsonPath("$.length()").value(2));
+            mvc.perform(get("/api/v1/attendance/section/section-2/roster").with(head))
+                    .andExpect(status().isForbidden());
+        }
+        String subject = "roster-super-admin";
+        io.campuscore.restfulapi.testsupport.AccountAuthorityFixture.ensureUser(jdbc, subject);
+        io.campuscore.restfulapi.testsupport.AccountAuthorityFixture.role(jdbc, subject, "SUPER_ADMIN");
+        RequestPostProcessor superAdmin = jwt().jwt(token -> token.subject(subject).claim("roles", List.of("SUPER_ADMIN")))
+                .authorities(new SimpleGrantedAuthority("ROLE_SUPER_ADMIN"));
+        mvc.perform(get("/api/v1/attendance/section/section-1/roster").with(superAdmin))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.length()").value(2));
+        mvc.perform(get("/api/v1/attendance/section/section-1/roster").with(adminJwt()))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.length()").value(2));
+        jdbc.update("UPDATE academic.\"Section\" SET \"lecturerId\"='lecturer-1' WHERE \"id\"='section-1'");
+        mvc.perform(get("/api/v1/attendance/section/section-1/roster").with(lecturerJwt("lecturer-1")))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.length()").value(2));
+        mvc.perform(get("/api/v1/attendance/section/section-1/roster").with(studentJwt("student-user-1", "student-1")))
+                .andExpect(status().isForbidden());
     }
 
     private static RequestPostProcessor adminJwt() {
