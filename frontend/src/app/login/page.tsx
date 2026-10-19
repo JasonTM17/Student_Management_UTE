@@ -11,7 +11,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useI18n } from '@/i18n';
 import type { User } from '@/types/api';
-import { SessionVerificationError } from '@/lib/api';
+import { API_BASE_URL, SessionVerificationError } from '@/lib/api';
 import { campusCodeMessage, type CampusErrorCopy } from '@/lib/campus-error';
 import { isStaleDemoPassword } from '@/lib/demo-credentials';
 import {
@@ -110,6 +110,15 @@ export default function LoginPage() {
   const portalCopy = messages.login.portals[portal];
   // Memoized so the prefill effect below depends on a stable reference.
   const demoCredentials = useMemo(() => demoCredentialsFor(portal), [portal]);
+
+  // Wake the backend the moment the login page renders. Render free instances
+  // suspend after idle minutes, so starting the wake-up while the visitor is
+  // still typing credentials hides most of the cold-boot delay.
+  useEffect(() => {
+    fetch(`${API_BASE_URL}/health/liveness`, { cache: 'no-store', credentials: 'omit' }).catch(() => {
+      /* best-effort wake-up only; login itself surfaces real connectivity errors */
+    });
+  }, []);
 
   useEffect(() => {
     setFormError('');

@@ -2,10 +2,11 @@ name: Production Keep-Alive Heartbeat
 
 on:
   schedule:
-    # Runs every 6 hours (at 00:00, 06:00, 12:00, 18:00 UTC). A 10-minute cadence
-    # would keep Render warm but burns ~2160 GH Actions minutes/month, beyond the
-    # free budget; the cold-boot gap is covered by the frontend retry UX instead.
-    - cron: '0 */6 * * *'
+    # Every 10 minutes keeps the Render free dyno inside its 15-minute idle
+    # window so it never suspends. The repository is public, so scheduled
+    # Actions minutes are free — a faster cadence is the structural fix for
+    # perceived production lag, not the frontend retry UX alone.
+    - cron: '*/10 * * * *'
   workflow_dispatch:
 
 permissions:
