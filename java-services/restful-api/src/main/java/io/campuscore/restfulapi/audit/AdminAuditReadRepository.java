@@ -1,8 +1,10 @@
 package io.campuscore.restfulapi.audit;
 
+import io.campuscore.restfulapi.common.LikePattern;
 import java.sql.Timestamp;
 import java.time.Instant;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import org.springframework.context.annotation.Profile;
 import org.springframework.jdbc.core.namedparam.MapSqlParameterSource;
@@ -21,6 +23,10 @@ import org.springframework.stereotype.Repository;
 public class AdminAuditReadRepository {
 
     private static final String AUDIT = "campuscore_audit.\"AdminAudit\"";
+    // Search the same legacy fallback that the operator sees, preserving stored snapshots.
+    private static final String ACTOR_LABEL = "COALESCE(NULLIF(TRIM(\"actorLabel\"), ''),"
+            + " (SELECT TRIM(COALESCE(u.\"lastName\", '') || ' ' || COALESCE(u.\"firstName\", '')) || ' (' || u.\"email\" || ')'"
+            + " FROM campuscore_auth.\"User\" u WHERE u.\"id\" = \"actorId\"), \"actorId\")";
     static final int MAX_PAGE_SIZE = 100;
 
     private final NamedParameterJdbcTemplate jdbc;
@@ -82,20 +88,19 @@ public class AdminAuditReadRepository {
         appendFilter(where, parameters, "\"actorId\" = :actorId", "actorId", actorId);
         if (search != null && !search.isBlank()) {
             String[] tokens = search.trim().split("\\s+");
+            parameters.addValue("foldFrom", LikePattern.FOLD_FROM);
+            parameters.addValue("foldTo", LikePattern.FOLD_TO);
             for (int i = 0; i < tokens.length; i++) {
-                if (tokens[i].isEmpty()) {
-                    continue;
-                }
                 String param = "searchToken" + i;
                 if (where.length() > 0) {
                     where.append(" AND ");
                 }
-                where.append("(\"summary\" ILIKE :").append(param)
-                        .append(" OR \"actorLabel\" ILIKE :").append(param)
-                        .append(" OR \"entityId\" ILIKE :").append(param)
-                        .append(" OR \"action\" ILIKE :").append(param)
-                        .append(" OR \"entityType\" ILIKE :").append(param).append(")");
-                parameters.addValue(param, "%" + escapeLike(tokens[i]) + "%");
+                List<String> fields = List.of("\"summary\"", ACTOR_LABEL, "\"entityId\"", "\"action\"", "\"entityType\"");
+                where.append("(").append(String.join(" OR ", fields.stream()
+                        .map(field -> "TRANSLATE(LOWER(COALESCE(" + field + ", '')), :foldFrom, :foldTo) LIKE :"
+                                + param + " ESCAPE '\\'")
+                        .toList())).append(")");
+                parameters.addValue(param, "%" + escapeLike(LikePattern.fold(tokens[i].toLowerCase(Locale.ROOT))) + "%");
             }
         }
         String clause = where.length() == 0 ? "" : " WHERE " + where;
@@ -103,10 +108,7 @@ public class AdminAuditReadRepository {
                 "SELECT COUNT(*) FROM " + AUDIT + clause, parameters, Long.class);
         List<AuditEntry> rows = jdbc.query(
                 "SELECT \"id\", \"actorId\","
-                        + " COALESCE(NULLIF(TRIM(\"actorLabel\"), ''),"
-                        + "   (SELECT TRIM(COALESCE(u.\"lastName\", '') || ' ' || COALESCE(u.\"firstName\", '')) || ' (' || u.\"email\" || ')'"
-                        + "    FROM campuscore_auth.\"User\" u WHERE u.\"id\" = \"actorId\"),"
-                        + "   \"actorId\") AS \"actorLabel\","
+                        + " " + ACTOR_LABEL + " AS \"actorLabel\","
                         + " \"action\", \"entityType\", \"entityId\","
                         + " \"summary\", \"beforeState\", \"afterState\", \"createdAt\""
                         + " FROM " + AUDIT + clause
