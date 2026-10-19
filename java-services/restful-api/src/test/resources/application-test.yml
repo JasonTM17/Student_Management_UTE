@@ -43,3 +43,22 @@ spring:
 app:
   rate-limit:
     enabled: false
+  keepalive:
+    db-interval-ms: 999999999
+    db-initial-delay-ms: 999999999
+
+engagement:
+  announcement-notify:
+    enabled: false
+
+academic:
+  enrolled-count:
+    enabled: false
+
+auth:
+  two-factor:
+    retention:
+      enabled: false
+  password-reset:
+    retention:
+      enabled: false

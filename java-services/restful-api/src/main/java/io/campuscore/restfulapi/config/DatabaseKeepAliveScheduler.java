@@ -33,8 +33,8 @@ public class DatabaseKeepAliveScheduler {
             initialDelayString = "${app.keepalive.db-initial-delay-ms:120000}")
     public void pingDatabase() {
         try {
-            Integer count = jdbc.queryForObject("SELECT count(*) FROM engagement.\"Announcement\"", Integer.class);
-            log.info("Database keep-alive ping succeeded (announcements count: {})", count);
+            Integer probe = jdbc.queryForObject("SELECT 1", Integer.class);
+            log.info("Database keep-alive ping succeeded (probe: {})", probe);
         } catch (DataAccessException ex) {
             log.warn("Database keep-alive ping encountered non-fatal error: {}", ex.getMessage());
         }

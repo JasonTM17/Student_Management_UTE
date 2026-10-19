@@ -14,7 +14,7 @@ for (const relative of files) {
   }
 
   const source = fs.readFileSync(full, 'utf8');
-  if (/\uFFFD|Ã|Â|â€/u.test(source)) {
+  if (/\uFFFD|\u00C3|\u00C2|\u00E2\u20AC/u.test(source)) {
     errors.push(`${relative} contains likely mojibake`);
   }
 }
