@@ -73,7 +73,12 @@ public class AdminAuditReadRepository {
         Long total = jdbc.queryForObject(
                 "SELECT COUNT(*) FROM " + AUDIT + clause, parameters, Long.class);
         List<AuditEntry> rows = jdbc.query(
-                "SELECT \"id\", \"actorId\", \"actorLabel\", \"action\", \"entityType\", \"entityId\","
+                "SELECT \"id\", \"actorId\","
+                        + " COALESCE(NULLIF(TRIM(\"actorLabel\"), ''),"
+                        + "   (SELECT TRIM(COALESCE(u.\"lastName\", '') || ' ' || COALESCE(u.\"firstName\", '')) || ' (' || u.\"email\" || ')'"
+                        + "    FROM campuscore_auth.\"User\" u WHERE u.\"id\" = \"actorId\"),"
+                        + "   \"actorId\") AS \"actorLabel\","
+                        + " \"action\", \"entityType\", \"entityId\","
                         + " \"summary\", \"beforeState\", \"afterState\", \"createdAt\""
                         + " FROM " + AUDIT + clause
                         + " ORDER BY \"createdAt\" DESC, \"id\" DESC LIMIT :limit OFFSET :offset",

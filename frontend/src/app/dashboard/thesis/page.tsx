@@ -1006,31 +1006,32 @@ export default function ThesisPage() {
   }, [isSupervisorOrAdmin, supervisedGroups, supervisedReports]);
 
   const filteredRepositoryReports = useMemo(() => {
-    if (!repositorySearch.trim()) return repositoryReports;
-    const q = repositorySearch.trim().toLowerCase();
+    const raw = repositorySearch.trim();
+    if (!raw) return repositoryReports;
+    const fold = (value: string) =>
+      value
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .replace(/đ/g, 'd')
+        .replace(/Đ/g, 'd')
+        .toLowerCase();
+    const foldedQuery = fold(raw);
+    const queryTokens = foldedQuery.split(/\s+/).filter(Boolean);
     return repositoryReports.filter((report) => {
-      const topicTitle = (report.topicTitle || report.title || '').toLowerCase();
-      const topicDescription = (report.topicDescription || '').toLowerCase();
-      const reportNote = (report.note || '').toLowerCase();
-      const fileName = (report.fileName || '').toLowerCase();
-      const submitter = `${report.submittedByDisplayName || ''} ${report.submittedByStudentNumber || ''}`.toLowerCase();
-      const supervisorMatch = report.supervisors.some((s) =>
-        s.displayName.toLowerCase().includes(q),
+      const haystack = fold(
+        [
+          report.topicTitle || report.title || '',
+          report.topicDescription || '',
+          report.note || '',
+          report.fileName || '',
+          report.departmentName || '',
+          report.submittedByDisplayName || '',
+          report.submittedByStudentNumber || '',
+          ...report.supervisors.map((s) => s.displayName || ''),
+          ...report.members.map((m) => `${m.displayName || ''} ${m.studentNumber || ''}`),
+        ].join(' '),
       );
-      const memberMatch = report.members.some((m) =>
-        `${m.displayName} ${m.studentNumber || ''}`.toLowerCase().includes(q),
-      );
-
-      return (
-        topicTitle.includes(q) ||
-        topicDescription.includes(q) ||
-        reportNote.includes(q) ||
-        fileName.includes(q) ||
-        (report.departmentName || '').toLowerCase().includes(q) ||
-        submitter.includes(q) ||
-        Boolean(supervisorMatch) ||
-        Boolean(memberMatch)
-      );
+      return queryTokens.every((token) => haystack.includes(token));
     });
   }, [repositoryReports, repositorySearch]);
 
@@ -1058,9 +1059,7 @@ export default function ThesisPage() {
   const getLecturerLabel = (lecturer: Lecturer) => {
     const linkedUser = lecturer.user;
     const name = linkedUser
-      ? locale === 'vi'
-        ? `${linkedUser.lastName} ${linkedUser.firstName}`.trim()
-        : `${linkedUser.firstName} ${linkedUser.lastName}`.trim()
+      ? `${linkedUser.lastName ?? ''} ${linkedUser.firstName ?? ''}`.trim()
       : '';
     return name || lecturer.employeeId || lecturer.id;
   };
@@ -3356,10 +3355,7 @@ export default function ThesisPage() {
                     const inGroup = groupMemberList.some(
                       (member) => member.studentId === student.studentId,
                     );
-                    const fullName =
-                      locale === 'vi'
-                        ? `${student.lastName} ${student.firstName}`.trim()
-                        : `${student.firstName} ${student.lastName}`.trim();
+                    const fullName = `${student.lastName ?? ''} ${student.firstName ?? ''}`.trim();
                     const curriculumLabel = [student.curriculumCode, student.curriculumName]
                       .filter(Boolean)
                       .join(' - ');

@@ -226,6 +226,23 @@ export default function AdminClassroomsPage() {
   );
 
   useEffect(() => {
+    const trimmed = searchInput.trim();
+    if (trimmed === search) {
+      return;
+    }
+    if (!trimmed) {
+      setSearch('');
+      setPage(1);
+      return;
+    }
+    const timer = window.setTimeout(() => {
+      setSearch(trimmed);
+      setPage(1);
+    }, 250);
+    return () => window.clearTimeout(timer);
+  }, [searchInput, search]);
+
+  useEffect(() => {
     if (canAccess) {
       void fetchClassrooms();
     }

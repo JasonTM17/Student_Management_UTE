@@ -16,6 +16,7 @@ import { WorkspaceForbiddenState } from '@/components/ProtectedRoute';
 import { EmptyState, ErrorState, LoadingState } from '@/components/ui/state-block';
 import { StatusBadge } from '@/components/thesis/StatusBadge';
 import { TopicCardGridSkeleton } from '@/components/ui/skeleton';
+import { normalizeVietnameseText } from '@/lib/registration-browse';
 import { cn } from '@/lib/utils';
 import { useThesisWorkspace } from './useThesisWorkspace';
 
@@ -56,11 +57,16 @@ export default function ThesisTopicCatalogPage() {
     }
 
     return workspace.topics.filter((topic) => {
-      const fullText = [topic.title, topic.description]
-        .filter(Boolean)
-        .join(' ')
-        .toLowerCase();
-      return searchTerms.some((term) => fullText.includes(term));
+      const fullText = normalizeVietnameseText(
+        [topic.title, topic.description].filter(Boolean).join(' '),
+      );
+      return searchTerms.some((term) => {
+        const foldedTerm = normalizeVietnameseText(term);
+        if (!foldedTerm) return true;
+        if (fullText.includes(foldedTerm)) return true;
+        const tokens = foldedTerm.split(/\s+/).filter(Boolean);
+        return tokens.length > 0 && tokens.every((tok) => fullText.includes(tok));
+      });
     });
   }, [normalizedQuery, searchActive, showAll, workspace.topics]);
 

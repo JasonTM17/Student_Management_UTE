@@ -407,7 +407,8 @@ public class AcademicReadRepository {
                         + " FROM \"academic\".\"Classroom\" cl"
                         + searchWhere(parameters, search,
                                 likeTerms("cl.\"building\"", "cl.\"roomNumber\"",
-                                        "cl.\"building\" || ' ' || cl.\"roomNumber\""))
+                                        "cl.\"building\" || ' ' || cl.\"roomNumber\"",
+                                        "cl.\"building\" || '-' || cl.\"roomNumber\""))
                         + " ORDER BY cl.\"building\" ASC, cl.\"roomNumber\" ASC LIMIT :limit OFFSET :offset",
                 parameters,
                 CLASSROOM_ROW_MAPPER);
@@ -419,7 +420,8 @@ public class AcademicReadRepository {
                 "SELECT COUNT(*) FROM \"academic\".\"Classroom\" cl"
                         + searchWhere(parameters, search,
                                 likeTerms("cl.\"building\"", "cl.\"roomNumber\"",
-                                        "cl.\"building\" || ' ' || cl.\"roomNumber\"")),
+                                        "cl.\"building\" || ' ' || cl.\"roomNumber\"",
+                                        "cl.\"building\" || '-' || cl.\"roomNumber\"")),
                 parameters,
                 Long.class);
         return Objects.requireNonNullElse(count, 0L);
@@ -483,10 +485,26 @@ public class AcademicReadRepository {
         if (search == null) {
             return "";
         }
+        List<String> tokens = LikePattern.tokensFromContainsPattern(search);
+        if (tokens.isEmpty()) {
+            return "";
+        }
         parameters.addValue("search", search);
         parameters.addValue("foldFrom", LikePattern.FOLD_FROM);
         parameters.addValue("foldTo", LikePattern.FOLD_TO);
-        return " WHERE (" + predicate + ")";
+        if (tokens.size() == 1) {
+            return " WHERE (" + predicate + ")";
+        }
+        StringBuilder where = new StringBuilder(" WHERE ");
+        for (int i = 0; i < tokens.size(); i++) {
+            if (i > 0) {
+                where.append(" AND ");
+            }
+            String paramName = "searchToken" + i;
+            parameters.addValue(paramName, tokens.get(i));
+            where.append("(").append(predicate.replace(":search", ":" + paramName)).append(")");
+        }
+        return where.toString();
     }
 
     /**

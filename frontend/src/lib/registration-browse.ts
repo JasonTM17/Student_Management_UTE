@@ -62,20 +62,28 @@ export function normalizeVietnameseText(value: string): string {
     .toLowerCase();
 }
 
-/** Everything one search box matches against: code, section number, name. */
+/** Everything one search box matches against: code, section number, name, lecturer, room. */
 export function sectionSearchHaystack(section: BrowseSection): string {
+  const scheduleExtras = (section.schedules ?? [])
+    .map((slot) => `${slot.lecturer ?? ''} ${slot.room ?? ''}`)
+    .join(' ');
   return normalizeVietnameseText(
-    `${section.courseCode} ${section.sectionNumber} ${section.courseName}`,
+    `${section.courseCode} ${section.sectionNumber} ${section.courseName} ${scheduleExtras}`,
   );
 }
 
-/** Empty queries match everything; otherwise code OR name substring, diacritics-insensitive. */
+/** Empty queries match everything; otherwise multi-token diacritics-insensitive match. */
 export function matchesSectionSearch(section: BrowseSection, rawQuery: string): boolean {
   const query = normalizeVietnameseText(rawQuery.trim());
   if (!query) {
     return true;
   }
-  return sectionSearchHaystack(section).includes(query);
+  const haystack = sectionSearchHaystack(section);
+  if (haystack.includes(query)) {
+    return true;
+  }
+  const tokens = query.split(/\s+/).filter(Boolean);
+  return tokens.every((token) => haystack.includes(token));
 }
 
 export function matchesCurriculumFilter(
