@@ -1,5 +1,6 @@
 package io.campuscore.restfulapi.academic.repository;
 
+import io.campuscore.restfulapi.common.LikePattern;
 import java.math.BigDecimal;
 import java.sql.ResultSet;
 import java.sql.SQLException;
@@ -53,8 +54,12 @@ public class AcademicEnrollmentReadRepository {
     }
 
     public List<EnrollmentRow> findEnrollments(long offset, int limit, String status, String semesterId, String studentId, String courseId, String sectionId) {
+        return findEnrollments(offset, limit, status, semesterId, studentId, courseId, sectionId, null);
+    }
+
+    public List<EnrollmentRow> findEnrollments(long offset, int limit, String status, String semesterId, String studentId, String courseId, String sectionId, String search) {
         MapSqlParameterSource parameters = new MapSqlParameterSource();
-        String where = enrollmentWhere(parameters, status, semesterId, studentId, courseId, sectionId);
+        String where = enrollmentWhere(parameters, status, semesterId, studentId, courseId, sectionId, search);
         return jdbc.query(enrollmentSelect() + where
                         + " ORDER BY e.\"enrolledAt\" DESC LIMIT :limit OFFSET :offset",
                 parameters
@@ -64,11 +69,14 @@ public class AcademicEnrollmentReadRepository {
     }
 
     public long countEnrollments(String status, String semesterId, String studentId, String courseId, String sectionId) {
+        return countEnrollments(status, semesterId, studentId, courseId, sectionId, null);
+    }
+
+    public long countEnrollments(String status, String semesterId, String studentId, String courseId, String sectionId, String search) {
         MapSqlParameterSource parameters = new MapSqlParameterSource();
-        String where = enrollmentWhere(parameters, status, semesterId, studentId, courseId, sectionId);
+        String where = enrollmentWhere(parameters, status, semesterId, studentId, courseId, sectionId, search);
         Long count = jdbc.queryForObject(
-                "SELECT COUNT(*) FROM " + ENROLLMENT + " e JOIN " + SECTION
-                        + " section ON section.\"id\" = e.\"sectionId\"" + where,
+                "SELECT COUNT(*) FROM " + ENROLLMENT + " e" + commonJoins() + where,
                 parameters,
                 Long.class);
         return Objects.requireNonNullElse(count, 0L);
@@ -223,13 +231,31 @@ public class AcademicEnrollmentReadRepository {
                 + " LEFT JOIN " + USER + " lecturer_user ON lecturer_user.\"id\" = lecturer.\"userId\"";
     }
 
-    private static String enrollmentWhere(MapSqlParameterSource parameters, String status, String semesterId, String studentId, String courseId, String sectionId) {
+    private static String enrollmentWhere(MapSqlParameterSource parameters, String status, String semesterId, String studentId, String courseId, String sectionId, String search) {
         List<String> filters = new ArrayList<>();
         addFilter(filters, parameters, "status", status, "e.\"status\" = :status");
         addFilter(filters, parameters, "semesterId", semesterId, "e.\"semesterId\" = :semesterId");
         addFilter(filters, parameters, "studentId", studentId, "e.\"studentId\" = :studentId");
         addFilter(filters, parameters, "courseId", courseId, "section.\"courseId\" = :courseId");
         addFilter(filters, parameters, "sectionId", sectionId, "e.\"sectionId\" = :sectionId");
+        List<String> tokens = LikePattern.tokens(search);
+        if (!tokens.isEmpty()) {
+            parameters.addValue("foldFrom", LikePattern.FOLD_FROM);
+            parameters.addValue("foldTo", LikePattern.FOLD_TO);
+            for (int i = 0; i < tokens.size(); i++) {
+                String paramName = "searchToken" + i;
+                parameters.addValue(paramName, tokens.get(i));
+                filters.add("(TRANSLATE(LOWER(student.\"studentId\"), :foldFrom, :foldTo) LIKE :" + paramName + " ESCAPE '\\'"
+                        + " OR TRANSLATE(LOWER(student_user.\"firstName\"), :foldFrom, :foldTo) LIKE :" + paramName + " ESCAPE '\\'"
+                        + " OR TRANSLATE(LOWER(student_user.\"lastName\"), :foldFrom, :foldTo) LIKE :" + paramName + " ESCAPE '\\'"
+                        + " OR TRANSLATE(LOWER(student_user.\"email\"), :foldFrom, :foldTo) LIKE :" + paramName + " ESCAPE '\\'"
+                        + " OR TRANSLATE(LOWER(section.\"sectionNumber\"), :foldFrom, :foldTo) LIKE :" + paramName + " ESCAPE '\\'"
+                        + " OR TRANSLATE(LOWER(course.\"code\"), :foldFrom, :foldTo) LIKE :" + paramName + " ESCAPE '\\'"
+                        + " OR TRANSLATE(LOWER(course.\"name\"), :foldFrom, :foldTo) LIKE :" + paramName + " ESCAPE '\\'"
+                        + " OR TRANSLATE(LOWER(COALESCE(lecturer_user.\"firstName\", '')), :foldFrom, :foldTo) LIKE :" + paramName + " ESCAPE '\\'"
+                        + " OR TRANSLATE(LOWER(COALESCE(lecturer_user.\"lastName\", '')), :foldFrom, :foldTo) LIKE :" + paramName + " ESCAPE '\\')");
+            }
+        }
         return filters.isEmpty() ? "" : " WHERE " + String.join(" AND ", filters);
     }
 

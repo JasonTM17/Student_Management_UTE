@@ -47,9 +47,10 @@ public class AcademicSectionReadController {
             @Parameter(description = "Mã học kỳ (Semester ID)") @RequestParam(required = false) String semesterId,
             @Parameter(description = "Mã Bộ môn (Department ID)") @RequestParam(required = false) String departmentId,
             @Parameter(description = "Mã học phần (Course ID)") @RequestParam(required = false) String courseId,
+            @Parameter(description = "Từ khóa tìm kiếm theo mã lớp, môn học hoặc giảng viên") @RequestParam(required = false) String search,
             @RequestParam MultiValueMap<String, String> queryParameters) {
-        requireAllowedQuery(queryParameters, Set.of("page", "limit", "semesterId", "departmentId", "courseId"));
-        return academic.findSections(page, limit, semesterId, departmentId, courseId);
+        requireAllowedQuery(queryParameters, Set.of("page", "limit", "semesterId", "departmentId", "courseId", "search"));
+        return academic.findSections(page, limit, semesterId, departmentId, courseId, search);
     }
 
     @GetMapping("my/schedule")

@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Download, Eye, FileText, Trash2, UserRound } from 'lucide-react';
+import { Download, Eye, FileText, Search, Trash2, UserRound } from 'lucide-react';
 import { toast } from 'sonner';
 import { useAuth } from '@/context/AuthContext';
 import {
@@ -21,6 +21,7 @@ import {
   AdminToolbarCard,
 } from '@/components/admin/AdminSurface';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import { Modal } from '@/components/ui/modal';
 import { Select } from '@/components/ui/select';
 import { metricToneClass } from '@/components/ui/status';
@@ -138,6 +139,8 @@ export default function AdminEnrollmentsPage() {
     sectionId: '',
     status: '',
   });
+  const [search, setSearch] = useState('');
+  const [searchInput, setSearchInput] = useState('');
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [total, setTotal] = useState(0);
@@ -219,11 +222,13 @@ export default function AdminEnrollmentsPage() {
         courseId?: string;
         sectionId?: string;
         status?: string;
+        search?: string;
       } = { page, limit: 20 };
       if (filters.semesterId) params.semesterId = filters.semesterId;
       if (filters.courseId) params.courseId = filters.courseId;
       if (filters.sectionId) params.sectionId = filters.sectionId;
       if (filters.status) params.status = filters.status;
+      if (search) params.search = search;
 
       const response = await enrollmentsApi.getAll(params);
       setEnrollments(response.data || []);
@@ -238,7 +243,24 @@ export default function AdminEnrollmentsPage() {
     } finally {
       setIsLoading(false);
     }
-  }, [filters.courseId, filters.sectionId, filters.semesterId, filters.status, locale, page]);
+  }, [filters.courseId, filters.sectionId, filters.semesterId, filters.status, locale, page, search]);
+
+  useEffect(() => {
+    const trimmed = searchInput.trim();
+    if (trimmed === search) {
+      return;
+    }
+    if (!trimmed) {
+      setSearch('');
+      setPage(1);
+      return;
+    }
+    const timer = window.setTimeout(() => {
+      setSearch(trimmed);
+      setPage(1);
+    }, 250);
+    return () => window.clearTimeout(timer);
+  }, [searchInput, search]);
 
   const copy =
     locale === 'vi'
@@ -248,6 +270,8 @@ export default function AdminEnrollmentsPage() {
           description:
             'Rà soát và quản lý hồ sơ đăng ký học phần theo sinh viên, lớp học phần và trạng thái đào tạo.',
           exportCsv: 'Xuất CSV',
+          searchLabel: 'Tìm sinh viên / học phần',
+          searchPlaceholder: 'Tìm theo họ tên, MSSV, email hoặc môn học',
           semester: 'Học kỳ',
           course: 'Môn học',
           section: 'Lớp học phần',
@@ -330,6 +354,8 @@ export default function AdminEnrollmentsPage() {
           description:
             'Review registrations by student, section, and status; open the student profile context from the list.',
           exportCsv: 'Export CSV',
+          searchLabel: 'Search student / course',
+          searchPlaceholder: 'Search by student name, ID, email, or course',
           semester: 'Semester',
           course: 'Course',
           section: 'Section',
@@ -477,6 +503,8 @@ export default function AdminEnrollmentsPage() {
 
   const handleClearFilters = () => {
     setFilters({ semesterId: '', courseId: '', sectionId: '', status: '' });
+    setSearch('');
+    setSearchInput('');
     setPage(1);
   };
 
@@ -548,9 +576,23 @@ export default function AdminEnrollmentsPage() {
     >
       <div className="space-y-6">
         <AdminToolbarCard>
-            <div className="grid gap-4 xl:grid-cols-5">
-              <Select
-                label={copy.semester}
+            <div className="space-y-4">
+              <div className="w-full max-w-xl">
+                <label className="mb-2 block text-sm font-medium text-foreground">
+                  {copy.searchLabel}
+                </label>
+                <Input
+                  type="text"
+                  value={searchInput}
+                  onChange={(event) => setSearchInput(event.target.value)}
+                  placeholder={copy.searchPlaceholder}
+                  aria-label={copy.searchLabel}
+                  icon={<Search className="h-4 w-4" />}
+                />
+              </div>
+              <div className="grid gap-4 xl:grid-cols-5">
+                <Select
+                  label={copy.semester}
                 value={filters.semesterId}
                 onChange={(event) => {
                   setFilters((current) => ({
@@ -606,6 +648,7 @@ export default function AdminEnrollmentsPage() {
                 <div className="text-sm text-muted-foreground">
                   {copy.enrollmentsCount(total)}
                 </div>
+              </div>
               </div>
             </div>
         </AdminToolbarCard>

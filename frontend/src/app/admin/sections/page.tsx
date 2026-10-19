@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { ClipboardList, Pencil, Plus, Trash2, X } from 'lucide-react';
+import { ClipboardList, Pencil, Plus, Search, Trash2, X } from 'lucide-react';
 import { toast } from 'sonner';
 import { useAuth } from '@/context/AuthContext';
 import {
@@ -133,6 +133,8 @@ export default function AdminSectionsPage() {
   const [error, setError] = useState('');
   const [referenceError, setReferenceError] = useState('');
   const [semesterFilter, setSemesterFilter] = useState('');
+  const [search, setSearch] = useState('');
+  const [searchInput, setSearchInput] = useState('');
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -206,6 +208,7 @@ export default function AdminSectionsPage() {
         page,
         limit: 20,
         semesterId: semesterFilter || undefined,
+        search: search || undefined,
       });
       setSections(response.data || []);
       setTotalPages(response.meta?.totalPages || 1);
@@ -218,7 +221,24 @@ export default function AdminSectionsPage() {
     } finally {
       setIsLoading(false);
     }
-  }, [locale, page, semesterFilter]);
+  }, [locale, page, search, semesterFilter]);
+
+  useEffect(() => {
+    const trimmed = searchInput.trim();
+    if (trimmed === search) {
+      return;
+    }
+    if (!trimmed) {
+      setSearch('');
+      setPage(1);
+      return;
+    }
+    const timer = window.setTimeout(() => {
+      setSearch(trimmed);
+      setPage(1);
+    }, 250);
+    return () => window.clearTimeout(timer);
+  }, [searchInput, search]);
 
   const dayOptions = useMemo(
     () =>
@@ -252,6 +272,8 @@ export default function AdminSectionsPage() {
           description:
             'Quản lý sức chứa, phân công giảng dạy và lịch phòng học trong một quy trình nhất quán.',
           create: 'Tạo lớp học phần',
+          searchLabel: 'Tìm lớp học phần',
+          searchPlaceholder: 'Tìm theo mã lớp, môn học hoặc giảng viên',
           semester: 'Học kỳ',
           allSemesters: 'Tất cả học kỳ',
           selectCourse: 'Chọn môn học',
@@ -323,6 +345,8 @@ export default function AdminSectionsPage() {
           description:
             'Manage class capacity, teaching assignments, and classroom schedules from one consistent workflow.',
           create: 'Create section',
+          searchLabel: 'Search sections',
+          searchPlaceholder: 'Search by section code, course, or lecturer',
           semester: 'Semester',
           allSemesters: 'All semesters',
           selectCourse: 'Select course',
@@ -640,7 +664,20 @@ export default function AdminSectionsPage() {
       <div className="space-y-6">
         <AdminToolbarCard>
             <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
-              <div className="w-full max-w-sm">
+              <div className="grid w-full gap-4 md:max-w-3xl md:grid-cols-2">
+                <div>
+                  <label className="mb-2 block text-sm font-medium text-foreground">
+                    {copy.searchLabel}
+                  </label>
+                  <Input
+                    type="text"
+                    value={searchInput}
+                    onChange={(event) => setSearchInput(event.target.value)}
+                    placeholder={copy.searchPlaceholder}
+                    aria-label={copy.searchLabel}
+                    icon={<Search className="h-4 w-4" />}
+                  />
+                </div>
                 <Select
                   label={copy.semester}
                   value={semesterFilter}

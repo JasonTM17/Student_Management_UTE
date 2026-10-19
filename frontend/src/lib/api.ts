@@ -713,6 +713,7 @@ export const sectionsApi = {
     semesterId?: string;
     departmentId?: string;
     courseId?: string;
+    search?: string;
   }): Promise<ApiResponse<Section[]>> => {
     const response = await api.get<ApiResponse<Section[]>>('/sections', {
       params,
@@ -957,6 +958,7 @@ export const enrollmentsApi = {
     studentId?: string;
     courseId?: string;
     sectionId?: string;
+    search?: string;
   }): Promise<ApiResponse<Enrollment[]>> => {
     const response = await api.get<ApiResponse<Enrollment[]>>('/enrollments', {
       params,
@@ -1174,6 +1176,7 @@ export const adminSectionsApi = {
     semesterId?: string;
     departmentId?: string;
     courseId?: string;
+    search?: string;
   }): Promise<ApiResponse<Section[]>> => {
     const response = await api.get<ApiResponse<Section[]>>('/sections', {
       params,

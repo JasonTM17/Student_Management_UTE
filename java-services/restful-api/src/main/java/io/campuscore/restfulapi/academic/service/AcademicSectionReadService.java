@@ -43,17 +43,23 @@ public class AcademicSectionReadService {
 
     @Transactional(readOnly = true)
     public SectionListResponse findSections(int page, int limit, String semesterId, String departmentId, String courseId) {
+        return findSections(page, limit, semesterId, departmentId, courseId, null);
+    }
+
+    @Transactional(readOnly = true)
+    public SectionListResponse findSections(int page, int limit, String semesterId, String departmentId, String courseId, String search) {
         requirePage(page, limit);
         String normalizedSemesterId = normalizeOptional("semesterId", semesterId);
         String normalizedDepartmentId = normalizeOptional("departmentId", departmentId);
         String normalizedCourseId = normalizeOptional("courseId", courseId);
-        long total = sections.countSections(normalizedSemesterId, normalizedDepartmentId, normalizedCourseId);
+        long total = sections.countSections(normalizedSemesterId, normalizedDepartmentId, normalizedCourseId, search);
         List<SectionRow> rows = sections.findSections(
                 offset(page, limit),
                 limit,
                 normalizedSemesterId,
                 normalizedDepartmentId,
-                normalizedCourseId);
+                normalizedCourseId,
+                search);
         return new SectionListResponse(sectionResponses(rows), meta(total, page, limit));
     }
 

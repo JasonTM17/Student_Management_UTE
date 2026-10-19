@@ -106,6 +106,19 @@ public class AcademicEnrollmentReadService {
             String studentId,
             String courseId,
             String sectionId) {
+        return findEnrollments(page, limit, status, semesterId, studentId, courseId, sectionId, null);
+    }
+
+    @Transactional(readOnly = true)
+    public EnrollmentListResponse findEnrollments(
+            int page,
+            int limit,
+            String status,
+            String semesterId,
+            String studentId,
+            String courseId,
+            String sectionId,
+            String search) {
         requirePage(page, limit);
         String normalizedStatus = normalizeOptional("status", status);
         String normalizedSemesterId = normalizeOptional("semesterId", semesterId);
@@ -117,7 +130,8 @@ public class AcademicEnrollmentReadService {
                 normalizedSemesterId,
                 normalizedStudentId,
                 normalizedCourseId,
-                normalizedSectionId);
+                normalizedSectionId,
+                search);
         return new EnrollmentListResponse(
                 enrollments(academic.findEnrollments(
                         offset(page, limit),
@@ -126,7 +140,8 @@ public class AcademicEnrollmentReadService {
                         normalizedSemesterId,
                         normalizedStudentId,
                         normalizedCourseId,
-                        normalizedSectionId)),
+                        normalizedSectionId,
+                        search)),
                 meta(total, page, limit));
     }
 

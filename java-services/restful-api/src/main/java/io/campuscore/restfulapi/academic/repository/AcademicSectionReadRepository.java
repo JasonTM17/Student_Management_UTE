@@ -1,5 +1,6 @@
 package io.campuscore.restfulapi.academic.repository;
 
+import io.campuscore.restfulapi.common.LikePattern;
 import java.math.BigDecimal;
 import java.sql.ResultSet;
 import java.sql.SQLException;
@@ -36,10 +37,14 @@ public class AcademicSectionReadRepository {
     }
 
     public List<SectionRow> findSections(long offset, int limit, String semesterId, String departmentId, String courseId) {
+        return findSections(offset, limit, semesterId, departmentId, courseId, null);
+    }
+
+    public List<SectionRow> findSections(long offset, int limit, String semesterId, String departmentId, String courseId, String search) {
         MapSqlParameterSource parameters = new MapSqlParameterSource()
                 .addValue("offset", offset)
                 .addValue("limit", limit);
-        String where = filters(parameters, semesterId, departmentId, courseId);
+        String where = filters(parameters, semesterId, departmentId, courseId, search);
         return jdbc.query(sectionSelect() + where
                         + " ORDER BY section.\"sectionNumber\" ASC, section.\"id\" ASC LIMIT :limit OFFSET :offset",
                 parameters,
@@ -47,11 +52,17 @@ public class AcademicSectionReadRepository {
     }
 
     public long countSections(String semesterId, String departmentId, String courseId) {
+        return countSections(semesterId, departmentId, courseId, null);
+    }
+
+    public long countSections(String semesterId, String departmentId, String courseId, String search) {
         MapSqlParameterSource parameters = new MapSqlParameterSource();
-        String where = filters(parameters, semesterId, departmentId, courseId);
+        String where = filters(parameters, semesterId, departmentId, courseId, search);
         Long count = jdbc.queryForObject(
                 "SELECT COUNT(*) FROM " + SECTION + " section"
-                        + " JOIN " + COURSE + " course ON course.\"id\" = section.\"courseId\"" + where,
+                        + " JOIN " + COURSE + " course ON course.\"id\" = section.\"courseId\""
+                        + " LEFT JOIN " + LECTURER + " lecturer ON lecturer.\"id\" = section.\"lecturerId\""
+                        + " LEFT JOIN " + USER + " lecturer_user ON lecturer_user.\"id\" = lecturer.\"userId\"" + where,
                 parameters,
                 Long.class);
         return Objects.requireNonNullElse(count, 0L);
@@ -137,11 +148,30 @@ public class AcademicSectionReadRepository {
             MapSqlParameterSource parameters,
             String semesterId,
             String departmentId,
-            String courseId) {
+            String courseId,
+            String search) {
         StringBuilder where = new StringBuilder();
         appendFilter(where, "section.\"semesterId\" = :semesterId", "semesterId", semesterId, parameters);
         appendFilter(where, "course.\"departmentId\" = :departmentId", "departmentId", departmentId, parameters);
         appendFilter(where, "section.\"courseId\" = :courseId", "courseId", courseId, parameters);
+        List<String> tokens = LikePattern.tokens(search);
+        if (!tokens.isEmpty()) {
+            parameters.addValue("foldFrom", LikePattern.FOLD_FROM);
+            parameters.addValue("foldTo", LikePattern.FOLD_TO);
+            for (int i = 0; i < tokens.size(); i++) {
+                String paramName = "searchToken" + i;
+                parameters.addValue(paramName, tokens.get(i));
+                where.append(where.length() == 0 ? " WHERE (" : " AND (")
+                        .append("TRANSLATE(LOWER(section.\"sectionNumber\"), :foldFrom, :foldTo) LIKE :").append(paramName).append(" ESCAPE '\\'")
+                        .append(" OR TRANSLATE(LOWER(course.\"code\"), :foldFrom, :foldTo) LIKE :").append(paramName).append(" ESCAPE '\\'")
+                        .append(" OR TRANSLATE(LOWER(course.\"name\"), :foldFrom, :foldTo) LIKE :").append(paramName).append(" ESCAPE '\\'")
+                        .append(" OR TRANSLATE(LOWER(COALESCE(course.\"nameEn\", '')), :foldFrom, :foldTo) LIKE :").append(paramName).append(" ESCAPE '\\'")
+                        .append(" OR TRANSLATE(LOWER(COALESCE(course.\"nameVi\", '')), :foldFrom, :foldTo) LIKE :").append(paramName).append(" ESCAPE '\\'")
+                        .append(" OR TRANSLATE(LOWER(COALESCE(lecturer.\"employeeId\", '')), :foldFrom, :foldTo) LIKE :").append(paramName).append(" ESCAPE '\\'")
+                        .append(" OR TRANSLATE(LOWER(COALESCE(lecturer_user.\"firstName\", '')), :foldFrom, :foldTo) LIKE :").append(paramName).append(" ESCAPE '\\'")
+                        .append(" OR TRANSLATE(LOWER(COALESCE(lecturer_user.\"lastName\", '')), :foldFrom, :foldTo) LIKE :").append(paramName).append(" ESCAPE '\\'))");
+            }
+        }
         return where.toString();
     }
 

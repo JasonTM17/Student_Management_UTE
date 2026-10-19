@@ -109,11 +109,12 @@ public class AcademicEnrollmentReadController {
             @Parameter(description = "Mã định danh sinh viên (UUID)") @RequestParam(required = false) String studentId,
             @Parameter(description = "Mã định danh môn học (UUID)") @RequestParam(required = false) String courseId,
             @Parameter(description = "Mã định danh lớp học phần (UUID)") @RequestParam(required = false) String sectionId,
+            @Parameter(description = "Từ khóa tìm kiếm theo tên/MSSV/email sinh viên hoặc môn học") @RequestParam(required = false) String search,
             @RequestParam MultiValueMap<String, String> queryParameters) {
         requireAllowedQuery(
                 queryParameters,
-                Set.of("page", "limit", "status", "semesterId", "studentId", "courseId", "sectionId"));
-        return academic.findEnrollments(page, limit, status, semesterId, studentId, courseId, sectionId);
+                Set.of("page", "limit", "status", "semesterId", "studentId", "courseId", "sectionId", "search"));
+        return academic.findEnrollments(page, limit, status, semesterId, studentId, courseId, sectionId, search);
     }
 
     @Operation(summary = "Chi tiết một bản ghi ghi danh học phần", description = "Lấy thông tin chi tiết một lượt ghi danh của sinh viên")
