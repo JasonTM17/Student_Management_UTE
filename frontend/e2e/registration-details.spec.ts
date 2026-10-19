@@ -108,6 +108,7 @@ async function mockRegistration(page: Page, options: FixtureOptions = {}) {
     }
     const payloads: Record<string, unknown> = {
       '/api/site-appearance': {}, '/api/v1/site-appearance': {},
+      '/api/v1/health/liveness': { status: 'UP' },
       '/api/v1/auth/me': user, '/api/v1/auth/logout': {},
       '/api/v1/semesters': { data: terms },
       '/api/v1/notifications/my': { data: [] }, '/api/v1/notifications/my/unread-count': { unreadCount: 0 },
@@ -528,6 +529,7 @@ test('registration details: SPA account switch cannot reuse the previous student
   await expect(page.getByRole('tabpanel', { name: names.en.registered, exact: true }).getByText(names.en.empty).first()).toBeVisible();
   await expect(page.getByRole('tabpanel', { name: names.en.registered, exact: true }).getByText('MF101', { exact: true })).toHaveCount(0);
   expect(await page.evaluate(() => document.documentElement.dataset.registrationTestDocument)).toBe('persistent');
+  expect(fixture.requests).toContain('/api/v1/health/liveness');
   expect(fixture.errors).toEqual([]);
 });
 
