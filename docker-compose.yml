@@ -204,6 +204,7 @@ services:
         # passwords empty), so this never leaks into a deployed bundle.
         NEXT_PUBLIC_DEMO_STUDENT_PASSWORD: ${NEXT_PUBLIC_DEMO_STUDENT_PASSWORD:-password123}
         NEXT_PUBLIC_DEMO_LECTURER_PASSWORD: ${NEXT_PUBLIC_DEMO_LECTURER_PASSWORD:-password123}
+        NEXT_PUBLIC_DEMO_DEAN_PASSWORD: ${NEXT_PUBLIC_DEMO_DEAN_PASSWORD:-password123}
     image: student-management-ute-frontend:local
     environment:
       NODE_ENV: production

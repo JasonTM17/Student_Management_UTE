@@ -32,7 +32,7 @@ import { cn } from '@/lib/utils';
 const DEMO_ACCOUNT_EMAILS: Record<LoginPortal, string> = {
   student: 'student@campuscore.edu',
   lecturer: 'lecturer@campuscore.edu',
-  dean: 'dean@campuscore.edu',
+  dean: 'truongkhoa@campuscore.demo',
   admin: 'admin@campuscore.edu',
 };
 
@@ -56,15 +56,16 @@ const STUDENT_DEMO_ACCOUNTS: ReadonlyArray<{ email: string; name: string; leader
  * `process.env.NEXT_PUBLIC_*` only when it can see the literal key, so a computed
  * lookup would silently read `undefined` in the browser.
  *
- * The admin and dean portals deliberately have no entry: privileged accounts
- * govern users, academic records, and faculty oversight, so their passwords
- * are never published in the client bundle or pre-filled. They still sign in
- * normally through a portal tab.
+ * The admin portal deliberately has no entry: a privileged account governs
+ * users and academic records, so its password is never published in the
+ * client bundle or pre-filled. It still signs in normally through its tab.
+ * The dean portal quick-fills the seeded truongkhoa demo account only when
+ * the deployment hands the build a real password — never a source literal.
  */
 const DEMO_PASSWORDS: Record<LoginPortal, string | undefined> = {
   student: process.env.NEXT_PUBLIC_DEMO_STUDENT_PASSWORD,
   lecturer: process.env.NEXT_PUBLIC_DEMO_LECTURER_PASSWORD,
-  dean: undefined,
+  dean: process.env.NEXT_PUBLIC_DEMO_DEAN_PASSWORD,
   admin: undefined,
 };
 

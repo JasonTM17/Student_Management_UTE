@@ -33,6 +33,10 @@ test('demo passwords come from the environment and have no in-source fallback', 
   assert.ok(passwords, 'the demo password map must be declared');
   assert.match(passwords[0], /process\.env\.NEXT_PUBLIC_DEMO_STUDENT_PASSWORD/);
   assert.match(passwords[0], /process\.env\.NEXT_PUBLIC_DEMO_LECTURER_PASSWORD/);
+  // The dean portal quick-fills the seeded truongkhoa demo account, but the
+  // password still comes from the build environment — never a literal.
+  assert.match(passwords[0], /process\.env\.NEXT_PUBLIC_DEMO_DEAN_PASSWORD/);
+  assert.match(loginPage, /dean:\s*'truongkhoa@campuscore\.demo'/);
   // The admin portal is never quick-filled: referencing its env key would
   // inline the privileged password into the public client bundle.
   assert.doesNotMatch(loginPage, /NEXT_PUBLIC_DEMO_ADMIN_PASSWORD/);
