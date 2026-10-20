@@ -20,6 +20,25 @@ import { normalizeVietnameseText } from '@/lib/registration-browse';
 import { cn } from '@/lib/utils';
 import { useThesisWorkspace } from './useThesisWorkspace';
 
+/**
+ * Topic descriptions are authored in the rich-text editor (HTML). Card
+ * previews need the plain text — the raw markup used to render as literal
+ * `<p>`/`<strong>` noise under the clamp.
+ */
+function plainTextDescription(raw: string | null | undefined): string {
+  if (!raw) return '';
+  return raw
+    .replace(/<[^>]*>/g, ' ')
+    .replace(/&nbsp;/gi, ' ')
+    .replace(/&amp;/gi, '&')
+    .replace(/&lt;/gi, '<')
+    .replace(/&gt;/gi, '>')
+    .replace(/&quot;/gi, '"')
+    .replace(/&#39;|&apos;/gi, "'")
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
 export default function ThesisTopicCatalogPage() {
   const { user, isLoading: authLoading, hasAccess, isForbidden } = useRequireAuth();
   const { messages, locale } = useI18n();
@@ -58,7 +77,7 @@ export default function ThesisTopicCatalogPage() {
 
     return workspace.topics.filter((topic) => {
       const fullText = normalizeVietnameseText(
-        [topic.title, topic.description].filter(Boolean).join(' '),
+        [topic.title, plainTextDescription(topic.description)].filter(Boolean).join(' '),
       );
       return searchTerms.some((term) => {
         const foldedTerm = normalizeVietnameseText(term);
@@ -251,7 +270,11 @@ export default function ThesisTopicCatalogPage() {
       </form>
 
       {workspace.error ? (
-        <ErrorState title={messages.thesis.loadFailed} description={workspace.error} />
+        <ErrorState
+          title={messages.thesis.loadFailed}
+          description={workspace.error}
+          onRetry={() => void workspace.reload()}
+        />
       ) : workspace.workspaceLoading && workspace.topics.length === 0 ? (
         <Card variant="muted">
           <CardHeader>
@@ -342,11 +365,17 @@ export default function ThesisTopicCatalogPage() {
                   </span>
                   <ArrowUpRight className="h-4 w-4 text-muted-foreground transition-transform group-hover:-translate-y-0.5 group-hover:translate-x-0.5" />
                 </div>
-                <h2 className="mt-5 line-clamp-3 text-lg font-semibold leading-7 text-foreground">
+                <h2
+                  className="mt-5 line-clamp-3 text-lg font-semibold leading-7 text-foreground"
+                  title={topic.title}
+                >
                   {topic.title}
                 </h2>
-                <p className="mt-2 line-clamp-4 text-sm leading-6 text-muted-foreground">
-                  {topic.description}
+                <p
+                  className="mt-2 line-clamp-4 text-sm leading-6 text-muted-foreground"
+                  title={plainTextDescription(topic.description)}
+                >
+                  {plainTextDescription(topic.description)}
                 </p>
                 <span className={cn('mt-auto pt-5 text-sm font-semibold text-primary')}>
                   {messages.thesis.topicDetailTitle}

@@ -340,6 +340,19 @@ class ThesisCouncilRoundPostgresIT {
                 UUID.randomUUID(), topicId, supervisor);
         jdbc.update("INSERT INTO thesis.thesis_council_topic (id, council_id, topic_id, assigned_by) VALUES (?, ?, ?, ?)",
                 UUID.randomUUID(), councilId, topicId, deanUser);
+
+        // Defense/GVPB scoring now requires an approved defended group.
+        UUID groupId = UUID.randomUUID();
+        String leader = "tcr-" + tag + "-" + suffix + "-leader";
+        jdbc.update("INSERT INTO thesis.thesis_group (id, round_id, leader_student_id, topic_id, status, approval_status) "
+                        + "VALUES (?, ?, ?, ?, 'SUBMITTED', 'APPROVED')",
+                groupId, roundId, leader, topicId);
+        for (int order = 1; order <= 3; order++) {
+            jdbc.update("INSERT INTO thesis.thesis_group_member (id, group_id, round_id, student_id, member_order, is_leader) "
+                            + "VALUES (?, ?, ?, ?, ?, ?)",
+                    UUID.randomUUID(), groupId, roundId,
+                    order == 1 ? leader : leader + "-" + order, order, order == 1);
+        }
         return new Fixture(roundId, councilId, topicId, chair, secretary, member, supervisor, reviewer, deanUser);
     }
 

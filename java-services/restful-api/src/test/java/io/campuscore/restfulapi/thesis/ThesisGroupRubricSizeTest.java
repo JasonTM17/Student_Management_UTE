@@ -9,6 +9,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import java.sql.Timestamp;
 import java.time.Instant;
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -104,7 +106,13 @@ class ThesisGroupRubricSizeTest {
                 .andExpect(jsonPath("$.approvalStatus").value("APPROVED"));
 
         assertRoster(groupId, memberCount);
-        assertThat(auditActions(groupId)).containsExactly("THESIS_GROUP_APPROVED");
+        // Membership and topic assignment are now audited alongside approval;
+        // the implicit leader row in createGroup is the only unaudited seat.
+        List<String> expectedActions = new ArrayList<>(
+                Collections.nCopies(memberCount - 1, "THESIS_GROUP_MEMBER_ADDED"));
+        expectedActions.add("THESIS_GROUP_TOPIC_ASSIGNED");
+        expectedActions.add("THESIS_GROUP_APPROVED");
+        assertThat(auditActions(groupId)).containsExactlyElementsOf(expectedActions);
         progress(groupId).andExpect(status().isOk())
                 .andExpect(jsonPath("$.memberCount").value(memberCount))
                 .andExpect(jsonPath("$.currentMilestone").value("GROUP_APPROVED"))
@@ -185,7 +193,10 @@ class ThesisGroupRubricSizeTest {
         assertThat(members(groupId)).containsExactlyElementsOf(before.members().stream()
                 .filter(member -> !"rgs-member-4".equals(member.get("student_id"))).toList());
         assertThat(reports(groupId)).containsExactlyElementsOf(before.reports());
-        assertThat(auditActions(groupId)).containsExactlyElementsOf(before.auditActions());
+        // The roster history is preserved plus the new removal audit row.
+        List<String> expectedAudit = new ArrayList<>(before.auditActions());
+        expectedAudit.add("THESIS_GROUP_MEMBER_REMOVED");
+        assertThat(auditActions(groupId)).containsExactlyElementsOf(expectedAudit);
         assertRoster(groupId, 3);
         assertThat(group(groupId)).containsEntry("approval_status", "APPROVED");
     }

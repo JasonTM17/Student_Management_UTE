@@ -25,7 +25,7 @@ public final class ThesisCouncilRequestDtos {
             @NotBlank(message = "roundId is required")
             @Pattern(regexp = UUID_PATTERN, message = "roundId must be a UUID")
             String roundId,
-            @Size(max = 200, message = "name must contain at most 200 characters")
+            @Size(max = 180, message = "name must contain at most 180 characters")
             String name) {
     }
 
@@ -33,7 +33,7 @@ public final class ThesisCouncilRequestDtos {
     public record AddCouncilMemberRequest(
             @NotBlank(message = "lecturerId is required")
             String lecturerId,
-            @Size(max = 60, message = "memberRole must contain at most 60 characters")
+            @Size(max = 20, message = "memberRole must contain at most 20 characters")
             String memberRole) {
     }
 

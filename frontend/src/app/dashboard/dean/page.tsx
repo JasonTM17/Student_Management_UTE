@@ -295,7 +295,11 @@ export default function DeanOverviewPage() {
 
       {isLoading ? <LoadingState label={copy.loading} /> : null}
       {!isLoading && error ? (
-        <ErrorState title={copy.title} description={copy.loadError} />
+        <ErrorState
+          title={copy.title}
+          description={copy.loadError}
+          onRetry={() => (selectedRoundId ? loadOverview(selectedRoundId) : window.location.reload())}
+        />
       ) : null}
       {!isLoading && !error && overview ? (
         <>

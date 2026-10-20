@@ -670,6 +670,7 @@ class ThesisGovernanceIntegrationTest {
                         .content("{\"topicId\":\"" + topicId + "\"}")
                         .with(truongKhoaJwt()))
                 .andExpect(status().isOk());
+        insertApprovedGroupWithRoster(roundId, topicId, "gov-score");
 
         mvc.perform(delete("/api/v1/thesis/councils/{id}/members/{lecturerId}", councilId, "gov-score-secretary")
                         .with(truongKhoaJwt()))
@@ -801,6 +802,7 @@ class ThesisGovernanceIntegrationTest {
                         .content("{\"topicId\":\"" + topicId + "\"}")
                         .with(truongKhoaJwt()))
                 .andExpect(status().isOk());
+        insertApprovedGroupWithRoster(roundId, topicId, "gov-audit");
 
         // First score: no outgoing value; the trace carries the recorded one.
         mvc.perform(post("/api/v1/thesis/councils/{councilId}/topics/{topicId}/scores", councilId, topicId)
@@ -870,14 +872,15 @@ class ThesisGovernanceIntegrationTest {
                 .andExpect(status().isOk());
         UUID councilId = jdbc.queryForObject(
                 "SELECT id FROM thesis.thesis_council WHERE name = 'Hội đồng super admin'", UUID.class);
-        councilSeat(councilId, "gov-sa-chair", "CHAIR");
-        councilSeat(councilId, "gov-sa-secretary", "SECRETARY");
-        councilSeat(councilId, "gov-sa-member", "MEMBER");
+        councilSeat(councilId, "gov-sa-chair", "CHAIR", superAdminJwt());
+        councilSeat(councilId, "gov-sa-secretary", "SECRETARY", superAdminJwt());
+        councilSeat(councilId, "gov-sa-member", "MEMBER", superAdminJwt());
         mvc.perform(post("/api/v1/thesis/councils/{id}/topics", councilId)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"topicId\":\"" + topicId + "\"}")
                         .with(superAdminJwt()))
                 .andExpect(status().isOk());
+        insertApprovedGroupWithRoster(roundId, topicId, "gov-sa");
 
         mvc.perform(post("/api/v1/thesis/councils/{councilId}/topics/{topicId}/scores", councilId, topicId)
                         .contentType(MediaType.APPLICATION_JSON)
@@ -890,6 +893,249 @@ class ThesisGovernanceIntegrationTest {
                         .with(superAdminJwt()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$[0].score").value(8));
+    }
+
+    // ---------- R8b: cross-faculty concealment and workflow invariants ----------
+
+    @Test
+    void aDeanCannotReadOrRestaffAForeignFacultyCouncilOrScores() throws Exception {
+        // A second faculty gives the foreign dean a resolved scope that still
+        // excludes the fixture council; without a profile the check fails
+        // closed before concealment is even evaluated.
+        jdbc.update("INSERT INTO academic.\"Faculty\" (\"id\",\"name\",\"isActive\") "
+                + "VALUES ('gov-faculty-foreign','Khoa ngoài phạm vi',TRUE)");
+        jdbc.update("INSERT INTO academic.\"Department\" (\"id\",\"name\",\"nameEn\",\"nameVi\",\"code\",\"facultyId\",\"isActive\") "
+                + "VALUES ('gov-department-foreign','Foreign','Foreign','Foreign','FR','gov-faculty-foreign',TRUE)");
+        ThesisAuthorityFixture.role(jdbc, "gov-foreign-dean-user", "TRUONG_KHOA");
+        jdbc.update("INSERT INTO campuscore_auth.\"Lecturer\" (\"id\",\"userId\",\"departmentId\",\"employeeId\",\"isActive\") "
+                + "VALUES ('gov-foreign-dean-lecturer','gov-foreign-dean-user','gov-department-foreign','GV-foreign-dean',TRUE)");
+        var foreignDean = ThesisAuthorityFixture.role(jdbc, "gov-foreign-dean-user", "TRUONG_KHOA");
+
+        UUID roundId = insertRound("Gov Foreign Council Round", "REGISTRATION_CLOSED",
+                Instant.now().minusSeconds(3_600), Instant.now().plusSeconds(3_600));
+        CouncilFixture fixture = councilFixture(roundId, "gov-foreign");
+
+        // Every roster/read surface answers the concealment 404, never data.
+        mvc.perform(get("/api/v1/thesis/councils/{id}", fixture.councilId()).with(foreignDean))
+                .andExpect(status().isNotFound());
+        mvc.perform(post("/api/v1/thesis/councils/{id}/members", fixture.councilId())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"lecturerId\":\"gov-foreign-chair\",\"memberRole\":\"MEMBER\"}")
+                        .with(foreignDean))
+                .andExpect(status().isNotFound());
+        mvc.perform(delete("/api/v1/thesis/councils/{id}/members/{lecturerId}",
+                        fixture.councilId(), "gov-foreign-member").with(foreignDean))
+                .andExpect(status().isNotFound());
+        mvc.perform(post("/api/v1/thesis/councils/{id}/topics", fixture.councilId())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"topicId\":\"" + fixture.topicId() + "\"}")
+                        .with(foreignDean))
+                .andExpect(status().isNotFound());
+        // Unpublished scores conceal through the same topic scope.
+        mvc.perform(get("/api/v1/thesis/councils/{councilId}/topics/{topicId}/scores",
+                        fixture.councilId(), fixture.topicId()).with(foreignDean))
+                .andExpect(status().isNotFound());
+        // The round listing silently drops councils outside the dean's faculty.
+        mvc.perform(get("/api/v1/thesis/councils")
+                        .queryParam("roundId", roundId.toString())
+                        .with(foreignDean))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$").isArray())
+                .andExpect(jsonPath("$.length()").value(0));
+        // The owning dean still sees everything, proving the scope is
+        // faculty-based rather than a blanket council denial.
+        mvc.perform(get("/api/v1/thesis/councils/{id}", fixture.councilId()).with(truongKhoaJwt()))
+                .andExpect(status().isOk());
+    }
+
+    @Test
+    void aPendingGroupCannotSkipApprovalStraightToCompleted() throws Exception {
+        UUID roundId = insertRound("Gov Wedge Round", "REGISTRATION_CLOSED",
+                Instant.now().minusSeconds(3_600), Instant.now().plusSeconds(3_600));
+        UUID topicId = insertPublishedTopic(roundId);
+        ensureStudent("gov-wedge-leader", "gov-wedge-user", "gov-wedge-leader@campuscore.edu");
+        UUID pendingGroup = insertGroup(roundId, "gov-wedge-leader", topicId, "PENDING");
+        insertMember(pendingGroup, roundId, "gov-wedge-leader", 1);
+
+        // COMPLETED before approval would wedge the group forever: approval
+        // requires SUBMITTED status, which COMPLETED no longer reports.
+        mvc.perform(patch("/api/v1/thesis/groups/{id}/progress", pendingGroup)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"status\":\"COMPLETED\"}")
+                        .with(studentJwt("gov-wedge-leader")))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("GROUP_STATE_CONFLICT"));
+
+        // The approved path remains open once governance signs off.
+        ensureStudent("gov-done-leader", "gov-done-user", "gov-done-leader@campuscore.edu");
+        UUID approvedGroup = insertGroup(roundId, "gov-done-leader", topicId, "APPROVED");
+        insertMember(approvedGroup, roundId, "gov-done-leader", 1);
+        insertMember(approvedGroup, roundId, "gov-done-peer-2", 2);
+        insertMember(approvedGroup, roundId, "gov-done-peer-3", 3);
+        mvc.perform(patch("/api/v1/thesis/groups/{id}/progress", approvedGroup)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"status\":\"COMPLETED\"}")
+                        .with(studentJwt("gov-done-leader")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("COMPLETED"));
+    }
+
+    @Test
+    void theCounterReviewerCannotAlsoSitOnTheDefendingCouncil() throws Exception {
+        UUID roundId = insertRound("Gov Independence Round", "REGISTRATION_CLOSED",
+                Instant.now().minusSeconds(3_600), Instant.now().plusSeconds(3_600));
+        // Counter-review assignment only exists on rounds with a GVPB deadline.
+        jdbc.update("UPDATE thesis.thesis_registration_round SET gvpb_deadline = ? WHERE id = ?",
+                Timestamp.from(Instant.now().plusSeconds(86_400)), roundId);
+        CouncilFixture fixture = councilFixture(roundId, "gov-indep");
+
+        // Edge 1: a seated council member cannot be named counter-reviewer of
+        // a topic their council already defends.
+        mvc.perform(post("/api/v1/thesis/topics/{id}/reviewer", fixture.topicId())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"lecturerId\":\"gov-indep-member\"}")
+                        .with(truongKhoaJwt()))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("REVIEWER_MUST_BE_INDEPENDENT"));
+
+        // Edge 2: the member slips in as reviewer while the topic is not yet
+        // assigned; the assignment itself must then refuse the conflict.
+        UUID secondTopic = insertPublishedTopic(roundId);
+        mvc.perform(post("/api/v1/thesis/topics/{id}/reviewer", secondTopic)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"lecturerId\":\"gov-indep-member\"}")
+                        .with(truongKhoaJwt()))
+                .andExpect(status().isOk());
+        mvc.perform(post("/api/v1/thesis/councils/{id}/topics", fixture.councilId())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"topicId\":\"" + secondTopic + "\"}")
+                        .with(truongKhoaJwt()))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("REVIEWER_MUST_BE_INDEPENDENT"));
+
+        // Edge 3: an outsider reviews a topic already on the council; seating
+        // them afterwards is refused the same way.
+        ensureLecturer("gov-indep-outsider");
+        UUID thirdTopic = insertPublishedTopic(roundId);
+        mvc.perform(post("/api/v1/thesis/councils/{id}/topics", fixture.councilId())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"topicId\":\"" + thirdTopic + "\"}")
+                        .with(truongKhoaJwt()))
+                .andExpect(status().isOk());
+        mvc.perform(post("/api/v1/thesis/topics/{id}/reviewer", thirdTopic)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"lecturerId\":\"gov-indep-outsider\"}")
+                        .with(truongKhoaJwt()))
+                .andExpect(status().isOk());
+        mvc.perform(post("/api/v1/thesis/councils/{id}/members", fixture.councilId())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"lecturerId\":\"gov-indep-outsider\",\"memberRole\":\"MEMBER\"}")
+                        .with(truongKhoaJwt()))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("REVIEWER_MUST_BE_INDEPENDENT"));
+    }
+
+    @Test
+    void aDeactivatedSupervisorCannotKeepApprovingGroups() throws Exception {
+        UUID roundId = insertRound("Gov Deactivated Round", "REGISTRATION_OPEN",
+                Instant.now().minusSeconds(3_600), Instant.now().plusSeconds(3_600));
+        UUID topicId = insertPublishedTopic(roundId);
+        ensureLecturer("gov-deactivated-sup");
+        jdbc.update("INSERT INTO thesis.thesis_topic_supervisor (id, topic_id, lecturer_id, supervisor_order) "
+                        + "VALUES (?, ?, 'gov-deactivated-sup', 1)",
+                UUID.randomUUID(), topicId);
+        ensureStudent("gov-deactivated-leader", "gov-deactivated-user", "gov-deactivated-leader@campuscore.edu");
+        UUID groupId = insertGroup(roundId, "gov-deactivated-leader", topicId, "PENDING");
+        insertMember(groupId, roundId, "gov-deactivated-leader", 1);
+        insertMember(groupId, roundId, "gov-deactivated-peer-2", 2);
+        insertMember(groupId, roundId, "gov-deactivated-peer-3", 3);
+
+        // The live supervisor approves normally first.
+        mvc.perform(post("/api/v1/thesis/groups/{id}/approve", groupId).with(lecturerJwt("gov-deactivated-sup")))
+                .andExpect(status().isOk());
+
+        // Deactivating the profile must revoke the same authority instantly.
+        jdbc.update("UPDATE campuscore_auth.\"Lecturer\" SET \"isActive\" = FALSE WHERE \"id\" = 'gov-deactivated-sup'");
+        ensureStudent("gov-deactivated-leader-2", "gov-deactivated-user-2", "gov-deactivated-leader-2@campuscore.edu");
+        UUID secondGroup = insertGroup(roundId, "gov-deactivated-leader-2", topicId, "PENDING");
+        insertMember(secondGroup, roundId, "gov-deactivated-leader-2", 1);
+        insertMember(secondGroup, roundId, "gov-deactivated-peer-4", 2);
+        insertMember(secondGroup, roundId, "gov-deactivated-peer-5", 3);
+        mvc.perform(post("/api/v1/thesis/groups/{id}/approve", secondGroup).with(lecturerJwt("gov-deactivated-sup")))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void publicationRefusesWhileAnyGroupStillAwaitsApproval() throws Exception {
+        UUID roundId = insertRound("Gov Pending Publish Round", "REGISTRATION_CLOSED",
+                Instant.now().minusSeconds(3_600), Instant.now().plusSeconds(3_600));
+        UUID topicId = insertPublishedTopic(roundId);
+        ensureStudent("gov-pub-leader", "gov-pub-user", "gov-pub-leader@campuscore.edu");
+        ensureStudent("gov-pub-member-2", "gov-pub-user-2", "gov-pub-member-2@campuscore.edu");
+        ensureStudent("gov-pub-member-3", "gov-pub-user-3", "gov-pub-member-3@campuscore.edu");
+        UUID approvedGroup = insertGroup(roundId, "gov-pub-leader", topicId, "APPROVED");
+        insertMember(approvedGroup, roundId, "gov-pub-leader", 1);
+        insertMember(approvedGroup, roundId, "gov-pub-member-2", 2);
+        insertMember(approvedGroup, roundId, "gov-pub-member-3", 3);
+        jdbc.update("UPDATE thesis.thesis_topic SET final_score = 8.0, result_status = 'GRADED' WHERE id = ?", topicId);
+
+        // A graded round still cannot publish while a second group is PENDING:
+        // the pending group would be stranded without a publishable outcome.
+        ensureStudent("gov-pub-pending", "gov-pub-user-p", "gov-pub-pending@campuscore.edu");
+        UUID secondTopic = insertPublishedTopic(roundId);
+        UUID pendingGroup = insertGroup(roundId, "gov-pub-pending", secondTopic, "PENDING");
+        insertMember(pendingGroup, roundId, "gov-pub-pending", 1);
+
+        mvc.perform(post("/api/v1/thesis/rounds/{id}/publish-results", roundId).with(truongKhoaJwt()))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("GROUPS_PENDING_APPROVAL"));
+
+        // Rejecting it clears the gate; a cancelled pending group is ignored.
+        jdbc.update("UPDATE thesis.thesis_group SET approval_status = 'REJECTED' WHERE id = ?", pendingGroup);
+        mvc.perform(post("/api/v1/thesis/rounds/{id}/publish-results", roundId).with(truongKhoaJwt()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("RESULTS_PUBLISHED"));
+    }
+
+    @Test
+    void scoringIsRefusedUntilAGroupIsApprovedOnTheTopic() throws Exception {
+        UUID roundId = insertRound("Gov Unapproved Score Round", "REGISTRATION_CLOSED",
+                Instant.now().minusSeconds(3_600), Instant.now().plusSeconds(3_600));
+        ensureLecturer("gov-noscore-chair");
+        mvc.perform(post("/api/v1/thesis/councils")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"roundId\":\"" + roundId + "\",\"name\":\"Hội đồng chưa có nhóm\"}")
+                        .with(truongKhoaJwt()))
+                .andExpect(status().isOk());
+        UUID councilId = jdbc.queryForObject(
+                "SELECT id FROM thesis.thesis_council WHERE name = 'Hội đồng chưa có nhóm'", UUID.class);
+        ensureLecturer("gov-noscore-secretary");
+        ensureLecturer("gov-noscore-member");
+        councilSeat(councilId, "gov-noscore-chair", "CHAIR");
+        councilSeat(councilId, "gov-noscore-secretary", "SECRETARY");
+        councilSeat(councilId, "gov-noscore-member", "MEMBER");
+        UUID topicId = insertPublishedTopic(roundId);
+        mvc.perform(post("/api/v1/thesis/councils/{id}/topics", councilId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"topicId\":\"" + topicId + "\"}")
+                        .with(truongKhoaJwt()))
+                .andExpect(status().isOk());
+
+        // Without an approved group a defense score cannot be pre-baked.
+        mvc.perform(post("/api/v1/thesis/councils/{councilId}/topics/{topicId}/scores", councilId, topicId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"score\":8}")
+                        .with(lecturerJwt("gov-noscore-chair")))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("GROUP_NOT_APPROVED"));
+
+        // Approving the group unlocks grading.
+        insertApprovedGroupWithRoster(roundId, topicId, "gov-noscore");
+        mvc.perform(post("/api/v1/thesis/councils/{councilId}/topics/{topicId}/scores", councilId, topicId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"score\":8}")
+                        .with(lecturerJwt("gov-noscore-chair")))
+                .andExpect(status().isOk());
     }
 
     // ---------- R9: publication and student results ----------
@@ -1295,6 +1541,7 @@ class ThesisGovernanceIntegrationTest {
                         .content("{\"topicId\":\"" + topicId + "\"}")
                         .with(truongKhoaJwt()))
                 .andExpect(status().isOk());
+        insertApprovedGroupWithRoster(roundId, topicId, "gov-fin");
 
         mvc.perform(post("/api/v1/thesis/councils/{councilId}/topics/{topicId}/scores", councilId, topicId)
                         .contentType(MediaType.APPLICATION_JSON)
@@ -1392,6 +1639,7 @@ class ThesisGovernanceIntegrationTest {
                         .content("{\"topicId\":\"" + topicId + "\"}")
                         .with(truongKhoaJwt()))
                 .andExpect(status().isOk());
+        insertApprovedGroupWithRoster(roundId, topicId, "gov-bd");
 
         mvc.perform(post("/api/v1/thesis/councils/{councilId}/topics/{topicId}/scores", councilId, topicId)
                         .contentType(MediaType.APPLICATION_JSON)
@@ -1469,6 +1717,7 @@ class ThesisGovernanceIntegrationTest {
                         .content("{\"lecturerId\":\"gov-bound-reviewer\"}")
                         .with(truongKhoaJwt()))
                 .andExpect(status().isOk());
+        insertApprovedGroupWithRoster(roundId, topicId, "gov-bound");
 
         mvc.perform(post("/api/v1/thesis/topics/{id}/reviewer-score", topicId)
                         .contentType(MediaType.APPLICATION_JSON)
@@ -1624,6 +1873,7 @@ class ThesisGovernanceIntegrationTest {
                         .content("{\"lecturerId\":\"gov-blk-reviewer\"}")
                         .with(truongKhoaJwt()))
                 .andExpect(status().isOk());
+        insertApprovedGroupWithRoster(roundId, topicId, "gov-blk");
         Jwt reviewerActor = Jwt.withTokenValue("test")
                 .header("alg", "none")
                 .subject("gov-lecturer-user-gov-blk-reviewer")
@@ -1814,10 +2064,15 @@ class ThesisGovernanceIntegrationTest {
     }
 
     private void councilSeat(UUID councilId, String lecturerId, String role) throws Exception {
+        councilSeat(councilId, lecturerId, role, truongKhoaJwt());
+    }
+
+    private void councilSeat(UUID councilId, String lecturerId, String role,
+            org.springframework.test.web.servlet.request.RequestPostProcessor actor) throws Exception {
         mvc.perform(post("/api/v1/thesis/councils/{id}/members", councilId)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"lecturerId\":\"" + lecturerId + "\",\"memberRole\":\"" + role + "\"}")
-                        .with(truongKhoaJwt()))
+                        .with(actor))
                 .andExpect(status().isOk());
     }
 
@@ -1843,7 +2098,22 @@ class ThesisGovernanceIntegrationTest {
                         .content("{\"topicId\":\"" + topicId + "\"}")
                         .with(truongKhoaJwt()))
                 .andExpect(status().isOk());
+        insertApprovedGroupWithRoster(roundId, topicId, tag);
         return new CouncilFixture(councilId, topicId);
+    }
+
+    /**
+     * Defense and counter-review scores only exist once a group has been
+     * approved onto the topic, so every scoring fixture needs a defended
+     * roster: an APPROVED group with the contract's minimum three members.
+     */
+    private UUID insertApprovedGroupWithRoster(UUID roundId, UUID topicId, String tag) {
+        String leader = tag + "-leader";
+        UUID groupId = insertGroup(roundId, leader, topicId, "APPROVED");
+        insertMember(groupId, roundId, leader, 1);
+        insertMember(groupId, roundId, tag + "-member-2", 2);
+        insertMember(groupId, roundId, tag + "-member-3", 3);
+        return groupId;
     }
 
     private org.springframework.test.web.servlet.ResultActions addMember(UUID groupId, String studentId) throws Exception {

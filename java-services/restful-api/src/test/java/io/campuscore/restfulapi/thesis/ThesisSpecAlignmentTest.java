@@ -129,6 +129,17 @@ class ThesisSpecAlignmentTest {
         jdbc.update("INSERT INTO thesis.thesis_topic_supervisor (id, topic_id, lecturer_id, supervisor_order) "
                         + "VALUES (?, ?, 'sa-supervisor-1', 1)",
                 UUID.randomUUID(), topicId);
+        // Counter-review scoring requires an approved defended group.
+        UUID groupId = UUID.randomUUID();
+        jdbc.update("INSERT INTO thesis.thesis_group (id, round_id, leader_student_id, topic_id, status, approval_status) "
+                        + "VALUES (?, ?, 'sa-gvpb-leader', ?, 'SUBMITTED', 'APPROVED')",
+                groupId, roundId, topicId);
+        for (int order = 1; order <= 3; order++) {
+            jdbc.update("INSERT INTO thesis.thesis_group_member (id, group_id, round_id, student_id, member_order, is_leader) "
+                            + "VALUES (?, ?, ?, ?, ?, ?)",
+                    UUID.randomUUID(), groupId, roundId,
+                    order == 1 ? "sa-gvpb-leader" : "sa-gvpb-member-" + order, order, order == 1);
+        }
 
         // A topic supervisor cannot be its own counter-reviewer.
         mvc.perform(post("/api/v1/thesis/topics/{id}/reviewer", topicId)

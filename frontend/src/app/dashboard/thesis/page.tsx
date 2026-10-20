@@ -734,6 +734,11 @@ export default function ThesisPage() {
   useEffect(() => {
     setTopics([]);
     setGroups([]);
+    // Round-scoped UI state must not leak across rounds: the topic detail
+    // modal and action banners belonged to the previous round's objects.
+    setViewingTopic(null);
+    setActionError('');
+    setActionSuccess('');
     if (!selectedRoundId) {
       return;
     }
@@ -1421,12 +1426,17 @@ export default function ThesisPage() {
   const REPORT_FILE_EXTENSIONS = ['.pdf', '.doc', '.docx'];
   const REPORT_MAX_BYTES = 20 * 1024 * 1024;
 
+  // In-flight downloads per group: a double-click (or a slow network invite
+  // to click again) must not fire a second identical download.
+  const downloadPendingRef = useRef(new Set<string>());
+
   /** Downloads an attached report document for any authorized viewer. */
   const downloadReportArtifact = async (
     groupId: string,
     report: ThesisGroupReport | null | undefined,
   ) => {
-    if (!report?.fileName) return;
+    if (!report?.fileName || downloadPendingRef.current.has(groupId)) return;
+    downloadPendingRef.current.add(groupId);
     try {
       await thesisApi.downloadReportFile(groupId, report);
     } catch (caught) {
@@ -1437,6 +1447,8 @@ export default function ThesisPage() {
           ? messages.thesis.report.fileUnavailable
           : messages.thesis.report.submitFailed,
       );
+    } finally {
+      downloadPendingRef.current.delete(groupId);
     }
   };
 
@@ -1557,6 +1569,10 @@ export default function ThesisPage() {
           reportUploadAbortRef.current = null;
           setReportUploadPercent(null);
         }
+        // Reflect the landed file immediately: if the follow-up URL PATCH
+        // fails, the UI still shows "submitted" instead of a stale empty
+        // state while the server already holds the document.
+        setGroupReport(saved);
         // The link field is independent of the upload (file + link coexist):
         // a URL typed or cleared alongside the file goes through PATCH right
         // after the document lands.
@@ -2516,10 +2532,10 @@ export default function ThesisPage() {
             <WorkspaceMetricCard label={messages.thesis.roundStatus} value={statusLabel(selectedRound.status)} icon={<CalendarDays className="h-5 w-5" />} toneClassName={metricToneClass('warning')} />
             <WorkspaceMetricCard label={messages.thesis.topics} value={topics.length} icon={<FileStack className="h-5 w-5" />} toneClassName={metricToneClass('info')} />
             {canLoadStaffRelations || isStudent ? (
-              <>
-                <WorkspaceMetricCard label={messages.thesis.groups} value={groups.length} icon={<UsersRound className="h-5 w-5" />} toneClassName={metricToneClass('success')} />
-                <WorkspaceMetricCard label={messages.thesis.groupsTitle} value={currentGroup ? currentGroup.memberStudentIds.length : 0} icon={<Check className="h-5 w-5" />} toneClassName={metricToneClass('neutral')} />
-              </>
+              <WorkspaceMetricCard label={messages.thesis.groups} value={groups.length} icon={<UsersRound className="h-5 w-5" />} toneClassName={metricToneClass('success')} />
+            ) : null}
+            {isStudent ? (
+              <WorkspaceMetricCard label={messages.thesis.groupsTitle} value={currentGroup ? currentGroup.memberStudentIds.length : 0} icon={<Check className="h-5 w-5" />} toneClassName={metricToneClass('neutral')} />
             ) : null}
           </div>
 

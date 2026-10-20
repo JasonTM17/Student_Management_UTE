@@ -96,12 +96,13 @@ public class ThesisReportService {
     /** Feedback item 7: the leader may attach the report document itself. */
     @Transactional
     public ReportResponse submitFile(UUID groupId, MultipartFile file, String title, String note, Jwt actor) {
-        GroupContext group = lockGroupForWrite(groupId);
-        requireWriteAccess(group, actor);
-        ReportFilePolicy.ValidatedFile validated = ReportFilePolicy.validate(file);
-        requireReportWritable(group);
+        // Pre-lock preview: cheap authorization/shape checks run before any
+        // network I/O so a rejected upload never touches storage.
+        GroupContext preview = loadGroup(groupId);
+        requireWriteAccess(preview, actor);
+        requireReportWritable(preview);
         requireApproved(groupId);
-        StoredObjectRef previous = existingStoredObject(groupId);
+        ReportFilePolicy.ValidatedFile validated = ReportFilePolicy.validate(file);
         // The database provider keeps bytes in file_data instead of an object
         // store, so no storage_key is written and put() is not needed.
         boolean inDatabase = "database".equals(storage.provider());
@@ -110,10 +111,20 @@ public class ThesisReportService {
                 : "thesis-reports/" + groupId + "/" + UUID.randomUUID() + "." + validated.extension();
         String checksum = sha256(validated.data());
         boolean cleanupOnRollback = registerNewObjectRollbackCleanup(storageKey);
+        StoredObjectRef previous;
         try {
+            // The object upload must NOT hold the group/round row locks: a
+            // slow provider call inside lockGroupForWrite used to serialize
+            // every other mutation in the round for the full transfer. The
+            // locks are taken after the bytes land; the post-lock checks then
+            // re-verify window and approval against the freshest state.
             if (!inDatabase) {
                 storage.put(storageKey, validated.contentType(), validated.data());
             }
+            GroupContext group = lockGroupForWrite(groupId);
+            requireReportWritable(group);
+            requireApproved(groupId);
+            previous = existingStoredObject(groupId);
             // Upsert: replace only the file/storage/checksum columns. A prior
             // link (url), the submission identity and submitted_at survive an
             // upload; title/note are overwritten only when the caller sent a
@@ -367,7 +378,7 @@ public class ThesisReportService {
                         + "FROM thesis.thesis_group_report r "
                         + "JOIN thesis.thesis_group g ON g.id = r.group_id "
                         + "LEFT JOIN thesis.thesis_topic t ON t.id = g.topic_id "
-                        + "WHERE r.round_id = :roundId" + filter + " ORDER BY r.submitted_at DESC",
+                        + "WHERE r.round_id = :roundId" + filter + " ORDER BY r.submitted_at DESC, r.group_id",
                 parameters,
                 (rs, ignored) -> new ReportResponse(
                         UUID.fromString(rs.getString("group_id")),
@@ -493,8 +504,12 @@ public class ThesisReportService {
 
     @Transactional(readOnly = true)
     public ReportResponse getByTopic(UUID topicId, Jwt actor) {
+        // Deterministic pick: max_groups lets several approved groups share a
+        // topic, and an unordered LIMIT-1 made the returned report arbitrary.
+        // Oldest-approved-first is the stable contract.
         java.util.List<UUID> groupIds = jdbc.query(
-                "SELECT id FROM thesis.thesis_group WHERE topic_id = :topicId AND approval_status = 'APPROVED'",
+                "SELECT id FROM thesis.thesis_group WHERE topic_id = :topicId AND approval_status = 'APPROVED' "
+                        + "ORDER BY created_at, id LIMIT 1",
                 params().addValue("topicId", topicId),
                 (rs, ignored) -> UUID.fromString(rs.getString("id")));
         if (groupIds.isEmpty()) {

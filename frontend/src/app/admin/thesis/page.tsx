@@ -183,13 +183,19 @@ export default function AdminThesisPage() {
     setCouncils([]);
     setError('');
     try {
-      const [t, g, c] = await Promise.all([
-        thesisApi.listTopics(roundId),
+      // Draft proposals are exactly what a DRAFT/PROPOSAL_OPEN round holds, so
+      // the detail panel must merge both statuses or pending proposals read as
+      // an empty round (same merge the staff workspace does).
+      const [published, drafts, g, c] = await Promise.all([
+        thesisApi.listTopics(roundId, 'PUBLISHED'),
+        thesisApi.listTopics(roundId, 'DRAFT'),
         thesisApi.listGroups(roundId),
         thesisApi.listCouncils(roundId),
       ]);
       if (!isCurrent()) return;
-      setTopics(t);
+      const byId = new Map<string, (typeof published)[number]>();
+      for (const topic of [...published, ...drafts]) byId.set(topic.id, topic);
+      setTopics(Array.from(byId.values()));
       setGroups(g);
       if (expandedRoundRef.current === roundId) setCouncils(c);
       if (lecturers.length === 0) {

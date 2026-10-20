@@ -92,7 +92,7 @@ public class ThesisDeanOverviewRepository {
                         + "    JOIN academic.\"Curriculum\" c ON c.\"id\" = s.\"curriculumId\" "
                         + "    JOIN academic.\"Department\" md ON md.\"id\" = c.\"departmentId\" "
                         + "    WHERE m.group_id = g.id AND md.\"facultyId\" = :facultyId)) "
-                        + ") ORDER BY g.created_at DESC",
+                        + ") ORDER BY g.created_at DESC, g.id",
                 new MapSqlParameterSource("roundId", roundId).addValue("facultyId", facultyId),
                 (rs, ignored) -> new DeanGroup(
                         rs.getObject("id", UUID.class),

@@ -81,7 +81,7 @@ public class ThesisProgressService {
                     LEFT JOIN thesis.thesis_council_topic ct ON ct.topic_id = t.id
                     WHERE r.id = :roundId
                     ORDER BY CASE WHEN g.status = 'CANCELLED' THEN 1 ELSE 0 END,
-                             g.created_at DESC
+                             g.created_at DESC, g.id
                     LIMIT 1
                     """, params().addValue("roundId", roundId).addValue("studentId", studentId));
         } catch (EmptyResultDataAccessException exception) {

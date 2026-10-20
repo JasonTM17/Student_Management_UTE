@@ -58,9 +58,13 @@ export default function ThesisTopicDetailPage() {
       await thesisApi.assignTopic(myGroup.id, topicId);
       await workspace.refreshWorkspace();
     } catch (error) {
-      setActionError(campusErrorCode(error) === 'TOPIC_FULL'
-        ? messages.thesis.topicFull
-        : messages.thesis.actionFailed);
+      const code = campusErrorCode(error);
+      const codes = messages.common.campusErrors.codes as Record<string, string>;
+      setActionError(
+        code === 'TOPIC_FULL'
+          ? messages.thesis.topicFull
+          : (code ? codes[code] : undefined) ?? messages.thesis.actionFailed,
+      );
     } finally {
       setIsChoosing(false);
     }
@@ -214,6 +218,12 @@ export default function ThesisTopicDetailPage() {
             ) : isStudent && groupCancelled ? (
               <p className="rounded-lg border border-border/70 bg-muted/40 px-3 py-2 text-sm text-muted-foreground">
                 {messages.thesis.progressGroupCancelled}
+              </p>
+            ) : isStudent && !myGroup ? (
+              // Without a group the choose button can never appear, so the
+              // student needs the actual prerequisite, not a silent dead end.
+              <p className="rounded-lg border border-border/70 bg-muted/40 px-3 py-2 text-sm text-muted-foreground">
+                {messages.thesis.noGroup} {messages.thesis.noGroupDescription}
               </p>
             ) : null}
           </CardContent>

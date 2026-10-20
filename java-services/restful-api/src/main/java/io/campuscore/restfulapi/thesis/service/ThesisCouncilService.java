@@ -110,6 +110,7 @@ public class ThesisCouncilService {
     @Transactional
     public CouncilResponse addMember(UUID councilId, String lecturerId, String memberRole, Jwt actor) {
         requireGovernanceRole(actor, "Only a faculty head or admin can manage council members");
+        requireCouncilGovernanceAccess(councilId, actor);
         lockMutableCouncilRound(councilId);
         lockCouncil(councilId);
         requireRosterMutable(councilId);
@@ -144,6 +145,18 @@ public class ThesisCouncilService {
             throw conflict("COUNCIL_INCOMPLETE",
                     "Council seats fill in order: chair, secretary, then members (next seat: " + expectedRole + ")");
         }
+        // Third edge of the independence triangle (assignReviewer and
+        // assignTopic cover the other two): the reviewer must never join the
+        // council grading a topic they counter-review.
+        Integer reviewingAssignedTopic = count(
+                "SELECT COUNT(*) FROM thesis.thesis_council_topic ct "
+                        + "JOIN thesis.thesis_topic t ON t.id = ct.topic_id "
+                        + "WHERE ct.council_id = :councilId AND t.gvpb_lecturer_id = :lecturerId",
+                params().addValue("councilId", councilId).addValue("lecturerId", lecturerId));
+        if (reviewingAssignedTopic != null && reviewingAssignedTopic > 0) {
+            throw conflict("REVIEWER_MUST_BE_INDEPENDENT",
+                    "The assigned counter-reviewer cannot sit on the defense council for this topic");
+        }
         jdbc.update(
                 "INSERT INTO thesis.thesis_council_member (id, council_id, lecturer_id, member_role) "
                         + "VALUES (:id, :councilId, :lecturerId, :role)",
@@ -168,6 +181,7 @@ public class ThesisCouncilService {
     @Transactional
     public CouncilResponse removeMember(UUID councilId, String lecturerId, Jwt actor) {
         requireGovernanceRole(actor, "Only a faculty head or admin can manage council members");
+        requireCouncilGovernanceAccess(councilId, actor);
         lockMutableCouncilRound(councilId);
         lockCouncil(councilId);
         requireText(lecturerId, "lecturerId");
@@ -214,6 +228,7 @@ public class ThesisCouncilService {
     @Transactional
     public CouncilResponse assignTopic(UUID councilId, UUID topicId, Jwt actor) {
         requireGovernanceRole(actor, "Only a faculty head or admin can assign topics to a council");
+        requireCouncilGovernanceAccess(councilId, actor);
         lockMutableCouncilRound(councilId);
         lockCouncil(councilId);
         if (topicId == null) {
@@ -259,6 +274,18 @@ public class ThesisCouncilService {
             throw conflict("SUPERVISOR_CANNOT_CHAIR_COUNCIL",
                     "The topic supervisor cannot chair the defense council for this topic");
         }
+        // Mirror of assignReviewer's REVIEWER_MUST_BE_INDEPENDENT: a lecturer
+        // already named counter-reviewer must not grade this topic again from
+        // inside the council.
+        Integer reviewerOnCouncil = count(
+                "SELECT COUNT(*) FROM thesis.thesis_council_member cm "
+                        + "JOIN thesis.thesis_topic t ON t.gvpb_lecturer_id = cm.lecturer_id "
+                        + "WHERE cm.council_id = :councilId AND t.id = :topicId",
+                params().addValue("councilId", councilId).addValue("topicId", topicId));
+        if (reviewerOnCouncil != null && reviewerOnCouncil > 0) {
+            throw conflict("REVIEWER_MUST_BE_INDEPENDENT",
+                    "The assigned counter-reviewer cannot sit on the defense council for this topic");
+        }
         jdbc.update(
                 "INSERT INTO thesis.thesis_council_topic (id, council_id, topic_id, assigned_by) "
                         + "VALUES (:id, :councilId, :topicId, :assignedBy)",
@@ -278,7 +305,7 @@ public class ThesisCouncilService {
     @Transactional(readOnly = true)
     public List<CouncilResponse> listByRound(UUID roundId) {
         List<UUID> ids = jdbc.queryForList(
-                "SELECT id FROM thesis.thesis_council WHERE round_id = :roundId ORDER BY created_at",
+                "SELECT id FROM thesis.thesis_council WHERE round_id = :roundId ORDER BY created_at, id",
                 params().addValue("roundId", roundId), UUID.class);
         return ids.stream().map(this::getCouncil).toList();
     }
@@ -297,14 +324,26 @@ public class ThesisCouncilService {
     @Transactional(readOnly = true)
     public List<CouncilResponse> listByRoundForActor(UUID roundId, Jwt actor) {
         List<CouncilResponse> councils = listByRound(roundId);
-        if (isCouncilGovernanceStaff(actor)) {
+        if (ThesisDeanScope.isGlobalAdmin(actor)) {
             return councils;
         }
-        String lecturerId = normalize(actor == null ? null : actor.getClaimAsString("lecturerId"));
-        return councils.stream()
-                .filter(council -> council.members().stream()
-                        .anyMatch(member -> member.lecturerId().equals(lecturerId)))
-                .toList();
+        if (ThesisDeanScope.isFacultyHead(actor)) {
+            // Deans stay inside their faculty: councils they created or
+            // councils already grading one of their topics. Anything else is a
+            // foreign roster — the unconditional governance bypass used to
+            // hand every dean the whole round's councils.
+            return councils.stream()
+                    .filter(council -> deanCanSeeCouncil(council.id(), actor))
+                    .toList();
+        }
+        if (!isCouncilGovernanceStaff(actor)) {
+            String lecturerId = normalize(actor == null ? null : actor.getClaimAsString("lecturerId"));
+            return councils.stream()
+                    .filter(council -> council.members().stream()
+                            .anyMatch(member -> member.lecturerId().equals(lecturerId)))
+                    .toList();
+        }
+        return councils;
     }
 
     /**
@@ -330,13 +369,76 @@ public class ThesisCouncilService {
                 throw new DomainException(HttpStatus.FORBIDDEN, "COUNCIL_MEMBER_REQUIRED",
                         "Only council members or governance staff can read a council roster");
             }
+            return council;
         }
+        requireCouncilGovernanceAccess(councilId, actor);
         return council;
     }
 
     private boolean isCouncilGovernanceStaff(Jwt actor) {
         List<String> roles = actor == null ? null : actor.getClaimAsStringList("roles");
         return roles != null && (roles.contains("ADMIN") || roles.contains("TRUONG_KHOA") || roles.contains("SUPER_ADMIN"));
+    }
+
+    /**
+     * Faculty scope for council surfaces. Global admins pass. A dean may read
+     * and staff a council only when they created it or it grades at least one
+     * topic inside their faculty — without this check any dean could enumerate
+     * every council's roster and restaff foreign councils until scoring began.
+     * Out-of-scope councils are answered 404, matching the topic/group
+     * concealment convention.
+     */
+    private void requireCouncilGovernanceAccess(UUID councilId, Jwt actor) {
+        if (ThesisDeanScope.isGlobalAdmin(actor) || !ThesisDeanScope.isFacultyHead(actor)) {
+            return;
+        }
+        String facultyId = ThesisDeanScope.facultyId(jdbc, actor);
+        if (facultyId == null) {
+            throw new DomainException(HttpStatus.FORBIDDEN, "FACULTY_PROFILE_REQUIRED",
+                    "An active lecturer profile bound to the faculty head is required");
+        }
+        Integer createdByDean = count(
+                "SELECT COUNT(*) FROM thesis.thesis_council WHERE id = :councilId AND created_by = :subject",
+                params().addValue("councilId", councilId).addValue("subject", subject(actor)));
+        if (createdByDean != null && createdByDean > 0) {
+            return;
+        }
+        Integer inFacultyTopics = count(
+                "SELECT COUNT(*) FROM thesis.thesis_council_topic ct "
+                        + "JOIN thesis.thesis_topic t ON t.id = ct.topic_id "
+                        + "JOIN academic.\"Department\" d ON d.\"id\" = t.department_id "
+                        + "WHERE ct.council_id = :councilId AND d.\"facultyId\" = :facultyId",
+                params().addValue("councilId", councilId).addValue("facultyId", facultyId));
+        if (inFacultyTopics == null || inFacultyTopics == 0) {
+            throw new DomainException(HttpStatus.NOT_FOUND, "COUNCIL_NOT_FOUND", "Defense council not found");
+        }
+    }
+
+    /**
+     * Defense scores belong to a defended group, so a topic without at least
+     * one approved group cannot be graded or finalized — otherwise a council
+     * could pre-bake a final score that the group inherits the moment it is
+     * approved.
+     */
+    private void requireApprovedGroupForTopic(UUID topicId) {
+        Integer approvedGroups = count(
+                "SELECT COUNT(*) FROM thesis.thesis_group WHERE topic_id = :topicId "
+                        + "AND approval_status = 'APPROVED' AND status <> 'CANCELLED'",
+                params().addValue("topicId", topicId));
+        if (approvedGroups == null || approvedGroups == 0) {
+            throw conflict("GROUP_NOT_APPROVED",
+                    "The topic has no approved group to defend yet");
+        }
+    }
+
+    /** Non-throwing twin of {@link #requireCouncilGovernanceAccess} for list filtering. */
+    private boolean deanCanSeeCouncil(UUID councilId, Jwt actor) {
+        try {
+            requireCouncilGovernanceAccess(councilId, actor);
+            return true;
+        } catch (DomainException exception) {
+            return false;
+        }
     }
 
     /**
@@ -354,11 +456,11 @@ public class ThesisCouncilService {
         List<CouncilMember> members = jdbc.query(
                 "SELECT lecturer_id, member_role FROM thesis.thesis_council_member "
                         + "WHERE council_id = :councilId ORDER BY CASE member_role WHEN 'CHAIR' THEN 0 "
-                        + "WHEN 'SECRETARY' THEN 1 ELSE 2 END, created_at",
+                        + "WHEN 'SECRETARY' THEN 1 ELSE 2 END, created_at, lecturer_id",
                 params().addValue("councilId", councilId),
                 (rs, ignored) -> new CouncilMember(rs.getString("lecturer_id"), rs.getString("member_role")));
         List<UUID> topicIds = jdbc.queryForList(
-                "SELECT topic_id FROM thesis.thesis_council_topic WHERE council_id = :councilId ORDER BY created_at",
+                "SELECT topic_id FROM thesis.thesis_council_topic WHERE council_id = :councilId ORDER BY created_at, topic_id",
                 params().addValue("councilId", councilId), UUID.class);
         return new CouncilResponse(
                 (UUID) council.get("id"),
@@ -426,6 +528,7 @@ public class ThesisCouncilService {
         if (topicRow.get("final_score") != null) {
             throw conflict("SCORE_ALREADY_FINALIZED", "The topic score has been finalized by the chair");
         }
+        requireApprovedGroupForTopic(topicId);
         // K16: the row is overwritten DELETE-then-INSERT, so the outgoing value
         // only exists here — capture it for the audit trail before the delete.
         Map<String, Object> previousRow = jdbc.query(
@@ -526,6 +629,18 @@ public class ThesisCouncilService {
             throw conflict("SUPERVISOR_CANNOT_REVIEW",
                     "A topic supervisor cannot be its counter-reviewer");
         }
+        // The counter-review is the independent grade beside the council's:
+        // seating the reviewer on the grading council lets one person cast
+        // both the GVPB and a DEFENSE score on the same topic.
+        Integer onCouncil = count(
+                "SELECT COUNT(*) FROM thesis.thesis_council_topic ct "
+                        + "JOIN thesis.thesis_council_member cm ON cm.council_id = ct.council_id "
+                        + "WHERE ct.topic_id = :topicId AND cm.lecturer_id = :lecturerId",
+                params().addValue("topicId", topicId).addValue("lecturerId", lecturerId));
+        if (onCouncil != null && onCouncil > 0) {
+            throw conflict("REVIEWER_MUST_BE_INDEPENDENT",
+                    "The counter-reviewer cannot sit on the defense council for this topic");
+        }
         String previousReviewer = (String) topic.get("gvpb_lecturer_id");
         if (previousReviewer != null && !previousReviewer.equals(lecturerId)) {
             Integer scored = count(
@@ -594,13 +709,19 @@ public class ThesisCouncilService {
         }
         requireNotSupervisor(topicId, lecturerId);
         Instant deadline = instantOf(topic.get("gvpb_deadline"));
-        if (deadline != null && Instant.now().isAfter(deadline)) {
+        // Match requireReportWritable's exclusive boundary: the deadline is
+        // the first instant the window is closed, so == freezes like a passed
+        // deadline does everywhere else in the workflow.
+        if (deadline != null && !Instant.now().isBefore(deadline)) {
             throw conflict("GVPB_DEADLINE_PASSED",
                     "The counter-review deadline for this round has passed");
         }
         if (score == null || score.compareTo(BigDecimal.ZERO) < 0 || score.compareTo(BigDecimal.TEN) > 0) {
             throw invalid("score must be between 0 and 10");
         }
+        // A counter-review grades a submitted report — meaningless until an
+        // approved group exists to produce one.
+        requireApprovedGroupForTopic(topicId);
         String trimmedComment = comment == null ? null : comment.trim();
         if (trimmedComment != null && trimmedComment.isEmpty()) {
             trimmedComment = null;
@@ -651,6 +772,10 @@ public class ThesisCouncilService {
             throw new DomainException(HttpStatus.FORBIDDEN, "REVIEWER_REQUIRED",
                     "Only the assigned counter-reviewer can read the GVPB score");
         }
+        // A dean caller is governance but stays faculty-bound: without this the
+        // unconditional governance branch leaked foreign-faculty counter-review
+        // scores and comments pre-publication.
+        ThesisDeanScope.requireTopicAccess(jdbc, actor, topicId);
         if (assigned == null) {
             throw new DomainException(HttpStatus.NOT_FOUND, "REVIEW_SCORE_NOT_FOUND",
                     "No counter-reviewer is assigned to this topic");
@@ -677,14 +802,14 @@ public class ThesisCouncilService {
      */
     @Transactional(readOnly = true)
     public List<ScoreResponse> listScores(UUID councilId, UUID topicId, Jwt actor) {
-        requireScoreReadAccess(councilId, actor);
+        requireScoreReadAccess(councilId, topicId, actor);
         if (!councilHasTopic(councilId, topicId)) {
             throw conflict("TOPIC_NOT_ASSIGNED", "This council has not been assigned the topic");
         }
         return jdbc.query(
                 "SELECT lecturer_id, component, score, comment FROM thesis.thesis_topic_score "
                         + "WHERE council_id = :councilId AND topic_id = :topicId AND component = :component "
-                        + "ORDER BY graded_at",
+                        + "ORDER BY graded_at, lecturer_id",
                 params().addValue("councilId", councilId).addValue("topicId", topicId)
                         .addValue("component", SCORE_COMPONENT),
                 (rs, ignored) -> new ScoreResponse(topicId, rs.getString("lecturer_id"),
@@ -717,6 +842,7 @@ public class ThesisCouncilService {
         // Lock topic row to prevent concurrent score submission during finalization
         one("SELECT id FROM thesis.thesis_topic WHERE id = :topicId FOR UPDATE",
                 params().addValue("topicId", topicId), "TOPIC_NOT_FOUND", "Thesis topic not found");
+        requireApprovedGroupForTopic(topicId);
         int expectedScores = eligibleGraderCount(councilId, topicId);
         int submittedScores = submittedEligibleScoreCount(councilId, topicId);
         if (expectedScores == 0 || submittedScores < expectedScores) {
@@ -819,7 +945,7 @@ public class ThesisCouncilService {
     private List<ScoreComment> evaluationComments(UUID topicId) {
         return jdbc.query(
                 "SELECT component, comment FROM thesis.thesis_topic_score "
-                        + "WHERE topic_id = :topicId AND comment IS NOT NULL ORDER BY graded_at",
+                        + "WHERE topic_id = :topicId AND comment IS NOT NULL ORDER BY graded_at, component",
                 params().addValue("topicId", topicId),
                 (rs, ignored) -> new ScoreComment(rs.getString("component"), rs.getString("comment")));
     }
@@ -860,14 +986,20 @@ public class ThesisCouncilService {
         }
     }
 
-    private void requireScoreReadAccess(UUID councilId, Jwt actor) {
+    private void requireScoreReadAccess(UUID councilId, UUID topicId, Jwt actor) {
         List<String> roles = actor == null ? null : actor.getClaimAsStringList("roles");
         // Round-4 council sweep: SUPER_ADMIN is governance staff everywhere
         // ADMIN is (same class of gap as ThesisReportService, fixed in
         // be5ec0c0) — the controller already advertises SUPER_ADMIN on these
         // routes while the service answered 403.
-        if (roles != null && (roles.contains("ADMIN") || roles.contains("SUPER_ADMIN")
-                || roles.contains("TRUONG_KHOA"))) {
+        if (roles != null && (roles.contains("ADMIN") || roles.contains("SUPER_ADMIN"))) {
+            return;
+        }
+        if (roles != null && roles.contains("TRUONG_KHOA")) {
+            // A dean reads unpublished scores only inside their faculty (or on
+            // topics they supervise); the unconditional bypass let any dean
+            // read foreign-faculty defense scores.
+            ThesisDeanScope.requireTopicAccess(jdbc, actor, topicId);
             return;
         }
         String lecturerId = normalize(actor == null ? null : actor.getClaimAsString("lecturerId"));

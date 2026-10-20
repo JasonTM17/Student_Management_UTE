@@ -191,7 +191,9 @@ abstract class ThesisPublicationFixture {
         UUID secondTopic = insertTopic(roundId, "Nhóm khác: điểm riêng tư", 6.13);
         insertGroup(roundId, firstTopic, "APPROVED", "SUBMITTED", 1);
         insertGroup(roundId, secondTopic, "APPROVED", "SUBMITTED", 4);
-        insertGroup(roundId, firstTopic, "PENDING", "SUBMITTED", 7);
+        // REJECTED stands in for "not emailed" the same way the old PENDING row
+        // did; a real pending group now blocks publication by design.
+        insertGroup(roundId, firstTopic, "REJECTED", "SUBMITTED", 7);
         insertGroup(roundId, firstTopic, "APPROVED", "CANCELLED", 10);
         UUID otherRound = insertRound("Đợt khác không nhận thư");
         insertGroup(otherRound, insertTopic(otherRound, "Đề tài đợt khác", 9.42), "APPROVED", "SUBMITTED", 13);

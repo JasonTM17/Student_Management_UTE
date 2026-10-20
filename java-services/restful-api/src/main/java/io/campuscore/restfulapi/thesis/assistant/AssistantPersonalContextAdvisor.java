@@ -3050,7 +3050,7 @@ public class AssistantPersonalContextAdvisor {
                         + "JOIN thesis.thesis_registration_round r ON r.id = m.round_id "
                         + "LEFT JOIN thesis.thesis_topic t ON t.id = g.topic_id "
                         + "WHERE m.student_id = :studentId "
-                        + "ORDER BY r.created_at DESC",
+                        + "ORDER BY r.created_at DESC, g.id",
                 new MapSqlParameterSource("studentId", studentId));
         if (rows.isEmpty()) {
             // Audit D-Q6: when there are no registration rows the answer says so

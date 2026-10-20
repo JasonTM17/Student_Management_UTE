@@ -71,6 +71,18 @@ class ThesisCouncilRosterRacePostgresIT {
         }
         jdbc.update("INSERT INTO thesis.thesis_council_topic (id,council_id,topic_id,assigned_by) VALUES (:id,:council,:topic,'audit-admin')",
                 Map.of("id", UUID.randomUUID(), "council", council, "topic", topic));
+        // Defense scoring requires an approved defended group on the topic.
+        UUID groupId = UUID.randomUUID();
+        jdbc.update("INSERT INTO thesis.thesis_group (id,round_id,leader_student_id,topic_id,status,approval_status)"
+                        + " VALUES (:id,:round,'rr-leader',:topic,'SUBMITTED','APPROVED')",
+                Map.of("id", groupId, "round", round, "topic", topic));
+        for (int order = 1; order <= 3; order++) {
+            String student = order == 1 ? "rr-leader" : "rr-member-" + order;
+            jdbc.update("INSERT INTO thesis.thesis_group_member (id,group_id,round_id,student_id,member_order,is_leader)"
+                            + " VALUES (:id,:group,:round,:student,:order,:leader)",
+                    Map.of("id", UUID.randomUUID(), "group", groupId, "round", round,
+                            "student", student, "order", order, "leader", order == 1));
+        }
         Jwt grader = actor("LECTURER", member);
         Jwt admin = actor("ADMIN", "");
         CountDownLatch permissionChecked = new CountDownLatch(1);

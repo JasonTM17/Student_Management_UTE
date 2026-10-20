@@ -119,7 +119,7 @@ public class ThesisMutationService {
 
     @Transactional
     public RoundResponse createRound(RoundCreateRequest request, Jwt actor) {
-        requireText(request == null ? null : request.name(), "name");
+        requireText(request == null ? null : request.name(), "name", 180);
         requireText(request == null ? null : request.thesisType(), "thesisType");
         RoundType roundType = requireRoundType(request.thesisType());
         if (roundType.requiresGvpbDeadline() && request.gvpbDeadline() == null) {
@@ -279,7 +279,7 @@ public class ThesisMutationService {
             throw conflict("ROUND_STATE_CONFLICT",
                     "The schedule can only be amended before registration opens");
         }
-        requireText(request == null ? null : request.name(), "name");
+        requireText(request == null ? null : request.name(), "name", 180);
         requireText(request == null ? null : request.thesisType(), "thesisType");
         RoundType roundType = requireRoundType(request.thesisType());
         if (roundType.requiresGvpbDeadline() && request.gvpbDeadline() == null) {
@@ -548,6 +548,16 @@ public class ThesisMutationService {
             throw conflict("SCORES_INCOMPLETE",
                     "Every approved group must have a finalized score before results are published");
         }
+        // A group left PENDING at publication is permanently wedged — approval
+        // requires a non-terminal round — so force the governance team to
+        // approve or reject every submission before publishing.
+        Integer pending = jdbc.queryForObject(
+                "SELECT COUNT(*) FROM thesis.thesis_group WHERE round_id = :id AND approval_status = 'PENDING' AND status <> 'CANCELLED'",
+                params().addValue("id", id), Integer.class);
+        if (pending != null && pending > 0) {
+            throw conflict("GROUPS_PENDING_APPROVAL",
+                    "There are still " + pending + " group(s) awaiting approval; approve or reject them before publishing results");
+        }
         RoundResponse response = transitionRound(id, RoundStatus.REGISTRATION_CLOSED, RoundStatus.RESULTS_PUBLISHED, actor);
         if (notifier != null) {
             if (TransactionSynchronizationManager.isSynchronizationActive()) {
@@ -592,7 +602,7 @@ public class ThesisMutationService {
     @Transactional
     public TopicResponse createTopic(TopicCreateRequest request, Jwt actor) {
         requireText(request == null ? null : request.departmentId(), "departmentId");
-        requireText(request == null ? null : request.title(), "title");
+        requireText(request == null ? null : request.title(), "title", 240);
         requireText(request == null ? null : request.description(), "description");
         if (request.roundId() == null) {
             throw invalid("roundId is required");
@@ -675,7 +685,7 @@ public class ThesisMutationService {
             throw conflict("TOPIC_STATE_CONFLICT", "Only draft topics can be edited");
         }
         requireText(request == null ? null : request.departmentId(), "departmentId");
-        requireText(request == null ? null : request.title(), "title");
+        requireText(request == null ? null : request.title(), "title", 240);
         requireText(request == null ? null : request.description(), "description");
         int maxGroups = request.maxGroups() == null ? topic.getMaxGroups() : request.maxGroups();
         if (maxGroups < 1 || maxGroups > 20) {
@@ -845,13 +855,17 @@ public class ThesisMutationService {
         }
         String studentId = normalize(request == null ? null : request.studentId());
         if (studentId.isBlank()) {
-            addExternalMember(group, request);
+            addExternalMember(group, request, actor);
             return groups.findById(groupId);
         }
         requireActiveStudent(studentId);
         requireNotInAnotherActiveGroup(group.roundId(), studentId);
         jdbc.update("INSERT INTO thesis.thesis_group_member (id, group_id, round_id, student_id, member_order, is_leader) VALUES (:id, :groupId, :roundId, :studentId, :memberOrder, FALSE)", params().addValue("id", UUID.randomUUID()).addValue("groupId", groupId).addValue("roundId", group.roundId()).addValue("studentId", studentId).addValue("memberOrder", nextMemberOrder(groupId)));
         jdbc.update("UPDATE thesis.thesis_group SET updated_at = CURRENT_TIMESTAMP, version = version + 1 WHERE id = :groupId", params().addValue("groupId", groupId));
+        // Rosters are rewritten freely during registration, so without a trail
+        // a removed member cannot prove they ever belonged to the group.
+        audit.record(subject(actor), null, "THESIS_GROUP_MEMBER_ADDED", "THESIS_GROUP", groupId.toString(),
+                "Member " + studentId + " added to thesis group");
         return groups.findById(groupId);
     }
 
@@ -861,7 +875,7 @@ public class ThesisMutationService {
      * reviewer can verify it, and a synthetic student_id keeps the round's
      * one-group-per-member uniqueness intact.
      */
-    private void addExternalMember(GroupRow group, MemberRequest request) {
+    private void addExternalMember(GroupRow group, MemberRequest request, Jwt actor) {
         String displayName = normalize(request == null ? null : request.displayName());
         String contact = normalize(request == null ? null : request.contact());
         if (displayName.isBlank() || displayName.length() > 150) {
@@ -881,6 +895,8 @@ public class ThesisMutationService {
                         .addValue("displayName", displayName)
                         .addValue("contact", contact.isBlank() ? null : contact));
         jdbc.update("UPDATE thesis.thesis_group SET updated_at = CURRENT_TIMESTAMP, version = version + 1 WHERE id = :groupId", params().addValue("groupId", group.id()));
+        audit.record(subject(actor), null, "THESIS_GROUP_MEMBER_ADDED", "THESIS_GROUP", group.id().toString(),
+                "External member " + displayName + " added to thesis group");
     }
 
     /**
@@ -921,6 +937,8 @@ public class ThesisMutationService {
             throw notFound("MEMBER_NOT_FOUND", "Group member not found");
         }
         jdbc.update("UPDATE thesis.thesis_group SET updated_at = CURRENT_TIMESTAMP, version = version + 1 WHERE id = :groupId", params().addValue("groupId", groupId));
+        audit.record(subject(actor), null, "THESIS_GROUP_MEMBER_REMOVED", "THESIS_GROUP", groupId.toString(),
+                "Member " + normalized + " removed from thesis group");
         return groups.findById(groupId);
     }
 
@@ -970,6 +988,10 @@ public class ThesisMutationService {
         boolean isNewTopic = !topicId.equals(group.topicId());
         jdbc.update("UPDATE thesis.thesis_group SET topic_id = :topicId, status = CASE WHEN status = 'DRAFT' THEN 'SUBMITTED' ELSE status END, approval_status = CASE WHEN approval_status = 'REJECTED' OR :isNewTopic THEN 'PENDING' ELSE approval_status END, approved_by = CASE WHEN :isNewTopic THEN NULL ELSE approved_by END, approved_at = CASE WHEN :isNewTopic THEN NULL ELSE approved_at END, rejection_reason = CASE WHEN approval_status = 'REJECTED' OR :isNewTopic THEN NULL ELSE rejection_reason END, updated_at = CURRENT_TIMESTAMP, version = version + 1 WHERE id = :groupId",
                 params().addValue("topicId", topicId).addValue("groupId", groupId).addValue("isNewTopic", isNewTopic));
+        // A topic switch resets the approval trace (approved_by/at nulled
+        // above), so the binding itself must be traceable.
+        audit.record(subject(actor), null, "THESIS_GROUP_TOPIC_ASSIGNED", "THESIS_GROUP", groupId.toString(),
+                "Thesis topic " + topicId + " assigned to group");
         if (notifier != null && isNewTopic) {
             try {
                 notifier.notifyTopicAssigned(groupId, topicId);
@@ -1016,6 +1038,12 @@ public class ThesisMutationService {
                 && status != group.status()) {
             throw conflict("GROUP_STATUS_INVALID", "An approved group can only be marked COMPLETED");
         }
+        // The reverse wedge: a PENDING group marked COMPLETED can never be
+        // approved (approveGroup requires status SUBMITTED), so only an
+        // approved group may complete.
+        if (status == GroupStatus.COMPLETED && group.approvalStatus() != ApprovalStatus.APPROVED) {
+            throw conflict("GROUP_STATE_CONFLICT", "Only an approved group can be marked completed");
+        }
         if (!isAdmin(actor) && group.status() == GroupStatus.COMPLETED && status != GroupStatus.COMPLETED) {
             throw conflict("GROUP_STATUS_INVALID", "A completed group cannot reopen; contact your supervisor");
         }
@@ -1025,6 +1053,12 @@ public class ThesisMutationService {
             // this at the database boundary, so this remains an atomic, harmless no-op there.
             jdbc.update("UPDATE thesis.thesis_group_member SET active_participation = FALSE WHERE group_id = :groupId AND active_participation = TRUE",
                     params().addValue("groupId", groupId));
+        }
+        if (status != group.status()) {
+            // Cancellation frees every member's active_participation slot;
+            // without this row the freeing actor is untraceable.
+            audit.record(subject(actor), null, "THESIS_GROUP_STATUS_CHANGED", "THESIS_GROUP", groupId.toString(),
+                    "Group status changed from " + group.status() + " to " + status);
         }
         return groups.findById(groupId);
     }
@@ -1243,8 +1277,14 @@ public class ThesisMutationService {
     }
 
     private boolean isSupervisorOf(UUID topicId, String lecturerId) {
+        // lecturer_id may hold either a Lecturer.id or, from the legacy
+        // created_by fallback, a User.id — resolve either against an ACTIVE
+        // lecturer profile so a deactivated supervisor loses review power.
         Integer count = jdbc.queryForObject(
-                "SELECT COUNT(*) FROM thesis.thesis_topic_supervisor WHERE topic_id = :topicId AND lecturer_id = :lecturerId",
+                "SELECT COUNT(*) FROM thesis.thesis_topic_supervisor s "
+                        + "JOIN campuscore_auth.\"Lecturer\" l ON (l.\"id\" = s.lecturer_id OR l.\"userId\" = s.lecturer_id) "
+                        + "AND l.\"isActive\" = TRUE "
+                        + "WHERE s.topic_id = :topicId AND s.lecturer_id = :lecturerId",
                 params().addValue("topicId", topicId).addValue("lecturerId", lecturerId),
                 Integer.class);
         return count != null && count > 0;
@@ -1261,8 +1301,13 @@ public class ThesisMutationService {
         // The reviewer must be a CURRENT supervisor — the topic creator loses
         // this right when setSupervisors replaces them, otherwise a stale
         // creator retains approval power over groups they no longer supervise.
+        // The active-lecturer join keeps a deactivated profile from retaining
+        // the same approval power after the account is disabled.
         Integer supervisorCount = jdbc.queryForObject(
-                "SELECT COUNT(*) FROM thesis.thesis_topic_supervisor WHERE topic_id = :topicId AND (lecturer_id = :lecturerId OR lecturer_id = :actorId)",
+                "SELECT COUNT(*) FROM thesis.thesis_topic_supervisor s "
+                        + "JOIN campuscore_auth.\"Lecturer\" l ON (l.\"id\" = s.lecturer_id OR l.\"userId\" = s.lecturer_id) "
+                        + "AND l.\"isActive\" = TRUE "
+                        + "WHERE s.topic_id = :topicId AND (s.lecturer_id = :lecturerId OR s.lecturer_id = :actorId)",
                 params().addValue("topicId", group.topicId())
                         .addValue("actorId", actorId)
                         .addValue("lecturerId", lecturerId.isBlank() ? actorId : lecturerId),
@@ -1577,6 +1622,10 @@ public class ThesisMutationService {
     private static String studentId(Jwt actor) { return normalize(actor == null ? null : actor.getClaimAsString("studentId")); }
     private static String normalize(String value) { return value == null ? "" : value.trim(); }
     private static void requireText(String value, String name) { if (value == null || value.isBlank()) throw invalid(name + " is required"); }
+    private static void requireText(String value, String name, int maxLength) {
+        requireText(value, name);
+        if (value.trim().length() > maxLength) throw invalid(name + " must contain at most " + maxLength + " characters");
+    }
     private static void requireDates(Instant start, Instant end, String startField, String endField) {
         if (start == null || end == null || !end.isAfter(start)) {
             throw invalid(endField + " must be after " + startField);

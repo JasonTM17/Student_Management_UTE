@@ -25,7 +25,7 @@ public class ThesisGroupReadRepository {
     public ThesisGroupReadRepository(NamedParameterJdbcTemplate jdbc) { this.jdbc = jdbc; }
 
     public List<GroupResponse> findByRoundId(UUID roundId) {
-        List<GroupRow> rows = jdbc.query("SELECT id, round_id, leader_student_id, topic_id, status, approval_status, rejection_reason FROM thesis.thesis_group WHERE round_id = :roundId ORDER BY created_at DESC", new MapSqlParameterSource("roundId", roundId), ThesisGroupReadRepository::row);
+        List<GroupRow> rows = jdbc.query("SELECT id, round_id, leader_student_id, topic_id, status, approval_status, rejection_reason FROM thesis.thesis_group WHERE round_id = :roundId ORDER BY created_at DESC, id", new MapSqlParameterSource("roundId", roundId), ThesisGroupReadRepository::row);
         return hydrate(rows);
     }
 
@@ -36,7 +36,7 @@ public class ThesisGroupReadRepository {
                         + "JOIN thesis.thesis_group_member m ON m.group_id = g.id "
                         + "WHERE g.round_id = :roundId AND m.student_id = :studentId "
                         + "ORDER BY CASE WHEN g.status = 'CANCELLED' THEN 1 ELSE 0 END, "
-                        + "g.created_at DESC",
+                        + "g.created_at DESC, g.id",
                 new MapSqlParameterSource("roundId", roundId).addValue("studentId", studentId),
                 ThesisGroupReadRepository::row);
         return hydrate(rows);
@@ -50,7 +50,7 @@ public class ThesisGroupReadRepository {
                         + "JOIN thesis.thesis_group_member m ON m.group_id = g.id "
                         + "WHERE m.student_id = :studentId "
                         + "ORDER BY CASE WHEN g.status = 'CANCELLED' THEN 1 ELSE 0 END, "
-                        + "g.created_at DESC",
+                        + "g.created_at DESC, g.id",
                 new MapSqlParameterSource("studentId", studentId),
                 ThesisGroupReadRepository::row);
         return hydrate(rows);
@@ -65,7 +65,7 @@ public class ThesisGroupReadRepository {
                         + "WHERE EXISTS ("
                         + "  SELECT 1 FROM thesis.thesis_topic_supervisor ts "
                         + "  WHERE ts.topic_id = t.id AND ts.lecturer_id = :lecturerId) "
-                        + "ORDER BY g.created_at DESC",
+                        + "ORDER BY g.created_at DESC, g.id",
                 new MapSqlParameterSource("lecturerId", lecturerId),
                 ThesisGroupReadRepository::row);
         return hydrate(rows);
@@ -80,7 +80,7 @@ public class ThesisGroupReadRepository {
                         + "WHERE g.round_id = :roundId AND EXISTS ("
                         + "  SELECT 1 FROM thesis.thesis_topic_supervisor ts "
                         + "  WHERE ts.topic_id = t.id AND ts.lecturer_id = :lecturerId) "
-                        + "ORDER BY g.created_at DESC",
+                        + "ORDER BY g.created_at DESC, g.id",
                 new MapSqlParameterSource("roundId", roundId).addValue("lecturerId", lecturerId),
                 ThesisGroupReadRepository::row);
         return hydrate(rows);
@@ -124,7 +124,7 @@ public class ThesisGroupReadRepository {
                         + "    JOIN academic.\"Curriculum\" c ON c.\"id\" = s.\"curriculumId\" "
                         + "    JOIN academic.\"Department\" md ON md.\"id\" = c.\"departmentId\" "
                         + "    WHERE m.group_id = g.id AND md.\"facultyId\" = :facultyId)) "
-                        + ") ORDER BY g.created_at DESC",
+                        + ") ORDER BY g.created_at DESC, g.id",
                 new MapSqlParameterSource("roundId", roundId).addValue("facultyId", facultyId),
                 ThesisGroupReadRepository::row);
         return hydrate(rows);
@@ -145,7 +145,7 @@ public class ThesisGroupReadRepository {
                         + "    JOIN academic.\"Curriculum\" c ON c.\"id\" = s.\"curriculumId\" "
                         + "    JOIN academic.\"Department\" md ON md.\"id\" = c.\"departmentId\" "
                         + "    WHERE m.group_id = g.id AND md.\"id\" = :departmentId)) "
-                        + ") ORDER BY g.created_at DESC",
+                        + ") ORDER BY g.created_at DESC, g.id",
                 new MapSqlParameterSource("roundId", roundId).addValue("departmentId", departmentId),
                 ThesisGroupReadRepository::row);
         return hydrate(rows);

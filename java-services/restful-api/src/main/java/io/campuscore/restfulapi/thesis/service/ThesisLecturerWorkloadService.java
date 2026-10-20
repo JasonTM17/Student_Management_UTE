@@ -38,7 +38,7 @@ public class ThesisLecturerWorkloadService {
                         + "LEFT JOIN thesis.thesis_group g ON g.topic_id = t.id AND g.status <> 'CANCELLED' "
                         + "WHERE ts.lecturer_id = :lecturerId "
                         + "GROUP BY ts.topic_id, t.title, t.status, t.round_id, r.name, r.status "
-                        + "ORDER BY MAX(r.created_at) DESC, MAX(t.created_at) DESC LIMIT 100",
+                        + "ORDER BY MAX(r.created_at) DESC, MAX(t.created_at) DESC, ts.topic_id LIMIT 100",
                 new MapSqlParameterSource("lecturerId", lecturerId),
                 (rs, ignored) -> new SupervisedTopic(
                         rs.getObject("topic_id", UUID.class),
@@ -60,7 +60,7 @@ public class ThesisLecturerWorkloadService {
                         + "LEFT JOIN thesis.thesis_council_topic ct ON ct.council_id = cm.council_id "
                         + "WHERE cm.lecturer_id = :lecturerId "
                         + "GROUP BY cm.council_id, c.name, cm.member_role, c.round_id, r.name, r.status "
-                        + "ORDER BY MAX(r.created_at) DESC LIMIT 50",
+                        + "ORDER BY MAX(r.created_at) DESC, cm.council_id LIMIT 50",
                 new MapSqlParameterSource("lecturerId", lecturerId),
                 (rs, ignored) -> new CouncilAssignment(
                         rs.getObject("council_id", UUID.class),
@@ -87,7 +87,7 @@ public class ThesisLecturerWorkloadService {
                         + "JOIN thesis.thesis_council c ON c.id = ct.council_id "
                         + "JOIN thesis.thesis_registration_round r ON r.id = c.round_id "
                         + "WHERE cm.lecturer_id = :lecturerId "
-                        + "ORDER BY r.created_at DESC, t.title ASC LIMIT 100",
+                        + "ORDER BY r.created_at DESC, t.title ASC, ct.topic_id LIMIT 100",
                 new MapSqlParameterSource("lecturerId", lecturerId),
                 (rs, ignored) -> new GradingTask(
                         rs.getObject("topic_id", UUID.class),

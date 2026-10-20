@@ -443,19 +443,28 @@ function topicChoiceFixture({ locale = 'en', failure, group = { id: 'own-draft' 
   const source = fs.readFileSync(path.join(__dirname, '../src/i18n/messages.ts'), 'utf8');
   const tree = ts.createSourceFile('messages.ts', source, ts.ScriptTarget.Latest, true);
   let copy;
+  let codes;
+  function literalMap(objectLiteral) {
+    return Object.fromEntries(objectLiteral.properties
+      .filter(item => ts.isPropertyAssignment(item) && ts.isStringLiteral(item.initializer))
+      .map(item => [item.name.getText(tree), item.initializer.text]));
+  }
   function visit(node) {
     if (ts.isVariableDeclaration(node) && node.name.getText(tree) === locale) {
       const dictionary = ts.isAsExpression(node.initializer) ? node.initializer.expression : node.initializer;
       assert.ok(ts.isObjectLiteralExpression(dictionary), `actual ${locale} object dictionary required`);
       const thesis = dictionary.properties.find(item => item.name?.getText(tree) === 'thesis');
-      copy = Object.fromEntries(thesis.initializer.properties
-        .filter(item => ts.isPropertyAssignment(item) && ts.isStringLiteral(item.initializer))
-        .map(item => [item.name.getText(tree), item.initializer.text]));
+      copy = literalMap(thesis.initializer);
+      const common = dictionary.properties.find(item => item.name?.getText(tree) === 'common');
+      const campusErrors = common?.initializer.properties.find(item => item.name?.getText(tree) === 'campusErrors');
+      const codesNode = campusErrors?.initializer.properties.find(item => item.name?.getText(tree) === 'codes');
+      codes = codesNode ? literalMap(codesNode.initializer) : {};
     }
     ts.forEachChild(node, visit);
   }
   visit(tree);
   assert.ok(copy?.actionFailed, `actual ${locale} thesis dictionary required`);
+  assert.ok(codes, `actual ${locale} campusErrors codes dictionary required`);
 
   const errorModule = { exports: {} };
   const errorSource = fs.readFileSync(path.join(__dirname, '../src/lib/campus-error.ts'), 'utf8');
@@ -466,7 +475,8 @@ function topicChoiceFixture({ locale = 'en', failure, group = { id: 'own-draft' 
 
   const events = [];
   const choose = executeDeclaration('components/dashboard/thesis/ThesisTopicDetailPage.tsx', 'chooseThisTopic', {
-    myGroup: group, topicId: 'full-topic', messages: { thesis: copy },
+    myGroup: group, topicId: 'full-topic',
+    messages: { thesis: copy, common: { campusErrors: { codes } } },
     campusErrorCode: errorModule.exports.campusErrorCode,
     setIsChoosing: value => events.push(['choosing', value]),
     setActionError: value => events.push(['error', value]),
