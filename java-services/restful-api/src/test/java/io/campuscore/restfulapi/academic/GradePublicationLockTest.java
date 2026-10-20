@@ -166,12 +166,30 @@ class GradePublicationLockTest {
     }
 
     @Test
-    void aLoneNullScoreIsRejectedAsPartial() throws Exception {
+    void midTermProcessScoreCanBeSavedAsDraftAlone() throws Exception {
         mvc.perform(put("/api/v1/sections/section-1/grades")
                         .with(lecturerJwt("lecturer-1"))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {"grades":[{"enrollmentId":"enrollment-1","processScore":8.0,"finalExamScore":null}]}
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.message").value("Grades saved as draft"));
+
+        assertEnrollmentGrade("enrollment-1", null, null, "DRAFT");
+        Integer components = jdbc.queryForObject(
+                "SELECT COUNT(*) FROM \"academic\".\"StudentGrade\" WHERE \"enrollmentId\" = 'enrollment-1'",
+                Integer.class);
+        org.assertj.core.api.Assertions.assertThat(components).isEqualTo(1);
+    }
+
+    @Test
+    void finalExamScoreWithoutProcessScoreIsRejectedAsPartial() throws Exception {
+        mvc.perform(put("/api/v1/sections/section-1/grades")
+                        .with(lecturerJwt("lecturer-1"))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"grades":[{"enrollmentId":"enrollment-1","processScore":null,"finalExamScore":8.0}]}
                                 """))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value("GRADE_PARTIAL_SCORE"));

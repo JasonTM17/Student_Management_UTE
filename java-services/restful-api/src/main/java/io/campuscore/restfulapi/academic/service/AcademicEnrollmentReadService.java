@@ -77,6 +77,10 @@ public class AcademicEnrollmentReadService {
             Map.entry("D-", BigDecimal.valueOf(0.7)),
             Map.entry("F", BigDecimal.ZERO));
 
+    private static BigDecimal gradePoint(String letterGrade) {
+        return letterGrade == null ? null : GRADE_POINTS.get(letterGrade);
+    }
+
     private final AcademicEnrollmentReadRepository academic;
 
     public AcademicEnrollmentReadService(AcademicEnrollmentReadRepository academic) {
@@ -205,40 +209,38 @@ public class AcademicEnrollmentReadService {
                             coalesce(grade.semesterNameEn(), grade.semester()),
                             grade.semesterNameVi()));
             semester.records.add(grade);
-            BigDecimal point = GRADE_POINTS.get(grade.letterGrade());
+            BigDecimal point = gradePoint(grade.letterGrade());
             if (point != null) {
                 BigDecimal weighted = point.multiply(BigDecimal.valueOf(grade.credits()));
                 semester.attempted += grade.credits();
+                semester.gpaAttempted += grade.credits();
                 semester.points = semester.points.add(weighted);
                 if (!"F".equals(grade.letterGrade())) {
                     semester.earned += grade.credits();
                 }
             } else if ("COMPLETED".equals(grade.enrollmentStatus())) {
+                semester.attempted += grade.credits();
                 semester.earned += grade.credits();
             }
 
             String courseKey = grade.courseCode() != null && !grade.courseCode().isBlank() ? grade.courseCode() : grade.id();
             GradeSummary existing = bestAttemptByCourse.get(courseKey);
-            if (existing == null) {
+            if (existing == null || isBetterAttempt(grade, existing)) {
                 bestAttemptByCourse.put(courseKey, grade);
-            } else {
-                BigDecimal existingPt = GRADE_POINTS.get(existing.letterGrade());
-                BigDecimal newPt = GRADE_POINTS.get(grade.letterGrade());
-                if (newPt != null && (existingPt == null || newPt.compareTo(existingPt) > 0)) {
-                    bestAttemptByCourse.put(courseKey, grade);
-                }
             }
         }
 
         int totalAttempted = 0;
+        int gpaAttempted = 0;
         int totalEarned = 0;
         BigDecimal totalPoints = BigDecimal.ZERO;
 
         for (GradeSummary best : bestAttemptByCourse.values()) {
-            BigDecimal point = GRADE_POINTS.get(best.letterGrade());
+            BigDecimal point = gradePoint(best.letterGrade());
             if (point != null) {
                 BigDecimal weighted = point.multiply(BigDecimal.valueOf(best.credits()));
                 totalAttempted += best.credits();
+                gpaAttempted += best.credits();
                 totalPoints = totalPoints.add(weighted);
                 if (!"F".equals(best.letterGrade())) {
                     totalEarned += best.credits();
@@ -251,27 +253,19 @@ public class AcademicEnrollmentReadService {
 
         return new TranscriptResponse(
                 new TranscriptSummary(
-                        gpa(totalPoints, totalAttempted), totalEarned, totalAttempted, TRANSCRIPT_BASIS_NOTE),
+                        gpa(totalPoints, gpaAttempted), totalEarned, totalAttempted, TRANSCRIPT_BASIS_NOTE),
                 bySemester.values().stream().map(TranscriptAccumulator::response).toList());
     }
 
     @Transactional(readOnly = true)
     public List<GradeItemResponse> findGradeItemsBySection(String sectionId, List<String> roles, String lecturerId) {
         String normalizedSectionId = normalizeRequired("sectionId", sectionId);
-        if (isAdmin(roles)) {
-            return academic.findGradeItemsBySection(normalizedSectionId).stream()
-                    .map(AcademicEnrollmentReadService::gradeItem)
-                    .toList();
-        }
-        // Round-11: a section the caller does not own used to answer a silent
-        // empty list while the sibling grades endpoints raise 403
-        // SECTION_FORBIDDEN; align the read with the domain contract.
-        String profileId = requireProfileId("lecturerId", lecturerId);
-        if (!academic.lecturerOwnsSection(normalizedSectionId, profileId)) {
+        String profileId = normalizeOptional("lecturerId", lecturerId);
+        if (!academic.hasSectionAccess(normalizedSectionId, roles, profileId)) {
             throw new io.campuscore.restfulapi.web.DomainException(
                     HttpStatus.FORBIDDEN, "SECTION_FORBIDDEN", "Section is not assigned to the current lecturer");
         }
-        return academic.findGradeItemsBySectionAndLecturer(normalizedSectionId, profileId).stream()
+        return academic.findGradeItemsBySection(normalizedSectionId).stream()
                 .map(AcademicEnrollmentReadService::gradeItem)
                 .toList();
     }
@@ -286,17 +280,12 @@ public class AcademicEnrollmentReadService {
     @Transactional(readOnly = true)
     public List<StudentGradeSectionRow> findStudentGradesBySection(String sectionId, List<String> roles, String lecturerId) {
         String normalizedSectionId = normalizeRequired("sectionId", sectionId);
-        if (isAdmin(roles)) {
-            return studentGradeRows(academic.findStudentGradesBySection(normalizedSectionId));
-        }
-        // Same round-11 alignment as the grade-items read: a section the
-        // caller does not own is 403 SECTION_FORBIDDEN, not a silent [].
-        String profileId = requireProfileId("lecturerId", lecturerId);
-        if (!academic.lecturerOwnsSection(normalizedSectionId, profileId)) {
+        String profileId = normalizeOptional("lecturerId", lecturerId);
+        if (!academic.hasSectionAccess(normalizedSectionId, roles, profileId)) {
             throw new io.campuscore.restfulapi.web.DomainException(
                     HttpStatus.FORBIDDEN, "SECTION_FORBIDDEN", "Section is not assigned to the current lecturer");
         }
-        return studentGradeRows(academic.findStudentGradesBySectionAndLecturer(normalizedSectionId, profileId));
+        return studentGradeRows(academic.findStudentGradesBySection(normalizedSectionId));
     }
 
     @Transactional(readOnly = true)
@@ -322,18 +311,15 @@ public class AcademicEnrollmentReadService {
         List<StudentGradeSectionRow> rows;
         if (isAdmin(roles)) {
             rows = studentGradeRows(academic.findStudentGradesByEnrollment(normalizedEnrollmentId));
-        } else if (roles != null && roles.contains("LECTURER")) {
-            String profileId = requireProfileId("lecturerId", lecturerId);
-            if (academic.findEnrollmentById(normalizedEnrollmentId).isEmpty()) {
-                throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Enrollment not found");
-            }
-            rows = studentGradeRows(academic.findStudentGradesByEnrollmentAndLecturer(
-                    normalizedEnrollmentId,
-                    profileId));
-            if (rows.isEmpty()) {
+        } else if (roles != null && (roles.contains("LECTURER") || roles.contains("TRUONG_BO_MON") || roles.contains("TRUONG_KHOA"))) {
+            String profileId = normalizeOptional("lecturerId", lecturerId);
+            var enrollment = academic.findEnrollmentById(normalizedEnrollmentId)
+                    .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Enrollment not found"));
+            if (!academic.hasSectionAccess(enrollment.sectionId(), roles, profileId)) {
                 throw new io.campuscore.restfulapi.web.DomainException(
                         HttpStatus.FORBIDDEN, "SECTION_FORBIDDEN", "Section is not assigned to the current lecturer");
             }
+            rows = studentGradeRows(academic.findStudentGradesByEnrollment(normalizedEnrollmentId));
         } else {
             academic.findEnrollmentById(normalizedEnrollmentId)
                     .filter(row -> row.studentId().equals(normalizeOptional("studentId", studentId)))
@@ -550,6 +536,54 @@ public class AcademicEnrollmentReadService {
                 && grade.maxScore().compareTo(BigDecimal.ZERO) > 0;
     }
 
+    private static boolean isBetterAttempt(GradeSummary candidate, GradeSummary current) {
+        BigDecimal candPt = gradePoint(candidate.letterGrade());
+        BigDecimal currPt = gradePoint(current.letterGrade());
+        boolean candPassed = isPassed(candidate, candPt);
+        boolean currPassed = isPassed(current, currPt);
+
+        if (candPassed && !currPassed) {
+            return true;
+        }
+        if (!candPassed && currPassed) {
+            return false;
+        }
+        if (candPassed && currPassed) {
+            if (candPt != null && currPt != null) {
+                int cmp = candPt.compareTo(currPt);
+                if (cmp != 0) {
+                    return cmp > 0;
+                }
+                return isHigherFinalGrade(candidate, current);
+            }
+            if (candPt != null) {
+                return true;
+            }
+            if (currPt != null) {
+                return false;
+            }
+            return isHigherFinalGrade(candidate, current);
+        }
+        if (candPt != null && currPt != null) {
+            return isHigherFinalGrade(candidate, current);
+        }
+        return false;
+    }
+
+    private static boolean isPassed(GradeSummary grade, BigDecimal point) {
+        if (point != null) {
+            return !"F".equals(grade.letterGrade());
+        }
+        return "COMPLETED".equals(grade.enrollmentStatus());
+    }
+
+    private static boolean isHigherFinalGrade(GradeSummary candidate, GradeSummary current) {
+        if (candidate.finalGrade() != null && current.finalGrade() != null) {
+            return candidate.finalGrade().compareTo(current.finalGrade()) > 0;
+        }
+        return false;
+    }
+
     private static String requireProfileId(String name, String value) {
         String normalized = normalizeOptional(name, value);
         if (normalized == null) {
@@ -621,6 +655,7 @@ public class AcademicEnrollmentReadService {
         private final List<GradeSummary> records = new ArrayList<>();
         private int earned;
         private int attempted;
+        private int gpaAttempted;
         private BigDecimal points = BigDecimal.ZERO;
 
         private TranscriptAccumulator(String semesterId, String semesterName, String semesterNameEn, String semesterNameVi) {
@@ -631,7 +666,7 @@ public class AcademicEnrollmentReadService {
         }
 
         private TranscriptSemester response() {
-            return new TranscriptSemester(semesterId, semesterName, semesterNameEn, semesterNameVi, records, gpa(points, attempted), earned, attempted);
+            return new TranscriptSemester(semesterId, semesterName, semesterNameEn, semesterNameVi, records, gpa(points, gpaAttempted), earned, attempted);
         }
     }
 

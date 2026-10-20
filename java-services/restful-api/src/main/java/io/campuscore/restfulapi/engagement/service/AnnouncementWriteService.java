@@ -39,7 +39,7 @@ public class AnnouncementWriteService {
     private static final Logger LOGGER = LoggerFactory.getLogger(AnnouncementWriteService.class);
 
     private static final Set<String> PRIORITIES = Set.of("LOW", "NORMAL", "HIGH", "URGENT");
-    private static final Set<String> TARGET_ROLES = Set.of("STUDENT", "LECTURER", "ADMIN", "SUPER_ADMIN");
+    private static final Set<String> TARGET_ROLES = Set.of("STUDENT", "LECTURER", "ADMIN", "SUPER_ADMIN", "TRUONG_KHOA", "TRUONG_BO_MON");
     private static final int MAX_HISTORY_PAGE_SIZE = 100;
     private static final int MAX_ACTOR_LABEL_LENGTH = 240;
 

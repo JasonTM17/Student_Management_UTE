@@ -264,6 +264,10 @@ class TwoFactorLoginPersistenceTest {
                 "SELECT \"twoFactorEnabled\" FROM \"campuscore_auth\".\"User\" WHERE \"id\" = 'student-user'",
                 Boolean.class);
         assertTrue(flag, "twoFactorEnabled must be persisted after confirm");
+        Long version = jdbc.queryForObject(
+                "SELECT \"credentialVersion\" FROM \"campuscore_auth\".\"User\" WHERE \"id\" = 'student-user'",
+                Long.class);
+        assertEquals(1L, version, "credentialVersion must be bumped after enabling 2FA");
 
         // 2. Login now returns a challenge: twoFactorRequired + challengeId +
         // masked email, and explicitly no tokens and no auth cookies.

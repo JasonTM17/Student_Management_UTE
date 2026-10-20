@@ -90,6 +90,55 @@ public class AcademicSectionReadRepository {
                 AcademicSectionReadRepository::mapSection);
     }
 
+    public boolean hasSectionAccess(String sectionId, List<String> roles, String lecturerId) {
+        if (roles != null && (roles.contains("ADMIN") || roles.contains("SUPER_ADMIN"))) {
+            return true;
+        }
+        if (lecturerId == null || lecturerId.isBlank()) {
+            return false;
+        }
+        Long ownCount = jdbc.queryForObject(
+                "SELECT COUNT(*) FROM " + SECTION + " WHERE \"id\" = :sectionId AND \"lecturerId\" = :lecturerId",
+                new MapSqlParameterSource().addValue("sectionId", sectionId).addValue("lecturerId", lecturerId),
+                Long.class);
+        if (ownCount != null && ownCount > 0) {
+            return true;
+        }
+        if (roles != null && roles.contains("TRUONG_BO_MON")) {
+            try {
+                Long count = jdbc.queryForObject(
+                        "SELECT COUNT(*) FROM " + SECTION + " section "
+                                + "JOIN " + COURSE + " course ON course.\"id\" = section.\"courseId\" "
+                                + "JOIN " + LECTURER + " lecturer ON lecturer.\"id\" = :lecturerId "
+                                + "WHERE section.\"id\" = :sectionId AND course.\"departmentId\" = lecturer.\"departmentId\"",
+                        new MapSqlParameterSource().addValue("sectionId", sectionId).addValue("lecturerId", lecturerId),
+                        Long.class);
+                if (count != null && count > 0) {
+                    return true;
+                }
+            } catch (Exception ignored) {
+            }
+        }
+        if (roles != null && roles.contains("TRUONG_KHOA")) {
+            try {
+                Long count = jdbc.queryForObject(
+                        "SELECT COUNT(*) FROM " + SECTION + " section "
+                                + "JOIN " + COURSE + " course ON course.\"id\" = section.\"courseId\" "
+                                + "JOIN " + DEPARTMENT + " courseDept ON courseDept.\"id\" = course.\"departmentId\" "
+                                + "JOIN " + LECTURER + " lecturer ON lecturer.\"id\" = :lecturerId "
+                                + "JOIN " + DEPARTMENT + " lecturerDept ON lecturerDept.\"id\" = lecturer.\"departmentId\" "
+                                + "WHERE section.\"id\" = :sectionId AND courseDept.\"facultyId\" = lecturerDept.\"facultyId\"",
+                        new MapSqlParameterSource().addValue("sectionId", sectionId).addValue("lecturerId", lecturerId),
+                        Long.class);
+                if (count != null && count > 0) {
+                    return true;
+                }
+            } catch (Exception ignored) {
+            }
+        }
+        return false;
+    }
+
     public List<GradingSectionRow> findLecturerGradingSections(String lecturerId, String semesterId) {
         MapSqlParameterSource parameters = new MapSqlParameterSource("lecturerId", lecturerId);
         String semesterFilter = "";

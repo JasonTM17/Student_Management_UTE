@@ -205,6 +205,11 @@ class NotificationReadPersistenceTest {
                 .andExpect(jsonPath("$.isRead").value(false));
 
         mvc.perform(get("/api/v1/notifications/detail").with(studentJwt()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value("detail"))
+                .andExpect(jsonPath("$.userId").value(STUDENT));
+
+        mvc.perform(get("/api/v1/notifications/detail").with(otherStudentJwt()))
                 .andExpect(status().isForbidden())
                 .andExpect(jsonPath("$.code").value("ACCESS_DENIED"));
 
@@ -254,6 +259,13 @@ class NotificationReadPersistenceTest {
     private RequestPostProcessor studentJwt() {
         return fixtureJwt(jdbc, STUDENT, token -> token
                         .subject(STUDENT)
+                        .claim("roles", List.of("STUDENT")), "STUDENT")
+                .authorities(new SimpleGrantedAuthority("ROLE_STUDENT"));
+    }
+
+    private RequestPostProcessor otherStudentJwt() {
+        return fixtureJwt(jdbc, OTHER_USER, token -> token
+                        .subject(OTHER_USER)
                         .claim("roles", List.of("STUDENT")), "STUDENT")
                 .authorities(new SimpleGrantedAuthority("ROLE_STUDENT"));
     }

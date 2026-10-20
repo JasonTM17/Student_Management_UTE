@@ -105,7 +105,7 @@ public class AcademicAttendanceReadController {
         @ApiResponse(responseCode = "200", description = "Truy vấn thành công")
     })
     @GetMapping("section/{sectionId}")
-    @PreAuthorize("hasAnyRole('ADMIN', 'SUPER_ADMIN', 'LECTURER')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'SUPER_ADMIN', 'LECTURER', 'TRUONG_BO_MON', 'TRUONG_KHOA')")
     public List<AttendanceResponse> getSectionAttendance(
             @AuthenticationPrincipal Jwt jwt,
             @Parameter(description = "Mã định danh lớp học phần (UUID)", required = true) @PathVariable String sectionId,
@@ -124,7 +124,7 @@ public class AcademicAttendanceReadController {
         @ApiResponse(responseCode = "200", description = "Truy vấn thành công")
     })
     @GetMapping("section/{sectionId}/roster")
-    @PreAuthorize("hasAnyRole('ADMIN', 'SUPER_ADMIN', 'LECTURER')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'SUPER_ADMIN', 'LECTURER', 'TRUONG_BO_MON', 'TRUONG_KHOA')")
     public List<AttendanceRosterEntry> getSectionAttendanceRoster(
             @AuthenticationPrincipal Jwt jwt,
             @Parameter(description = "Mã định danh lớp học phần (UUID)", required = true) @PathVariable String sectionId,
@@ -141,7 +141,7 @@ public class AcademicAttendanceReadController {
         @ApiResponse(responseCode = "200", description = "Lấy tổng kết lớp thành công")
     })
     @GetMapping("section/{sectionId}/summary")
-    @PreAuthorize("hasAnyRole('ADMIN', 'SUPER_ADMIN', 'LECTURER')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'SUPER_ADMIN', 'LECTURER', 'TRUONG_BO_MON', 'TRUONG_KHOA')")
     public SectionAttendanceSummaryResponse getSectionAttendanceSummary(
             @AuthenticationPrincipal Jwt jwt,
             @Parameter(description = "Mã định danh lớp học phần (UUID)", required = true) @PathVariable String sectionId,
@@ -158,7 +158,7 @@ public class AcademicAttendanceReadController {
         @ApiResponse(responseCode = "200", description = "Tìm thấy bản ghi điểm danh")
     })
     @GetMapping("{id}")
-    @PreAuthorize("hasAnyRole('ADMIN', 'SUPER_ADMIN', 'LECTURER', 'STUDENT')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'SUPER_ADMIN', 'LECTURER', 'STUDENT', 'TRUONG_BO_MON', 'TRUONG_KHOA')")
     public AttendanceResponse getAttendanceRecord(
             @AuthenticationPrincipal Jwt jwt,
             @Parameter(description = "Mã định danh bản ghi điểm danh (UUID)", required = true) @PathVariable String id) {

@@ -233,6 +233,25 @@ class AnnouncementWritePersistenceTest {
     }
 
     @Test
+    void createAnnouncementAllowsDepartmentAndFacultyHeadsAsTargetRoles() throws Exception {
+        mvc.perform(post("/api/v1/announcements")
+                        .with(adminJwt("admin-1"))
+                        .contentType(org.springframework.http.MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "title": "Faculty and Department Notice",
+                                  "content": "Special meeting for faculty and department heads.",
+                                  "priority": "HIGH",
+                                  "targetRoles": ["TRUONG_KHOA", "TRUONG_BO_MON"],
+                                  "isGlobal": false
+                                }
+                                """))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.targetRoles[0]").value("TRUONG_KHOA"))
+                .andExpect(jsonPath("$.targetRoles[1]").value("TRUONG_BO_MON"));
+    }
+
+    @Test
     void createBoundaryFailsClosedForStudentMissingBodyAndInvalidValues() throws Exception {
         mvc.perform(post("/api/v1/announcements")
                         .with(fixtureJwt(jdbc, "student-1", token -> token

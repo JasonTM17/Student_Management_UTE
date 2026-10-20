@@ -159,6 +159,7 @@ public class TwoFactorService {
         // trail records who and when, next to the password events.
         audit.record(userId, null, "TWO_FACTOR_ENABLED", "USER", userId,
                 "User enabled two-factor authentication");
+        users.bumpCredentialVersion(userId);
         revokeOtherRefreshSessions(userId);
     }
 

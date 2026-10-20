@@ -8,6 +8,7 @@ import io.campuscore.restfulapi.notification.web.NotificationReadDtos.UnreadCoun
 import java.util.List;
 import org.springframework.context.annotation.Profile;
 import org.springframework.http.HttpStatus;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
@@ -66,9 +67,19 @@ public class NotificationReadService {
 
     @Transactional(readOnly = true)
     public NotificationResponse findOne(String id) {
+        return findOne(id, null, List.of("ADMIN"));
+    }
+
+    @Transactional(readOnly = true)
+    public NotificationResponse findOne(String id, String userId, List<String> roles) {
         requireText(id, "notification id");
-        return notifications.findById(id)
+        NotificationResponse found = notifications.findById(id)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Notification not found"));
+        boolean isAdmin = roles != null && (roles.contains("ADMIN") || roles.contains("SUPER_ADMIN"));
+        if (!isAdmin && (userId == null || !userId.equals(found.userId()))) {
+            throw new AccessDeniedException("Access denied");
+        }
+        return found;
     }
 
     /**

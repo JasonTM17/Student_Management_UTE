@@ -134,7 +134,7 @@ public class AcademicEnrollmentReadController {
         @ApiResponse(responseCode = "200", description = "Lấy cấu trúc đầu điểm thành công")
     })
     @GetMapping("grades/items/section/{sectionId}")
-    @PreAuthorize("hasAnyRole('ADMIN', 'SUPER_ADMIN', 'LECTURER')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'SUPER_ADMIN', 'LECTURER', 'TRUONG_BO_MON', 'TRUONG_KHOA')")
     public List<GradeItemResponse> getGradeItemsBySection(
             @AuthenticationPrincipal Jwt jwt,
             @Parameter(description = "Mã định danh lớp học phần (UUID)", required = true) @PathVariable String sectionId) {
@@ -156,7 +156,7 @@ public class AcademicEnrollmentReadController {
         @ApiResponse(responseCode = "200", description = "Lấy bảng điểm lớp học phần thành công")
     })
     @GetMapping("grades/student-grades/section/{sectionId}")
-    @PreAuthorize("hasAnyRole('ADMIN', 'SUPER_ADMIN', 'LECTURER')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'SUPER_ADMIN', 'LECTURER', 'TRUONG_BO_MON', 'TRUONG_KHOA')")
     public List<StudentGradeSectionRow> getStudentGradesBySection(
             @AuthenticationPrincipal Jwt jwt,
             @Parameter(description = "Mã định danh lớp học phần (UUID)", required = true) @PathVariable String sectionId) {
@@ -182,7 +182,7 @@ public class AcademicEnrollmentReadController {
         @ApiResponse(responseCode = "200", description = "Lấy chi tiết điểm thành công")
     })
     @GetMapping("grades/student-grades/enrollment/{enrollmentId}")
-    @PreAuthorize("hasAnyRole('ADMIN', 'SUPER_ADMIN', 'LECTURER', 'STUDENT')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'SUPER_ADMIN', 'LECTURER', 'STUDENT', 'TRUONG_BO_MON', 'TRUONG_KHOA')")
     public StudentGradesByEnrollmentResponse getStudentGradesByEnrollment(
             @AuthenticationPrincipal Jwt jwt,
             @Parameter(description = "Mã định danh ghi danh (UUID)", required = true) @PathVariable String enrollmentId) {

@@ -23,6 +23,8 @@ public class AcademicAttendanceReadRepository {
     private static final String USER = "\"campuscore_auth\".\"User\"";
     private static final String SECTION = "\"academic\".\"Section\"";
     private static final String COURSE = "\"academic\".\"Course\"";
+    private static final String LECTURER = "\"academic\".\"Lecturer\"";
+    private static final String DEPARTMENT = "\"academic\".\"Department\"";
 
     private final NamedParameterJdbcTemplate jdbc;
 
@@ -181,6 +183,51 @@ public class AcademicAttendanceReadRepository {
                         .addValue("lecturerId", lecturerId),
                 Long.class);
         return count != null && count > 0;
+    }
+
+    public boolean hasSectionAccess(String sectionId, List<String> roles, String lecturerId) {
+        if (roles != null && (roles.contains("ADMIN") || roles.contains("SUPER_ADMIN"))) {
+            return true;
+        }
+        if (lecturerId == null || lecturerId.isBlank()) {
+            return false;
+        }
+        if (isSectionOwnedByLecturer(sectionId, lecturerId)) {
+            return true;
+        }
+        if (roles != null && roles.contains("TRUONG_BO_MON")) {
+            try {
+                Long count = jdbc.queryForObject(
+                        "SELECT COUNT(*) FROM " + SECTION + " section "
+                                + "JOIN " + COURSE + " course ON course.\"id\" = section.\"courseId\" "
+                                + "JOIN " + LECTURER + " lecturer ON lecturer.\"id\" = :lecturerId "
+                                + "WHERE section.\"id\" = :sectionId AND course.\"departmentId\" = lecturer.\"departmentId\"",
+                        new MapSqlParameterSource().addValue("sectionId", sectionId).addValue("lecturerId", lecturerId),
+                        Long.class);
+                if (count != null && count > 0) {
+                    return true;
+                }
+            } catch (Exception ignored) {
+            }
+        }
+        if (roles != null && roles.contains("TRUONG_KHOA")) {
+            try {
+                Long count = jdbc.queryForObject(
+                        "SELECT COUNT(*) FROM " + SECTION + " section "
+                                + "JOIN " + COURSE + " course ON course.\"id\" = section.\"courseId\" "
+                                + "JOIN " + DEPARTMENT + " courseDept ON courseDept.\"id\" = course.\"departmentId\" "
+                                + "JOIN " + LECTURER + " lecturer ON lecturer.\"id\" = :lecturerId "
+                                + "JOIN " + DEPARTMENT + " lecturerDept ON lecturerDept.\"id\" = lecturer.\"departmentId\" "
+                                + "WHERE section.\"id\" = :sectionId AND courseDept.\"facultyId\" = lecturerDept.\"facultyId\"",
+                        new MapSqlParameterSource().addValue("sectionId", sectionId).addValue("lecturerId", lecturerId),
+                        Long.class);
+                if (count != null && count > 0) {
+                    return true;
+                }
+            } catch (Exception ignored) {
+            }
+        }
+        return false;
     }
 
     private static String attendanceFilters(

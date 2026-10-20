@@ -37,7 +37,7 @@ public class EnrolledCountReconcileJob {
     private static final Logger log = LoggerFactory.getLogger(EnrolledCountReconcileJob.class);
 
     /** Same active-enrollment definition as RegistrationService seat accounting. */
-    static final String ACTIVE_STATUS_PREDICATE = "('ENROLLED', 'PENDING', 'CONFIRMED')";
+    static final String ACTIVE_STATUS_PREDICATE = "('ENROLLED', 'PENDING', 'CONFIRMED', 'COMPLETED')";
     private static final int LOGGED_SECTION_LIMIT = 20;
 
     private final NamedParameterJdbcTemplate jdbc;

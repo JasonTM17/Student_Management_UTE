@@ -857,6 +857,25 @@ class AuthLoginPersistenceTest {
     }
 
     @Test
+    void logoutAdvancesCredentialVersionAndInvalidatesExistingAccessToken() throws Exception {
+        MvcResult login = loginStudent().andExpect(status().isOk()).andReturn();
+        JsonNode loginBody = objectMapper.readTree(login.getResponse().getContentAsString());
+        String accessToken = loginBody.get("accessToken").asText();
+
+        mvc.perform(get("/api/v1/auth/me").header("Authorization", "Bearer " + accessToken))
+                .andExpect(status().isOk());
+
+        mvc.perform(post("/api/v1/auth/logout")
+                        .header("Authorization", "Bearer " + accessToken))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.message").value("Logged out successfully"));
+
+        mvc.perform(get("/api/v1/auth/me").header("Authorization", "Bearer " + accessToken))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.code").value("SESSION_INVALID"));
+    }
+
+    @Test
     void reconciledDemoRoleMigrationsRevokePreexistingAccessAndRefreshSessions() throws Exception {
         String user = "admin-user-002";
         String initialSecret = "PreMigration-" + UUID.randomUUID();

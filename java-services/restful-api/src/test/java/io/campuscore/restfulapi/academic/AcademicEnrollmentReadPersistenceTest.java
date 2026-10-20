@@ -271,6 +271,71 @@ class AcademicEnrollmentReadPersistenceTest {
     }
 
     @Test
+    void passFailCompletedCoursesDoNotDiluteGpaInTranscript() throws Exception {
+        insertCourse("course-pf", "PF101", "Physical Education", "Physical Education", "The duc", 2);
+        insertSection("section-pf", "PF", "course-pf");
+        insertEnrollment("enrollment-pf", "student-1", "section-pf", "COMPLETED", "PUBLISHED", null, null, 10);
+
+        mvc.perform(get("/api/v1/enrollments/my/transcript").with(studentJwt("student-user-1", "student-1")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.summary.cumulativeGpa").value(4.0))
+                .andExpect(jsonPath("$.summary.totalCreditsEarned").value(6))
+                .andExpect(jsonPath("$.summary.totalCreditsAttempted").value(6));
+    }
+
+    @Test
+    void retakeWithPassFailResolvesBestAttemptProperly() throws Exception {
+        insertCourse("course-retake-pf", "CS105", "Discrete Math", "Discrete Math", "Toan roi rac", 3);
+        insertSection("section-retake-f", "R1", "course-retake-pf");
+        insertSection("section-retake-p", "R2", "course-retake-pf");
+
+        // Attempt 1: Failed with F (0 grade points, 0 earned credits)
+        insertEnrollment("enrollment-f", "student-1", "section-retake-f", "COMPLETED", "PUBLISHED", "40.00", "F", 20);
+        // Attempt 2: Passed with Pass/Fail (no letter grade, COMPLETED, 3 earned credits)
+        insertEnrollment("enrollment-p", "student-1", "section-retake-p", "COMPLETED", "PUBLISHED", null, null, 21);
+
+        // Student-1 has enrollment-1 (CS101, 4 cr, A = 4.0), plus CS105 best attempt should be Pass (3 cr)
+        // Total earned credits should be 4 + 3 = 7
+        // Cumulative GPA should be 4.0 (CS101 4 cr at 4.0 = 16 pts / 4 cr = 4.0, Pass/Fail adds no GPA points/attempted)
+        mvc.perform(get("/api/v1/enrollments/my/transcript").with(studentJwt("student-user-1", "student-1")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.summary.cumulativeGpa").value(4.0))
+                .andExpect(jsonPath("$.summary.totalCreditsEarned").value(7))
+                .andExpect(jsonPath("$.summary.totalCreditsAttempted").value(7));
+
+        // Now test the reverse: course passed with Pass/Fail, then retaken and failed with F
+        insertCourse("course-pass-then-fail", "CS106", "Data Structures", "Data Structures", "Cau truc du lieu", 3);
+        insertSection("section-pf-pass", "P1", "course-pass-then-fail");
+        insertSection("section-pf-fail", "P2", "course-pass-then-fail");
+
+        insertEnrollment("enrollment-pf-first", "student-1", "section-pf-pass", "COMPLETED", "PUBLISHED", null, null, 22);
+        insertEnrollment("enrollment-pf-second", "student-1", "section-pf-fail", "COMPLETED", "PUBLISHED", "35.00", "F", 23);
+
+        // Best attempt for CS106 must remain the passed attempt (3 earned credits)
+        // Total earned credits should now be 7 + 3 = 10
+        mvc.perform(get("/api/v1/enrollments/my/transcript").with(studentJwt("student-user-1", "student-1")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.summary.cumulativeGpa").value(4.0))
+                .andExpect(jsonPath("$.summary.totalCreditsEarned").value(10))
+                .andExpect(jsonPath("$.summary.totalCreditsAttempted").value(10));
+    }
+
+    @Test
+    void adminCanReadSectionGradesAndItemsWithoutLecturerProfileClaim() throws Exception {
+        mvc.perform(get("/api/v1/grades/items/section/section-1").with(adminJwt()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(2));
+
+        mvc.perform(get("/api/v1/grades/student-grades/section/section-1").with(adminJwt()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(2));
+
+        mvc.perform(get("/api/v1/grades/student-grades/enrollment/enrollment-1").with(adminJwt()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.enrollment.id").value("enrollment-1"));
+    }
+
+    @Test
     void lecturerGradeReadsAreScopedToOwnedSectionsAndRequireLecturerClaim() throws Exception {
         mvc.perform(get("/api/v1/grades/items/lecturer/my").with(lecturerJwt("lecturer-1")))
                 .andExpect(status().isOk())
@@ -322,6 +387,36 @@ class AcademicEnrollmentReadPersistenceTest {
                                 .authorities(new SimpleGrantedAuthority("ROLE_LECTURER"))))
                 .andExpect(status().isUnauthorized())
                 .andExpect(jsonPath("$.code").value("SESSION_INVALID"));
+    }
+
+    @Test
+    void truongBoMonAndTruongKhoaCanReadGradesForSectionsInTheirDepartmentAndFaculty() throws Exception {
+        RequestPostProcessor tbmSameDept = headJwt("user-tbm-1", "lect-tbm-1", "department-1", "TRUONG_BO_MON");
+        RequestPostProcessor tbmOtherDept = headJwt("user-tbm-2", "lect-tbm-2", "department-2", "TRUONG_BO_MON");
+        RequestPostProcessor tkSameFaculty = headJwt("user-tk-1", "lect-tk-1", "department-2", "TRUONG_KHOA");
+        RequestPostProcessor tkOtherFaculty = headJwt("user-tk-2", "lect-tk-2", "department-3", "TRUONG_KHOA");
+
+        mvc.perform(get("/api/v1/grades/items/section/section-1").with(tbmSameDept))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(2));
+        mvc.perform(get("/api/v1/grades/student-grades/section/section-1").with(tbmSameDept))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(2));
+
+        mvc.perform(get("/api/v1/grades/items/section/section-1").with(tbmOtherDept))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("SECTION_FORBIDDEN"));
+
+        mvc.perform(get("/api/v1/grades/items/section/section-1").with(tkSameFaculty))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(2));
+        mvc.perform(get("/api/v1/grades/student-grades/section/section-1").with(tkSameFaculty))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(2));
+
+        mvc.perform(get("/api/v1/grades/items/section/section-1").with(tkOtherFaculty))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("SECTION_FORBIDDEN"));
     }
 
     @Test
@@ -385,6 +480,16 @@ class AcademicEnrollmentReadPersistenceTest {
         return CurrentAccountJwt.currentJwt(jdbc, subject);
     }
 
+    private RequestPostProcessor headJwt(String subject, String lecturerId, String departmentId, String role) {
+        AccountAuthorityFixture.ensureUser(jdbc, subject);
+        AccountAuthorityFixture.lecturer(jdbc, subject, lecturerId);
+        AccountAuthorityFixture.replaceRoles(jdbc, subject, "LECTURER", role);
+        jdbc.update("DELETE FROM \"academic\".\"Lecturer\" WHERE \"id\" = ?", lecturerId);
+        jdbc.update("INSERT INTO \"academic\".\"Lecturer\" (\"id\", \"userId\", \"departmentId\", \"employeeId\", \"isActive\")"
+                + " VALUES (?, ?, ?, ?, ?)", lecturerId, subject, departmentId, "EMP-" + lecturerId, true);
+        return CurrentAccountJwt.currentJwt(jdbc, subject);
+    }
+
     private void createTables() {
         jdbc.execute("""
                 CREATE TABLE IF NOT EXISTS "campuscore_auth"."User" (
@@ -407,6 +512,12 @@ class AcademicEnrollmentReadPersistenceTest {
                     "admissionDate" TIMESTAMP NOT NULL,
                     "createdAt" TIMESTAMP NOT NULL,
                     "updatedAt" TIMESTAMP NOT NULL
+                )
+                """);
+        jdbc.execute("""
+                CREATE TABLE IF NOT EXISTS "academic"."Department" (
+                    "id" VARCHAR(120) PRIMARY KEY,
+                    "facultyId" VARCHAR(120) NOT NULL
                 )
                 """);
         jdbc.execute("""
@@ -545,11 +656,15 @@ class AcademicEnrollmentReadPersistenceTest {
         jdbc.update("DELETE FROM \"academic\".\"Semester\"");
         jdbc.update("DELETE FROM \"academic\".\"AcademicYear\"");
         jdbc.update("DELETE FROM \"academic\".\"Lecturer\"");
+        jdbc.update("DELETE FROM \"academic\".\"Department\"");
         jdbc.update("DELETE FROM \"academic\".\"Student\"");
         jdbc.update("DELETE FROM \"campuscore_auth\".\"User\"");
     }
 
     private void insertFixture() {
+        jdbc.update("INSERT INTO \"academic\".\"Department\" (\"id\", \"facultyId\") VALUES (?, ?)", "department-1", "faculty-1");
+        jdbc.update("INSERT INTO \"academic\".\"Department\" (\"id\", \"facultyId\") VALUES (?, ?)", "department-2", "faculty-1");
+        jdbc.update("INSERT INTO \"academic\".\"Department\" (\"id\", \"facultyId\") VALUES (?, ?)", "department-3", "faculty-2");
         insertUser("student-user-1", "student1@campuscore.edu", "An", "Student");
         insertUser("student-user-2", "student2@campuscore.edu", "Binh", "Student");
         insertUser("lecturer-user-1", "lecturer@campuscore.edu", "Lan", "Lecturer");

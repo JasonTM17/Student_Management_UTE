@@ -144,14 +144,14 @@ public class AcademicAttendanceReadService {
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Attendance record not found"));
         if (!isAdmin(roles)
                 && !Objects.equals(row.studentId(), studentId)
-                && !attendance.isSectionOwnedByLecturer(row.sectionId(), lecturerId)) {
+                && !attendance.hasSectionAccess(row.sectionId(), roles, lecturerId)) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Attendance record is outside the current profile");
         }
         return attendanceResponse(row);
     }
 
     private void requireSectionAccess(String sectionId, List<String> roles, String lecturerId) {
-        if (!isAdmin(roles) && !attendance.isSectionOwnedByLecturer(sectionId, lecturerId)) {
+        if (!attendance.hasSectionAccess(sectionId, roles, lecturerId)) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Section is not assigned to the current lecturer");
         }
     }

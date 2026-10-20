@@ -327,17 +327,21 @@ public class AcademicMutationService {
             }
             // Both-null clears a mistakenly saved draft: the batch DELETE below
             // removes the component rows and the enrollment update restores the
-            // untouched NOT_GRADED state. A lone null cannot average, so it 400s.
+            // untouched NOT_GRADED state. A processScore can be saved alone as a
+            // mid-term draft, but a finalExamScore without processScore cannot average.
             boolean cleared = grade.processScore() == null && grade.finalExamScore() == null;
-            if (!cleared && (grade.processScore() == null || grade.finalExamScore() == null)) {
+            if (grade.processScore() == null && grade.finalExamScore() != null) {
                 throw problem(HttpStatus.BAD_REQUEST, "GRADE_PARTIAL_SCORE",
-                        "Both processScore and finalExamScore are required, or both must be null to clear the grade");
+                        "processScore is required when finalExamScore is provided");
             }
             if (!cleared) {
                 requireScoreRange(grade.processScore(), "processScore");
-                requireScoreRange(grade.finalExamScore(), "finalExamScore");
+                if (grade.finalExamScore() != null) {
+                    requireScoreRange(grade.finalExamScore(), "finalExamScore");
+                }
             }
-            BigDecimal total = cleared ? null : calculateFinalGrade(grade.processScore(), grade.finalExamScore());
+            boolean midTermOnly = grade.processScore() != null && grade.finalExamScore() == null;
+            BigDecimal total = (cleared || midTermOnly) ? null : calculateFinalGrade(grade.processScore(), grade.finalExamScore());
 
             if (!cleared) {
                 componentBatch.add(new MapSqlParameterSource()
@@ -346,16 +350,18 @@ public class AcademicMutationService {
                         .addValue("gradeItemId", processItemId)
                         .addValue("score", grade.processScore()));
 
-                componentBatch.add(new MapSqlParameterSource()
-                        .addValue("id", UUID.randomUUID().toString())
-                        .addValue("enrollmentId", grade.enrollmentId())
-                        .addValue("gradeItemId", finalItemId)
-                        .addValue("score", grade.finalExamScore()));
+                if (!midTermOnly) {
+                    componentBatch.add(new MapSqlParameterSource()
+                            .addValue("id", UUID.randomUUID().toString())
+                            .addValue("enrollmentId", grade.enrollmentId())
+                            .addValue("gradeItemId", finalItemId)
+                            .addValue("score", grade.finalExamScore()));
+                }
             }
 
             enrollmentBatch.add(new MapSqlParameterSource()
-                    .addValue("finalGrade", cleared ? null : total)
-                    .addValue("letterGrade", cleared ? null : letterGrade(total))
+                    .addValue("finalGrade", total)
+                    .addValue("letterGrade", total == null ? null : letterGrade(total))
                     .addValue("gradeStatus", cleared ? "NOT_GRADED" : "DRAFT")
                     .addValue("id", grade.enrollmentId()));
         }

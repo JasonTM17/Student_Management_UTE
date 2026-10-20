@@ -37,6 +37,7 @@ public class AdminCatalogMutationService {
     /** Statuses the academic services and the admin console understand. */
     private static final Set<String> SEMESTER_STATUSES =
             Set.of("DRAFT", "OPEN", "REGISTRATION_OPEN", "ADD_DROP_OPEN", "ACTIVE", "IN_PROGRESS", "CLOSED");
+    private static final Set<String> SECTION_STATUSES = Set.of("OPEN", "CLOSED", "CANCELLED");
 
     private final NamedParameterJdbcTemplate jdbc;
     private final AdminAuditRecorder audit;
@@ -191,6 +192,8 @@ public class AdminCatalogMutationService {
         String id = id(input);
         int capacity = number(input, "capacity", 30);
         requireSectionCapacity(capacity);
+        String status = text(input, "status", "OPEN");
+        requireSectionStatus(status);
         String courseId = required(input, "courseId");
         String semesterId = required(input, "semesterId");
         requireCatalogReference(COURSE, "courseId", courseId);
@@ -214,8 +217,8 @@ public class AdminCatalogMutationService {
                         .addValue("semesterId", semesterId)
                         .addValue("lecturerId", input.get("lecturerId"))
                         .addValue("classroomId", input.get("classroomId"))
-                        .addValue("capacity", number(input, "capacity", 30))
-                        .addValue("status", text(input, "status", "OPEN")));
+                        .addValue("capacity", capacity)
+                        .addValue("status", status));
         if (input.containsKey("schedules")) {
             replaceSectionSchedules(id, input.get("schedules"));
         }
@@ -613,6 +616,13 @@ public class AdminCatalogMutationService {
         }
     }
 
+    private static void requireSectionStatus(String status) {
+        if (status == null || !SECTION_STATUSES.contains(status)) {
+            throw problem(HttpStatus.BAD_REQUEST, "INVALID_SECTION_STATUS",
+                    "status must be one of " + String.join(", ", SECTION_STATUSES));
+        }
+    }
+
     /** Bogus foreign keys used to surface as an opaque 409 from the database constraint. */
     private void requireCatalogReference(String table, String field, String id) {
         Long count = jdbc.queryForObject(
@@ -638,6 +648,9 @@ public class AdminCatalogMutationService {
     }
 
     private void validateSectionUpdate(String id, Map<String, Object> input) {
+        if (input.containsKey("status")) {
+            requireSectionStatus(text(input, "status", null));
+        }
         boolean touchesCapacity = input.containsKey("capacity");
         boolean touchesRoom = input.containsKey("classroomId");
         if (touchesCapacity || touchesRoom) {

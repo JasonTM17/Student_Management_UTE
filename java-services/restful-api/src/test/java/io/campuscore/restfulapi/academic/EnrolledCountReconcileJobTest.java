@@ -139,6 +139,24 @@ class EnrolledCountReconcileJobTest {
         assertThat(warnEvents()).isEmpty();
     }
 
+    @Test
+    void completedEnrollmentsAreTreatedAsActiveAndNotDrifted() {
+        jdbc.update("INSERT INTO \"academic\".\"Section\" (\"id\", \"enrolledCount\") VALUES ('section-completed', 1)");
+        insertEnrollment("e-completed-1", "section-completed", "COMPLETED");
+
+        io.campuscore.restfulapi.academic.service.EnrolledCountReconcileJob job =
+                new io.campuscore.restfulapi.academic.service.EnrolledCountReconcileJob(
+                        new NamedParameterJdbcTemplate(jdbc), false);
+
+        job.reconcile();
+
+        List<ILoggingEvent> warnings = warnEvents();
+        assertThat(warnings).isNotEmpty();
+        String message = warnings.get(0).getFormattedMessage();
+        assertThat(message).doesNotContain("section-completed");
+        assertThat(counterOf("section-completed")).isEqualTo(1);
+    }
+
     private int counterOf(String sectionId) {
         Integer count = jdbc.queryForObject(
                 "SELECT \"enrolledCount\" FROM \"academic\".\"Section\" WHERE \"id\" = ?",

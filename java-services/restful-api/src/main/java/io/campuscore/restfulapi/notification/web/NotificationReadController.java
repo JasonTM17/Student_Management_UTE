@@ -73,13 +73,22 @@ public class NotificationReadController {
         @ApiResponse(responseCode = "200", description = "Tìm thấy thông báo")
     })
     @GetMapping("{id}")
-    @PreAuthorize("hasAnyRole('ADMIN', 'SUPER_ADMIN')")
+    @PreAuthorize("hasAnyRole('STUDENT', 'LECTURER', 'TRUONG_KHOA', 'TRUONG_BO_MON', 'ADMIN', 'SUPER_ADMIN')")
     public NotificationResponse findOne(
+            @AuthenticationPrincipal Jwt jwt,
             @Parameter(description = "Mã định danh thông báo (UUID)", required = true) @PathVariable String id) {
-        return notifications.findOne(id);
+        return notifications.findOne(id, subject(jwt), roles(jwt));
     }
 
     private String subject(Jwt jwt) {
         return jwt == null ? null : jwt.getSubject();
+    }
+
+    private java.util.List<String> roles(Jwt jwt) {
+        if (jwt == null) {
+            return java.util.List.of();
+        }
+        java.util.List<String> roles = jwt.getClaimAsStringList("roles");
+        return roles != null ? roles : java.util.List.of();
     }
 }

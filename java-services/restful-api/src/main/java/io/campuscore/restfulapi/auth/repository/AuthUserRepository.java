@@ -426,6 +426,17 @@ public class AuthUserRepository {
         invalidateLoginChallenges(userId);
     }
 
+    @Transactional
+    public void bumpCredentialVersion(String userId) {
+        jdbc.update(
+                "UPDATE " + USER_TABLE
+                        + " SET \"credentialVersion\" = \"credentialVersion\" + 1,"
+                        + " \"updatedAt\" = CURRENT_TIMESTAMP"
+                        + " WHERE \"id\" = :userId",
+                new MapSqlParameterSource("userId", userId));
+        invalidateLoginChallenges(userId);
+    }
+
     private List<String> findRoles(String userId) {
         return jdbc.queryForList(
                 "SELECT r.\"name\""

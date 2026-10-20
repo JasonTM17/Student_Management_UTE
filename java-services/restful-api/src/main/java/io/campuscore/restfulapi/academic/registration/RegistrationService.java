@@ -322,10 +322,6 @@ public class RegistrationService {
             throw problem(HttpStatus.FORBIDDEN, "STUDENT_PROFILE_REQUIRED", "Student profile is required");
         }
         String hash = sha256("ENROLL|" + sectionId);
-        // The registration slip is part of the enrollment contract: it must be
-        // produced inside the same transaction, so a renderer failure rolls
-        // the seat back instead of committing an enrollment whose slip is
-        // missing.
         EnrollmentResponse response = transactions.execute(status -> {
             EnrollmentResponse enrolled =
                     enrollLocked(studentId, sectionId, roles, idempotencyKey, hash);
@@ -522,7 +518,7 @@ public class RegistrationService {
         if (!"OPEN".equals(String.valueOf(section.get("status")))) {
             throw problem(HttpStatus.CONFLICT, "SECTION_CLOSED", "Section is not open for registration");
         }
-        Map<String, Object> round = openRound(semesterId, "REGISTRATION");
+        Map<String, Object> round = openRoundReadOnly(semesterId, "REGISTRATION");
         assertEligible(student, round, Instant.now());
         List<Map<String, Object>> active = lockActiveEnrollments(studentId, semesterId);
         if (active.stream().anyMatch(row -> sectionId.equals(String.valueOf(row.get("section_id"))))) {
@@ -627,8 +623,11 @@ public class RegistrationService {
         }
         // Student serializes same-student operations. Across students, Section
         // must precede Round on both enroll and drop to avoid a second lock cycle.
-        lockSection(String.valueOf(enrollment.get("section_id")));
-        openRound(String.valueOf(enrollment.get("semester_id")), "ADD_DROP");
+        Map<String, Object> section = lockSection(String.valueOf(enrollment.get("section_id")));
+        String droppedCourseId = String.valueOf(section.get("course_id"));
+        String semesterId = String.valueOf(enrollment.get("semester_id"));
+        assertNoActiveCorequisiteDependents(targetStudentId, droppedCourseId, semesterId, enrollmentId);
+        openRoundReadOnly(semesterId, "ADD_DROP");
         jdbc.update(
                 "UPDATE " + ENROLLMENT + " SET \"status\" = 'DROPPED', \"droppedAt\" = CURRENT_TIMESTAMP,"
                         + " \"updatedAt\" = CURRENT_TIMESTAMP WHERE \"id\" = :id",
@@ -979,6 +978,35 @@ public class RegistrationService {
             if ("COREQ".equals(kind) && !hasActiveCourse(studentId, semesterId, required) && !requestHasCourse(requestSectionIds, required)) {
                 throw problem(HttpStatus.UNPROCESSABLE_ENTITY, "COREQUISITE_UNMET", "A required corequisite is missing");
             }
+        }
+    }
+
+    private void assertNoActiveCorequisiteDependents(
+            String studentId,
+            String droppedCourseId,
+            String semesterId,
+            String droppedEnrollmentId) {
+        List<String> otherActiveCourseIds = activeEnrollments(studentId, semesterId).stream()
+                .filter(row -> !droppedEnrollmentId.equals(String.valueOf(row.get("id"))))
+                .map(row -> String.valueOf(row.get("course_id")))
+                .distinct()
+                .toList();
+        if (otherActiveCourseIds.isEmpty()) {
+            return;
+        }
+        if (hasCompleted(studentId, droppedCourseId, null)) {
+            return;
+        }
+        List<String> dependentCourses = jdbc.queryForList(
+                "SELECT \"courseId\" FROM " + REQUIREMENT
+                        + " WHERE \"courseId\" IN (:courseIds) AND \"requiredCourseId\" = :requiredId AND \"kind\" = 'COREQ'",
+                new MapSqlParameterSource()
+                        .addValue("courseIds", otherActiveCourseIds)
+                        .addValue("requiredId", droppedCourseId),
+                String.class);
+        if (!dependentCourses.isEmpty()) {
+            throw problem(HttpStatus.CONFLICT, "COREQUISITE_UNMET",
+                    "Cannot drop course because it is a corequisite for another active course this semester");
         }
     }
 

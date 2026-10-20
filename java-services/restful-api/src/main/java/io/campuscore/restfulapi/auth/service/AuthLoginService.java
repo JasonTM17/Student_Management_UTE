@@ -321,6 +321,7 @@ public class AuthLoginService {
             users.deleteAllRefreshSessions(userId);
         }
         users.clearUserRefreshToken(userId);
+        users.bumpCredentialVersion(userId);
     }
 
     private Jwt decodeRefresh(String refreshTokenValue) {

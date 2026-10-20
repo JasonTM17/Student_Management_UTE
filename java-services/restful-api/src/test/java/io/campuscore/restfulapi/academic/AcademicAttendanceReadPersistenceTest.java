@@ -21,6 +21,7 @@ import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.request.RequestPostProcessor;
+import io.campuscore.restfulapi.testsupport.CurrentAccountJwt;
 
 @SpringBootTest
 @AutoConfigureMockMvc
@@ -321,6 +322,46 @@ class AcademicAttendanceReadPersistenceTest {
                 .andExpect(status().isForbidden());
     }
 
+    @Test
+    void truongBoMonAndTruongKhoaCanReadAttendanceRosterAndSummaryWithoutLecturerRole() throws Exception {
+        String tbmSubject = "user-tbm-head";
+        String tbmProfile = "lect-tbm-head";
+        io.campuscore.restfulapi.testsupport.AccountAuthorityFixture.ensureUser(jdbc, tbmSubject);
+        io.campuscore.restfulapi.testsupport.AccountAuthorityFixture.lecturer(jdbc, tbmSubject, tbmProfile);
+        io.campuscore.restfulapi.testsupport.AccountAuthorityFixture.role(jdbc, tbmSubject, "TRUONG_BO_MON");
+        jdbc.update("INSERT INTO \"academic\".\"Lecturer\" (\"id\", \"userId\", \"departmentId\", \"isActive\") VALUES (?, ?, ?, ?)",
+                tbmProfile, tbmSubject, "department-1", true);
+
+        // Department head has only TRUONG_BO_MON authority (not LECTURER)
+        RequestPostProcessor tbmJwt = CurrentAccountJwt.currentJwt(jdbc, tbmSubject);
+
+        // course-1 belongs to department-1, taught by lecturer-1; tbm head can read roster & summary
+        mvc.perform(get("/api/v1/attendance/section/section-1/roster").with(tbmJwt))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(2));
+
+        mvc.perform(get("/api/v1/attendance/section/section-1/summary").with(tbmJwt))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.sectionId").value("section-1"));
+
+        String tkSubject = "user-tk-head";
+        String tkProfile = "lect-tk-head";
+        io.campuscore.restfulapi.testsupport.AccountAuthorityFixture.ensureUser(jdbc, tkSubject);
+        io.campuscore.restfulapi.testsupport.AccountAuthorityFixture.lecturer(jdbc, tkSubject, tkProfile);
+        io.campuscore.restfulapi.testsupport.AccountAuthorityFixture.role(jdbc, tkSubject, "TRUONG_KHOA");
+        jdbc.update("INSERT INTO \"academic\".\"Lecturer\" (\"id\", \"userId\", \"departmentId\", \"isActive\") VALUES (?, ?, ?, ?)",
+                tkProfile, tkSubject, "department-2", true);
+
+        RequestPostProcessor tkJwt = CurrentAccountJwt.currentJwt(jdbc, tkSubject);
+        mvc.perform(get("/api/v1/attendance/section/section-1/roster").with(tkJwt))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(2));
+
+        mvc.perform(get("/api/v1/attendance/section/section-1/summary").with(tkJwt))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.sectionId").value("section-1"));
+    }
+
     private static RequestPostProcessor adminJwt() {
         return jwt().jwt(token -> token
                         .subject("admin-user")
@@ -345,6 +386,21 @@ class AcademicAttendanceReadPersistenceTest {
                     "lastName" VARCHAR(120) NOT NULL,
                     "status" VARCHAR(40) NOT NULL DEFAULT 'ACTIVE',
                     "mustChangePassword" BOOLEAN NOT NULL DEFAULT FALSE
+                )
+                """);
+        jdbc.execute("""
+                CREATE TABLE IF NOT EXISTS "academic"."Department" (
+                    "id" VARCHAR(120) PRIMARY KEY,
+                    "facultyId" VARCHAR(120)
+                )
+                """);
+        jdbc.execute("""
+                CREATE TABLE IF NOT EXISTS "academic"."Lecturer" (
+                    "id" VARCHAR(120) PRIMARY KEY,
+                    "userId" VARCHAR(120) NOT NULL,
+                    "departmentId" VARCHAR(120) NOT NULL,
+                    "employeeId" VARCHAR(120),
+                    "isActive" BOOLEAN NOT NULL DEFAULT TRUE
                 )
                 """);
         jdbc.execute("""
@@ -420,10 +476,17 @@ class AcademicAttendanceReadPersistenceTest {
         jdbc.update("DELETE FROM \"academic\".\"Section\"");
         jdbc.update("DELETE FROM \"academic\".\"Course\"");
         jdbc.update("DELETE FROM \"academic\".\"Student\"");
+        jdbc.update("DELETE FROM \"academic\".\"Lecturer\"");
+        jdbc.update("DELETE FROM \"academic\".\"Department\"");
         jdbc.update("DELETE FROM \"campuscore_auth\".\"User\"");
     }
 
     private void insertFixture() {
+        jdbc.update("INSERT INTO \"academic\".\"Department\" (\"id\", \"facultyId\") VALUES (?, ?)", "department-1", "faculty-1");
+        jdbc.update("INSERT INTO \"academic\".\"Department\" (\"id\", \"facultyId\") VALUES (?, ?)", "department-2", "faculty-1");
+        jdbc.update("INSERT INTO \"academic\".\"Department\" (\"id\", \"facultyId\") VALUES (?, ?)", "department-3", "faculty-2");
+        jdbc.update("INSERT INTO \"academic\".\"Lecturer\" (\"id\", \"userId\", \"departmentId\", \"isActive\") VALUES (?, ?, ?, ?)", "lecturer-1", "lecturer-user-1", "department-1", true);
+        jdbc.update("INSERT INTO \"academic\".\"Lecturer\" (\"id\", \"userId\", \"departmentId\", \"isActive\") VALUES (?, ?, ?, ?)", "lecturer-2", "lecturer-user-2", "department-2", true);
         insertUser("student-user-1", "student1@campuscore.edu", "Linh", "Nguyen");
         insertUser("student-user-2", "student2@campuscore.edu", "Minh", "Tran");
         insertUser("student-user-3", "student3@campuscore.edu", "An", "Le");

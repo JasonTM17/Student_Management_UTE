@@ -86,7 +86,7 @@ public class AcademicSectionReadController {
     }
 
     @GetMapping("{id}/grades")
-    @PreAuthorize("hasAnyRole('ADMIN', 'SUPER_ADMIN', 'LECTURER')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'SUPER_ADMIN', 'LECTURER', 'TRUONG_BO_MON', 'TRUONG_KHOA')")
     @Operation(summary = "Bảng điểm lớp học phần", description = "Tra cứu bảng điểm chi tiết (điểm Quá trình 50% + Cuối kỳ 50%) của tất cả sinh viên trong lớp.")
     @ApiResponse(responseCode = "200", description = "Bảng điểm chi tiết của lớp học phần")
     public SectionGradesResponse getSectionGrades(

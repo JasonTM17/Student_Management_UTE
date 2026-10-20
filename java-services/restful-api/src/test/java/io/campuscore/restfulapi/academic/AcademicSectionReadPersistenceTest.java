@@ -203,6 +203,31 @@ class AcademicSectionReadPersistenceTest {
                 .andExpect(jsonPath("$.enrollments[1].studentCode").value("S002"))
                 .andExpect(jsonPath("$.enrollments[1].gradeStatus").value("DRAFT"));
 
+        // Admin can view section grades
+        mvc.perform(get("/api/v1/sections/section-1/grades").with(adminJwt()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.sectionId").value("section-1"));
+
+        // Department head (TRUONG_BO_MON) can view section grades for course in their department
+        AccountAuthorityFixture.ensureUser(jdbc, "dept-head-user");
+        AccountAuthorityFixture.lecturer(jdbc, "dept-head-user", "dept-head-lecturer");
+        AccountAuthorityFixture.replaceRoles(jdbc, "dept-head-user", "TRUONG_BO_MON");
+        insertLecturer("dept-head-lecturer", "dept-head-user", "department-cs", "DH01");
+        mvc.perform(get("/api/v1/sections/section-other/grades")
+                        .with(CurrentAccountJwt.currentJwt(jdbc, "dept-head-user")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.sectionId").value("section-other"));
+
+        // Faculty head (TRUONG_KHOA) can view section grades for course in their faculty
+        AccountAuthorityFixture.ensureUser(jdbc, "faculty-head-user");
+        AccountAuthorityFixture.lecturer(jdbc, "faculty-head-user", "faculty-head-lecturer");
+        AccountAuthorityFixture.replaceRoles(jdbc, "faculty-head-user", "TRUONG_KHOA");
+        insertLecturer("faculty-head-lecturer", "faculty-head-user", "department-swe", "FH01");
+        mvc.perform(get("/api/v1/sections/section-1/grades")
+                        .with(CurrentAccountJwt.currentJwt(jdbc, "faculty-head-user")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.sectionId").value("section-1"));
+
         // Foreign lecturer receives 403 SECTION_FORBIDDEN
         mvc.perform(get("/api/v1/sections/section-1/grades").with(lecturerJwt("lecturer-other")))
                 .andExpect(status().isForbidden())

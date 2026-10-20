@@ -132,6 +132,38 @@ class AdminCatalogMutationPersistenceTest {
     }
 
     @Test
+    void sectionCreateRejectsInvalidStatus() throws Exception {
+        mvc.perform(post("/api/v1/sections")
+                        .with(adminJwt())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "id": "section-bad-status",
+                                  "sectionNumber": "05",
+                                  "courseId": "course-old",
+                                  "semesterId": "semester-old",
+                                  "status": "INVALID_STATUS"
+                                }
+                                """))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("INVALID_SECTION_STATUS"));
+    }
+
+    @Test
+    void sectionUpdateRejectsInvalidStatus() throws Exception {
+        mvc.perform(put("/api/v1/sections/section-existing")
+                        .with(adminJwt())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "status": "BOGUS_STATUS"
+                                }
+                                """))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("INVALID_SECTION_STATUS"));
+    }
+
+    @Test
     void sectionUpdatePersistsMutableCourseSemesterAndReplacementSchedules() throws Exception {
         mvc.perform(put("/api/v1/sections/section-existing")
                         .with(adminJwt())
