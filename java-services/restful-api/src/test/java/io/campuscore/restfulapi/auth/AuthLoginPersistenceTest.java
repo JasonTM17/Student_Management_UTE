@@ -1043,6 +1043,45 @@ class AuthLoginPersistenceTest {
     }
 
     @Test
+    void logoutWithAPreRotationCookieStillTerminatesTheAccountSessions() throws Exception {
+        MvcResult first = loginStudent().andExpect(status().isOk()).andReturn();
+        MvcResult second = loginStudent().andExpect(status().isOk()).andReturn();
+        Cookie staleRefresh = first.getResponse().getCookie("cc_refresh_token");
+        Cookie csrfCookie = first.getResponse().getCookie("cc_csrf");
+        String accessToken = objectMapper
+                .readTree(first.getResponse().getContentAsString()).get("accessToken").asText();
+        String secondAccess = objectMapper
+                .readTree(second.getResponse().getContentAsString()).get("accessToken").asText();
+
+        // A real refresh rotates the session hash in place; the logout below
+        // still carries the pre-rotation cookie — the exact raced interleave
+        // where a hash-keyed delete would miss and leave the session alive.
+        mvc.perform(post("/api/v1/auth/refresh")
+                        .cookie(new Cookie("cc_refresh_token", staleRefresh.getValue()),
+                                new Cookie("cc_csrf", csrfCookie.getValue()))
+                        .header("X-CSRF-Token", csrfCookie.getValue())
+                        .header("User-Agent", "jest-java-logout-race"))
+                .andExpect(status().isOk());
+
+        mvc.perform(post("/api/v1/auth/logout")
+                        .header("Authorization", "Bearer " + accessToken)
+                        .cookie(staleRefresh, csrfCookie)
+                        .header("X-CSRF-Token", csrfCookie.getValue()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.message").value("Logged out successfully"));
+
+        Integer sessions = jdbc.queryForObject(
+                "SELECT COUNT(*) FROM \"campuscore_auth\".\"Session\" WHERE \"userId\" = 'student-user'",
+                Integer.class);
+        org.junit.jupiter.api.Assertions.assertEquals(0, sessions,
+                "an unresolvable caller session falls back to revoking every session");
+
+        mvc.perform(get("/api/v1/auth/me").header("Authorization", "Bearer " + secondAccess))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.code").value("SESSION_INVALID"));
+    }
+
+    @Test
     void loginAcceptsMixedCaseAndWhitespaceEmailsLikeRegistration() throws Exception {
         mvc.perform(post("/api/v1/auth/login")
                         .contentType(MediaType.APPLICATION_JSON)

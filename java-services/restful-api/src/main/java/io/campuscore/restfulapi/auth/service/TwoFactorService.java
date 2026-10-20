@@ -23,8 +23,6 @@ import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Profile;
 import org.springframework.http.HttpStatus;
-import org.springframework.jdbc.core.namedparam.MapSqlParameterSource;
-import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import io.campuscore.restfulapi.audit.AdminAuditRecorder;
 import org.springframework.stereotype.Service;
@@ -63,9 +61,6 @@ public class TwoFactorService {
     private static final String MAIL_SUBJECT = "[CampusUTE] Mã xác thực hai yếu tố";
     private static final String MAIL_TEMPLATE = "two-factor-code";
 
-    /** Mirrors AuthUserRepository's table constant; the repository has no delete-others API. */
-    private static final String SESSION_TABLE = "campuscore_auth.\"Session\"";
-
     private final AuthUserRepository users;
     private final TwoFactorChallengeRepository challenges;
     private final PasswordEncoder passwordEncoder;
@@ -75,7 +70,6 @@ public class TwoFactorService {
     private final SecureRandom secureRandom;
     private final AdminAuditRecorder audit;
     private final SessionCookieService cookies;
-    private final NamedParameterJdbcTemplate jdbc;
 
     @Autowired
     public TwoFactorService(
@@ -85,9 +79,8 @@ public class TwoFactorService {
             EmailService emailService,
             MailConfig mailConfig,
             AdminAuditRecorder audit,
-            SessionCookieService cookies,
-            NamedParameterJdbcTemplate jdbc) {
-        this(users, challenges, passwordEncoder, emailService, mailConfig, audit, cookies, jdbc,
+            SessionCookieService cookies) {
+        this(users, challenges, passwordEncoder, emailService, mailConfig, audit, cookies,
                 Clock.systemUTC());
     }
 
@@ -99,7 +92,6 @@ public class TwoFactorService {
             MailConfig mailConfig,
             AdminAuditRecorder audit,
             SessionCookieService cookies,
-            NamedParameterJdbcTemplate jdbc,
             Clock clock) {
         this.users = users;
         this.challenges = challenges;
@@ -108,7 +100,6 @@ public class TwoFactorService {
         this.mailConfig = mailConfig;
         this.audit = audit;
         this.cookies = cookies;
-        this.jdbc = jdbc;
         this.clock = clock;
         this.secureRandom = new SecureRandom();
     }
@@ -148,10 +139,11 @@ public class TwoFactorService {
      * issued before the switch flipped stop authenticating immediately,
      * and refresh sessions issued before it are revoked — keeping only the
      * caller's current browser refresh session (see
-     * {@link #revokeOtherRefreshSessions(String)}).
+     * {@link #revokeOtherRefreshSessions(String, String)}).
      */
     @Transactional(noRollbackFor = AppException.class)
     public void confirmEnable(String userId, String challengeId, String code) {
+        String keepSessionId = resolveCurrentSessionId(userId);
         ChallengeRecord challenge = requireUsableChallenge(
                 challengeId, TwoFactorChallengeRepository.PURPOSE_ENABLE, userId);
         verifyCode(challenge, code);
@@ -162,7 +154,7 @@ public class TwoFactorService {
         audit.record(userId, null, "TWO_FACTOR_ENABLED", "USER", userId,
                 "User enabled two-factor authentication");
         users.bumpCredentialVersion(userId);
-        revokeOtherRefreshSessions(userId);
+        revokeOtherRefreshSessions(userId, keepSessionId);
     }
 
     /**
@@ -196,6 +188,7 @@ public class TwoFactorService {
      */
     @Transactional(noRollbackFor = AppException.class)
     public void confirmDisable(String userId, String challengeId, String code) {
+        String keepSessionId = resolveCurrentSessionId(userId);
         ChallengeRecord challenge = requireUsableChallenge(
                 challengeId, TwoFactorChallengeRepository.PURPOSE_DISABLE, userId);
         verifyCode(challenge, code);
@@ -204,38 +197,50 @@ public class TwoFactorService {
         audit.record(userId, null, "TWO_FACTOR_DISABLED", "USER", userId,
                 "User disabled two-factor authentication after password and emailed-code verification");
         users.bumpCredentialVersion(userId);
-        revokeOtherRefreshSessions(userId);
+        revokeOtherRefreshSessions(userId, keepSessionId);
+    }
+
+    /**
+     * Pins the refresh session serving this request by its stable row id. The
+     * pin must be taken before any account write acquires the User row lock:
+     * a concurrent refresh holds that same lock while it rotates this row's
+     * token hash, so a cookie hash resolved only at delete time can already
+     * point nowhere — the just-rotated session would be deleted even though
+     * the flow promised to keep it. Session row ids survive rotation, so the
+     * pinned id still names the same session whichever interleaving wins.
+     * When no session resolves — no cookie, non-browser client, or the row
+     * was already rotated away or revoked — the caller is unidentifiable.
+     */
+    private String resolveCurrentSessionId(String userId) {
+        String refreshToken = currentRefreshToken();
+        if (refreshToken == null || refreshToken.isBlank()) {
+            return null;
+        }
+        return users.findSessionIdByRefreshHash(userId, sha256(refreshToken)).orElse(null);
     }
 
     /**
      * K17: enabling or disabling two-factor auth is a security-posture change,
      * so refresh sessions issued before it must stop working. The caller's
-     * current session — identified by the {@code cc_refresh_token} cookie — is
-     * kept so the user is not signed out in the middle of the flow; every other
-     * session of the account is deleted.
+     * current session — pinned by row id in {@link #resolveCurrentSessionId}
+     * before the credential lock is taken — is kept so the user is not signed
+     * out in the middle of the flow; every other session of the account is
+     * deleted. This runs after {@code bumpCredentialVersion}, so the account's
+     * User row lock is already held and a queued refresh cannot rotate the
+     * kept row mid-delete.
      *
-     * <p>When no refresh token can be identified (non-browser client, or a
-     * request without the cookie), every session is revoked instead. That is
-     * the safe direction: the callers' credential revision bump has already
-     * retired every issued access token, and with no refresh session left
-     * the next request requires a fresh login.
+     * <p>When no session could be pinned, every session is revoked instead.
+     * That is the safe direction: the callers' credential revision bump has
+     * already retired every issued access token, and with no refresh session
+     * left the next request requires a fresh login.
      */
-    private void revokeOtherRefreshSessions(String userId) {
-        String refreshToken = currentRefreshToken();
-        if (refreshToken == null || refreshToken.isBlank()) {
+    private void revokeOtherRefreshSessions(String userId, String keepSessionId) {
+        if (keepSessionId == null) {
             users.deleteAllRefreshSessions(userId);
             users.clearUserRefreshToken(userId);
             return;
         }
-        // AuthUserRepository owns this table's CRUD but exposes no
-        // delete-others variant, so this single statement mirrors
-        // deleteAllRefreshSessions with the caller's token excluded.
-        jdbc.update(
-                "DELETE FROM " + SESSION_TABLE
-                        + " WHERE \"userId\" = :userId AND \"refreshToken\" <> :keepHash",
-                new MapSqlParameterSource()
-                        .addValue("userId", userId)
-                        .addValue("keepHash", sha256(refreshToken)));
+        users.deleteOtherRefreshSessions(userId, keepSessionId);
     }
 
     /**

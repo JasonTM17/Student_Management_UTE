@@ -1,14 +1,18 @@
 package io.campuscore.restfulapi.auth;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.reset;
 
+import static org.mockito.ArgumentMatchers.eq;
+
 import io.campuscore.restfulapi.auth.repository.AuthUserRepository;
 import io.campuscore.restfulapi.auth.service.AuthLoginService;
 import io.campuscore.restfulapi.auth.service.PasswordResetService;
+import io.campuscore.restfulapi.auth.service.TwoFactorService;
 import io.campuscore.restfulapi.exception.AppException;
 import io.campuscore.restfulapi.mail.service.EmailService;
 import java.net.URI;
@@ -38,6 +42,10 @@ import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
+import org.springframework.mock.web.MockHttpServletRequest;
+import org.springframework.web.context.request.RequestContextHolder;
+import org.springframework.web.context.request.ServletRequestAttributes;
+import jakarta.servlet.http.Cookie;
 
 /** Root-owned real PostgreSQL schedules with explicit User-before-child-lock assertions. */
 @EnabledIf("postgresTargetConfigured")
@@ -47,6 +55,7 @@ class CredentialSessionLockOrderPostgresIT {
     private static final int WAIT_SECONDS = 20;
     @Autowired private AuthLoginService auth;
     @Autowired private PasswordResetService resets;
+    @Autowired private TwoFactorService twoFactor;
     @Autowired private PasswordEncoder encoder;
     @Autowired private JdbcTemplate jdbc;
     @MockitoSpyBean private AuthUserRepository users;
@@ -105,6 +114,137 @@ class CredentialSessionLockOrderPostgresIT {
     @Test
     void refreshWaitsOnUserBeforeSessionAndCannotResurrectRevokedCredentials() throws Exception {
         queuedAuthentication(false);
+    }
+
+    /**
+     * Deterministic losing schedule for the 2FA disable flow: the confirm
+     * transaction pins its session id, then a refresh commits the rotation
+     * before the confirm reaches the User row lock. Because the pin names the
+     * stable Session.id — which survives rotation — the caller's rotated
+     * session is still the one row kept. A hash-keyed keep-exclusion would
+     * instead delete the rotated row and break the preserved-session
+     * contract.
+     */
+    @Test
+    void confirmDisableKeepsThePinnedSessionAcrossACommittedRotation() throws Exception {
+        Fixture f = fixture();
+        String refresh0 = auth.login(f.email(), f.before(), "127.0.0.1", "race-it").response().refreshToken();
+        auth.login(f.email(), f.before(), "127.0.0.1", "race-it-2").response().refreshToken();
+        // Enabled after the logins: with the flag already on, login returns a
+        // challenge instead of issuing refresh sessions.
+        jdbc.update("UPDATE campuscore_auth.\"User\" SET \"twoFactorEnabled\" = TRUE WHERE \"id\" = ?", f.id());
+        String pinnedSession = jdbc.queryForObject(
+                "SELECT \"id\" FROM campuscore_auth.\"Session\" WHERE \"userId\"=? AND \"refreshToken\"=?",
+                String.class, f.id(), digest(refresh0));
+        String challengeId = "disable-race-" + UUID.randomUUID();
+        String code = "271828";
+        jdbc.update("INSERT INTO campuscore_auth.\"TwoFactorChallenge\""
+                + " (id,\"userId\",purpose,\"codeHash\",\"expiresAt\",attempts,\"createdAt\")"
+                + " VALUES (?,?,'DISABLE',?,CURRENT_TIMESTAMP+INTERVAL '5 minutes',0,CURRENT_TIMESTAMP)",
+                challengeId, f.id(), digest(f.id() + ':' + code));
+
+        var pinTaken = new CountDownLatch(1);
+        var rotationCommitted = new CountDownLatch(1);
+        String confirmThread = "disable-confirm-" + f.id();
+        doAnswer(invocation -> {
+            Object result = invocation.callRealMethod();
+            if (Thread.currentThread().getName().equals(confirmThread)) {
+                pinTaken.countDown();
+                await(rotationCommitted);
+            }
+            return result;
+        }).when(users).findSessionIdByRefreshHash(eq(f.id()), anyString());
+
+        var pool = Executors.newSingleThreadExecutor();
+        try {
+            Future<?> confirm = pool.submit(() -> {
+                Thread.currentThread().setName(confirmThread);
+                MockHttpServletRequest request = new MockHttpServletRequest();
+                request.setCookies(new Cookie("cc_refresh_token", refresh0));
+                RequestContextHolder.setRequestAttributes(new ServletRequestAttributes(request));
+                try {
+                    twoFactor.confirmDisable(f.id(), challengeId, code);
+                } finally {
+                    RequestContextHolder.resetRequestAttributes();
+                }
+                return null;
+            });
+            await(pinTaken);
+            // The review's losing interleave: the rotation commits while the
+            // confirm sits between its pin and the credential lock.
+            String refresh1 = auth.refresh(refresh0, "127.0.0.1", "race-it").response().refreshToken();
+            rotationCommitted.countDown();
+            confirm.get(WAIT_SECONDS, TimeUnit.SECONDS);
+
+            Integer sessions = jdbc.queryForObject(
+                    "SELECT count(*) FROM campuscore_auth.\"Session\" WHERE \"userId\"=?",
+                    Integer.class, f.id());
+            assertThat(sessions).isEqualTo(1);
+            String keptId = jdbc.queryForObject(
+                    "SELECT \"id\" FROM campuscore_auth.\"Session\" WHERE \"userId\"=?",
+                    String.class, f.id());
+            assertThat(keptId).isEqualTo(pinnedSession);
+            String keptHash = jdbc.queryForObject(
+                    "SELECT \"refreshToken\" FROM campuscore_auth.\"Session\" WHERE \"id\"=?",
+                    String.class, pinnedSession);
+            assertThat(keptHash).isEqualTo(digest(refresh1));
+            // The browser holding the rotated token still refreshes normally.
+            assertThat(auth.refresh(refresh1, "127.0.0.1", "race-it").response().user().id())
+                    .isEqualTo(f.id());
+            assertThat(users.findById(f.id()).orElseThrow().credentialVersion()).isEqualTo(1);
+        } finally {
+            rotationCommitted.countDown();
+            pool.shutdownNow();
+            assertThat(pool.awaitTermination(WAIT_SECONDS, TimeUnit.SECONDS)).isTrue();
+        }
+    }
+
+    /**
+     * Same raced schedule against single-session logout: the pin is taken
+     * before the User lock, a refresh commits the rotation underneath it, and
+     * the id-keyed delete still removes the rotated row. A hash-keyed delete
+     * would miss and leave the session alive past logout.
+     */
+    @Test
+    void logoutDropsThePinnedSessionAcrossACommittedRotation() throws Exception {
+        Fixture f = fixture();
+        String refresh0 = auth.login(f.email(), f.before(), "127.0.0.1", "race-it").response().refreshToken();
+
+        var pinTaken = new CountDownLatch(1);
+        var rotationCommitted = new CountDownLatch(1);
+        String logoutThread = "logout-race-" + f.id();
+        doAnswer(invocation -> {
+            Object result = invocation.callRealMethod();
+            if (Thread.currentThread().getName().equals(logoutThread)) {
+                pinTaken.countDown();
+                await(rotationCommitted);
+            }
+            return result;
+        }).when(users).findSessionIdByRefreshHash(eq(f.id()), anyString());
+
+        var pool = Executors.newSingleThreadExecutor();
+        try {
+            Future<?> logout = pool.submit(() -> {
+                Thread.currentThread().setName(logoutThread);
+                auth.logout(f.id(), refresh0);
+                return null;
+            });
+            await(pinTaken);
+            String refresh1 = auth.refresh(refresh0, "127.0.0.1", "race-it").response().refreshToken();
+            rotationCommitted.countDown();
+            logout.get(WAIT_SECONDS, TimeUnit.SECONDS);
+
+            Integer sessions = jdbc.queryForObject(
+                    "SELECT count(*) FROM campuscore_auth.\"Session\" WHERE \"userId\"=?",
+                    Integer.class, f.id());
+            assertThat(sessions).isZero();
+            assertThatThrownBy(() -> auth.refresh(refresh1, "127.0.0.1", "race-it"))
+                    .isInstanceOf(BadCredentialsException.class);
+        } finally {
+            rotationCommitted.countDown();
+            pool.shutdownNow();
+            assertThat(pool.awaitTermination(WAIT_SECONDS, TimeUnit.SECONDS)).isTrue();
+        }
     }
 
     @Test

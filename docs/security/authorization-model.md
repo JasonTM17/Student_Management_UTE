@@ -51,17 +51,28 @@ single-session logout.
 
 Enabling or disabling two-factor authentication is the same credential
 boundary: confirming either challenge advances the credential revision, so
-every access token issued before the confirmation stops authenticating
-immediately, and refresh sessions other than the caller's are deleted. The
-caller's current browser refresh session is the one explicit exception — it
-is identified by the `cc_refresh_token` cookie, kept so the user is not signed
-out mid-flow, and its next rotation issues an access token carrying the new
-revision. When no refresh session can be identified, every session is revoked
-instead. A rejected confirmation code does not alter the revision, the
-two-factor flag, or any session — only the challenge's failed-attempt
-bookkeeping (the five-strikes lock) still persists. See
-`TwoFactorService` and `TwoFactorLoginPersistenceTest` for the executable
-cases.
+once the transaction commits every access token issued before the
+confirmation stops authorizing business requests, and refresh sessions other
+than the caller's are deleted. Two narrow exceptions apply: the signed,
+unexpired stale token can still authenticate the session-cleanup endpoints
+that deliberately skip revision matching (`/api/v1/auth/logout` and the
+login/refresh/recovery endpoints that establish or discard session state),
+and a request already authorized before the commit may finish — this
+boundary does not cancel in-flight work. The caller's current browser
+refresh session is the one explicit session exception — the confirm pins it
+to its stable `Session.id` (which survives refresh rotation) *before* taking
+the credential lock, so a rotation committed mid-flow still preserves the
+same row, kept so the user is not signed out mid-flow, and its next rotation
+issues an access token carrying the new revision. When the request's session
+can no longer be identified — no cookie, or the row was already rotated away
+or revoked — every session is revoked instead. The same pinning applies to
+`logout`: the pinned row is deleted under the lock even if its hash rotated,
+and an unidentifiable presented session escalates to revoking every session
+of the account. A rejected confirmation code does not alter the revision,
+the two-factor flag, or any session — the challenge's failed-attempt
+bookkeeping (the five-strikes lock) still persists. See `TwoFactorService`
+and `TwoFactorLoginPersistenceTest` for the executable cases; the raced
+rotation schedules live in `CredentialSessionLockOrderPostgresIT`.
 
 Credential verification and replacement serialize on the account's User row
 lock, so login, refresh, reset issuance/redemption, and password writes for the

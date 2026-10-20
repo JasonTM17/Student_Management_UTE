@@ -314,9 +314,19 @@ public class AuthLoginService {
 
     @Transactional
     public void logout(String userId, String refreshTokenValue) {
+        // Pin the caller's session by stable row id BEFORE the User lock: a
+        // refresh holding that lock can rotate the row's token hash while
+        // logout waits, and a hash resolved only afterwards points nowhere —
+        // the rotated session would silently survive the logout. When the
+        // presented session can no longer be identified at all, revoke every
+        // session of the account: termination with an ambiguous device is the
+        // safe direction.
+        String sessionId = refreshTokenValue == null || refreshTokenValue.isBlank()
+                ? null
+                : users.findSessionIdByRefreshHash(userId, hash(refreshTokenValue)).orElse(null);
         users.lockUserRow(userId);
-        if (refreshTokenValue != null && !refreshTokenValue.isBlank()) {
-            users.deleteRefreshSession(userId, hash(refreshTokenValue));
+        if (sessionId != null) {
+            users.deleteRefreshSessionById(userId, sessionId);
         } else {
             users.deleteAllRefreshSessions(userId);
         }

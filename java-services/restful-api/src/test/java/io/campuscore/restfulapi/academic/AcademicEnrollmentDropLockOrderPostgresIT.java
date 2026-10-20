@@ -122,37 +122,34 @@ class AcademicEnrollmentDropLockOrderPostgresIT {
     @Test
     void differentStudentsCanEnrollAndDropASharedSectionWithoutRoundSectionCycle() throws Exception {
         var fixture = AcademicEnrollmentPostgresFixture.seed(jdbc, 10);
-        String enrollingStudent = fixture.seedStudent(1);
+        String seatedStudent = fixture.seedStudent(1);
         String droppingStudent = fixture.seedStudent(2);
-        registration.enroll(enrollingStudent, fixture.sectionId, List.of("STUDENT"), "seed-" + enrollingStudent);
+        String enrollingStudent = fixture.seedStudent(3);
+        registration.enroll(seatedStudent, fixture.sectionId, List.of("STUDENT"), "seed-" + seatedStudent);
         String droppingEnrollment = registration.enroll(droppingStudent, fixture.sectionId,
                 List.of("STUDENT"), "seed-" + droppingStudent).id();
-        String nextCourse = fixture.courseId + "-next";
-        String nextSection = fixture.sectionId + "-next";
-        jdbc.update("INSERT INTO academic.\"Course\" (\"id\",\"code\",\"name\",\"credits\",\"departmentId\",\"isActive\")"
-                + " VALUES (:id,:id,'Concurrent next course',3,:department,TRUE)",
-                Map.of("id", nextCourse, "department", fixture.departmentId));
-        jdbc.update("INSERT INTO academic.\"Section\" (\"id\",\"sectionNumber\",\"courseId\",\"semesterId\",\"capacity\",\"enrolledCount\",\"status\")"
-                + " VALUES (:id,'02',:course,:semester,10,0,'OPEN')",
-                Map.of("id", nextSection, "course", nextCourse, "semester", fixture.semesterId));
 
-        CountDownLatch roundLocked = new CountDownLatch(1);
+        // Enrollment rounds are read without FOR UPDATE now; both enroll and
+        // drop serialize on the shared Section row (after their own Student
+        // row), so the contention point the regression must observe is the
+        // Section lock.
+        CountDownLatch sectionLocked = new CountDownLatch(1);
         CountDownLatch releaseEnroll = new CountDownLatch(1);
         AtomicInteger enrollPid = new AtomicInteger();
         AtomicInteger dropPid = new AtomicInteger();
         doAnswer(call -> {
-            Object result = call.callRealMethod();
-            String sql = call.getArgument(0);
-            if (Thread.currentThread().getName().equals("audit-enroll-shared")
-                    && sql.contains("academic.\"RegistrationRound\"") && sql.contains("FOR UPDATE")) {
-                enrollPid.set(jdbc.getJdbcOperations().queryForObject("SELECT pg_backend_pid()", Integer.class));
-                roundLocked.countDown();
-                if (!releaseEnroll.await(15, TimeUnit.SECONDS)) throw new IllegalStateException("round barrier timeout");
+            String worker = Thread.currentThread().getName();
+            if (worker.equals("audit-enroll-shared")) {
+                Object result = call.callRealMethod();
+                String sql = call.getArgument(0);
+                if (sql.contains("academic.\"Section\"") && sql.contains("FOR UPDATE")) {
+                    enrollPid.set(jdbc.getJdbcOperations().queryForObject("SELECT pg_backend_pid()", Integer.class));
+                    sectionLocked.countDown();
+                    if (!releaseEnroll.await(15, TimeUnit.SECONDS)) throw new IllegalStateException("section barrier timeout");
+                }
+                return result;
             }
-            return result;
-        }).when(jdbc).queryForList(anyString(), any(SqlParameterSource.class));
-        doAnswer(call -> {
-            if (Thread.currentThread().getName().equals("audit-drop-shared")) {
+            if (worker.equals("audit-drop-shared")) {
                 dropPid.compareAndSet(0, jdbc.getJdbcOperations().queryForObject("SELECT pg_backend_pid()", Integer.class));
             }
             return call.callRealMethod();
@@ -162,33 +159,31 @@ class AcademicEnrollmentDropLockOrderPostgresIT {
         try {
             Future<?> enrolling = pool.submit(() -> {
                 Thread.currentThread().setName("audit-enroll-shared");
-                registration.enroll(enrollingStudent, nextSection, List.of("STUDENT"), "next-" + enrollingStudent);
+                registration.enroll(enrollingStudent, fixture.sectionId, List.of("STUDENT"), "next-" + enrollingStudent);
             });
-            assertThat(roundLocked.await(10, TimeUnit.SECONDS)).as("enroll owns the registration round").isTrue();
+            assertThat(sectionLocked.await(10, TimeUnit.SECONDS)).as("enroll owns the shared section").isTrue();
             Future<?> dropping = pool.submit(() -> {
                 Thread.currentThread().setName("audit-drop-shared");
                 registration.drop(droppingEnrollment, droppingStudent, List.of("STUDENT"), "drop-" + droppingStudent);
             });
-            boolean waitingOnRound = false;
+            boolean waitingOnSection = false;
             long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(10);
-            while (!waitingOnRound && System.nanoTime() < deadline) {
+            while (!waitingOnSection && System.nanoTime() < deadline) {
                 if (dropPid.get() != 0) {
-                    waitingOnRound = Boolean.TRUE.equals(jdbc.queryForObject(
+                    waitingOnSection = Boolean.TRUE.equals(jdbc.queryForObject(
                             "SELECT :owner = ANY(pg_blocking_pids(:waiter))",
                             Map.of("owner", enrollPid.get(), "waiter", dropPid.get()), Boolean.class));
                 }
-                if (!waitingOnRound) Thread.sleep(25);
+                if (!waitingOnSection) Thread.sleep(25);
             }
-            assertThat(waitingOnRound).as("drop owns the shared Section and waits on enroll's Round lock").isTrue();
+            assertThat(waitingOnSection).as("drop waits on enroll's shared Section lock").isTrue();
             releaseEnroll.countDown();
             enrolling.get(20, TimeUnit.SECONDS);
             dropping.get(20, TimeUnit.SECONDS);
             assertThat(jdbc.queryForObject("SELECT \"status\" FROM academic.\"Enrollment\" WHERE \"id\"=:id",
                     Map.of("id", droppingEnrollment), String.class)).isEqualTo("DROPPED");
             assertThat(jdbc.queryForObject("SELECT \"enrolledCount\" FROM academic.\"Section\" WHERE \"id\"=:id",
-                    Map.of("id", fixture.sectionId), Integer.class)).isEqualTo(1);
-            assertThat(jdbc.queryForObject("SELECT \"enrolledCount\" FROM academic.\"Section\" WHERE \"id\"=:id",
-                    Map.of("id", nextSection), Integer.class)).isEqualTo(1);
+                    Map.of("id", fixture.sectionId), Integer.class)).isEqualTo(2);
         } finally {
             releaseEnroll.countDown();
             pool.shutdownNow();

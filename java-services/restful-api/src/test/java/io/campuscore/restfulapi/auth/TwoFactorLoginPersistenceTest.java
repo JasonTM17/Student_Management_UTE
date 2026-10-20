@@ -4,6 +4,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
@@ -341,7 +342,10 @@ class TwoFactorLoginPersistenceTest {
         String enableChallengeId = objectMapper
                 .readTree(enable.getResponse().getContentAsString())
                 .path("challengeId").asText();
-        latestCode();
+        String correctCode = latestCode();
+        // The generator could legitimately emit "000000"; pick a value that
+        // differs from the issued code whatever it is.
+        String wrongCode = correctCode.equals("000000") ? "000001" : "000000";
 
         // Attempts 1-4: wrong code -> TWO_FACTOR_CODE_INVALID; each attempt must
         // persist across the transaction boundary (Kongming condition on the
@@ -350,7 +354,7 @@ class TwoFactorLoginPersistenceTest {
             mvc.perform(post("/api/v1/me/two-factor/confirm")
                             .with(io.campuscore.restfulapi.testsupport.CurrentAccountJwt.currentJwt(jdbc, "student-user"))
                             .contentType(MediaType.APPLICATION_JSON)
-                            .content("{\"challengeId\":\"" + enableChallengeId + "\",\"code\":\"000000\"}"))
+                            .content("{\"challengeId\":\"" + enableChallengeId + "\",\"code\":\"" + wrongCode + "\"}"))
                     .andExpect(status().isBadRequest())
                     .andExpect(jsonPath("$.code").value("TWO_FACTOR_CODE_INVALID"));
         }
@@ -359,7 +363,7 @@ class TwoFactorLoginPersistenceTest {
         mvc.perform(post("/api/v1/me/two-factor/confirm")
                         .with(io.campuscore.restfulapi.testsupport.CurrentAccountJwt.currentJwt(jdbc, "student-user"))
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"challengeId\":\"" + enableChallengeId + "\",\"code\":\"000000\"}"))
+                        .content("{\"challengeId\":\"" + enableChallengeId + "\",\"code\":\"" + wrongCode + "\"}"))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value("TWO_FACTOR_CODE_LOCKED"));
 
@@ -638,6 +642,8 @@ class TwoFactorLoginPersistenceTest {
         enableTwoFactorDirectly();
 
         String challengeId = startDisableChallenge();
+        int sessionsBefore = sessionCount();
+        String sessionHashBefore = onlySessionHash();
         // The generator could legitimately emit "000000"; pick a value that
         // differs from the issued code whatever it is.
         String correctCode = latestCode();
@@ -654,11 +660,66 @@ class TwoFactorLoginPersistenceTest {
                 "SELECT \"credentialVersion\" FROM \"campuscore_auth\".\"User\" WHERE \"id\" = 'student-user'",
                 Long.class);
         assertEquals(0L, version, "a rejected disable code must not advance the credential revision");
+        Boolean flag = jdbc.queryForObject(
+                "SELECT \"twoFactorEnabled\" FROM \"campuscore_auth\".\"User\" WHERE \"id\" = 'student-user'",
+                Boolean.class);
+        assertTrue(flag, "a rejected disable code must not clear the twoFactorEnabled flag");
+        assertEquals(sessionsBefore, sessionCount(), "a rejected disable code must not touch refresh sessions");
+        assertEquals(sessionHashBefore, onlySessionHash(), "a rejected disable code must not rotate the refresh token hash");
+        Integer attempts = jdbc.queryForObject(
+                "SELECT \"attempts\" FROM \"campuscore_auth\".\"TwoFactorChallenge\" WHERE \"id\" = ?",
+                Integer.class, challengeId);
+        assertEquals(1, attempts, "the rejected code still counts toward the five-strikes lock");
+        Integer consumed = jdbc.queryForObject(
+                "SELECT COUNT(*) FROM \"campuscore_auth\".\"TwoFactorChallenge\" WHERE \"id\" = ? AND \"consumedAt\" IS NOT NULL",
+                Integer.class, challengeId);
+        assertEquals(0, consumed, "a rejected code must not consume the challenge");
         // The real login token — not a synthetic JWT — must keep working.
         mvc.perform(get("/api/v1/auth/me")
                         .header("Authorization", "Bearer " + device.accessToken()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.id").value("student-user"));
+    }
+
+    @Test
+    void confirmDisableWithAPreRotationCookieRevokesEverySession() throws Exception {
+        DeviceSession currentDevice = loginDevice("device-a");
+        loginDevice("device-b");
+        enableTwoFactorDirectly();
+        assertEquals(2, sessionCount());
+
+        // The racing interleave the pin-by-id fix covers: a real refresh
+        // rotates the caller's session hash in place, then the confirm
+        // request still carries the pre-rotation cookie — the row no longer
+        // resolves by that hash, so the caller is unidentifiable.
+        mvc.perform(post("/api/v1/auth/refresh")
+                        .cookie(new Cookie("cc_refresh_token", currentDevice.refreshToken()),
+                                new Cookie("cc_csrf", currentDevice.csrfToken()))
+                        .header("X-CSRF-Token", currentDevice.csrfToken())
+                        .header("User-Agent", "device-a"))
+                .andExpect(status().isOk());
+        String rotatedHash = jdbc.queryForObject(
+                "SELECT \"refreshToken\" FROM \"campuscore_auth\".\"User\" WHERE \"id\" = 'student-user'",
+                String.class);
+        assertNotEquals(sha256(currentDevice.refreshToken()), rotatedHash,
+                "the refresh must have rotated the session hash in place");
+
+        String challengeId = startDisableChallenge();
+        String code = latestCode();
+        mvc.perform(post("/api/v1/me/two-factor/disable")
+                        .with(io.campuscore.restfulapi.testsupport.CurrentAccountJwt.currentJwt(jdbc, "student-user"))
+                        .with(csrfPair(currentDevice))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"challengeId\":\"" + challengeId + "\",\"code\":\"" + code + "\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.enabled").value(false));
+
+        assertEquals(0, sessionCount(),
+                "an unresolvable caller session falls back to revoking every session");
+        String legacy = jdbc.queryForObject(
+                "SELECT \"refreshToken\" FROM \"campuscore_auth\".\"User\" WHERE \"id\" = 'student-user'",
+                String.class);
+        assertNull(legacy, "the legacy single-session column is cleared on the safe path");
     }
 
     @Test
@@ -702,8 +763,9 @@ class TwoFactorLoginPersistenceTest {
                 .andExpect(jsonPath("$.enabled").value(true));
 
         // No cookie means the caller's session cannot be identified; revoking
-        // everything is the safe direction (the access token still works until
-        // it expires, and the next refresh needs a fresh login).
+        // everything is the safe direction. The revision bump above already
+        // retired the old access token, so the next request needs a fresh
+        // login.
         assertEquals(0, sessionCount());
     }
 

@@ -11,7 +11,6 @@ import java.util.UUID;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import org.flywaydb.core.Flyway;
-import org.flywaydb.core.api.MigrationVersion;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Order;
 import org.junit.jupiter.api.TestMethodOrder;
@@ -41,8 +40,11 @@ class ThesisCancellationMembershipMigrationPostgresIT {
             if ("90".equals(currentVersion(connection))) {
                 UUID round = UUID.fromString(scalar(connection,
                         "SELECT id::text FROM thesis.thesis_registration_round ORDER BY id LIMIT 1"));
+                // V112 reconciles the demo dataset by deleting non-canonical
+                // groups led by 'student-profile' — the fixture must anchor to
+                // a different student or the upgrade purge removes it.
                 String student = scalar(connection,
-                        "SELECT \"id\" FROM campuscore_auth.\"Student\" ORDER BY \"id\" LIMIT 1");
+                        "SELECT \"id\" FROM campuscore_auth.\"Student\" WHERE \"id\" <> 'student-profile' ORDER BY \"id\" LIMIT 1");
                 insertGroup(connection, LEGACY_GROUP, round, student, "V90 cancelled membership history");
                 insertMember(connection, LEGACY_MEMBER, LEGACY_GROUP, round, student);
                 try (PreparedStatement statement = connection.prepareStatement(
@@ -61,7 +63,9 @@ class ThesisCancellationMembershipMigrationPostgresIT {
         UUID replacementMember = UUID.randomUUID();
         UUID conflictingGroup = UUID.randomUUID();
         try (Connection connection = DriverManager.getConnection(url, user, password)) {
-            assertThat(currentVersion(connection)).isEqualTo("91");
+            // V91's semantics are what this scenario locks; the head version
+            // floats as later migrations land.
+            assertThat(Integer.parseInt(currentVersion(connection))).isGreaterThanOrEqualTo(91);
             assertThat(scalar(connection,
                     "SELECT active_participation::text FROM thesis.thesis_group_member WHERE id='" + LEGACY_MEMBER + "'"))
                     .isEqualTo("false");
@@ -199,7 +203,7 @@ class ThesisCancellationMembershipMigrationPostgresIT {
         var configuration = Flyway.configure().dataSource(url, user, password)
                 .locations("classpath:db/migration").createSchemas(true).defaultSchema("thesis")
                 .schemas("thesis").cleanDisabled(true);
-        if (target != null) configuration.target(MigrationVersion.fromVersion(target));
+        if (target != null) configuration.target(target);
         return configuration.load();
     }
 

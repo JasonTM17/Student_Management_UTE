@@ -71,10 +71,12 @@ class ThesisCouncilRosterRacePostgresIT {
         }
         jdbc.update("INSERT INTO thesis.thesis_council_topic (id,council_id,topic_id,assigned_by) VALUES (:id,:council,:topic,'audit-admin')",
                 Map.of("id", UUID.randomUUID(), "council", council, "topic", topic));
-        // Defense scoring requires an approved defended group on the topic.
+        // Defense scoring requires an approved defended group on the topic. The
+        // V65 membership-state constraint trigger validates APPROVED groups at
+        // commit, so the roster lands first and approval flips afterwards.
         UUID groupId = UUID.randomUUID();
         jdbc.update("INSERT INTO thesis.thesis_group (id,round_id,leader_student_id,topic_id,status,approval_status)"
-                        + " VALUES (:id,:round,'rr-leader',:topic,'SUBMITTED','APPROVED')",
+                        + " VALUES (:id,:round,'rr-leader',:topic,'SUBMITTED','PENDING')",
                 Map.of("id", groupId, "round", round, "topic", topic));
         for (int order = 1; order <= 3; order++) {
             String student = order == 1 ? "rr-leader" : "rr-member-" + order;
@@ -83,6 +85,8 @@ class ThesisCouncilRosterRacePostgresIT {
                     Map.of("id", UUID.randomUUID(), "group", groupId, "round", round,
                             "student", student, "order", order, "leader", order == 1));
         }
+        jdbc.update("UPDATE thesis.thesis_group SET approval_status = 'APPROVED' WHERE id = :id",
+                Map.of("id", groupId));
         Jwt grader = actor("LECTURER", member);
         Jwt admin = actor("ADMIN", "");
         CountDownLatch permissionChecked = new CountDownLatch(1);

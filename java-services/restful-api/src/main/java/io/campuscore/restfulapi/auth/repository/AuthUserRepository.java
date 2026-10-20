@@ -343,6 +343,52 @@ public class AuthUserRepository {
                         .addValue("refreshToken", refreshTokenHash));
     }
 
+    /**
+     * Resolves a session row's stable identity from its current refresh-token
+     * hash. Rotation rewrites the hash in place, so the row id outlives every
+     * rotation — callers that must act on "the session behind this request"
+     * pin it by id BEFORE taking the account's User row lock, then reference
+     * the id under that lock.
+     */
+    public Optional<String> findSessionIdByRefreshHash(String userId, String refreshTokenHash) {
+        return jdbc.query(
+                        "SELECT \"id\" FROM " + SESSION_TABLE
+                                + " WHERE \"userId\" = :userId AND \"refreshToken\" = :refreshToken",
+                        new MapSqlParameterSource()
+                                .addValue("userId", userId)
+                                .addValue("refreshToken", refreshTokenHash),
+                        (rs, rowNum) -> rs.getString(1))
+                .stream()
+                .findFirst();
+    }
+
+    /**
+     * Revokes every session of the account except the row pinned by stable
+     * id. Callers must hold the account's User row lock so no refresh can
+     * rotate the kept row between the pin and this delete.
+     */
+    public int deleteOtherRefreshSessions(String userId, String keepSessionId) {
+        return jdbc.update(
+                "DELETE FROM " + SESSION_TABLE
+                        + " WHERE \"userId\" = :userId AND \"id\" <> :keepSessionId",
+                new MapSqlParameterSource()
+                        .addValue("userId", userId)
+                        .addValue("keepSessionId", keepSessionId));
+    }
+
+    /**
+     * Deletes exactly the session pinned by stable id. Same locking contract
+     * as {@link #deleteOtherRefreshSessions}: run under the User row lock.
+     */
+    public int deleteRefreshSessionById(String userId, String sessionId) {
+        return jdbc.update(
+                "DELETE FROM " + SESSION_TABLE
+                        + " WHERE \"userId\" = :userId AND \"id\" = :sessionId",
+                new MapSqlParameterSource()
+                        .addValue("userId", userId)
+                        .addValue("sessionId", sessionId));
+    }
+
     public void deleteAllRefreshSessions(String userId) {
         jdbc.update(
                 "DELETE FROM " + SESSION_TABLE + " WHERE \"userId\" = :userId",

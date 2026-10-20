@@ -179,6 +179,7 @@ class ThesisCouncilRoundPostgresIT {
         insertDefenseScore(fx, fx.chair(), new BigDecimal("8"));
         insertDefenseScore(fx, fx.secretary(), new BigDecimal("9"));
         insertDefenseScore(fx, fx.member(), new BigDecimal("10"));
+        insertCounterReviewScore(fx, fx.reviewer(), new BigDecimal("8.5"));
 
         ThesisCouncilService.TopicResult result = councils.finalizeScores(fx.councilId(), fx.topicId(), chairJwt(fx.chair()));
         assertThat(result.finalScore()).isEqualByComparingTo(new BigDecimal("9.00"));
@@ -299,6 +300,12 @@ class ThesisCouncilRoundPostgresIT {
                 UUID.randomUUID(), fx.topicId(), fx.councilId(), lecturerId, score);
     }
 
+    private void insertCounterReviewScore(Fixture fx, String lecturerId, BigDecimal score) {
+        jdbc.update("INSERT INTO thesis.thesis_topic_score (id, topic_id, council_id, lecturer_id, component, score) "
+                        + "VALUES (?, ?, ?, ?, 'GVPB', ?)",
+                UUID.randomUUID(), fx.topicId(), fx.councilId(), lecturerId, score);
+    }
+
     private Fixture fixture(String tag) {
         String suffix = UUID.randomUUID().toString().substring(0, 12);
         String deanUser = "tcr-" + tag + "-" + suffix + "-dean";
@@ -341,11 +348,15 @@ class ThesisCouncilRoundPostgresIT {
         jdbc.update("INSERT INTO thesis.thesis_council_topic (id, council_id, topic_id, assigned_by) VALUES (?, ?, ?, ?)",
                 UUID.randomUUID(), councilId, topicId, deanUser);
 
-        // Defense/GVPB scoring now requires an approved defended group.
+        // Defense/GVPB scoring now requires an approved defended group. The
+        // V65 membership-state constraint trigger validates APPROVED groups
+        // at commit, so the group lands pending, the roster is filled, and
+        // approval flips only once the cohort exists — the same order the
+        // production flow uses.
         UUID groupId = UUID.randomUUID();
         String leader = "tcr-" + tag + "-" + suffix + "-leader";
         jdbc.update("INSERT INTO thesis.thesis_group (id, round_id, leader_student_id, topic_id, status, approval_status) "
-                        + "VALUES (?, ?, ?, ?, 'SUBMITTED', 'APPROVED')",
+                        + "VALUES (?, ?, ?, ?, 'SUBMITTED', 'PENDING')",
                 groupId, roundId, leader, topicId);
         for (int order = 1; order <= 3; order++) {
             jdbc.update("INSERT INTO thesis.thesis_group_member (id, group_id, round_id, student_id, member_order, is_leader) "
@@ -353,6 +364,7 @@ class ThesisCouncilRoundPostgresIT {
                     UUID.randomUUID(), groupId, roundId,
                     order == 1 ? leader : leader + "-" + order, order, order == 1);
         }
+        jdbc.update("UPDATE thesis.thesis_group SET approval_status = 'APPROVED' WHERE id = ?", groupId);
         return new Fixture(roundId, councilId, topicId, chair, secretary, member, supervisor, reviewer, deanUser);
     }
 
