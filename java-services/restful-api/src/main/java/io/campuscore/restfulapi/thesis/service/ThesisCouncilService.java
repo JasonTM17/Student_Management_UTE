@@ -2,6 +2,7 @@ package io.campuscore.restfulapi.thesis.service;
 
 import io.campuscore.restfulapi.audit.AdminAuditRecorder;
 import io.campuscore.restfulapi.thesis.domain.RoundStatus;
+import io.campuscore.restfulapi.thesis.domain.RoundType;
 import io.campuscore.restfulapi.thesis.domain.TopicStatus;
 import io.campuscore.restfulapi.web.DomainException;
 import java.math.BigDecimal;
@@ -159,6 +160,18 @@ public class ThesisCouncilService {
             throw conflict("REVIEWER_MUST_BE_INDEPENDENT",
                     "The assigned counter-reviewer cannot sit on the defense council for this topic");
         }
+        Integer supervisingAssignedTopic = count(
+                "SELECT COUNT(*) FROM thesis.thesis_council_topic ct "
+                        + "JOIN thesis.thesis_topic_supervisor sup ON sup.topic_id = ct.topic_id "
+                        + "JOIN campuscore_auth.\"Lecturer\" l "
+                        + "  ON (l.\"id\" = sup.lecturer_id OR l.\"userId\" = sup.lecturer_id) "
+                        + "WHERE ct.council_id = :councilId "
+                        + "  AND (sup.lecturer_id = :lecturerId OR l.\"id\" = :lecturerId OR l.\"userId\" = :lecturerId)",
+                params().addValue("councilId", councilId).addValue("lecturerId", lecturerId));
+        if (supervisingAssignedTopic != null && supervisingAssignedTopic > 0) {
+            throw conflict("SUPERVISOR_CANNOT_CHAIR_COUNCIL",
+                    "The topic supervisor cannot chair or sit on the defense council for an assigned topic");
+        }
         jdbc.update(
                 "INSERT INTO thesis.thesis_council_member (id, council_id, lecturer_id, member_role) "
                         + "VALUES (:id, :councilId, :lecturerId, :role)",
@@ -270,18 +283,22 @@ public class ThesisCouncilService {
         // Resolve the member's lecturer profile, then match the supervisor
         // row against either of its stored key forms (Lecturer.id or legacy
         // User.id) — a direct id comparison would miss legacy-keyed rows.
-        Integer supervisorChair = count(
+        Integer supervisorOfficer = count(
                 "SELECT COUNT(*) FROM thesis.thesis_council_member m "
                         + "JOIN campuscore_auth.\"Lecturer\" l "
                         + "  ON (l.\"id\" = m.lecturer_id OR l.\"userId\" = m.lecturer_id) "
                         + "JOIN thesis.thesis_topic_supervisor sup "
                         + "  ON sup.topic_id = :topicId "
                         + " AND (sup.lecturer_id = l.\"id\" OR sup.lecturer_id = l.\"userId\") "
-                        + "WHERE m.council_id = :councilId AND m.member_role = 'CHAIR'",
+                        + "WHERE m.council_id = :councilId AND m.member_role IN ('CHAIR', 'SECRETARY')",
                 params().addValue("councilId", councilId).addValue("topicId", topicId));
-        if (supervisorChair != null && supervisorChair > 0) {
+        if (supervisorOfficer != null && supervisorOfficer > 0) {
             throw conflict("SUPERVISOR_CANNOT_CHAIR_COUNCIL",
-                    "The topic supervisor cannot chair the defense council for this topic");
+                    "The topic supervisor cannot chair or be secretary of the defense council for this topic");
+        }
+        if (eligibleGraderCount(councilId, topicId) < MIN_COUNCIL_SIZE) {
+            throw conflict("COUNCIL_SIZE_INVALID",
+                    "A council needs at least three eligible members excluding supervisors to evaluate this topic");
         }
         // Mirror of assignReviewer's REVIEWER_MUST_BE_INDEPENDENT: a lecturer
         // already named counter-reviewer must not grade this topic again from
@@ -866,10 +883,47 @@ public class ThesisCouncilService {
                 params().addValue("topicId", topicId), "TOPIC_NOT_FOUND", "Thesis topic not found");
         requireApprovedGroupForTopic(topicId);
         int expectedScores = eligibleGraderCount(councilId, topicId);
+        if (expectedScores < MIN_COUNCIL_SIZE) {
+            throw conflict("COUNCIL_SIZE_INVALID",
+                    "A council needs at least three eligible members to evaluate and finalize this topic");
+        }
         int submittedScores = submittedEligibleScoreCount(councilId, topicId);
-        if (expectedScores == 0 || submittedScores < expectedScores) {
+        if (submittedScores < expectedScores) {
             throw conflict("SCORES_INCOMPLETE",
                     "Every eligible council member must submit a defense score before finalizing");
+        }
+        Map<String, Object> roundAndTopic = one(
+                "SELECT r.thesis_type, r.gvpb_deadline, t.gvpb_lecturer_id "
+                        + "FROM thesis.thesis_topic t "
+                        + "JOIN thesis.thesis_registration_round r ON r.id = t.round_id "
+                        + "WHERE t.id = :topicId",
+                params().addValue("topicId", topicId), "TOPIC_NOT_FOUND", "Thesis topic not found");
+        String roundTypeStr = (String) roundAndTopic.get("thesis_type");
+        RoundType roundType = null;
+        if (roundTypeStr != null) {
+            try {
+                roundType = RoundType.valueOf(roundTypeStr);
+            } catch (IllegalArgumentException ignored) {
+                roundType = null;
+            }
+        }
+        Object gvpbDeadline = roundAndTopic.get("gvpb_deadline");
+        String gvpbLecturerId = (String) roundAndTopic.get("gvpb_lecturer_id");
+        boolean requiresGvpb = (roundType != null && roundType.requiresGvpbDeadline() && gvpbDeadline != null)
+                || (gvpbLecturerId != null);
+        if (requiresGvpb) {
+            List<BigDecimal> gvpbScores = jdbc.queryForList(
+                    "SELECT score FROM thesis.thesis_topic_score WHERE topic_id = :topicId AND component = :component",
+                    params().addValue("topicId", topicId).addValue("component", GVPB_COMPONENT),
+                    BigDecimal.class);
+            if (gvpbScores.isEmpty() || gvpbScores.get(0) == null) {
+                throw conflict("REVIEW_SCORE_REQUIRED",
+                        "A counter-review (GVPB) score is required before the defense score can be finalized");
+            }
+            if (gvpbScores.get(0).compareTo(BigDecimal.valueOf(5.0)) < 0) {
+                throw conflict("REVIEW_SCORE_BELOW_THRESHOLD",
+                        "Topic counter-review score must be at least 5.0 to qualify for defense");
+            }
         }
         List<BigDecimal> scores = jdbc.queryForList(
                 "SELECT s.score FROM thesis.thesis_topic_score s "

@@ -149,6 +149,7 @@ export default function ThesisPage() {
   const [departments, setDepartments] = useState<Department[]>([]);
   const [selectedRoundId, setSelectedRoundId] = useState('');
   const topicRequestRef = useRef(0);
+  const councilRequestRef = useRef(0);
   const selectedRoundRef = useRef(selectedRoundId);
   selectedRoundRef.current = selectedRoundId;
   const [viewingTopic, setViewingTopic] = useState<ThesisTopic | null>(null);
@@ -293,6 +294,9 @@ export default function ThesisPage() {
   // Score-list load failures stay distinguishable from a genuinely empty list
   // ("0 of N graded" would otherwise mask an outage).
   const [councilScoreErrors, setCouncilScoreErrors] = useState<Record<string, boolean>>({});
+  // A failed council listing must never read as "no councils yet": this flag
+  // keeps the outage distinguishable and gives the defense tab a retry.
+  const [councilLoadError, setCouncilLoadError] = useState('');
   const [draftScores, setDraftScores] = useState<Record<string, string>>({});
   const [draftComments, setDraftComments] = useState<Record<string, string>>({});
   const [topicSupervisors, setTopicSupervisors] = useState<Record<string, string[]>>({});
@@ -338,11 +342,19 @@ export default function ThesisPage() {
     );
   }, [councils, isAdmin, isSupervisorOrAdmin, myLecturerId]);
 
-  const loadCouncilDetails = useCallback(async (councilsList: ThesisCouncil[]) => {
+  // `isCurrent` carries the caller's request identity: a round switch, an
+  // unmount, or a newer retry invalidates the load so a late resolution can
+  // neither issue more requests nor write stale round data into the maps.
+  const loadCouncilDetails = useCallback(async (
+    councilsList: ThesisCouncil[],
+    isCurrent: () => boolean = () => true,
+  ) => {
     for (const c of councilsList) {
+      if (!isCurrent()) return;
       const isMemberOrAdmin = isAdmin || c.members?.some((m) => m.lecturerId === myLecturerId);
       const tids = (c as unknown as { topicIds?: string[] }).topicIds || [];
       for (const tid of tids) {
+        if (!isCurrent()) return;
         const key = `${c.id}:${tid}`;
         try {
           const [scoresResult, sups, reportResult] = await Promise.all([
@@ -358,6 +370,7 @@ export default function ThesisPage() {
               () => ({ report: null, failed: true }),
             ),
           ]);
+          if (!isCurrent()) return;
           setCouncilScores((prev) => ({ ...prev, [key]: scoresResult.scores }));
           setCouncilScoreErrors((prev) => ({ ...prev, [key]: scoresResult.failed }));
           setTopicSupervisors((prev) => ({ ...prev, [tid]: sups.map((s) => s.lecturerId) }));
@@ -741,11 +754,29 @@ export default function ThesisPage() {
     setViewingTopic(null);
     setActionError('');
     setActionSuccess('');
+    // Council defense state is equally round-scoped: score lists, score
+    // drafts, supervisor and report maps from the previous round must not
+    // render against the new selection (or linger when it is cleared).
+    setCouncils([]);
+    setCouncilScores({});
+    setCouncilScoreErrors({});
+    setDraftScores({});
+    setDraftComments({});
+    setTopicSupervisors({});
+    setTopicReports({});
+    setTopicReportErrors({});
+    setCouncilLoadError('');
     if (!selectedRoundId) {
       return;
     }
 
     let cancelled = false;
+    const councilRequestId = ++councilRequestRef.current;
+    const roundId = selectedRoundId;
+    const isCouncilCurrent = () =>
+      !cancelled
+      && councilRequestId === councilRequestRef.current
+      && roundId === selectedRoundRef.current;
     const loadWorkspace = async () => {
       setError('');
       try {
@@ -761,9 +792,17 @@ export default function ThesisPage() {
           setIsRepositoryLoading(true);
           promises.push(
             thesisApi.listCouncils(selectedRoundId).then((cList) => {
-              if (!cancelled) {
+              if (isCouncilCurrent()) {
                 setCouncils(cList);
-                void loadCouncilDetails(cList);
+                setCouncilLoadError('');
+                void loadCouncilDetails(cList, isCouncilCurrent);
+              }
+            }).catch(() => {
+              if (isCouncilCurrent()) {
+                // The defense tab reads an empty council list as "no councils
+                // yet"; keep the failure distinct and retryable instead.
+                setCouncils([]);
+                setCouncilLoadError(messages.thesis.loadFailed);
               }
             }),
             thesisApi.listRoundRepository(selectedRoundId).then((rList) => {
@@ -794,8 +833,33 @@ export default function ThesisPage() {
     return () => {
       cancelled = true;
       topicRequestRef.current += 1;
+      councilRequestRef.current += 1;
     };
   }, [canLoadStaffRelations, isStudent, loadCouncilDetails, messages.thesis.loadFailed, refreshTopics, selectedRoundId]);
+
+  // Retry path for a failed council listing: the defense tab gets the real
+  // failure with a way back, instead of a council workspace that silently
+  // reads as empty. The detail loader shares the same request identity, so a
+  // round switch or a newer retry invalidates whatever it resolves late.
+  const reloadCouncils = useCallback(async () => {
+    if (!selectedRoundId || !canLoadStaffRelations) return;
+    const requestId = ++councilRequestRef.current;
+    const roundId = selectedRoundId;
+    const isCurrent = () =>
+      requestId === councilRequestRef.current && roundId === selectedRoundRef.current;
+    setCouncilLoadError('');
+    try {
+      const cList = await thesisApi.listCouncils(roundId);
+      if (!isCurrent()) return;
+      setCouncils(cList);
+      await loadCouncilDetails(cList, isCurrent);
+    } catch {
+      if (isCurrent()) {
+        setCouncils([]);
+        setCouncilLoadError(messages.thesis.loadFailed);
+      }
+    }
+  }, [canLoadStaffRelations, loadCouncilDetails, messages.thesis.loadFailed, selectedRoundId]);
 
   // Retry path for a failed repository load: the reader gets the real failure
   // with a way back, instead of an archive that silently reads as empty.
@@ -2782,6 +2846,8 @@ export default function ThesisPage() {
                     myLecturerId={myLecturerId}
                     topics={topics}
                     lecturers={lecturers}
+                    councilLoadError={councilLoadError}
+                    onRetryCouncils={() => void reloadCouncils()}
                     councilScores={councilScores}
                     councilScoreErrors={councilScoreErrors}
                     topicSupervisors={topicSupervisors}

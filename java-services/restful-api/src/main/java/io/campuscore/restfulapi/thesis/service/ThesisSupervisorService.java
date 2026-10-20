@@ -17,6 +17,8 @@ import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 import org.springframework.util.StringUtils;
 
 /**
@@ -186,14 +188,38 @@ public class ThesisSupervisorService {
                     .filter(id -> !previousSupervisorIds.contains(id))
                     .toList();
             if (!added.isEmpty()) {
-                try {
-                    notifier.notifySupervisorsAssigned(topicId, added);
-                } catch (RuntimeException exception) {
-                    log.warn("Thesis supervisor notification fan-out failed for topic {}", topicId, exception);
-                }
+                // Same after-commit rule as the mutation and council services:
+                // the fan-out runs REQUIRES_NEW, so an in-transaction call
+                // would still publish a notification for a roster a later
+                // rollback erased.
+                afterCommit(() -> {
+                    try {
+                        notifier.notifySupervisorsAssigned(topicId, added);
+                    } catch (RuntimeException exception) {
+                        log.warn("Thesis supervisor notification fan-out failed for topic {}", topicId, exception);
+                    }
+                });
             }
         }
         return list(topicId, actor);
+    }
+
+    /**
+     * Runs the fan-out only after the roster write commits. Without an active
+     * synchronization (e.g. a non-transactional caller) the action runs inline,
+     * matching the convention in {@code ThesisMutationService}.
+     */
+    private void afterCommit(Runnable action) {
+        if (TransactionSynchronizationManager.isSynchronizationActive()) {
+            TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+                @Override
+                public void afterCommit() {
+                    action.run();
+                }
+            });
+        } else {
+            action.run();
+        }
     }
 
     private ThesisTopic requireTopic(UUID topicId) {
@@ -251,6 +277,10 @@ public class ThesisSupervisorService {
         }
         if (ThesisDeanScope.isFacultyHead(actor)) {
             ThesisDeanScope.requireTopicAccess(jdbc, actor, topic.getId());
+            return;
+        }
+        if (ThesisDepartmentScope.isDepartmentHead(actor)
+                && ThesisDepartmentScope.owns(jdbc, actor, topic.getDepartmentId())) {
             return;
         }
         String actorId = subject(actor);

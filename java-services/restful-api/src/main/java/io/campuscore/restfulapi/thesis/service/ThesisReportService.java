@@ -642,7 +642,7 @@ public class ThesisReportService {
      * Faculty heads also require their separate subject-bound faculty lookup.
      */
     private boolean isActiveLecturerActor(Jwt actor) {
-        if (!hasRole(actor, "LECTURER")) {
+        if (!hasRole(actor, "LECTURER") && !hasRole(actor, "TRUONG_BO_MON")) {
             return false;
         }
         String id = lecturerId(actor);

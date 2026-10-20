@@ -2,11 +2,15 @@ package io.campuscore.restfulapi.thesis;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+
+import io.campuscore.restfulapi.testsupport.AccountAuthorityFixture;
+import io.campuscore.restfulapi.testsupport.CurrentAccountJwt;
 
 import java.sql.Timestamp;
 import java.time.Instant;
@@ -64,6 +68,7 @@ class ThesisSpecAlignmentTest {
         jdbc.update("DELETE FROM campuscore_auth.\"Student\" WHERE \"id\" LIKE 'sa-%'");
         jdbc.update("DELETE FROM campuscore_auth.\"Lecturer\" WHERE \"id\" LIKE 'sa-%'");
         jdbc.update("DELETE FROM campuscore_auth.\"User\" WHERE \"id\" LIKE 'sa-%'");
+        jdbc.update("DELETE FROM academic.\"Department\" WHERE \"id\" = 'department-other'");
     }
 
     // ---------- R1/R2: round update + cancel lifecycle ----------
@@ -267,6 +272,353 @@ class ThesisSpecAlignmentTest {
         assertThat(actions).contains("THESIS_GROUP_APPROVED");
     }
 
+    // ---------- Defect 1: TRUONG_BO_MON RBAC & department scope ----------
+
+    @Test
+    void departmentHeadCanManageSupervisorsAndReadCouncilsAndRepository() throws Exception {
+        UUID roundId = insertRound("sa-round-tbm", "REGISTRATION_OPEN");
+        UUID topicId = insertPublishedTopic(roundId);
+
+        ensureLecturer("sa-sup-a");
+        ensureLecturer("sa-tbm-lecturer");
+
+        RequestPostProcessor tbm = truongBoMonJwt("sa-tbm-lecturer", "department-demo");
+
+        // TRUONG_BO_MON can set supervisors for their department topic
+        mvc.perform(put("/api/v1/thesis/topics/{id}/supervisors", topicId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"supervisorIds\":[\"sa-sup-a\"]}")
+                        .with(tbm))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].lecturerId").value("sa-sup-a"));
+
+        // Department head from another department cannot change supervisors
+        ensureDepartment("department-other");
+        ensureLecturer("sa-tbm-other");
+        RequestPostProcessor tbmOther = truongBoMonJwt("sa-tbm-other", "department-other");
+        mvc.perform(put("/api/v1/thesis/topics/{id}/supervisors", topicId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"supervisorIds\":[\"sa-sup-a\"]}")
+                        .with(tbmOther))
+                .andExpect(status().isForbidden());
+
+        // TRUONG_BO_MON can list councils
+        mvc.perform(get("/api/v1/thesis/councils")
+                        .param("roundId", roundId.toString())
+                        .with(tbm))
+                .andExpect(status().isOk());
+
+        // TRUONG_BO_MON can list repository
+        mvc.perform(get("/api/v1/thesis/rounds/{id}/repository", roundId)
+                        .with(tbm))
+                .andExpect(status().isOk());
+
+        // TRUONG_BO_MON can propose topics for their department during PROPOSAL_OPEN
+        UUID roundPropId = insertRoundProposalOpen("sa-round-tbm-prop");
+        mvc.perform(post("/api/v1/thesis/topics")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"roundId\":\"" + roundPropId + "\",\"departmentId\":\"department-demo\","
+                                + "\"title\":\"TBM Proposed Topic\",\"description\":\"TBM Desc\",\"maxGroups\":1}")
+                        .with(tbm))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.title").value("TBM Proposed Topic"));
+
+        // Department head from another department cannot propose topics for department-demo
+        mvc.perform(post("/api/v1/thesis/topics")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"roundId\":\"" + roundPropId + "\",\"departmentId\":\"department-demo\","
+                                + "\"title\":\"Foreign TBM Topic\",\"description\":\"Foreign Desc\",\"maxGroups\":1}")
+                        .with(tbmOther))
+                .andExpect(status().isForbidden());
+
+        // Setup approved group with report for topicId
+        UUID grpId = insertApprovedGroupWithRoster(roundId, topicId, "sa-tbm-grp");
+        UUID reportId = UUID.randomUUID();
+        jdbc.update("INSERT INTO thesis.thesis_group_report (id, group_id, round_id, submitted_by, title, file_name, file_type, file_size, file_data) "
+                        + "VALUES (?, ?, ?, 'sa-tbm-grp-leader', 'Final Thesis Report', 'report.pdf', 'application/pdf', 4, ?)",
+                reportId, grpId, roundId, "demo".getBytes(java.nio.charset.StandardCharsets.UTF_8));
+
+        // TRUONG_BO_MON can read report metadata & download file for department topic
+        mvc.perform(get("/api/v1/thesis/groups/{id}/report", grpId).with(tbm))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.title").value("Final Thesis Report"));
+
+        mvc.perform(get("/api/v1/thesis/topics/{id}/report", topicId).with(tbm))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.title").value("Final Thesis Report"));
+
+        mvc.perform(get("/api/v1/thesis/groups/{id}/report/file", grpId).with(tbm))
+                .andExpect(status().isOk());
+
+        mvc.perform(get("/api/v1/thesis/reports/{id}/file", reportId).with(tbm))
+                .andExpect(status().isOk());
+
+        // Foreign department head cannot read reports of this department
+        mvc.perform(get("/api/v1/thesis/groups/{id}/report", grpId).with(tbmOther))
+                .andExpect(status().isNotFound());
+    }
+
+    // ---------- Defect 2: Council conflict of interest & minimum size ----------
+
+    @Test
+    void councilRejectsSupervisorInExecutiveRolesOrBelowMinEligibleGraders() throws Exception {
+        UUID roundId = insertRound("sa-round-council-coi", "REGISTRATION_CLOSED");
+        UUID topicId = insertPublishedTopic(roundId);
+        ensureLecturer("sa-coi-sup");
+        jdbc.update("INSERT INTO thesis.thesis_topic_supervisor (id, topic_id, lecturer_id, supervisor_order) "
+                + "VALUES (?, ?, 'sa-coi-sup', 1)", UUID.randomUUID(), topicId);
+
+        ensureLecturer("sa-coi-chair");
+        ensureLecturer("sa-coi-sec");
+        ensureLecturer("sa-coi-mem1");
+
+        // 1. Council with supervisor as CHAIR -> assignTopic rejected
+        UUID councilChairSup = createCouncil(roundId, "Council Chair Sup");
+        seatMember(councilChairSup, "sa-coi-sup", "CHAIR");
+        seatMember(councilChairSup, "sa-coi-sec", "SECRETARY");
+        seatMember(councilChairSup, "sa-coi-mem1", "MEMBER");
+        mvc.perform(post("/api/v1/thesis/councils/{id}/topics", councilChairSup)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"topicId\":\"" + topicId + "\"}")
+                        .with(truongKhoaJwt()))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("SUPERVISOR_CANNOT_CHAIR_COUNCIL"));
+
+        // 2. Council with 3 members where 1 is supervisor as MEMBER -> eligible graders = 2 < 3 -> assignTopic rejected
+        UUID councilSmallEligible = createCouncil(roundId, "Council Small Eligible");
+        seatMember(councilSmallEligible, "sa-coi-chair", "CHAIR");
+        seatMember(councilSmallEligible, "sa-coi-sec", "SECRETARY");
+        seatMember(councilSmallEligible, "sa-coi-sup", "MEMBER");
+        mvc.perform(post("/api/v1/thesis/councils/{id}/topics", councilSmallEligible)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"topicId\":\"" + topicId + "\"}")
+                        .with(truongKhoaJwt()))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("COUNCIL_SIZE_INVALID"));
+
+        // 3. Council with 3 independent members + topic assigned -> cannot seat supervisor
+        UUID councilValid = createCouncil(roundId, "Council Valid");
+        seatMember(councilValid, "sa-coi-chair", "CHAIR");
+        seatMember(councilValid, "sa-coi-sec", "SECRETARY");
+        seatMember(councilValid, "sa-coi-mem1", "MEMBER");
+        mvc.perform(post("/api/v1/thesis/councils/{id}/topics", councilValid)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"topicId\":\"" + topicId + "\"}")
+                        .with(truongKhoaJwt()))
+                .andExpect(status().isOk());
+
+        // Seating supervisor on council after topic assignment is rejected
+        mvc.perform(post("/api/v1/thesis/councils/{id}/members", councilValid)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"lecturerId\":\"sa-coi-sup\",\"memberRole\":\"MEMBER\"}")
+                        .with(truongKhoaJwt()))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("SUPERVISOR_CANNOT_CHAIR_COUNCIL"));
+
+        // 4. Council with supervisor as SECRETARY -> assignTopic rejected
+        UUID topicIdSec = insertPublishedTopic(roundId);
+        jdbc.update("INSERT INTO thesis.thesis_topic_supervisor (id, topic_id, lecturer_id, supervisor_order) "
+                + "VALUES (?, ?, 'sa-coi-sup', 1)", UUID.randomUUID(), topicIdSec);
+
+        UUID councilSecSup = createCouncil(roundId, "Council Sec Sup");
+        seatMember(councilSecSup, "sa-coi-chair", "CHAIR");
+        seatMember(councilSecSup, "sa-coi-sup", "SECRETARY");
+        seatMember(councilSecSup, "sa-coi-mem1", "MEMBER");
+        mvc.perform(post("/api/v1/thesis/councils/{id}/topics", councilSecSup)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"topicId\":\"" + topicIdSec + "\"}")
+                        .with(truongKhoaJwt()))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("SUPERVISOR_CANNOT_CHAIR_COUNCIL"));
+
+        // 5. Council where member removal drops eligible graders below 3 -> finalizeScores rejected with COUNCIL_SIZE_INVALID
+        UUID topicIdFour = insertPublishedTopic(roundId);
+        jdbc.update("INSERT INTO thesis.thesis_topic_supervisor (id, topic_id, lecturer_id, supervisor_order) "
+                + "VALUES (?, ?, 'sa-coi-sup', 1)", UUID.randomUUID(), topicIdFour);
+
+        ensureLecturer("sa-coi-mem2");
+        UUID councilFour = createCouncil(roundId, "Council Four Graders");
+        seatMember(councilFour, "sa-coi-chair", "CHAIR");
+        seatMember(councilFour, "sa-coi-sec", "SECRETARY");
+        seatMember(councilFour, "sa-coi-mem1", "MEMBER");
+        seatMember(councilFour, "sa-coi-sup", "MEMBER");
+        mvc.perform(post("/api/v1/thesis/councils/{id}/topics", councilFour)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"topicId\":\"" + topicIdFour + "\"}")
+                        .with(truongKhoaJwt()))
+                .andExpect(status().isOk());
+
+        insertApprovedGroupWithRoster(roundId, topicIdFour, "sa-coi-grp");
+
+        // Remove eligible member sa-coi-mem1 -> council drops to 3 members, eligible graders = 2 < 3
+        mvc.perform(delete("/api/v1/thesis/councils/{id}/members/{lecturerId}", councilFour, "sa-coi-mem1")
+                        .with(truongKhoaJwt()))
+                .andExpect(status().isOk());
+
+        mvc.perform(post("/api/v1/thesis/councils/{councilId}/topics/{topicId}/scores", councilFour, topicIdFour)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"score\":8.0}")
+                        .with(lecturerJwt("sa-coi-chair")))
+                .andExpect(status().isOk());
+        mvc.perform(post("/api/v1/thesis/councils/{councilId}/topics/{topicId}/scores", councilFour, topicIdFour)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"score\":8.5}")
+                        .with(lecturerJwt("sa-coi-sec")))
+                .andExpect(status().isOk());
+
+        mvc.perform(post("/api/v1/thesis/councils/{councilId}/topics/{topicId}/finalize", councilFour, topicIdFour)
+                        .with(lecturerJwt("sa-coi-chair")))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("COUNCIL_SIZE_INVALID"));
+    }
+
+    // ---------- Defect 3: Student self-leave ----------
+
+    @Test
+    void nonLeaderStudentCanSelfLeaveInDraftOrSubmittedState() throws Exception {
+        UUID roundId = insertRound("sa-round-leave", "REGISTRATION_OPEN");
+        ensureStudent("sa-leave-leader");
+        ensureStudent("sa-leave-member");
+        ensureStudent("sa-leave-other");
+
+        mvc.perform(post("/api/v1/thesis/groups")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"roundId\":\"" + roundId + "\"}")
+                        .with(studentJwt("sa-leave-leader")))
+                .andExpect(status().isOk());
+        UUID groupId = jdbc.queryForObject(
+                "SELECT id FROM thesis.thesis_group WHERE round_id = ?", UUID.class, roundId);
+
+        mvc.perform(post("/api/v1/thesis/groups/{id}/members", groupId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"studentId\":\"sa-leave-member\"}")
+                        .with(studentJwt("sa-leave-leader")))
+                .andExpect(status().isOk());
+
+        // Other non-leader student cannot remove members
+        mvc.perform(delete("/api/v1/thesis/groups/{id}/members/{studentId}", groupId, "sa-leave-member")
+                        .with(studentJwt("sa-leave-other")))
+                .andExpect(status().isForbidden());
+
+        // Non-leader member can leave on their own in DRAFT
+        mvc.perform(delete("/api/v1/thesis/groups/{id}/members/{studentId}", groupId, "sa-leave-member")
+                        .with(studentJwt("sa-leave-member")))
+                .andExpect(status().isOk());
+
+        Integer memberCount = jdbc.queryForObject(
+                "SELECT COUNT(*) FROM thesis.thesis_group_member WHERE group_id = ?", Integer.class, groupId);
+        assertThat(memberCount).isEqualTo(1);
+
+        // Leader cannot remove themselves
+        mvc.perform(delete("/api/v1/thesis/groups/{id}/members/{studentId}", groupId, "sa-leave-leader")
+                        .with(studentJwt("sa-leave-leader")))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("LEADER_CANNOT_BE_REMOVED"));
+
+        // Non-leader can self-leave in SUBMITTED state
+        UUID roundSub = insertRound("sa-round-leave-sub", "REGISTRATION_OPEN");
+        ensureStudent("sa-sub-leader");
+        ensureStudent("sa-sub-member");
+        mvc.perform(post("/api/v1/thesis/groups")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"roundId\":\"" + roundSub + "\"}")
+                        .with(studentJwt("sa-sub-leader")))
+                .andExpect(status().isOk());
+        UUID groupSubId = jdbc.queryForObject(
+                "SELECT id FROM thesis.thesis_group WHERE round_id = ?", UUID.class, roundSub);
+        mvc.perform(post("/api/v1/thesis/groups/{id}/members", groupSubId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"studentId\":\"sa-sub-member\"}")
+                        .with(studentJwt("sa-sub-leader")))
+                .andExpect(status().isOk());
+        UUID topicSub = insertPublishedTopic(roundSub);
+        mvc.perform(post("/api/v1/thesis/groups/{id}/topic", groupSubId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"topicId\":\"" + topicSub + "\"}")
+                        .with(studentJwt("sa-sub-leader")))
+                .andExpect(status().isOk());
+        // Group is now in SUBMITTED status and PENDING approval
+        mvc.perform(delete("/api/v1/thesis/groups/{id}/members/{studentId}", groupSubId, "sa-sub-member")
+                        .with(studentJwt("sa-sub-member")))
+                .andExpect(status().isOk());
+        Integer subCount = jdbc.queryForObject(
+                "SELECT COUNT(*) FROM thesis.thesis_group_member WHERE group_id = ?", Integer.class, groupSubId);
+        assertThat(subCount).isEqualTo(1);
+
+        // Non-leader CANNOT self-leave once group is APPROVED
+        UUID groupAppId = insertApprovedGroupWithRoster(roundSub, topicSub, "sa-app-grp");
+        mvc.perform(delete("/api/v1/thesis/groups/{id}/members/{studentId}", groupAppId, "sa-app-grp-m2")
+                        .with(studentJwt("sa-app-grp-m2")))
+                .andExpect(status().isForbidden());
+    }
+
+    // ---------- Defect 4: GVPB threshold & anti-lockout ----------
+
+    @Test
+    void finalizeScoresEnforcesGvpbThresholdInRoundsRequiringGvpb() throws Exception {
+        UUID roundId = insertRound("sa-round-gvpb-gate", "REGISTRATION_CLOSED");
+        UUID topicId = insertPublishedTopic(roundId);
+
+        ensureLecturer("sa-gvpb-chair");
+        ensureLecturer("sa-gvpb-sec");
+        ensureLecturer("sa-gvpb-mem");
+        ensureLecturer("sa-gvpb-reviewer");
+
+        UUID councilId = createCouncil(roundId, "Council GVPB Gate");
+        seatMember(councilId, "sa-gvpb-chair", "CHAIR");
+        seatMember(councilId, "sa-gvpb-sec", "SECRETARY");
+        seatMember(councilId, "sa-gvpb-mem", "MEMBER");
+
+        mvc.perform(post("/api/v1/thesis/councils/{id}/topics", councilId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"topicId\":\"" + topicId + "\"}")
+                        .with(truongKhoaJwt()))
+                .andExpect(status().isOk());
+
+        // Assign GVPB reviewer
+        mvc.perform(post("/api/v1/thesis/topics/{id}/reviewer", topicId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"lecturerId\":\"sa-gvpb-reviewer\"}")
+                        .with(truongKhoaJwt()))
+                .andExpect(status().isOk());
+
+        // Create approved group with roster so scoring is permitted
+        insertApprovedGroupWithRoster(roundId, topicId, "sa-gvpb-grp");
+
+        // Council members submit defense scores
+        for (String member : new String[]{"sa-gvpb-chair", "sa-gvpb-sec", "sa-gvpb-mem"}) {
+            mvc.perform(post("/api/v1/thesis/councils/{councilId}/topics/{topicId}/scores", councilId, topicId)
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content("{\"score\":8.0}")
+                            .with(lecturerJwt(member)))
+                    .andExpect(status().isOk());
+        }
+
+        // 1. Finalize without GVPB score -> 409 REVIEW_SCORE_REQUIRED
+        mvc.perform(post("/api/v1/thesis/councils/{councilId}/topics/{topicId}/finalize", councilId, topicId)
+                        .with(lecturerJwt("sa-gvpb-chair")))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("REVIEW_SCORE_REQUIRED"));
+
+        // 2. Submit GVPB score < 5.0 (4.9) -> finalize rejected with REVIEW_SCORE_BELOW_THRESHOLD
+        jdbc.update("INSERT INTO thesis.thesis_topic_score (id, topic_id, lecturer_id, component, score) "
+                + "VALUES (?, ?, 'sa-gvpb-reviewer', 'GVPB', 4.9)", UUID.randomUUID(), topicId);
+
+        mvc.perform(post("/api/v1/thesis/councils/{councilId}/topics/{topicId}/finalize", councilId, topicId)
+                        .with(lecturerJwt("sa-gvpb-chair")))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("REVIEW_SCORE_BELOW_THRESHOLD"));
+
+        // 3. Update GVPB score to boundary >= 5.0 (5.0) -> finalize succeeds
+        jdbc.update("UPDATE thesis.thesis_topic_score SET score = 5.0 WHERE topic_id = ? AND component = 'GVPB'", topicId);
+
+        mvc.perform(post("/api/v1/thesis/councils/{councilId}/topics/{topicId}/finalize", councilId, topicId)
+                        .with(lecturerJwt("sa-gvpb-chair")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.finalScore").value(8.0))
+                .andExpect(jsonPath("$.status").value("GRADED"));
+    }
+
     // ---------- fixtures ----------
 
     private List<String> auditActions(UUID entityId) {
@@ -298,6 +650,21 @@ class ThesisSpecAlignmentTest {
         return roundId;
     }
 
+    private UUID insertRoundProposalOpen(String name) {
+        UUID roundId = UUID.randomUUID();
+        Instant now = Instant.now();
+        jdbc.update(
+                "INSERT INTO thesis.thesis_registration_round "
+                        + "(id, name, thesis_type, lecturer_submit_start, lecturer_submit_end, "
+                        + "registration_start, registration_end, gvpb_deadline, status) "
+                        + "VALUES (?, ?, 'KLTN', ?, ?, ?, ?, ?, 'PROPOSAL_OPEN')",
+                roundId, name,
+                Timestamp.from(now.minusSeconds(3_600)), Timestamp.from(now.plusSeconds(3_600)),
+                Timestamp.from(now.plusSeconds(3_600)), Timestamp.from(now.plusSeconds(86_400)),
+                Timestamp.from(now.plusSeconds(172_800)));
+        return roundId;
+    }
+
     private UUID insertPublishedTopic(UUID roundId) {
         UUID topicId = UUID.randomUUID();
         jdbc.update(
@@ -309,6 +676,11 @@ class ThesisSpecAlignmentTest {
 
     private void ensureStudent(String studentId) {
         String userId = "sa-user-" + studentId;
+        Integer count = jdbc.queryForObject(
+                "SELECT COUNT(*) FROM campuscore_auth.\"User\" WHERE \"id\" = ?", Integer.class, userId);
+        if (count != null && count > 0) {
+            return;
+        }
         jdbc.update("INSERT INTO campuscore_auth.\"User\" "
                         + "(\"id\", \"email\", \"password\", \"firstName\", \"lastName\", \"status\", "
                         + "\"emailVerified\", \"isSuperAdmin\", \"failedLoginAttempts\", \"createdAt\", \"updatedAt\") "
@@ -323,6 +695,11 @@ class ThesisSpecAlignmentTest {
 
     private void ensureLecturer(String lecturerId) {
         String userId = "sa-user-" + lecturerId;
+        Integer count = jdbc.queryForObject(
+                "SELECT COUNT(*) FROM campuscore_auth.\"User\" WHERE \"id\" = ?", Integer.class, userId);
+        if (count != null && count > 0) {
+            return;
+        }
         jdbc.update("INSERT INTO campuscore_auth.\"User\" "
                         + "(\"id\", \"email\", \"password\", \"firstName\", \"lastName\", \"status\", "
                         + "\"emailVerified\", \"isSuperAdmin\", \"failedLoginAttempts\", \"createdAt\", \"updatedAt\") "
@@ -357,5 +734,62 @@ class ThesisSpecAlignmentTest {
                     + "VALUES ('sa-tk-lecturer', 'sa-tk-user', 'department-demo', 'GV-sa-tk', TRUE)");
         }
         return ThesisAuthorityFixture.role(jdbc, "sa-tk-user", "TRUONG_KHOA");
+    }
+
+    private void ensureDepartment(String departmentId) {
+        Integer count = jdbc.queryForObject(
+                "SELECT COUNT(*) FROM academic.\"Department\" WHERE \"id\" = ?", Integer.class, departmentId);
+        if (count == null || count == 0) {
+            jdbc.update("INSERT INTO academic.\"Department\" (\"id\", \"name\", \"code\", \"facultyId\", \"isActive\") "
+                    + "SELECT ?, 'Other Department', 'OD', \"facultyId\", TRUE FROM academic.\"Department\" WHERE \"id\" = 'department-demo'",
+                    departmentId);
+        }
+    }
+
+    private UUID createCouncil(UUID roundId, String name) throws Exception {
+        mvc.perform(post("/api/v1/thesis/councils")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"roundId\":\"" + roundId + "\",\"name\":\"" + name + "\"}")
+                        .with(truongKhoaJwt()))
+                .andExpect(status().isOk());
+        return jdbc.queryForObject(
+                "SELECT id FROM thesis.thesis_council WHERE name = ?", UUID.class, name);
+    }
+
+    private void seatMember(UUID councilId, String lecturerId, String role) throws Exception {
+        mvc.perform(post("/api/v1/thesis/councils/{id}/members", councilId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"lecturerId\":\"" + lecturerId + "\",\"memberRole\":\"" + role + "\"}")
+                        .with(truongKhoaJwt()))
+                .andExpect(status().isOk());
+    }
+
+    private RequestPostProcessor truongBoMonJwt(String lecturerId, String departmentId) {
+        ensureLecturer(lecturerId);
+        jdbc.update("UPDATE campuscore_auth.\"Lecturer\" SET \"departmentId\" = ? WHERE \"id\" = ?", departmentId, lecturerId);
+        String subject = jdbc.queryForObject("SELECT \"userId\" FROM campuscore_auth.\"Lecturer\" WHERE \"id\" = ?", String.class, lecturerId);
+        AccountAuthorityFixture.replaceRoles(jdbc, subject, "TRUONG_BO_MON");
+        return CurrentAccountJwt.currentJwt(jdbc, subject);
+    }
+
+    private UUID insertApprovedGroupWithRoster(UUID roundId, UUID topicId, String tag) {
+        UUID groupId = UUID.randomUUID();
+        String leader = tag + "-leader";
+        ensureStudent(leader);
+        ensureStudent(tag + "-m2");
+        ensureStudent(tag + "-m3");
+        jdbc.update("INSERT INTO thesis.thesis_group (id, round_id, leader_student_id, topic_id, status, approval_status) "
+                        + "VALUES (?, ?, ?, ?, 'SUBMITTED', 'APPROVED')",
+                groupId, roundId, leader, topicId);
+        jdbc.update("INSERT INTO thesis.thesis_group_member (id, group_id, round_id, student_id, member_order, is_leader) "
+                        + "VALUES (?, ?, ?, ?, 1, TRUE)",
+                UUID.randomUUID(), groupId, roundId, leader);
+        jdbc.update("INSERT INTO thesis.thesis_group_member (id, group_id, round_id, student_id, member_order, is_leader) "
+                        + "VALUES (?, ?, ?, ?, 2, FALSE)",
+                UUID.randomUUID(), groupId, roundId, tag + "-m2");
+        jdbc.update("INSERT INTO thesis.thesis_group_member (id, group_id, round_id, student_id, member_order, is_leader) "
+                        + "VALUES (?, ?, ?, ?, 3, FALSE)",
+                UUID.randomUUID(), groupId, roundId, tag + "-m3");
+        return groupId;
     }
 }

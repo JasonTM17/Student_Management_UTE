@@ -931,13 +931,19 @@ public class ThesisMutationService {
     @Transactional
     public GroupResponse removeMember(UUID groupId, String studentId, Jwt actor) {
         GroupRow group = lockGroup(groupId);
-        boolean supervisorPath = authorizeMemberManagement(group, actor);
+        String normalized = normalize(studentId);
+        boolean selfLeave = normalized.equals(studentId(actor))
+                && (group.status() == GroupStatus.DRAFT || group.status() == GroupStatus.SUBMITTED)
+                && group.approvalStatus() != ApprovalStatus.APPROVED;
+        boolean supervisorPath = false;
+        if (!selfLeave) {
+            supervisorPath = authorizeMemberManagement(group, actor);
+        }
         requireRoundStatus(group.roundId(), RoundStatus.REGISTRATION_OPEN);
         requireActiveRoster(group);
-        if (!supervisorPath) {
+        if (!supervisorPath && !selfLeave) {
             requireMutableMembership(group, actor);
         }
-        String normalized = normalize(studentId);
         if (group.leaderStudentId().equals(normalized)) {
             throw conflict("LEADER_CANNOT_BE_REMOVED", "The group leader cannot be removed");
         }

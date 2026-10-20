@@ -120,6 +120,10 @@ export const en = {
           'This course is only open to students in the eligible academic cohort.',
         SUPERVISOR_CANNOT_CHAIR_COUNCIL:
           'A supervisor cannot serve as the council chair for their supervised topic.',
+        REVIEW_SCORE_REQUIRED:
+          'A counter-review (GVPB) score is required before finalizing council scores.',
+        REVIEW_SCORE_BELOW_THRESHOLD:
+          'The counter-review (GVPB) score must be at least 5.0 to be eligible for defense.',
         COUNCIL_SIZE_INVALID:
           'An evaluation council must consist of 3 to 5 members per academic regulations.',
         CREDIT_LIMIT_APPLICATION_EXISTS:
@@ -3048,6 +3052,10 @@ export const vi: I18nMessages = {
           'Học phần này chỉ mở cho sinh viên thuộc đúng niên khóa/chương trình đào tạo.',
         SUPERVISOR_CANNOT_CHAIR_COUNCIL:
           'Giảng viên hướng dẫn không được đảm nhiệm vị trí Chủ tịch hội đồng bảo vệ cho đề tài này.',
+        REVIEW_SCORE_REQUIRED:
+          'Cần có điểm chấm phản biện (GVPB) trước khi chốt điểm hội đồng.',
+        REVIEW_SCORE_BELOW_THRESHOLD:
+          'Điểm phản biện (GVPB) phải đạt từ 5.0 trở lên để đủ điều kiện bảo vệ.',
         COUNCIL_SIZE_INVALID:
           'Hội đồng đánh giá phải có từ 3 đến 5 thành viên theo quy chế.',
         CREDIT_LIMIT_APPLICATION_EXISTS:

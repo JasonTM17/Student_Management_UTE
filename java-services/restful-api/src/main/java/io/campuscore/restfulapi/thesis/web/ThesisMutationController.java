@@ -176,7 +176,7 @@ public class ThesisMutationController {
     }
 
     @PostMapping("/topics")
-    @PreAuthorize("hasAnyRole('ADMIN','TRUONG_KHOA','LECTURER','SUPER_ADMIN')")
+    @PreAuthorize("hasAnyRole('ADMIN','TRUONG_KHOA','TRUONG_BO_MON','LECTURER','SUPER_ADMIN')")
     public TopicResponse createTopic(
             @RequestBody TopicCreateRequest request,
             @AuthenticationPrincipal Jwt actor) {
@@ -184,7 +184,7 @@ public class ThesisMutationController {
     }
 
     @PutMapping("/topics/{id}")
-    @PreAuthorize("hasAnyRole('ADMIN','TRUONG_KHOA','LECTURER','SUPER_ADMIN')")
+    @PreAuthorize("hasAnyRole('ADMIN','TRUONG_KHOA','TRUONG_BO_MON','LECTURER','SUPER_ADMIN')")
     public TopicResponse updateTopic(
             @PathVariable UUID id,
             @RequestBody TopicUpdateRequest request,
@@ -206,7 +206,7 @@ public class ThesisMutationController {
 
     /** Brief R3: replace the topic's supervisor list (one or two lecturers). */
     @PutMapping("/topics/{id}/supervisors")
-    @PreAuthorize("hasAnyRole('ADMIN','TRUONG_KHOA','LECTURER','SUPER_ADMIN')")
+    @PreAuthorize("hasAnyRole('ADMIN','TRUONG_KHOA','TRUONG_BO_MON','LECTURER','SUPER_ADMIN')")
     public List<ThesisSupervisorService.SupervisorRow> setSupervisors(
             @PathVariable UUID id,
             @RequestBody Map<String, List<String>> request,
@@ -335,7 +335,7 @@ public class ThesisMutationController {
 
     /** Feedback item 7: download the attached document; same read matrix as the report metadata. */
     @GetMapping("/groups/{id}/report/file")
-    @PreAuthorize("hasAnyRole('STUDENT','ADMIN','TRUONG_KHOA','LECTURER','SUPER_ADMIN')")
+    @PreAuthorize("hasAnyRole('STUDENT','ADMIN','TRUONG_KHOA','TRUONG_BO_MON','LECTURER','SUPER_ADMIN')")
     public org.springframework.http.ResponseEntity<byte[]> downloadReportFile(
             @PathVariable UUID id,
             @AuthenticationPrincipal Jwt actor) {
@@ -356,7 +356,7 @@ public class ThesisMutationController {
 
     /** Download a repository artifact by its opaque report id. */
     @GetMapping("/reports/{id}/file")
-    @PreAuthorize("hasAnyRole('ADMIN','TRUONG_KHOA','LECTURER','SUPER_ADMIN')")
+    @PreAuthorize("hasAnyRole('ADMIN','TRUONG_KHOA','TRUONG_BO_MON','LECTURER','SUPER_ADMIN')")
     public org.springframework.http.ResponseEntity<byte[]> downloadRepositoryReportFile(
             @PathVariable UUID id,
             @AuthenticationPrincipal Jwt actor) {
@@ -376,13 +376,13 @@ public class ThesisMutationController {
     }
 
     @GetMapping("/groups/{id}/report")
-    @PreAuthorize("hasAnyRole('STUDENT','ADMIN','TRUONG_KHOA','LECTURER','SUPER_ADMIN')")
+    @PreAuthorize("hasAnyRole('STUDENT','ADMIN','TRUONG_KHOA','TRUONG_BO_MON','LECTURER','SUPER_ADMIN')")
     public ReportResponse getReport(@PathVariable UUID id, @AuthenticationPrincipal Jwt actor) {
         return reports.get(id, actor);
     }
 
     @GetMapping("/topics/{id}/report")
-    @PreAuthorize("hasAnyRole('STUDENT','ADMIN','TRUONG_KHOA','LECTURER','SUPER_ADMIN')")
+    @PreAuthorize("hasAnyRole('STUDENT','ADMIN','TRUONG_KHOA','TRUONG_BO_MON','LECTURER','SUPER_ADMIN')")
     public org.springframework.http.ResponseEntity<ReportResponse> getReportByTopic(@PathVariable UUID id, @AuthenticationPrincipal Jwt actor) {
         ReportResponse response = reports.getByTopic(id, actor);
         if (response == null) {
@@ -392,7 +392,7 @@ public class ThesisMutationController {
     }
 
     @GetMapping("/rounds/{id}/reports")
-    @PreAuthorize("hasAnyRole('ADMIN','TRUONG_KHOA','LECTURER','SUPER_ADMIN')")
+    @PreAuthorize("hasAnyRole('ADMIN','TRUONG_KHOA','TRUONG_BO_MON','LECTURER','SUPER_ADMIN')")
     public List<ReportResponse> listReportsByRound(
             @PathVariable UUID id,
             @AuthenticationPrincipal Jwt actor) {
@@ -400,7 +400,7 @@ public class ThesisMutationController {
     }
 
     @GetMapping("/rounds/{id}/repository")
-    @PreAuthorize("hasAnyRole('ADMIN','TRUONG_KHOA','LECTURER','SUPER_ADMIN')")
+    @PreAuthorize("hasAnyRole('ADMIN','TRUONG_KHOA','TRUONG_BO_MON','LECTURER','SUPER_ADMIN')")
     public List<RepositoryReportResponse> listRepository(
             @PathVariable UUID id,
             @AuthenticationPrincipal Jwt actor) {

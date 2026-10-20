@@ -58,7 +58,7 @@ public class ThesisCouncilController {
 
     @Operation(summary = "Danh sách hội đồng theo đợt khóa luận", description = "Truy xuất danh sách tất cả các hội đồng bảo vệ trong một đợt khóa luận (giảng viên chỉ thấy hội đồng mình là thành viên)")
     @GetMapping("/councils")
-    @PreAuthorize("hasAnyRole('ADMIN','TRUONG_KHOA','SUPER_ADMIN','LECTURER')")
+    @PreAuthorize("hasAnyRole('ADMIN','TRUONG_KHOA','TRUONG_BO_MON','SUPER_ADMIN','LECTURER')")
     public List<CouncilResponse> listCouncils(@Parameter(description = "Mã UUID của đợt", required = true) @RequestParam UUID roundId,
             @AuthenticationPrincipal Jwt actor) {
         return councils.listByRoundForActor(roundId, actor);
@@ -66,7 +66,7 @@ public class ThesisCouncilController {
 
     @Operation(summary = "Xem chi tiết một hội đồng", description = "Truy xuất thông tin chi tiết một hội đồng: danh sách giảng viên thành viên và đề tài được phân công (chỉ thành viên hội đồng hoặc cán bộ quản lý)")
     @GetMapping("/councils/{id}")
-    @PreAuthorize("hasAnyRole('ADMIN','TRUONG_KHOA','SUPER_ADMIN','LECTURER')")
+    @PreAuthorize("hasAnyRole('ADMIN','TRUONG_KHOA','TRUONG_BO_MON','SUPER_ADMIN','LECTURER')")
     public CouncilResponse getCouncil(@Parameter(description = "Mã UUID của hội đồng", required = true) @PathVariable UUID id,
             @AuthenticationPrincipal Jwt actor) {
         return councils.readCouncil(id, actor);
@@ -144,7 +144,7 @@ public class ThesisCouncilController {
         @ApiResponse(responseCode = "403", description = "Không có quyền truy cập")
     })
     @GetMapping("/councils/{councilId}/topics/{topicId}/scores")
-    @PreAuthorize("hasAnyRole('ADMIN','TRUONG_KHOA','LECTURER','SUPER_ADMIN')")
+    @PreAuthorize("hasAnyRole('ADMIN','TRUONG_KHOA','TRUONG_BO_MON','LECTURER','SUPER_ADMIN')")
     public List<ScoreResponse> listScores(
             @Parameter(description = "Mã UUID của hội đồng", required = true) @PathVariable UUID councilId,
             @Parameter(description = "Mã UUID của đề tài", required = true) @PathVariable UUID topicId,

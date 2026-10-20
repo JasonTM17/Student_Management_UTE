@@ -1077,18 +1077,13 @@ export const thesisApi = {
     councilId: string,
     topicId: string,
   ): Promise<ThesisCouncilScore[]> => {
-    try {
-      const response = await api.get<ThesisCouncilScore[]>(
-        '/thesis/councils/' + councilId + '/topics/' + topicId + '/scores',
-      );
-      return response.data;
-    } catch (err: unknown) {
-      const status = (err as { response?: { status?: number } })?.response?.status;
-      if (status === 403 || status === 404 || status === 204) {
-        return [];
-      }
-      throw err;
-    }
+    // Errors must reach the caller: converting a denied or missing score list
+    // into [] reads as "nobody graded yet" and hides real outages behind the
+    // same rendering as a genuinely empty list.
+    const response = await api.get<ThesisCouncilScore[]>(
+      '/thesis/councils/' + councilId + '/topics/' + topicId + '/scores',
+    );
+    return response.data;
   },
 
   finalizeScores: async (

@@ -4,6 +4,7 @@ import { Check, ExternalLink, FileDown, FileText, Shield, Users } from 'lucide-r
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
+import { ErrorState } from '@/components/ui/state-block';
 import type { I18nMessages } from '@/i18n/messages';
 import type { Lecturer } from '@/types/api';
 import {
@@ -21,6 +22,10 @@ interface CouncilDefenseWorkspaceProps {
   myLecturerId: string;
   topics: ThesisTopic[];
   lecturers: Lecturer[];
+  /** Localized message while the council listing itself failed; an outage is
+   * not an empty council list. */
+  councilLoadError?: string;
+  onRetryCouncils?: () => void;
   councilScores: Record<string, ThesisCouncilScore[]>;
   /** Keys whose score list failed to load — distinct from an empty list. */
   councilScoreErrors: Record<string, boolean>;
@@ -43,6 +48,10 @@ interface CouncilDefenseWorkspaceProps {
   ) => void | Promise<void>;
 }
 
+/** Mirrors ThesisCouncilService.MIN_COUNCIL_SIZE: a finalize needs at least
+ * three eligible graders. */
+const MIN_ELIGIBLE_GRADERS = 3;
+
 /** Council defense grading workspace (R6-R8); every mutation is owned by the page. */
 export default function CouncilDefenseWorkspace({
   messages,
@@ -50,6 +59,8 @@ export default function CouncilDefenseWorkspace({
   myLecturerId,
   topics,
   lecturers,
+  councilLoadError,
+  onRetryCouncils,
   councilScores,
   councilScoreErrors,
   topicSupervisors,
@@ -83,6 +94,14 @@ export default function CouncilDefenseWorkspace({
         </div>
       </CardHeader>
       <CardContent className="space-y-6">
+        {councilLoadError ? (
+          <ErrorState
+            title={messages.thesis.grading.title}
+            description={councilLoadError}
+            onRetry={onRetryCouncils}
+            className="min-h-0"
+          />
+        ) : null}
         {showProfileClaimNotice ? (
           <p className="rounded-lg border border-status-warning/30 bg-status-warning/10 px-4 py-3 text-sm text-foreground">
             {profileClaimMissingLabel}
@@ -146,15 +165,33 @@ export default function CouncilDefenseWorkspace({
                     // topic.createdBy must not count — the creator can be
                     // removed as supervisor yet stays required for
                     // finalize, which would wedge the score count.
-                    const eligibleGraderCount = (council.members || []).filter(
-                      (m) => !sups.includes(m.lecturerId),
-                    ).length;
-                    const submittedCount = scores.length;
+                    const eligibleGraderIds = new Set(
+                      (council.members || [])
+                        .filter((m) => !sups.includes(m.lecturerId))
+                        .map((m) => m.lecturerId),
+                    );
+                    const eligibleGraderCount = eligibleGraderIds.size;
+                    // Only unique DEFENSE rows from eligible members count —
+                    // GVPB reviews, non-member submissions and duplicates must
+                    // not inflate the total (backend
+                    // submittedEligibleScoreCount does the same).
+                    const submittedCount = new Set(
+                      scores
+                        .filter(
+                          (s): s is ThesisCouncilScore & { lecturerId: string } =>
+                            s.component === 'DEFENSE' &&
+                            s.lecturerId != null &&
+                            eligibleGraderIds.has(s.lecturerId),
+                        )
+                        .map((s) => s.lecturerId),
+                    ).size;
                     const canFinalize =
                       isChair &&
+                      !isSupervisor &&
                       !isFinalized &&
-                      submittedCount >= eligibleGraderCount &&
-                      eligibleGraderCount > 0;
+                      !scoresFailed &&
+                      eligibleGraderCount >= MIN_ELIGIBLE_GRADERS &&
+                      submittedCount >= eligibleGraderCount;
 
                     return (
                       <div
@@ -330,11 +367,13 @@ export default function CouncilDefenseWorkspace({
                         {isChair && !isFinalized && !scoresFailed && (
                           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-t border-border/40 pt-3">
                             <p className="text-xs text-muted-foreground">
-                              {submittedCount >= eligibleGraderCount
+                              {canFinalize
                                 ? messages.thesis.grading.readyToFinalize
-                                : messages.thesis.grading.waitingGrades
-                                    .replace('{submitted}', String(submittedCount))
-                                    .replace('{total}', String(eligibleGraderCount))}
+                                : eligibleGraderCount < MIN_ELIGIBLE_GRADERS
+                                  ? messages.common.campusErrors.codes.COUNCIL_SIZE_INVALID
+                                  : messages.thesis.grading.waitingGrades
+                                      .replace('{submitted}', String(submittedCount))
+                                      .replace('{total}', String(eligibleGraderCount))}
                             </p>
                             <Button
                               type="button"
