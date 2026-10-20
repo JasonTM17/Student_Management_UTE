@@ -58,13 +58,19 @@ public class ThesisGroupReadRepository {
 
     /** Groups whose topic the lecturer supervises, across every round. */
     public List<GroupResponse> findBySupervisorId(String lecturerId) {
+        // Resolve the lecturer profile then match either stored key form; a
+        // deactivated supervisor must lose read authority like write power.
         List<GroupRow> rows = jdbc.query(
                 "SELECT g.id, g.round_id, g.leader_student_id, g.topic_id, g.status, "
                         + "g.approval_status, g.rejection_reason FROM thesis.thesis_group g "
                         + "JOIN thesis.thesis_topic t ON t.id = g.topic_id "
                         + "WHERE EXISTS ("
                         + "  SELECT 1 FROM thesis.thesis_topic_supervisor ts "
-                        + "  WHERE ts.topic_id = t.id AND ts.lecturer_id = :lecturerId) "
+                        + "  JOIN campuscore_auth.\"Lecturer\" l "
+                        + "    ON (l.\"id\" = :lecturerId OR l.\"userId\" = :lecturerId) "
+                        + "   AND l.\"isActive\" = TRUE "
+                        + "   AND (ts.lecturer_id = l.\"id\" OR ts.lecturer_id = l.\"userId\") "
+                        + "  WHERE ts.topic_id = t.id) "
                         + "ORDER BY g.created_at DESC, g.id",
                 new MapSqlParameterSource("lecturerId", lecturerId),
                 ThesisGroupReadRepository::row);
@@ -79,7 +85,11 @@ public class ThesisGroupReadRepository {
                         + "JOIN thesis.thesis_topic t ON t.id = g.topic_id "
                         + "WHERE g.round_id = :roundId AND EXISTS ("
                         + "  SELECT 1 FROM thesis.thesis_topic_supervisor ts "
-                        + "  WHERE ts.topic_id = t.id AND ts.lecturer_id = :lecturerId) "
+                        + "  JOIN campuscore_auth.\"Lecturer\" l "
+                        + "    ON (l.\"id\" = :lecturerId OR l.\"userId\" = :lecturerId) "
+                        + "   AND l.\"isActive\" = TRUE "
+                        + "   AND (ts.lecturer_id = l.\"id\" OR ts.lecturer_id = l.\"userId\") "
+                        + "  WHERE ts.topic_id = t.id) "
                         + "ORDER BY g.created_at DESC, g.id",
                 new MapSqlParameterSource("roundId", roundId).addValue("lecturerId", lecturerId),
                 ThesisGroupReadRepository::row);
@@ -191,8 +201,12 @@ public class ThesisGroupReadRepository {
 
     public boolean isTopicSupervisedBy(UUID topicId, String lecturerId) {
         Integer count = jdbc.queryForObject(
-                "SELECT COUNT(*) FROM thesis.thesis_topic_supervisor "
-                        + "WHERE topic_id = :topicId AND lecturer_id = :lecturerId",
+                "SELECT COUNT(*) FROM thesis.thesis_topic_supervisor ts "
+                        + "JOIN campuscore_auth.\"Lecturer\" l "
+                        + "  ON (l.\"id\" = :lecturerId OR l.\"userId\" = :lecturerId) "
+                        + " AND l.\"isActive\" = TRUE "
+                        + " AND (ts.lecturer_id = l.\"id\" OR ts.lecturer_id = l.\"userId\") "
+                        + "WHERE ts.topic_id = :topicId",
                 new MapSqlParameterSource("topicId", topicId).addValue("lecturerId", lecturerId),
                 Integer.class);
         return count != null && count > 0;

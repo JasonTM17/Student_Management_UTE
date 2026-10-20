@@ -24,6 +24,7 @@ import {
   type ThesisRound,
   type ThesisTopic,
 } from '@/lib/thesis-api';
+import { plainTextThesisDescription } from '@/lib/thesis-text';
 
 export default function ThesisRoundDetailPage() {
   const { roundId } = useParams<{ roundId: string }>();
@@ -142,7 +143,7 @@ export default function ThesisRoundDetailPage() {
                       <h3 className="text-sm font-semibold leading-6 text-foreground">{topic.title}</h3>
                       <StatusBadge status={topic.status} />
                     </div>
-                    <p className="mt-2 line-clamp-3 text-sm leading-6 text-muted-foreground" title={topic.description}>{topic.description}</p>
+                    <p className="mt-2 line-clamp-3 text-sm leading-6 text-muted-foreground" title={plainTextThesisDescription(topic.description)}>{plainTextThesisDescription(topic.description)}</p>
                     <p className="mt-3 text-xs text-muted-foreground">
                       {messages.thesis.detail.maxGroups}: {topic.maxGroups}
                     </p>

@@ -38,6 +38,7 @@ import {
 import { StatusBadge } from '@/components/thesis/StatusBadge';
 import { useI18n } from '@/i18n';
 import { fetchAllPages, lecturersApi } from '@/lib/api';
+import { campusCodeMessage } from '@/lib/campus-error';
 import type { Lecturer } from '@/types/api';
 import {
   thesisApi,
@@ -220,18 +221,8 @@ export default function AdminThesisPage() {
    * actionFailed line. Surface the codes that already carry translated copy
    * (common.campusErrors.codes) and keep the generic fallback for the rest.
    */
-  const transitionErrorMessage = (err: unknown): string => {
-    const { codes } = messages.common.campusErrors;
-    const code = getThesisErrorCode(err);
-    if (code === 'SCORES_INCOMPLETE') return codes.SCORES_INCOMPLETE;
-    if (code === 'RESULTS_NOT_READY') return codes.RESULTS_NOT_READY;
-    if (code === 'RESULTS_NOT_PUBLISHED') return codes.RESULTS_NOT_PUBLISHED;
-    if (code === 'GROUP_APPROVAL_STATE_CONFLICT') return codes.GROUP_APPROVAL_STATE_CONFLICT;
-    if (code === 'ROUND_STATE_CONFLICT') return codes.ROUND_STATE_CONFLICT;
-    if (code === 'GROUP_STATE_CONFLICT') return codes.GROUP_STATE_CONFLICT;
-    if (code === 'VALIDATION_ERROR') return codes.VALIDATION_ERROR;
-    return messages.thesis.actionFailed;
-  };
+  const transitionErrorMessage = (err: unknown): string =>
+    campusCodeMessage(err, messages.common.campusErrors, messages.thesis.actionFailed);
 
   const handleCreateCouncil = async (roundId: string) => {
     if (!councilNameInput.trim()) return;
@@ -280,6 +271,14 @@ export default function AdminThesisPage() {
   };
 
   const handleRemoveMember = async (councilId: string, lecturerId: string, roundId: string) => {
+    const confirmed = await confirm({
+      title: messages.thesis.councils.removeMember,
+      message: messages.thesis.councils.removeMemberConfirm,
+      confirmText: messages.common.actions.confirm,
+      cancelText: messages.common.actions.cancel,
+      variant: 'destructive',
+    });
+    if (!confirmed) return;
     setIsSaving(true);
     setError('');
     setSuccess('');
@@ -288,8 +287,8 @@ export default function AdminThesisPage() {
       setSuccess(messages.thesis.councils.memberRemovedSuccess);
       const c = await thesisApi.listCouncils(roundId);
       if (expandedRoundRef.current === roundId) setCouncils(c);
-    } catch {
-      setError(messages.thesis.actionFailed);
+    } catch (err: unknown) {
+      setError(transitionErrorMessage(err));
     } finally {
       setIsSaving(false);
     }
@@ -307,8 +306,8 @@ export default function AdminThesisPage() {
       setShowAssignTopicModal(false);
       const c = await thesisApi.listCouncils(roundId);
       if (expandedRoundRef.current === roundId) setCouncils(c);
-    } catch {
-      setError(messages.thesis.actionFailed);
+    } catch (assignErr) {
+      setError(campusCodeMessage(assignErr, messages.common.campusErrors, messages.thesis.actionFailed));
     } finally {
       setIsSaving(false);
     }
@@ -1431,8 +1430,14 @@ export default function AdminThesisPage() {
                 allAssigned.add(tid);
               }
             }
+            // The backend only accepts PUBLISHED/APPROVED topics — the merged
+            // detail list also carries DRAFT proposals for review, and showing
+            // one here just produced a guaranteed TOPIC_NOT_PUBLISHED 409.
             const assignableTopics = topics.filter(
-              (t) => !allAssigned.has(t.id) && t.finalScore == null
+              (t) =>
+                !allAssigned.has(t.id) &&
+                t.finalScore == null &&
+                (t.status === 'PUBLISHED' || t.status === 'APPROVED')
             );
 
             return (

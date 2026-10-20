@@ -574,6 +574,24 @@ public class ThesisMutationService {
         return response;
     }
 
+    /**
+     * Runs the fan-out only after the mutation commits: the notifier methods
+     * run REQUIRES_NEW, so an in-transaction call would still publish a
+     * notification for a change a later rollback erased.
+     */
+    private void afterCommit(Runnable action) {
+        if (TransactionSynchronizationManager.isSynchronizationActive()) {
+            TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+                @Override
+                public void afterCommit() {
+                    action.run();
+                }
+            });
+        } else {
+            action.run();
+        }
+    }
+
     private void sendPublishedResults(UUID roundId) {
         // Both channels read the committed result state. A failed inbox write
         // must not suppress email, and neither failure can undo publication.
@@ -972,13 +990,20 @@ public class ThesisMutationService {
             // first so the downgrade leaves a review trail.
             throw conflict("GROUP_STATE_CONFLICT", "An approved group cannot change its topic");
         }
-        Map<String, Object> topic = one("SELECT id, round_id, status, max_groups, department_id FROM thesis.thesis_topic WHERE id = :id FOR UPDATE", params().addValue("id", topicId), "TOPIC_NOT_FOUND", "Thesis topic not found");
+        Map<String, Object> topic = one("SELECT id, round_id, status, max_groups, department_id, final_score FROM thesis.thesis_topic WHERE id = :id FOR UPDATE", params().addValue("id", topicId), "TOPIC_NOT_FOUND", "Thesis topic not found");
         ThesisDeanScope.requireTopicAccess(jdbc, actor, topicId);
         if (!group.roundId().equals(topic.get("round_id"))) {
             throw conflict("TOPIC_ROUND_MISMATCH", "Topic belongs to another registration round");
         }
         if (!TopicStatus.PUBLISHED.name().equals(topic.get("status")) && !TopicStatus.APPROVED.name().equals(topic.get("status"))) {
             throw conflict("TOPIC_NOT_PUBLISHED", "Only published topics can be selected");
+        }
+        // A finalized topic must not absorb a new group: the publication gate
+        // counts every approved group under it as graded, so a late assignee
+        // would inherit a defense score it never earned.
+        if (topic.get("final_score") != null && !topicId.equals(group.topicId())) {
+            throw conflict("TOPIC_ALREADY_GRADED",
+                    "This topic's defense score is finalized; it cannot accept another group");
         }
         int maxGroups = ((Number) topic.get("max_groups")).intValue();
         boolean alreadyOccupiesSlot = topicId.equals(group.topicId()) && group.approvalStatus() != ApprovalStatus.REJECTED;
@@ -993,11 +1018,13 @@ public class ThesisMutationService {
         audit.record(subject(actor), null, "THESIS_GROUP_TOPIC_ASSIGNED", "THESIS_GROUP", groupId.toString(),
                 "Thesis topic " + topicId + " assigned to group");
         if (notifier != null && isNewTopic) {
-            try {
-                notifier.notifyTopicAssigned(groupId, topicId);
-            } catch (RuntimeException exception) {
-                log.warn("Thesis topic-assigned notification fan-out failed for group {}", groupId, exception);
-            }
+            afterCommit(() -> {
+                try {
+                    notifier.notifyTopicAssigned(groupId, topicId);
+                } catch (RuntimeException exception) {
+                    log.warn("Thesis topic-assigned notification fan-out failed for group {}", groupId, exception);
+                }
+            });
         }
         return groups.findById(groupId);
     }
@@ -1008,7 +1035,7 @@ public class ThesisMutationService {
      * @param groupId group whose progress changes
      * @param request progress status, restricted to {@code DRAFT}, {@code SUBMITTED},
      *         {@code COMPLETED}, or {@code CANCELLED}
-     * @param actor caller JWT; the leader, a supervisor, or an admin
+     * @param actor caller JWT; the leader or an admin
      * @return the group with its new progress status
      * @throws DomainException with code VALIDATION_ERROR for a missing or unsupported status, or
      *         GROUP_STATUS_INVALID when an approved group does something other than complete, or a
@@ -1093,6 +1120,17 @@ public class ThesisMutationService {
         if (group.status() != GroupStatus.SUBMITTED || group.topicId() == null) {
             throw conflict("GROUP_APPROVAL_STATE_CONFLICT", "Only a submitted group with a topic can be approved");
         }
+        // Approving a group under a topic whose defense score is already
+        // finalized lets that group inherit a grade it never defended for —
+        // the same wedge assignTopic blocks upstream.
+        Object finalizedScore = one(
+                "SELECT final_score FROM thesis.thesis_topic WHERE id = :id",
+                params().addValue("id", group.topicId()), "TOPIC_NOT_FOUND", "Thesis topic not found")
+                .get("final_score");
+        if (finalizedScore != null) {
+            throw conflict("TOPIC_ALREADY_GRADED",
+                    "This topic's defense score is finalized; new groups can no longer be approved for it");
+        }
         Integer memberCount = count("SELECT COUNT(*) FROM thesis.thesis_group_member WHERE group_id = :groupId", "groupId", groupId);
         if (memberCount == null || memberCount < MIN_GROUP_MEMBERS) {
             int present = memberCount == null ? 0 : memberCount;
@@ -1125,11 +1163,13 @@ public class ThesisMutationService {
         audit.record(subject(actor), null, "THESIS_GROUP_APPROVED", "THESIS_GROUP", groupId.toString(),
                 "Thesis group approved");
         if (notifier != null) {
-            try {
-                notifier.notifyGroupDecision(groupId, true, null);
-            } catch (RuntimeException exception) {
-                log.warn("Thesis group-approval notification fan-out failed for group {}", groupId, exception);
-            }
+            afterCommit(() -> {
+                try {
+                    notifier.notifyGroupDecision(groupId, true, null);
+                } catch (RuntimeException exception) {
+                    log.warn("Thesis group-approval notification fan-out failed for group {}", groupId, exception);
+                }
+            });
         }
         return groups.findById(groupId);
     }
@@ -1165,11 +1205,14 @@ public class ThesisMutationService {
         audit.record(subject(actor), null, "THESIS_GROUP_REJECTED", "THESIS_GROUP", groupId.toString(),
                 "Thesis group rejected; reason: " + reason);
         if (notifier != null) {
-            try {
-                notifier.notifyGroupDecision(groupId, false, reason);
-            } catch (RuntimeException exception) {
-                log.warn("Thesis group-rejection notification fan-out failed for group {}", groupId, exception);
-            }
+            String notifyReason = reason;
+            afterCommit(() -> {
+                try {
+                    notifier.notifyGroupDecision(groupId, false, notifyReason);
+                } catch (RuntimeException exception) {
+                    log.warn("Thesis group-rejection notification fan-out failed for group {}", groupId, exception);
+                }
+            });
         }
         return groups.findById(groupId);
     }
@@ -1191,9 +1234,12 @@ public class ThesisMutationService {
         if (normalized.length() < 2) {
             return List.of();
         }
+        // Teammate search only matters while a round actually accepts roster
+        // changes (addMember requires REGISTRATION_OPEN); outside that window
+        // the directory stays off instead of answering lookups it cannot serve.
         Integer liveRounds = jdbc.queryForObject(
                 "SELECT COUNT(*) FROM thesis.thesis_registration_round"
-                        + " WHERE status IN ('DRAFT', 'PROPOSAL_OPEN', 'PROPOSALS_PUBLISHED', 'REGISTRATION_OPEN', 'REGISTRATION_CLOSED')",
+                        + " WHERE status = 'REGISTRATION_OPEN'",
                 params(),
                 Integer.class);
         if (liveRounds == null || liveRounds == 0) {
@@ -1210,10 +1256,11 @@ public class ThesisMutationService {
         for (int i = 0; i < tokens.size(); i++) {
             String paramName = "token" + i;
             searchParams.addValue(paramName, tokens.get(i));
+            // Search covers student number and names only — an email predicate
+            // would double as an existence oracle for student addresses.
             tokenPredicates.append(" AND (TRANSLATE(LOWER(s.\"studentId\"), :foldFrom, :foldTo) LIKE :").append(paramName).append(" ESCAPE '\\'")
                     .append(" OR TRANSLATE(LOWER(u.\"firstName\"), :foldFrom, :foldTo) LIKE :").append(paramName).append(" ESCAPE '\\'")
-                    .append(" OR TRANSLATE(LOWER(u.\"lastName\"), :foldFrom, :foldTo) LIKE :").append(paramName).append(" ESCAPE '\\'")
-                    .append(" OR TRANSLATE(LOWER(COALESCE(u.\"email\", '')), :foldFrom, :foldTo) LIKE :").append(paramName).append(" ESCAPE '\\')");
+                    .append(" OR TRANSLATE(LOWER(u.\"lastName\"), :foldFrom, :foldTo) LIKE :").append(paramName).append(" ESCAPE '\\')");
         }
         return jdbc.query(
                 "SELECT s.\"id\", s.\"studentId\" AS student_number, u.\"firstName\", u.\"lastName\","
@@ -1265,6 +1312,11 @@ public class ThesisMutationService {
         String lecturerId = normalize(actor == null ? null : actor.getClaimAsString("lecturerId"));
         if (isLecturer(actor) && !lecturerId.isBlank() && group.topicId() != null
                 && isSupervisorOf(group.topicId(), lecturerId)) {
+            // Supervisors may complete a roster after faculty approval, but a
+            // completed group is done — its roster must be final.
+            if (group.status() == GroupStatus.COMPLETED) {
+                throw conflict("GROUP_STATE_CONFLICT", "A completed group's roster is final");
+            }
             return true;
         }
         if (!group.leaderStudentId().equals(studentId(actor))) {

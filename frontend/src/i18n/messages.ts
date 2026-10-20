@@ -159,6 +159,68 @@ export const en = {
         RESULTS_NOT_PUBLISHED: 'Results for this round have not been published yet.',
         SCORE_ALREADY_FINALIZED: 'That score is already finalized.',
         SUPERVISOR_CANNOT_GRADE: 'A supervisor cannot score the group they supervise.',
+        TOPIC_ALREADY_GRADED: "This topic's defense score is already finalized.",
+        GROUPS_PENDING_APPROVAL:
+          'Some groups are still awaiting approval; approve or reject them first.',
+        // Thesis councils & reviewers
+        COUNCIL_NOT_FOUND: 'Defense council not found.',
+        COUNCIL_ADMIN_REQUIRED: 'Only a faculty head or administrator can perform this action.',
+        COUNCIL_MEMBER_REQUIRED: 'Only a council member can perform this action.',
+        COUNCIL_SCORE_ACCESS_REQUIRED:
+          'Only council members or governance staff can view these scores.',
+        COUNCIL_MEMBER_EXISTS: 'This lecturer already sits on the council.',
+        COUNCIL_MEMBER_NOT_FOUND: 'That council member was not found.',
+        COUNCIL_CHAIR_REQUIRED:
+          'The council chair cannot leave while the council has assigned topics.',
+        COUNCIL_SECRETARY_REQUIRED:
+          'The council secretary cannot leave while the council has assigned topics.',
+        COUNCIL_INCOMPLETE:
+          'The council roster is incomplete or the seat order does not match.',
+        COUNCIL_STATE_CONFLICT: 'This council is not in a state that allows that action.',
+        TOPIC_NOT_FOUND: 'Thesis topic not found.',
+        TOPIC_NOT_PUBLISHED: 'Only published topics can be used for this action.',
+        TOPIC_ROUND_MISMATCH: 'The topic belongs to a different round.',
+        TOPIC_ALREADY_ASSIGNED: 'This topic is already assigned to a council.',
+        TOPIC_FULL: 'This topic has reached its group limit.',
+        TOPIC_NOT_ASSIGNED: 'This topic has not been assigned to a council.',
+        TOPIC_IN_USE: 'This topic is in use and cannot be changed.',
+        TOPIC_STATE_CONFLICT: 'This topic is not in a state that allows that action.',
+        TOPIC_APPROVER_REQUIRED: 'Only an authorized approver can perform this action.',
+        TOPIC_SUPERVISOR_REQUIRED: 'Only an assigned supervisor can perform this action.',
+        REVIEWER_MUST_BE_INDEPENDENT:
+          'The counter-reviewer cannot sit on the defense council for this topic.',
+        REVIEWER_REQUIRED: 'Only the assigned counter-reviewer can perform this action.',
+        SUPERVISOR_CANNOT_REVIEW: 'A topic supervisor cannot be its counter-reviewer.',
+        GVPB_SCORE_SUBMITTED:
+          'The counter-reviewer already submitted a score; the assignment is frozen.',
+        GVPB_DEADLINE_PASSED: 'The counter-review deadline has passed.',
+        GROUP_REVIEWER_REQUIRED: 'Only an assigned supervisor or admin can review this group.',
+        GROUP_TOO_LARGE: 'The group exceeds the maximum member limit.',
+        GROUP_LEADER_INVALID: 'The group needs exactly one valid leader.',
+        LECTURER_PROFILE_REQUIRED: 'An active lecturer profile is required.',
+        FACULTY_PROFILE_REQUIRED:
+          'An active lecturer profile bound to the faculty head is required.',
+        COUNCIL_ROLE_REQUIRED: 'A council seat needs a valid role.',
+        FACULTY_SCOPE_UNAVAILABLE:
+          'Your faculty scope could not be resolved for this action.',
+        GROUP_INVALID_MEMBER_COUNT: 'The group roster size is outside the allowed bounds.',
+        GROUP_NOT_APPROVED:
+          'The topic needs an approved group before this step can run.',
+        GROUP_STATUS_INVALID: 'This status change is not allowed for the group.',
+        LECTURER_OR_STAFF_REQUIRED: 'Only a lecturer or governance staff can do this.',
+        LECTURER_WINDOW_CLOSED: 'The lecturer proposal window has closed.',
+        LECTURER_WINDOW_NOT_OPEN: 'The lecturer proposal window has not opened yet.',
+        MEMBER_NOT_FOUND: 'The group member could not be found.',
+        REGISTRATION_WINDOW_NOT_OPEN: 'Group registration has not opened yet.',
+        REPORT_FILE_NOT_FOUND: 'The stored report file is no longer available.',
+        ROUND_NOT_ACCEPTING_PROPOSALS: 'This round is not accepting topic proposals.',
+        ROUND_NOT_FOUND: 'The registration round could not be found.',
+        SCORES_REQUIRED: 'Scores are required before this step can run.',
+        STUDENT_PROFILE_REQUIRED: 'An active student profile is required.',
+        SUPERVISOR_STATE_CONFLICT: 'The supervisor list conflicts with this action.',
+        THESIS_GROUP_NOT_FOUND: 'The thesis group could not be found.',
+        TOPIC_DEPARTMENT_FORBIDDEN: 'This topic belongs to another department.',
+        TOPIC_OWNER_REQUIRED: 'Only the topic owner or an approver can do this.',
         // Grades
         GRADES_PUBLISHED_LOCKED: 'Published grades are locked and can no longer be edited.',
         GRADE_COMPONENTS_INCOMPLETE:
@@ -2392,6 +2454,8 @@ export const en = {
       assignSuccess: 'Topic assigned to council successfully.',
       memberAddedSuccess: 'Council member added successfully.',
       memberRemovedSuccess: 'Council member removed.',
+      removeMemberConfirm:
+        'Remove this lecturer from the council? Assigned topics may lose a grader.',
       councilCreatedSuccess: 'Defense council created successfully.',
       councilSeatOrderHint: 'Required seat order: 1st Chair, 2nd Secretary, then 3-5 Members.',
       councilCompleteBadge: 'Ready (3-5 members)',
@@ -3023,6 +3087,68 @@ export const vi: I18nMessages = {
         RESULTS_NOT_PUBLISHED: 'Kết quả của đợt này chưa được công bố.',
         SCORE_ALREADY_FINALIZED: 'Điểm này đã được chốt.',
         SUPERVISOR_CANNOT_GRADE: 'Giảng viên hướng dẫn không chấm điểm nhóm mình hướng dẫn.',
+        TOPIC_ALREADY_GRADED: 'Điểm bảo vệ của đề tài này đã được chốt.',
+        GROUPS_PENDING_APPROVAL:
+          'Vẫn còn nhóm đang chờ duyệt; hãy duyệt hoặc từ chối trước khi tiếp tục.',
+        // Hội đồng và phản biện
+        COUNCIL_NOT_FOUND: 'Không tìm thấy hội đồng bảo vệ.',
+        COUNCIL_ADMIN_REQUIRED: 'Chỉ trưởng khoa hoặc quản trị viên mới được thực hiện thao tác này.',
+        COUNCIL_MEMBER_REQUIRED: 'Chỉ thành viên hội đồng mới được thực hiện thao tác này.',
+        COUNCIL_SCORE_ACCESS_REQUIRED:
+          'Chỉ thành viên hội đồng hoặc cán bộ quản lý mới được xem điểm này.',
+        COUNCIL_MEMBER_EXISTS: 'Giảng viên này đã có trong hội đồng.',
+        COUNCIL_MEMBER_NOT_FOUND: 'Không tìm thấy thành viên hội đồng.',
+        COUNCIL_CHAIR_REQUIRED:
+          'Chủ tịch hội đồng không thể rời khi hội đồng đã được phân đề tài.',
+        COUNCIL_SECRETARY_REQUIRED:
+          'Thư ký hội đồng không thể rời khi hội đồng đã được phân đề tài.',
+        COUNCIL_INCOMPLETE:
+          'Danh sách hội đồng chưa đầy đủ hoặc thứ tự ghế không đúng.',
+        COUNCIL_STATE_CONFLICT: 'Hội đồng hiện không ở trạng thái cho phép thao tác này.',
+        TOPIC_NOT_FOUND: 'Không tìm thấy đề tài.',
+        TOPIC_NOT_PUBLISHED: 'Chỉ đề tài đã công bố mới được dùng cho thao tác này.',
+        TOPIC_ROUND_MISMATCH: 'Đề tài thuộc một đợt đăng ký khác.',
+        TOPIC_ALREADY_ASSIGNED: 'Đề tài này đã được phân cho một hội đồng.',
+        TOPIC_FULL: 'Đề tài này đã đủ số nhóm đăng ký.',
+        TOPIC_NOT_ASSIGNED: 'Đề tài này chưa được phân cho hội đồng nào.',
+        TOPIC_IN_USE: 'Đề tài đang được sử dụng và không thể thay đổi.',
+        TOPIC_STATE_CONFLICT: 'Đề tài hiện không ở trạng thái cho phép thao tác này.',
+        TOPIC_APPROVER_REQUIRED: 'Chỉ người có thẩm quyền mới được thực hiện thao tác này.',
+        TOPIC_SUPERVISOR_REQUIRED: 'Chỉ giảng viên hướng dẫn được phân công mới được thực hiện thao tác này.',
+        REVIEWER_MUST_BE_INDEPENDENT:
+          'Giảng viên phản biện không được ngồi trong hội đồng bảo vệ cùng đề tài.',
+        REVIEWER_REQUIRED: 'Chỉ giảng viên phản biện được phân công mới được thực hiện thao tác này.',
+        SUPERVISOR_CANNOT_REVIEW: 'Giảng viên hướng dẫn không thể làm phản biện chính đề tài mình.',
+        GVPB_SCORE_SUBMITTED:
+          'Giảng viên phản biện đã nộp điểm; phân công này đã bị khóa.',
+        GVPB_DEADLINE_PASSED: 'Đã quá hạn chấm phản biện.',
+        GROUP_REVIEWER_REQUIRED: 'Chỉ giảng viên hướng dẫn được phân công hoặc quản trị viên mới được duyệt nhóm này.',
+        GROUP_TOO_LARGE: 'Nhóm vượt quá số thành viên tối đa.',
+        GROUP_LEADER_INVALID: 'Nhóm cần đúng một nhóm trưởng hợp lệ.',
+        LECTURER_PROFILE_REQUIRED: 'Cần hồ sơ giảng viên đang hoạt động.',
+        FACULTY_PROFILE_REQUIRED:
+          'Cần hồ sơ giảng viên đang hoạt động gắn với trưởng khoa.',
+        COUNCIL_ROLE_REQUIRED: 'Ghế hội đồng cần một vai trò hợp lệ.',
+        FACULTY_SCOPE_UNAVAILABLE:
+          'Không xác định được phạm vi khoa của bạn cho thao tác này.',
+        GROUP_INVALID_MEMBER_COUNT: 'Số thành viên nhóm nằm ngoài giới hạn cho phép.',
+        GROUP_NOT_APPROVED:
+          'Đề tài cần một nhóm đã được duyệt trước khi thực hiện bước này.',
+        GROUP_STATUS_INVALID: 'Nhóm không thể chuyển sang trạng thái này.',
+        LECTURER_OR_STAFF_REQUIRED: 'Chỉ giảng viên hoặc cán bộ quản lý mới được thực hiện thao tác này.',
+        LECTURER_WINDOW_CLOSED: 'Cửa sổ đề xuất đề tài của giảng viên đã đóng.',
+        LECTURER_WINDOW_NOT_OPEN: 'Cửa sổ đề xuất đề tài của giảng viên chưa mở.',
+        MEMBER_NOT_FOUND: 'Không tìm thấy thành viên nhóm.',
+        REGISTRATION_WINDOW_NOT_OPEN: 'Đăng ký nhóm chưa mở.',
+        REPORT_FILE_NOT_FOUND: 'Tệp báo cáo đã lưu không còn khả dụng.',
+        ROUND_NOT_ACCEPTING_PROPOSALS: 'Đợt này không nhận đề xuất đề tài.',
+        ROUND_NOT_FOUND: 'Không tìm thấy đợt đăng ký.',
+        SCORES_REQUIRED: 'Cần có điểm trước khi thực hiện bước này.',
+        STUDENT_PROFILE_REQUIRED: 'Cần hồ sơ sinh viên đang hoạt động.',
+        SUPERVISOR_STATE_CONFLICT: 'Danh sách hướng dẫn xung đột với thao tác này.',
+        THESIS_GROUP_NOT_FOUND: 'Không tìm thấy nhóm đồ án.',
+        TOPIC_DEPARTMENT_FORBIDDEN: 'Đề tài này thuộc một bộ môn khác.',
+        TOPIC_OWNER_REQUIRED: 'Chỉ chủ sở hữu đề tài hoặc người có thẩm quyền mới được thực hiện thao tác này.',
         // Điểm số
         GRADES_PUBLISHED_LOCKED: 'Điểm đã công bố được khóa và không thể sửa tiếp.',
         GRADE_COMPONENTS_INCOMPLETE:
@@ -5250,6 +5376,8 @@ export const vi: I18nMessages = {
       assignSuccess: 'Đã gán đề tài vào hội đồng thành công.',
       memberAddedSuccess: 'Đã thêm thành viên hội đồng thành công.',
       memberRemovedSuccess: 'Đã xóa thành viên khỏi hội đồng.',
+      removeMemberConfirm:
+        'Xóa giảng viên này khỏi hội đồng? Các đề tài đã phân công có thể mất người chấm.',
       councilCreatedSuccess: 'Đã tạo hội đồng đánh giá thành công.',
       councilSeatOrderHint: 'Thứ tự ghế bắt buộc: 1 Chủ tịch, 2 Thư ký, sau đó là Ủy viên (tối thiểu 3, tối đa 5).',
       councilCompleteBadge: 'Đủ điều kiện (3-5 thành viên)',

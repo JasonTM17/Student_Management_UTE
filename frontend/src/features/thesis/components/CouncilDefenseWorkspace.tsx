@@ -13,6 +13,7 @@ import {
   type ThesisTopic,
 } from '@/lib/thesis-api';
 import { fillCopy } from '@/features/thesis/components/thesis-helpers';
+import { plainTextThesisDescription } from '@/lib/thesis-text';
 
 interface CouncilDefenseWorkspaceProps {
   messages: I18nMessages;
@@ -166,8 +167,8 @@ export default function CouncilDefenseWorkspace({
                               {topic?.title || tid}
                             </h5>
                             {topic?.description && (
-                              <p className="text-xs text-muted-foreground line-clamp-2" title={topic.description}>
-                                {topic.description}
+                              <p className="text-xs text-muted-foreground line-clamp-2" title={plainTextThesisDescription(topic.description)}>
+                                {plainTextThesisDescription(topic.description)}
                               </p>
                             )}
                             {topicReportErrors[tid] ? (

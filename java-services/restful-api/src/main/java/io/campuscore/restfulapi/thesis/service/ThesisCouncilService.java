@@ -19,6 +19,8 @@ import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 import org.springframework.util.StringUtils;
 
 /**
@@ -265,10 +267,17 @@ public class ThesisCouncilService {
         if (taken != null && taken > 0) {
             throw conflict("TOPIC_ALREADY_ASSIGNED", "The topic already belongs to a council");
         }
+        // Resolve the member's lecturer profile, then match the supervisor
+        // row against either of its stored key forms (Lecturer.id or legacy
+        // User.id) — a direct id comparison would miss legacy-keyed rows.
         Integer supervisorChair = count(
                 "SELECT COUNT(*) FROM thesis.thesis_council_member m "
-                        + "JOIN thesis.thesis_topic_supervisor sup ON sup.lecturer_id = m.lecturer_id "
-                        + "WHERE m.council_id = :councilId AND sup.topic_id = :topicId AND m.member_role = 'CHAIR'",
+                        + "JOIN campuscore_auth.\"Lecturer\" l "
+                        + "  ON (l.\"id\" = m.lecturer_id OR l.\"userId\" = m.lecturer_id) "
+                        + "JOIN thesis.thesis_topic_supervisor sup "
+                        + "  ON sup.topic_id = :topicId "
+                        + " AND (sup.lecturer_id = l.\"id\" OR sup.lecturer_id = l.\"userId\") "
+                        + "WHERE m.council_id = :councilId AND m.member_role = 'CHAIR'",
                 params().addValue("councilId", councilId).addValue("topicId", topicId));
         if (supervisorChair != null && supervisorChair > 0) {
             throw conflict("SUPERVISOR_CANNOT_CHAIR_COUNCIL",
@@ -276,10 +285,13 @@ public class ThesisCouncilService {
         }
         // Mirror of assignReviewer's REVIEWER_MUST_BE_INDEPENDENT: a lecturer
         // already named counter-reviewer must not grade this topic again from
-        // inside the council.
+        // inside the council. The member row may key the reviewer by Lecturer.id
+        // or legacy User.id, so resolve the profile and match either form.
         Integer reviewerOnCouncil = count(
                 "SELECT COUNT(*) FROM thesis.thesis_council_member cm "
-                        + "JOIN thesis.thesis_topic t ON t.gvpb_lecturer_id = cm.lecturer_id "
+                        + "JOIN campuscore_auth.\"Lecturer\" l "
+                        + "  ON (l.\"id\" = cm.lecturer_id OR l.\"userId\" = cm.lecturer_id) "
+                        + "JOIN thesis.thesis_topic t ON t.gvpb_lecturer_id = l.\"id\" "
                         + "WHERE cm.council_id = :councilId AND t.id = :topicId",
                 params().addValue("councilId", councilId).addValue("topicId", topicId));
         if (reviewerOnCouncil != null && reviewerOnCouncil > 0) {
@@ -622,8 +634,14 @@ public class ThesisCouncilService {
         if (!lecturerExists(lecturerId)) {
             throw invalid("Unknown or inactive lecturer: " + lecturerId);
         }
+        // Same dual-key resolution as requireNotSupervisor: a legacy
+        // User.id-keyed supervisor row must not slip past the check.
         Integer supervising = count(
-                "SELECT COUNT(*) FROM thesis.thesis_topic_supervisor WHERE topic_id = :topicId AND lecturer_id = :lecturerId",
+                "SELECT COUNT(*) FROM thesis.thesis_topic_supervisor sup "
+                        + "JOIN campuscore_auth.\"Lecturer\" l "
+                        + "  ON (l.\"id\" = :lecturerId OR l.\"userId\" = :lecturerId) "
+                        + " AND (sup.lecturer_id = l.\"id\" OR sup.lecturer_id = l.\"userId\") "
+                        + "WHERE sup.topic_id = :topicId",
                 params().addValue("topicId", topicId).addValue("lecturerId", lecturerId));
         if (supervising != null && supervising > 0) {
             throw conflict("SUPERVISOR_CANNOT_REVIEW",
@@ -631,11 +649,15 @@ public class ThesisCouncilService {
         }
         // The counter-review is the independent grade beside the council's:
         // seating the reviewer on the grading council lets one person cast
-        // both the GVPB and a DEFENSE score on the same topic.
+        // both the GVPB and a DEFENSE score on the same topic. The council
+        // member row may store the reviewer's legacy User.id key, so resolve
+        // the profile and match either stored form.
         Integer onCouncil = count(
                 "SELECT COUNT(*) FROM thesis.thesis_council_topic ct "
                         + "JOIN thesis.thesis_council_member cm ON cm.council_id = ct.council_id "
-                        + "WHERE ct.topic_id = :topicId AND cm.lecturer_id = :lecturerId",
+                        + "JOIN campuscore_auth.\"Lecturer\" l ON l.\"id\" = :lecturerId "
+                        + " AND (cm.lecturer_id = l.\"id\" OR cm.lecturer_id = l.\"userId\") "
+                        + "WHERE ct.topic_id = :topicId",
                 params().addValue("topicId", topicId).addValue("lecturerId", lecturerId));
         if (onCouncil != null && onCouncil > 0) {
             throw conflict("REVIEWER_MUST_BE_INDEPENDENT",
@@ -856,7 +878,10 @@ public class ThesisCouncilService {
                         + "WHERE s.council_id = :councilId AND s.topic_id = :topicId AND s.component = :component "
                         + "AND NOT EXISTS ("
                         + "  SELECT 1 FROM thesis.thesis_topic_supervisor sup "
-                        + "  WHERE sup.topic_id = :topicId AND sup.lecturer_id = s.lecturer_id"
+                        + "  JOIN campuscore_auth.\"Lecturer\" l "
+                        + "    ON (l.\"id\" = s.lecturer_id OR l.\"userId\" = s.lecturer_id) "
+                        + "   AND (sup.lecturer_id = l.\"id\" OR sup.lecturer_id = l.\"userId\") "
+                        + "  WHERE sup.topic_id = :topicId"
                         + ")",
                 params().addValue("councilId", councilId).addValue("topicId", topicId)
                         .addValue("component", SCORE_COMPONENT), BigDecimal.class);
@@ -885,11 +910,16 @@ public class ThesisCouncilService {
                 "Defense score finalized for topic " + topicId + " at " + average,
                 beforeState, afterState);
         if (notifier != null) {
-            try {
-                notifier.notifyScoreFinalized(topicId);
-            } catch (RuntimeException exception) {
-                log.warn("Thesis finalize notification fan-out failed for topic {}", topicId, exception);
-            }
+            // Same after-commit rule as publishResults: a REQUIRES_NEW fan-out
+            // fired inside the transaction would survive a later rollback and
+            // announce a score that never persisted.
+            afterCommit(() -> {
+                try {
+                    notifier.notifyScoreFinalized(topicId);
+                } catch (RuntimeException exception) {
+                    log.warn("Thesis finalize notification fan-out failed for topic {}", topicId, exception);
+                }
+            });
         }
         return new TopicResult(topicId, average, subject(actor), Instant.now(), "GRADED");
     }
@@ -961,8 +991,14 @@ public class ThesisCouncilService {
 
     /** Brief R8: nobody grades a topic they supervise. */
     private void requireNotSupervisor(UUID topicId, String lecturerId) {
+        // lecturer_id may store either a Lecturer.id or a legacy User.id, so
+        // resolve the caller's profile and match either stored key form.
         Integer supervising = count(
-                "SELECT COUNT(*) FROM thesis.thesis_topic_supervisor WHERE topic_id = :topicId AND lecturer_id = :lecturerId",
+                "SELECT COUNT(*) FROM thesis.thesis_topic_supervisor sup "
+                        + "JOIN campuscore_auth.\"Lecturer\" l "
+                        + "  ON (l.\"id\" = :lecturerId OR l.\"userId\" = :lecturerId) "
+                        + " AND (sup.lecturer_id = l.\"id\" OR sup.lecturer_id = l.\"userId\") "
+                        + "WHERE sup.topic_id = :topicId",
                 params().addValue("topicId", topicId).addValue("lecturerId", lecturerId));
         if (supervising != null && supervising > 0) {
             throw new DomainException(HttpStatus.FORBIDDEN, "SUPERVISOR_CANNOT_GRADE",
@@ -1016,7 +1052,10 @@ public class ThesisCouncilService {
                         + "WHERE m.council_id = :councilId "
                         + "AND NOT EXISTS ("
                         + "  SELECT 1 FROM thesis.thesis_topic_supervisor sup "
-                        + "  WHERE sup.topic_id = :topicId AND sup.lecturer_id = m.lecturer_id"
+                        + "  JOIN campuscore_auth.\"Lecturer\" l "
+                        + "    ON (l.\"id\" = m.lecturer_id OR l.\"userId\" = m.lecturer_id) "
+                        + "   AND (sup.lecturer_id = l.\"id\" OR sup.lecturer_id = l.\"userId\") "
+                        + "  WHERE sup.topic_id = :topicId"
                         + ")",
                 params().addValue("councilId", councilId).addValue("topicId", topicId));
     }
@@ -1029,7 +1068,10 @@ public class ThesisCouncilService {
                         + "WHERE s.council_id = :councilId AND s.topic_id = :topicId AND s.component = :component "
                         + "AND NOT EXISTS ("
                         + "  SELECT 1 FROM thesis.thesis_topic_supervisor sup "
-                        + "  WHERE sup.topic_id = :topicId AND sup.lecturer_id = s.lecturer_id"
+                        + "  JOIN campuscore_auth.\"Lecturer\" l "
+                        + "    ON (l.\"id\" = s.lecturer_id OR l.\"userId\" = s.lecturer_id) "
+                        + "   AND (sup.lecturer_id = l.\"id\" OR sup.lecturer_id = l.\"userId\") "
+                        + "  WHERE sup.topic_id = :topicId"
                         + ")",
                 params().addValue("councilId", councilId).addValue("topicId", topicId)
                         .addValue("component", SCORE_COMPONENT));
@@ -1076,6 +1118,23 @@ public class ThesisCouncilService {
                 || roles.contains("TRUONG_KHOA"));
         if (!allowed) {
             throw new DomainException(HttpStatus.FORBIDDEN, "COUNCIL_ADMIN_REQUIRED", message);
+        }
+    }
+
+    /**
+     * Defers a fan-out until the mutation commits; the notifier runs
+     * REQUIRES_NEW, so a mid-transaction call would survive a later rollback.
+     */
+    private void afterCommit(Runnable action) {
+        if (TransactionSynchronizationManager.isSynchronizationActive()) {
+            TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+                @Override
+                public void afterCommit() {
+                    action.run();
+                }
+            });
+        } else {
+            action.run();
         }
     }
 

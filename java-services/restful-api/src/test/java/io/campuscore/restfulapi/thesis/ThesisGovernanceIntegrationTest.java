@@ -1066,6 +1066,169 @@ class ThesisGovernanceIntegrationTest {
     }
 
     @Test
+    void aFinalizedTopicCannotAbsorbNewGroupsThroughApprovalOrReassignment() throws Exception {
+        // The publication gate counts every approved group on a topic as
+        // graded, so a group admitted after finalization would inherit a
+        // defense score it never earned — both entry points must refuse.
+        UUID roundId = insertRound("Gov Graded Topic Round", "REGISTRATION_OPEN",
+                Instant.now().minusSeconds(3_600), Instant.now().plusSeconds(3_600));
+        UUID gradedTopic = insertPublishedTopic(roundId);
+        jdbc.update("UPDATE thesis.thesis_topic SET final_score = 8.5, result_status = 'GRADED' WHERE id = ?",
+                gradedTopic);
+
+        ensureStudent("gov-graded-leader", "gov-graded-user", "gov-graded-leader@campuscore.edu");
+        UUID pendingGroup = insertGroup(roundId, "gov-graded-leader", gradedTopic, "PENDING");
+        insertMember(pendingGroup, roundId, "gov-graded-leader", 1);
+        insertMember(pendingGroup, roundId, "gov-graded-peer-2", 2);
+        insertMember(pendingGroup, roundId, "gov-graded-peer-3", 3);
+        mvc.perform(post("/api/v1/thesis/groups/{id}/approve", pendingGroup).with(adminJwt()))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("TOPIC_ALREADY_GRADED"));
+        assertThat(jdbc.queryForObject(
+                "SELECT approval_status FROM thesis.thesis_group WHERE id = ?", String.class, pendingGroup))
+                .isEqualTo("PENDING");
+
+        // The same wedge applies to a pending group switching onto the topic.
+        ensureStudent("gov-graded-mover", "gov-graded-user-m", "gov-graded-mover@campuscore.edu");
+        UUID otherTopic = insertPublishedTopic(roundId);
+        UUID mover = insertGroup(roundId, "gov-graded-mover", otherTopic, "PENDING");
+        insertMember(mover, roundId, "gov-graded-mover", 1);
+        mvc.perform(post("/api/v1/thesis/groups/{id}/topic", mover)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"topicId\":\"" + gradedTopic + "\"}")
+                        .with(studentJwt("gov-graded-mover")))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("TOPIC_ALREADY_GRADED"));
+        assertThat(jdbc.queryForObject(
+                "SELECT topic_id FROM thesis.thesis_group WHERE id = ?", String.class, mover))
+                .isEqualTo(otherTopic.toString());
+    }
+
+    @Test
+    void aCompletedGroupsRosterIsFinalEvenForItsSupervisor() throws Exception {
+        UUID roundId = insertRound("Gov Completed Roster Round", "REGISTRATION_OPEN",
+                Instant.now().minusSeconds(3_600), Instant.now().plusSeconds(3_600));
+        UUID topicId = insertPublishedTopic(roundId);
+        ensureLecturer("gov-completed-sup");
+        jdbc.update("INSERT INTO thesis.thesis_topic_supervisor (id, topic_id, lecturer_id, supervisor_order) "
+                        + "VALUES (?, ?, 'gov-completed-sup', 1)",
+                UUID.randomUUID(), topicId);
+        ensureStudent("gov-completed-leader", "gov-completed-user", "gov-completed-leader@campuscore.edu");
+        UUID groupId = insertGroup(roundId, "gov-completed-leader", topicId, "APPROVED");
+        insertMember(groupId, roundId, "gov-completed-leader", 1);
+        insertMember(groupId, roundId, "gov-completed-peer-2", 2);
+        insertMember(groupId, roundId, "gov-completed-peer-3", 3);
+        jdbc.update("UPDATE thesis.thesis_group SET status = 'COMPLETED' WHERE id = ?", groupId);
+
+        ensureStudent("gov-completed-new", "gov-completed-user-n", "gov-completed-new@campuscore.edu");
+        mvc.perform(post("/api/v1/thesis/groups/{id}/members", groupId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"studentId\":\"gov-completed-new\"}")
+                        .with(lecturerJwt("gov-completed-sup")))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("GROUP_STATE_CONFLICT"));
+        assertThat(jdbc.queryForObject(
+                "SELECT COUNT(*) FROM thesis.thesis_group_member WHERE group_id = ?",
+                Integer.class, groupId)).isEqualTo(3);
+    }
+
+    @Test
+    void teammateSearchStaysClosedOutsideRegistrationAndNeverMatchesEmail() throws Exception {
+        insertRound("Gov Search Closed Round", "REGISTRATION_CLOSED",
+                Instant.now().minusSeconds(7_200), Instant.now().minusSeconds(3_600));
+        ensureStudent("gov-search-target", "gov-search-user-t", "unique-target-mail@campuscore.edu");
+        ensureStudent("gov-search-caller", "gov-search-user-c", "gov-search-caller@campuscore.edu");
+
+        // No REGISTRATION_OPEN round: the directory stays closed entirely.
+        mvc.perform(get("/api/v1/thesis/students/search").param("q", "CODE-gov-search")
+                        .with(studentJwt("gov-search-caller")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(0));
+
+        insertRound("Gov Search Open Round", "REGISTRATION_OPEN",
+                Instant.now().minusSeconds(3_600), Instant.now().plusSeconds(3_600));
+        mvc.perform(get("/api/v1/thesis/students/search").param("q", "CODE-gov-search-target")
+                        .with(studentJwt("gov-search-caller")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].studentId").value("gov-search-target"));
+
+        // An email fragment must not act as an existence oracle.
+        mvc.perform(get("/api/v1/thesis/students/search").param("q", "unique-target-mail")
+                        .with(studentJwt("gov-search-caller")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(0));
+    }
+
+    @Test
+    void aLegacyKeyedCouncilMemberStillBlocksTheCounterReviewerSeat() throws Exception {
+        // Older rows keyed council members by User.id instead of Lecturer.id;
+        // the independence check must resolve both forms or a reviewer could
+        // sit inside the council grading the same topic.
+        UUID roundId = insertRound("Gov Legacy Council Round", "REGISTRATION_CLOSED",
+                Instant.now().minusSeconds(3_600), Instant.now().plusSeconds(3_600));
+        jdbc.update("UPDATE thesis.thesis_registration_round SET gvpb_deadline = ? WHERE id = ?",
+                Timestamp.from(Instant.now().plusSeconds(86_400)), roundId);
+        CouncilFixture fixture = councilFixture(roundId, "gov-legacy");
+
+        ensureLecturer("gov-legacy-reviewer");
+        String reviewerUserId = jdbc.queryForObject(
+                "SELECT \"userId\" FROM campuscore_auth.\"Lecturer\" WHERE \"id\" = 'gov-legacy-reviewer'",
+                String.class);
+        jdbc.update("INSERT INTO thesis.thesis_council_member (id, council_id, lecturer_id, member_role) "
+                        + "VALUES (?, ?, ?, 'MEMBER')",
+                UUID.randomUUID(), fixture.councilId(), reviewerUserId);
+
+        mvc.perform(post("/api/v1/thesis/topics/{id}/reviewer", fixture.topicId())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"lecturerId\":\"gov-legacy-reviewer\"}")
+                        .with(truongKhoaJwt()))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("REVIEWER_MUST_BE_INDEPENDENT"));
+
+        // A properly independent reviewer still assigns cleanly.
+        ensureLecturer("gov-legacy-independent");
+        mvc.perform(post("/api/v1/thesis/topics/{id}/reviewer", fixture.topicId())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"lecturerId\":\"gov-legacy-independent\"}")
+                        .with(truongKhoaJwt()))
+                .andExpect(status().isOk());
+    }
+
+    @Test
+    void aTopicReportReadPrefersTheCallersOwnGroup() throws Exception {
+        // max_groups lets several approved groups share one topic; a member of
+        // the second group must land on their own report, not the first.
+        UUID roundId = insertRound("Gov Shared Topic Round", "REGISTRATION_CLOSED",
+                Instant.now().minusSeconds(3_600), Instant.now().plusSeconds(3_600));
+        UUID topicId = insertPublishedTopic(roundId);
+        ensureStudent("gov-shared-leader-a", "gov-shared-user-a", "gov-shared-leader-a@campuscore.edu");
+        ensureStudent("gov-shared-leader-b", "gov-shared-user-b", "gov-shared-leader-b@campuscore.edu");
+        UUID groupA = insertGroup(roundId, "gov-shared-leader-a", topicId, "APPROVED");
+        insertMember(groupA, roundId, "gov-shared-leader-a", 1);
+        insertMember(groupA, roundId, "gov-shared-peer-a2", 2);
+        insertMember(groupA, roundId, "gov-shared-peer-a3", 3);
+        // Force the older group to be picked first by the fallback ordering.
+        Thread.sleep(5);
+        UUID groupB = insertGroup(roundId, "gov-shared-leader-b", topicId, "APPROVED");
+        insertMember(groupB, roundId, "gov-shared-leader-b", 1);
+        insertMember(groupB, roundId, "gov-shared-peer-b2", 2);
+        insertMember(groupB, roundId, "gov-shared-peer-b3", 3);
+        jdbc.update(
+                "INSERT INTO thesis.thesis_group_report (id, group_id, round_id, submitted_by, title, url) "
+                        + "VALUES (?, ?, ?, ?, 'Report A', 'https://example.test/a.pdf')",
+                UUID.randomUUID(), groupA, roundId, "gov-shared-leader-a");
+        jdbc.update(
+                "INSERT INTO thesis.thesis_group_report (id, group_id, round_id, submitted_by, title, url) "
+                        + "VALUES (?, ?, ?, ?, 'Report B', 'https://example.test/b.pdf')",
+                UUID.randomUUID(), groupB, roundId, "gov-shared-leader-b");
+
+        mvc.perform(get("/api/v1/thesis/topics/{id}/report", topicId)
+                        .with(studentJwt("gov-shared-leader-b")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.title").value("Report B"));
+    }
+
+    @Test
     void publicationRefusesWhileAnyGroupStillAwaitsApproval() throws Exception {
         UUID roundId = insertRound("Gov Pending Publish Round", "REGISTRATION_CLOSED",
                 Instant.now().minusSeconds(3_600), Instant.now().plusSeconds(3_600));

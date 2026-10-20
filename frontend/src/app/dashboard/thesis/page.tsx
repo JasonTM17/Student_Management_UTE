@@ -412,8 +412,9 @@ export default function ThesisPage() {
         setActionError(messages.thesis.grading.supervisorCannotGrade);
         toast.error(messages.thesis.grading.supervisorCannotGrade);
       } else {
-        setActionError(messages.thesis.actionFailed);
-        toast.error(messages.thesis.actionFailed);
+        const msg = thesisActionError(err);
+        setActionError(msg);
+        toast.error(msg);
       }
     } finally {
       setIsActionPending(false);
@@ -449,8 +450,9 @@ export default function ThesisPage() {
         setActionError(msg);
         toast.info(msg);
       } else {
-        setActionError(messages.thesis.actionFailed);
-        toast.error(messages.thesis.actionFailed);
+        const msg = thesisActionError(err);
+        setActionError(msg);
+        toast.error(msg);
       }
     } finally {
       setIsActionPending(false);
@@ -522,7 +524,7 @@ export default function ThesisPage() {
             ? pageCopy.topicAlreadyFinalised
             : code === 'SUPERVISOR_CANNOT_GRADE'
               ? messages.thesis.grading.supervisorCannotGrade
-              : messages.thesis.actionFailed;
+              : thesisActionError(err);
       setActionError(msg);
       toast.error(msg);
     } finally {
@@ -1222,6 +1224,13 @@ export default function ThesisPage() {
     }
   };
 
+  /** Backend domain code → dictionary copy, falling back to the generic line. */
+  const thesisActionError = (caught: unknown): string => {
+    const codes = messages.common.campusErrors.codes as Record<string, string>;
+    const code = getThesisErrorCode(caught);
+    return (code ? codes[code] : undefined) ?? messages.thesis.actionFailed;
+  };
+
   const createGroup = async () => {
     if (!selectedRoundId) return;
     setIsActionPending(true);
@@ -1230,8 +1239,8 @@ export default function ThesisPage() {
     try {
       await thesisApi.createGroup(selectedRoundId);
       await refreshGroups();
-    } catch {
-      setActionError(messages.thesis.actionFailed);
+    } catch (caught) {
+      setActionError(thesisActionError(caught));
     } finally {
       setIsActionPending(false);
     }
@@ -1268,7 +1277,7 @@ export default function ThesisPage() {
       } else if (code === 'STUDENT_ALREADY_IN_GROUP') {
         setAddMemberError(memberCopy.studentAlreadyInGroup);
       } else {
-        setAddMemberError(messages.thesis.actionFailed);
+        setAddMemberError(thesisActionError(caught));
       }
     } finally {
       setIsActionPending(false);
@@ -1321,7 +1330,7 @@ export default function ThesisPage() {
       } else if (code === 'STUDENT_ALREADY_IN_GROUP') {
         setAddMemberError(memberCopy.studentAlreadyInGroup);
       } else {
-        setAddMemberError(messages.thesis.actionFailed);
+        setAddMemberError(thesisActionError(caught));
       }
     } finally {
       setIsActionPending(false);
@@ -1349,8 +1358,8 @@ export default function ThesisPage() {
       await thesisApi.removeMember(currentGroup.id, targetStudentId);
       await refreshGroups();
       setActionSuccess(messages.thesis.memberRemoved);
-    } catch {
-      setActionError(messages.thesis.actionFailed);
+    } catch (caught) {
+      setActionError(thesisActionError(caught));
     } finally {
       setIsActionPending(false);
     }
@@ -1374,7 +1383,7 @@ export default function ThesisPage() {
       } else if (code === 'GROUP_APPROVAL_STATE_CONFLICT') {
         setActionError(messages.thesis.groupStateConflict);
       } else {
-        setActionError(messages.thesis.actionFailed);
+        setActionError(thesisActionError(caught));
       }
     } finally {
       setIsActionPending(false);
@@ -1406,8 +1415,8 @@ export default function ThesisPage() {
       await refreshGroups();
       setIsRejectModalOpen(false);
       setActionSuccess(messages.thesis.rejectSuccess);
-    } catch {
-      setRejectError(messages.thesis.actionFailed);
+    } catch (caught) {
+      setRejectError(thesisActionError(caught));
     } finally {
       setIsActionPending(false);
     }
@@ -1719,7 +1728,7 @@ export default function ThesisPage() {
       } else if (code === 'TOPIC_DEPARTMENT_FORBIDDEN') {
         setProposeError(messages.thesis.topicDepartmentForbidden);
       } else {
-        setProposeError(messages.thesis.actionFailed);
+        setProposeError(thesisActionError(caught));
       }
     } finally {
       setIsActionPending(false);
@@ -1773,7 +1782,7 @@ export default function ThesisPage() {
       } else if (code === 'TOPIC_DEPARTMENT_FORBIDDEN') {
         setEditError(messages.thesis.topicDepartmentForbidden);
       } else {
-        setEditError(messages.thesis.actionFailed);
+        setEditError(thesisActionError(caught));
       }
     } finally {
       setIsActionPending(false);
@@ -1790,7 +1799,7 @@ export default function ThesisPage() {
     if (code === 'LECTURER_WINDOW_CLOSED') return messages.thesis.lecturerWindowClosed;
     if (code === 'TOPIC_DEPARTMENT_FORBIDDEN') return messages.thesis.topicDepartmentForbidden;
     if (code === 'FORBIDDEN' || status === 403) return messages.thesis.topicActionForbidden;
-    return messages.thesis.actionFailed;
+    return thesisActionError(caught);
   };
 
   const handlePublishTopic = async (topicId: string) => {
@@ -2732,6 +2741,9 @@ export default function ThesisPage() {
                     isActionPending={isActionPending}
                     getTopicTitle={getTopicTitle}
                     isRoundOpen={isRegistrationOpenFor}
+                    canReviewGroup={(group) =>
+                      isAdmin || (!!group.topicId && supervisedTopicIds.has(group.topicId))
+                    }
                     onGroupUpdated={(next) =>
                       setGroups((current) =>
                         current.map((item) => (item.id === next.id ? next : item)),

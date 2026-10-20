@@ -19,6 +19,8 @@ interface SupervisedGroupListProps {
   isActionPending: boolean;
   getTopicTitle: (topicId?: string | null) => string;
   isRoundOpen: (group: ThesisGroup) => boolean;
+  /** R3 supervisor or admin — proposed-but-not-supervised topics stay read-only. */
+  canReviewGroup?: (group: ThesisGroup) => boolean;
   onGroupUpdated: (group: ThesisGroup) => void;
   onApprove: (groupId: string) => void | Promise<void>;
   onReject: (groupId: string) => void;
@@ -38,6 +40,7 @@ export default function SupervisedGroupList({
   isActionPending,
   getTopicTitle,
   isRoundOpen,
+  canReviewGroup,
   onGroupUpdated,
   onApprove,
   onReject,
@@ -72,6 +75,10 @@ export default function SupervisedGroupList({
               const topicTitle = getTopicTitle(group.topicId);
               const isPending =
                 group.status === 'SUBMITTED' && group.approvalStatus === 'PENDING';
+              // The backend reviewer check is R3 supervision (or admin), not
+              // topic authorship — a department head who merely proposed the
+              // topic must not see dead approve/reject buttons.
+              const mayReview = !canReviewGroup || canReviewGroup(group);
               return (
                 <div
                   key={group.id}
@@ -146,7 +153,7 @@ export default function SupervisedGroupList({
                   </div>
 
                   <div className="flex shrink-0 items-center gap-2">
-                    {isPending ? (
+                    {isPending && mayReview ? (
                       <>
                         <Button
                           type="button"

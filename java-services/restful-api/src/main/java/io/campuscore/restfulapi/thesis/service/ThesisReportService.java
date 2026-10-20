@@ -506,11 +506,15 @@ public class ThesisReportService {
     public ReportResponse getByTopic(UUID topicId, Jwt actor) {
         // Deterministic pick: max_groups lets several approved groups share a
         // topic, and an unordered LIMIT-1 made the returned report arbitrary.
-        // Oldest-approved-first is the stable contract.
+        // A member of a later-approved group must land on their own group's
+        // report, so caller membership outranks the oldest-approved fallback.
         java.util.List<UUID> groupIds = jdbc.query(
-                "SELECT id FROM thesis.thesis_group WHERE topic_id = :topicId AND approval_status = 'APPROVED' "
-                        + "ORDER BY created_at, id LIMIT 1",
-                params().addValue("topicId", topicId),
+                "SELECT g.id FROM thesis.thesis_group g WHERE g.topic_id = :topicId AND g.approval_status = 'APPROVED' "
+                        + "ORDER BY CASE WHEN EXISTS ("
+                        + "  SELECT 1 FROM thesis.thesis_group_member m "
+                        + "  WHERE m.group_id = g.id AND m.student_id = :studentId"
+                        + ") THEN 0 ELSE 1 END, g.created_at, g.id LIMIT 1",
+                params().addValue("topicId", topicId).addValue("studentId", studentId(actor)),
                 (rs, ignored) -> UUID.fromString(rs.getString("id")));
         if (groupIds.isEmpty()) {
             return null;

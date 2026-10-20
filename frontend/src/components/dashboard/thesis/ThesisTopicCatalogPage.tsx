@@ -17,27 +17,9 @@ import { EmptyState, ErrorState, LoadingState } from '@/components/ui/state-bloc
 import { StatusBadge } from '@/components/thesis/StatusBadge';
 import { TopicCardGridSkeleton } from '@/components/ui/skeleton';
 import { normalizeVietnameseText } from '@/lib/registration-browse';
+import { plainTextThesisDescription as plainTextDescription } from '@/lib/thesis-text';
 import { cn } from '@/lib/utils';
 import { useThesisWorkspace } from './useThesisWorkspace';
-
-/**
- * Topic descriptions are authored in the rich-text editor (HTML). Card
- * previews need the plain text — the raw markup used to render as literal
- * `<p>`/`<strong>` noise under the clamp.
- */
-function plainTextDescription(raw: string | null | undefined): string {
-  if (!raw) return '';
-  return raw
-    .replace(/<[^>]*>/g, ' ')
-    .replace(/&nbsp;/gi, ' ')
-    .replace(/&amp;/gi, '&')
-    .replace(/&lt;/gi, '<')
-    .replace(/&gt;/gi, '>')
-    .replace(/&quot;/gi, '"')
-    .replace(/&#39;|&apos;/gi, "'")
-    .replace(/\s+/g, ' ')
-    .trim();
-}
 
 export default function ThesisTopicCatalogPage() {
   const { user, isLoading: authLoading, hasAccess, isForbidden } = useRequireAuth();

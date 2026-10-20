@@ -6,6 +6,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Input } from '@/components/ui/input';
 import type { I18nMessages } from '@/i18n/messages';
 import type { ThesisCouncilScore, ThesisRound, ThesisTopic } from '@/lib/thesis-api';
+import { plainTextThesisDescription } from '@/lib/thesis-text';
 
 interface GvpbReviewPanelProps {
   messages: I18nMessages;
@@ -68,8 +69,8 @@ export default function GvpbReviewPanel({
                 <div>
                   <h5 className="font-semibold text-foreground text-sm">{topic.title}</h5>
                   {topic.description ? (
-                    <p className="text-xs text-muted-foreground line-clamp-2 mt-0.5" title={topic.description}>
-                      {topic.description}
+                    <p className="text-xs text-muted-foreground line-clamp-2 mt-0.5" title={plainTextThesisDescription(topic.description)}>
+                      {plainTextThesisDescription(topic.description)}
                     </p>
                   ) : null}
                 </div>
