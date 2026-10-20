@@ -3140,7 +3140,7 @@ export const vi: I18nMessages = {
         LECTURER_WINDOW_NOT_OPEN: 'Cửa sổ đề xuất đề tài của giảng viên chưa mở.',
         MEMBER_NOT_FOUND: 'Không tìm thấy thành viên nhóm.',
         REGISTRATION_WINDOW_NOT_OPEN: 'Đăng ký nhóm chưa mở.',
-        REPORT_FILE_NOT_FOUND: 'Tệp báo cáo đã lưu không còn khả dụng.',
+        REPORT_FILE_NOT_FOUND: 'Tệp đính kèm của bài nộp không còn khả dụng.',
         ROUND_NOT_ACCEPTING_PROPOSALS: 'Đợt này không nhận đề xuất đề tài.',
         ROUND_NOT_FOUND: 'Không tìm thấy đợt đăng ký.',
         SCORES_REQUIRED: 'Cần có điểm trước khi thực hiện bước này.',
