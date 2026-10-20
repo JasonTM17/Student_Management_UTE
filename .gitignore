@@ -96,6 +96,7 @@ dogfood-output/
 
 # Local-only tool artifacts and database backups
 database/backups/
+/backups/
 .mimosa/
 .video_agent/
 frontend/.mimosa/
@@ -107,3 +108,10 @@ scratch/
 # Devin agent runtime config (local-only)
 .devin/
 /.playwright-mcp/
+
+# Local-only scratch captures and non-CampusCore reference artifacts
+/*.png
+/r2.code
+/r2.json
+/database/domain_management_system*.sql
+/docs/report_images/
