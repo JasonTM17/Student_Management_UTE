@@ -533,6 +533,36 @@ class TwoFactorLoginPersistenceTest {
                 "the current device keeps its refresh session");
         assertNotEquals(sha256(otherDevice.refreshToken()), keptHash,
                 "the other device's session is revoked");
+
+        // The revision bump retires every access token issued before the
+        // switch flipped — the other device's and the caller's own.
+        mvc.perform(get("/api/v1/auth/me")
+                        .header("Authorization", "Bearer " + otherDevice.accessToken()))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.code").value("SESSION_INVALID"));
+        mvc.perform(get("/api/v1/auth/me")
+                        .header("Authorization", "Bearer " + currentDevice.accessToken()))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.code").value("SESSION_INVALID"));
+
+        // The kept browser session rotates normally: the refreshed access
+        // token carries the new revision and authenticates again.
+        MvcResult refreshed = mvc.perform(post("/api/v1/auth/refresh")
+                        .cookie(new Cookie("cc_refresh_token", currentDevice.refreshToken()),
+                                new Cookie("cc_csrf", currentDevice.csrfToken()))
+                        .header("X-CSRF-Token", currentDevice.csrfToken())
+                        .header("User-Agent", "device-a"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.accessToken", org.hamcrest.Matchers.notNullValue()))
+                .andReturn();
+        String rotatedAccess = objectMapper
+                .readTree(refreshed.getResponse().getContentAsString())
+                .path("accessToken").asText();
+        mvc.perform(get("/api/v1/auth/me")
+                        .header("Authorization", "Bearer " + rotatedAccess))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value("student-user"));
+        assertEquals(1, sessionCount(), "the rotation replaces the kept session in place");
     }
 
     @Test
@@ -565,6 +595,95 @@ class TwoFactorLoginPersistenceTest {
         String keptHash = onlySessionHash();
         assertEquals(sha256(currentDevice.refreshToken()), keptHash);
         assertNotEquals(sha256(otherDevice.refreshToken()), keptHash);
+
+        // Disabling 2FA is the same security-posture change as enabling: the
+        // credential revision must advance so access tokens issued before the
+        // disable stop authenticating on every device.
+        Long version = jdbc.queryForObject(
+                "SELECT \"credentialVersion\" FROM \"campuscore_auth\".\"User\" WHERE \"id\" = 'student-user'",
+                Long.class);
+        assertEquals(1L, version, "disabling 2FA must bump the credential revision like enable");
+        mvc.perform(get("/api/v1/auth/me")
+                        .header("Authorization", "Bearer " + otherDevice.accessToken()))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.code").value("SESSION_INVALID"));
+        mvc.perform(get("/api/v1/auth/me")
+                        .header("Authorization", "Bearer " + currentDevice.accessToken()))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.code").value("SESSION_INVALID"));
+
+        // The one preserved refresh session still rotates and reissues an
+        // access token carrying the new revision.
+        MvcResult refreshed = mvc.perform(post("/api/v1/auth/refresh")
+                        .cookie(new Cookie("cc_refresh_token", currentDevice.refreshToken()),
+                                new Cookie("cc_csrf", currentDevice.csrfToken()))
+                        .header("X-CSRF-Token", currentDevice.csrfToken())
+                        .header("User-Agent", "device-a"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.accessToken", org.hamcrest.Matchers.notNullValue()))
+                .andReturn();
+        String rotatedAccess = objectMapper
+                .readTree(refreshed.getResponse().getContentAsString())
+                .path("accessToken").asText();
+        mvc.perform(get("/api/v1/auth/me")
+                        .header("Authorization", "Bearer " + rotatedAccess))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value("student-user"));
+        assertEquals(1, sessionCount(), "the rotation replaces the kept session in place");
+    }
+
+    @Test
+    void confirmDisableWithAWrongCodeKeepsTheRevisionAndExistingAccess() throws Exception {
+        DeviceSession device = loginDevice("device-a");
+        enableTwoFactorDirectly();
+
+        String challengeId = startDisableChallenge();
+        // The generator could legitimately emit "000000"; pick a value that
+        // differs from the issued code whatever it is.
+        String correctCode = latestCode();
+        String wrongCode = correctCode.equals("000000") ? "000001" : "000000";
+        mvc.perform(post("/api/v1/me/two-factor/disable")
+                        .with(io.campuscore.restfulapi.testsupport.CurrentAccountJwt.currentJwt(jdbc, "student-user"))
+                        .with(csrfPair(device))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"challengeId\":\"" + challengeId + "\",\"code\":\"" + wrongCode + "\"}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("TWO_FACTOR_CODE_INVALID"));
+
+        Long version = jdbc.queryForObject(
+                "SELECT \"credentialVersion\" FROM \"campuscore_auth\".\"User\" WHERE \"id\" = 'student-user'",
+                Long.class);
+        assertEquals(0L, version, "a rejected disable code must not advance the credential revision");
+        // The real login token — not a synthetic JWT — must keep working.
+        mvc.perform(get("/api/v1/auth/me")
+                        .header("Authorization", "Bearer " + device.accessToken()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value("student-user"));
+    }
+
+    @Test
+    void confirmDisableWithoutARefreshCookieRevokesEverySession() throws Exception {
+        DeviceSession device = loginDevice("device-a");
+        loginDevice("device-b");
+        enableTwoFactorDirectly();
+        assertEquals(2, sessionCount());
+
+        String challengeId = startDisableChallenge();
+        String code = latestCode();
+        mvc.perform(post("/api/v1/me/two-factor/disable")
+                        .with(io.campuscore.restfulapi.testsupport.CurrentAccountJwt.currentJwt(jdbc, "student-user"))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"challengeId\":\"" + challengeId + "\",\"code\":\"" + code + "\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.enabled").value(false));
+
+        assertEquals(0, sessionCount());
+        // With no identifiable caller session the revision bump retires every
+        // previously issued access token too — nothing survives the disable.
+        mvc.perform(get("/api/v1/auth/me")
+                        .header("Authorization", "Bearer " + device.accessToken()))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.code").value("SESSION_INVALID"));
     }
 
     @Test
@@ -719,22 +838,26 @@ class TwoFactorLoginPersistenceTest {
         assertEquals(1, sessionCount());
     }
 
-    /** A browser session issued by a real login: refresh token + its CSRF pair. */
-    private record DeviceSession(String refreshToken, String csrfToken) { }
+    /** A real browser login: refresh token, CSRF pair, and issued access token. */
+    private record DeviceSession(String refreshToken, String csrfToken, String accessToken) { }
 
-    /** Logs in and returns the issued session cookies. */
+    /** Logs in and returns the issued session cookies and access token. */
     private DeviceSession loginDevice(String userAgent) throws Exception {
         MvcResult result = mvc.perform(post("/api/v1/auth/login")
                         .contentType(MediaType.APPLICATION_JSON)
                         .header("User-Agent", userAgent)
                         .content("{\"email\":\"" + STUDENT_EMAIL + "\",\"password\":\"" + STUDENT_PASSWORD + "\"}"))
                 .andExpect(status().isOk())
+                .andExpect(jsonPath("$.accessToken", org.hamcrest.Matchers.notNullValue()))
                 .andReturn();
         Cookie refresh = result.getResponse().getCookie("cc_refresh_token");
         Cookie csrf = result.getResponse().getCookie("cc_csrf");
         assertNotNull(refresh, "a successful login must issue a refresh cookie");
         assertNotNull(csrf, "a successful login must issue the CSRF cookie");
-        return new DeviceSession(refresh.getValue(), csrf.getValue());
+        String accessToken = objectMapper
+                .readTree(result.getResponse().getContentAsString())
+                .path("accessToken").asText();
+        return new DeviceSession(refresh.getValue(), csrf.getValue(), accessToken);
     }
 
     /**
@@ -774,6 +897,18 @@ class TwoFactorLoginPersistenceTest {
                 .andReturn();
         return objectMapper
                 .readTree(enable.getResponse().getContentAsString())
+                .path("challengeId").asText();
+    }
+
+    private String startDisableChallenge() throws Exception {
+        MvcResult challenge = mvc.perform(post("/api/v1/me/two-factor/disable/challenge")
+                        .with(io.campuscore.restfulapi.testsupport.CurrentAccountJwt.currentJwt(jdbc, "student-user"))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"password\":\"" + STUDENT_PASSWORD + "\"}"))
+                .andExpect(status().isOk())
+                .andReturn();
+        return objectMapper
+                .readTree(challenge.getResponse().getContentAsString())
                 .path("challengeId").asText();
     }
 

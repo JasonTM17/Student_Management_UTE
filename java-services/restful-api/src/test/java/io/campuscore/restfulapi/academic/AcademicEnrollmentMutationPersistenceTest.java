@@ -438,6 +438,61 @@ class AcademicEnrollmentMutationPersistenceTest {
     }
 
     @Test
+    void historicalPassDoesNotExemptAnActiveCorequisiteFromTheDropGuard() throws Exception {
+        // course-open declares course-two as a concurrent COREQ.
+        jdbc.update(
+                "INSERT INTO \"academic\".\"CourseRequirement\""
+                        + " (\"id\", \"courseId\", \"requiredCourseId\", \"kind\", \"minLetterGrade\")"
+                        + " VALUES ('req-test-coreq-history', 'course-open', 'course-two', 'COREQ', null)");
+        // A completed pass of course-two from an earlier semester exists, but
+        // the COREQ contract requires CONCURRENT enrollment: the historical
+        // pass must not exempt the still-active paired course from the drop
+        // guard.
+        seedCompletedEnrollment("enrollment-coreq-history", "section-two", "course-two", "B");
+        seedActiveEnrollment("enrollment-coreq-parent", "section-two", "course-two");
+        jdbc.update("UPDATE \"academic\".\"Section\" SET \"enrolledCount\" = 1 WHERE \"id\" = 'section-two'");
+
+        // Enrolling the dependent succeeds because the paired course is active.
+        MvcResult enrollResult = mvc.perform(post("/api/v1/enrollments/enroll")
+                        .with(studentJwt("student-user-1", "student-1"))
+                        .header("Idempotency-Key", "enroll-coreq-history-dep")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"sectionId\":\"section-open\"}"))
+                .andExpect(status().isOk())
+                .andReturn();
+        String dependentEnrollmentId = objectMapper.readTree(enrollResult.getResponse().getContentAsString())
+                .get("id").asText();
+
+        // Dropping the still-required paired course is refused despite the
+        // historical pass.
+        mvc.perform(post("/api/v1/enrollments/enrollment-coreq-parent/drop")
+                        .with(studentJwt("student-user-1", "student-1"))
+                        .header("Idempotency-Key", "drop-coreq-parent-history"))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("COREQUISITE_UNMET"));
+
+        // The refused drop leaves the enrollment row and seat counter intact.
+        String status = jdbc.queryForObject(
+                "SELECT \"status\" FROM \"academic\".\"Enrollment\" WHERE \"id\" = 'enrollment-coreq-parent'",
+                String.class);
+        assertThat(status).isEqualTo("ENROLLED");
+        Integer enrolledCount = jdbc.queryForObject(
+                "SELECT \"enrolledCount\" FROM \"academic\".\"Section\" WHERE \"id\" = 'section-two'",
+                Integer.class);
+        assertThat(enrolledCount).isEqualTo(1);
+
+        // Order is still honored: drop the dependent first, then the parent.
+        mvc.perform(post("/api/v1/enrollments/" + dependentEnrollmentId + "/drop")
+                        .with(studentJwt("student-user-1", "student-1"))
+                        .header("Idempotency-Key", "drop-coreq-history-dep"))
+                .andExpect(status().isOk());
+        mvc.perform(post("/api/v1/enrollments/enrollment-coreq-parent/drop")
+                        .with(studentJwt("student-user-1", "student-1"))
+                        .header("Idempotency-Key", "drop-coreq-parent-history-ok"))
+                .andExpect(status().isOk());
+    }
+
+    @Test
     void legacyPrerequisiteSpellingDoesNotGateRegistrationAfterTheV97Normalization() throws Exception {
         // V97 normalizes seeded data to 'PREREQ'; the enforcement contract is
         // an exact match, so a row still spelled 'PREREQUISITE' (unmigrated

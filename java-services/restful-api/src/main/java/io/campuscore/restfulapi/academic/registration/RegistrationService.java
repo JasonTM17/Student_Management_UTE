@@ -994,9 +994,6 @@ public class RegistrationService {
         if (otherActiveCourseIds.isEmpty()) {
             return;
         }
-        if (hasCompleted(studentId, droppedCourseId, null)) {
-            return;
-        }
         List<String> dependentCourses = jdbc.queryForList(
                 "SELECT \"courseId\" FROM " + REQUIREMENT
                         + " WHERE \"courseId\" IN (:courseIds) AND \"requiredCourseId\" = :requiredId AND \"kind\" = 'COREQ'",

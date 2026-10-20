@@ -144,8 +144,10 @@ public class TwoFactorService {
      * Confirms the ENABLE challenge and flips the account switch on. Wrong
      * attempts must persist across the transaction boundary (same 5-strikes
      * lock as the LOGIN branch), so AppException is exempted from the
-     * rollback. K17: refresh sessions issued before the switch flipped are
-     * revoked, keeping the caller's current session (see
+     * rollback. K17: the credential revision advances, so access tokens
+     * issued before the switch flipped stop authenticating immediately,
+     * and refresh sessions issued before it are revoked — keeping only the
+     * caller's current browser refresh session (see
      * {@link #revokeOtherRefreshSessions(String)}).
      */
     @Transactional(noRollbackFor = AppException.class)
@@ -187,8 +189,10 @@ public class TwoFactorService {
 
     /**
      * Confirms the DISABLE challenge and flips the account switch off.
-     * K17: like the enable path, refresh sessions issued before the change are
-     * revoked while the caller's current session survives.
+     * K17: like the enable path, the credential revision advances so access
+     * tokens issued before the change stop authenticating immediately, and
+     * refresh sessions issued before it are revoked while the caller's
+     * current browser refresh session survives.
      */
     @Transactional(noRollbackFor = AppException.class)
     public void confirmDisable(String userId, String challengeId, String code) {
@@ -199,6 +203,7 @@ public class TwoFactorService {
         challenges.consume(challenge.id(), clock.instant());
         audit.record(userId, null, "TWO_FACTOR_DISABLED", "USER", userId,
                 "User disabled two-factor authentication after password and emailed-code verification");
+        users.bumpCredentialVersion(userId);
         revokeOtherRefreshSessions(userId);
     }
 
@@ -211,9 +216,9 @@ public class TwoFactorService {
      *
      * <p>When no refresh token can be identified (non-browser client, or a
      * request without the cookie), every session is revoked instead. That is
-     * the safe direction: the current access token stays valid until it
-     * expires, so the user is not dropped immediately, and the next refresh
-     * requires a fresh login.
+     * the safe direction: the callers' credential revision bump has already
+     * retired every issued access token, and with no refresh session left
+     * the next request requires a fresh login.
      */
     private void revokeOtherRefreshSessions(String userId) {
         String refreshToken = currentRefreshToken();

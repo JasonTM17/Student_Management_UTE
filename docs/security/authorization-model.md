@@ -49,6 +49,20 @@ replacement commits may finish. This boundary does not promise cancellation of
 in-flight work, recovery of past side effects, or access-token blacklisting on
 single-session logout.
 
+Enabling or disabling two-factor authentication is the same credential
+boundary: confirming either challenge advances the credential revision, so
+every access token issued before the confirmation stops authenticating
+immediately, and refresh sessions other than the caller's are deleted. The
+caller's current browser refresh session is the one explicit exception — it
+is identified by the `cc_refresh_token` cookie, kept so the user is not signed
+out mid-flow, and its next rotation issues an access token carrying the new
+revision. When no refresh session can be identified, every session is revoked
+instead. A rejected confirmation code does not alter the revision, the
+two-factor flag, or any session — only the challenge's failed-attempt
+bookkeeping (the five-strikes lock) still persists. See
+`TwoFactorService` and `TwoFactorLoginPersistenceTest` for the executable
+cases.
+
 Credential verification and replacement serialize on the account's User row
 lock, so login, refresh, reset issuance/redemption, and password writes for the
 same account queue rather than interleave. Row-lock contention is per account,
