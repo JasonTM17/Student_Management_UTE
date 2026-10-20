@@ -987,6 +987,7 @@ export const enrollmentsApi = {
     studentId?: string;
     courseId?: string;
     sectionId?: string;
+    search?: string;
   }): Promise<string> => {
     const response = await api.get<string>('/enrollments/export/csv', {
       params,

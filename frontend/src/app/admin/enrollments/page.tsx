@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Download, Eye, FileText, Search, Trash2, UserRound } from 'lucide-react';
 import { toast } from 'sonner';
@@ -185,21 +185,31 @@ export default function AdminEnrollmentsPage() {
     }
   }, [messages]);
 
+  // Request generations: a filter change (or unmount) invalidates in-flight
+  // completions so a slower older response cannot repopulate the page after
+  // the newer one already rendered.
+  const enrollmentsRequestRef = useRef(0);
+  const sectionsRequestRef = useRef(0);
+
   const fetchSectionsForCourse = useCallback(async (courseId: string) => {
+    const requestId = ++sectionsRequestRef.current;
+    const isCurrent = () => requestId === sectionsRequestRef.current;
+    // Every course change drops the shown options immediately — a slower
+    // pending response for the old course must not repopulate the dropdown.
+    setSections([]);
+    setSectionReferenceError('');
     if (!courseId) {
-      setSections([]);
-      setSectionReferenceError('');
       return;
     }
-
-    setSectionReferenceError('');
     try {
       // Page through the course's whole section list — a one-page pull hid
       // every section beyond the first 100 from the filter dropdown.
       const rows = await fetchAllPages<Section>((p, l) =>
         sectionsApi.getAll({ courseId, page: p, limit: l }));
+      if (!isCurrent()) return;
       setSections(rows);
     } catch {
+      if (!isCurrent()) return;
       setSections([]);
       setSectionReferenceError(
         locale === 'vi'
@@ -210,6 +220,8 @@ export default function AdminEnrollmentsPage() {
   }, [locale]);
 
   const fetchEnrollments = useCallback(async () => {
+    const requestId = ++enrollmentsRequestRef.current;
+    const isCurrent = () => requestId === enrollmentsRequestRef.current;
     setIsLoading(true);
     setError('');
 
@@ -230,17 +242,19 @@ export default function AdminEnrollmentsPage() {
       if (search) params.search = search;
 
       const response = await enrollmentsApi.getAll(params);
+      if (!isCurrent()) return;
       setEnrollments(response.data || []);
       setTotalPages(response.meta?.totalPages || 1);
       setTotal(response.meta?.total || 0);
     } catch {
+      if (!isCurrent()) return;
       setError(
         locale === 'vi'
           ? 'Hiện chưa thể tải danh sách đăng ký.'
           : 'Enrollments could not be loaded.',
       );
     } finally {
-      setIsLoading(false);
+      if (isCurrent()) setIsLoading(false);
     }
   }, [filters.courseId, filters.sectionId, filters.semesterId, filters.status, locale, page, search]);
 
@@ -442,12 +456,18 @@ export default function AdminEnrollmentsPage() {
       void fetchDropdownData();
       void fetchEnrollments();
     }
+    return () => {
+      enrollmentsRequestRef.current += 1;
+    };
   }, [canAccess, fetchDropdownData, fetchEnrollments]);
 
   useEffect(() => {
     if (canAccess) {
       void fetchSectionsForCourse(filters.courseId);
     }
+    return () => {
+      sectionsRequestRef.current += 1;
+    };
   }, [canAccess, fetchSectionsForCourse, filters.courseId]);
 
   const semesterOptions = useMemo(
@@ -546,7 +566,9 @@ export default function AdminEnrollmentsPage() {
 
   const handleExportCsv = async () => {
     try {
-      const csvData = await enrollmentsApi.exportCsv(filters);
+      // Export the committed search term — searchInput is still debouncing
+      // and must not leak into the CSV the filters panel describes.
+      const csvData = await enrollmentsApi.exportCsv({ ...filters, search: search || undefined });
       // Same BOM convention as grade-export/attendance-export: without it,
       // Excel on Windows decodes the UTF-8 Vietnamese columns as mojibake.
       const blob = new Blob(['\uFEFF', csvData], { type: 'text/csv;charset=utf-8;' });

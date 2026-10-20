@@ -10,6 +10,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import java.sql.Timestamp;
 import java.time.Instant;
 import java.time.LocalDate;
+import java.time.ZoneId;
 import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -364,6 +365,38 @@ class AcademicAttendanceMutationPersistenceTest {
                         .with(lecturerJwt("lecturer-1")))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value("INVALID_ATTENDANCE_DATE"));
+    }
+
+    @Test
+    void campusTodayIsAllowedButCampusTomorrowIsRejected() throws Exception {
+        LocalDate campusToday = Instant.now()
+                .atZone(ZoneId.of("Asia/Ho_Chi_Minh"))
+                .toLocalDate();
+        LocalDate campusTomorrow = campusToday.plusDays(1);
+
+        // The boundary is the normalized campus day, not now()+24h: a request
+        // for today must pass while tomorrow must fail at every wall-clock hour.
+        mvc.perform(put("/api/v1/attendance/sections/section-1")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"date\":\"" + campusToday + "\",\"records\":[{\"studentId\":\"student-1\",\"status\":\"PRESENT\"}]}")
+                        .with(lecturerJwt("lecturer-1")))
+                .andExpect(status().isOk());
+
+        mvc.perform(put("/api/v1/attendance/sections/section-1")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"date\":\"" + campusTomorrow + "\",\"records\":[{\"studentId\":\"student-2\",\"status\":\"PRESENT\"}]}")
+                        .with(lecturerJwt("lecturer-1")))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("INVALID_ATTENDANCE_DATE"));
+
+        assertThat(jdbc.queryForObject(
+                        "SELECT COUNT(*) FROM \"academic\".\"Attendance\" WHERE \"sectionId\"='section-1' AND \"studentId\"='student-1'",
+                        Integer.class))
+                .isEqualTo(1);
+        assertThat(jdbc.queryForObject(
+                        "SELECT COUNT(*) FROM \"academic\".\"Attendance\" WHERE \"sectionId\"='section-1' AND \"studentId\"='student-2'",
+                        Integer.class))
+                .isZero();
     }
 
     @Test

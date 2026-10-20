@@ -7,7 +7,9 @@ const STUDENT = { id: 'integrity-user', studentId: 'integrity-student', email: '
 const ADMIN = { ...STUDENT, studentId: undefined, roles: ['ADMIN'] };
 const ROUND_A = {
   id: 'integrity-a', name: 'Integrity Round A', thesisType: 'MON_HOC', status: 'PROPOSAL_OPEN',
-  registrationStart: new Date(Date.now() - 7 * 86_400_000).toISOString(), registrationEnd: new Date(Date.now() + 7 * 86_400_000).toISOString(),
+  // .140ms keeps a deterministic trailing-zero fraction: datetime-local drops
+  // it from .value, so the dialog assertion below must exercise that case.
+  registrationStart: new Date(new Date(Date.now() - 7 * 86_400_000).setMilliseconds(140)).toISOString(), registrationEnd: new Date(Date.now() + 7 * 86_400_000).toISOString(),
   lecturerSubmitStart: '2026-10-01T10:23:45.123Z', lecturerSubmitEnd: '2026-10-15T10:23:45.789Z',
 };
 const ROUND_B = { ...ROUND_A, id: 'integrity-b', name: 'Integrity Round B' };
@@ -81,7 +83,18 @@ test('admin unchanged schedule save retains every timestamp and supported precis
   await page.getByText(ROUND_A.name, { exact: true }).click();
   await page.getByRole('button', { name: 'Edit schedule', exact: true }).click();
   const modal = page.getByRole('dialog');
-  await expect(modal.locator('input[type="datetime-local"]').first()).toHaveValue(bangkok(ROUND_A.registrationStart));
+  // Regression guard: the fixture must end in the trailing-zero fraction and
+  // a different millisecond must not compare equal under this oracle.
+  expect(bangkok(ROUND_A.registrationStart)).toMatch(/\.140$/);
+  expect(Date.parse(`${bangkok(ROUND_A.registrationStart).replace('.140', '.123')}Z`))
+    .not.toBe(Date.parse(`${bangkok(ROUND_A.registrationStart)}Z`));
+  // datetime-local .value normalizes .140 to .14, so compare valueAsNumber —
+  // the civil fields encoded as UTC per the HTML spec — which keeps
+  // millisecond precision regardless of the test-runner timezone.
+  await expect.poll(() =>
+    modal.locator('input[type="datetime-local"]').first()
+      .evaluate((input: HTMLInputElement) => input.valueAsNumber),
+  ).toBe(Date.parse(`${bangkok(ROUND_A.registrationStart)}Z`));
   await modal.getByRole('button', { name: 'Edit schedule', exact: true }).click();
   await expect.poll(() => patch).not.toBeNull();
   for (const field of ['registrationStart', 'registrationEnd', 'lecturerSubmitStart', 'lecturerSubmitEnd'] as const) {

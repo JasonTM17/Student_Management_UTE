@@ -93,6 +93,19 @@ export default function SectionGradingPage() {
   const { confirm, confirmationDialog } = useConfirmationDialog();
 
   const sectionId = params?.id;
+  // Section navigation must never let an old request write into the new
+  // sheet: every load/mutation captures the section it started on, and the
+  // generation counter rejects anything superseded by a newer request.
+  const gradeRequestRef = useRef(0);
+  const loadedSectionRef = useRef('');
+  const currentSectionRef = useRef('');
+  const gradeMutationRef = useRef(0);
+  if (currentSectionRef.current !== (sectionId ?? '')) {
+    // Bump before the ref flips so a save/publish started on the previous
+    // section dies here — section id alone cannot catch an A→B→A detour.
+    gradeMutationRef.current += 1;
+    currentSectionRef.current = sectionId ?? '';
+  }
   const localizedCourseName = useMemo(
     () =>
       sectionData
@@ -289,8 +302,12 @@ export default function SectionGradingPage() {
 
   const fetchSectionGrades = useCallback(
     async (options?: { silent?: boolean; preserveLocalRows?: GradeUpdate[] }) => {
+    const requestId = ++gradeRequestRef.current;
+    const loadSectionId = sectionId;
+    const isCurrent = () =>
+      requestId === gradeRequestRef.current && loadSectionId === currentSectionRef.current;
     publishGuard.current.ready = false;
-    if (!sectionId) {
+    if (!loadSectionId) {
       setError(copy.missingSection);
       setIsLoading(false);
       return;
@@ -303,8 +320,23 @@ export default function SectionGradingPage() {
     }
     setError('');
 
+    // A different section id means the previous roster, drafts and inline
+    // errors describe another sheet — drop them before the new load renders.
+    if (loadedSectionRef.current !== loadSectionId) {
+      setSectionData(null);
+      setGrades(new Map());
+      setEditedIds(new Set());
+      setScoreErrors(new Map());
+      // A save/publish of the old section may still be in flight; reset its
+      // busy flags here because its finally skips a newer operation's state.
+      setIsSaving(false);
+      setIsPublishing(false);
+    }
+
     try {
-      const data = (await sectionsApi.getSectionGrades(sectionId)) as SectionGrades;
+      const data = (await sectionsApi.getSectionGrades(loadSectionId)) as SectionGrades;
+      if (!isCurrent()) return;
+      loadedSectionRef.current = loadSectionId;
       setSectionData(data);
 
       const nextGrades = new Map<string, GradeUpdate>();
@@ -349,12 +381,16 @@ export default function SectionGradingPage() {
         setEditedIds(new Set());
       }
     } catch (requestError: any) {
-      setError(
-        campusErrorMessage(requestError, messages.common.campusErrors, copy.loadFailed),
-      );
+      if (isCurrent()) {
+        setError(
+          campusErrorMessage(requestError, messages.common.campusErrors, copy.loadFailed),
+        );
+      }
     } finally {
-      setIsLoading(false);
-      setIsRefreshing(false);
+      if (isCurrent()) {
+        setIsLoading(false);
+        setIsRefreshing(false);
+      }
     }
     },
     [copy.loadFailed, copy.missingSection, messages.common.campusErrors, sectionId],
@@ -364,7 +400,17 @@ export default function SectionGradingPage() {
     if (hasAccess) {
       void fetchSectionGrades();
     }
+    return () => {
+      gradeRequestRef.current += 1;
+    };
   }, [fetchSectionGrades, hasAccess]);
+
+  // Only a real unmount may retire in-flight mutations — bumping the epoch
+  // inside the load effect's cleanup would also fire on locale/copy-driven
+  // reruns and strand the busy flag a still-current save could not release.
+  useEffect(() => () => {
+    gradeMutationRef.current += 1;
+  }, []);
 
   const hasChanges = editedIds.size > 0;
 
@@ -393,7 +439,10 @@ export default function SectionGradingPage() {
 
   const publishReady = allGraded && !hasChanges && scoreErrors.size === 0
     && !isSaving && !isRefreshing && !isPublishing && !isLoading && !error
-    && Boolean(sectionData?.enrollments.some((enrollment) => enrollment.gradeStatus !== 'PUBLISHED'));
+    && Boolean(sectionData?.enrollments.some((enrollment) => enrollment.gradeStatus !== 'PUBLISHED'))
+    // The data on screen must belong to the route's section — a transient
+    // render after navigation could otherwise publish the previous sheet.
+    && sectionData?.sectionId === sectionId;
   publishGuard.current = { sectionId: sectionId ?? '', ready: Boolean(publishReady) };
 
   const markEdited = (enrollmentId: string) => {
@@ -519,9 +568,15 @@ export default function SectionGradingPage() {
   };
 
   const handleSave = async () => {
-    if (!sectionId || !sectionData || isSaving || isPublishing || isRefreshing) {
+    if (!sectionId || !sectionData || sectionData.sectionId !== sectionId
+        || isSaving || isPublishing || isRefreshing) {
       return;
     }
+    const saveSectionId = sectionId;
+    const saveMutation = ++gradeMutationRef.current;
+    const saveIsCurrent = () =>
+      saveSectionId === currentSectionRef.current &&
+      saveMutation === gradeMutationRef.current;
 
     // The backend upserts only the rows it receives, so submit just the
     // enrollments the lecturer actually edited instead of the whole roster.
@@ -570,7 +625,8 @@ export default function SectionGradingPage() {
     setIsSaving(true);
 
     try {
-      await sectionsApi.updateSectionGrades(sectionId, updates);
+      await sectionsApi.updateSectionGrades(saveSectionId, updates);
+      if (!saveIsCurrent()) return;
       if (partialRows.length > 0) {
         toast.warning(copy.partialRowsSkipped.replace('{count}', formatNumber(partialRows.length)));
       }
@@ -583,11 +639,13 @@ export default function SectionGradingPage() {
         .filter((update): update is GradeUpdate => Boolean(update));
       await fetchSectionGrades({ silent: true, preserveLocalRows: skippedDrafts });
     } catch (requestError: any) {
-      toast.error(
-        campusErrorMessage(requestError, messages.common.campusErrors, copy.saveFailed),
-      );
+      if (saveIsCurrent()) {
+        toast.error(
+          campusErrorMessage(requestError, messages.common.campusErrors, copy.saveFailed),
+        );
+      }
     } finally {
-      setIsSaving(false);
+      if (saveIsCurrent()) setIsSaving(false);
     }
   };
 
@@ -595,6 +653,11 @@ export default function SectionGradingPage() {
     if (!sectionId || !publishGuard.current.ready) {
       return;
     }
+    const publishSectionId = sectionId;
+    const publishMutation = ++gradeMutationRef.current;
+    const publishIsCurrent = () =>
+      publishSectionId === currentSectionRef.current &&
+      publishMutation === gradeMutationRef.current;
 
     const shouldPublish = await confirm({
       title: copy.publishTitle,
@@ -602,7 +665,8 @@ export default function SectionGradingPage() {
       confirmText: copy.publishGrades,
     });
 
-    if (!shouldPublish || !publishGuard.current.ready || publishGuard.current.sectionId !== sectionId) {
+    if (!publishIsCurrent()) return;
+    if (!shouldPublish || !publishGuard.current.ready || publishGuard.current.sectionId !== publishSectionId) {
       return;
     }
 
@@ -610,15 +674,18 @@ export default function SectionGradingPage() {
     setIsPublishing(true);
 
     try {
-      await sectionsApi.publishSectionGrades(sectionId);
+      await sectionsApi.publishSectionGrades(publishSectionId);
+      if (!publishIsCurrent()) return;
       toast.success(copy.published);
       await fetchSectionGrades();
     } catch (requestError: any) {
-      toast.error(
-        campusErrorMessage(requestError, messages.common.campusErrors, copy.publishFailed),
-      );
+      if (publishIsCurrent()) {
+        toast.error(
+          campusErrorMessage(requestError, messages.common.campusErrors, copy.publishFailed),
+        );
+      }
     } finally {
-      setIsPublishing(false);
+      if (publishIsCurrent()) setIsPublishing(false);
     }
   };
 

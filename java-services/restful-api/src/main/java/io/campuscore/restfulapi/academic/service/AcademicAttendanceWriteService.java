@@ -6,7 +6,6 @@ import io.campuscore.restfulapi.academic.web.AcademicAttendanceMutationDtos.Atte
 import io.campuscore.restfulapi.academic.web.AcademicAttendanceMutationDtos.SectionAttendanceUpdateRequest;
 import io.campuscore.restfulapi.academic.web.AcademicAttendanceMutationDtos.StudentAttendanceEntry;
 import io.campuscore.restfulapi.web.DomainException;
-import java.time.Duration;
 import java.time.Instant;
 import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
@@ -55,7 +54,7 @@ public class AcademicAttendanceWriteService {
         }
 
         Instant normalizedDate = parseAndNormalizeDate(request.date());
-        Instant maxAllowedDate = Instant.now().plus(Duration.ofDays(1));
+        Instant maxAllowedDate = AttendanceDay.parse(Instant.now().toString());
         if (normalizedDate.isAfter(maxAllowedDate)) {
             throw new DomainException(HttpStatus.BAD_REQUEST, "INVALID_ATTENDANCE_DATE", "Attendance date cannot be in the future");
         }

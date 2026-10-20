@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import {
   CheckCircle2,
@@ -234,7 +234,13 @@ export default function AdminUsersPage() {
     }
   }, [href, isAdmin, isSuperAdmin, isAuthLoading, isLoggingOut, router, user]);
 
+  // A filter/page change invalidates the in-flight request generation so a
+  // slower older response cannot repopulate the list after a newer render.
+  const usersRequestRef = useRef(0);
+
   const fetchUsers = useCallback(async () => {
+    const requestId = ++usersRequestRef.current;
+    const isCurrent = () => requestId === usersRequestRef.current;
     setIsLoading(true);
     setError('');
     try {
@@ -247,6 +253,7 @@ export default function AdminUsersPage() {
         search: search || undefined,
         role: roleFilter === 'ALL' ? undefined : roleFilter,
       });
+      if (!isCurrent()) return;
       const rows = Array.isArray(response.data)
         ? response.data
         : Array.isArray(response)
@@ -256,6 +263,7 @@ export default function AdminUsersPage() {
       setTotalItems(Number(response.meta?.total ?? rows.length));
       setTotalPages(response.meta?.totalPages || 1);
     } catch (loadError) {
+      if (!isCurrent()) return;
       const status = (loadError as { response?: { status?: number } }).response?.status;
       setError(
         status === 403
@@ -267,7 +275,7 @@ export default function AdminUsersPage() {
             : 'User records could not be loaded.',
       );
     } finally {
-      setIsLoading(false);
+      if (isCurrent()) setIsLoading(false);
     }
   }, [locale, page, search, roleFilter]);
 
@@ -314,6 +322,9 @@ export default function AdminUsersPage() {
       void fetchUsers();
       void fetchReferenceData();
     }
+    return () => {
+      usersRequestRef.current += 1;
+    };
   }, [canAccess, fetchUsers, fetchReferenceData]);
 
   const pageSummary = useMemo(() => {
