@@ -6,6 +6,7 @@ import static org.springframework.security.test.web.servlet.request.SecurityMock
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -110,6 +111,7 @@ class SiteAppearancePersistenceTest {
     void anonymousGetStartsEmpty() throws Exception {
         mvc.perform(get("/api/v1/site-appearance"))
                 .andExpect(status().isOk())
+                .andExpect(header().string("Cache-Control", "max-age=300, public, stale-while-revalidate=600"))
                 .andExpect(content().json("{}"));
     }
 

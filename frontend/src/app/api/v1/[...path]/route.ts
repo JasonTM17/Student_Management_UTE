@@ -13,7 +13,7 @@ type RouteContext = {
 // Truly public GET endpoints whose payload is identical for every caller may
 // carry a short shared cache window; authenticated/private responses must
 // never gain a cache directive here.
-const PUBLIC_GET_PATHS = new Set(['site-appearance']);
+const PUBLIC_GET_PATHS = new Set(['site-appearance', 'article-taxonomy/v2/categories']);
 
 async function handle(request: NextRequest, context: RouteContext) {
   const { path } = await context.params;
@@ -63,9 +63,10 @@ async function handle(request: NextRequest, context: RouteContext) {
   responseHeaders.delete('connection');
 
   if (request.method === 'GET' && PUBLIC_GET_PATHS.has(path.join('/'))) {
+    const upstreamCacheControl = response.headers.get('cache-control');
     responseHeaders.set(
       'Cache-Control',
-      'public, max-age=30, stale-while-revalidate=120',
+      upstreamCacheControl || 'public, max-age=300, stale-while-revalidate=600',
     );
   }
 

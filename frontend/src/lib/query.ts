@@ -8,7 +8,8 @@ import {
   type UseQueryResult,
 } from '@tanstack/react-query';
 
-const DEFAULT_STALE_TIME_MS = 60_000;
+export const STATIC_STALE_TIME_MS = 10 * 60_000;
+export const DEFAULT_STALE_TIME_MS = 5 * 60_000;
 
 export function createQueryClient(): QueryClient {
   return new QueryClient({

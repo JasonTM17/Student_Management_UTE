@@ -115,7 +115,7 @@ export function HomeNewsSection() {
           : announcementsApi.getPublic({ page: 1, limit: 18 }),
       [user],
     ),
-    { staleTime: 60_000 },
+    { staleTime: 5 * 60_000 },
   );
   const items = useMemo(
     () => (Array.isArray(pagedItems?.data) ? pagedItems.data : []),

@@ -6,8 +6,11 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import java.time.Duration;
+import org.springframework.http.CacheControl;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.oauth2.jwt.Jwt;
@@ -45,9 +48,13 @@ public class SiteAppearanceController {
         @ApiResponse(responseCode = "200", description = "Truy xuất cấu hình giao diện thành công")
     })
     @GetMapping
-    public String read() {
+    public ResponseEntity<String> read() {
         String payload = store.read();
-        return payload == null ? "{}" : payload;
+        return ResponseEntity.ok()
+                .cacheControl(CacheControl.maxAge(Duration.ofMinutes(5))
+                        .cachePublic()
+                        .staleWhileRevalidate(Duration.ofMinutes(10)))
+                .body(payload == null ? "{}" : payload);
     }
 
     @Operation(summary = "Cập nhật cấu hình giao diện hệ thống", description = "Lưu cấu hình giao diện mới dành cho người quản trị (ADMIN, SUPER_ADMIN)")

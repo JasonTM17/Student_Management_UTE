@@ -56,7 +56,7 @@ export async function GET() {
     { ...(saved ?? DEFAULT_SITE_APPEARANCE), hasSavedPayload: saved !== null },
     {
       headers: {
-        'Cache-Control': 'no-store',
+        'Cache-Control': 'public, max-age=300, stale-while-revalidate=600',
       },
     },
   );

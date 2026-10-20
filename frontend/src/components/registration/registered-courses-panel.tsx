@@ -4,7 +4,7 @@ import { useMemo, useRef, useState } from 'react';
 import { BookOpen, CalendarDays, RefreshCw } from 'lucide-react';
 import { useI18n } from '@/i18n';
 import { enrollmentsApi, semestersApi } from '@/lib/api';
-import { useApiQuery } from '@/lib/query';
+import { STATIC_STALE_TIME_MS, useApiQuery } from '@/lib/query';
 import { getLocalizedName } from '@/lib/academic-content';
 import { isActiveEnrollment } from '@/lib/enrollment-status';
 import { pickPreferredSemesterId } from '@/lib/semesters';
@@ -39,7 +39,7 @@ export function RegisteredCoursesPanel({
   const semestersQuery = useApiQuery(
     ['registration', 'detail-semesters', userId],
     async () => (await semestersApi.getAll()).data ?? [],
-    { enabled: active, staleTime: 60_000 },
+    { enabled: active, staleTime: STATIC_STALE_TIME_MS },
   );
   const semesters = semestersQuery.data ?? [];
   const preferred = semesters.some((term) => term.id === initialSemesterId)
@@ -50,7 +50,7 @@ export function RegisteredCoursesPanel({
   const enrollmentsQuery = useApiQuery(
     ['registration', 'enrollments', semesterId, userId],
     () => enrollmentsApi.getMyEnrollments(semesterId),
-    { enabled: active && Boolean(semesterId), staleTime: 30_000 },
+    { enabled: active && Boolean(semesterId), staleTime: 2 * 60_000 },
   );
   const registered = useMemo(
     () => (enrollmentsQuery.data ?? []).filter(

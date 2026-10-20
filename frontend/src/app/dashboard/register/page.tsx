@@ -251,7 +251,7 @@ export default function RegisterPage() {
   // ---- server state (react-query; per-mutation invalidation) ----
   const roundsQuery = useApiQuery(['registration', 'rounds'], () => registrationApi.rounds(), {
     enabled: canLoad,
-    staleTime: 30_000,
+    staleTime: 2 * 60_000,
   });
 
   const now = Date.now();
@@ -277,29 +277,29 @@ export default function RegisterPage() {
   const eligibilityQuery = useApiQuery(
     ['registration', 'eligibility', roundId ?? ''],
     () => registrationApi.eligibility({ semesterId, roundId }),
-    { enabled: canLoad && Boolean(roundId), staleTime: 30_000 },
+    { enabled: canLoad && Boolean(roundId), staleTime: 2 * 60_000 },
   );
   const sectionsQuery = useApiQuery(
     ['registration', 'sections', roundId ?? ''],
     () => registrationApi.sections({ semesterId, roundId }),
-    { enabled: canLoad && Boolean(roundId), staleTime: 30_000 },
+    { enabled: canLoad && Boolean(roundId), staleTime: 2 * 60_000 },
   );
   const enrollmentsQuery = useApiQuery(
     ['registration', 'enrollments', semesterId ?? '', user?.id ?? ''],
     () => enrollmentsApi.getMyEnrollments(semesterId),
     // Stays gated on the resolved user: the key carries user.id, so firing on
     // the session hint would only refetch the same rows under a second key.
-    { enabled: hasAccess && Boolean(semesterId), staleTime: 30_000 },
+    { enabled: hasAccess && Boolean(semesterId), staleTime: 2 * 60_000 },
   );
   const summaryQuery = useApiQuery(
     ['registration', 'summary', semesterId ?? ''],
     () => registrationApi.summary(semesterId),
-    { enabled: canLoad && Boolean(semesterId), staleTime: 30_000 },
+    { enabled: canLoad && Boolean(semesterId), staleTime: 2 * 60_000 },
   );
   const applicationQuery = useApiQuery(
     ['registration', 'credit-limit-application', roundId ?? ''],
     () => registrationApi.creditLimitApplication(roundId ?? ''),
-    { enabled: canLoad && Boolean(roundId), staleTime: 60_000 },
+    { enabled: canLoad && Boolean(roundId), staleTime: 5 * 60_000 },
   );
 
   const eligibilityErrorCode = eligibilityQuery.error ? campusErrorCode(eligibilityQuery.error) : undefined;

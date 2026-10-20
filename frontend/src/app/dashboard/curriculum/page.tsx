@@ -68,14 +68,14 @@ export default function CurriculumPage() {
 
   const curriculumQuery = useApiQuery(['curriculum', 'mine'], () => curriculumApi.getMyCurriculum(), {
     enabled: hasAccess,
-    staleTime: 60_000,
+    staleTime: 5 * 60_000,
   });
   // The catalog endpoint answers 4xx when no registration round is open; a
   // closed round degrades to "no open section" markers instead of an error.
   const sectionsQuery = useApiQuery(
     ['registration', 'sections', 'curriculum-page'],
     () => registrationApi.sections().catch(() => [] as RegistrationSection[]),
-    { enabled: hasAccess, staleTime: 60_000 },
+    { enabled: hasAccess, staleTime: 5 * 60_000 },
   );
 
   const courses = useMemo(() => curriculumQuery.data?.courses ?? [], [curriculumQuery.data]);

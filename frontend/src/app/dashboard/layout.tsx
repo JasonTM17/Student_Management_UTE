@@ -56,7 +56,12 @@ import { useDocumentTitle } from '@/lib/use-document-title';
 import { Button } from '@/components/ui/button';
 import { useI18n } from '@/i18n';
 import { Skeleton } from '@/components/ui/skeleton';
-import { notificationsApi } from '@/lib/api';
+import {
+  notificationsApi,
+  clearNotificationCache,
+  clearSemestersCache,
+  clearDepartmentsCache,
+} from '@/lib/api';
 import { hasCsrfSessionHint } from '@/lib/session-hint';
 import { cn, htmlToPlainText, stripNotificationTagPrefix } from '@/lib/utils';
 import { stripLocaleFromPathname } from '@/i18n/paths';
@@ -671,14 +676,21 @@ export default function DashboardLayout({
   const notificationRequestRef = useRef(0);
   const notificationSessionRef = useRef({ userId: user?.id ?? null, isLoggingOut });
   notificationSessionRef.current = { userId: user?.id ?? null, isLoggingOut };
+  const lastNotificationsFetchTimeRef = useRef(0);
 
-  const reloadNotifications = useCallback(async () => {
+  const reloadNotifications = useCallback(async (options?: { force?: boolean }) => {
     // The csrf cookie is written by the login response before this layout
     // mounts, so its presence means a session most likely exists: the bell
     // may load while /auth/me is still resolving instead of queueing behind
     // it. A dead session takes the same 401 refresh/redirect path a failed
     // /auth/me would.
     if (!user && !hasCsrfSessionHint()) {
+      return;
+    }
+
+    const now = Date.now();
+    // Throttle duplicate loads across rapid tab switches unless explicitly forced
+    if (!options?.force && now - lastNotificationsFetchTimeRef.current < 60_000 && lastNotificationsFetchTimeRef.current > 0) {
       return;
     }
 
@@ -699,9 +711,10 @@ export default function DashboardLayout({
           limit: 5,
           isRead: false,
         }),
-        notificationsApi.unreadCount(),
+        notificationsApi.unreadCount({ force: options?.force }),
       ]);
       if (isCurrent()) {
+        lastNotificationsFetchTimeRef.current = Date.now();
         setNotifications(response.data);
         setUnreadCount(count);
       }
@@ -717,6 +730,27 @@ export default function DashboardLayout({
         setNotificationsLoading(false);
       }
     }
+  }, [user]);
+
+  // Periodic unread count polling (3 minutes) while the tab is visible;
+  // hidden tabs pause polling. Avoids redundant heavy fetches on every tab switch.
+  useEffect(() => {
+    if (!user && !hasCsrfSessionHint()) {
+      return;
+    }
+    const timer = window.setInterval(() => {
+      if (document.visibilityState === 'visible' && !notificationSessionRef.current.isLoggingOut) {
+        notificationsApi.unreadCount()
+          .then((count) => {
+            if (!notificationSessionRef.current.isLoggingOut) {
+              setUnreadCount(count);
+            }
+          })
+          .catch(() => {});
+      }
+    }, 180_000);
+
+    return () => window.clearInterval(timer);
   }, [user]);
 
   // Fire once when the first gate opens (session hint or resolved user); the
@@ -740,6 +774,10 @@ export default function DashboardLayout({
       if (previousUserId !== null) {
         notificationEpochRef.current += 1;
         notificationsRequested.current = false;
+        lastNotificationsFetchTimeRef.current = 0;
+        clearNotificationCache();
+        clearSemestersCache();
+        clearDepartmentsCache();
         setNotifications([]);
         setUnreadCount(0);
         setNotificationsError(false);
@@ -1207,7 +1245,7 @@ export default function DashboardLayout({
                             variant="outline"
                             size="sm"
                             className="mt-2"
-                            onClick={() => void reloadNotifications()}
+                            onClick={() => void reloadNotifications({ force: true })}
                           >
                             <RefreshCw className="mr-2 h-3.5 w-3.5" aria-hidden="true" />
                             {messages.common.actions.retry}

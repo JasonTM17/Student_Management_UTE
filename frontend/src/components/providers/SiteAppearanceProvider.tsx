@@ -5,6 +5,7 @@ import {
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
   type ReactNode,
 } from 'react';
@@ -30,8 +31,13 @@ const SiteAppearanceContext = createContext<SiteAppearanceContextValue>({
 
 export function SiteAppearanceProvider({ children }: { children: ReactNode }) {
   const [appearance, setAppearance] = useState<SiteAppearance>(DEFAULT_SITE_APPEARANCE);
+  const isRefreshingRef = useRef(false);
 
   const refreshAppearance = async () => {
+    if (isRefreshingRef.current) {
+      return;
+    }
+    isRefreshingRef.current = true;
     try {
       const next = sanitizeSiteAppearance(await fetchSiteAppearance());
       setAppearance((current) =>
@@ -42,25 +48,45 @@ export function SiteAppearanceProvider({ children }: { children: ReactNode }) {
       applySiteAppearanceAccent(next.accent);
     } catch {
       // Public pages keep the last known campus chrome.
+    } finally {
+      isRefreshingRef.current = false;
     }
   };
 
   useEffect(() => {
     void refreshAppearance();
-    // Poll slowly and only while the tab is visible; hidden tabs pause
-    // polling and catch up immediately when they become visible again.
+    let lastRefreshTime = Date.now();
+    // Poll slowly (every 5 minutes, previously 15000 ms) and only while the tab is visible;
+    // hidden tabs pause polling and catch up when they become visible again.
+    const APPEARANCE_POLL_INTERVAL_MS = 300_000; // 5 minutes (reduced from 15000)
     const timer = window.setInterval(() => {
       if (document.visibilityState === 'visible') {
+        lastRefreshTime = Date.now();
         void refreshAppearance();
       }
-    }, 15000);
+    }, APPEARANCE_POLL_INTERVAL_MS);
 
     const onVisibilityChange = () => {
       if (document.visibilityState === 'visible') {
-        void refreshAppearance();
+        const now = Date.now();
+        if (now - lastRefreshTime >= 60_000) {
+          lastRefreshTime = now;
+          void refreshAppearance();
+        }
       }
     };
     document.addEventListener('visibilitychange', onVisibilityChange);
+
+    const onFocus = () => {
+      if (document.visibilityState === 'visible') {
+        const now = Date.now();
+        if (now - lastRefreshTime >= 60_000) {
+          lastRefreshTime = now;
+          void refreshAppearance();
+        }
+      }
+    };
+    window.addEventListener('focus', onFocus);
 
     const channel = typeof BroadcastChannel !== 'undefined'
       ? new BroadcastChannel(SITE_APPEARANCE_CHANNEL)
@@ -75,6 +101,7 @@ export function SiteAppearanceProvider({ children }: { children: ReactNode }) {
     return () => {
       window.clearInterval(timer);
       document.removeEventListener('visibilitychange', onVisibilityChange);
+      window.removeEventListener('focus', onFocus);
       channel?.removeEventListener('message', onMessage);
       channel?.close();
     };

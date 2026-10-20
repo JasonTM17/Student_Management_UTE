@@ -16,7 +16,7 @@ import {
 } from 'lucide-react';
 import { useRequireAuth } from '@/context/AuthContext';
 import { enrollmentsApi, registrationApi, semestersApi } from '@/lib/api';
-import { useApiQuery } from '@/lib/query';
+import { STATIC_STALE_TIME_MS, useApiQuery } from '@/lib/query';
 import { hasCsrfSessionHint } from '@/lib/session-hint';
 import { isActiveEnrollment } from '@/lib/enrollment-status';
 import { getLocalizedName } from '@/lib/academic-content';
@@ -149,7 +149,7 @@ export default function DashboardPage() {
     async () => (await semestersApi.getAll()).data,
     // Semester reference data changes rarely; caching it across navigations
     // removes a full waterfall level on repeat visits.
-    { enabled: canLoad, staleTime: 5 * 60_000 },
+    { enabled: canLoad, staleTime: STATIC_STALE_TIME_MS },
   );
   const semesters = useMemo(() => semestersQuery.data ?? [], [semestersQuery.data]);
   const currentSemester = useMemo(() => pickPreferredSemesterId(semesters), [semesters]);
@@ -161,12 +161,12 @@ export default function DashboardPage() {
   const enrollmentsQuery = useApiQuery(
     ['registration', 'enrollments', currentSemester, user?.id ?? ''],
     () => enrollmentsApi.getMyEnrollments(currentSemester || undefined),
-    { enabled: hasAccess && Boolean(currentSemester), staleTime: 30_000 },
+    { enabled: hasAccess && Boolean(currentSemester), staleTime: 5 * 60_000 },
   );
   const summaryQuery = useApiQuery(
     ['registration', 'summary', currentSemester],
     () => registrationApi.summary(currentSemester).catch(() => null),
-    { enabled: canLoad && Boolean(currentSemester), staleTime: 30_000 },
+    { enabled: canLoad && Boolean(currentSemester), staleTime: 5 * 60_000 },
   );
 
   const enrollments = (enrollmentsQuery.data ?? []) as Enrollment[];

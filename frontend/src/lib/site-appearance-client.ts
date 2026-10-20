@@ -64,7 +64,6 @@ async function readLegacyAppearance(): Promise<{
 } | null> {
   try {
     const response = await fetch('/api/site-appearance', {
-      cache: 'no-store',
       credentials: 'same-origin',
     });
     if (!response.ok) {
@@ -122,31 +121,44 @@ async function writeLegacyAppearance(appearance: SiteAppearance): Promise<SiteAp
  * the API row is still empty its branding is preferred over the defaults so a
  * live site does not visually reset before its first API write.
  */
-export async function fetchSiteAppearance(): Promise<SiteAppearance> {
-  let payload: unknown;
-  try {
-    payload = await siteAppearanceApi.get();
-  } catch (error) {
-    if (!isAbsentApiEndpoint(error)) {
-      throw error;
-    }
-    const legacy = await readLegacyAppearance();
-    if (!legacy) {
-      throw new Error('appearance-unavailable');
-    }
-    return legacy.appearance;
-  }
+let activeAppearanceFetch: Promise<SiteAppearance> | null = null;
 
-  if (hasWriteStamp(payload)) {
-    return sanitizeSiteAppearance(payload);
+export async function fetchSiteAppearance(): Promise<SiteAppearance> {
+  if (activeAppearanceFetch) {
+    return activeAppearanceFetch;
   }
-  const migrated = await legacySeedPayload();
-  return sanitizeSiteAppearance(migrated ?? payload);
+  activeAppearanceFetch = (async () => {
+    let payload: unknown;
+    try {
+      payload = await siteAppearanceApi.get();
+    } catch (error) {
+      if (!isAbsentApiEndpoint(error)) {
+        throw error;
+      }
+      const legacy = await readLegacyAppearance();
+      if (!legacy) {
+        throw new Error('appearance-unavailable');
+      }
+      return legacy.appearance;
+    }
+
+    if (hasWriteStamp(payload)) {
+      return sanitizeSiteAppearance(payload);
+    }
+    const migrated = await legacySeedPayload();
+    return sanitizeSiteAppearance(migrated ?? payload);
+  })().finally(() => {
+    activeAppearanceFetch = null;
+  });
+
+  return activeAppearanceFetch;
 }
 
 export async function saveSiteAppearance(
   appearance: SiteAppearance,
 ): Promise<SiteAppearanceSaveResult> {
+  legacySeed = null;
+  activeAppearanceFetch = null;
   try {
     const saved = (await siteAppearanceApi.put(appearance)) as SiteAppearance;
     return { ...saved, persisted: true };

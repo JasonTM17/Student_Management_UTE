@@ -646,6 +646,9 @@ export const authApi = {
   },
 
   logout: async (): Promise<void> => {
+    clearNotificationCache();
+    clearSemestersCache();
+    clearDepartmentsCache();
     await withSessionTransport(() =>
       api.post(
         '/auth/logout',
@@ -992,31 +995,110 @@ export const enrollmentsApi = {
   },
 };
 
+// Cached reference-data reads share one bound so a stalled upstream cannot
+// pin a module-level promise forever: the request errors out, the entry is
+// evicted, and the next call retries.
+const CACHED_GET_TIMEOUT_MS = 15_000;
+
+let cachedSemesters: { promise: Promise<ApiResponse<Semester[]>>; timestamp: number } | null = null;
+const SEMESTERS_CACHE_TTL_MS = 5 * 60_000; // 5 minutes
+
+export function clearSemestersCache(): void {
+  cachedSemesters = null;
+}
+
 // Semesters API
 export const semestersApi = {
-  getAll: async (): Promise<ApiResponse<Semester[]>> => {
-    const response = await api.get<ApiResponse<Semester[]>>('/semesters');
-    return response.data;
+  getAll: async (options?: { forceRefresh?: boolean }): Promise<ApiResponse<Semester[]>> => {
+    const now = Date.now();
+    if (
+      !options?.forceRefresh &&
+      cachedSemesters &&
+      now - cachedSemesters.timestamp < SEMESTERS_CACHE_TTL_MS
+    ) {
+      return cachedSemesters.promise;
+    }
+    const promise = api
+      .get<ApiResponse<Semester[]>>('/semesters', {
+        timeout: CACHED_GET_TIMEOUT_MS,
+      })
+      .then(
+      (response) => response.data,
+      (error) => {
+        if (cachedSemesters?.promise === promise) {
+          cachedSemesters = null;
+        }
+        throw error;
+      },
+    );
+    cachedSemesters = { promise, timestamp: now };
+    return promise;
   },
 };
 
+const departmentsCache = new Map<string, { promise: Promise<ApiResponse<Department[]>>; timestamp: number }>();
+const DEPARTMENTS_CACHE_TTL_MS = 5 * 60_000; // 5 minutes
+
+export function clearDepartmentsCache(): void {
+  departmentsCache.clear();
+}
+
 // Departments API
 export const departmentsApi = {
-  getAll: async (params?: {
-    page?: number;
-    limit?: number;
-    search?: string;
-  }): Promise<ApiResponse<Department[]>> => {
-    const response = await api.get<ApiResponse<Department[]>>('/departments', {
-      params,
-    });
-    return response.data;
+  getAll: async (
+    params?: {
+      page?: number;
+      limit?: number;
+      search?: string;
+    },
+    options?: { forceRefresh?: boolean },
+  ): Promise<ApiResponse<Department[]>> => {
+    const key = params
+      ? JSON.stringify(
+          Object.keys(params)
+            .sort()
+            .reduce((acc, k) => {
+              const val = params[k as keyof typeof params];
+              if (val !== undefined) acc[k] = val;
+              return acc;
+            }, {} as Record<string, unknown>),
+        )
+      : '{}';
+    const now = Date.now();
+    const cached = departmentsCache.get(key);
+    if (!options?.forceRefresh && cached && now - cached.timestamp < DEPARTMENTS_CACHE_TTL_MS) {
+      return cached.promise;
+    }
+    const promise = api
+      .get<ApiResponse<Department[]>>('/departments', {
+        params,
+        timeout: CACHED_GET_TIMEOUT_MS,
+      })
+      .then(
+        (response) => response.data,
+        (error) => {
+          if (departmentsCache.get(key)?.promise === promise) {
+            departmentsCache.delete(key);
+          }
+          throw error;
+        },
+      );
+    departmentsCache.set(key, { promise, timestamp: now });
+    // `search` makes the key space unbounded; evict expired entries on write
+    // so a searching session cannot grow the map without bound.
+    for (const [k, entry] of departmentsCache) {
+      if (now - entry.timestamp >= DEPARTMENTS_CACHE_TTL_MS) {
+        departmentsCache.delete(k);
+      }
+    }
+    return promise;
   },
   getById: async (id: string): Promise<Department> => {
     const response = await api.get<Department>(`/departments/${id}`);
     return response.data;
   },
   create: async (data: Partial<Department>): Promise<Department> => {
+    clearDepartmentsCache();
     const response = await api.post<Department>('/departments', data);
     return response.data;
   },
@@ -1024,10 +1106,12 @@ export const departmentsApi = {
     id: string,
     data: Partial<Department>,
   ): Promise<Department> => {
+    clearDepartmentsCache();
     const response = await api.put<Department>(`/departments/${id}`, data);
     return response.data;
   },
   delete: async (id: string): Promise<{ message: string }> => {
+    clearDepartmentsCache();
     const response = await api.delete<{ message: string }>(
       `/departments/${id}`,
     );
@@ -1155,14 +1239,17 @@ export const adminSemestersApi = {
     return response.data;
   },
   create: async (data: ApiObject): Promise<Semester> => {
+    clearSemestersCache();
     const response = await api.post<Semester>('/semesters', data);
     return response.data;
   },
   update: async (id: string, data: ApiObject): Promise<Semester> => {
+    clearSemestersCache();
     const response = await api.put<Semester>(`/semesters/${id}`, data);
     return response.data;
   },
   delete: async (id: string): Promise<{ message: string }> => {
+    clearSemestersCache();
     const response = await api.delete<{ message: string }>(`/semesters/${id}`);
     return response.data;
   },
@@ -1403,7 +1490,17 @@ export const articleTaxonomyApi = {
 
 export const siteAppearanceApi = {
   get: async (): Promise<unknown> => {
-    const response = await api.get<unknown>('/site-appearance');
+    const response = await api.get<unknown>('/site-appearance', {
+      timeout: CACHED_GET_TIMEOUT_MS,
+      headers: {
+        // The shared instance defaults every request to no-store; undefined
+        // values delete those inherited headers so the public response cache
+        // (max-age=300 upstream) is actually allowed to engage.
+        'Cache-Control': 'max-age=300',
+        Pragma: undefined,
+        Expires: undefined,
+      },
+    });
     return response.data;
   },
   put: async (appearance: unknown): Promise<unknown> => {
@@ -1457,6 +1554,13 @@ export const campusDistributionApi = {
   },
 };
 
+let cachedUnreadCount: { promise: Promise<number>; timestamp: number } | null = null;
+const UNREAD_COUNT_CACHE_TTL_MS = 60_000;
+
+export function clearNotificationCache(): void {
+  cachedUnreadCount = null;
+}
+
 // Notifications API
 export const notificationsApi = {
   getMy: async (params?: {
@@ -1479,13 +1583,29 @@ export const notificationsApi = {
   // The inbox rows are a capped preview; the badge number must come from the
   // server-side counter so it cannot truncate at the page size. The Java
   // controller wraps it: UnreadCountResponse { unreadCount }.
-  unreadCount: async (): Promise<number> => {
-    const response = await api.get<{ unreadCount?: number }>(
-      '/notifications/my/unread-count',
-    );
-    return response.data.unreadCount ?? 0;
+  unreadCount: async (options?: { force?: boolean }): Promise<number> => {
+    const now = Date.now();
+    if (!options?.force && cachedUnreadCount && now - cachedUnreadCount.timestamp < UNREAD_COUNT_CACHE_TTL_MS) {
+      return cachedUnreadCount.promise;
+    }
+    const promise = api
+      .get<{ unreadCount?: number }>('/notifications/my/unread-count', {
+        timeout: CACHED_GET_TIMEOUT_MS,
+      })
+      .then(
+        (response) => response.data.unreadCount ?? 0,
+        (error) => {
+          if (cachedUnreadCount?.promise === promise) {
+            cachedUnreadCount = null;
+          }
+          throw error;
+        },
+      );
+    cachedUnreadCount = { promise, timestamp: now };
+    return promise;
   },
   markRead: async (id: string): Promise<ApiObject> => {
+    clearNotificationCache();
     const response = await api.patch<ApiObject>(
       `/notifications/my/${id}/read`,
       {},
@@ -1493,6 +1613,7 @@ export const notificationsApi = {
     return response.data;
   },
   markAllRead: async (): Promise<{ updated: number }> => {
+    clearNotificationCache();
     const response = await api.patch<{ updated: number }>(
       '/notifications/my/read-all',
       {},
