@@ -1052,7 +1052,9 @@ export default function ThesisPage() {
   const getTopicTitle = (topicId?: string | null) => {
     if (!topicId) return '—';
     const found = topics.find((topic) => topic.id === topicId);
-    return found ? found.title : topicId;
+    // The directory may be department-scoped while own supervision spans it.
+    const supervised = lecturerWorkload?.topics.find((topic) => topic.topicId === topicId);
+    return found ? found.title : supervised?.title || topicId;
   };
 
   const getLecturerLabel = (lecturer: Lecturer) => {
@@ -2333,6 +2335,7 @@ export default function ThesisPage() {
     currentGroup && currentGroup.approvalStatus === 'APPROVED' ? (
       <SubmissionStatusTimeline
         report={groupReport}
+        reportWindowState={reportWindowState}
         deadlineAt={reportDeadlineAt}
         daysRemaining={reportDaysRemaining}
         formatDateTime={formatDateTime}

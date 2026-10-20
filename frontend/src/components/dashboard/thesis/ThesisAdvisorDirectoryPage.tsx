@@ -49,12 +49,23 @@ interface AdvisorWorkload {
 }
 
 function getAdvisorFullName(lec: Lecturer): string {
-  const parts = [lec.user?.lastName, lec.user?.firstName].filter(Boolean);
+  const parts = [lec.user?.lastName, lec.user?.firstName].map((part) => part?.trim()).filter(Boolean);
   if (parts.length > 0) {
     return parts.join(' ').trim();
   }
   // The record's own identifier, never a guessed name.
   return lec.employeeId || '—';
+}
+
+function getAdvisorDisplayName(lec: Lecturer): string {
+  const name = getAdvisorFullName(lec);
+  const title = lec.title?.trim();
+  // Stored names may already include the exact title. Require a name boundary
+  // so matching title letters never hide part of a person's name.
+  if (!title || name === title || (name.startsWith(title) && /^\s/.test(name.slice(title.length)))) {
+    return name;
+  }
+  return `${title} ${name}`;
 }
 
 function getInitials(name: string): string {
@@ -527,14 +538,13 @@ export default function ThesisAdvisorDirectoryPage() {
       key: 'name',
       title: isVi ? 'Giảng viên hướng dẫn' : 'Lecturer & Advisor',
       render: (record) => {
-        const titlePrefix = record.title ? `${record.title} ` : '';
-        const name = getAdvisorFullName(record);
+        const name = getAdvisorDisplayName(record);
         return (
           <div className="flex items-center gap-3">
             <AdvisorAvatar lecturer={record} />
             <div className="min-w-0">
               <div className="text-sm font-bold text-foreground">
-                {titlePrefix}{name}
+                {name}
               </div>
               <div className="flex items-center gap-1 font-mono text-xs text-muted-foreground">
                 <span>{record.employeeId || '—'}</span>
@@ -821,8 +831,7 @@ export default function ThesisAdvisorDirectoryPage() {
                 {visibleLecturers.map((lec) => {
                   const workload = workloadFor(advisorWorkloadMap, lec.id);
                   const isAvailable = workload.topicCount < workload.maxTopics;
-                  const titlePrefix = lec.title ? `${lec.title} ` : '';
-                  const fullName = getAdvisorFullName(lec);
+                  const fullName = getAdvisorDisplayName(lec);
 
                   return (
                     <Card
@@ -835,8 +844,8 @@ export default function ThesisAdvisorDirectoryPage() {
                           <div className="flex items-start gap-3.5">
                             <AdvisorAvatar lecturer={lec} size="lg" />
                             <div className="min-w-0 flex-1">
-                              <h3 className="truncate text-base font-bold text-foreground" title={`${titlePrefix}${fullName}`}>
-                                {titlePrefix}{fullName}
+                              <h3 className="truncate text-base font-bold text-foreground" title={fullName}>
+                                {fullName}
                               </h3>
                               <p className="mt-0.5 flex items-center gap-1.5 truncate text-xs font-medium text-muted-foreground">
                                 <Building2 className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
@@ -1005,7 +1014,7 @@ export default function ThesisAdvisorDirectoryPage() {
         onClose={() => setIsModalOpen(false)}
         title={
           selectedAdvisor
-            ? `${selectedAdvisor.title ? `${selectedAdvisor.title} ` : ''}${getAdvisorFullName(selectedAdvisor)}`
+            ? getAdvisorDisplayName(selectedAdvisor)
             : undefined
         }
         className="max-w-2xl"

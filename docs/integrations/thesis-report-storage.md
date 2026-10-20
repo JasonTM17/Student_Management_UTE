@@ -88,6 +88,11 @@ owns presentation; [report persistence](../../java-services/restful-api/src/main
 owns authorization, artifact preservation and the write boundary shared with
 group membership and round publication.
 
+A missing deadline is not a closed submission window, and a rounded day count
+is not permission to write. Keep the timeline aligned with the form's lifecycle
+authority; see [timeline presentation](../../frontend/src/features/thesis/components/SubmissionStatusTimeline.tsx)
+and its [lifecycle regressions](../../frontend/tests/thesis-report-safety.test.js).
+
 Report confidentiality follows academic responsibility: `ADMIN` and
 `SUPER_ADMIN` have institution-wide read authority; `TRUONG_KHOA` has own-faculty
 authority determined from the caller's current, active, subject-bound lecturer

@@ -7,6 +7,98 @@ const ts = require('typescript');
 const root = path.resolve(__dirname, '..');
 const read = (relative) => fs.readFileSync(path.join(root, relative), 'utf8');
 
+// Execute the real name formatter and JSX consumers without mounting network hooks.
+function loadAdvisorNameRenderers() {
+  const source = read('src/components/dashboard/thesis/ThesisAdvisorDirectoryPage.tsx');
+  const ast = ts.createSourceFile('advisor.tsx', source, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX);
+  const functions = [];
+  const gridDeclarations = [];
+  let tableRenderer;
+  let gridHeading;
+  let modalTitle;
+  const visit = (node) => {
+    if (ts.isFunctionDeclaration(node) && /^getAdvisor(?:Full|Display)Name$/.test(node.name?.text)) functions.push(node.getText(ast));
+    if (ts.isVariableDeclaration(node) && node.name.getText(ast) === 'tableColumns') {
+      tableRenderer = node.initializer.elements[0].properties.find((property) => property.name?.getText(ast) === 'render').initializer;
+    }
+    if (ts.isCallExpression(node) && node.expression.getText(ast) === 'visibleLecturers.map') {
+      for (const statement of node.arguments[0].body.statements) {
+        if (ts.isVariableStatement(statement)) {
+          for (const declaration of statement.declarationList.declarations) {
+            if (['titlePrefix', 'fullName'].includes(declaration.name.getText(ast))) gridDeclarations.push(`const ${declaration.getText(ast)};`);
+          }
+        }
+      }
+    }
+    if (ts.isJsxElement(node) && node.openingElement.tagName.getText(ast) === 'h3') gridHeading = node;
+    if (ts.isJsxOpeningElement(node) && node.tagName.getText(ast) === 'Modal') {
+      modalTitle = node.attributes.properties.find((property) => property.name?.getText(ast) === 'title')?.initializer?.expression;
+    }
+    ts.forEachChild(node, visit);
+  };
+  visit(ast);
+  assert.ok(tableRenderer && gridHeading && modalTitle, 'all displayed name consumers are identified');
+  const emitted = ts.transpileModule(`${functions.join('\n')}
+    const AdvisorAvatar = () => null;
+    module.exports = {
+      raw: getAdvisorFullName,
+      table: ${tableRenderer.getText(ast)},
+      grid: (lec) => { ${gridDeclarations.join('\n')} return (${gridHeading.getText(ast)}); },
+      modal: (selectedAdvisor) => (${modalTitle.getText(ast)}),
+    };`, {
+    compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2020, jsx: ts.JsxEmit.ReactJSX },
+    fileName: 'advisor-names.tsx',
+  }).outputText;
+  const record = { exports: {} };
+  Function('module', 'exports', 'require', emitted)(record, record.exports, require);
+  return record.exports;
+}
+
+const advisorNameCases = [
+  ['stored doctorate', 'TS.', 'TS. Nguyễn Minh', 'Đạo', 'TS. Nguyễn Minh Đạo'],
+  ['stored associate professor', 'PGS.TS.', 'PGS.TS. Lê Văn', 'Vinh', 'PGS.TS. Lê Văn Vinh'],
+  ['stored masters', 'ThS.', 'ThS. Nguyễn Quang', 'Huy', 'ThS. Nguyễn Quang Huy'],
+  ['unprefixed name', 'TS.', 'Nguyễn Minh', 'Đạo', 'TS. Nguyễn Minh Đạo'],
+  ['no separate title', null, 'TS. Nguyễn Minh', 'Đạo', 'TS. Nguyễn Minh Đạo'],
+  ['name equals title', 'TS.', 'TS.', '', 'TS.'],
+  ['trimmed title', ' TS. ', 'TS. Nguyễn Minh', 'Đạo', 'TS. Nguyễn Minh Đạo'],
+  ['title substring inside a name', 'TS.', 'Nguyễn TS.', 'Đạo', 'TS. Nguyễn TS. Đạo'],
+  ['prefix letters without name boundary', 'TS.', 'TS.Nguyễn Minh', 'Đạo', 'TS. TS.Nguyễn Minh Đạo'],
+];
+
+for (const [label, title, lastName, firstName, expected] of advisorNameCases) {
+  test(`advisor displays one exact academic-title prefix: ${label}`, () => {
+    const { renderToStaticMarkup } = require('react-dom/server');
+    const renderers = loadAdvisorNameRenderers();
+    const lecturer = { id: 'advisor-1', title, employeeId: 'GV-001', user: { lastName, firstName } };
+    const table = renderToStaticMarkup(renderers.table(lecturer));
+    const grid = renderToStaticMarkup(renderers.grid(lecturer));
+    assert.ok(table.includes(`>${expected}</div>`), 'desktop table and its mobile card renderer display the same name');
+    assert.ok(grid.includes(`title="${expected}"`), 'grid tooltip displays the same name');
+    assert.ok(grid.includes(`>${expected}</h3>`), 'grid heading displays the same name');
+    assert.equal(renderers.modal(lecturer), expected, 'detail modal displays the same name');
+  });
+}
+
+test('advisor formatting preserves identifiers, absent names, accents and raw avatar/search input', () => {
+  const { renderToStaticMarkup } = require('react-dom/server');
+  const renderers = loadAdvisorNameRenderers();
+  for (const [lecturer, expected] of [
+    [{ id: 'a', employeeId: 'GV-001' }, 'GV-001'],
+    [{ id: 'a', title: 'TS.', employeeId: 'GV-001' }, 'TS. GV-001'],
+    [{ id: 'a' }, '—'],
+    [{ id: 'a', user: { lastName: ' ', firstName: ' ' }, employeeId: 'GV-001' }, 'GV-001'],
+  ]) {
+    assert.ok(renderToStaticMarkup(renderers.table(lecturer)).includes(`>${expected}</div>`));
+    assert.equal(renderers.modal(lecturer), expected);
+  }
+  const lecturer = { id: 'a', title: 'TS.', user: { lastName: 'TS. Nguyễn Minh', firstName: 'Đạo' } };
+  assert.equal(renderers.raw(lecturer), 'TS. Nguyễn Minh Đạo');
+  const source = read('src/components/dashboard/thesis/ThesisAdvisorDirectoryPage.tsx');
+  assert.match(source, /const name = getAdvisorFullName\(lecturer\)/, 'avatar keeps raw input');
+  assert.match(source, /const haystack = normalizeVietnameseText\(\s*\[\s*getAdvisorFullName\(lec\)/, 'search keeps raw input');
+});
+
 function readSourceTree(directory = path.join(root, 'src'), files = []) {
   for (const entry of fs.readdirSync(directory, { withFileTypes: true })) {
     const absolute = path.join(directory, entry.name);

@@ -24,6 +24,8 @@ export interface SubmissionStatusTimelineCopy {
   deadlineChip: string;
   overdueChip: string;
   notOpenChip: string;
+  openNoDeadlineChip: string;
+  closedFinalChip: string;
   deadlineDateLabel: string;
   firstSubmissionLabel: string;
   latestUpdateLabel: string;
@@ -40,6 +42,8 @@ export interface SubmissionStatusTimelineCopy {
 interface SubmissionStatusTimelineProps {
   /** The group's report; `null` keeps the timeline in its not-submitted state. */
   report: ThesisGroupReport | null;
+  /** Same lifecycle authority as the report form; rounded days are display only. */
+  reportWindowState: 'notYetOpen' | 'open' | 'deadlinePassed' | 'closedFinal';
   /** The round's report-submission deadline, when the round publishes one. */
   deadlineAt?: string | null;
   /**
@@ -93,6 +97,7 @@ const CHIP_BASE_CLASS =
 
 export default function SubmissionStatusTimeline({
   report,
+  reportWindowState,
   deadlineAt,
   daysRemaining,
   formatDateTime,
@@ -145,13 +150,23 @@ export default function SubmissionStatusTimeline({
     : [];
 
   const deadlineTone: StatusTone =
-    daysRemaining == null ? 'neutral' : daysRemaining < 0 ? 'danger' : 'warning';
+    reportWindowState === 'deadlinePassed'
+      ? 'danger'
+      : reportWindowState === 'open'
+        ? daysRemaining == null
+          ? 'success'
+          : 'warning'
+        : 'neutral';
   const deadlineLabel =
-    daysRemaining == null
+    reportWindowState === 'notYetOpen'
       ? copy.notOpenChip
-      : daysRemaining < 0
-        ? copy.overdueChip
-        : fillCopy(copy.deadlineChip, { days: daysRemaining });
+      : reportWindowState === 'closedFinal'
+        ? copy.closedFinalChip
+        : reportWindowState === 'deadlinePassed'
+          ? copy.overdueChip
+          : daysRemaining == null
+            ? copy.openNoDeadlineChip
+            : fillCopy(copy.deadlineChip, { days: daysRemaining });
 
   return (
     <div className="rounded-xl border border-border/70 bg-card p-4">
