@@ -150,6 +150,7 @@ export default function ThesisPage() {
   const [selectedRoundId, setSelectedRoundId] = useState('');
   const topicRequestRef = useRef(0);
   const councilRequestRef = useRef(0);
+  const repositoryRequestRef = useRef(0);
   const selectedRoundRef = useRef(selectedRoundId);
   selectedRoundRef.current = selectedRoundId;
   const [viewingTopic, setViewingTopic] = useState<ThesisTopic | null>(null);
@@ -772,10 +773,15 @@ export default function ThesisPage() {
 
     let cancelled = false;
     const councilRequestId = ++councilRequestRef.current;
+    const repositoryRequestId = ++repositoryRequestRef.current;
     const roundId = selectedRoundId;
     const isCouncilCurrent = () =>
       !cancelled
       && councilRequestId === councilRequestRef.current
+      && roundId === selectedRoundRef.current;
+    const isRepositoryCurrent = () =>
+      !cancelled
+      && repositoryRequestId === repositoryRequestRef.current
       && roundId === selectedRoundRef.current;
     const loadWorkspace = async () => {
       setError('');
@@ -806,13 +812,13 @@ export default function ThesisPage() {
               }
             }),
             thesisApi.listRoundRepository(selectedRoundId).then((rList) => {
-              if (!cancelled) {
+              if (isRepositoryCurrent()) {
                 setRepositoryReports(rList);
                 setRepositoryError('');
                 setIsRepositoryLoading(false);
               }
             }).catch(() => {
-              if (!cancelled) {
+              if (isRepositoryCurrent()) {
                 setRepositoryReports([]);
                 setRepositoryError(messages.thesis.loadFailed);
                 setIsRepositoryLoading(false);
@@ -863,17 +869,27 @@ export default function ThesisPage() {
 
   // Retry path for a failed repository load: the reader gets the real failure
   // with a way back, instead of an archive that silently reads as empty.
+  // The retry can resolve after the reader switched rounds, so — like the
+  // council retry above — every state write is gated on the round still being
+  // selected; a stale answer must not overwrite the new round's archive.
   const reloadRepository = useCallback(async () => {
     if (!selectedRoundId || !canLoadStaffRelations) return;
+    const requestId = ++repositoryRequestRef.current;
+    const roundId = selectedRoundId;
+    const isCurrent = () =>
+      requestId === repositoryRequestRef.current && roundId === selectedRoundRef.current;
     setIsRepositoryLoading(true);
     setRepositoryError('');
     try {
-      setRepositoryReports(await thesisApi.listRoundRepository(selectedRoundId));
+      const reports = await thesisApi.listRoundRepository(roundId);
+      if (!isCurrent()) return;
+      setRepositoryReports(reports);
     } catch {
+      if (!isCurrent()) return;
       setRepositoryReports([]);
       setRepositoryError(messages.thesis.loadFailed);
     } finally {
-      setIsRepositoryLoading(false);
+      if (isCurrent()) setIsRepositoryLoading(false);
     }
   }, [canLoadStaffRelations, messages.thesis.loadFailed, selectedRoundId]);
 

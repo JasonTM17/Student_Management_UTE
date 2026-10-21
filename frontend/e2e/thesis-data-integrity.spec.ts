@@ -144,6 +144,57 @@ test('dashboard topic request from the previous round never replaces current top
   await expect(page.getByText('STALE_TOPIC_A', { exact: true })).toHaveCount(0);
 });
 
+test('admin repository retry resolving after a round switch never overwrites the current archive', async ({ page }) => {
+  // reloadRepository regression: the retry must not write round A rows once the
+  // reader has switched to round B. Round A's archive fails once (so the retry
+  // affordance appears), the retry response is then held behind a gate; round B
+  // answers instantly with a distinct marker. Without the round guard the late
+  // round-A payload lands in repositoryReports after B already rendered.
+  const held = gate();
+  let failedOnce = false;
+  let retryArrived = false;
+  let staleDelivered = false;
+  const repoReport = (reportId: string, topicTitle: string) => ({
+    reportId, topicTitle, departmentName: 'INTEGRITY_DEPT', groupStatus: 'COMPLETED',
+    approvalStatus: 'APPROVED', submittedAt: '2026-10-12T00:00:00Z', updatedAt: '2026-10-12T00:00:00Z',
+    supervisors: [], members: [],
+  });
+  await session(page, true, async (route, url) => {
+    if (url.pathname.endsWith(`/thesis/rounds/${ROUND_B.id}/repository`)) {
+      await json(route, [repoReport('repo-b', 'CURRENT_REPO_B')]);
+      return true;
+    }
+    if (!url.pathname.endsWith(`/thesis/rounds/${ROUND_A.id}/repository`)) return false;
+    if (!failedOnce) {
+      failedOnce = true;
+      await json(route, { code: 'INTERNAL_ERROR' }, 500);
+      return true;
+    }
+    retryArrived = true;
+    await held.promise;
+    await json(route, [repoReport('repo-a', 'STALE_REPO_A')]);
+    staleDelivered = true;
+    return true;
+  });
+  // Admin sees the repository tab; ?tab=repository selects it directly.
+  await page.goto(`/en/dashboard/thesis?roundId=${ROUND_A.id}&tab=repository`);
+  // The failed archive load renders the panel's error block (role=alert is
+  // unique on this page — every other fixture endpoint succeeds).
+  const failure = page.getByRole('alert');
+  await expect(failure).toHaveCount(1);
+  await failure.getByRole('button').click();
+  await expect.poll(() => retryArrived).toBe(true);
+  await page.getByRole('combobox', { name: /round/i }).selectOption(ROUND_B.id);
+  await expect(page.getByText('CURRENT_REPO_B', { exact: true })).toBeVisible();
+  held.release();
+  // Proves the held round-A payload actually arrived after the switch —
+  // otherwise the zero-count assertion below would be vacuous.
+  await expect.poll(() => staleDelivered).toBe(true);
+  await page.waitForLoadState('networkidle');
+  await expect(page.getByText('CURRENT_REPO_B', { exact: true })).toBeVisible();
+  await expect(page.getByText('STALE_REPO_A', { exact: true })).toHaveCount(0);
+});
+
 test('student progress opens the older membership round instead of a new empty round', async ({ page }) => {
   await session(page, false, async (route, url) => {
     if (url.pathname.endsWith('/thesis/rounds')) { await json(route, [{ ...ROUND_B, status: 'REGISTRATION_OPEN', thesisType: 'KLTN' }, { ...ROUND_A, status: 'REGISTRATION_CLOSED' }]); return true; }
