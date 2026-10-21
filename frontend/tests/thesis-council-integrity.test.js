@@ -204,6 +204,7 @@ function effectDeps(overrides) {
     selectedRoundRef: { current: '' },
     topicRequestRef: { current: 0 },
     councilRequestRef: { current: 0 },
+    repositoryRequestRef: { current: 0 },
     isStudent: false,
     canLoadStaffRelations: true,
     messages: { thesis: { loadFailed: 'LOAD_FAILED' } },
