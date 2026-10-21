@@ -100,7 +100,13 @@ public class ThesisSupervisorService {
         // as their serialization point.  Without the lock, each transaction
         // could pass its precondition check against the other's uncommitted
         // state and create a supervisor/chair conflict.
-        lockTopic(topicId);
+        java.util.Map<String, Object> locked = lockTopic(topicId);
+
+        // The early authorize ran on a read that can go stale: re-check
+        // against the locked row so a head whose department the topic left in
+        // a committed transfer cannot still rewrite its roster.
+        authorize(topicId, String.valueOf(locked.get("created_by")),
+                String.valueOf(locked.get("department_id")), actor);
 
         Integer assignedTopics = jdbc.queryForObject(
                 "SELECT COUNT(*) FROM thesis.thesis_council_topic WHERE topic_id = :topicId",
@@ -272,21 +278,30 @@ public class ThesisSupervisorService {
     }
 
     private void authorize(ThesisTopic topic, Jwt actor) {
+        authorize(topic.getId(), topic.getCreatedBy(), topic.getDepartmentId(), actor);
+    }
+
+    /**
+     * Same decision as {@link #authorize(ThesisTopic, Jwt)} but on explicit
+     * values, so the post-lock re-check can run on the fresh row the FOR
+     * UPDATE read returned instead of a possibly stale entity.
+     */
+    private void authorize(UUID topicId, String createdBy, String departmentId, Jwt actor) {
         if (hasRole(actor, "ADMIN") || hasRole(actor, "SUPER_ADMIN")) {
             return;
         }
         if (ThesisDeanScope.isFacultyHead(actor)) {
-            ThesisDeanScope.requireTopicAccess(jdbc, actor, topic.getId());
+            ThesisDeanScope.requireTopicAccess(jdbc, actor, topicId);
             return;
         }
         if (ThesisDepartmentScope.isDepartmentHead(actor)
-                && ThesisDepartmentScope.owns(jdbc, actor, topic.getDepartmentId())) {
+                && ThesisDepartmentScope.owns(jdbc, actor, departmentId)) {
             return;
         }
         String actorId = subject(actor);
         String lecturerId = normalize(actor == null ? null : actor.getClaimAsString("lecturerId"));
-        boolean owner = StringUtils.hasText(topic.getCreatedBy())
-                && (topic.getCreatedBy().equals(actorId) || (StringUtils.hasText(lecturerId) && topic.getCreatedBy().equals(lecturerId)));
+        boolean owner = StringUtils.hasText(createdBy)
+                && (createdBy.equals(actorId) || (StringUtils.hasText(lecturerId) && createdBy.equals(lecturerId)));
         if (!owner) {
             throw new DomainException(HttpStatus.FORBIDDEN, "TOPIC_OWNER_REQUIRED", "Only the topic owner can change supervisors");
         }
@@ -316,11 +331,11 @@ public class ThesisSupervisorService {
         }
     }
 
-    private void lockTopic(UUID topicId) {
+    private java.util.Map<String, Object> lockTopic(UUID topicId) {
         try {
-            jdbc.queryForObject(
-                    "SELECT id FROM thesis.thesis_topic WHERE id = :topicId FOR UPDATE",
-                    new MapSqlParameterSource().addValue("topicId", topicId), UUID.class);
+            return jdbc.queryForMap(
+                    "SELECT created_by, department_id FROM thesis.thesis_topic WHERE id = :topicId FOR UPDATE",
+                    new MapSqlParameterSource().addValue("topicId", topicId));
         } catch (org.springframework.dao.EmptyResultDataAccessException exception) {
             throw notFound("TOPIC_NOT_FOUND", "Thesis topic not found");
         }

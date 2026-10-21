@@ -2842,6 +2842,7 @@ export default function ThesisPage() {
                   />
                   <CouncilDefenseWorkspace
                     messages={messages}
+                    round={selectedRound}
                     councils={visibleCouncils}
                     myLecturerId={myLecturerId}
                     topics={topics}

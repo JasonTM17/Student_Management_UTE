@@ -699,6 +699,12 @@ public class ThesisMutationService {
         requireMutableRound(UUID.fromString(String.valueOf(gate.get("round_id"))));
         lockTopicForGovernance(id);
         ThesisTopic topic = topics.findById(id).orElseThrow(() -> notFound("TOPIC_NOT_FOUND", "Thesis topic not found"));
+        // Re-verify governance on the locked row: the gate read above can go
+        // stale when a concurrent authorized update transfers the topic to a
+        // department the caller does not govern between the early check and
+        // this lock (the same re-check publishTopic/archiveTopic already do).
+        authorizeTopicOwnerOrDepartmentHead(topic.getCreatedBy(), topic.getDepartmentId(), actor);
+        ThesisDeanScope.requireTopicAccess(jdbc, actor, id);
         if (topic.getStatus() != TopicStatus.DRAFT) {
             throw conflict("TOPIC_STATE_CONFLICT", "Only draft topics can be edited");
         }

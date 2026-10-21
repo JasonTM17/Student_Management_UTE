@@ -43,6 +43,11 @@ export default function GvpbReviewPanel({
   const copy = messages.thesis.review;
   const deadline = round?.gvpbDeadline ?? null;
   const deadlinePassed = deadline != null && Date.parse(deadline) < Date.now();
+  // A terminal round freezes every counter-review, deadline or not — the
+  // server rejects late writes the same way.
+  const roundTerminal = round?.status === 'CANCELLED'
+    || round?.status === 'CLOSED'
+    || round?.status === 'RESULTS_PUBLISHED';
 
   return (
     <Card className="rounded-xl border-border/80 shadow-xs">
@@ -59,7 +64,7 @@ export default function GvpbReviewPanel({
       <CardContent className="space-y-4">
         {reviewTopics.map((topic) => {
           const existing = gvpbScores[topic.id];
-          const frozen = topic.finalScore != null || deadlinePassed;
+          const frozen = topic.finalScore != null || deadlinePassed || roundTerminal;
           return (
             <div
               key={topic.id}
@@ -82,7 +87,11 @@ export default function GvpbReviewPanel({
               </div>
               {frozen ? (
                 <p className="text-xs text-muted-foreground italic">
-                  {topic.finalScore != null ? copy.finalizedLocked : copy.deadlinePassed}
+                  {topic.finalScore != null
+                    ? copy.finalizedLocked
+                    : roundTerminal
+                      ? copy.roundClosed
+                      : copy.deadlinePassed}
                 </p>
               ) : (
                 <div className="flex flex-wrap items-end gap-3">

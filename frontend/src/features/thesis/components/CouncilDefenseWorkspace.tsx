@@ -11,6 +11,7 @@ import {
   type ThesisCouncil,
   type ThesisCouncilScore,
   type ThesisGroupReport,
+  type ThesisRound,
   type ThesisTopic,
 } from '@/lib/thesis-api';
 import { fillCopy } from '@/features/thesis/components/thesis-helpers';
@@ -18,6 +19,10 @@ import { plainTextThesisDescription } from '@/lib/thesis-text';
 
 interface CouncilDefenseWorkspaceProps {
   messages: I18nMessages;
+  /** Selected round; once it is terminal (CANCELLED/CLOSED/RESULTS_PUBLISHED)
+   * every mutation affordance below is suppressed — the workspace itself
+   * stays readable. */
+  round?: ThesisRound | null;
   councils: ThesisCouncil[];
   myLecturerId: string;
   topics: ThesisTopic[];
@@ -55,6 +60,7 @@ const MIN_ELIGIBLE_GRADERS = 3;
 /** Council defense grading workspace (R6-R8); every mutation is owned by the page. */
 export default function CouncilDefenseWorkspace({
   messages,
+  round,
   councils,
   myLecturerId,
   topics,
@@ -79,6 +85,9 @@ export default function CouncilDefenseWorkspace({
   onDownloadReport,
 }: CouncilDefenseWorkspaceProps) {
   const pageCopy = messages.thesisWorkflow.page;
+  const roundTerminal = round?.status === 'CANCELLED'
+    || round?.status === 'CLOSED'
+    || round?.status === 'RESULTS_PUBLISHED';
 
   return (
     <Card className="rounded-xl border-border/80 shadow-xs">
@@ -276,7 +285,7 @@ export default function CouncilDefenseWorkspace({
                               {messages.thesis.grading.supervisorCannotGrade}
                             </span>
                           </div>
-                        ) : !isFinalized && myMembership ? (
+                        ) : !isFinalized && !roundTerminal && myMembership ? (
                           /* Grading Input for Eligible Council Member */
                           <div className="flex flex-wrap items-end gap-3 pt-1">
                             <label className="text-xs font-medium text-foreground flex items-center gap-2">
@@ -364,7 +373,7 @@ export default function CouncilDefenseWorkspace({
                         {/* Chair Finalize Action — suppressed while the score
                             list failed to load so a stale 0-of-N count cannot
                             invite a doomed finalize request. */}
-                        {isChair && !isFinalized && !scoresFailed && (
+                        {isChair && !isFinalized && !scoresFailed && !roundTerminal && (
                           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-t border-border/40 pt-3">
                             <p className="text-xs text-muted-foreground">
                               {canFinalize
