@@ -1,6 +1,7 @@
 'use client';
 
 import * as React from 'react';
+import { createPortal } from 'react-dom';
 import { X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
@@ -47,6 +48,11 @@ export function Modal({
   const closeButtonRef = React.useRef<HTMLButtonElement>(null);
   const previousFocusRef = React.useRef<HTMLElement | null>(null);
   const onCloseRef = React.useRef(onClose);
+  const [mounted, setMounted] = React.useState(false);
+
+  React.useEffect(() => {
+    setMounted(true);
+  }, []);
 
   React.useEffect(() => {
     onCloseRef.current = onClose;
@@ -123,9 +129,9 @@ export function Modal({
   // `dismissible` is static per call site, so including it is safe.
   }, [isOpen, dismissible]);
 
-  if (!isOpen) return null;
+  if (!isOpen || !mounted || typeof document === 'undefined' || !document.body) return null;
 
-  return (
+  return createPortal(
     <div className={cn('fixed inset-0 z-[60] overflow-y-auto overscroll-contain', printable && 'printable-backdrop')}>
       <div
         className="absolute inset-0 bg-black/55 backdrop-blur-sm print:hidden"
@@ -187,7 +193,8 @@ export function Modal({
           <div className="min-h-0 overflow-y-auto p-5 print:p-0 print:overflow-visible">{children}</div>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }
 

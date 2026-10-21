@@ -178,6 +178,9 @@ test('shared modal traps focus and closes on Escape', () => {
   // Tab-cycling focus trap over the dialog contents.
   assert.match(source, /querySelectorAll<HTMLElement>\(/);
   assert.match(source, /event\.shiftKey && \(active === first/);
+  // Modal portals to document.body so the backdrop overlays sticky headers and shells without leaks.
+  assert.match(source, /createPortal\(/);
+  assert.match(source, /document\.body/);
 });
 
 test('conduct history rows and record modal are keyboard operable', () => {
