@@ -533,7 +533,7 @@ export default function SchedulePage() {
             <div
               role="tablist"
               aria-label={locale === 'vi' ? 'Chế độ xem thời khóa biểu' : 'Schedule view mode'}
-              className="flex items-center gap-1 rounded-lg bg-secondary/60 p-1"
+              className="flex w-full items-center gap-1 rounded-lg bg-secondary/60 p-1 sm:w-auto"
             >
               <Button
                 ref={viewModeTabs.tabRef('grid')}
@@ -546,7 +546,7 @@ export default function SchedulePage() {
                 variant={viewMode === 'grid' ? 'default' : 'ghost'}
                 size="sm"
                 onClick={() => setViewMode('grid')}
-                className="gap-2 text-xs font-semibold"
+                className="min-w-0 flex-1 gap-1.5 px-2 text-xs font-semibold sm:flex-none sm:gap-2 sm:px-3"
               >
                 <LayoutGrid className="h-3.5 w-3.5" />
                 {copy.viewGrid}
@@ -562,7 +562,7 @@ export default function SchedulePage() {
                 variant={viewMode === 'day' ? 'default' : 'ghost'}
                 size="sm"
                 onClick={() => setViewMode('day')}
-                className="gap-2 text-xs font-semibold"
+                className="min-w-0 flex-1 gap-1.5 px-2 text-xs font-semibold sm:flex-none sm:gap-2 sm:px-3"
               >
                 <CalendarDays className="h-3.5 w-3.5" />
                 {copy.viewDay}
@@ -578,7 +578,7 @@ export default function SchedulePage() {
                 variant={viewMode === 'list' ? 'default' : 'ghost'}
                 size="sm"
                 onClick={() => setViewMode('list')}
-                className="gap-2 text-xs font-semibold"
+                className="min-w-0 flex-1 gap-1.5 px-2 text-xs font-semibold sm:flex-none sm:gap-2 sm:px-3"
               >
                 <List className="h-3.5 w-3.5" />
                 {copy.viewList}

@@ -3029,7 +3029,7 @@ export default function ThesisPage() {
           )}
 
               {/* 2-Column Grid for Student */}
-              <div className="grid gap-6 xl:grid-cols-[0.92fr_1.08fr]">
+              <div className="grid grid-cols-1 gap-6 xl:grid-cols-[minmax(0,0.92fr)_minmax(0,1.08fr)]">
                 <StudentGroupCard
                   messages={messages}
                   group={currentGroup ?? null}
