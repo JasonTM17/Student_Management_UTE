@@ -112,7 +112,10 @@ class ThesisGroupRubricSizeTest {
                 Collections.nCopies(memberCount - 1, "THESIS_GROUP_MEMBER_ADDED"));
         expectedActions.add("THESIS_GROUP_TOPIC_ASSIGNED");
         expectedActions.add("THESIS_GROUP_APPROVED");
-        assertThat(auditActions(groupId)).containsExactlyElementsOf(expectedActions);
+        // Audit rows from back-to-back requests can share a createdAt tick and
+        // their ids are random UUIDs, so row order is not a guarantee; assert
+        // that every action was audited exactly once per occurrence instead.
+        assertThat(auditActions(groupId)).containsExactlyInAnyOrderElementsOf(expectedActions);
         progress(groupId).andExpect(status().isOk())
                 .andExpect(jsonPath("$.memberCount").value(memberCount))
                 .andExpect(jsonPath("$.currentMilestone").value("GROUP_APPROVED"))
@@ -196,7 +199,7 @@ class ThesisGroupRubricSizeTest {
         // The roster history is preserved plus the new removal audit row.
         List<String> expectedAudit = new ArrayList<>(before.auditActions());
         expectedAudit.add("THESIS_GROUP_MEMBER_REMOVED");
-        assertThat(auditActions(groupId)).containsExactlyElementsOf(expectedAudit);
+        assertThat(auditActions(groupId)).containsExactlyInAnyOrderElementsOf(expectedAudit);
         assertRoster(groupId, 3);
         assertThat(group(groupId)).containsEntry("approval_status", "APPROVED");
     }
