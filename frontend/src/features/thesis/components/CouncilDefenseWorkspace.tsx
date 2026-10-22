@@ -116,6 +116,11 @@ export default function CouncilDefenseWorkspace({
             {profileClaimMissingLabel}
           </p>
         ) : null}
+        {councils.length === 0 && !councilLoadError && !showProfileClaimNotice ? (
+          <p className="rounded-lg border border-border/70 bg-muted/40 px-4 py-3 text-sm text-muted-foreground">
+            {messages.thesis.councils.noVisibleCouncils}
+          </p>
+        ) : null}
         {councils.map((council) => {
           const myMembership = council.members?.find(
             (m) => m.lecturerId === myLecturerId,
