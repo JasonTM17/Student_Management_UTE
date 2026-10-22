@@ -917,7 +917,8 @@ export default function SectionGradingPage() {
         </Card>
       </div>
 
-      {!allGraded ? (
+      {/* An empty roster has nobody left to grade; the empty state below explains it. */}
+      {!allGraded && sectionData.enrollments.length > 0 ? (
         <Card variant="muted" className="print:hidden">
           <CardContent className="pt-6 text-sm leading-6 text-muted-foreground">
             {copy.publishWarning}
