@@ -83,3 +83,26 @@ test('sortThesisRoundsForOverview prioritizes active registration/execution KLTN
   );
   assert.match(deanPage, /sortThesisRoundsForOverview/);
 });
+
+test('advisor directory and admin round list share the overview ordering', () => {
+  const advisors = fs.readFileSync(
+    path.join(root, 'src/components/dashboard/thesis/ThesisAdvisorDirectoryPage.tsx'),
+    'utf8',
+  );
+  assert.match(advisors, /sortThesisRoundsForOverview\(roundsList\)/);
+  assert.doesNotMatch(advisors, /roundsList\[0\]/);
+  const admin = fs.readFileSync(path.join(root, 'src/app/admin/thesis/page.tsx'), 'utf8');
+  assert.match(admin, /setRounds\(sortThesisRoundsForOverview\(data\)\)/);
+});
+
+test('advisor directory action buttons say they open the topic proposal form', () => {
+  const advisors = fs.readFileSync(
+    path.join(root, 'src/components/dashboard/thesis/ThesisAdvisorDirectoryPage.tsx'),
+    'utf8',
+  );
+  const proposeLinks = advisors.match(/action=propose`\}[\s\S]{0,260}?<\/LinkButton>/g) || [];
+  assert.equal(proposeLinks.length, 3);
+  for (const link of proposeLinks) {
+    assert.doesNotMatch(link, /Chọn GV|Chọn hướng dẫn|'Select'/);
+  }
+});
