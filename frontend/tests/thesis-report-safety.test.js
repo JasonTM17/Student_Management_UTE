@@ -265,3 +265,14 @@ for (const locale of ['en', 'vi']) {
     assert.equal(/hạn nộp|deadline|submission window/i.test(copy.feedbackPendingNote), false);
   });
 }
+
+test('supervised report fetch requests each group once, even when it is unsubmitted', () => {
+  const effect = page.match(/useEffect\(\(\) => \{\s*if \(!isSupervisorOrAdmin \|\| supervisedGroups\.length === 0\) return;[\s\S]*?\}, \[([^\]]*)\]\);/);
+  assert.ok(effect, 'supervised report effect not found');
+  // A 404 ("not submitted yet") stores no report, so keying the guard on the
+  // loaded reports re-fetched every unsubmitted group whenever the effect re-ran.
+  assert.match(effect[0], /requested\.has\(g\.id\)/);
+  assert.match(effect[0], /requested\.add\(g\.id\)/);
+  assert.doesNotMatch(effect[0], /!supervisedReports\[g\.id\]/);
+  assert.doesNotMatch(effect[1], /supervisedReports/);
+});
