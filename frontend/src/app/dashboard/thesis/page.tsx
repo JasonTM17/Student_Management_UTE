@@ -2624,7 +2624,7 @@ export default function ThesisPage() {
               <WorkspaceMetricCard label={messages.thesis.groups} value={groups.length} icon={<UsersRound className="h-5 w-5" />} toneClassName={metricToneClass('success')} />
             ) : null}
             {isStudent ? (
-              <WorkspaceMetricCard label={messages.thesis.groupsTitle} value={currentGroup ? currentGroup.memberStudentIds.length : 0} icon={<Check className="h-5 w-5" />} toneClassName={metricToneClass('neutral')} />
+              <WorkspaceMetricCard label={messages.thesis.groupMembersMetric} value={currentGroup ? currentGroup.memberStudentIds.length : 0} icon={<Check className="h-5 w-5" />} toneClassName={metricToneClass('neutral')} />
             ) : null}
           </div>
 

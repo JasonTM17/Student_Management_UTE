@@ -242,3 +242,52 @@ test('a live round still renders the counter-review form', () => {
   assert.equal(html.includes(messages.thesis.review.roundClosed), false,
     'the round-closed copy must not render for a live round');
 });
+
+// The workflow stepper is the round's progress summary: once results are
+// published or the round is closed, no stage may still claim to be "current".
+function renderWorkflowStepper(status, locale) {
+  const React = require('react');
+  const { renderToStaticMarkup } = require('react-dom/server');
+  const dictionaries = loadModule('src/i18n/messages-thesis-workflow.ts');
+  const thesisWorkflow = locale === 'vi' ? dictionaries.thesisWorkflowVi : dictionaries.thesisWorkflowEn;
+  const { ThesisWorkflowStepper } = loadModule('src/components/thesis/ThesisWorkflowStepper.tsx', {
+    '@/i18n': { useI18n: () => ({ messages: { thesisWorkflow } }) },
+    '@/lib/utils': { cn: (...values) => values.filter(Boolean).join(' ') },
+  });
+  const round = {
+    status,
+    lecturerSubmitStart: '2026-01-15T00:00:00Z',
+    lecturerSubmitEnd: '2026-02-15T00:00:00Z',
+    proposalPublishAt: null,
+    registrationStart: '2026-02-15T00:00:00Z',
+    registrationEnd: '2026-04-01T00:00:00Z',
+    gvpbDeadline: null,
+    reportDate: null,
+    defenseDate: null,
+  };
+  const html = renderToStaticMarkup(React.createElement(ThesisWorkflowStepper, {
+    round,
+    formatDateTime: (value) => String(value),
+  }));
+  return { html, progress: thesisWorkflow.stepper.stageProgress };
+}
+
+const occurrences = (html, text) => html.split(text).length - 1;
+
+for (const locale of ['en', 'vi']) {
+  for (const status of ['RESULTS_PUBLISHED', 'CLOSED']) {
+    test(`workflow stepper marks every stage done once the round is ${status} (${locale})`, () => {
+      const { html, progress } = renderWorkflowStepper(status, locale);
+      assert.equal(occurrences(html, progress.current), 0,
+        'a finished round has no current stage');
+      assert.equal(occurrences(html, progress.done), 5,
+        'all five stages of a finished round are done');
+    });
+  }
+
+  test(`workflow stepper keeps exactly one current stage on a running round (${locale})`, () => {
+    const { html, progress } = renderWorkflowStepper('REGISTRATION_CLOSED', locale);
+    assert.equal(occurrences(html, progress.current), 1);
+    assert.equal(occurrences(html, progress.done), 3);
+  });
+}

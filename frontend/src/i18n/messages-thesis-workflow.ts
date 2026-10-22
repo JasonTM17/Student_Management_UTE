@@ -289,7 +289,7 @@ export const thesisWorkflowEn = {
       feedbackLabel: 'Supervisor feedback',
       awaitingChip: 'Awaiting',
       feedbackPendingNote:
-        'No supervising-lecturer feedback has been recorded yet. The report is reviewed once the submission window closes.',
+        'No supervising-lecturer feedback has been recorded for this report yet.',
       noSubmissionTitle: 'No report submitted yet',
       noSubmissionDescription:
         'The group leader submits the thesis report once the topic is approved (Article R5).',
@@ -621,7 +621,7 @@ export const thesisWorkflowVi: Widen<typeof thesisWorkflowEn> = {
       feedbackLabel: 'Phản hồi từ GVHD',
       awaitingChip: 'Đang chờ',
       feedbackPendingNote:
-        'Chưa có phản hồi từ giảng viên hướng dẫn. Báo cáo sẽ được GVHD nhận xét sau khi kết thúc hạn nộp.',
+        'Chưa có phản hồi từ giảng viên hướng dẫn cho báo cáo này.',
       noSubmissionTitle: 'Chưa nộp báo cáo',
       noSubmissionDescription:
         'Nhóm trưởng nộp báo cáo luận văn sau khi đề tài được phê duyệt (Điều R5).',
