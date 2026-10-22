@@ -1,0 +1,16 @@
+# Vercel project "campusute" has Root Directory = frontend, so it deploys
+# from the repo root with frontend/ inside the package. Ship only what the
+# Next.js build needs; keep the 16GB plans/ tree, Java service, and heavy
+# build dirs out of the upload.
+.git
+.github
+.claude
+plans
+docs
+java-services
+node_modules
+.next
+target
+*.log
+.env
+.env.*
