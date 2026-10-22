@@ -341,5 +341,7 @@ test('narrow-screen layouts keep their content inside the card', () => {
   assert.match(read('src/app/dashboard/thesis/page.tsx'), /grid grid-cols-1 gap-6 xl:grid-cols-\[minmax\(0,0\.92fr\)_minmax\(0,1\.08fr\)\]/);
   assert.match(read('src/app/dashboard/lecturer/mail/page.tsx'), /grid grid-cols-1 gap-6 lg:grid-cols-3/);
   assert.match(read('src/app/dashboard/transcript/page.tsx'), /grid grid-cols-1 gap-4 lg:grid-cols-2/);
+  assert.match(read('src/components/admin/AdminSurface.tsx'), /function AdminRowActions[\s\S]{0,200}'flex flex-wrap items-center justify-end gap-2'/);
+  assert.match(read('src/app/dashboard/editor/page.tsx'), /flex flex-wrap items-center gap-2">\s*<Button[\s\S]{0,240}handleResetBlocks/);
   assert.match(read('src/app/dashboard/lecturer/attendance/page.tsx'), /flex flex-wrap items-center gap-2">\s*<Button[\s\S]{0,120}handleMarkAllPresent/);
 });
