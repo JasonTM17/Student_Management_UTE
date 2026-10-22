@@ -590,7 +590,7 @@ export default function LecturerAttendancePage() {
               {lateCount > 0 && <span className="text-amber-700 dark:text-amber-400 font-medium">• {formatNumber(lateCount)} {copy.statuses.LATE}</span>}
             </div>
 
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center gap-2">
               <Button
                 variant="outline"
                 size="sm"

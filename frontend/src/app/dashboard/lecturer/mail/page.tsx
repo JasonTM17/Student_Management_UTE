@@ -643,7 +643,7 @@ export default function LecturerMailComposePage() {
         </div>
       </section>
 
-      <div className="grid gap-6 lg:grid-cols-3">
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
         {/* Dynamic form, one variant per template. The fieldset disables every
             control at once while a dispatch is in flight. */}
         <Card variant="elevated" className="lg:col-span-2">
@@ -1101,7 +1101,7 @@ export default function LecturerMailComposePage() {
             <CardContent className="space-y-2.5 text-sm">
               <RailRow label={copy.fields.email}>
                 {(template === 'notice' ? notice.to : template === 'registration' ? registration.to : gradeAlert.to).trim() || (
-                  <span className="font-normal text-muted-foreground">{copy.recipientEmpty}</span>
+                  <span className="block whitespace-normal font-normal text-muted-foreground">{copy.recipientEmpty}</span>
                 )}
               </RailRow>
               <RailRow label={copy.templateLabel}>{templateTitle(template)}</RailRow>

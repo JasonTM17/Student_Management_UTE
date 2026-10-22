@@ -327,3 +327,18 @@ test('site appearance PUT fails loudly when persistence fails', () => {
   assert.match(route, /status: 500/);
   assert.match(route, /SITE_APPEARANCE_NOT_SAVED/);
 });
+
+// A grid without explicit columns sizes its implicit track to min-content, and a
+// row of nowrap buttons never shrinks, so on a 375px phone these blocks pushed
+// past their card. Each one must now fit the column it sits in.
+test('narrow-screen layouts keep their content inside the card', () => {
+  const read = (rel) => fs.readFileSync(path.join(root, rel), 'utf8');
+  for (const rel of ['src/app/dashboard/schedule/page.tsx', 'src/app/dashboard/lecturer/schedule/page.tsx']) {
+    const src = read(rel);
+    assert.match(src, /role="tablist"[\s\S]{0,200}className="flex w-full items-center gap-1 rounded-lg bg-secondary\/60 p-1 sm:w-auto"/, rel);
+    assert.equal((src.match(/min-w-0 flex-1 gap-1\.5 px-2 text-xs font-semibold sm:flex-none/g) || []).length, 3, rel);
+  }
+  assert.match(read('src/app/dashboard/thesis/page.tsx'), /grid grid-cols-1 gap-6 xl:grid-cols-\[minmax\(0,0\.92fr\)_minmax\(0,1\.08fr\)\]/);
+  assert.match(read('src/app/dashboard/lecturer/mail/page.tsx'), /grid grid-cols-1 gap-6 lg:grid-cols-3/);
+  assert.match(read('src/app/dashboard/lecturer/attendance/page.tsx'), /flex flex-wrap items-center gap-2">\s*<Button[\s\S]{0,120}handleMarkAllPresent/);
+});
