@@ -1254,13 +1254,13 @@ export default function AdminUsersPage() {
               {users.map((record) => (
                 <article key={record.id} className="space-y-3 p-4">
                   <div className="flex items-start justify-between gap-3">
-                    <div>
-                      <h3 className="font-semibold text-foreground">
+                    <div className="min-w-0">
+                      <h3 className="break-words font-semibold text-foreground">
                         {record.lastName} {record.firstName}
                       </h3>
-                      <p className="text-xs text-muted-foreground">{record.email}</p>
+                      <p className="break-all text-xs text-muted-foreground">{record.email}</p>
                     </div>
-                    <StatusPill tone={userStatusTone(record.status)} className="py-1">
+                    <StatusPill tone={userStatusTone(record.status)} className="shrink-0 py-1">
                       {statusLabel(record.status)}
                     </StatusPill>
                   </div>
