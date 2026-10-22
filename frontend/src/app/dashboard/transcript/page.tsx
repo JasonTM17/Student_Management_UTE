@@ -654,7 +654,7 @@ export default function TranscriptPage() {
             </p>
           ) : null}
 
-          <div className="grid gap-4 lg:grid-cols-2">
+          <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
             <Card variant="elevated">
               <CardHeader className="flex flex-col gap-3 pb-3 sm:flex-row sm:items-center sm:justify-between">
                 <div>
