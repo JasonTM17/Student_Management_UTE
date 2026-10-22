@@ -106,3 +106,8 @@ test('student quick-fill lists exactly the four approved team members', () => {
   ]);
   assert.equal(rows.filter((row) => row.leader).length, 1, 'exactly one leader row');
 });
+
+test('quick-fill rows never emit an email-shaped text node for a proxy to rewrite', () => {
+  assert.doesNotMatch(loginPage, /\{account\.email\}<\/code>/, 'a bare {account.email} text node is rewritten by edge email obfuscation and breaks hydration');
+  assert.match(loginPage, /<span>@<\/span>/);
+});

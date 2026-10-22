@@ -34,6 +34,7 @@ import { useI18n } from '@/i18n';
 import { WorkspaceForbiddenState } from '@/components/ProtectedRoute';
 import { lecturersApi, departmentsApi, fetchAllPages } from '@/lib/api';
 import { thesisApi, type ThesisRound, type ThesisTopic } from '@/lib/thesis-api';
+import { sortThesisRoundsForOverview } from '@/lib/thesis-round';
 import type { Lecturer, Department } from '@/types/api';
 import { normalizeVietnameseText } from '@/lib/registration-browse';
 import { cn } from '@/lib/utils';
@@ -354,8 +355,11 @@ export default function ThesisAdvisorDirectoryPage() {
       setLecturers(lecResult.data);
       setLoadState('ready');
 
+      // Same ordering the thesis overview uses, so the workload numbers describe
+      // the round staff actually see first rather than whichever the API listed.
+      const orderedRounds = sortThesisRoundsForOverview(roundsList);
       const targetRound =
-        roundsList.find((r) => r.id === preselectedRoundId) || roundsList[0];
+        orderedRounds.find((r) => r.id === preselectedRoundId) || orderedRounds[0];
       if (targetRound) {
         const topicList = await thesisApi
           .listTopics(targetRound.id, 'PUBLISHED')
@@ -609,7 +613,7 @@ export default function ThesisAdvisorDirectoryPage() {
             size="sm"
             className="h-9 px-3 text-xs"
           >
-            {isVi ? 'Chọn GV' : 'Select'}
+            {isVi ? 'Đề xuất đề tài' : 'Propose topic'}
           </LinkButton>
         </div>
       ),
@@ -918,7 +922,7 @@ export default function ThesisAdvisorDirectoryPage() {
                             href={`/dashboard/thesis?advisorId=${lec.id}&action=propose`}
                             className="h-9 min-w-0 flex-1 basis-32 justify-center rounded-lg text-xs font-semibold"
                           >
-                            {isVi ? 'Chọn hướng dẫn' : 'Select'}
+                            {isVi ? 'Đề xuất đề tài' : 'Propose topic'}
                           </LinkButton>
                         </div>
                       </div>

@@ -410,7 +410,13 @@ export default function LoginPage() {
                         </span>
                       ) : null}
                     </span>
-                    <code className="shrink-0 truncate text-[11px] text-muted-foreground">{account.email}</code>
+                    {/* The @ sits in its own element so Cloudflare Email Address Obfuscation, which
+                        rewrites email-shaped text nodes before hydration, leaves this row alone. */}
+                    <code className="shrink-0 truncate text-[11px] text-muted-foreground" title={account.email}>
+                      {account.email.split('@')[0]}
+                      <span>@</span>
+                      {account.email.split('@')[1]}
+                    </code>
                   </button>
                 );
               })}
