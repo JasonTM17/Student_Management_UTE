@@ -1073,10 +1073,17 @@ export default function ThesisPage() {
   );
 
 
+  // Groups whose report was already requested. supervisedGroups is recomputed
+  // as topics and workload load in, and a "not submitted" 404 stores nothing,
+  // so without this every recompute re-fetched each unsubmitted report.
+  const requestedReportGroupsRef = useRef(new Set<string>());
+
   useEffect(() => {
     if (!isSupervisorOrAdmin || supervisedGroups.length === 0) return;
+    const requested = requestedReportGroupsRef.current;
     for (const g of supervisedGroups) {
-      if (g.approvalStatus === 'APPROVED' && !supervisedReports[g.id]) {
+      if (g.approvalStatus === 'APPROVED' && !requested.has(g.id)) {
+        requested.add(g.id);
         void thesisApi.getReport(g.id)
           .then((rep) => setSupervisedReports((prev) => ({ ...prev, [g.id]: rep })))
           .catch((err: unknown) => {
@@ -1084,12 +1091,14 @@ export default function ThesisPage() {
             // an expected state, not a data error.
             const status = (err as { response?: { status?: number } })?.response?.status;
             if (status !== 404 && status !== 204) {
+              // A real failure may be retried on the next recompute.
+              requested.delete(g.id);
               setSecondaryDataError(true);
             }
           });
       }
     }
-  }, [isSupervisorOrAdmin, supervisedGroups, supervisedReports]);
+  }, [isSupervisorOrAdmin, supervisedGroups]);
 
   const filteredRepositoryReports = useMemo(() => {
     const raw = repositorySearch.trim();
