@@ -8,7 +8,7 @@ import { LinkButton } from '@/components/ui/link-button';
 import { RichContentRenderer } from '@/components/ui/rich-content-renderer';
 import { useRequireAuth } from '@/context/AuthContext';
 import { useI18n } from '@/i18n';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { PageHeader, SectionEyebrow } from '@/components/ui/page-header';
 import { WorkspaceForbiddenState } from '@/components/ProtectedRoute';
 import { EmptyState, ErrorState, LoadingState } from '@/components/ui/state-block';
@@ -157,47 +157,24 @@ export default function ThesisTopicDetailPage() {
         }
       />
 
-      {/* Executive Thesis Defense Hall Banner */}
-      <div className="overflow-hidden rounded-2xl border border-border/80 bg-card text-card-foreground shadow-xs">
-        <div className="grid grid-cols-1 lg:grid-cols-12">
-          <div className="flex flex-col justify-center p-6 lg:col-span-8 space-y-2.5">
-            <div className="flex flex-wrap items-center gap-2">
-              <span className="rounded-md bg-primary/10 px-2.5 py-0.5 text-[11px] font-bold uppercase tracking-wider text-primary border border-primary/20">
-                {messages.thesis.topicDetailTitle}
-              </span>
-              <span className="rounded-md bg-muted px-2 py-0.5 text-[11px] font-semibold text-muted-foreground">
-                HCMUTE Academic Defense Council
-              </span>
-            </div>
-            <h2 className="text-xl font-bold tracking-tight text-foreground sm:text-2xl">
-              {topic.title}
-            </h2>
-            <p className="text-xs leading-relaxed text-muted-foreground sm:text-sm">
-              {messages.thesis.topicDetailDescription}
-            </p>
-          </div>
-          <div className="relative h-48 lg:h-full lg:col-span-4 overflow-hidden border-t lg:border-t-0 lg:border-l border-border/60 min-h-[160px]">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
-              src="/images/banners/thesis_defense_hall.jpg"
-              alt="HCMUTE Thesis Defense Hall & Faculty Committee"
-              className="h-full w-full object-cover object-center transition duration-500 hover:scale-105"
-            />
-            <div className="absolute inset-0 bg-gradient-to-t from-black/50 via-transparent to-transparent lg:hidden" />
-            <div className="absolute bottom-2 left-3 rounded-md bg-background/85 px-2 py-0.5 text-[11px] font-semibold text-foreground backdrop-blur-xs">
-              {locale === 'vi' ? 'Hội đồng Đánh giá Khóa luận HCMUTE' : 'HCMUTE Thesis Evaluation Council'}
-            </div>
-          </div>
+      {/* The page header above already carries the topic title and summary, so
+          the banner stays purely visual instead of repeating them. */}
+      <div className="relative h-40 overflow-hidden rounded-2xl border border-border/80 bg-card shadow-xs sm:h-48">
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src="/images/banners/thesis_defense_hall.jpg"
+          alt={locale === 'vi' ? 'Hội trường bảo vệ khóa luận HCMUTE' : 'HCMUTE thesis defense hall'}
+          className="h-full w-full object-cover object-center transition duration-500 hover:scale-105"
+        />
+        <div className="absolute inset-0 bg-gradient-to-t from-black/50 via-transparent to-transparent" />
+        <div className="absolute bottom-2 left-3 rounded-md bg-background/85 px-2 py-0.5 text-[11px] font-semibold text-foreground backdrop-blur-xs">
+          {locale === 'vi' ? 'Hội đồng Đánh giá Khóa luận HCMUTE' : 'HCMUTE Thesis Evaluation Council'}
         </div>
       </div>
 
       <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_20rem]">
         <Card variant="muted">
-          <CardHeader>
-            <CardTitle>{topic.title}</CardTitle>
-            <CardDescription>{messages.thesis.topicDetailDescription}</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-5">
+          <CardContent className="space-y-5 pt-6">
             {/* This is the page students read a topic on, so the description
                 renders as rich content rather than escaped plain text. */}
             <div className="rich-html-content rounded-lg border border-primary/20 bg-primary/[0.035] p-5 text-sm leading-7 text-muted-foreground">
@@ -231,11 +208,11 @@ export default function ThesisTopicDetailPage() {
 
         <Card variant="elevated" className="h-fit">
           <CardHeader>
-            <CardTitle className="text-lg">{messages.thesis.roundStatus}</CardTitle>
+            <CardTitle className="text-lg">{messages.thesis.topicDetailTitle}</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4 text-sm">
             <div className="flex items-center justify-between gap-3 border-b border-border/70 pb-3">
-              <span className="text-muted-foreground">{messages.thesis.groups}</span>
+              <span className="text-muted-foreground">{messages.thesis.detail.maxGroups}</span>
               <span className="font-semibold text-foreground">{topic.maxGroups}</span>
             </div>
             <div className="flex items-center justify-between gap-3">

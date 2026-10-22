@@ -28,6 +28,33 @@ test('lecturer grade sheet does not claim ungraded students on an empty roster',
   assert.match(warning[1], /sectionData\.enrollments\.length > 0/);
 });
 
+test('thesis catalog and detail copy only promises what the pages render', () => {
+  const messages = read('src/i18n/messages.ts');
+  // The catalog is a flat, searchable list; no department grouping is rendered.
+  assert.doesNotMatch(messages, /topicsDescription: '[^']*(grouped by department|gom theo bộ môn)/);
+  // The detail page has no department row, so its summary must not name one.
+  assert.doesNotMatch(messages, /topicDetailDescription: '[^']*(department|bộ môn)/);
+
+  const detail = read('src/components/dashboard/thesis/ThesisTopicDetailPage.tsx');
+  // The topic title and summary live in the page header only; the banner and
+  // card used to repeat them so they read three times on one screen.
+  assert.equal(detail.match(/topic\.title/g)?.length, 1);
+  assert.match(detail, /title=\{topic\.title\}/);
+  assert.equal(detail.match(/topicDetailDescription/g)?.length, 1);
+  assert.doesNotMatch(detail, /HCMUTE Academic Defense Council/);
+});
+
+test('lecturer topic proposal modal formats its submission window like the rest of the page', () => {
+  const source = read('src/app/dashboard/thesis/page.tsx');
+  const messages = read('src/i18n/messages.ts');
+  // This is the lecturer submission window, not the student registration
+  // window, and it used to print raw ISO date slices.
+  assert.match(source, /messages\.thesis\.proposalWindow\}: \{formatDateTime\(currentProposeRound\.lecturerSubmitStart\)\}/);
+  assert.doesNotMatch(source, /lecturerSubmitStart\.slice\(0, 10\)/);
+  assert.match(messages, /proposalWindow: 'Topic submission window'/);
+  assert.match(messages, /proposalWindow: 'Thời gian nộp đề tài'/);
+});
+
 test('certificate preview asserts no authority the backend never granted', () => {
   const source = read('src/app/dashboard/certificates/page.tsx');
 

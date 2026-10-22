@@ -291,3 +291,46 @@ for (const locale of ['en', 'vi']) {
     assert.equal(occurrences(html, progress.done), 3);
   });
 }
+
+// ---------- CouncilDefenseWorkspace: an empty council list explains itself ----------
+
+for (const locale of ['en', 'vi']) {
+  test(`council workspace says so when no council is visible (${locale})`, () => {
+    const messages = loadModule('src/i18n/messages.ts', {
+      '@/i18n/config': {},
+      '@/i18n/messages-thesis-workflow': loadModule('src/i18n/messages-thesis-workflow.ts'),
+      '@/i18n/messages-dean-overview': loadModule('src/i18n/messages-dean-overview.ts'),
+    })[locale];
+    const Workspace = loadWorkspaceComponent();
+    const note = messages.thesis.councils.noVisibleCouncils;
+    assert.ok(note && note.length > 0);
+
+    const empty = renderToStaticMarkup(React.createElement(Workspace, workspaceProps({
+      messages,
+      councils: [],
+      round: round('REGISTRATION_CLOSED'),
+    })));
+    assert.ok(empty.includes(note),
+      'a lecturer with no council must see an empty state, not a bare heading');
+
+    // The note must not stack on a load error or the profile-claim notice,
+    // which already explain why nothing is listed.
+    const withError = renderToStaticMarkup(React.createElement(Workspace, workspaceProps({
+      messages,
+      councils: [],
+      councilLoadError: 'boom',
+      onRetryCouncils: () => {},
+    })));
+    assert.equal(withError.includes(note), false);
+    const withClaim = renderToStaticMarkup(React.createElement(Workspace, workspaceProps({
+      messages,
+      councils: [],
+      showProfileClaimNotice: true,
+      profileClaimMissingLabel: 'CLAIM_NOTICE',
+    })));
+    assert.equal(withClaim.includes(note), false);
+
+    const populated = renderToStaticMarkup(React.createElement(Workspace, workspaceProps({ messages })));
+    assert.equal(populated.includes(note), false);
+  });
+}

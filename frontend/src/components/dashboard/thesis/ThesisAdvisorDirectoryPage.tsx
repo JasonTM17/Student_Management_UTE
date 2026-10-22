@@ -661,7 +661,7 @@ export default function ThesisAdvisorDirectoryPage() {
                 {isVi ? 'Hội đồng Khoa học & Đào tạo' : 'Academic Council & Faculty'}
               </span>
               <span className="rounded-md bg-muted px-2 py-0.5 text-[11px] font-semibold text-muted-foreground">
-                HCMUTE Thesis Committee
+                {isVi ? 'Hội đồng Khóa luận HCMUTE' : 'HCMUTE Thesis Committee'}
               </span>
             </div>
             <h2 className="text-xl font-bold tracking-tight text-foreground sm:text-2xl">

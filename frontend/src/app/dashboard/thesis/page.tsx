@@ -3144,7 +3144,7 @@ export default function ThesisPage() {
                   <div className="font-semibold">{messages.thesis.proposeRoundOpenNotice}</div>
                   {currentProposeRound?.lecturerSubmitStart && currentProposeRound?.lecturerSubmitEnd ? (
                     <div className="mt-1 text-xs opacity-90">
-                      {messages.thesis.registrationWindow}: {currentProposeRound.lecturerSubmitStart.slice(0, 10)} → {currentProposeRound.lecturerSubmitEnd.slice(0, 10)}
+                      {messages.thesis.proposalWindow}: {formatDateTime(currentProposeRound.lecturerSubmitStart)} → {formatDateTime(currentProposeRound.lecturerSubmitEnd)}
                     </div>
                   ) : null}
                 </div>
