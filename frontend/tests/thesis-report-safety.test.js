@@ -252,3 +252,16 @@ test('the report window renders four honest states', () => {
     'closedFinalTitle must be localized in en + vi',
   );
 });
+
+for (const locale of ['en', 'vi']) {
+  test(`supervisor feedback note promises no deadline-driven review the system cannot deliver (${locale})`, () => {
+    const { html, copy } = renderTimeline(locale, {
+      report: { submittedAt: '2026-10-01T02:00:00Z', updatedAt: '2026-10-01T02:00:00Z', fileName: null },
+      reportWindowState: 'open', deadlineAt: null, daysRemaining: null,
+    });
+    // The report payload carries no feedback field, and a round may have no
+    // report deadline at all, so the note must not tie a review to one.
+    assert.ok(html.includes(copy.feedbackPendingNote));
+    assert.equal(/hạn nộp|deadline|submission window/i.test(copy.feedbackPendingNote), false);
+  });
+}

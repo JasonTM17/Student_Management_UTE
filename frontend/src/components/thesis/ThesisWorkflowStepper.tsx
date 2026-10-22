@@ -57,6 +57,14 @@ export function ThesisWorkflowStepper({ round, formatDateTime }: ThesisWorkflowS
     }
   }, [round.status]);
 
+  // A round with published results or closed has finished every stage, so
+  // progress runs past the last step: all five read as done and none as
+  // current. activeStage still opens the detail panel on the final stage.
+  const progressStage =
+    round.status === 'RESULTS_PUBLISHED' || round.status === 'CLOSED'
+      ? copy.stages.length + 1
+      : activeStage;
+
   const [selectedStage, setSelectedStage] = useState<number>(activeStage);
   const [isDetailExpanded, setIsDetailExpanded] = useState<boolean>(true);
 
@@ -92,7 +100,7 @@ export function ThesisWorkflowStepper({ round, formatDateTime }: ThesisWorkflowS
         shortDesc: stage.shortDesc,
         role: stage.role,
         rule: stage.rule,
-        status: activeStage > step ? 'completed' : activeStage === step ? 'active' : 'upcoming',
+        status: progressStage > step ? 'completed' : progressStage === step ? 'active' : 'upcoming',
         timeline,
         icon: STAGE_ICONS[index],
         details: {
@@ -102,7 +110,7 @@ export function ThesisWorkflowStepper({ round, formatDateTime }: ThesisWorkflowS
         },
       };
     });
-  }, [copy, round, activeStage, formatDateTime]);
+  }, [copy, round, progressStage, formatDateTime]);
 
   const currentStageInfo = stages.find((s) => s.step === selectedStage) || stages[activeStage - 1] || stages[0];
 
@@ -147,7 +155,7 @@ export function ThesisWorkflowStepper({ round, formatDateTime }: ThesisWorkflowS
       {/* Stepper Timeline Bar */}
       <div className="mt-6 grid grid-cols-1 gap-3 sm:grid-cols-5">
         {stages.map((stage) => {
-          const isCurrentActive = stage.step === activeStage;
+          const isCurrentActive = stage.step === progressStage;
           const isSelected = stage.step === selectedStage;
           const isCompleted = stage.status === 'completed';
           const StageIcon = stage.icon;

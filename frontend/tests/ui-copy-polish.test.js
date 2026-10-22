@@ -372,3 +372,17 @@ test('milestone 2: a11y keyboard focus indicators and accessible names', () => {
   );
   assert.ok(matches && matches.length >= 2, 'both featured and standard share buttons must have focus rings');
 });
+
+test('thesis member metric card is labelled as a member count, not the group-area heading', () => {
+  const page = read('src/app/dashboard/thesis/page.tsx');
+  const card = page.match(
+    /<WorkspaceMetricCard label=\{([^}]+)\} value=\{currentGroup \? currentGroup\.memberStudentIds\.length : 0\}/,
+  );
+  assert.ok(card, 'the student member-count metric card must exist');
+  assert.equal(card[1], 'messages.thesis.groupMembersMetric',
+    'a member count must not borrow the "your group area" section heading');
+
+  const messages = read('src/i18n/messages.ts');
+  assert.equal((messages.match(/groupMembersMetric: '/g) || []).length, 2,
+    'groupMembersMetric must be localized in en + vi');
+});
