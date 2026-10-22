@@ -133,6 +133,70 @@ test('document titles are wired through the shared hook in both shells', () => {
   assert.match(adminFrame, /useDocumentTitle\(title\)/);
 });
 
+test('document title hook lets the next route title win once its shell unmounts', () => {
+  // Fake React: layout-effect cleanups run inside the commit that unmounts the
+  // shell, passive-effect cleanups only afterwards. MutationObserver callbacks
+  // fire in between, as microtasks after the DOM commit — the window in which a
+  // still-connected observer used to write the old title back over /login.
+  const layoutEffects = [];
+  const passiveEffects = [];
+  const fakeReact = {
+    useLayoutEffect: (effect) => layoutEffects.push(effect),
+    useEffect: (effect) => passiveEffects.push(effect),
+  };
+  class FakeMutationObserver {
+    constructor(callback) {
+      this.callback = callback;
+      this.active = false;
+      observers.push(this);
+    }
+    observe() { this.active = true; }
+    disconnect() { this.active = false; }
+  }
+  const observers = [];
+  const notify = () => observers.filter((o) => o.active).forEach((o) => o.callback([]));
+  const doc = { title: 'CampusUTE', head: {} };
+  const saved = { window: global.window, document: global.document, MutationObserver: global.MutationObserver };
+  global.window = {};
+  global.document = doc;
+  global.MutationObserver = FakeMutationObserver;
+  try {
+    const source = fs.readFileSync(path.join(root, 'src/lib/use-document-title.ts'), 'utf8');
+    const output = ts.transpileModule(source, {
+      compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2020 },
+    }).outputText;
+    const moduleRecord = { exports: {} };
+    Function('module', 'exports', 'require', output)(
+      moduleRecord,
+      moduleRecord.exports,
+      (name) => (name === 'react' ? fakeReact : require(name)),
+    );
+
+    moduleRecord.exports.useDocumentTitle('Đang đăng xuất');
+    const layoutCleanups = layoutEffects.map((effect) => effect());
+    const passiveCleanups = passiveEffects.map((effect) => effect());
+    assert.equal(doc.title, 'Đang đăng xuất | CampusUTE');
+
+    // While mounted, the hook still re-asserts over the root metadata title.
+    doc.title = 'Bảng điều khiển học vụ | CampusUTE';
+    notify();
+    assert.equal(doc.title, 'Đang đăng xuất | CampusUTE');
+
+    // Sign-out navigates to /login: the shell unmounts in the same commit that
+    // installs the login metadata title.
+    layoutCleanups.forEach((cleanup) => cleanup?.());
+    doc.title = 'Đăng nhập | CampusUTE';
+    notify();
+    passiveCleanups.forEach((cleanup) => cleanup?.());
+    assert.equal(doc.title, 'Đăng nhập | CampusUTE');
+  } finally {
+    for (const [key, value] of Object.entries(saved)) {
+      if (value === undefined) delete global[key];
+      else global[key] = value;
+    }
+  }
+});
+
 test('demo polish regression tests stay registered in the test script', () => {
   const packageJson = JSON.parse(
     fs.readFileSync(path.join(root, 'package.json'), 'utf8'),
