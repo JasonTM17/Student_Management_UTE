@@ -270,7 +270,7 @@ export function AdminRowActions({
   className,
 }: AdminRowActionsProps) {
   return (
-    <div className={cn('flex flex-wrap items-center justify-end gap-2', className)}>
+    <div className={cn('flex flex-wrap items-center justify-end gap-2 md:flex-nowrap', className)}>
       {children}
     </div>
   );
