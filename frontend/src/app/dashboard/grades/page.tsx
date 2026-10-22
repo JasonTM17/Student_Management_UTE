@@ -234,6 +234,12 @@ export default function GradesPage() {
           currentGpa: 'GPA hiện tại',
           completedCredits: 'Tín chỉ hoàn tất',
           gradedCourses: 'Môn đã có điểm',
+          // Scope hint on the summary cards: these stats follow the semester
+          // filter, so "toàn khóa" (all terms) vs "học kỳ này" (this term)
+          // keeps the totals from looking like they clash with the per-term
+          // group cards below.
+          scopeAll: 'toàn khóa',
+          scopeTerm: 'học kỳ này',
           courseWord: 'môn',
           coursesWord: 'môn',
           creditsWord: 'tín chỉ',
@@ -269,6 +275,8 @@ export default function GradesPage() {
           currentGpa: 'Current GPA',
           completedCredits: 'Completed credits',
           gradedCourses: 'Graded courses',
+          scopeAll: 'all terms',
+          scopeTerm: 'this term',
           courseWord: 'course',
           coursesWord: 'courses',
           creditsWord: 'credits',
@@ -360,7 +368,12 @@ export default function GradesPage() {
             <Card variant="elevated">
               <CardContent className="flex items-center justify-between gap-4 pt-6">
                 <div>
-                  <div className="text-sm text-muted-foreground">{copy.currentGpa}</div>
+                  <div className="text-sm text-muted-foreground">
+                    {copy.currentGpa}{' '}
+                    <span className="text-xs font-normal text-muted-foreground/70">
+                      · {selectedSemester ? copy.scopeTerm : copy.scopeAll}
+                    </span>
+                  </div>
                   <div className="mt-1 text-3xl font-semibold tracking-tight text-foreground">
                     {summary.gpa}
                   </div>
@@ -373,7 +386,12 @@ export default function GradesPage() {
             <Card variant="elevated">
               <CardContent className="flex items-center justify-between gap-4 pt-6">
                 <div>
-                  <div className="text-sm text-muted-foreground">{copy.completedCredits}</div>
+                  <div className="text-sm text-muted-foreground">
+                    {copy.completedCredits}{' '}
+                    <span className="text-xs font-normal text-muted-foreground/70">
+                      · {selectedSemester ? copy.scopeTerm : copy.scopeAll}
+                    </span>
+                  </div>
                   <div className="mt-1 text-3xl font-semibold tracking-tight text-foreground">
                     {formatNumber(summary.completedCredits)}
                   </div>
@@ -386,7 +404,12 @@ export default function GradesPage() {
             <Card variant="elevated">
               <CardContent className="flex items-center justify-between gap-4 pt-6">
                 <div>
-                  <div className="text-sm text-muted-foreground">{copy.gradedCourses}</div>
+                  <div className="text-sm text-muted-foreground">
+                    {copy.gradedCourses}{' '}
+                    <span className="text-xs font-normal text-muted-foreground/70">
+                      · {selectedSemester ? copy.scopeTerm : copy.scopeAll}
+                    </span>
+                  </div>
                   <div className="mt-1 text-3xl font-semibold tracking-tight text-foreground">
                     {formatNumber(summary.gradedCount)}/{formatNumber(summary.courseCount)}
                   </div>

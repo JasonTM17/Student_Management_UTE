@@ -317,6 +317,10 @@ export default function TranscriptPage() {
           earnedCredits: 'Tín chỉ đã đạt',
           completedCourses: 'Môn đã hoàn tất',
           inProgressCourses: 'Môn đang học',
+          // These two counts come from the curriculum (degree map), not the
+          // per-row grade list on the Grades page, so the hint marks their
+          // scope to avoid a false mismatch with that page's "graded" count.
+          scopeCurriculum: 'theo CTĐT',
           courseWord: 'môn',
           coursesWord: 'môn',
           creditsAttempted: 'tín chỉ đã đăng ký',
@@ -384,6 +388,7 @@ export default function TranscriptPage() {
           earnedCredits: 'Credits earned',
           completedCourses: 'Completed courses',
           inProgressCourses: 'In progress',
+          scopeCurriculum: 'in curriculum',
           courseWord: 'course',
           coursesWord: 'courses',
           creditsAttempted: 'credits attempted',
@@ -607,7 +612,12 @@ export default function TranscriptPage() {
             <Card variant="elevated">
               <CardContent className="flex items-center justify-between gap-4 pt-6">
                 <div>
-                  <div className="text-sm text-muted-foreground">{copy.completedCourses}</div>
+                  <div className="text-sm text-muted-foreground">
+                    {copy.completedCourses}{' '}
+                    <span className="text-xs font-normal text-muted-foreground/70">
+                      · {copy.scopeCurriculum}
+                    </span>
+                  </div>
                   <div className="mt-1 text-3xl font-semibold tracking-tight text-foreground">
                     {formatNumber(completedCourseCount)}
                   </div>
@@ -620,7 +630,12 @@ export default function TranscriptPage() {
             <Card variant="elevated">
               <CardContent className="flex items-center justify-between gap-4 pt-6">
                 <div>
-                  <div className="text-sm text-muted-foreground">{copy.inProgressCourses}</div>
+                  <div className="text-sm text-muted-foreground">
+                    {copy.inProgressCourses}{' '}
+                    <span className="text-xs font-normal text-muted-foreground/70">
+                      · {copy.scopeCurriculum}
+                    </span>
+                  </div>
                   <div className="mt-1 text-3xl font-semibold tracking-tight text-foreground">
                     {formatNumber(inProgressCourseCount)}
                   </div>
