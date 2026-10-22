@@ -18,6 +18,16 @@ function readFromRepo(relativePath) {
 // Phase 03 — the certificate surface mints nothing official and invents nobody
 // ---------------------------------------------------------------------------
 
+test('lecturer grade sheet does not claim ungraded students on an empty roster', () => {
+  const source = read('src/app/dashboard/lecturer/grades/[id]/page.tsx');
+  const warning = source.match(/\{([^{}]*)\?\s*\(\s*<Card[^>]*>\s*<CardContent[^>]*>\s*\{copy\.publishWarning\}/);
+  assert.ok(warning, 'publish warning block not found');
+  // "At least one student still needs a grade" is false with zero enrollments;
+  // the empty-roster state explains that case instead.
+  assert.match(warning[1], /!allGraded/);
+  assert.match(warning[1], /sectionData\.enrollments\.length > 0/);
+});
+
 test('certificate preview asserts no authority the backend never granted', () => {
   const source = read('src/app/dashboard/certificates/page.tsx');
 
