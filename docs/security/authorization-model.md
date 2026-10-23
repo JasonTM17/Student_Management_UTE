@@ -152,6 +152,15 @@ retroactively identify password changes made before the revision existed.
   [ThesisGroupReadController](../../java-services/restful-api/src/main/java/io/campuscore/restfulapi/thesis/web/ThesisGroupReadController.java),
   and [NotificationReadController](../../java-services/restful-api/src/main/java/io/campuscore/restfulapi/notification/web/NotificationReadController.java).
   A supplied record ID is a locator, never proof of access.
+- **Student directory data** is relationship-scoped, not role-scoped. Admins
+  keep the full directory; students still read only their own record.
+  Lecturers — including `TRUONG_BO_MON`/`TRUONG_KHOA` — see only students
+  enrolled in sections they teach or reach through the section-access
+  department/faculty rules, and students in thesis groups whose topics they
+  supervise, review, or sit on a council for. List totals and the status
+  filter apply to the scoped set, and an out-of-scope detail id answers the
+  same 404 as a missing id. The owner is
+  [PeopleReadRepository.LecturerDirectoryScope](../../java-services/restful-api/src/main/java/io/campuscore/restfulapi/people/repository/PeopleReadRepository.java).
 - **Announcement audiences** must protect detail access and inbox previews as
   well as feeds; a preview can disclose the same private content as the full row.
   The owners are [AnnouncementReadService](../../java-services/restful-api/src/main/java/io/campuscore/restfulapi/engagement/service/AnnouncementReadService.java)
