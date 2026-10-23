@@ -1,5 +1,5 @@
 {
-  "comment": "Shared allowlist corpus for notification deep links. Java NotificationLinkPolicy, frontend safe-path.ts, and migration V142 must classify every case identically. Unsafe cases cover scheme smuggling, protocol-relative hosts, backslashes, dot segments, percent-encoded separators/dots, and Unicode whitespace/format/control characters.",
+  "comment": "Shared allowlist corpus for notification deep links. Java NotificationLinkPolicy and frontend safe-path.ts must classify every case identically; migration V142's cleanup additionally clears the U+E0100 variation-selector supplement (a mark the runtime allowlists accept). Unsafe cases cover scheme smuggling, protocol-relative hosts, backslashes, dot segments, percent-encoded separators/dots, Unicode separator/format/control/private-use/noncharacter code points, and leading/trailing whitespace that must reject rather than trim.",
   "safe": [
     "/dashboard",
     "/dashboard/register?q=CS101",
@@ -8,7 +8,8 @@
     "/vi/dashboard",
     "/khoa-luận/đề-tài",
     "/a/b/c?x=%20%E2%9C%93",
-    "/a~b-c_d:e@f&g=h+i,j;k!l(m)n'o"
+    "/a~b-c_d:e@f&g=h+i,j;k!l(m)n'o",
+    "/a󠄀b"
   ],
   "unsafe": [
     {
@@ -198,6 +199,50 @@
     {
       "value": "/a᠎b",
       "why": "Mongolian vowel separator U+180E (Cf)"
+    },
+    {
+      "value": "/ab",
+      "why": "private use U+E000 (Co)"
+    },
+    {
+      "value": "/a﷐b",
+      "why": "noncharacter U+FDD0 (Cn)"
+    },
+    {
+      "value": "/a\u000bb",
+      "why": "vertical tab U+000B"
+    },
+    {
+      "value": "/a\fb",
+      "why": "form feed U+000C"
+    },
+    {
+      "value": "/ab",
+      "why": "next line U+0085 (C1)"
+    },
+    {
+      "value": " /dashboard",
+      "why": "leading ASCII space must reject, not trim"
+    },
+    {
+      "value": "/dashboard ",
+      "why": "trailing ASCII space must reject, not trim"
+    },
+    {
+      "value": " /dashboard",
+      "why": "leading NBSP U+00A0 must reject, not trim"
+    },
+    {
+      "value": "/dashboard ",
+      "why": "trailing line separator U+2028 must reject, not trim"
+    },
+    {
+      "value": "\t/dashboard",
+      "why": "leading tab must reject, not trim"
+    },
+    {
+      "value": "/dashboard\n",
+      "why": "trailing newline must reject, not trim"
     }
   ]
 }

@@ -31,6 +31,7 @@ export function safeInternalPath(
   if (typeof value !== 'string') {
     return null;
   }
-  const trimmed = value.trim();
-  return passesAllowlist(trimmed) ? trimmed : null;
+  // Edge whitespace rejects rather than trims: the emitted href must be the
+  // byte-exact path that was validated.
+  return passesAllowlist(value) ? value : null;
 }

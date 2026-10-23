@@ -58,6 +58,23 @@ test('safe internal path accepts single-slash relative paths with query and hash
   assert.equal(safePath.safeInternalPath('/dashboard'), '/dashboard');
 });
 
+test('safe internal path rejects edge whitespace instead of trimming', () => {
+  // The stored/emitted href must be the byte-exact path that was validated —
+  // a trim-then-emit would let " /x" and "/x " through as if they were "/x".
+  for (const padded of [
+    ' /dashboard',
+    '/dashboard ',
+    '\t/dashboard',
+    '/dashboard\n',
+    '\u00A0/dashboard',
+    '/dashboard\u2028',
+    ' /dashboard ',
+  ]) {
+    assert.equal(safePath.isSafeInternalPath(padded), false, JSON.stringify(padded));
+    assert.equal(safePath.safeInternalPath(padded), null, JSON.stringify(padded));
+  }
+});
+
 test('safe internal path rejects schemes, protocol-relative hosts, backslashes and whitespace', () => {
   for (const bad of [
     'javascript:alert(1)',
