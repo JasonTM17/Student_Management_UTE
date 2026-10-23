@@ -363,9 +363,13 @@ public class ThesisMutationService {
     }
 
     /**
-     * Cancels a round that has not published results. Cancelled groups keep
-     * their historical rosters; the one-active-group index releases the
-     * students for a future round.
+     * Cancels a round that has not published results. Cancellation only moves
+     * the round row: groups, rosters, topics, reports, councils and scores all
+     * stay as history, and the status the round leaves behind is captured in
+     * {@code cancelled_from_status} so {@link #restoreRound} can undo an
+     * accidental cancel. Students of the cancelled round are free to join
+     * another round because the participation checks treat CANCELLED rounds as
+     * holding no seat.
      *
      * @param id round to cancel
      * @param actor caller JWT recorded in the audit row
@@ -377,7 +381,8 @@ public class ThesisMutationService {
     public RoundResponse cancelRound(UUID id, Jwt actor) {
         roundReadPort.requireExisting(id);
         int updated = jdbc.update(
-                "UPDATE thesis.thesis_registration_round SET status = 'CANCELLED', updated_at = CURRENT_TIMESTAMP, version = version + 1 "
+                "UPDATE thesis.thesis_registration_round SET status = 'CANCELLED', cancelled_from_status = status, "
+                        + "updated_at = CURRENT_TIMESTAMP, version = version + 1 "
                         + "WHERE id = :id AND status NOT IN ('RESULTS_PUBLISHED', 'CLOSED', 'CANCELLED')",
                 params().addValue("id", id));
         if (updated != 1) {
@@ -386,6 +391,111 @@ public class ThesisMutationService {
         audit.record(subject(actor), null, "THESIS_ROUND_CANCELLED", "THESIS_ROUND", id.toString(),
                 "Round cancelled");
         return roundReads.get(id);
+    }
+
+    /**
+     * Reverses a cancellation (the admin escape hatch). The round returns to
+     * the status captured at cancel time; a caller may instead name an
+     * explicit {@code targetStatus} among the live pre-terminal statuses —
+     * needed when the stored target is no longer reachable, e.g. a
+     * REGISTRATION_OPEN snapshot whose window has since closed. Rounds
+     * cancelled before {@code cancelled_from_status} existed carry NULL and
+     * fall back to DRAFT, the only status that fabricates no progress.
+     *
+     * <p>Nothing else was mutated by the cancel, so nothing is resurrected
+     * here — the UPDATE is a pure status flip guarded by the row lock and the
+     * {@code status = 'CANCELLED'} predicate, which keeps the optimistic
+     * version check honest against a concurrent restore or cancel. Two safety
+     * checks run under that lock before the flip:
+     *
+     * <ul>
+     *   <li>a student who joined another still-live round while this one was
+     *   cancelled cannot hold two active seats, so the restore is rejected
+     *   with ROUND_RESTORE_MEMBER_CONFLICT rather than corrupting rosters;</li>
+     *   <li>a round containing frozen historical small groups must not be
+     *   reopened — the V113 trigger is the backstop, and the explicit
+     *   ROUND_RESTORE_FROZEN_HISTORY check gives the admin a clear reason.</li>
+     * </ul>
+     *
+     * @param id round to restore
+     * @param targetStatus explicit restore target, or null to use the recorded
+     *        pre-cancel status (DRAFT when nothing was recorded)
+     * @param actor caller JWT recorded in the audit row
+     * @return the round after restoration
+     */
+    @Transactional
+    public RoundResponse restoreRound(UUID id, String targetStatus, Jwt actor) {
+        Map<String, Object> row = one(
+                "SELECT status, cancelled_from_status FROM thesis.thesis_registration_round WHERE id = :id FOR UPDATE",
+                params().addValue("id", id), "ROUND_NOT_FOUND", "Thesis registration round not found");
+        if (!RoundStatus.CANCELLED.name().equals(row.get("status"))) {
+            throw conflict("ROUND_STATE_CONFLICT", "Only a cancelled round can be restored");
+        }
+        RoundStatus target = resolveRestoreTarget((String) row.get("cancelled_from_status"), targetStatus);
+        // Restoring to an open registration replays the same window guard the
+        // open-registration transition enforces; otherwise the round would
+        // come back "open" while every roster action still fails.
+        if (target == RoundStatus.REGISTRATION_OPEN) {
+            requireLiveRegistrationWindow(id);
+        }
+        Integer seatConflicts = jdbc.queryForObject(
+                "SELECT COUNT(*) FROM thesis.thesis_group_member m "
+                        + "JOIN thesis.thesis_group g ON g.id = m.group_id "
+                        + "JOIN thesis.thesis_group_member other ON other.student_id = m.student_id "
+                        + "JOIN thesis.thesis_group og ON og.id = other.group_id AND og.status <> 'CANCELLED' "
+                        + "JOIN thesis.thesis_registration_round orr ON orr.id = other.round_id "
+                        + "WHERE g.round_id = :id AND g.status <> 'CANCELLED' AND m.active_participation "
+                        + "AND other.round_id <> :id AND other.active_participation "
+                        + "AND orr.status NOT IN ('RESULTS_PUBLISHED', 'CLOSED', 'CANCELLED')",
+                params().addValue("id", id), Integer.class);
+        if (seatConflicts != null && seatConflicts > 0) {
+            throw conflict("ROUND_RESTORE_MEMBER_CONFLICT",
+                    seatConflicts + " student(s) already hold an active seat in another live round; "
+                            + "restoring this round would give them two active groups");
+        }
+        Integer frozenHistory = jdbc.queryForObject(
+                "SELECT COUNT(*) FROM thesis.thesis_group WHERE round_id = :id AND legacy_group_size_exception",
+                params().addValue("id", id), Integer.class);
+        if (frozenHistory != null && frozenHistory > 0) {
+            throw conflict("ROUND_RESTORE_FROZEN_HISTORY",
+                    "This round contains frozen historical small groups and cannot be reopened");
+        }
+        int updated = jdbc.update(
+                "UPDATE thesis.thesis_registration_round SET status = :target, cancelled_from_status = NULL, "
+                        + "updated_at = CURRENT_TIMESTAMP, version = version + 1 "
+                        + "WHERE id = :id AND status = 'CANCELLED'",
+                params().addValue("id", id).addValue("target", target.name()));
+        if (updated != 1) {
+            throw conflict("ROUND_STATE_CONFLICT", "The round is no longer cancelled");
+        }
+        audit.record(subject(actor), null, "THESIS_ROUND_RESTORED", "THESIS_ROUND", id.toString(),
+                "Round restored CANCELLED -> " + target.name(),
+                Map.of("status", "CANCELLED",
+                        "cancelled_from_status", row.get("cancelled_from_status") == null
+                                ? "" : String.valueOf(row.get("cancelled_from_status"))),
+                Map.of("status", target.name()));
+        return roundReads.get(id);
+    }
+
+    private RoundStatus resolveRestoreTarget(String recorded, String requested) {
+        String name = requested != null && !requested.isBlank() ? requested.trim() : recorded;
+        if (name == null || name.isBlank()) {
+            // Legacy cancellation: no prior status survived, so land on the
+            // status that fabricates nothing and re-uses the normal chain.
+            return RoundStatus.DRAFT;
+        }
+        try {
+            RoundStatus target = RoundStatus.valueOf(name);
+            if (target == RoundStatus.CANCELLED
+                    || target == RoundStatus.RESULTS_PUBLISHED
+                    || target == RoundStatus.CLOSED) {
+                throw invalid("targetStatus must be a live status: DRAFT, PROPOSAL_OPEN, "
+                        + "PROPOSALS_PUBLISHED, REGISTRATION_OPEN or REGISTRATION_CLOSED");
+            }
+            return target;
+        } catch (IllegalArgumentException exception) {
+            throw invalid("targetStatus must be a valid round status");
+        }
     }
 
     /**

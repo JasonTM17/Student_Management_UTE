@@ -156,7 +156,12 @@ public class ThesisProgressService {
         }
 
         String attention = "NONE";
-        if (groupId == null) {
+        if ("CANCELLED".equals(roundStatus)) {
+            // A cancelled round voids every seat in it: the student must see
+            // the round's fate, not a group or milestone that no longer
+            // advances anything.
+            attention = "ROUND_CANCELLED";
+        } else if (groupId == null) {
             attention = "NOT_PARTICIPATING";
         } else if ("REJECTED".equals(approvalStatus)) {
             attention = "GROUP_REJECTED";
@@ -178,7 +183,8 @@ public class ThesisProgressService {
         return new ProgressResponse(
                 roundId,
                 roundStatus,
-                groupId == null ? "NOT_PARTICIPATING" : "PARTICIPATING",
+                groupId == null || "CANCELLED".equals(roundStatus)
+                        ? "NOT_PARTICIPATING" : "PARTICIPATING",
                 current,
                 List.copyOf(completed),
                 attention,

@@ -61,6 +61,15 @@ public class ThesisRegistrationRound {
     @Column(nullable = false, length = 32)
     private RoundStatus status;
 
+    /**
+     * Status the round held when it was cancelled; only populated while the
+     * round is CANCELLED. NULL marks a legacy cancellation — those restore to
+     * DRAFT because no earlier status survives to replay.
+     */
+    @Enumerated(EnumType.STRING)
+    @Column(name = "cancelled_from_status", length = 32)
+    private RoundStatus cancelledFromStatus;
+
     protected ThesisRegistrationRound() {
     }
 
@@ -77,4 +86,5 @@ public class ThesisRegistrationRound {
     public Instant getReportDate() { return reportDate; }
     public Instant getDefenseDate() { return defenseDate; }
     public RoundStatus getStatus() { return status; }
+    public RoundStatus getCancelledFromStatus() { return cancelledFromStatus; }
 }

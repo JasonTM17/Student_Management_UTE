@@ -118,7 +118,9 @@ export default function ThesisProgressPage() {
   const progressIndex = Math.max(PROGRESS_MILESTONES.indexOf(progress.currentMilestone), 0);
   const completedMilestones = new Set(progress.completedMilestones);
   const hasGroup = progress.participationState === 'PARTICIPATING';
-  const attentionMessage = progress.attentionState === 'NOT_PARTICIPATING'
+  const attentionMessage = progress.attentionState === 'ROUND_CANCELLED'
+    ? messages.thesis.progressRoundCancelled
+    : progress.attentionState === 'NOT_PARTICIPATING'
     ? messages.thesis.progressNotParticipating
     : progress.attentionState === 'RESULT_NOT_AVAILABLE'
       ? messages.thesis.progressResultNotAvailable
