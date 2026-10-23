@@ -282,9 +282,10 @@ class SectionCancellationPersistenceTest {
     }
 
     @Test
-    void cancelledSectionDoesNotSatisfyPrerequisite() throws Exception {
-        // course-overlap requires completed course-open as PREREQ; a pass in a
-        // section that was later cancelled must not unlock it.
+    void publishedHistoryInCancelledSectionStillSatisfiesPrerequisite() throws Exception {
+        // A completed, published pass stays on the academic record even after
+        // its section is cancelled — the transcript keeps it, so the
+        // prerequisite gate must keep counting it too.
         jdbc.update(
                 "INSERT INTO \"academic\".\"CourseRequirement\""
                         + " (\"id\", \"courseId\", \"requiredCourseId\", \"kind\", \"minLetterGrade\")"
@@ -295,6 +296,26 @@ class SectionCancellationPersistenceTest {
         mvc.perform(post("/api/v1/enrollments/enroll")
                         .with(studentJwt())
                         .header("Idempotency-Key", "cancel-prereq-second")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"sectionId\":\"section-overlap\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("ENROLLED"));
+    }
+
+    @Test
+    void enrolledRowInCancelledSectionDoesNotSatisfyPrerequisite() throws Exception {
+        // Only completed work survives cancellation: a merely ENROLLED row in
+        // a cancelled section is not proof of having taken the course.
+        jdbc.update(
+                "INSERT INTO \"academic\".\"CourseRequirement\""
+                        + " (\"id\", \"courseId\", \"requiredCourseId\", \"kind\", \"minLetterGrade\")"
+                        + " VALUES ('req-cancel-prereq-open', 'course-overlap', 'course-open', 'PREREQ', 'D')");
+        seedActiveEnrollment("enrollment-cancel-active", "section-open", "course-open");
+        cancelSection("section-open");
+
+        mvc.perform(post("/api/v1/enrollments/enroll")
+                        .with(studentJwt())
+                        .header("Idempotency-Key", "cancel-prereq-active")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"sectionId\":\"section-overlap\"}"))
                 .andExpect(status().isUnprocessableEntity())
@@ -462,6 +483,149 @@ class SectionCancellationPersistenceTest {
                 .andExpect(jsonPath("$.code").value("SCHEDULE_CONFLICT"));
     }
 
+    @Test
+    void enrollIsRejectedWhileSemesterIsClosed() throws Exception {
+        // The semester lifecycle, not only the round row, gates registration:
+        // a CLOSED semester must refuse enroll even while a round stays OPEN.
+        mvc.perform(put("/api/v1/semesters/semester-1")
+                        .with(adminJwt())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"status\":\"CLOSED\"}"))
+                .andExpect(status().isOk());
+
+        mvc.perform(post("/api/v1/enrollments/enroll")
+                        .with(studentJwt())
+                        .header("Idempotency-Key", "semester-closed-enroll")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"sectionId\":\"section-two\"}"))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("SEMESTER_CLOSED"));
+
+        // Reopening the semester restores registration without touching data.
+        mvc.perform(put("/api/v1/semesters/semester-1")
+                        .with(adminJwt())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"status\":\"OPEN\"}"))
+                .andExpect(status().isOk());
+
+        mvc.perform(post("/api/v1/enrollments/enroll")
+                        .with(studentJwt())
+                        .header("Idempotency-Key", "semester-reopen-enroll")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"sectionId\":\"section-two\"}"))
+                .andExpect(status().isOk());
+    }
+
+    @Test
+    void schedulingSectionIntoInactiveClassroomIsRejected() throws Exception {
+        deactivateRoom("room-1");
+
+        mvc.perform(put("/api/v1/sections/section-two")
+                        .with(adminJwt())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"schedules\":[{\"classroomId\":\"room-1\",\"dayOfWeek\":3,\"startTime\":\"10:00\",\"endTime\":\"12:00\"}]}"))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("CLASSROOM_INACTIVE"));
+    }
+
+    @Test
+    void creatingSectionWithInactiveClassroomIsRejected() throws Exception {
+        deactivateRoom("room-1");
+
+        mvc.perform(post("/api/v1/sections")
+                        .with(adminJwt())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"sectionNumber\":\"09\",\"courseId\":\"course-two\",\"semesterId\":\"semester-1\",\"classroomId\":\"room-1\",\"capacity\":30}"))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("CLASSROOM_INACTIVE"));
+    }
+
+    @Test
+    void reopeningSectionWithDeactivatedRoomIsRejected() throws Exception {
+        // Reopen revalidates the assignment: a section whose room was
+        // deactivated while it was cancelled cannot silently come back online.
+        // room-2 is conflict-free so the classroom check is what must fire.
+        jdbc.update("INSERT INTO \"academic\".\"Classroom\" (\"id\", \"building\", \"roomNumber\", \"capacity\", \"isActive\")"
+                + " VALUES ('room-2', 'B', '202', 60, TRUE)");
+        insertSection("section-room2", "05", "course-two", null);
+        jdbc.update(
+                "INSERT INTO \"academic\".\"SectionSchedule\""
+                        + " (\"id\", \"sectionId\", \"classroomId\", \"dayOfWeek\", \"startTime\", \"endTime\")"
+                        + " VALUES ('sched-room2', 'section-room2', 'room-2', 5, '13:00', '15:00')");
+        cancelSection("section-room2");
+        deactivateRoom("room-2");
+
+        mvc.perform(put("/api/v1/sections/section-room2")
+                        .with(adminJwt())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"status\":\"OPEN\"}"))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("CLASSROOM_INACTIVE"));
+    }
+
+    @Test
+    void roomDeactivationLeavesExistingSchedulesUntouched() throws Exception {
+        // Deactivating a room is non-destructive: stored schedules stay, and
+        // the section can still be edited on unrelated fields.
+        deactivateRoom("room-1");
+
+        mvc.perform(put("/api/v1/sections/section-open")
+                        .with(adminJwt())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"capacity\":30}"))
+                .andExpect(status().isOk());
+        assertThat(jdbc.queryForObject(
+                "SELECT COUNT(*) FROM \"academic\".\"SectionSchedule\" WHERE \"sectionId\" = 'section-open'",
+                Integer.class))
+                .isEqualTo(1);
+    }
+
+    @Test
+    void adminCanReassignSectionToAnotherLecturer() throws Exception {
+        // The recovery path for a deactivated lecturer is reassigning the
+        // section to an active one; the admin update must accept that.
+        insertLecturer("lecturer-2", "lecturer-user-2", "L002");
+
+        mvc.perform(put("/api/v1/sections/section-two")
+                        .with(adminJwt())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"lecturerId\":\"lecturer-2\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.lecturerId").value("lecturer-2"));
+    }
+
+    @Test
+    void lecturerDeactivationReportsRemainingAssignments() throws Exception {
+        // Deactivation is non-destructive (sections keep their lecturer), so
+        // the response reports how many sections still point at them.
+        jdbc.update("UPDATE \"academic\".\"Section\" SET \"lecturerId\" = 'lecturer-1' WHERE \"id\" = 'section-two'");
+
+        mvc.perform(put("/api/v1/lecturers/lecturer-1")
+                        .with(adminJwt())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"isActive\":false}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.assignedSectionCount").value(1));
+    }
+
+    private void deactivateRoom(String classroomId) throws Exception {
+        mvc.perform(put("/api/v1/classrooms/" + classroomId)
+                        .with(adminJwt())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"isActive\":false}"))
+                .andExpect(status().isOk());
+    }
+
+    private void insertLecturer(String id, String userId, String employeeId) {
+        jdbc.update(
+                "INSERT INTO \"campuscore_auth\".\"User\" (\"id\", \"email\", \"firstName\", \"lastName\") VALUES (?, ?, ?, ?)",
+                userId, userId + "@campuscore.edu", "New", "Lecturer");
+        jdbc.update(
+                "INSERT INTO \"academic\".\"Lecturer\" (\"id\", \"userId\", \"departmentId\", \"employeeId\", \"isActive\")"
+                        + " VALUES (?, ?, ?, ?, ?)",
+                id, userId, "department-1", employeeId, true);
+    }
+
     private void cancelSection(String sectionId) throws Exception {
         mvc.perform(put("/api/v1/sections/" + sectionId)
                         .with(adminJwt())
@@ -545,7 +709,8 @@ class SectionCancellationPersistenceTest {
                     "userId" VARCHAR(120) NOT NULL,
                     "departmentId" VARCHAR(120) NOT NULL,
                     "employeeId" VARCHAR(120) NOT NULL,
-                    "isActive" BOOLEAN NOT NULL
+                    "isActive" BOOLEAN NOT NULL,
+                    "updatedAt" TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
                 )
                 """);
         jdbc.execute("""
@@ -601,7 +766,9 @@ class SectionCancellationPersistenceTest {
                     "id" VARCHAR(120) PRIMARY KEY,
                     "building" VARCHAR(120) NOT NULL,
                     "roomNumber" VARCHAR(120) NOT NULL,
-                    "capacity" INTEGER NOT NULL DEFAULT 60
+                    "capacity" INTEGER NOT NULL DEFAULT 60,
+                    "isActive" BOOLEAN NOT NULL DEFAULT TRUE,
+                    "updatedAt" TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
                 )
                 """);
         jdbc.execute("""
