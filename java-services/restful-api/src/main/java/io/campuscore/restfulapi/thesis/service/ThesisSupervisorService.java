@@ -291,7 +291,11 @@ public class ThesisSupervisorService {
             return;
         }
         if (ThesisDeanScope.isFacultyHead(actor)) {
-            ThesisDeanScope.requireTopicAccess(jdbc, actor, topicId);
+            // Rewriting who supervises a topic is governance on the topic's
+            // faculty: the supervisor escape requireTopicAccess keeps for
+            // ordinary topic work would let a foreign dean who co-supervises
+            // replace the home supervisor after registration closed.
+            ThesisDeanScope.requireTopicGovernanceScope(jdbc, actor, topicId);
             return;
         }
         if (ThesisDepartmentScope.isDepartmentHead(actor)
