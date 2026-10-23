@@ -51,9 +51,11 @@ export function AuthShell({
       <a href="#main-content" className="portal-skip-link">
         {messages.home.skipToContent}
       </a>
+      {/* grid-cols-1 caps the phone column at the viewport; the implicit auto
+          track grew to fit the no-wrap demo account rows and clipped the panel. */}
       <div
         className={cn(
-          'grid min-h-screen',
+          'grid min-h-screen grid-cols-1',
           isAdmin ? 'lg:grid-cols-[1.05fr_0.95fr]' : 'lg:grid-cols-[0.9fr_1.1fr]',
         )}
       >

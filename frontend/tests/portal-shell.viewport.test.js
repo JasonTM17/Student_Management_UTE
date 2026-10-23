@@ -218,6 +218,40 @@ test('admin portal shell holds at 1440, 768, and 390', async (t) => {
   }
 });
 
+test('login page with the demo account list fits at 1440, 768, and 390', async (t) => {
+  const browser = await openShellBrowserOrSkip(t);
+  if (!browser) return;
+  // The four-row student demo list is the widest login state; it only renders
+  // when the dev server was started with the public demo credentials.
+  const expectDemoList = process.env.NEXT_PUBLIC_SHOW_DEMO_CREDENTIALS === 'true';
+  try {
+    for (const viewport of viewports) {
+      const context = await browser.newContext({ viewport });
+      const page = await context.newPage();
+      await page.goto(`${baseURL}/vi/login`, { waitUntil: 'load' });
+      await page.locator('#main-content').waitFor({ state: 'visible', timeout: 60_000 });
+
+      const demoList = page.getByRole('group', { name: 'Chọn tài khoản sinh viên demo' });
+      if (expectDemoList) {
+        assert.equal(await demoList.isVisible(), true, `${viewport.name}: demo list is not rendered`);
+      }
+      await assertNoHorizontalOverflow(page, `login ${viewport.name}`);
+      const main = await page.locator('#main-content').boundingBox();
+      assert.ok(main && main.width <= viewport.width, `${viewport.name}: login panel is ${main?.width}px wide`);
+      for (const control of [
+        page.getByRole('group', { name: 'Ngôn ngữ' }),
+        page.getByRole('button', { name: /Chuyển sang giao diện/ }),
+      ]) {
+        const box = await control.boundingBox();
+        assert.ok(box && box.x + box.width <= viewport.width, `${viewport.name}: corner control is clipped`);
+      }
+      await context.close();
+    }
+  } finally {
+    await browser.close();
+  }
+});
+
 test('Super Admin has its own identity in both portal shells and locales', async (t) => {
   const browser = await openShellBrowserOrSkip(t);
   if (!browser) return;

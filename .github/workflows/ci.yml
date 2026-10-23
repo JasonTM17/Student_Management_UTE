@@ -63,6 +63,11 @@ jobs:
   portal-viewport:
     name: Portal viewport shell
     runs-on: ubuntu-latest
+    env:
+      # Public demo values already printed on the login page; they render the
+      # widest login state so the viewport check covers it.
+      NEXT_PUBLIC_SHOW_DEMO_CREDENTIALS: 'true'
+      NEXT_PUBLIC_DEMO_STUDENT_PASSWORD: password123
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
