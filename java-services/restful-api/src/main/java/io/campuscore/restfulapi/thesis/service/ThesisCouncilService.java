@@ -122,6 +122,10 @@ public class ThesisCouncilService {
         requireCouncilGovernanceAccess(councilId, actor);
         lockMutableCouncilRound(councilId);
         lockCouncil(councilId);
+        // Restaffing the panel is governance on every topic it grades, the
+        // same rule replaceMember enforces — otherwise remove-then-add
+        // bypasses the refused one-step swap on a mixed council.
+        requireAllCouncilTopicsInScope(councilId, actor);
         requireRosterMutable(councilId);
         requireText(lecturerId, "lecturerId");
         String role = normalizeRole(memberRole);
@@ -205,6 +209,9 @@ public class ThesisCouncilService {
         requireCouncilGovernanceAccess(councilId, actor);
         lockMutableCouncilRound(councilId);
         lockCouncil(councilId);
+        // Same per-topic governance rule as addMember/replaceMember: a dean
+        // must own the faculty of every topic this council grades.
+        requireAllCouncilTopicsInScope(councilId, actor);
         requireText(lecturerId, "lecturerId");
         Integer assignedTopics = count(
                 "SELECT COUNT(*) FROM thesis.thesis_council_topic WHERE council_id = :councilId",
