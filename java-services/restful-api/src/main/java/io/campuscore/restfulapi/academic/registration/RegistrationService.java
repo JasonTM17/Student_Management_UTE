@@ -396,6 +396,22 @@ public class RegistrationService {
         if (targetSemesterId != null && !targetSemesterId.isBlank()) {
             List<Map<String, Object>> active = activeEnrollments(studentId, targetSemesterId);
             if (!active.isEmpty()) {
+                // A section cancellation deletes persisted slips; a slip
+                // rendered from pre-cancel state could commit afterwards and
+                // keep listing the cancelled course. Share-lock the section
+                // rows so the render serializes with the cancel's UPDATE but
+                // not with other renders, then re-read the active set under
+                // the lock before persisting.
+                for (String sectionId : active.stream()
+                        .map(row -> String.valueOf(row.get("section_id"))).distinct().sorted().toList()) {
+                    jdbc.queryForList(
+                            "SELECT \"id\" FROM " + SECTION + " WHERE \"id\" = :id"
+                                    + (postgres ? " FOR SHARE" : " FOR UPDATE"),
+                            new MapSqlParameterSource("id", sectionId));
+                }
+                active = activeEnrollments(studentId, targetSemesterId);
+            }
+            if (!active.isEmpty()) {
                 Map<String, Object> first = active.get(0);
                 String enrollmentId = String.valueOf(first.get("id"));
                 String sectionId = String.valueOf(first.get("section_id"));
@@ -544,6 +560,13 @@ public class RegistrationService {
         if (active.stream().anyMatch(row -> courseId.equals(String.valueOf(row.get("course_id"))))) {
             throw problem(HttpStatus.CONFLICT, "DUPLICATE_COURSE", "Student already has this course this term");
         }
+        // Cancelling a section preserves its enrollment rows as history, and
+        // the per-course uniqueness still counts them while their status stays
+        // active — the duplicate check above skips cancelled sections, so a
+        // same-course replacement would collide on the unique index at insert.
+        // Retire the preserved row as an automatic drop under this lock order;
+        // a later reopen does not resurrect it.
+        retireCancelledSectionEnrollment(studentId, semesterId, courseId, hash);
         int used = active.stream().mapToInt(row -> ((Number) row.get("credits")).intValue()).sum();
         int limit = creditLimitApplications.effectiveLimit(studentId, round);
         if (used + credits > limit) {
@@ -679,6 +702,66 @@ public class RegistrationService {
                         .addValue("actorId", actorId == null || actorId.isBlank() ? "system" : actorId)
                         .addValue("hash", hash));
         completeIdempotency(studentId == null ? enrollmentId : studentId, idempotencyKey, enrollmentId, hash);
+    }
+
+    /**
+     * Cancelling a section preserves its enrollment rows as history, and the
+     * partial unique index on (student, course, semester) still counts them
+     * while their status stays active — the in-Java duplicate check skips
+     * cancelled sections, so inserting a replacement enroll for the same
+     * course would collide at the database boundary. Retire the preserved row
+     * as an automatic drop under the same student-first lock order the manual
+     * drop uses; a later section reopen does not resurrect it.
+     */
+    private void retireCancelledSectionEnrollment(
+            String studentId, String semesterId, String courseId, String hash) {
+        List<Map<String, Object>> preserved = jdbc.queryForList(
+                "SELECT enrollment.\"id\", enrollment.\"sectionId\" AS section_id FROM " + ENROLLMENT + " enrollment"
+                        + " JOIN " + SECTION + " section ON section.\"id\" = enrollment.\"sectionId\""
+                        + " WHERE enrollment.\"studentId\" = :studentId"
+                        + " AND enrollment.\"semesterId\" = :semesterId"
+                        + " AND enrollment.\"courseId\" = :courseId"
+                        + " AND enrollment.\"status\" IN ('ENROLLED', 'PENDING', 'CONFIRMED')"
+                        + " AND section.\"status\" = 'CANCELLED'"
+                        // Same join-shaping as lockActiveEnrollments: only the
+                        // Enrollment row is meant to lock.
+                        + (postgres ? " FOR UPDATE OF enrollment" : " FOR UPDATE"),
+                new MapSqlParameterSource()
+                        .addValue("studentId", studentId)
+                        .addValue("semesterId", semesterId)
+                        .addValue("courseId", courseId));
+        for (Map<String, Object> row : preserved) {
+            String enrollmentId = String.valueOf(row.get("id"));
+            String oldSectionId = String.valueOf(row.get("section_id"));
+            jdbc.update(
+                    "UPDATE " + ENROLLMENT + " SET \"status\" = 'DROPPED', \"droppedAt\" = CURRENT_TIMESTAMP,"
+                            + " \"updatedAt\" = CURRENT_TIMESTAMP WHERE \"id\" = :id",
+                    new MapSqlParameterSource("id", enrollmentId));
+            jdbc.update(
+                    "UPDATE " + SECTION + " SET \"enrolledCount\" = CASE WHEN \"enrolledCount\" > 0 THEN \"enrolledCount\" - 1 ELSE 0 END,"
+                            + " \"updatedAt\" = CURRENT_TIMESTAMP WHERE \"id\" = :sectionId",
+                    new MapSqlParameterSource("sectionId", oldSectionId));
+            // The action name carries the explanation: the seat was dropped
+            // because its section was cancelled and replaced by a new section.
+            jdbc.update(
+                    "INSERT INTO " + EVENT
+                            + " (\"id\", \"enrollmentId\", \"studentId\", \"sectionId\", \"action\", \"actorId\", \"requestHash\")"
+                            + " VALUES (:id, :enrollmentId, :studentId, :sectionId, 'REPLACED', :actorId, :hash)",
+                    new MapSqlParameterSource()
+                            .addValue("id", UUID.randomUUID().toString())
+                            .addValue("enrollmentId", enrollmentId)
+                            .addValue("studentId", studentId)
+                            .addValue("sectionId", oldSectionId)
+                            .addValue("actorId", studentId)
+                            .addValue("hash", hash));
+            // A persisted slip asserting the old seat is stale the moment the
+            // preserved row drops; the enroll-time persist re-issues it.
+            jdbc.update(
+                    "DELETE FROM " + SLIP + " WHERE \"studentId\" = :studentId AND \"semesterId\" = :semesterId",
+                    new MapSqlParameterSource()
+                            .addValue("studentId", studentId)
+                            .addValue("semesterId", semesterId));
+        }
     }
 
     private void persistSlip(String studentId, EnrollmentResponse response) {

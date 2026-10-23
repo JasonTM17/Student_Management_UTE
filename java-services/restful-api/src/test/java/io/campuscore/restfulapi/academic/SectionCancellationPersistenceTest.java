@@ -211,15 +211,21 @@ class SectionCancellationPersistenceTest {
                         + " (\"id\", \"sectionId\", \"classroomId\", \"dayOfWeek\", \"startTime\", \"endTime\")"
                         + " VALUES ('sched-open-b', 'section-open-b', 'room-1', 4, '13:00', '15:30')");
 
-        mvc.perform(post("/api/v1/enrollments/enroll")
+        MvcResult firstEnroll = mvc.perform(post("/api/v1/enrollments/enroll")
                         .with(studentJwt())
                         .header("Idempotency-Key", "cancel-dup-enroll")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"sectionId\":\"section-open\"}"))
-                .andExpect(status().isOk());
+                .andExpect(status().isOk())
+                .andReturn();
+        String firstEnrollmentId = objectMapper.readTree(
+                firstEnroll.getResponse().getContentAsString()).get("id").asText();
         cancelSection("section-open");
 
-        // Same course, different section: must not trip DUPLICATE_COURSE.
+        // Same course, different section: must not trip DUPLICATE_COURSE, and
+        // the seat preserved by the cancellation must be retired inside the
+        // same transaction — the database's active-enrollment unique index
+        // would otherwise reject the insert (Postgres 23505).
         mvc.perform(post("/api/v1/enrollments/enroll")
                         .with(studentJwt())
                         .header("Idempotency-Key", "cancel-dup-second")
@@ -227,6 +233,19 @@ class SectionCancellationPersistenceTest {
                         .content("{\"sectionId\":\"section-open-b\"}"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.status").value("ENROLLED"));
+
+        // The preserved row is DROPPED with an event explaining why; a later
+        // reopen of the cancelled section must not resurrect the seat.
+        assertThat(jdbc.queryForObject(
+                "SELECT \"status\" FROM \"academic\".\"Enrollment\" WHERE \"id\" = ?",
+                String.class, firstEnrollmentId)).isEqualTo("DROPPED");
+        assertThat(jdbc.queryForObject(
+                "SELECT COUNT(*) FROM \"academic\".\"EnrollmentEvent\""
+                        + " WHERE \"enrollmentId\" = ? AND \"action\" = 'REPLACED'",
+                Integer.class, firstEnrollmentId)).isEqualTo(1);
+        assertThat(jdbc.queryForObject(
+                "SELECT \"enrolledCount\" FROM \"academic\".\"Section\" WHERE \"id\" = 'section-open'",
+                Integer.class)).isZero();
 
         // The cancelled section's timetable must not conflict-block other
         // sections either: section-overlap shares the same day/slot.
@@ -481,6 +500,77 @@ class SectionCancellationPersistenceTest {
                         .content("{\"status\":\"OPEN\"}"))
                 .andExpect(status().isConflict())
                 .andExpect(jsonPath("$.code").value("SCHEDULE_CONFLICT"));
+    }
+
+    @Test
+    void reopeningCancelledSectionReportsStudentConflictsAndHonoursAcknowledgement() throws Exception {
+        // section-open's preserved seat belongs to a student who re-registers
+        // during the cancel window. Move its room so only student-level
+        // conflicts remain, and shrink the round cap so the reopen also
+        // breaks the credit limit.
+        jdbc.update("INSERT INTO \"academic\".\"Classroom\" (\"id\", \"building\", \"roomNumber\", \"capacity\")"
+                + " VALUES ('room-2', 'B', '202', 60)");
+        jdbc.update("UPDATE \"academic\".\"SectionSchedule\" SET \"classroomId\" = 'room-2'"
+                + " WHERE \"sectionId\" = 'section-open'");
+        mvc.perform(post("/api/v1/enrollments/enroll")
+                        .with(studentJwt())
+                        .header("Idempotency-Key", "reopen-conflict-enroll")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"sectionId\":\"section-open\"}"))
+                .andExpect(status().isOk());
+        cancelSection("section-open");
+        // The student spends the freed slot on section-overlap — same day,
+        // overlapping times — and the round cap no longer fits both courses.
+        jdbc.update("UPDATE \"academic\".\"RegistrationRound\" SET \"creditLimit\" = 4");
+        mvc.perform(post("/api/v1/enrollments/enroll")
+                        .with(studentJwt())
+                        .header("Idempotency-Key", "reopen-conflict-moved")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"sectionId\":\"section-overlap\"}"))
+                .andExpect(status().isOk());
+        assertThat(jdbc.queryForObject(
+                "SELECT COUNT(*) FROM \"academic\".\"RegistrationSlip\" WHERE \"studentId\" = 'student-1'",
+                Integer.class)).isEqualTo(1);
+
+        // Without an acknowledgement the reopen is refused with the
+        // admin-only conflict detail: count, student id, reasons, peer
+        // section ids.
+        mvc.perform(put("/api/v1/sections/section-open")
+                        .with(adminJwt())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"status\":\"OPEN\"}"))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("REOPEN_CONFLICTS"))
+                .andExpect(jsonPath("$.details.conflictCount").value(1))
+                .andExpect(jsonPath("$.details.conflicts[0].studentId").value("student-1"))
+                .andExpect(jsonPath("$.details.conflicts[0].reasons", org.hamcrest.Matchers
+                        .containsInAnyOrder("CREDIT_CAP", "SCHEDULE_OVERLAP")))
+                .andExpect(jsonPath("$.details.conflicts[0].sections[0]").value("section-overlap"));
+        // An acknowledgement without a reason is still refused.
+        mvc.perform(put("/api/v1/sections/section-open")
+                        .with(adminJwt())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"status\":\"OPEN\",\"acknowledgeConflicts\":true}"))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("REOPEN_CONFLICTS"));
+
+        // An explicit acknowledgement + reason reopens, lands on the audit
+        // trail, and invalidates the student's persisted slip.
+        mvc.perform(put("/api/v1/sections/section-open")
+                        .with(adminJwt())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"status\":\"OPEN\",\"acknowledgeConflicts\":true,"
+                                + "\"reason\":\"student re-registered during the cancel window\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("OPEN"));
+        assertThat(jdbc.queryForObject(
+                "SELECT COUNT(*) FROM \"campuscore_audit\".\"AdminAudit\""
+                        + " WHERE \"entityId\" = 'section-open'"
+                        + " AND \"action\" = 'SECTION_REOPEN_CONFLICTS_ACKNOWLEDGED'",
+                Integer.class)).isEqualTo(1);
+        assertThat(jdbc.queryForObject(
+                "SELECT COUNT(*) FROM \"academic\".\"RegistrationSlip\" WHERE \"studentId\" = 'student-1'",
+                Integer.class)).isZero();
     }
 
     @Test
@@ -822,9 +912,16 @@ class SectionCancellationPersistenceTest {
                     "courseId" VARCHAR(120) NOT NULL,
                     "roundId" VARCHAR(120),
                     "creditsSnapshot" INTEGER NOT NULL,
+                    "activeCourseSlot" VARCHAR(120) AS (
+                        CASE WHEN "status" IN ('ENROLLED', 'PENDING', 'CONFIRMED')
+                             THEN "courseId" ELSE "id" END),
                     "version" INTEGER NOT NULL DEFAULT 0,
                     "createdAt" TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-                    "updatedAt" TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+                    "updatedAt" TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                    -- H2 has no filtered indexes; the generated slot mirrors the
+                    -- PostgreSQL partial unique index
+                    -- academic_enrollment_active_student_course_semester_uq.
+                    UNIQUE ("studentId", "semesterId", "activeCourseSlot")
                 )
                 """);
         jdbc.execute("""
