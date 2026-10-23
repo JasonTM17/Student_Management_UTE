@@ -114,11 +114,12 @@ export type SignInResponse = LoginResponse | TwoFactorChallengeResponse;
 export function isTwoFactorChallenge(
   response: SignInResponse | null | undefined,
 ): response is TwoFactorChallengeResponse {
+  const candidate = response as TwoFactorChallengeResponse | null | undefined;
   return Boolean(
-    response
-      && response.twoFactorRequired === true
-      && typeof (response as TwoFactorChallengeResponse).challengeId === 'string'
-      && (response as TwoFactorChallengeResponse).challengeId.trim().length > 0,
+    candidate
+      && candidate.twoFactorRequired === true
+      && typeof candidate.challengeId === 'string'
+      && candidate.challengeId.trim().length > 0,
   );
 }
 
@@ -225,6 +226,16 @@ export interface MobileNotification {
   message: string;
   isRead: boolean;
   createdAt: string;
+}
+
+export interface MobileNotificationPage {
+  data: MobileNotification[];
+  meta?: {
+    total: number;
+    page: number;
+    limit: number;
+    totalPages: number;
+  };
 }
 
 export interface ApiClientOptions {
@@ -680,7 +691,12 @@ export const campusApi = {
     apiClient.get<MobileAttendanceSummary[]>(
       apiRoutes.attendanceSummary + (semesterId ? `?semesterId=${encodeURIComponent(semesterId)}` : ''),
     ),
-  notifications: () => apiClient.get<{ data: MobileNotification[] }>(apiRoutes.notifications),
+  notifications: (page = 1, limit = 20) =>
+    apiClient.get<MobileNotificationPage>(
+      `${apiRoutes.notifications}?page=${page}&limit=${limit}`,
+    ),
+  notificationUnreadCount: () =>
+    apiClient.get<{ unreadCount: number }>(`${apiRoutes.notifications}/unread-count`),
   markNotificationRead: (id: string) =>
     apiClient.patch<JsonObject>(`/notifications/my/${id}/read`, {}),
   markAllNotificationsRead: () =>

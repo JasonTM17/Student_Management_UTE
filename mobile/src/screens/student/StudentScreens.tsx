@@ -19,7 +19,10 @@ import {
 } from '../../components/Ui';
 import { tokens } from '../../design/tokens';
 import { ApiClientError, apiClient, campusApi, type AuthUser, type JsonObject, type MobileAttendanceSummary, type MobileEnrollment, type MobileNotification, type RegistrationCatalogSection } from '../../api/client';
+import { mergeNotificationItems } from './notification-feed';
 import type { MobileScreenProps } from '../../navigation/types';
+
+const NOTIFICATION_PAGE_SIZE = 20;
 
 const friendlyErrorMessageByCode: Record<string, string> = {
   ACCESS_DENIED: 'You do not have access to this action.',
@@ -677,30 +680,99 @@ export function NotificationsScreen({ navigation }: MobileScreenProps) {
   const [busyId, setBusyId] = useState<string | null>(null);
   const [isMarkingAll, setIsMarkingAll] = useState(false);
   const [mutationError, setMutationError] = useState<string | null>(null);
-  const {
-    data: liveNotifications,
-    error,
-    isLoading,
-    reload,
-    setData: setLiveNotifications,
-  } = useLiveResource<MobileNotification[]>(
-    [],
-    async () => (await campusApi.notifications()).data,
-    'Notifications are unavailable.',
-  );
-  const visibleNotifications = apiClient.mode === 'preview'
+  const [items, setItems] = useState<MobileNotification[]>([]);
+  const [totalPages, setTotalPages] = useState(1);
+  const [nextPage, setNextPage] = useState(2);
+  const [unreadCount, setUnreadCount] = useState<number | null>(null);
+  const [isLoading, setIsLoading] = useState(apiClient.mode === 'live');
+  const [error, setError] = useState<string | null>(null);
+  const [isLoadingMore, setIsLoadingMore] = useState(false);
+  const [loadMoreError, setLoadMoreError] = useState<string | null>(null);
+  const mountedRef = useRef(true);
+
+  useEffect(() => () => {
+    mountedRef.current = false;
+  }, []);
+
+  const loadFirstPage = useCallback(async () => {
+    if (apiClient.mode !== 'live') {
+      setIsLoading(false);
+      return;
+    }
+    setIsLoading(true);
+    setError(null);
+    setLoadMoreError(null);
+    try {
+      const [pageResult, unreadResult] = await Promise.all([
+        campusApi.notifications(1, NOTIFICATION_PAGE_SIZE),
+        campusApi.notificationUnreadCount().catch(() => null),
+      ]);
+      if (!mountedRef.current) {
+        return;
+      }
+      setItems(mergeNotificationItems([], pageResult.data ?? []));
+      setTotalPages(pageResult.meta?.totalPages ?? 1);
+      setNextPage(2);
+      setUnreadCount(unreadResult?.unreadCount ?? null);
+    } catch (loadError) {
+      if (mountedRef.current) {
+        setError(studentFriendlyErrorMessage(loadError, 'Notifications are unavailable.'));
+      }
+    } finally {
+      if (mountedRef.current) {
+        setIsLoading(false);
+      }
+    }
+  }, []);
+
+  useEffect(() => {
+    void loadFirstPage();
+  }, [loadFirstPage]);
+
+  const loadMore = async () => {
+    if (apiClient.mode !== 'live' || isLoadingMore || nextPage > totalPages) {
+      return;
+    }
+    setIsLoadingMore(true);
+    setLoadMoreError(null);
+    try {
+      const pageResult = await campusApi.notifications(nextPage, NOTIFICATION_PAGE_SIZE);
+      if (!mountedRef.current) {
+        return;
+      }
+      setItems((current) => mergeNotificationItems(current, pageResult.data ?? []));
+      setTotalPages((current) => pageResult.meta?.totalPages ?? current);
+      setNextPage((current) => current + 1);
+    } catch (loadError) {
+      if (mountedRef.current) {
+        setLoadMoreError(studentFriendlyErrorMessage(loadError, 'More notifications could not be loaded.'));
+      }
+    } finally {
+      if (mountedRef.current) {
+        setIsLoadingMore(false);
+      }
+    }
+  };
+
+  const reload = () => loadFirstPage();
+  const isPreview = apiClient.mode === 'preview';
+  const visibleNotifications = isPreview
     ? previewNotifications.map((item, index) => ({ id: String(index), title: item.title, message: item.subtitle, createdAt: item.meta, isRead: !item.unread }))
-    : liveNotifications;
+    : items;
+  const visibleUnread = visibleNotifications.filter((item) => !item.isRead).length;
+  const displayedUnread = isPreview ? visibleUnread : (unreadCount ?? visibleUnread);
+  const hasMore = !isPreview && nextPage <= totalPages;
 
   const markRead = async (id: string) => {
-    if (apiClient.mode === 'preview') return;
+    if (isPreview) return;
     setBusyId(id);
     setMutationError(null);
     try {
       await campusApi.markNotificationRead(id);
-      setLiveNotifications((current) => current.map((item) => (
+      setItems((current) => current.map((item) => (
         item.id === id ? { ...item, isRead: true } : item
       )));
+      setUnreadCount((current) => (current === null ? null : Math.max(0, current - 1)));
     } catch (nextError) {
       setMutationError(studentFriendlyErrorMessage(nextError, 'Notification could not be updated.'));
     } finally {
@@ -709,12 +781,13 @@ export function NotificationsScreen({ navigation }: MobileScreenProps) {
   };
 
   const markAllRead = async () => {
-    if (apiClient.mode === 'preview') return;
+    if (isPreview) return;
     setIsMarkingAll(true);
     setMutationError(null);
     try {
       await campusApi.markAllNotificationsRead();
-      setLiveNotifications((current) => current.map((item) => ({ ...item, isRead: true })));
+      setItems((current) => current.map((item) => ({ ...item, isRead: true })));
+      setUnreadCount(0);
     } catch (nextError) {
       setMutationError(studentFriendlyErrorMessage(nextError, 'Notifications could not be updated.'));
     } finally {
@@ -740,7 +813,7 @@ export function NotificationsScreen({ navigation }: MobileScreenProps) {
     <ScreenShell title="Notifications" eyebrow="Stay informed" subtitle="Unread items are marked clearly for continuity.">
       <Card tone="low" style={styles.notificationSummary}>
         <View accessibilityLiveRegion="polite">
-          <UiText variant="label" tone="primary">{visibleNotifications.filter((item) => !item.isRead).length} unread updates</UiText>
+          <UiText variant="label" tone="primary">{displayedUnread} unread updates</UiText>
           <UiText variant="bodySmall" tone="muted">Your next action is thesis registration.</UiText>
         </View>
       </Card>
@@ -767,13 +840,31 @@ export function NotificationsScreen({ navigation }: MobileScreenProps) {
       </Card> : (
         <StatePanel kind="empty" title="No notifications" description="New account and academic updates will appear here." />
       )}
+      {loadMoreError ? (
+        <StatePanel
+          kind="error"
+          title="More notifications unavailable"
+          description={loadMoreError}
+          actionLabel="Try again"
+          onAction={() => void loadMore()}
+        />
+      ) : null}
+      {hasMore ? (
+        <Button
+          label="Load more"
+          loading={isLoadingMore}
+          onPress={() => void loadMore()}
+          variant="secondary"
+          style={styles.loadMore}
+        />
+      ) : null}
       <ScreenSpacer />
       <Button
         label="Mark all as read"
         loading={isMarkingAll}
         onPress={() => void markAllRead()}
         variant="secondary"
-        disabled={apiClient.mode === 'preview' || visibleNotifications.every((item) => item.isRead)}
+        disabled={isPreview || displayedUnread === 0}
       />
     </ScreenShell>
   );
@@ -962,6 +1053,7 @@ const styles = StyleSheet.create({
   registrationMeta: { alignItems: 'flex-start', flexDirection: 'row', gap: tokens.spacing.sm, marginBottom: tokens.spacing.md, marginTop: tokens.spacing.sm },
   registrationSlot: { flex: 1 },
   notificationSummary: { padding: tokens.spacing.md },
+  loadMore: { marginTop: tokens.spacing.md },
   profileHero: { padding: tokens.spacing.lg },
   profileHeader: { alignItems: 'center', flexDirection: 'row' },
   profileCopy: { flex: 1, marginLeft: tokens.spacing.md },
