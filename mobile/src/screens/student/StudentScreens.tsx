@@ -130,7 +130,9 @@ export function StudentDashboardScreen({ navigation }: MobileScreenProps) {
     async () => (await campusApi.announcements()).data ?? [],
     'Announcements are unavailable.',
   );
-  const activeEnrollments = liveEnrollments.filter((item) => item.status === 'ENROLLED');
+  const activeEnrollments = liveEnrollments.filter(
+    (item) => item.status === 'ENROLLED' && item.section?.status !== 'CANCELLED',
+  );
   const dashboardClasses: Array<{ semesterId?: string; code: string; name: string; time: string; room: string }> = apiClient.mode === 'preview'
     ? upcomingClasses
     : activeEnrollments.slice(0, 3).map((item) => ({
@@ -228,7 +230,9 @@ export function ScheduleScreen({ navigation }: MobileScreenProps) {
     () => campusApi.enrollments(),
     'Schedule is unavailable.',
   );
-  const liveSchedule = liveEnrollments.flatMap((item) => (item.section?.schedules ?? []).map((slot) => ({
+  const liveSchedule = liveEnrollments
+    .filter((item) => item.section?.status !== 'CANCELLED')
+    .flatMap((item) => (item.section?.schedules ?? []).map((slot) => ({
     code: item.section?.course?.code ?? item.section?.sectionNumber ?? item.sectionId,
     name: item.section?.course?.nameVi ?? item.section?.course?.name ?? 'Course',
     time: `${slot.startTime} – ${slot.endTime}`,
@@ -325,7 +329,7 @@ export function CoursesScreen({ navigation }: MobileScreenProps) {
   const visibleCourses: Array<{ semesterId?: string; code: string; name: string; lecturer: string; progress: number; status: string }> = apiClient.mode === 'preview'
     ? courses
     : liveEnrollments
-      .filter((item) => item.status === 'ENROLLED')
+      .filter((item) => item.status === 'ENROLLED' && item.section?.status !== 'CANCELLED')
       .map((item) => ({
         code: item.section?.course?.code ?? item.section?.sectionNumber ?? item.sectionId,
         name: item.section?.course?.nameVi ?? item.section?.course?.name ?? 'Course',
@@ -554,9 +558,11 @@ export function RegistrationScreen({ navigation }: MobileScreenProps) {
   const liveSections = registrationData.sections;
   const enrollments = registrationData.enrollments;
   const roundOpen = registrationData.roundOpen;
-  const activeEnrollmentCount = enrollments.filter((item) => item.status !== 'DROPPED').length;
+  const activeEnrollmentCount = enrollments.filter(
+    (item) => item.status !== 'DROPPED' && item.section?.status !== 'CANCELLED',
+  ).length;
 
-  const availableSections = apiClient.mode === 'preview'
+  const availableSections: Array<{ id: string; code: string; name: string; slot: string; seats: string; status?: string }> = apiClient.mode === 'preview'
     ? [
         { id: 'preview-cs401', code: 'CS401', name: 'Distributed Systems', slot: 'Tue · 10:00 · A3.201', seats: '12 seats left' },
         { id: 'preview-ux305', code: 'UX305', name: 'Service Design', slot: 'Thu · 13:30 · C2.105', seats: '5 seats left' },
@@ -569,6 +575,7 @@ export function RegistrationScreen({ navigation }: MobileScreenProps) {
         name: section.courseName,
         slot: 'Schedule pending',
         seats: section.remainingSeats > 0 ? `${section.remainingSeats} seats left` : 'Full',
+        status: section.status,
       }));
 
   const toggleEnrollment = async (sectionId: string) => {
@@ -639,6 +646,10 @@ export function RegistrationScreen({ navigation }: MobileScreenProps) {
       {availableSections.map((section) => {
         const enrolled = enrollments.some((item) => item.sectionId === section.id && item.status !== 'DROPPED');
         const isPreview = apiClient.mode === 'preview';
+        const cancelled = section.status === 'CANCELLED';
+        // A cancelled section stays droppable at any time so a student is
+        // never trapped by an admin cancellation outside an open round.
+        const actionAllowed = enrolled ? roundOpen || cancelled : roundOpen && !cancelled;
         return (
         <Card key={section.id} style={styles.registrationCard}>
           <UiText variant="meta" tone="primary">{section.code}</UiText>
@@ -649,6 +660,7 @@ export function RegistrationScreen({ navigation }: MobileScreenProps) {
             <UiText variant="bodySmall" tone="muted" style={styles.registrationSlot}>
               {section.slot}
             </UiText>
+            {cancelled ? <Badge label="Cancelled" tone="warning" /> : null}
             <Badge
               label={section.seats}
               tone={section.seats === 'Full' ? 'warning' : 'success'}
@@ -656,7 +668,7 @@ export function RegistrationScreen({ navigation }: MobileScreenProps) {
           </View>
           <Button
             label={isPreview ? 'Preview only' : enrolled ? 'Drop section' : 'Add section'}
-            disabled={isPreview || !roundOpen || pending === section.id || section.seats === 'Full'}
+            disabled={isPreview || !actionAllowed || pending === section.id || (!enrolled && section.seats === 'Full')}
             loading={pending === section.id}
             onPress={() => void toggleEnrollment(section.id)}
             variant="secondary"

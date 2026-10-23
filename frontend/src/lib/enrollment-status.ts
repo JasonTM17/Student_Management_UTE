@@ -24,3 +24,15 @@ export function isDroppableEnrollment(status: string | undefined | null): boolea
     (status ?? '') as (typeof DROPPABLE_ENROLLMENT_STATUSES)[number],
   );
 }
+
+/**
+ * An enrollment whose section was cancelled stays visible as cancelled
+ * history but is ignored by every active calculation — the backend applies
+ * the same `section.status <> 'CANCELLED'` predicate to credits, duplicate
+ * checks, schedule conflicts and prerequisite/corequisite satisfaction.
+ */
+export function isCancelledSection(
+  enrollment: { section?: { status?: string | null } | null } | undefined | null,
+): boolean {
+  return enrollment?.section?.status === 'CANCELLED';
+}
