@@ -85,6 +85,9 @@ export interface AuthUser {
   email: string;
   firstName?: string | null;
   lastName?: string | null;
+  phone?: string | null;
+  dateOfBirth?: string | null;
+  address?: string | null;
   roles?: string[];
   permissions?: string[];
   studentId?: string | null;

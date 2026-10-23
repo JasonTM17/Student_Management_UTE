@@ -633,11 +633,10 @@ export const authApi = {
     return response.data;
   },
 
-  // The full name is school-managed, so it is not part of this payload; the
-  // server ignores it if an older client still sends it.
+  // Names and date of birth are school-managed, so they are not part of this
+  // payload; the server ignores them if an older client still sends them.
   updateProfile: async (data: {
     phone?: string;
-    dateOfBirth?: string;
     address?: string;
     avatar?: string;
   }): Promise<User> => {

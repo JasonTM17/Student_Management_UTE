@@ -790,8 +790,8 @@ export function ProfileScreen({ navigation, role }: MobileScreenProps) {
     () => campusApi.account(),
     'Profile is unavailable.',
   );
-  const [firstName, setFirstName] = useState(account?.firstName ?? '');
-  const [lastName, setLastName] = useState(account?.lastName ?? '');
+  const [phone, setPhone] = useState(account?.phone ?? '');
+  const [address, setAddress] = useState(account?.address ?? '');
   const [oldPassword, setOldPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [profileMessage, setProfileMessage] = useState<string | null>(null);
@@ -799,15 +799,17 @@ export function ProfileScreen({ navigation, role }: MobileScreenProps) {
   const [isSavingPassword, setIsSavingPassword] = useState(false);
 
   useEffect(() => {
-    setFirstName(account?.firstName ?? '');
-    setLastName(account?.lastName ?? '');
+    setPhone(account?.phone ?? '');
+    setAddress(account?.address ?? '');
   }, [account]);
 
   const saveProfile = async () => {
     setIsSavingProfile(true);
     setProfileMessage(null);
     try {
-      await campusApi.updateProfile({ firstName, lastName });
+      // Names and date of birth are school-managed; the writable fields are
+      // the self-service contact details.
+      await campusApi.updateProfile({ phone: phone.trim(), address: address.trim() });
       setProfileMessage('Profile saved.');
       void reload();
     } catch {
@@ -881,11 +883,23 @@ export function ProfileScreen({ navigation, role }: MobileScreenProps) {
         <ListRow title="Student ID" subtitle={displayStudentId} />
         <Divider />
         <ListRow title="Account status" subtitle={apiClient.mode === 'preview' ? 'Preview' : 'Authenticated through Java API'} />
+        <Divider />
+        <ListRow title="Full name" subtitle={displayName} />
+        <Divider />
+        <ListRow
+          title="Date of birth"
+          subtitle={account?.dateOfBirth ? String(account.dateOfBirth).slice(0, 10) : '—'}
+        />
         {apiClient.mode === 'live' ? (
           <>
             <Divider />
-            <Field label="First name" value={firstName} onChangeText={setFirstName} />
-            <Field label="Last name" value={lastName} onChangeText={setLastName} />
+            <Field
+              label="Phone"
+              value={phone}
+              onChangeText={setPhone}
+              keyboardType="phone-pad"
+            />
+            <Field label="Address" value={address} onChangeText={setAddress} />
             <Button
               label="Save profile"
               disabled={isSavingProfile}

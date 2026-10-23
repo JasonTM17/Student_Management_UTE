@@ -875,6 +875,37 @@ class AuthLoginPersistenceTest {
     }
 
     @Test
+    void updateProfileKeepsSchoolManagedDateOfBirth() throws Exception {
+        MvcResult login = loginStudent().andReturn();
+        Cookie accessCookie = login.getResponse().getCookie("cc_access_token");
+        Cookie csrfCookie = login.getResponse().getCookie("cc_csrf");
+
+        java.sql.Timestamp managedDateOfBirth = java.sql.Timestamp.from(Instant.parse("1999-12-31T00:00:00Z"));
+        jdbc.update(
+                "UPDATE \"campuscore_auth\".\"User\" SET \"dateOfBirth\" = ? WHERE \"id\" = 'student-user'",
+                managedDateOfBirth);
+
+        MvcResult updated = mvc.perform(put("/api/v1/auth/profile")
+                        .cookie(accessCookie, csrfCookie)
+                        .header("X-CSRF-Token", csrfCookie.getValue())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "phone":"+84999999999",
+                                  "dateOfBirth":"2001-02-03",
+                                  "address":"Java monolith lane"
+                                }
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.phone").value("+84999999999"))
+                .andReturn();
+
+        JsonNode updatedBody = objectMapper.readTree(updated.getResponse().getContentAsString());
+        assertThat(updatedBody.path("dateOfBirth").asText())
+                .isEqualTo(managedDateOfBirth.toInstant().toString());
+    }
+
+    @Test
     void updateProfileEnforcesAvatarSizeContract() throws Exception {
         MvcResult login = loginStudent().andReturn();
         Cookie accessCookie = login.getResponse().getCookie("cc_access_token");
