@@ -85,6 +85,9 @@ export interface AuthUser {
   email: string;
   firstName?: string | null;
   lastName?: string | null;
+  phone?: string | null;
+  dateOfBirth?: string | null;
+  address?: string | null;
   roles?: string[];
   permissions?: string[];
   studentId?: string | null;
@@ -95,6 +98,29 @@ export interface LoginResponse {
   user: AuthUser;
   accessToken: string;
   refreshToken: string;
+}
+
+export interface TwoFactorChallengeResponse {
+  twoFactorRequired: boolean;
+  challengeId: string;
+  email: string | null;
+  user: null;
+  accessToken: null;
+  refreshToken: null;
+}
+
+export type SignInResponse = LoginResponse | TwoFactorChallengeResponse;
+
+export function isTwoFactorChallenge(
+  response: SignInResponse | null | undefined,
+): response is TwoFactorChallengeResponse {
+  const candidate = response as TwoFactorChallengeResponse | null | undefined;
+  return Boolean(
+    candidate
+      && candidate.twoFactorRequired === true
+      && typeof candidate.challengeId === 'string'
+      && candidate.challengeId.trim().length > 0,
+  );
 }
 
 export interface ChangePasswordResponse {
@@ -200,6 +226,16 @@ export interface MobileNotification {
   message: string;
   isRead: boolean;
   createdAt: string;
+}
+
+export interface MobileNotificationPage {
+  data: MobileNotification[];
+  meta?: {
+    total: number;
+    page: number;
+    limit: number;
+    totalPages: number;
+  };
 }
 
 export interface ApiClientOptions {
@@ -325,7 +361,8 @@ function shouldRefreshAfterUnauthorized(path: string, status: number) {
     status === 401 &&
     !normalizedPath.startsWith('/auth/login') &&
     !normalizedPath.startsWith('/auth/refresh') &&
-    !normalizedPath.startsWith('/auth/logout')
+    !normalizedPath.startsWith('/auth/logout') &&
+    !normalizedPath.startsWith('/auth/two-factor')
   );
 }
 
@@ -593,6 +630,7 @@ export const apiRoutes = {
     refresh: '/auth/refresh',
     logout: '/auth/logout',
     me: '/auth/me',
+    twoFactorVerify: '/auth/two-factor/verify',
   },
   identity: '/me',
   health: '/health/liveness',
@@ -621,7 +659,15 @@ export const campusApi = {
   me: () => apiClient.get<JsonObject>(apiRoutes.identity),
   account: () => apiClient.get<AuthUser>(apiRoutes.auth.me),
   login: (email: string, password: string) =>
-    apiClient.post<LoginResponse>(apiRoutes.auth.login, { email, password }),
+    apiClient.post<SignInResponse>(apiRoutes.auth.login, { email, password }),
+  verifyTwoFactor: async (challengeId: string, code: string) => {
+    const response = await apiClient.post<LoginResponse>(
+      apiRoutes.auth.twoFactorVerify,
+      { challengeId, code },
+    );
+    apiClient.setSessionTokens(response.accessToken, response.refreshToken);
+    return response;
+  },
   refresh: async () => {
     const response = await apiClient.post<LoginResponse>(
       apiRoutes.auth.refresh,
@@ -699,7 +745,12 @@ export const campusApi = {
     apiClient.get<MobileAttendanceSummary[]>(
       apiRoutes.attendanceSummary + (semesterId ? `?semesterId=${encodeURIComponent(semesterId)}` : ''),
     ),
-  notifications: () => apiClient.get<{ data: MobileNotification[] }>(apiRoutes.notifications),
+  notifications: (page = 1, limit = 20) =>
+    apiClient.get<MobileNotificationPage>(
+      `${apiRoutes.notifications}?page=${page}&limit=${limit}`,
+    ),
+  notificationUnreadCount: () =>
+    apiClient.get<{ unreadCount: number }>(`${apiRoutes.notifications}/unread-count`),
   markNotificationRead: (id: string) =>
     apiClient.patch<JsonObject>(`/notifications/my/${id}/read`, {}),
   markAllNotificationsRead: () =>

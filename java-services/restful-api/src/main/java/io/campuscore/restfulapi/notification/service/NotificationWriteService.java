@@ -78,7 +78,7 @@ public class NotificationWriteService {
                 requireText(request.title(), "title"),
                 requireText(request.message(), "message"),
                 type,
-                request.link(),
+                NotificationLinkPolicy.requireSafe(request.link()),
                 now));
         audit.record(actorId, null, "NOTIFICATION_CREATED", "NOTIFICATION", created.id(),
                 "Notification " + created.id() + " created for user " + created.userId()
@@ -135,7 +135,7 @@ public class NotificationWriteService {
                 patch(request, "title", textPatch(request, "title", request.title())),
                 patch(request, "message", textPatch(request, "message", request.message())),
                 patch(request, "type", request.type()),
-                patch(request, "link", request.link())));
+                patch(request, "link", NotificationLinkPolicy.requireSafe(request.link()))));
         NotificationResponse after = notifications.findById(id)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Notification not found"));
         List<String> changedFields = changedFields(request);
