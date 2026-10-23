@@ -278,10 +278,11 @@ public class AdminCatalogMutationService {
                 && "CANCELLED".equals(before.get("status"))
                 && input.containsKey("status") && !"CANCELLED".equals(input.get("status"));
         if (reopening) {
-            // A reopen re-adds enrollment capacity, so it shares the
-            // registration path's open-semester gate; cancelling stays
+            // A reopen re-adds enrollment capacity, so it must not run inside
+            // a semester that already ended; every earlier lifecycle state
+            // allows it subject to the conflict checks. Cancelling stays
             // allowed in any semester state because it only removes seats.
-            requireOpenSemesterForReopen(before.get("semesterId"));
+            requireNonTerminalSemesterForReopen(before.get("semesterId"));
             lockReopenAffectedStudents(id);
         }
         MapSqlParameterSource parameters = new MapSqlParameterSource("id", id);
@@ -1010,15 +1011,17 @@ public class AdminCatalogMutationService {
     }
 
     /**
-     * A reopen re-adds enrollment capacity to a semester, so it shares the
-     * registration path's open-semester gate. Cancel is not gated: it only
-     * removes seats and stays legal in any semester state.
+     * A reopen re-adds enrollment capacity to a semester, so it refuses only
+     * a semester that already reached a terminal state — DRAFT, IN_PROGRESS
+     * and every other non-terminal lifecycle state still allow it subject to
+     * the conflict checks. Cancel is not gated: it only removes seats and
+     * stays legal in any semester state.
      */
-    private void requireOpenSemesterForReopen(Object semesterId) {
+    private void requireNonTerminalSemesterForReopen(Object semesterId) {
         Long count = jdbc.queryForObject(
-                "SELECT COUNT(*) FROM " + SEMESTER + " WHERE \"id\" = :id AND \"status\" IN (:openStatuses)",
+                "SELECT COUNT(*) FROM " + SEMESTER + " WHERE \"id\" = :id AND \"status\" NOT IN (:terminalStatuses)",
                 new MapSqlParameterSource().addValue("id", semesterId)
-                        .addValue("openStatuses", SemesterStatuses.OPEN),
+                        .addValue("terminalStatuses", SemesterStatuses.TERMINAL),
                 Long.class);
         if (count == null || count == 0) {
             throw problem(HttpStatus.CONFLICT, "SEMESTER_CLOSED", "Semester is closed for registration");
