@@ -7,13 +7,19 @@ import org.springframework.http.HttpStatus;
 /**
  * Same-origin allowlist for notification deep links stored from admin writes.
  * A stored link is only rendered when it is a single-slash relative path with
- * no backslash and no control/whitespace characters; anything else would let a
- * notification carry a {@code javascript:}, {@code data:}, or protocol-relative
- * href into the clients.
+ * no backslash, no dot segments, no percent-encoded separators or dots, and no
+ * Unicode separator/format/control code points; anything else would let a
+ * notification carry a {@code javascript:}, {@code data:}, traversal, or
+ * protocol-relative href into the clients. The shared corpus at
+ * {@code src/test/resources/notification/link-corpus.json} is the contract the
+ * frontend safe-path module and migration V142 mirror exactly.
  */
 final class NotificationLinkPolicy {
 
-    private static final Pattern SAFE = Pattern.compile("^/(?!/)[^\\s\\\\\\p{Cntrl}]*$");
+    private static final Pattern SAFE = Pattern.compile("^/(?!/)[^\\\\\\p{C}\\p{Z}]*$");
+    private static final Pattern DOT_SEGMENT = Pattern.compile("(^|/)\\.\\.?(/|$)");
+    private static final Pattern ENCODED_SEPARATOR_OR_DOT =
+            Pattern.compile("%(?i:2e|2f|5c|25)");
 
     private NotificationLinkPolicy() {
     }
@@ -23,7 +29,9 @@ final class NotificationLinkPolicy {
             return null;
         }
         String trimmed = link.trim();
-        if (!SAFE.matcher(trimmed).matches()) {
+        if (!SAFE.matcher(trimmed).matches()
+                || DOT_SEGMENT.matcher(trimmed).find()
+                || ENCODED_SEPARATOR_OR_DOT.matcher(trimmed).find()) {
             throw new DomainException(
                     HttpStatus.BAD_REQUEST,
                     "INVALID_NOTIFICATION_LINK",
