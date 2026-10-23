@@ -20,6 +20,7 @@ import {
 import { tokens } from '../../design/tokens';
 import { ApiClientError, apiClient, campusApi, type AuthUser, type JsonObject, type MobileAttendanceSummary, type MobileEnrollment, type MobileNotification, type RegistrationCatalogSection } from '../../api/client';
 import { mergeNotificationItems } from './notification-feed';
+import { loadRegistrationCatalog } from './registration-window';
 import type { MobileScreenProps } from '../../navigation/types';
 
 const NOTIFICATION_PAGE_SIZE = 20;
@@ -532,25 +533,12 @@ export function RegistrationScreen({ navigation }: MobileScreenProps) {
     { sections: [], enrollments: [], roundOpen: true },
     async () => {
       const enrollmentResponse = await campusApi.enrollments();
-      try {
-        const [rounds, catalog] = await Promise.all([
-          campusApi.registrationRounds(),
-          campusApi.registrationSections(),
-        ]);
-        return {
-          sections: catalog,
-          enrollments: enrollmentResponse,
-          roundOpen: rounds.some((round) => round.status === 'OPEN'),
-        };
-      } catch (catalogError) {
-        if (
-          catalogError instanceof ApiClientError
-          && (catalogError.code === 'WINDOW_CLOSED' || catalogError.code === 'COHORT_INELIGIBLE' || catalogError.code === 'ROUND_NOT_FOUND')
-        ) {
-          return { sections: [], enrollments: enrollmentResponse, roundOpen: false };
-        }
-        throw catalogError;
-      }
+      const catalog = await loadRegistrationCatalog(campusApi);
+      return {
+        sections: catalog.sections,
+        enrollments: enrollmentResponse,
+        roundOpen: catalog.roundOpen,
+      };
     },
     'Registration data is unavailable.',
   );
