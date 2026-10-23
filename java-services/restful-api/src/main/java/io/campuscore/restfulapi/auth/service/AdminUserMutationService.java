@@ -35,15 +35,16 @@ public class AdminUserMutationService {
     private static final String ACADEMIC_DEPARTMENT = "academic.\"Department\"";
     private static final String ACADEMIC_CURRICULUM = "academic.\"Curriculum\"";
     /**
-     * Roles a plain administrator may not hand out. {@code TRUONG_KHOA} is here
-     * because a faculty head governs the thesis round lifecycle, which the role
-     * ceiling reserves above a plain administrator: without it one administrator
-     * could mint a dean and escalate through that account.
+     * Roles whose existing holders a plain administrator may not take over,
+     * disable, delete or strip. Granting {@code TRUONG_KHOA} is the one exception
+     * the Academic Office keeps (see {@link #guardRoleMutation}): a faculty head
+     * governs the thesis round lifecycle, so once appointed the account is
+     * protected like the other reserved roles.
      *
      * <p>The same set governs {@link #requireSuperAdminForProtectedAccount}: a role
-     * a plain administrator may not grant is also one whose existing holders it may
-     * not take over, disable or delete. Blocking only the grant leaves the identical
-     * escalation reachable through the account instead of the role.
+     * a plain administrator may not manage is one whose existing holders it may
+     * not take over, disable or delete. Blocking only the grant would leave the
+     * identical escalation reachable through the account instead of the role.
      *
      * <p>Ordered so the refusal message names the same role every time.
      */
@@ -179,6 +180,7 @@ public class AdminUserMutationService {
         // exactly once, and the account cannot be used until it is rotated.
         String role = text(input, "role", "STUDENT").toUpperCase(java.util.Locale.ROOT);
         guardRoleMutation(null, role, canManageSuperAdmin);
+        requireNoOtherDean(null, role, input);
         preflightConflicts(email, role, input, null);
 
         String temporaryPassword = generateTemporaryPassword();
@@ -322,6 +324,7 @@ public class AdminUserMutationService {
         }
         if (requestedRole != null) {
             guardRoleMutation(id, requestedRole, canManageSuperAdmin);
+            requireNoOtherDean(id, requestedRole, input);
         } else {
             requireSuperAdminForProtectedAccount(id, canManageSuperAdmin, "manage");
         }
@@ -623,12 +626,15 @@ public class AdminUserMutationService {
                     "ROLE_ESCALATION",
                     "Only a super administrator can manage super administrator accounts");
         }
-        // A dean account carries the thesis round lifecycle, so granting it is a
-        // super-administrator action. Re-sending the role a user already holds is
-        // not a grant, though: the admin edit form echoes the unchanged role back,
-        // and refusing that would make every other field on the account unsavable.
+        // The Academic Office appoints faculty heads (TRUONG_KHOA): the grant is
+        // bounded by one active head per faculty (requireNoOtherDean), and every
+        // account-side power over an existing head stays with a super administrator.
+        // A department head is still a super-administrator grant. Re-sending the
+        // role a user already holds is not a grant, though: the admin edit form
+        // echoes the unchanged role back, and refusing that would make every other
+        // field on the account unsavable.
         if (!canManageSuperAdmin
-                && ("TRUONG_KHOA".equals(roleName) || "TRUONG_BO_MON".equals(roleName))
+                && "TRUONG_BO_MON".equals(roleName)
                 && !(userId != null && hasRole(userId, roleName))) {
             throw problem(
                     HttpStatus.FORBIDDEN,
@@ -659,6 +665,68 @@ public class AdminUserMutationService {
                 }
             }
         }
+    }
+
+    /**
+     * A faculty has one active dean. The faculty is the one the lecturer's
+     * department sits in — the same binding the thesis governance scope uses —
+     * and a lecturer who has no profile yet takes it from the department the
+     * request is about to create the profile in.
+     *
+     * <p>The faculty row is locked first so two concurrent appointments in the
+     * same faculty serialize instead of both passing the check. An inactive
+     * incumbent does not block: only an account that can still act as dean does.
+     */
+    private void requireNoOtherDean(String userId, String requestedRole, Map<String, Object> input) {
+        if (!"TRUONG_KHOA".equals(requestedRole) || (userId != null && hasRole(userId, requestedRole))) {
+            return;
+        }
+        String facultyId = deanFacultyId(userId, input);
+        if (facultyId == null) {
+            return;
+        }
+        jdbc.queryForList(
+                "SELECT \"id\" FROM academic.\"Faculty\" WHERE \"id\" = :facultyId FOR UPDATE",
+                new MapSqlParameterSource("facultyId", facultyId), String.class);
+        List<String> incumbents = jdbc.queryForList(
+                "SELECT u.\"id\" FROM " + USER + " u"
+                        + " JOIN " + USER_ROLE + " ur ON ur.\"userId\" = u.\"id\""
+                        + " JOIN " + ROLE + " r ON r.\"id\" = ur.\"roleId\" AND r.\"name\" = 'TRUONG_KHOA'"
+                        + " JOIN " + LECTURER + " l ON l.\"userId\" = u.\"id\" AND l.\"isActive\" = TRUE"
+                        + " JOIN academic.\"Department\" d ON d.\"id\" = l.\"departmentId\""
+                        + " WHERE d.\"facultyId\" = :facultyId AND u.\"status\" = 'ACTIVE'"
+                        + " AND u.\"id\" <> :userId",
+                new MapSqlParameterSource().addValue("facultyId", facultyId)
+                        .addValue("userId", userId == null ? "" : userId),
+                String.class);
+        if (!incumbents.isEmpty()) {
+            throw problem(
+                    HttpStatus.CONFLICT,
+                    "DEAN_ALREADY_ASSIGNED",
+                    "This faculty already has an active dean; remove the dean role from the"
+                            + " current holder before appointing another");
+        }
+    }
+
+    private String deanFacultyId(String userId, Map<String, Object> input) {
+        if (userId != null) {
+            List<String> held = jdbc.queryForList(
+                    "SELECT d.\"facultyId\" FROM " + LECTURER + " l"
+                            + " JOIN academic.\"Department\" d ON d.\"id\" = l.\"departmentId\""
+                            + " WHERE l.\"userId\" = :userId",
+                    new MapSqlParameterSource("userId", userId), String.class);
+            if (!held.isEmpty()) {
+                return held.get(0);
+            }
+        }
+        Object requested = input.get("departmentId");
+        if (requested == null || requested.toString().isBlank()) {
+            return null;
+        }
+        List<String> rows = jdbc.queryForList(
+                "SELECT \"facultyId\" FROM academic.\"Department\" WHERE \"id\" = :departmentId",
+                new MapSqlParameterSource("departmentId", requested.toString().trim()), String.class);
+        return rows.isEmpty() ? null : rows.get(0);
     }
 
     private boolean roleExists(String roleName) {

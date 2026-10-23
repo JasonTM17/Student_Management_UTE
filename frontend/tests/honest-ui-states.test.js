@@ -360,3 +360,17 @@ test('narrow-screen layouts keep their content inside the card', () => {
   assert.match(read('src/app/dashboard/editor/page.tsx'), /flex flex-wrap items-center gap-2">\s*<Button[\s\S]{0,240}handleResetBlocks/);
   assert.match(read('src/app/dashboard/lecturer/attendance/page.tsx'), /flex flex-wrap items-center gap-2">\s*<Button[\s\S]{0,120}handleMarkAllPresent/);
 });
+
+test('a plain administrator can appoint a faculty head and sees why a second one is refused', () => {
+  const users = read('src/app/admin/users/page.tsx');
+  const messages = read('src/i18n/messages.ts');
+  const afterLecturer = users.slice(users.indexOf("value: 'LECTURER', label: copy.roles.LECTURER"));
+  assert.match(afterLecturer.slice(0, afterLecturer.indexOf('...(isSuperAdmin')), /value: 'TRUONG_KHOA'/);
+  const deanChip = users.slice(
+    users.indexOf("active={formData.role === 'TRUONG_KHOA'}"),
+    users.indexOf("active={formData.role === 'TRUONG_BO_MON'}"),
+  );
+  assert.doesNotMatch(deanChip, /disabled=\{!isSuperAdmin\}/);
+  assert.match(users, /campusCodeMessage\(/);
+  assert.equal((messages.match(/DEAN_ALREADY_ASSIGNED:/g) || []).length, 2);
+});

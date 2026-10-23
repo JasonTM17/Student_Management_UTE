@@ -42,7 +42,7 @@ import { useConfirmationDialog } from '@/components/ui/use-confirmation-dialog';
 import { useI18n } from '@/i18n';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
-import { campusErrorMessage } from '@/lib/campus-error';
+import { campusCodeMessage } from '@/lib/campus-error';
 import {
   isPrivilegedAccountTarget,
   primaryManagedRole,
@@ -1009,7 +1009,7 @@ export default function AdminUsersPage() {
         };
         setFieldErrors({ [fieldKey]: fieldMessages[code as string] });
       }
-      const message = campusErrorMessage(
+      const message = campusCodeMessage(
         err,
         messages.common.campusErrors,
         copy.saveFailed,
@@ -1467,8 +1467,6 @@ export default function AdminUsersPage() {
                     active={formData.role === 'TRUONG_KHOA'}
                     activeClassName={roleSolidClass('TRUONG_KHOA')}
                     onClick={() => setFormData((c) => ({ ...c, role: 'TRUONG_KHOA' }))}
-                    disabled={!isSuperAdmin}
-                    title={!isSuperAdmin ? copy.errors.adminReserved : undefined}
                   >
                     <School className="h-3.5 w-3.5" />
                     {copy.rolesShort.TRUONG_KHOA}
@@ -1605,10 +1603,10 @@ export default function AdminUsersPage() {
                         const options = [
                           { value: 'STUDENT', label: copy.roles.STUDENT },
                           { value: 'LECTURER', label: copy.roles.LECTURER },
+                          { value: 'TRUONG_KHOA', label: copy.roles.TRUONG_KHOA },
                           ...(isSuperAdmin
                             ? [
                                 { value: 'ADMIN', label: copy.roles.ADMIN },
-                                { value: 'TRUONG_KHOA', label: copy.roles.TRUONG_KHOA },
                                 { value: 'TRUONG_BO_MON', label: copy.roles.TRUONG_BO_MON },
                                 { value: 'SUPER_ADMIN', label: copy.roles.SUPER_ADMIN },
                               ]
