@@ -87,8 +87,19 @@ public final class ThesisMutationDtos {
             String reason) {
     }
 
-    /** Audited post-registration roster addition with a size exception flag. */
-    public record RosterOverrideRequest(String studentId, String reason, Boolean allowSizeException) {
+    /**
+     * Audited post-registration roster override. {@code action} is ADD
+     * (default, also when omitted) or REMOVE. {@code successorStudentId} names
+     * the member who takes over leadership when a REMOVE targets the leader;
+     * it is required then and ignored otherwise. A removal that leaves the
+     * approved roster below the minimum needs {@code allowSizeException} just
+     * like an addition does.
+     */
+    public record RosterOverrideRequest(String studentId, String action, String reason,
+            Boolean allowSizeException, String successorStudentId) {
+        public RosterOverrideRequest(String studentId, String reason, Boolean allowSizeException) {
+            this(studentId, null, reason, allowSizeException, null);
+        }
     }
 
     /**

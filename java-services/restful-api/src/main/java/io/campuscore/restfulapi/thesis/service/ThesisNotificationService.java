@@ -206,6 +206,28 @@ public class ThesisNotificationService {
                 "INFO", STUDENT_LINK, null);
     }
 
+    /**
+     * Post-close roster removal: the removed student is no longer a member, so
+     * the group notice cannot reach them — they get a dedicated message, and
+     * the surviving roster still gets the shared roster-changed notice.
+     */
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public int notifyGroupMemberRemoved(UUID groupId, String studentId) {
+        int sent = 0;
+        List<String> removedUserIds = jdbc.queryForList(
+                "SELECT s.\"userId\" FROM campuscore_auth.\"Student\" s WHERE s.\"id\" = :studentId",
+                new MapSqlParameterSource("studentId", studentId), String.class);
+        if (!removedUserIds.isEmpty()) {
+            String topic = topicTitleByGroup(groupId);
+            sent += fanOut(removedUserIds, "Bạn đã được gỡ khỏi nhóm",
+                    "Phòng quản lý đã gỡ bạn khỏi danh sách thành viên nhóm"
+                            + (topic.isBlank() ? "" : " (đề tài \"" + topic + "\")")
+                            + ".",
+                    "INFO", STUDENT_LINK, null);
+        }
+        return sent + notifyGroupRosterChanged(groupId);
+    }
+
     private static String resultsSourceKey(UUID roundId) {
         return "THESIS_RESULTS:" + roundId;
     }

@@ -938,6 +938,146 @@ class ThesisCouncilEscapeHatchTest {
                 .andExpect(jsonPath("$.code").value("TOPIC_NOT_FOUND"));
     }
 
+    @Test
+    void rosterOverrideRemovesMemberAfterCloseWithGuards() throws Exception {
+        Instant now = Instant.now();
+        UUID closed = insertRound("Esc Round Roster Remove", "REGISTRATION_CLOSED",
+                now.plusSeconds(86_400), now.plusSeconds(5 * 86_400));
+        UUID topicId = insertTopic(closed, "Esc Roster Remove Topic");
+        UUID groupId = insertGroupWithMembers(closed, topicId, "esc-rm", 4);
+
+        // Happy path: a non-leader member is removed from an unscored group in
+        // a closed round, audited with the reason, and the removed student is
+        // notified directly (the roster-changed notice only reaches members).
+        rosterOverride(groupId, "esc-rm-student-4", "departed the programme", null, null)
+                .andExpect(status().isOk());
+        assertThat(jdbc.queryForObject(
+                "SELECT COUNT(*) FROM thesis.thesis_group_member WHERE group_id = ? AND student_id = 'esc-rm-student-4'",
+                Integer.class, groupId)).isZero();
+        assertThat(auditCount(groupId.toString(), "THESIS_GROUP_ROSTER_OVERRIDE")).isEqualTo(1);
+        assertThat(jdbc.queryForObject(
+                "SELECT COUNT(*) FROM notifications.notification WHERE user_id = 'esc-user-esc-rm-student-4'",
+                Integer.class)).isEqualTo(1);
+
+        // The removed seat frees (round_id, student_id), so the same-round
+        // re-add path is open again — deterministic, not a shadow block.
+        UUID secondGroup = insertGroupWithMembers(closed, topicId, "esc-rm2", 3);
+        mutations.overrideGroupRoster(secondGroup,
+                new io.campuscore.restfulapi.thesis.web.ThesisMutationDtos.RosterOverrideRequest(
+                        "esc-rm-student-4", "re-seated", null), admin());
+        assertThat(jdbc.queryForObject(
+                "SELECT COUNT(*) FROM thesis.thesis_group_member WHERE round_id = ? AND student_id = 'esc-rm-student-4'",
+                Integer.class, closed)).isEqualTo(1);
+
+        // Guards: an open round refuses, a scored topic refuses, and removing
+        // a student who is not on the roster is a clean not-found.
+        UUID openRound = insertRound("Esc Round Remove Open", "REGISTRATION_OPEN",
+                now.plusSeconds(86_400), now.plusSeconds(5 * 86_400));
+        UUID openGroup = insertGroupWithMembers(openRound, insertTopic(openRound, "Esc Remove Open Topic"),
+                "esc-rm3", 3);
+        rosterOverride(openGroup, "esc-rm3-student-2", "reason", null, null)
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("ROUND_CLOSED"));
+        UUID scoredCouncil = insertCouncil(closed, "Esc Remove Score Council");
+        seat(scoredCouncil, "esc-rm-scorer", "MEMBER");
+        jdbc.update("INSERT INTO thesis.thesis_topic_score (id, topic_id, council_id, lecturer_id, component, score) "
+                        + "VALUES (?, ?, ?, ?, 'DEFENSE', 8)",
+                UUID.randomUUID(), topicId, scoredCouncil, "esc-rm-scorer");
+        rosterOverride(secondGroup, "esc-rm2-student-2", "reason", null, null)
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("GROUP_SCORES_EXIST"));
+        UUID ghostTopic = insertTopic(closed, "Esc Remove Ghost Topic");
+        UUID ghostGroup = insertGroupWithMembers(closed, ghostTopic, "esc-rm4", 3);
+        rosterOverride(ghostGroup, "esc-rm-ghost", "reason", null, null)
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.code").value("STUDENT_NOT_IN_GROUP"));
+    }
+
+    @Test
+    void rosterOverrideRemoveBelowMinimumNeedsSizeExceptionAndNeverEmpties() throws Exception {
+        Instant now = Instant.now();
+        UUID closed = insertRound("Esc Round Remove Floor", "REGISTRATION_CLOSED",
+                now.plusSeconds(86_400), now.plusSeconds(5 * 86_400));
+        UUID topicId = insertTopic(closed, "Esc Remove Floor Topic");
+        UUID groupId = insertGroupWithMembers(closed, topicId, "esc-rf", 3);
+
+        // Dropping an approved roster to two members needs the same explicit
+        // size-exception flag the add path requires.
+        rosterOverride(groupId, "esc-rf-student-3", "withdrew", null, null)
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("GROUP_SIZE_EXCEPTION_REQUIRED"));
+        rosterOverride(groupId, "esc-rf-student-3", "withdrew", true, null)
+                .andExpect(status().isOk());
+        assertThat(jdbc.queryForObject(
+                "SELECT size_exception_reason FROM thesis.thesis_group WHERE id = ?",
+                String.class, groupId)).isEqualTo("withdrew");
+        assertThat(jdbc.queryForObject(
+                "SELECT COUNT(*) FROM thesis.thesis_group_member WHERE group_id = ?",
+                Integer.class, groupId)).isEqualTo(2);
+
+        // A group may never end with zero members — dissolving one stays on the
+        // existing cancel path, not this hatch.
+        rosterOverride(groupId, "esc-rf-student-1", "second departure", true, "esc-rf-student-2")
+                .andExpect(status().isOk());
+        rosterOverride(groupId, "esc-rf-student-2", "last member", true, null)
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("GROUP_EMPTY"));
+        assertThat(jdbc.queryForObject(
+                "SELECT COUNT(*) FROM thesis.thesis_group_member WHERE group_id = ?",
+                Integer.class, groupId)).isEqualTo(1);
+    }
+
+    @Test
+    void rosterOverrideRemoveLeaderRequiresNamedSuccessor() throws Exception {
+        Instant now = Instant.now();
+        UUID closed = insertRound("Esc Round Remove Leader", "REGISTRATION_CLOSED",
+                now.plusSeconds(86_400), now.plusSeconds(5 * 86_400));
+        UUID topicId = insertTopic(closed, "Esc Remove Leader Topic");
+        UUID groupId = insertGroupWithMembers(closed, topicId, "esc-rl", 4);
+        // The fixture stores leader_student_id = <tag>-leader; bind the real
+        // leader member so the group row matches its leader flag.
+        jdbc.update("UPDATE thesis.thesis_group SET leader_student_id = 'esc-rl-student-1' WHERE id = ?",
+                groupId);
+
+        // Removing the leader without naming a successor is refused; a
+        // successor that is not a remaining member is refused as well.
+        rosterOverride(groupId, "esc-rl-student-1", "leader departed", null, null)
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("LEADER_SUCCESSOR_REQUIRED"));
+        rosterOverride(groupId, "esc-rl-student-1", "leader departed", null, "esc-rl-outsider")
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.code").value("STUDENT_NOT_IN_GROUP"));
+
+        rosterOverride(groupId, "esc-rl-student-1", "leader departed", null, "esc-rl-student-2")
+                .andExpect(status().isOk());
+        assertThat(jdbc.queryForObject(
+                "SELECT leader_student_id FROM thesis.thesis_group WHERE id = ?",
+                String.class, groupId)).isEqualTo("esc-rl-student-2");
+        assertThat(jdbc.queryForObject(
+                "SELECT COUNT(*) FROM thesis.thesis_group_member "
+                        + "WHERE group_id = ? AND is_leader AND student_id = 'esc-rl-student-2'",
+                Integer.class, groupId)).isEqualTo(1);
+        assertThat(auditCount(groupId.toString(), "THESIS_GROUP_ROSTER_OVERRIDE")).isEqualTo(1);
+    }
+
+    private org.springframework.test.web.servlet.ResultActions rosterOverride(
+            UUID groupId, String studentId, String reason, Boolean allowSizeException,
+            String successorStudentId) throws Exception {
+        StringBuilder body = new StringBuilder("{\"action\":\"REMOVE\",\"studentId\":\"")
+                .append(studentId).append("\",\"reason\":\"").append(reason).append("\"");
+        if (allowSizeException != null) {
+            body.append(",\"allowSizeException\":").append(allowSizeException);
+        }
+        if (successorStudentId != null) {
+            body.append(",\"successorStudentId\":\"").append(successorStudentId).append("\"");
+        }
+        body.append("}");
+        return mvc.perform(post("/api/v1/thesis/groups/{id}/roster-override", groupId)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(body.toString())
+                .with(ThesisAuthorityFixture.role(jdbc, "esc-admin", "ADMIN")));
+    }
+
     private org.springframework.test.web.servlet.ResultActions reassign(
             UUID groupId, UUID targetTopicId, String adminSubject) throws Exception {
         return mvc.perform(post("/api/v1/thesis/groups/{id}/topic-reassign", groupId)
