@@ -25,6 +25,7 @@ import io.campuscore.restfulapi.thesis.web.ThesisMutationDtos.TopicCreateRequest
 import io.campuscore.restfulapi.thesis.web.ThesisMutationDtos.TopicUpdateRequest;
 import io.campuscore.restfulapi.thesis.web.ThesisMutationDtos.GroupRejectionRequest;
 import io.campuscore.restfulapi.thesis.web.ThesisMutationDtos.LateTopicRequest;
+import io.campuscore.restfulapi.thesis.web.ThesisMutationDtos.RosterOverrideRequest;
 import io.campuscore.restfulapi.thesis.web.ThesisRoundDtos.RoundResponse;
 import io.campuscore.restfulapi.thesis.web.ThesisTopicDtos.TopicResponse;
 import io.campuscore.restfulapi.web.DomainException;
@@ -946,6 +947,81 @@ public class ThesisMutationService {
             }
         });
         return topics.findById(lateTopicId).map(TopicResponse::from).orElseGet(() -> TopicResponse.from(topic));
+    }
+
+    /**
+     * Governance override that adds a student to a roster after the
+     * registration window closed: only while the round is REGISTRATION_CLOSED,
+     * only into a group whose topic has no scores of any kind, and always with
+     * the audited reason. A resulting roster below the minimum additionally
+     * requires the explicit size-exception flag and records it on the group —
+     * the V113 legacy exception cannot serve because its trigger freezes the
+     * whole group.
+     */
+    @Transactional
+    public GroupResponse overrideGroupRoster(UUID groupId, RosterOverrideRequest request, Jwt actor) {
+        requireGovernanceRole(actor);
+        String cleanReason = requireReason(request == null ? null : request.reason());
+        requireText(request == null ? null : request.studentId(), "studentId", 120);
+        String studentId = request.studentId().trim();
+        // Lock order matches the rest of the roster paths: round -> group ->
+        // student row. The group's round id is read unlocked first; the locks
+        // below take it in the shared order.
+        GroupResponse groupMeta = groups.findById(groupId);
+        requireRoundStatus(groupMeta.roundId(), RoundStatus.REGISTRATION_CLOSED);
+        GroupRow group = lockGroup(groupId);
+        if (!ThesisDeanScope.isGlobalAdmin(actor) && group.topicId() != null) {
+            ThesisDeanScope.requireTopicAccess(jdbc, actor, group.topicId());
+        }
+        Integer topicScores = jdbc.queryForObject(
+                "SELECT COUNT(*) FROM thesis.thesis_topic_score WHERE topic_id = :topicId",
+                params().addValue("topicId", group.topicId()), Integer.class);
+        if (topicScores != null && topicScores > 0) {
+            throw conflict("GROUP_SCORES_EXIST",
+                    "The roster cannot change once scoring has started for the group's topic");
+        }
+        int memberCount = count("SELECT COUNT(*) FROM thesis.thesis_group_member WHERE group_id = :groupId",
+                "groupId", groupId);
+        if (memberCount >= MAX_GROUP_MEMBERS) {
+            throw conflict("GROUP_FULL", "A thesis group can have at most " + MAX_GROUP_MEMBERS + " members");
+        }
+        Integer already = jdbc.queryForObject(
+                "SELECT COUNT(*) FROM thesis.thesis_group_member WHERE group_id = :groupId AND student_id = :studentId",
+                params().addValue("groupId", groupId).addValue("studentId", studentId), Integer.class);
+        if (already != null && already > 0) {
+            throw conflict("STUDENT_ALREADY_IN_GROUP", "The student is already a member of this group");
+        }
+        requireActiveStudent(studentId);
+        requireNotInAnotherActiveGroup(group.roundId(), studentId);
+        boolean underSize = memberCount + 1 < MIN_GROUP_MEMBERS;
+        if (underSize && !Boolean.TRUE.equals(request.allowSizeException())) {
+            throw conflict("GROUP_SIZE_EXCEPTION_REQUIRED",
+                    "The roster stays below the minimum of " + MIN_GROUP_MEMBERS
+                            + "; pass allowSizeException to accept a documented exception");
+        }
+        jdbc.update("INSERT INTO thesis.thesis_group_member (id, group_id, round_id, student_id, member_order, is_leader) VALUES (:id, :groupId, :roundId, :studentId, :memberOrder, FALSE)",
+                params().addValue("id", UUID.randomUUID()).addValue("groupId", groupId)
+                        .addValue("roundId", group.roundId()).addValue("studentId", studentId)
+                        .addValue("memberOrder", nextMemberOrder(groupId)));
+        if (underSize) {
+            jdbc.update(
+                    "UPDATE thesis.thesis_group SET size_exception_reason = :reason, size_exception_by = :by, "
+                            + "size_exception_at = CURRENT_TIMESTAMP WHERE id = :groupId",
+                    params().addValue("groupId", groupId).addValue("reason", cleanReason).addValue("by", subject(actor)));
+        }
+        jdbc.update("UPDATE thesis.thesis_group SET updated_at = CURRENT_TIMESTAMP, version = version + 1 WHERE id = :groupId",
+                params().addValue("groupId", groupId));
+        audit.record(subject(actor), null, "THESIS_GROUP_ROSTER_OVERRIDE", "THESIS_GROUP", groupId.toString(),
+                "Member " + studentId + " added after registration closed; reason: " + cleanReason
+                        + (underSize ? "; below-minimum size exception accepted" : ""),
+                Map.of("memberCount", memberCount),
+                Map.of("memberCount", memberCount + 1, "sizeException", underSize));
+        afterCommit(() -> {
+            if (notifier != null) {
+                notifier.notifyGroupRosterChanged(groupId);
+            }
+        });
+        return groups.findById(groupId);
     }
 
     private void requireGovernanceRole(Jwt actor) {
