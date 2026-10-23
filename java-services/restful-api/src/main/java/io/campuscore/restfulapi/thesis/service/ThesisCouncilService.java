@@ -269,7 +269,9 @@ public class ThesisCouncilService {
         Map<String, Object> topic = one(
                 "SELECT id, round_id, status, final_score FROM thesis.thesis_topic WHERE id = :topicId",
                 params().addValue("topicId", topicId), "TOPIC_NOT_FOUND", "Thesis topic not found");
-        ThesisDeanScope.requireTopicAccess(jdbc, actor, topicId);
+        // Binding a topic to a grading panel is outcome governance, not
+        // supervision: the dean must own the topic's faculty.
+        ThesisDeanScope.requireTopicGovernanceScope(jdbc, actor, topicId);
         if (!"PUBLISHED".equals(topic.get("status")) && !"APPROVED".equals(topic.get("status"))) {
             throw conflict("TOPIC_NOT_PUBLISHED",
                     "Only a published topic can be assigned to a defense council");
@@ -463,7 +465,9 @@ public class ThesisCouncilService {
                 "SELECT topic_id FROM thesis.thesis_council_topic WHERE council_id = :councilId",
                 params().addValue("councilId", councilId), UUID.class);
         for (UUID assignedTopic : assigned) {
-            ThesisDeanScope.requireTopicAccess(jdbc, actor, assignedTopic);
+            // Restaffing the panel that grades a topic is governance on that
+            // topic; the dean must own its faculty, not merely supervise it.
+            ThesisDeanScope.requireTopicGovernanceScope(jdbc, actor, assignedTopic);
         }
     }
 
@@ -662,7 +666,9 @@ public class ThesisCouncilService {
                         + "JOIN thesis.thesis_registration_round r ON r.id = t.round_id "
                         + "WHERE t.id = :topicId FOR UPDATE OF t",
                 params().addValue("topicId", topicId), "TOPIC_NOT_FOUND", "Thesis topic not found");
-        ThesisDeanScope.requireTopicAccess(jdbc, actor, topicId);
+        // Naming the counter-reviewer is outcome governance: the dean must
+        // own the topic's faculty, not merely supervise it.
+        ThesisDeanScope.requireTopicGovernanceScope(jdbc, actor, topicId);
         if (RoundStatus.CANCELLED.name().equals(topic.get("round_status"))
                 || RoundStatus.RESULTS_PUBLISHED.name().equals(topic.get("round_status"))) {
             throw conflict("ROUND_STATE_CONFLICT", "The round no longer accepts a counter-reviewer assignment");
@@ -1052,9 +1058,10 @@ public class ThesisCouncilService {
         }
         lockTopic(topicId);
         // The council-level check admits a dean on a single in-faculty topic;
-        // detaching still needs the topic's own scope check so a mixed council
-        // cannot release foreign topics.
-        ThesisDeanScope.requireTopicAccess(jdbc, actor, topicId);
+        // detaching still needs the topic's own governance scope so a mixed
+        // council cannot release foreign topics — or topics a foreign dean
+        // merely supervises.
+        ThesisDeanScope.requireTopicGovernanceScope(jdbc, actor, topicId);
         if (!councilHasTopic(councilId, topicId)) {
             throw conflict("TOPIC_NOT_ASSIGNED", "This council has not been assigned the topic");
         }

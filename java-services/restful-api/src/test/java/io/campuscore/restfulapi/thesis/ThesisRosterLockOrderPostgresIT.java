@@ -6,9 +6,11 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.doAnswer;
 
+import io.campuscore.restfulapi.thesis.service.ThesisCouncilService;
 import io.campuscore.restfulapi.thesis.service.ThesisMutationService;
 import io.campuscore.restfulapi.thesis.web.ThesisMutationDtos.GroupApprovalRequest;
 import io.campuscore.restfulapi.thesis.web.ThesisMutationDtos.RosterOverrideRequest;
+import io.campuscore.restfulapi.thesis.web.ThesisMutationDtos.TopicReassignRequest;
 import io.campuscore.restfulapi.web.DomainException;
 import java.sql.Timestamp;
 import java.time.Instant;
@@ -57,6 +59,7 @@ class ThesisRosterLockOrderPostgresIT {
 
     @Autowired private JdbcTemplate jdbc;
     @Autowired private ThesisMutationService mutations;
+    @Autowired private ThesisCouncilService councils;
     @MockitoSpyBean private NamedParameterJdbcTemplate namedJdbc;
 
     private UUID roundId;
@@ -101,6 +104,8 @@ class ThesisRosterLockOrderPostgresIT {
                         + " JOIN thesis.thesis_registration_round r ON r.id = g.round_id WHERE r.name = ?)",
                 ROUND_NAME);
         jdbc.update("DELETE FROM thesis.thesis_group WHERE round_id IN "
+                + "(SELECT id FROM thesis.thesis_registration_round WHERE name = ?)", ROUND_NAME);
+        jdbc.update("DELETE FROM thesis.thesis_council WHERE round_id IN "
                 + "(SELECT id FROM thesis.thesis_registration_round WHERE name = ?)", ROUND_NAME);
         jdbc.update("DELETE FROM thesis.thesis_topic WHERE round_id IN "
                 + "(SELECT id FROM thesis.thesis_registration_round WHERE name = ?)", ROUND_NAME);
@@ -370,6 +375,186 @@ class ThesisRosterLockOrderPostgresIT {
     }
 
     /**
+     * Post-close roster edits are governance writes, not supervision: a dean
+     * who supervises the topic from another faculty used to pass the group
+     * check through the reviewer escape and could rewrite — or shrink below
+     * the documented minimum — an approved roster. The override shares the
+     * waiver's owning-faculty rule now; ordinary review rights stay
+     * unchanged.
+     */
+    @Test
+    void rosterOverrideBelongsToTheOwningFacultyNotTheSupervisor() {
+        UUID topicId = insertTopic("Rlo Override Scope Topic");
+        UUID groupId = insertGroup(topicId, "rlo-ov", 2);
+        Jwt foreignDean = dean("rlo-dean-foreign", "rlo-dept-foreign", "rlo-fac-foreign");
+        supervise(topicId, "rlo-dean-foreign");
+        ensureStudent("rlo-override-student");
+
+        // ADD: refused before a seat or the exception marker is written.
+        assertThatThrownBy(() -> mutations.overrideGroupRoster(groupId,
+                new RosterOverrideRequest("rlo-override-student", "documented post-close seat", true),
+                foreignDean))
+                .isInstanceOf(DomainException.class)
+                .satisfies(failure -> assertThat(((DomainException) failure).code())
+                        .isEqualTo("THESIS_GROUP_NOT_FOUND"));
+        assertThat(jdbc.queryForObject(
+                "SELECT COUNT(*) FROM thesis.thesis_group_member WHERE group_id = ?",
+                Integer.class, groupId)).isEqualTo(2);
+
+        // REMOVE on an approved roster: refused before the waiver lands.
+        UUID approvedGroup = insertGroup(topicId, "rlo-apx", 3);
+        mutations.approveGroup(approvedGroup, admin());
+        assertThatThrownBy(() -> mutations.overrideGroupRoster(approvedGroup,
+                new RosterOverrideRequest("rlo-apx-student-3", "REMOVE", "stepped back", true, null),
+                foreignDean))
+                .isInstanceOf(DomainException.class)
+                .satisfies(failure -> assertThat(((DomainException) failure).code())
+                        .isEqualTo("THESIS_GROUP_NOT_FOUND"));
+        assertThat(jdbc.queryForObject(
+                "SELECT COUNT(*) FROM thesis.thesis_group_member WHERE group_id = ?",
+                Integer.class, approvedGroup)).isEqualTo(3);
+        assertThat(jdbc.queryForObject(
+                "SELECT size_exception_reason FROM thesis.thesis_group WHERE id = ?",
+                String.class, approvedGroup)).isNull();
+
+        // The owning faculty head keeps the override in both directions, and
+        // a global admin writes the waiver the foreign dean attempted.
+        Jwt ownDean = dean("rlo-dean-own", "department-demo", "faculty-demo");
+        mutations.overrideGroupRoster(groupId,
+                new RosterOverrideRequest("rlo-override-student", "documented post-close seat", true),
+                ownDean);
+        assertThat(jdbc.queryForObject(
+                "SELECT COUNT(*) FROM thesis.thesis_group_member WHERE group_id = ?",
+                Integer.class, groupId)).isEqualTo(3);
+
+        mutations.overrideGroupRoster(approvedGroup,
+                new RosterOverrideRequest("rlo-apx-student-3", "REMOVE", "stepped back", true, null),
+                admin());
+        assertThat(jdbc.queryForObject(
+                "SELECT COUNT(*) FROM thesis.thesis_group_member WHERE group_id = ?",
+                Integer.class, approvedGroup)).isEqualTo(2);
+        assertThat(jdbc.queryForObject(
+                "SELECT size_exception_reason FROM thesis.thesis_group WHERE id = ?",
+                String.class, approvedGroup)).isEqualTo("stepped back");
+    }
+
+    /**
+     * Re-pointing an orphaned group and naming a counter-reviewer are
+     * post-close outcome governance: the dean must own the faculty on the
+     * topic, not merely supervise it. A foreign dean supervising both ends
+     * loses the write; the home dean keeps it.
+     */
+    @Test
+    void orphanReassignAndReviewerAssignmentNeedTheOwningFaculty() {
+        UUID orphanTopic = insertTopic("Rlo Withdrawn Topic");
+        UUID groupId = insertGroup(orphanTopic, "rlo-re", 3);
+        jdbc.update("UPDATE thesis.thesis_topic SET result_status = 'WITHDRAWN' WHERE id = ?",
+                orphanTopic);
+        UUID newTopic = insertTopic("Rlo Reassign Target");
+
+        Jwt foreignDean = dean("rlo-dean-foreign", "rlo-dept-foreign", "rlo-fac-foreign");
+        supervise(orphanTopic, "rlo-dean-foreign");
+        supervise(newTopic, "rlo-dean-foreign");
+
+        // Re-pointing between two supervised foreign topics is still a
+        // governance write the supervisor escape cannot authorize.
+        assertThatThrownBy(() -> mutations.reassignOrphanedTopic(groupId,
+                new TopicReassignRequest(newTopic, "topic withdrawn by governance"), foreignDean))
+                .isInstanceOf(DomainException.class)
+                .satisfies(failure -> assertThat(((DomainException) failure).code())
+                        .isEqualTo("TOPIC_NOT_FOUND"));
+        assertThat(jdbc.queryForObject(
+                "SELECT topic_id FROM thesis.thesis_group WHERE id = ?", UUID.class, groupId))
+                .isEqualTo(orphanTopic);
+
+        // A supervised topic does not hand its counter-reviewer pick to the
+        // foreign dean either.
+        ensureLecturer("rlo-gvpb");
+        assertThatThrownBy(() -> councils.assignReviewer(newTopic, "rlo-gvpb", foreignDean))
+                .isInstanceOf(DomainException.class)
+                .satisfies(failure -> assertThat(((DomainException) failure).code())
+                        .isEqualTo("TOPIC_NOT_FOUND"));
+        assertThat(jdbc.queryForObject(
+                "SELECT gvpb_lecturer_id FROM thesis.thesis_topic WHERE id = ?",
+                String.class, newTopic)).isNull();
+
+        Jwt ownDean = dean("rlo-dean-own", "department-demo", "faculty-demo");
+        councils.assignReviewer(newTopic, "rlo-gvpb", ownDean);
+        assertThat(jdbc.queryForObject(
+                "SELECT gvpb_lecturer_id FROM thesis.thesis_topic WHERE id = ?",
+                String.class, newTopic)).isEqualTo("rlo-gvpb");
+
+        mutations.reassignOrphanedTopic(groupId,
+                new TopicReassignRequest(newTopic, "topic withdrawn by governance"), ownDean);
+        assertThat(jdbc.queryForObject(
+                "SELECT topic_id FROM thesis.thesis_group WHERE id = ?", UUID.class, groupId))
+                .isEqualTo(newTopic);
+    }
+
+    /**
+     * Council writes that move a topic — assigning it to the panel, releasing
+     * it, or restaffing the panel grading it — bind the topic's own faculty.
+     * The council-owner rule still admits the dean who created the panel, so
+     * a foreign dean reaches the per-topic check and is refused there; the
+     * home dean performs all three.
+     */
+    @Test
+    void councilTopicWritesNeedTheOwningFacultyOfTheTopic() {
+        UUID topicId = insertTopic("Rlo Council Scope Topic");
+        Jwt foreignDean = dean("rlo-dean-foreign", "rlo-dept-foreign", "rlo-fac-foreign");
+        supervise(topicId, "rlo-dean-foreign");
+
+        ensureLecturer("rlo-chair");
+        ensureLecturer("rlo-secretary");
+        ensureLecturer("rlo-member");
+        ensureLecturer("rlo-replacement");
+
+        UUID foreignCouncil = insertCouncil("rlo-user-rlo-dean-foreign");
+        seat(foreignCouncil, "rlo-chair", "CHAIR");
+        seat(foreignCouncil, "rlo-secretary", "SECRETARY");
+        seat(foreignCouncil, "rlo-member", "MEMBER");
+
+        assertThatThrownBy(() -> councils.assignTopic(foreignCouncil, topicId, foreignDean))
+                .isInstanceOf(DomainException.class)
+                .satisfies(failure -> assertThat(((DomainException) failure).code())
+                        .isEqualTo("TOPIC_NOT_FOUND"));
+
+        // A foreign topic parked on their panel cannot be released or have
+        // its grading roster restaffed by the supervising dean either.
+        assignCouncilTopic(foreignCouncil, topicId, "rlo-user-rlo-dean-foreign");
+        assertThatThrownBy(() -> councils.unassignTopic(foreignCouncil, topicId,
+                "re-seat the topic", foreignDean))
+                .isInstanceOf(DomainException.class)
+                .satisfies(failure -> assertThat(((DomainException) failure).code())
+                        .isEqualTo("TOPIC_NOT_FOUND"));
+        assertThatThrownBy(() -> councils.replaceMember(foreignCouncil,
+                "rlo-member", "rlo-replacement", "seat swap", foreignDean))
+                .isInstanceOf(DomainException.class)
+                .satisfies(failure -> assertThat(((DomainException) failure).code())
+                        .isEqualTo("TOPIC_NOT_FOUND"));
+
+        // The owning faculty head performs all three on their own panel.
+        Jwt ownDean = dean("rlo-dean-own", "department-demo", "faculty-demo");
+        UUID ownCouncil = insertCouncil("rlo-user-rlo-dean-own");
+        seat(ownCouncil, "rlo-chair", "CHAIR");
+        seat(ownCouncil, "rlo-secretary", "SECRETARY");
+        seat(ownCouncil, "rlo-member", "MEMBER");
+        UUID ownTopic = insertTopic("Rlo Council Own Topic");
+
+        councils.assignTopic(ownCouncil, ownTopic, ownDean);
+        councils.replaceMember(ownCouncil, "rlo-member", "rlo-replacement",
+                "documented seat swap", ownDean);
+        councils.unassignTopic(ownCouncil, ownTopic, "release for reassignment", ownDean);
+        assertThat(jdbc.queryForObject(
+                "SELECT COUNT(*) FROM thesis.thesis_council_topic WHERE council_id = ?",
+                Integer.class, ownCouncil)).isZero();
+        assertThat(jdbc.queryForObject(
+                "SELECT lecturer_id FROM thesis.thesis_council_member "
+                        + "WHERE council_id = ? AND member_role = 'MEMBER'",
+                String.class, ownCouncil)).isEqualTo("rlo-replacement");
+    }
+
+    /**
      * Parks each named thread immediately before one lock acquisition, so the
      * locks it already holds at that instant are exactly the order under
      * test: the override before {@code thesis_group ... FOR UPDATE} and the
@@ -402,12 +587,42 @@ class ThesisRosterLockOrderPostgresIT {
     }
 
     private UUID insertTopic(String title) {
+        return insertTopic(title, "department-demo");
+    }
+
+    private UUID insertTopic(String title, String departmentId) {
         UUID id = UUID.randomUUID();
         jdbc.update("INSERT INTO thesis.thesis_topic "
                         + "(id, round_id, department_id, title, description, max_groups, status, created_by) "
-                        + "VALUES (?, ?, 'department-demo', ?, 'fixture', 2, 'PUBLISHED', 'rlo-admin')",
-                id, roundId, title);
+                        + "VALUES (?, ?, ?, ?, 'fixture', 2, 'PUBLISHED', 'rlo-admin')",
+                id, roundId, departmentId, title);
         return id;
+    }
+
+    private void supervise(UUID topicId, String lecturerId) {
+        jdbc.update("INSERT INTO thesis.thesis_topic_supervisor (id, topic_id, lecturer_id, supervisor_order)"
+                        + " VALUES (?, ?, ?, 1)",
+                UUID.randomUUID(), topicId, lecturerId);
+    }
+
+    private UUID insertCouncil(String createdBy) {
+        UUID id = UUID.randomUUID();
+        jdbc.update("INSERT INTO thesis.thesis_council (id, round_id, name, status, created_by) "
+                        + "VALUES (?, ?, ?, 'ACTIVE', ?)",
+                id, roundId, "Council rlo", createdBy);
+        return id;
+    }
+
+    private void seat(UUID councilId, String lecturerId, String role) {
+        jdbc.update("INSERT INTO thesis.thesis_council_member (id, council_id, lecturer_id, member_role) "
+                        + "VALUES (?, ?, ?, ?)",
+                UUID.randomUUID(), councilId, lecturerId, role);
+    }
+
+    private void assignCouncilTopic(UUID councilId, UUID topicId, String assignedBy) {
+        jdbc.update("INSERT INTO thesis.thesis_council_topic (id, council_id, topic_id, assigned_by) "
+                        + "VALUES (?, ?, ?, ?)",
+                UUID.randomUUID(), councilId, topicId, assignedBy);
     }
 
     private UUID insertGroup(UUID topicId, String tag, int memberCount) {
