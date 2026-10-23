@@ -825,7 +825,13 @@ export function ProfileScreen({ navigation, role }: MobileScreenProps) {
     setIsSavingPassword(true);
     setProfileMessage(null);
     try {
-      await campusApi.changePassword(oldPassword, newPassword);
+      const result = await campusApi.changePassword(oldPassword, newPassword);
+      if (!result.sessionPreserved) {
+        // The server could not pin a session for this device, so it revoked
+        // every session — the same terminal state as an expired session.
+        navigation.signOut();
+        return;
+      }
       setProfileMessage('Password updated.');
       setOldPassword('');
       setNewPassword('');
