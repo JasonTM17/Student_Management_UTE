@@ -86,7 +86,7 @@ final class ThesisDeanScope {
         if (supervised != null && supervised > 0) {
             return;
         }
-        throw new DomainException(HttpStatus.NOT_FOUND, "TOPIC_NOT_FOUND", "Thesis topic not found");
+        throw topicScopeFailure(jdbc, topicId);
     }
 
     /**
@@ -113,8 +113,28 @@ final class ThesisDeanScope {
                 new MapSqlParameterSource("topicId", topicId).addValue("facultyId", facultyId),
                 Integer.class);
         if (inFaculty == null || inFaculty == 0) {
-            throw new DomainException(HttpStatus.NOT_FOUND, "TOPIC_NOT_FOUND", "Thesis topic not found");
+            throw topicScopeFailure(jdbc, topicId);
         }
+    }
+
+    /**
+     * Refusal classifier shared by both scope checks: a topic row whose
+     * department resolves to no faculty cannot be governed by any dean, so
+     * the failure must name the data problem — not pretend the row is gone
+     * or merely out of scope. A global admin still reaches the row.
+     */
+    private static DomainException topicScopeFailure(NamedParameterJdbcTemplate jdbc, UUID topicId) {
+        List<String> resolved = jdbc.queryForList(
+                "SELECT f.\"id\" FROM thesis.thesis_topic t "
+                        + "LEFT JOIN academic.\"Department\" d ON d.\"id\" = t.department_id "
+                        + "LEFT JOIN academic.\"Faculty\" f ON f.\"id\" = d.\"facultyId\" "
+                        + "WHERE t.id = :topicId",
+                new MapSqlParameterSource("topicId", topicId), String.class);
+        if (!resolved.isEmpty() && resolved.get(0) == null) {
+            return new DomainException(HttpStatus.CONFLICT, "TOPIC_SCOPE_UNRESOLVABLE",
+                    "The topic's department resolves to no faculty; only a global admin can act on it");
+        }
+        return new DomainException(HttpStatus.NOT_FOUND, "TOPIC_NOT_FOUND", "Thesis topic not found");
     }
 
     /**
