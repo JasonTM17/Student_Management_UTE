@@ -87,6 +87,10 @@ public final class ThesisMutationDtos {
             String reason) {
     }
 
+    /** Audited post-registration roster addition with a size exception flag. */
+    public record RosterOverrideRequest(String studentId, String reason, Boolean allowSizeException) {
+    }
+
     /**
      * Publish body: {@code confirmAllExcluded} is the explicit acknowledgement
      * required when every approved group's topic is excluded — an otherwise

@@ -676,6 +676,65 @@ class ThesisCouncilEscapeHatchTest {
     }
 
     @Test
+    void rosterOverrideAddsStudentAfterCloseWithGuards() {
+        Instant now = Instant.now();
+        UUID closed = insertRound("Esc Round Roster Override", "REGISTRATION_CLOSED",
+                now.plusSeconds(86_400), now.plusSeconds(5 * 86_400));
+        UUID topicId = insertTopic(closed, "Esc Roster Override Topic");
+        UUID groupId = insertGroupWithMembers(closed, topicId, "esc-ro", 3);
+        ensureStudent("esc-ro-new");
+
+        // Happy path: an active student joins an unscored group in a closed
+        // round, audited with the reason.
+        var added = mutations.overrideGroupRoster(groupId,
+                new io.campuscore.restfulapi.thesis.web.ThesisMutationDtos.RosterOverrideRequest(
+                        "esc-ro-new", "medical leave resolved", null), admin());
+        assertThat(added.memberStudentIds()).contains("esc-ro-new");
+        assertThat(auditCount(groupId.toString(), "THESIS_GROUP_ROSTER_OVERRIDE")).isEqualTo(1);
+
+        // Below-minimum results need the explicit size exception flag.
+        UUID smallGroup = insertGroupWithMembers(closed, topicId, "esc-ro2", 1);
+        ensureStudent("esc-ro2-new");
+        assertThatThrownBy(() -> mutations.overrideGroupRoster(smallGroup,
+                new io.campuscore.restfulapi.thesis.web.ThesisMutationDtos.RosterOverrideRequest(
+                        "esc-ro2-new", "reason", null), admin()))
+                .isInstanceOf(DomainException.class)
+                .isInstanceOfSatisfying(DomainException.class,
+                        e -> assertThat(e.getCode()).isEqualTo("GROUP_SIZE_EXCEPTION_REQUIRED"));
+        mutations.overrideGroupRoster(smallGroup,
+                new io.campuscore.restfulapi.thesis.web.ThesisMutationDtos.RosterOverrideRequest(
+                        "esc-ro2-new", "partner dropped out", true), admin());
+        assertThat(jdbc.queryForObject(
+                "SELECT size_exception_reason FROM thesis.thesis_group WHERE id = ?",
+                String.class, smallGroup)).isEqualTo("partner dropped out");
+
+        // Guards: an open round refuses, a scored topic refuses, a duplicate
+        // member refuses.
+        UUID openRound = insertRound("Esc Round Roster Open", "REGISTRATION_OPEN",
+                now.plusSeconds(86_400), now.plusSeconds(5 * 86_400));
+        UUID openGroup = insertGroupWithMembers(openRound, insertTopic(openRound, "Esc Open Topic"), "esc-ro3", 3);
+        ensureStudent("esc-ro3-new");
+        assertThatThrownBy(() -> mutations.overrideGroupRoster(openGroup,
+                new io.campuscore.restfulapi.thesis.web.ThesisMutationDtos.RosterOverrideRequest(
+                        "esc-ro3-new", "reason", null), admin()))
+                .isInstanceOf(DomainException.class)
+                .isInstanceOfSatisfying(DomainException.class,
+                        e -> assertThat(e.getCode()).isEqualTo("ROUND_CLOSED"));
+        UUID scoredCouncil = insertCouncil(closed, "Esc Scored Council");
+        seat(scoredCouncil, "esc-ro-scorer", "MEMBER");
+        jdbc.update("INSERT INTO thesis.thesis_topic_score (id, topic_id, council_id, lecturer_id, component, score) "
+                        + "VALUES (?, ?, ?, ?, 'DEFENSE', 8)",
+                UUID.randomUUID(), topicId, scoredCouncil, "esc-ro-scorer");
+        ensureStudent("esc-ro4-new");
+        assertThatThrownBy(() -> mutations.overrideGroupRoster(groupId,
+                new io.campuscore.restfulapi.thesis.web.ThesisMutationDtos.RosterOverrideRequest(
+                        "esc-ro4-new", "reason", null), admin()))
+                .isInstanceOf(DomainException.class)
+                .isInstanceOfSatisfying(DomainException.class,
+                        e -> assertThat(e.getCode()).isEqualTo("GROUP_SCORES_EXIST"));
+    }
+
+    @Test
     void aForeignFacultyDeanCannotWithdrawOrReinstateAnotherFacultysTopic() {
         Instant now = Instant.now();
         // A resolved but foreign faculty scope: the dean's lecturer profile is

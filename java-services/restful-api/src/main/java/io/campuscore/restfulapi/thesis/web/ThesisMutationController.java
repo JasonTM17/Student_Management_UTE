@@ -11,6 +11,7 @@ import io.campuscore.restfulapi.thesis.web.ThesisMutationDtos.GroupRejectionRequ
 import io.campuscore.restfulapi.thesis.web.ThesisMutationDtos.GvpbDeadlineUpdateRequest;
 import io.campuscore.restfulapi.thesis.web.ThesisMutationDtos.LateTopicRequest;
 import io.campuscore.restfulapi.thesis.web.ThesisMutationDtos.PublishResultsRequest;
+import io.campuscore.restfulapi.thesis.web.ThesisMutationDtos.RosterOverrideRequest;
 import io.campuscore.restfulapi.thesis.web.ThesisMutationDtos.MemberRequest;
 import io.campuscore.restfulapi.thesis.web.ThesisMutationDtos.ProgressRequest;
 import io.campuscore.restfulapi.thesis.web.ThesisMutationDtos.PublishResultsPreviewResponse;
@@ -234,6 +235,20 @@ public class ThesisMutationController {
             @RequestBody LateTopicRequest request,
             @AuthenticationPrincipal Jwt actor) {
         return mutations.createLateTopic(id, request, actor);
+    }
+
+    /**
+     * Post-registration roster override: adds an active student to a group of
+     * a REGISTRATION_CLOSED round whose topic has no scores yet.
+     */
+    @Operation(summary = "Điều chỉnh thành viên sau đóng đăng ký", description = "Thêm sinh viên vào nhóm của đợt REGISTRATION_CLOSED khi đề tài chưa có điểm; ghi audit kèm lý do")
+    @PostMapping("/groups/{id}/roster-override")
+    @PreAuthorize("hasAnyRole('ADMIN','TRUONG_KHOA','SUPER_ADMIN')")
+    public GroupResponse overrideGroupRoster(
+            @Parameter(description = "Mã UUID của nhóm", required = true) @PathVariable UUID id,
+            @RequestBody RosterOverrideRequest request,
+            @AuthenticationPrincipal Jwt actor) {
+        return mutations.overrideGroupRoster(id, request, actor);
     }
 
     /**

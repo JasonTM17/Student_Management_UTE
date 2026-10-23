@@ -156,6 +156,21 @@ public class ThesisNotificationService {
         return sent;
     }
 
+    /** Roster-override notice: every current member hears who governs the change. */
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public int notifyGroupRosterChanged(UUID groupId) {
+        List<String> userIds = memberUserIds(groupId);
+        if (userIds.isEmpty()) {
+            return 0;
+        }
+        String topic = topicTitleByGroup(groupId);
+        return fanOut(userIds, "Danh sách thành viên nhóm đã thay đổi",
+                "Danh sách thành viên nhóm của bạn"
+                        + (topic.isBlank() ? "" : " (đề tài \"" + topic + "\")")
+                        + " đã được điều chỉnh bởi phòng quản lý.",
+                "INFO", STUDENT_LINK, null);
+    }
+
     private static String resultsSourceKey(UUID roundId) {
         return "THESIS_RESULTS:" + roundId;
     }
