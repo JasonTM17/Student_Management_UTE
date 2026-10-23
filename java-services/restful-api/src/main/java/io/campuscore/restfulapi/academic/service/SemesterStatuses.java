@@ -13,7 +13,9 @@ public final class SemesterStatuses {
      * Lifecycle states a semester never leaves. The column is free-form
      * (VARCHAR(40)) and the admin catalog only writes CLOSED, but the set
      * covers the closed/completed/archived vocabulary the rest of the
-     * codebase uses so a direct write cannot silently reopen.
+     * codebase uses so a direct write cannot silently reopen. Callers
+     * compare against UPPER(TRIM(status)), so case or whitespace variants
+     * of these values refuse the same way.
      */
     public static final Set<String> TERMINAL =
             Set.of("CLOSED", "COMPLETED", "ARCHIVED");
