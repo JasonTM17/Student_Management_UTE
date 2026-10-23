@@ -488,22 +488,24 @@ export default function ThesisPage() {
     if (myReviewTopics.length === 0) return;
     let cancelled = false;
     void (async () => {
-      for (const t of myReviewTopics) {
-        try {
-          const row = await thesisApi.reviewerScore(t.id);
-          if (cancelled) return;
-          setGvpbScores((prev) => ({ ...prev, [t.id]: row }));
-          if (row) {
-            setGvpbDraftScores((prev) => ({ ...prev, [t.id]: String(row.score) }));
-            if (row.comment) {
-              setGvpbDraftComments((prev) => ({ ...prev, [t.id]: row.comment ?? '' }));
+      await Promise.all(
+        myReviewTopics.map(async (t) => {
+          try {
+            const row = await thesisApi.reviewerScore(t.id);
+            if (cancelled) return;
+            setGvpbScores((prev) => ({ ...prev, [t.id]: row }));
+            if (row) {
+              setGvpbDraftScores((prev) => ({ ...prev, [t.id]: String(row.score) }));
+              if (row.comment) {
+                setGvpbDraftComments((prev) => ({ ...prev, [t.id]: row.comment ?? '' }));
+              }
             }
+          } catch {
+            // A read failure leaves the form usable; the submit stays the
+            // authoritative path.
           }
-        } catch {
-          // A read failure leaves the form usable; the submit stays the
-          // authoritative path.
-        }
-      }
+        }),
+      );
     })();
     return () => {
       cancelled = true;

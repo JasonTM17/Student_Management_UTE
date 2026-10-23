@@ -203,30 +203,34 @@ export default function RegisterPage() {
     if (!filtersHydrated) {
       return;
     }
-    const params = new URLSearchParams(window.location.search);
-    for (const key of ['q', 'curriculum', 'seats', 'noconflict', 'sort']) params.delete(key);
-    if (searchText.trim()) {
-      params.set('q', searchText.trim());
-    }
-    if (curriculumFilter !== 'ALL') {
-      params.set('curriculum', curriculumFilter);
-    }
-    if (seatsOnly) {
-      params.set('seats', '1');
-    }
-    if (noConflictOnly) {
-      params.set('noconflict', '1');
-    }
-    if (sortMode !== 'code') {
-      params.set('sort', sortMode);
-    }
-    const query = params.toString();
-    // Reading window.location keeps the comparison cheap and avoids a
-    // replace-loop: the effect does not depend on searchParams.
-    const currentQuery = window.location.search.replace(/^\?/, '');
-    if (query !== currentQuery) {
-      router.replace(`${query ? `${pathname}?${query}` : pathname}${window.location.hash}`, { scroll: false });
-    }
+    const timer = window.setTimeout(() => {
+      const params = new URLSearchParams(window.location.search);
+      for (const key of ['q', 'curriculum', 'seats', 'noconflict', 'sort']) params.delete(key);
+      if (searchText.trim()) {
+        params.set('q', searchText.trim());
+      }
+      if (curriculumFilter !== 'ALL') {
+        params.set('curriculum', curriculumFilter);
+      }
+      if (seatsOnly) {
+        params.set('seats', '1');
+      }
+      if (noConflictOnly) {
+        params.set('noconflict', '1');
+      }
+      if (sortMode !== 'code') {
+        params.set('sort', sortMode);
+      }
+      const query = params.toString();
+      // Reading window.location keeps the comparison cheap and avoids a
+      // replace-loop: the effect does not depend on searchParams.
+      const currentQuery = window.location.search.replace(/^\?/, '');
+      if (query !== currentQuery) {
+        router.replace(`${query ? `${pathname}?${query}` : pathname}${window.location.hash}`, { scroll: false });
+      }
+    }, 250);
+
+    return () => window.clearTimeout(timer);
   }, [
     curriculumFilter,
     filtersHydrated,
