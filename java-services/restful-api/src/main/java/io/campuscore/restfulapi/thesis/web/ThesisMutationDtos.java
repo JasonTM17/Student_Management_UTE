@@ -103,6 +103,10 @@ public final class ThesisMutationDtos {
     public record RetractPublicationRequest(String reason, String confirmation) {
     }
 
+    /** Re-points an approved group orphaned by a withdrawn topic (audited). */
+    public record TopicReassignRequest(UUID topicId, String reason) {
+    }
+
     /**
      * Consequence preview for publish-results: the group tallies and the
      * topics excluded from the completeness requirement with their outcome

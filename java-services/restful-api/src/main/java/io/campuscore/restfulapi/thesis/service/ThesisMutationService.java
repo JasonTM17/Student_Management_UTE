@@ -27,6 +27,7 @@ import io.campuscore.restfulapi.thesis.web.ThesisMutationDtos.GroupRejectionRequ
 import io.campuscore.restfulapi.thesis.web.ThesisMutationDtos.LateTopicRequest;
 import io.campuscore.restfulapi.thesis.web.ThesisMutationDtos.RetractPublicationRequest;
 import io.campuscore.restfulapi.thesis.web.ThesisMutationDtos.RosterOverrideRequest;
+import io.campuscore.restfulapi.thesis.web.ThesisMutationDtos.TopicReassignRequest;
 import io.campuscore.restfulapi.thesis.web.ThesisRoundDtos.RoundResponse;
 import io.campuscore.restfulapi.thesis.web.ThesisTopicDtos.TopicResponse;
 import io.campuscore.restfulapi.web.DomainException;
@@ -1027,6 +1028,96 @@ public class ThesisMutationService {
         afterCommit(() -> {
             if (notifier != null) {
                 notifier.notifyGroupRosterChanged(groupId);
+            }
+        });
+        return groups.findById(groupId);
+    }
+
+    /**
+     * Re-points an approved group whose topic governance withdrew after the
+     * registration window closed. Every ordinary path refuses that group —
+     * assignTopic needs REGISTRATION_OPEN, rejectGroup needs a PENDING row,
+     * and member edits are frozen — so without this hatch the roster is
+     * excluded from publication with no way back to a live topic. Approval is
+     * kept: it covered the roster, the rebind itself is the audited act, and
+     * post-close no path could re-approve a demoted group.
+     */
+    @Transactional
+    public GroupResponse reassignOrphanedTopic(UUID groupId, TopicReassignRequest request, Jwt actor) {
+        requireGovernanceRole(actor);
+        String cleanReason = requireReason(request == null ? null : request.reason());
+        if (request == null || request.topicId() == null) {
+            throw invalid("topicId is required");
+        }
+        UUID newTopicId = request.topicId();
+        // Lock order matches the rest of the governance paths: round row,
+        // then the group, then the topic rows it binds.
+        GroupResponse groupMeta = groups.findById(groupId);
+        requireRoundStatus(groupMeta.roundId(), RoundStatus.REGISTRATION_CLOSED);
+        GroupRow group = lockGroup(groupId);
+        requireActiveRoster(group);
+        UUID oldTopicId = group.topicId();
+        if (oldTopicId == null) {
+            throw conflict("GROUP_TOPIC_NOT_ORPHANED", "The group has no topic to re-point away from");
+        }
+        if (oldTopicId.equals(newTopicId)) {
+            throw invalid("topicId must differ from the group's current topic");
+        }
+        Map<String, Object> oldTopic = one(
+                "SELECT result_status, final_score FROM thesis.thesis_topic WHERE id = :id FOR UPDATE",
+                params().addValue("id", oldTopicId), "TOPIC_NOT_FOUND", "Thesis topic not found");
+        // The hatch exists only for a governance-orphaned group: a WITHDRAWN
+        // outcome removed its topic from the round. A live or review-failed
+        // binding is a different question (the group chose that topic).
+        if (!ThesisReviewOutcome.WITHDRAWN.equals(oldTopic.get("result_status"))) {
+            throw conflict("GROUP_TOPIC_NOT_ORPHANED",
+                    "Only a group whose topic was withdrawn can be re-pointed");
+        }
+        Map<String, Object> newTopic = one(
+                "SELECT round_id, status, max_groups, result_status, final_score FROM thesis.thesis_topic "
+                        + "WHERE id = :id FOR UPDATE",
+                params().addValue("id", newTopicId), "TOPIC_NOT_FOUND", "Thesis topic not found");
+        // A dean may only re-point between topics inside their own faculty;
+        // foreign topics conceal as not-found on either end.
+        if (!ThesisDeanScope.isGlobalAdmin(actor)) {
+            ThesisDeanScope.requireTopicAccess(jdbc, actor, oldTopicId);
+            ThesisDeanScope.requireTopicAccess(jdbc, actor, newTopicId);
+        }
+        // Any score on either side freezes the binding: re-pointing a scored
+        // pair would silently move a verdict the group never earned.
+        Integer scores = jdbc.queryForObject(
+                "SELECT COUNT(*) FROM thesis.thesis_topic_score WHERE topic_id IN (:oldId, :newId)",
+                params().addValue("oldId", oldTopicId).addValue("newId", newTopicId), Integer.class);
+        if (scores != null && scores > 0) {
+            throw conflict("GROUP_SCORES_EXIST",
+                    "The binding cannot change once scoring has started on either topic");
+        }
+        if (oldTopic.get("final_score") != null || newTopic.get("final_score") != null) {
+            throw conflict("GROUP_SCORES_EXIST", "A finalized topic binding cannot be re-pointed");
+        }
+        if (!group.roundId().equals(newTopic.get("round_id"))) {
+            throw conflict("TOPIC_ROUND_MISMATCH", "Topic belongs to another registration round");
+        }
+        if (!TopicStatus.PUBLISHED.name().equals(newTopic.get("status"))
+                || newTopic.get("result_status") != null) {
+            throw conflict("TOPIC_NOT_PUBLISHED",
+                    "Only a published, outcome-free topic can take an orphaned group");
+        }
+        int maxGroups = ((Number) newTopic.get("max_groups")).intValue();
+        if (count("SELECT COUNT(*) FROM thesis.thesis_group WHERE topic_id = :topicId "
+                + "AND status <> 'CANCELLED' AND approval_status <> 'REJECTED'", "topicId", newTopicId) >= maxGroups) {
+            throw conflict("TOPIC_FULL", "This topic has reached its group limit");
+        }
+        jdbc.update("UPDATE thesis.thesis_group SET topic_id = :topicId, updated_at = CURRENT_TIMESTAMP, "
+                        + "version = version + 1 WHERE id = :groupId",
+                params().addValue("topicId", newTopicId).addValue("groupId", groupId));
+        audit.record(subject(actor), null, "THESIS_GROUP_TOPIC_REASSIGNED", "THESIS_GROUP", groupId.toString(),
+                "Orphaned group re-pointed to a live topic; reason: " + cleanReason,
+                Map.of("topicId", oldTopicId.toString()),
+                Map.of("topicId", newTopicId.toString()));
+        afterCommit(() -> {
+            if (notifier != null) {
+                notifier.notifyTopicAssigned(groupId, newTopicId);
             }
         });
         return groups.findById(groupId);

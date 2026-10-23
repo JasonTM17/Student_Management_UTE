@@ -13,6 +13,7 @@ import io.campuscore.restfulapi.thesis.web.ThesisMutationDtos.LateTopicRequest;
 import io.campuscore.restfulapi.thesis.web.ThesisMutationDtos.PublishResultsRequest;
 import io.campuscore.restfulapi.thesis.web.ThesisMutationDtos.RetractPublicationRequest;
 import io.campuscore.restfulapi.thesis.web.ThesisMutationDtos.RosterOverrideRequest;
+import io.campuscore.restfulapi.thesis.web.ThesisMutationDtos.TopicReassignRequest;
 import io.campuscore.restfulapi.thesis.web.ThesisMutationDtos.MemberRequest;
 import io.campuscore.restfulapi.thesis.web.ThesisMutationDtos.ProgressRequest;
 import io.campuscore.restfulapi.thesis.web.ThesisMutationDtos.PublishResultsPreviewResponse;
@@ -250,6 +251,20 @@ public class ThesisMutationController {
             @RequestBody RosterOverrideRequest request,
             @AuthenticationPrincipal Jwt actor) {
         return mutations.overrideGroupRoster(id, request, actor);
+    }
+
+    /**
+     * Re-points an approved group orphaned when governance withdrew its topic
+     * after registration closed; audited with a reason.
+     */
+    @Operation(summary = "Chuyển nhóm sang đề tài khác", description = "Chuyển nhóm đã duyệt bị mất đề tài do đề tài bị rút sau đóng đăng ký sang đề tài khác trong cùng đợt; ghi audit kèm lý do")
+    @PostMapping("/groups/{id}/topic-reassign")
+    @PreAuthorize("hasAnyRole('ADMIN','TRUONG_KHOA','SUPER_ADMIN')")
+    public GroupResponse reassignOrphanedTopic(
+            @Parameter(description = "Mã UUID của nhóm", required = true) @PathVariable UUID id,
+            @RequestBody TopicReassignRequest request,
+            @AuthenticationPrincipal Jwt actor) {
+        return mutations.reassignOrphanedTopic(id, request, actor);
     }
 
     /**

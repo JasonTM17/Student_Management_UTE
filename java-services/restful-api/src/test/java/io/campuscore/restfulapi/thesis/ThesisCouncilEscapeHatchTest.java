@@ -848,6 +848,104 @@ class ThesisCouncilEscapeHatchTest {
                 .isInstanceOf(DomainException.class);
     }
 
+    @Test
+    void withdrawnTopicOrphansApprovedGroupUntilAdminReassigns() throws Exception {
+        Instant now = Instant.now();
+        UUID roundId = insertRound("Esc Round Orphaned Group", "REGISTRATION_CLOSED",
+                now.plusSeconds(86_400), now.plusSeconds(5 * 86_400));
+        UUID withdrawnTopic = insertTopic(roundId, "Esc Orphan Source");
+        UUID targetTopic = insertTopic(roundId, "Esc Orphan Target");
+        UUID groupId = insertGroupWithMembers(roundId, withdrawnTopic, "esc-og", 3);
+
+        mutations.withdrawTopic(withdrawnTopic, "department pulled the topic", admin());
+
+        // The dead end: every existing group path refuses a REGISTRATION_CLOSED
+        // group — re-point needs the open window, reject needs a PENDING group,
+        // and member edits are frozen — so the approved roster sits excluded
+        // from publication with no way back to a live topic.
+        assertThatThrownBy(() -> mutations.assignTopic(groupId,
+                new io.campuscore.restfulapi.thesis.web.ThesisMutationDtos.TopicAssignmentRequest(targetTopic),
+                admin()))
+                .isInstanceOfSatisfying(DomainException.class,
+                        e -> assertThat(e.getCode()).isEqualTo("ROUND_CLOSED"));
+        assertThatThrownBy(() -> mutations.rejectGroup(groupId,
+                new io.campuscore.restfulapi.thesis.web.ThesisMutationDtos.GroupRejectionRequest("orphaned"),
+                admin()))
+                .isInstanceOfSatisfying(DomainException.class,
+                        e -> assertThat(e.getCode()).isEqualTo("GROUP_APPROVAL_STATE_CONFLICT"));
+        assertThatThrownBy(() -> mutations.removeMember(groupId, "esc-og-student-2", admin()))
+                .isInstanceOf(DomainException.class);
+
+        // The audited escape: re-point the group to a live topic in the same
+        // round, keeping its roster approval — post-close there is no path to
+        // re-approve, so a re-point that dropped approval would strand it again.
+        reassign(groupId, targetTopic, "esc-og-admin")
+                .andExpect(status().isOk());
+        assertThat(jdbc.queryForObject(
+                "SELECT topic_id FROM thesis.thesis_group WHERE id = ?", String.class, groupId))
+                .isEqualTo(targetTopic.toString());
+        assertThat(jdbc.queryForObject(
+                "SELECT approval_status FROM thesis.thesis_group WHERE id = ?", String.class, groupId))
+                .isEqualTo("APPROVED");
+        assertThat(auditCount(groupId.toString(), "THESIS_GROUP_TOPIC_REASSIGNED")).isEqualTo(1);
+    }
+
+    @Test
+    void topicReassignRefusesLiveTopicsScoredPairsAndForeignDeans() throws Exception {
+        Instant now = Instant.now();
+        UUID roundId = insertRound("Esc Round Reassign Guards", "REGISTRATION_CLOSED",
+                now.plusSeconds(86_400), now.plusSeconds(5 * 86_400));
+        UUID liveTopic = insertTopic(roundId, "Esc Reassign Live");
+        UUID otherTopic = insertTopic(roundId, "Esc Reassign Other");
+        UUID groupId = insertGroupWithMembers(roundId, liveTopic, "esc-rg", 3);
+
+        // Not orphaned: a live topic keeps its binding.
+        reassign(groupId, otherTopic, "esc-rg-admin")
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("GROUP_TOPIC_NOT_ORPHANED"));
+
+        // Withdrawn but scored: the binding is frozen by the verdict.
+        UUID scoredTopic = insertTopic(roundId, "Esc Reassign Scored");
+        UUID scoredGroup = insertGroupWithMembers(roundId, scoredTopic, "esc-rg2", 3);
+        UUID scoreCouncil = insertCouncil(roundId, "Esc Reassign Score Council");
+        jdbc.update("INSERT INTO thesis.thesis_topic_score (id, topic_id, council_id, lecturer_id, component, score, graded_at) "
+                + "VALUES (?, ?, ?, 'esc-rg-grader', 'DEFENSE', 7.0, CURRENT_TIMESTAMP)",
+                UUID.randomUUID(), scoredTopic, scoreCouncil);
+        mutations.withdrawTopic(scoredTopic, "withdrawn after a stray score", admin());
+        reassign(scoredGroup, otherTopic, "esc-rg-admin")
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("GROUP_SCORES_EXIST"));
+
+        // A foreign-faculty dean is concealed as not-found on the orphaned topic.
+        jdbc.update("INSERT INTO academic.\"Faculty\" (\"id\",\"name\",\"isActive\") "
+                + "VALUES ('esc-faculty-rg','Reassign faculty',TRUE)");
+        jdbc.update("INSERT INTO academic.\"Department\" (\"id\",\"name\",\"nameEn\",\"nameVi\",\"code\",\"facultyId\",\"isActive\") "
+                + "VALUES ('esc-department-rg','Reassign','Reassign','Reassign','RG','esc-faculty-rg',TRUE)");
+        jdbc.update("INSERT INTO campuscore_auth.\"User\" (\"id\", \"email\", \"password\", \"firstName\", \"lastName\", "
+                        + "\"status\", \"emailVerified\", \"isSuperAdmin\", \"failedLoginAttempts\", \"createdAt\", \"updatedAt\") "
+                        + "VALUES ('esc-user-rg-dean', 'esc-rg-dean@fixture.test', 'test-password', 'Esc', 'RgDean', "
+                        + "'ACTIVE', FALSE, FALSE, 0, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)");
+        jdbc.update("INSERT INTO campuscore_auth.\"Lecturer\" (\"id\",\"userId\",\"departmentId\",\"employeeId\",\"isActive\") "
+                + "VALUES ('esc-rg-dean','esc-user-rg-dean','esc-department-rg','GV-rg-dean',TRUE)");
+        UUID thirdTopic = insertTopic(roundId, "Esc Reassign Third");
+        UUID thirdGroup = insertGroupWithMembers(roundId, thirdTopic, "esc-rg3", 3);
+        mutations.withdrawTopic(thirdTopic, "gone", admin());
+        mvc.perform(post("/api/v1/thesis/groups/{id}/topic-reassign", thirdGroup)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"topicId\":\"" + otherTopic + "\",\"reason\":\"foreign dean\"}")
+                        .with(ThesisAuthorityFixture.role(jdbc, "esc-user-rg-dean", "TRUONG_KHOA")))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.code").value("TOPIC_NOT_FOUND"));
+    }
+
+    private org.springframework.test.web.servlet.ResultActions reassign(
+            UUID groupId, UUID targetTopicId, String adminSubject) throws Exception {
+        return mvc.perform(post("/api/v1/thesis/groups/{id}/topic-reassign", groupId)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"topicId\":\"" + targetTopicId + "\",\"reason\":\"orphan re-point\"}")
+                .with(ThesisAuthorityFixture.role(jdbc, adminSubject, "ADMIN")));
+    }
+
     // ---------- fixtures ----------
 
     private UUID insertGroupWithMembers(UUID roundId, UUID topicId, String tag, int memberCount) {
