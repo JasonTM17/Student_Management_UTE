@@ -43,13 +43,13 @@ class StudentPolicyCorrectionMigrationPostgresIT {
                            (SELECT jsonb_agg(to_jsonb(r) ORDER BY r.version)
                               FROM assistant.knowledge_document_revision r WHERE r.document_id=d.id) AS revisions
                       FROM assistant.knowledge_document d WHERE NOT (d.id=ANY(?::uuid[]))
-                    """, seeds.toArray(UUID[]::new));
+                    """, (Object) seeds.toArray(UUID[]::new));
             assertThat(runtimeContent(connection, V95_RELEASE, "catalog-attendance-policy-vi"))
                     .contains("vắng quá 80%");
             String v1Payloads = fingerprint(connection, """
                     SELECT document_id,version,locale,slug,title,content,source,priority,created_by,reviewed_by,domain
                       FROM assistant.knowledge_document_revision WHERE document_id=ANY(?::uuid[]) AND version=1
-                    """, seeds.toArray(UUID[]::new));
+                    """, (Object) seeds.toArray(UUID[]::new));
 
             fixture.migrate("96");
             assertForwardHistory(connection, fixture);
@@ -62,17 +62,17 @@ class StudentPolicyCorrectionMigrationPostgresIT {
             assertThat(count(connection, """
                     SELECT COUNT(*) FROM assistant.knowledge_document_revision
                      WHERE document_id=ANY(?::uuid[]) AND version=2 AND state='PUBLISHED'
-                    """, seeds.toArray(UUID[]::new))).isEqualTo(24);
+                    """, (Object) seeds.toArray(UUID[]::new))).isEqualTo(24);
             assertThat(fingerprint(connection, """
                     SELECT document_id,version,locale,slug,title,content,source,priority,created_by,reviewed_by,domain
                       FROM assistant.knowledge_document_revision WHERE document_id=ANY(?::uuid[]) AND version=1
-                    """, seeds.toArray(UUID[]::new))).isEqualTo(v1Payloads);
+                    """, (Object) seeds.toArray(UUID[]::new))).isEqualTo(v1Payloads);
             assertThat(fingerprint(connection, """
                     SELECT to_jsonb(d) AS document,
                            (SELECT jsonb_agg(to_jsonb(r) ORDER BY r.version)
                               FROM assistant.knowledge_document_revision r WHERE r.document_id=d.id) AS revisions
                       FROM assistant.knowledge_document d WHERE NOT (d.id=ANY(?::uuid[]))
-                    """, seeds.toArray(UUID[]::new))).isEqualTo(nonSeedAuthoring);
+                    """, (Object) seeds.toArray(UUID[]::new))).isEqualTo(nonSeedAuthoring);
             assertSourceAlignedPolicyCopy(connection);
             assertLatestPublishedProjection(connection, V96_RELEASE);
             String stableRelease = releaseFingerprint(connection, V96_RELEASE);
@@ -201,7 +201,7 @@ class StudentPolicyCorrectionMigrationPostgresIT {
             assertThat(count(observer, """
                     SELECT COUNT(*) FROM assistant.knowledge_document_revision
                      WHERE document_id=ANY(?::uuid[]) AND version=2 AND state='PUBLISHED'
-                    """, untouched)).isEqualTo(20);
+                    """, (Object) untouched)).isEqualTo(20);
             assertThat(activeRelease(observer)).isEqualTo(V96_RELEASE.toString());
             assertLatestPublishedProjection(observer, V96_RELEASE);
         }
