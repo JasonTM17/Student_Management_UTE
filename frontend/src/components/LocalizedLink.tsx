@@ -18,7 +18,8 @@ export const LocalizedLink = React.forwardRef<HTMLAnchorElement, LocalizedLinkPr
     const { href: localizeHref, isPrefixed } = useI18n();
 
     if (typeof href === 'string' && !isSafeInternalPath(href)) {
-      return <a ref={ref} {...props} />;
+      const { prefetch, replace, scroll, shallow, locale, onNavigate, ...anchorProps } = props;
+      return <a ref={ref} {...anchorProps} />;
     }
 
     const resolvedHref =
