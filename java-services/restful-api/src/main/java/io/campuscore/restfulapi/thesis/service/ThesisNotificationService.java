@@ -119,6 +119,9 @@ public class ThesisNotificationService {
             return 0;
         }
         String sourceKey = resultsSourceKey(roundId);
+        // A republish after a retraction retires the "retracted" notices too,
+        // or the inbox stacks a stale correction on the fresh publication.
+        notifications.deleteBySourceKey(resultsRetractedSourceKey(roundId));
         int sent = 0;
         List<String> includedIds = jdbc.queryForList(
                 "SELECT DISTINCT s.\"userId\" FROM thesis.thesis_group_member m"
@@ -159,16 +162,11 @@ public class ThesisNotificationService {
     /** Inbox recall for retracted publication, keyed by the producer tag. */
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public int recallResultsPublished(UUID roundId) {
-        int removed = notifications.deleteBySourceKey(resultsSourceKey(roundId));
-        // Rows fanned out before the source_key column existed carry no tag;
-        // match them by the exact title/link/round-name prefix they used.
-        removed += jdbc.update(
-                "DELETE FROM notifications.notification WHERE source_key IS NULL"
-                        + " AND title = 'Kết quả khóa luận đã công bố' AND link = :link"
-                        + " AND message LIKE :prefix ESCAPE '!'",
-                new MapSqlParameterSource("link", STUDENT_LINK)
-                        .addValue("prefix", "Kết quả đợt " + likeEscape(roundNameOf(roundId)) + "%"));
-        return removed;
+        // Only producer-tagged rows are recalled: round names are not unique,
+        // so matching untagged legacy rows by a name prefix could delete
+        // another round's notices. Rounds published before source_key existed
+        // predate the retraction window anyway.
+        return notifications.deleteBySourceKey(resultsSourceKey(roundId));
     }
 
     /** Correction notice after a retracted publication. */
@@ -188,7 +186,7 @@ public class ThesisNotificationService {
         return fanOut(userIds, "Kết quả khóa luận đã được thu hồi",
                 "Kết quả đợt " + roundName.trim()
                         + " đã được thu hồi để hiệu chỉnh và sẽ được công bố lại sau.",
-                "WARNING", STUDENT_LINK, "THESIS_RESULTS_RETRACTED:" + roundId);
+                "WARNING", STUDENT_LINK, resultsRetractedSourceKey(roundId));
     }
 
     /** Roster-override notice: every current member hears who governs the change. */
@@ -232,15 +230,15 @@ public class ThesisNotificationService {
         return "THESIS_RESULTS:" + roundId;
     }
 
+    private static String resultsRetractedSourceKey(UUID roundId) {
+        return "THESIS_RESULTS_RETRACTED:" + roundId;
+    }
+
     private String roundNameOf(UUID roundId) {
         List<String> names = jdbc.queryForList(
                 "SELECT name FROM thesis.thesis_registration_round WHERE id = :id",
                 new MapSqlParameterSource("id", roundId), String.class);
         return names.isEmpty() ? "" : names.getFirst();
-    }
-
-    private static String likeEscape(String value) {
-        return value.replace("!", "!!").replace("%", "!%").replace("_", "!_");
     }
 
     /**

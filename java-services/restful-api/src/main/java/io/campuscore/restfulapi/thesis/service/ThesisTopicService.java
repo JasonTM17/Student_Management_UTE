@@ -90,6 +90,17 @@ public class ThesisTopicService {
             String departmentId = ThesisDepartmentScope.departmentId(jdbc, actor);
             result = result.stream().filter(topic -> topic.getDepartmentId().equals(departmentId)).toList();
         }
+        // A withdrawn topic's outcome is masked for students, so listing it
+        // would offer a pick the assign path always refuses. Governance roles
+        // and lecturers keep full visibility (owners/supervisors/graders must
+        // still see it); students see only live topics.
+        if (!isAdmin(actor) && !ThesisDeanScope.isFacultyHead(actor)
+                && !ThesisDepartmentScope.isDepartmentHead(actor) && !isLecturer(actor)
+                && !result.isEmpty()) {
+            result = result.stream()
+                    .filter(topic -> !"WITHDRAWN".equals(topic.getResultStatus()))
+                    .toList();
+        }
         boolean published = isRoundResultsPublished(roundId);
         // One query for every topic the caller grades as a council member, so
         // the mask check below does not turn into per-topic round-trips.

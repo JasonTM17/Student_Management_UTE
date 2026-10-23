@@ -745,17 +745,20 @@ public class ThesisMutationService {
         // A sub-threshold counter-review while its window is still open is
         // provisional — the reviewer may overwrite — so it neither excludes
         // the topic nor blocks anything; the preview lists it separately.
+        // The inclusion predicate must match publishResults exactly: a NULL
+        // result_status makes the exclusion condition NULL, and NOT NULL is
+        // still NULL — so "included" is spelled as IS NULL OR NOT <cond>.
         Map<String, Object> scoring = jdbc.queryForMap(
-                "SELECT COUNT(*) FILTER (WHERE NOT excluded_condition) AS included_count, "
-                        + "COUNT(*) FILTER (WHERE t.final_score IS NULL AND NOT excluded_condition) AS ungraded_count "
-                        + "FROM (SELECT t.final_score, "
+                "SELECT COUNT(*) FILTER (WHERE s.result_status IS NULL OR NOT s.excluded_condition) AS included_count, "
+                        + "COUNT(*) FILTER (WHERE s.final_score IS NULL AND (s.result_status IS NULL OR NOT s.excluded_condition)) AS ungraded_count "
+                        + "FROM (SELECT t.final_score, t.result_status, "
                         + "  (t.result_status = 'WITHDRAWN' OR (t.result_status = 'REVIEW_FAILED' "
                         + "    AND r.gvpb_deadline IS NOT NULL AND r.gvpb_deadline <= CURRENT_TIMESTAMP)) "
                         + "  AS excluded_condition "
                         + "  FROM thesis.thesis_group g "
                         + "  JOIN thesis.thesis_topic t ON t.id = g.topic_id "
                         + "  JOIN thesis.thesis_registration_round r ON r.id = t.round_id "
-                        + "  WHERE g.round_id = :roundId AND g.approval_status = 'APPROVED') t",
+                        + "  WHERE g.round_id = :roundId AND g.approval_status = 'APPROVED') s",
                 params().addValue("roundId", roundId));
         List<PublishResultsExcludedTopic> excluded = excludedTopicsQuery(roundId, actor);
         List<PublishResultsExcludedTopic> openReview = jdbc.query(
@@ -986,14 +989,17 @@ public class ThesisMutationService {
         if (!"ADD".equals(action) && !"REMOVE".equals(action)) {
             throw invalid("action must be ADD or REMOVE");
         }
-        // Lock order matches the rest of the roster paths: round -> group ->
-        // student row. The group's round id is read unlocked first; the locks
-        // below take it in the shared order.
-        GroupResponse groupMeta = groups.findById(groupId);
-        requireRoundStatus(groupMeta.roundId(), RoundStatus.REGISTRATION_CLOSED);
+        // The group lock precedes the round lock to match the order every
+        // sibling group mutation uses (approve, update, assign, roster edits);
+        // the opposite order deadlocks under real Postgres row locks.
         GroupRow group = lockGroup(groupId);
-        if (!ThesisDeanScope.isGlobalAdmin(actor) && group.topicId() != null) {
-            ThesisDeanScope.requireTopicAccess(jdbc, actor, group.topicId());
+        requireRoundStatus(group.roundId(), RoundStatus.REGISTRATION_CLOSED);
+        // The dean must govern either the topic's department or (topicless
+        // groups only) a member's curriculum — identical to the sibling
+        // group-scope endpoints; a foreign dean otherwise reaches past their
+        // faculty through this escape hatch.
+        if (!isGroupAdmin(group, actor)) {
+            throw notFound("THESIS_GROUP_NOT_FOUND", "Thesis group not found");
         }
         Integer topicScores = jdbc.queryForObject(
                 "SELECT COUNT(*) FROM thesis.thesis_topic_score WHERE topic_id = :topicId",
@@ -1005,6 +1011,9 @@ public class ThesisMutationService {
         if ("REMOVE".equals(action)) {
             return removeOverriddenMember(group, request, actor, studentId, cleanReason);
         }
+        // A cancelled group has no roster to override: ADD must refuse it the
+        // same way REMOVE already does instead of inserting a dead row.
+        requireActiveRoster(group);
         int memberCount = count("SELECT COUNT(*) FROM thesis.thesis_group_member WHERE group_id = :groupId",
                 "groupId", groupId);
         if (memberCount >= MAX_GROUP_MEMBERS) {
@@ -1028,7 +1037,11 @@ public class ThesisMutationService {
                 params().addValue("id", UUID.randomUUID()).addValue("groupId", groupId)
                         .addValue("roundId", group.roundId()).addValue("studentId", studentId)
                         .addValue("memberOrder", nextMemberOrder(groupId)));
-        if (underSize) {
+        // The deferred membership validator only permits a size-exception
+        // marker on an APPROVED group; a PENDING/REJECTED group has no
+        // minimum, so its exception lives on the audit row alone — writing
+        // the marker would be rejected at commit time.
+        if (underSize && group.approvalStatus() == ApprovalStatus.APPROVED) {
             jdbc.update(
                     "UPDATE thesis.thesis_group SET size_exception_reason = :reason, size_exception_by = :by, "
                             + "size_exception_at = CURRENT_TIMESTAMP WHERE id = :groupId",
@@ -1141,11 +1154,10 @@ public class ThesisMutationService {
             throw invalid("topicId is required");
         }
         UUID newTopicId = request.topicId();
-        // Lock order matches the rest of the governance paths: round row,
-        // then the group, then the topic rows it binds.
-        GroupResponse groupMeta = groups.findById(groupId);
-        requireRoundStatus(groupMeta.roundId(), RoundStatus.REGISTRATION_CLOSED);
+        // The group lock precedes the round lock to match the order every
+        // sibling group mutation uses; the topic rows it binds come last.
         GroupRow group = lockGroup(groupId);
+        requireRoundStatus(group.roundId(), RoundStatus.REGISTRATION_CLOSED);
         requireActiveRoster(group);
         UUID oldTopicId = group.topicId();
         if (oldTopicId == null) {
@@ -1261,8 +1273,22 @@ public class ThesisMutationService {
                 Map.of("status", RoundStatus.REGISTRATION_CLOSED.name()));
         afterCommit(() -> {
             if (notifier != null) {
-                notifier.recallResultsPublished(id);
-                notifier.notifyResultsRetracted(id);
+                // The retraction already committed: a recall/notify failure
+                // here must not surface as a 500 — log it, mark the audit
+                // trail, and let the retract stand.
+                try {
+                    notifier.recallResultsPublished(id);
+                    notifier.notifyResultsRetracted(id);
+                } catch (RuntimeException exception) {
+                    log.warn("Thesis results retracted for round {} but the inbox recall/notice failed", id, exception);
+                    try {
+                        audit.record(subject(actor), null, "THESIS_RESULTS_RETRACT_NOTIFY_FAILED", "THESIS_ROUND",
+                                id.toString(),
+                                "Results were retracted but the inbox recall/notice failed post-commit");
+                    } catch (RuntimeException auditFailure) {
+                        log.warn("Audit write for the failed retract notice also failed for round {}", id, auditFailure);
+                    }
+                }
             }
         });
         return roundReads.get(id);
@@ -1884,13 +1910,18 @@ public class ThesisMutationService {
             // first so the downgrade leaves a review trail.
             throw conflict("GROUP_STATE_CONFLICT", "An approved group cannot change its topic");
         }
-        Map<String, Object> topic = one("SELECT id, round_id, status, max_groups, department_id, final_score FROM thesis.thesis_topic WHERE id = :id FOR UPDATE", params().addValue("id", topicId), "TOPIC_NOT_FOUND", "Thesis topic not found");
+        Map<String, Object> topic = one("SELECT id, round_id, status, max_groups, department_id, final_score, result_status FROM thesis.thesis_topic WHERE id = :id FOR UPDATE", params().addValue("id", topicId), "TOPIC_NOT_FOUND", "Thesis topic not found");
         ThesisDeanScope.requireTopicAccess(jdbc, actor, topicId);
         if (!group.roundId().equals(topic.get("round_id"))) {
             throw conflict("TOPIC_ROUND_MISMATCH", "Topic belongs to another registration round");
         }
         if (!TopicStatus.PUBLISHED.name().equals(topic.get("status")) && !TopicStatus.APPROVED.name().equals(topic.get("status"))) {
             throw conflict("TOPIC_NOT_PUBLISHED", "Only published topics can be selected");
+        }
+        // A withdrawn topic is excluded from the round by governance; binding
+        // another group to it would resurrect a dead pick.
+        if (ThesisReviewOutcome.WITHDRAWN.equals(topic.get("result_status"))) {
+            throw conflict("TOPIC_WITHDRAWN", "This topic has been withdrawn from the round");
         }
         // A finalized topic must not absorb a new group: the publication gate
         // counts every approved group under it as graded, so a late assignee
@@ -2014,14 +2045,18 @@ public class ThesisMutationService {
         if (group.status() != GroupStatus.SUBMITTED || group.topicId() == null) {
             throw conflict("GROUP_APPROVAL_STATE_CONFLICT", "Only a submitted group with a topic can be approved");
         }
+        // A withdrawn topic is excluded from the round by governance; a group
+        // still bound to it is orphaned and must be re-pointed, not approved.
+        Map<String, Object> boundTopic = one(
+                "SELECT final_score, result_status FROM thesis.thesis_topic WHERE id = :id",
+                params().addValue("id", group.topicId()), "TOPIC_NOT_FOUND", "Thesis topic not found");
+        if (ThesisReviewOutcome.WITHDRAWN.equals(boundTopic.get("result_status"))) {
+            throw conflict("TOPIC_WITHDRAWN", "This topic has been withdrawn from the round");
+        }
         // Approving a group under a topic whose defense score is already
         // finalized lets that group inherit a grade it never defended for —
         // the same wedge assignTopic blocks upstream.
-        Object finalizedScore = one(
-                "SELECT final_score FROM thesis.thesis_topic WHERE id = :id",
-                params().addValue("id", group.topicId()), "TOPIC_NOT_FOUND", "Thesis topic not found")
-                .get("final_score");
-        if (finalizedScore != null) {
+        if (boundTopic.get("final_score") != null) {
             throw conflict("TOPIC_ALREADY_GRADED",
                     "This topic's defense score is finalized; new groups can no longer be approved for it");
         }

@@ -57,6 +57,10 @@ class ThesisCouncilEscapeHatchTest {
     private ThesisCouncilService councils;
     @Autowired
     private ThesisMutationService mutations;
+    @Autowired
+    private io.campuscore.restfulapi.thesis.service.ThesisTopicService topicReads;
+    @org.springframework.test.context.bean.override.mockito.MockitoSpyBean
+    private io.campuscore.restfulapi.thesis.service.ThesisNotificationService notifier;
 
     @BeforeEach
     void cleanDatabase() {
@@ -692,8 +696,12 @@ class ThesisCouncilEscapeHatchTest {
         assertThat(added.memberStudentIds()).contains("esc-ro-new");
         assertThat(auditCount(groupId.toString(), "THESIS_GROUP_ROSTER_OVERRIDE")).isEqualTo(1);
 
-        // Below-minimum results need the explicit size exception flag.
+        // Below-minimum results need the explicit size exception flag. The
+        // fixture carries the marker a 1-member APPROVED roster requires on
+        // Postgres — the deferred validator would never persist it without.
         UUID smallGroup = insertGroupWithMembers(closed, topicId, "esc-ro2", 1);
+        jdbc.update("UPDATE thesis.thesis_group SET size_exception_reason = 'seeded below-minimum approval', "
+                + "size_exception_by = 'esc-admin', size_exception_at = CURRENT_TIMESTAMP WHERE id = ?", smallGroup);
         ensureStudent("esc-ro2-new");
         assertThatThrownBy(() -> mutations.overrideGroupRoster(smallGroup,
                 new io.campuscore.restfulapi.thesis.web.ThesisMutationDtos.RosterOverrideRequest(
@@ -1058,6 +1066,328 @@ class ThesisCouncilEscapeHatchTest {
                         + "WHERE group_id = ? AND is_leader AND student_id = 'esc-rl-student-2'",
                 Integer.class, groupId)).isEqualTo(1);
         assertThat(auditCount(groupId.toString(), "THESIS_GROUP_ROSTER_OVERRIDE")).isEqualTo(1);
+    }
+
+    @Test
+    void rosterOverrideRequiresDeanFacultyScopeOnTopiclessGroups() {
+        Instant now = Instant.now();
+        UUID closed = insertRound("Esc Round Roster Scope", "REGISTRATION_CLOSED",
+                now.plusSeconds(86_400), now.plusSeconds(5 * 86_400));
+        // A topicless group's faculty derives from its members' curriculum —
+        // the same rule the dean overview uses.
+        jdbc.update("INSERT INTO academic.\"Curriculum\" (\"id\", \"name\", \"departmentId\") "
+                + "SELECT 'curriculum-demo', 'Demo curriculum', 'department-demo' "
+                + "WHERE NOT EXISTS (SELECT 1 FROM academic.\"Curriculum\" WHERE \"id\" = 'curriculum-demo')");
+        UUID topicless = insertTopiclessGroup(closed, "esc-tl", 3);
+        ensureStudent("esc-tl-new");
+        ensureStudent("esc-tl-new2");
+
+        Jwt foreignDean = foreignDean();
+        assertThatThrownBy(() -> mutations.overrideGroupRoster(topicless,
+                new io.campuscore.restfulapi.thesis.web.ThesisMutationDtos.RosterOverrideRequest(
+                        "esc-tl-new", "foreign dean add", null), foreignDean))
+                .isInstanceOfSatisfying(DomainException.class,
+                        e -> assertThat(e.getCode()).isEqualTo("THESIS_GROUP_NOT_FOUND"));
+        assertThatThrownBy(() -> mutations.overrideGroupRoster(topicless,
+                new io.campuscore.restfulapi.thesis.web.ThesisMutationDtos.RosterOverrideRequest(
+                        "esc-tl-student-3", "REMOVE", "foreign dean remove", null, null), foreignDean))
+                .isInstanceOfSatisfying(DomainException.class,
+                        e -> assertThat(e.getCode()).isEqualTo("THESIS_GROUP_NOT_FOUND"));
+
+        // An in-faculty dean and a global admin both keep the hatch.
+        mutations.overrideGroupRoster(topicless,
+                new io.campuscore.restfulapi.thesis.web.ThesisMutationDtos.RosterOverrideRequest(
+                        "esc-tl-new", "own faculty add", null), facultyDean("esc-dean-se"));
+        assertThat(jdbc.queryForObject(
+                "SELECT COUNT(*) FROM thesis.thesis_group_member WHERE group_id = ? AND student_id = 'esc-tl-new'",
+                Integer.class, topicless)).isEqualTo(1);
+
+        // A cancelled roster is read-only for ADD exactly as for REMOVE.
+        UUID cancelled = insertTopiclessGroup(closed, "esc-tlc", 3);
+        jdbc.update("UPDATE thesis.thesis_group SET status = 'CANCELLED' WHERE id = ?", cancelled);
+        ensureStudent("esc-tlc-new");
+        assertThatThrownBy(() -> mutations.overrideGroupRoster(cancelled,
+                new io.campuscore.restfulapi.thesis.web.ThesisMutationDtos.RosterOverrideRequest(
+                        "esc-tlc-new", "add to cancelled", null), admin()))
+                .isInstanceOfSatisfying(DomainException.class,
+                        e -> assertThat(e.getCode()).isEqualTo("GROUP_STATE_CONFLICT"));
+
+        // A topic-bound group in the dean's own faculty still works.
+        UUID topicId = insertTopic(closed, "Esc Roster Scope Topic");
+        UUID topicGroup = insertGroupWithMembers(closed, topicId, "esc-td", 3);
+        ensureStudent("esc-td-new");
+        assertThatThrownBy(() -> mutations.overrideGroupRoster(topicGroup,
+                new io.campuscore.restfulapi.thesis.web.ThesisMutationDtos.RosterOverrideRequest(
+                        "esc-td-new", "foreign dean on topic group", null), foreignDean))
+                .isInstanceOfSatisfying(DomainException.class,
+                        e -> assertThat(e.getCode()).isEqualTo("THESIS_GROUP_NOT_FOUND"));
+    }
+
+    @Test
+    void rosterOverrideSizeExceptionMarkerStaysOnApprovedGroupsOnly() {
+        Instant now = Instant.now();
+        UUID closed = insertRound("Esc Round Marker Gate", "REGISTRATION_CLOSED",
+                now.plusSeconds(86_400), now.plusSeconds(5 * 86_400));
+        UUID topicId = insertTopic(closed, "Esc Marker Gate Topic");
+        // A 1-member PENDING group is a real state (PENDING has no roster
+        // minimum); the under-size ADD is audited but must not write the
+        // marker — Postgres' deferred validator would reject it at commit.
+        UUID pending = insertGroupWithMembers(closed, topicId, "esc-mg", 1);
+        jdbc.update("UPDATE thesis.thesis_group SET approval_status = 'PENDING' WHERE id = ?", pending);
+        ensureStudent("esc-mg-new");
+        mutations.overrideGroupRoster(pending,
+                new io.campuscore.restfulapi.thesis.web.ThesisMutationDtos.RosterOverrideRequest(
+                        "esc-mg-new", "kept under minimum", true), admin());
+        assertThat(jdbc.queryForObject(
+                "SELECT COUNT(*) FROM thesis.thesis_group_member WHERE group_id = ?",
+                Integer.class, pending)).isEqualTo(2);
+        assertThat(jdbc.queryForObject(
+                "SELECT size_exception_reason FROM thesis.thesis_group WHERE id = ?",
+                String.class, pending)).isNull();
+        assertThat(auditCount(pending.toString(), "THESIS_GROUP_ROSTER_OVERRIDE")).isEqualTo(1);
+    }
+
+    @Test
+    void councilUnassignAndMemberReplaceRespectTopicScope() {
+        Instant now = Instant.now();
+        UUID closed = insertRound("Esc Round Council Scope", "REGISTRATION_CLOSED",
+                now.plusSeconds(86_400), now.plusSeconds(5 * 86_400));
+        Jwt foreignDean = foreignDean();
+        UUID council = insertCouncil(closed, "Esc Mixed Council");
+        UUID ownTopic = insertTopic(closed, "Esc In-Faculty Topic");
+        UUID foreignTopic = insertTopic(closed, "Esc Foreign Topic");
+        jdbc.update("UPDATE thesis.thesis_topic SET department_id = 'esc-department-foreign' WHERE id = ?",
+                foreignTopic);
+        assignCouncilTopic(council, ownTopic);
+        assignCouncilTopic(council, foreignTopic);
+        seat(council, "esc-mc-outgoing", "MEMBER");
+        ensureLecturer("esc-mc-incoming");
+
+        Jwt dean = facultyDean("esc-dean-se");
+        // The council-level check admits the dean on one in-faculty topic, so
+        // the unassign must still scope the specific topic being detached.
+        assertThatThrownBy(() -> councils.unassignTopic(council, foreignTopic, "release", dean))
+                .isInstanceOfSatisfying(DomainException.class,
+                        e -> assertThat(e.getCode()).isEqualTo("TOPIC_NOT_FOUND"));
+        // A member swap on a mixed council needs every topic in scope.
+        assertThatThrownBy(() -> councils.replaceMember(council, "esc-mc-outgoing", "esc-mc-incoming",
+                "seat swap", dean))
+                .isInstanceOfSatisfying(DomainException.class,
+                        e -> assertThat(e.getCode()).isEqualTo("TOPIC_NOT_FOUND"));
+        // In-faculty topics still move; an all-own-faculty council can be staffed.
+        councils.unassignTopic(council, ownTopic, "release", dean);
+        councils.unassignTopic(council, foreignTopic, "admin release", admin());
+        assignCouncilTopic(council, ownTopic);
+        councils.replaceMember(council, "esc-mc-outgoing", "esc-mc-incoming", "seat swap", dean);
+        assertThat(jdbc.queryForObject(
+                "SELECT COUNT(*) FROM thesis.thesis_council_member WHERE council_id = ? AND lecturer_id = 'esc-mc-incoming'",
+                Integer.class, council)).isEqualTo(1);
+        // A foreign dean is refused the council entirely.
+        assertThatThrownBy(() -> councils.replaceMember(council, "esc-mc-incoming", "esc-mc-outgoing",
+                "foreign seat swap", foreignDean))
+                .isInstanceOf(DomainException.class);
+        // An admin still succeeds.
+        councils.replaceMember(council, "esc-mc-incoming", "esc-mc-outgoing", "admin swap", admin());
+    }
+
+    @Test
+    void withdrawnTopicCannotBeAssignedApprovedOrListed() {
+        Instant now = Instant.now();
+        UUID open = insertRound("Esc Round Withdrawn Pick", "REGISTRATION_OPEN",
+                now.plusSeconds(86_400), now.plusSeconds(5 * 86_400));
+        // assignTopic requires the registration window to be live.
+        jdbc.update("UPDATE thesis.thesis_registration_round "
+                + "SET registration_start = ?, registration_end = ? WHERE id = ?",
+                Timestamp.from(now.minusSeconds(3_600)), Timestamp.from(now.plusSeconds(86_400)), open);
+        UUID withdrawn = insertTopic(open, "Esc Withdrawn Pick");
+        UUID live = insertTopic(open, "Esc Live Pick");
+        jdbc.update("UPDATE thesis.thesis_topic SET result_status = 'WITHDRAWN' WHERE id = ?", withdrawn);
+        UUID picking = insertTopiclessGroup(open, "esc-wp", 3);
+        // An approved group cannot change its topic; keep this one pending so
+        // the topic check itself is what fires.
+        jdbc.update("UPDATE thesis.thesis_group SET approval_status = 'PENDING' WHERE id = ?", picking);
+
+        assertThatThrownBy(() -> mutations.assignTopic(picking,
+                new io.campuscore.restfulapi.thesis.web.ThesisMutationDtos.TopicAssignmentRequest(withdrawn),
+                admin()))
+                .isInstanceOfSatisfying(DomainException.class,
+                        e -> assertThat(e.getCode()).isEqualTo("TOPIC_WITHDRAWN"));
+        // The live topic still binds.
+        mutations.assignTopic(picking,
+                new io.campuscore.restfulapi.thesis.web.ThesisMutationDtos.TopicAssignmentRequest(live),
+                admin());
+
+        // A group that still points at a withdrawn topic is orphaned — the
+        // approval path must refuse it too.
+        UUID closed = insertRound("Esc Round Withdrawn Approve", "REGISTRATION_CLOSED",
+                now.plusSeconds(86_400), now.plusSeconds(5 * 86_400));
+        UUID orphanTopic = insertTopic(closed, "Esc Withdrawn Bound");
+        UUID orphan = insertGroupWithMembers(closed, orphanTopic, "esc-wa", 3);
+        jdbc.update("UPDATE thesis.thesis_group SET approval_status = 'PENDING' WHERE id = ?", orphan);
+        jdbc.update("UPDATE thesis.thesis_topic SET result_status = 'WITHDRAWN' WHERE id = ?", orphanTopic);
+        assertThatThrownBy(() -> mutations.approveGroup(orphan, admin()))
+                .isInstanceOfSatisfying(DomainException.class,
+                        e -> assertThat(e.getCode()).isEqualTo("TOPIC_WITHDRAWN"));
+
+        // The student topic list hides the dead pick; the live topic stays.
+        Jwt student = Jwt.withTokenValue("escape-fixture").header("alg", "none")
+                .subject("esc-wp-student").claim("roles", List.of("STUDENT")).build();
+        var listed = topicReads.list(open, null, student);
+        assertThat(listed.stream().map(t -> t.id()).toList())
+                .contains(live).doesNotContain(withdrawn);
+    }
+
+    @Test
+    void publishPreviewCountsNullOutcomeTopicsAsIncluded() {
+        Instant now = Instant.now();
+        UUID roundId = insertRound("Esc Round Preview Parity", "REGISTRATION_CLOSED",
+                now.plusSeconds(86_400), now.plusSeconds(5 * 86_400));
+        // Ten approved groups on ungraded topics with NULL result_status: the
+        // publish predicate treats them as included, so the preview must too.
+        for (int index = 1; index <= 10; index++) {
+            insertApprovedGroup(roundId, insertTopic(roundId, "Esc Preview Topic " + index), "esc-pv" + index);
+        }
+        var preview = mutations.publishResultsPreview(roundId, admin());
+        assertThat(preview.approvedGroupCount()).isEqualTo(10);
+        assertThat(preview.includedGroupCount()).isEqualTo(10);
+        // Publish agrees: every included group is ungraded, which is the
+        // completeness failure — proving both sides counted the same 10.
+        assertThatThrownBy(() -> mutations.publishResults(roundId, admin()))
+                .isInstanceOfSatisfying(DomainException.class,
+                        e -> assertThat(e.getCode()).isEqualTo("RESULTS_NOT_READY"));
+
+        // Grading all ten lets the round publish while a withdrawn topic
+        // stays excluded on both sides.
+        jdbc.update("UPDATE thesis.thesis_topic SET final_score = 8.0, "
+                + "final_score_finalized_by = 'esc-chair', final_score_finalized_at = CURRENT_TIMESTAMP "
+                + "WHERE round_id = ?", roundId);
+        UUID withdrawnTopic = insertTopic(roundId, "Esc Preview Withdrawn");
+        insertApprovedGroup(roundId, withdrawnTopic, "esc-pvw");
+        jdbc.update("UPDATE thesis.thesis_topic SET result_status = 'WITHDRAWN' WHERE id = ?", withdrawnTopic);
+        preview = mutations.publishResultsPreview(roundId, admin());
+        assertThat(preview.approvedGroupCount()).isEqualTo(11);
+        assertThat(preview.includedGroupCount()).isEqualTo(10);
+        assertThat(preview.excludedTopics()).hasSize(1);
+        mutations.publishResults(roundId, admin());
+        assertThat(jdbc.queryForObject(
+                "SELECT status FROM thesis.thesis_registration_round WHERE id = ?",
+                String.class, roundId)).isEqualTo("RESULTS_PUBLISHED");
+    }
+
+    @Test
+    void retractRecallStaysSourceKeyedAndRepublishClearsCorrectionNotices() {
+        Instant now = Instant.now();
+        // Prefix-related round names: a name-prefix recall on one round must
+        // never touch another round's inbox rows.
+        UUID sharedA = insertRound("Esc Shared", "REGISTRATION_CLOSED",
+                now.plusSeconds(86_400), now.plusSeconds(5 * 86_400));
+        UUID topicA = insertTopic(sharedA, "Esc Shared Topic");
+        insertApprovedGroup(sharedA, topicA, "esc-sh");
+        // The notify join needs real student rows for the fixture members.
+        for (int member = 1; member <= 3; member++) {
+            ensureStudent("esc-sh-student-" + member);
+        }
+        jdbc.update("UPDATE thesis.thesis_topic SET final_score = 8.0, "
+                + "final_score_finalized_by = 'esc-chair', final_score_finalized_at = CURRENT_TIMESTAMP "
+                + "WHERE id = ?", topicA);
+        mutations.publishResults(sharedA, null, admin());
+        // An untagged legacy-looking row whose message matches the round-name
+        // prefix used to be deleted by the recall even when it belonged to a
+        // different round's publication.
+        jdbc.update("INSERT INTO notifications.notification "
+                + "(id, user_id, title, message, type, link, source_key, is_read, created_at, updated_at) "
+                + "VALUES ('esc-sh-legacy', 'esc-user-1', 'Kết quả khóa luận đã công bố', "
+                + "'Kết quả đợt Esc Shared đã công bố khác', 'SUCCESS', '/dashboard/thesis', NULL, FALSE, "
+                + "CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)");
+        mutations.retractResults(sharedA,
+                new io.campuscore.restfulapi.thesis.web.ThesisMutationDtos
+                        .RetractPublicationRequest("correct and republish", "RETRACT"),
+                admin());
+        assertThat(jdbc.queryForObject(
+                "SELECT COUNT(*) FROM notifications.notification WHERE id = 'esc-sh-legacy'",
+                Integer.class)).isEqualTo(1);
+        // The retraction notice went out tagged for this round.
+        assertThat(jdbc.queryForObject(
+                "SELECT COUNT(*) FROM notifications.notification WHERE source_key = 'THESIS_RESULTS_RETRACTED:' || ?",
+                Integer.class, sharedA.toString())).isGreaterThan(0);
+
+        // Republish clears the stale correction notices — no stacking.
+        mutations.publishResults(sharedA, null, admin());
+        assertThat(jdbc.queryForObject(
+                "SELECT COUNT(*) FROM notifications.notification WHERE source_key = 'THESIS_RESULTS_RETRACTED:' || ?",
+                Integer.class, sharedA.toString())).isZero();
+
+        // A failed post-commit recall/notice must not fail the retract: when
+        // the notifier blows up after the transition commits, the retract
+        // still stands and the failure lands on the audit trail.
+        UUID broken = insertRound("Esc Broken Notify", "REGISTRATION_CLOSED",
+                now.plusSeconds(86_400), now.plusSeconds(5 * 86_400));
+        UUID brokenTopic = insertTopic(broken, "Esc Broken Topic");
+        insertApprovedGroup(broken, brokenTopic, "esc-bn");
+        for (int member = 1; member <= 3; member++) {
+            ensureStudent("esc-bn-student-" + member);
+        }
+        jdbc.update("UPDATE thesis.thesis_topic SET final_score = 8.0, "
+                + "final_score_finalized_by = 'esc-chair', final_score_finalized_at = CURRENT_TIMESTAMP "
+                + "WHERE id = ?", brokenTopic);
+        mutations.publishResults(broken, null, admin());
+        org.mockito.Mockito.doThrow(new IllegalStateException("inbox is down"))
+                .when(notifier).recallResultsPublished(org.mockito.ArgumentMatchers.any());
+        try {
+            mutations.retractResults(broken,
+                    new io.campuscore.restfulapi.thesis.web.ThesisMutationDtos
+                            .RetractPublicationRequest("inbox is down", "RETRACT"),
+                    admin());
+        } finally {
+            org.mockito.Mockito.reset(notifier);
+        }
+        assertThat(jdbc.queryForObject(
+                "SELECT status FROM thesis.thesis_registration_round WHERE id = ?",
+                String.class, broken)).isEqualTo("REGISTRATION_CLOSED");
+        assertThat(auditCount(broken.toString(), "THESIS_RESULTS_RETRACT_NOTIFY_FAILED")).isEqualTo(1);
+    }
+
+    private UUID insertTopiclessGroup(UUID roundId, String tag, int memberCount) {
+        UUID groupId = UUID.randomUUID();
+        jdbc.update("INSERT INTO thesis.thesis_group "
+                        + "(id, round_id, leader_student_id, topic_id, status, approval_status) "
+                        + "VALUES (?, ?, ?, NULL, 'SUBMITTED', 'APPROVED')",
+                groupId, roundId, tag + "-leader");
+        for (int order = 1; order <= memberCount; order++) {
+            ensureStudent(tag + "-student-" + order);
+            jdbc.update("INSERT INTO thesis.thesis_group_member "
+                            + "(id, group_id, round_id, student_id, member_order, is_leader) "
+                            + "VALUES (?, ?, ?, ?, ?, ?)",
+                    UUID.randomUUID(), groupId, roundId, tag + "-student-" + order, order, order == 1);
+        }
+        return groupId;
+    }
+
+    /** A TRUONG_KHOA bound to a faculty other than the fixture's. */
+    private Jwt foreignDean() {
+        jdbc.update("INSERT INTO academic.\"Faculty\" (\"id\",\"name\",\"isActive\") "
+                + "VALUES ('esc-faculty-foreign','Foreign faculty',TRUE)");
+        jdbc.update("INSERT INTO academic.\"Department\" (\"id\",\"name\",\"nameEn\",\"nameVi\",\"code\",\"facultyId\",\"isActive\") "
+                + "VALUES ('esc-department-foreign','Foreign','Foreign','Foreign','FR','esc-faculty-foreign',TRUE)");
+        jdbc.update("INSERT INTO campuscore_auth.\"User\" (\"id\", \"email\", \"password\", \"firstName\", \"lastName\", "
+                + "\"status\", \"emailVerified\", \"isSuperAdmin\", \"failedLoginAttempts\", \"createdAt\", \"updatedAt\") "
+                + "VALUES ('esc-user-fdean', 'esc-fdean@fixture.test', 'test-password', 'Esc', 'FDean', 'ACTIVE', "
+                + "FALSE, FALSE, 0, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)");
+        jdbc.update("INSERT INTO campuscore_auth.\"Lecturer\" (\"id\",\"userId\",\"departmentId\",\"employeeId\",\"isActive\") "
+                + "VALUES ('esc-fdean','esc-user-fdean','esc-department-foreign','GV-fdean',TRUE)");
+        return Jwt.withTokenValue("escape-fixture").header("alg", "none")
+                .subject("esc-user-fdean")
+                .claim("roles", List.of("TRUONG_KHOA"))
+                .claim("lecturerId", "esc-fdean").build();
+    }
+
+    /** A TRUONG_KHOA whose lecturer profile sits in the fixture faculty. */
+    private Jwt facultyDean(String lecturerId) {
+        ensureLecturer(lecturerId);
+        return Jwt.withTokenValue("escape-fixture").header("alg", "none")
+                .subject("esc-user-" + lecturerId)
+                .claim("roles", List.of("TRUONG_KHOA"))
+                .claim("lecturerId", lecturerId).build();
     }
 
     private org.springframework.test.web.servlet.ResultActions rosterOverride(
