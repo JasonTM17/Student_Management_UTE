@@ -450,6 +450,24 @@ public class ThesisCouncilService {
     }
 
     /**
+     * A dean may only act on a council whose every assigned topic sits inside
+     * their topic-level scope. {@link #requireCouncilGovernanceAccess} admits a
+     * dean on a single in-faculty topic, so writes that affect the whole
+     * council — member swaps on a mixed panel — need every topic checked.
+     */
+    private void requireAllCouncilTopicsInScope(UUID councilId, Jwt actor) {
+        if (ThesisDeanScope.isGlobalAdmin(actor) || !ThesisDeanScope.isFacultyHead(actor)) {
+            return;
+        }
+        List<UUID> assigned = jdbc.queryForList(
+                "SELECT topic_id FROM thesis.thesis_council_topic WHERE council_id = :councilId",
+                params().addValue("councilId", councilId), UUID.class);
+        for (UUID assignedTopic : assigned) {
+            ThesisDeanScope.requireTopicAccess(jdbc, actor, assignedTopic);
+        }
+    }
+
+    /**
      * Defense scores belong to a defended group, so a topic without at least
      * one approved group cannot be graded or finalized — otherwise a council
      * could pre-bake a final score that the group inherits the moment it is
@@ -1033,6 +1051,10 @@ public class ThesisCouncilService {
             throw invalid("topicId is required");
         }
         lockTopic(topicId);
+        // The council-level check admits a dean on a single in-faculty topic;
+        // detaching still needs the topic's own scope check so a mixed council
+        // cannot release foreign topics.
+        ThesisDeanScope.requireTopicAccess(jdbc, actor, topicId);
         if (!councilHasTopic(councilId, topicId)) {
             throw conflict("TOPIC_NOT_ASSIGNED", "This council has not been assigned the topic");
         }
@@ -1096,6 +1118,11 @@ public class ThesisCouncilService {
         }
         lockMutableCouncilRound(councilId);
         lockCouncil(councilId);
+        // A dean staffing a council must govern every topic it grades: the
+        // council-level check passes on a single in-faculty topic, so a mixed
+        // council needs the per-topic check to keep a foreign grading panel
+        // out of a foreign dean's reach.
+        requireAllCouncilTopicsInScope(councilId, actor);
         Map<String, Object> seat = jdbc.query(
                 "SELECT lecturer_id, member_role FROM thesis.thesis_council_member "
                         + "WHERE council_id = :councilId AND lecturer_id = :lecturerId",
