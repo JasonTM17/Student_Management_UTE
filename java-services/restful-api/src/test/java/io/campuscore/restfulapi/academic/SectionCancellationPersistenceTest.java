@@ -574,6 +574,47 @@ class SectionCancellationPersistenceTest {
     }
 
     @Test
+    void reopeningEvaluatesTheCapAgainstTheCurrentlyOpenRound() throws Exception {
+        // Move the reopened section off the shared slot so the only possible
+        // conflict is the credit cap, then let the student spend the freed
+        // seat elsewhere while the section is cancelled.
+        jdbc.update("UPDATE \"academic\".\"SectionSchedule\" SET \"dayOfWeek\" = 4, \"classroomId\" = 'room-1'"
+                + " WHERE \"sectionId\" = 'section-open'");
+        mvc.perform(post("/api/v1/enrollments/enroll")
+                        .with(studentJwt())
+                        .header("Idempotency-Key", "cap-round-enroll")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"sectionId\":\"section-open\"}"))
+                .andExpect(status().isOk());
+        cancelSection("section-open");
+        mvc.perform(post("/api/v1/enrollments/enroll")
+                        .with(studentJwt())
+                        .header("Idempotency-Key", "cap-round-moved")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"sectionId\":\"section-overlap\"}"))
+                .andExpect(status().isOk());
+
+        // The round the preserved enrollment was written under has since
+        // closed, and its configured cap could no longer host both courses —
+        // but the student won an approved limit under the round that is open
+        // now, the same one an enroll attempt would evaluate.
+        jdbc.update("UPDATE \"academic\".\"RegistrationRound\" SET \"creditLimit\" = 4, \"status\" = 'CLOSED'"
+                + " WHERE \"id\" = 'round-open'");
+        jdbc.update("INSERT INTO \"academic\".\"CreditLimitApplication\""
+                + " (\"id\", \"studentId\", \"semesterId\", \"roundId\", \"requestedLimit\", \"reason\", \"status\","
+                + " \"reviewedBy\", \"reviewedAt\")"
+                + " VALUES ('cap-app-1', 'student-1', 'semester-1', 'round-add-drop', 30,"
+                + " 'documented overload', 'APPROVED', 'admin-1', CURRENT_TIMESTAMP)");
+
+        mvc.perform(put("/api/v1/sections/section-open")
+                        .with(adminJwt())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"status\":\"OPEN\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("OPEN"));
+    }
+
+    @Test
     void enrollIsRejectedWhileSemesterIsClosed() throws Exception {
         // The semester lifecycle, not only the round row, gates registration:
         // a CLOSED semester must refuse enroll even while a round stays OPEN.

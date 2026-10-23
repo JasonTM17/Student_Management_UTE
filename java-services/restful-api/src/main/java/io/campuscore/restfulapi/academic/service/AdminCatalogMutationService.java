@@ -35,6 +35,7 @@ public class AdminCatalogMutationService {
     private static final String SECTION_SCHEDULE = "\"academic\".\"SectionSchedule\"";
     private static final String ENROLLMENT = "\"academic\".\"Enrollment\"";
     private static final String SLIP = "\"academic\".\"RegistrationSlip\"";
+    private static final String STUDENT = "\"academic\".\"Student\"";
     /** Section.lecturerId joins the academic profile table (the auth schema exposes it as a view). */
     private static final String LECTURER = "\"academic\".\"Lecturer\"";
     /** Statuses the academic services and the admin console understand. */
@@ -264,6 +265,21 @@ public class AdminCatalogMutationService {
                 throw problem(HttpStatus.BAD_REQUEST, "INVALID_CAPACITY", "Classroom capacity must be at least 1");
             }
         }
+        // Reopening a cancelled section must serialize with concurrent
+        // enrolls: without these locks an enroll could commit between the
+        // conflict scan and this transaction's commit, leaving the student
+        // over the cap with no acknowledgement on the audit trail. Take the
+        // enroll path's Student FOR UPDATE first, in id order and BEFORE the
+        // section write — the global Student -> Section -> Round order.
+        // Taking them after the update would invert against
+        // retire-on-re-enroll, which holds the student and then updates this
+        // section's rows.
+        boolean reopening = SECTION.equals(table) && before != null
+                && "CANCELLED".equals(before.get("status"))
+                && input.containsKey("status") && !"CANCELLED".equals(input.get("status"));
+        if (reopening) {
+            lockReopenAffectedStudents(id);
+        }
         MapSqlParameterSource parameters = new MapSqlParameterSource("id", id);
         StringBuilder sql = new StringBuilder("UPDATE ").append(table).append(" SET ");
         boolean replacesSchedules = SECTION.equals(table) && input.containsKey("schedules");
@@ -311,7 +327,6 @@ public class AdminCatalogMutationService {
         if (SECTION.equals(table) && input.containsKey("status") && before != null) {
             boolean cancelled = "CANCELLED".equals(before.get("status"));
             boolean cancelling = !cancelled && "CANCELLED".equals(input.get("status"));
-            boolean reopening = cancelled && !"CANCELLED".equals(input.get("status"));
             if (reopening) {
                 // The cancelled section released its room/lecturer slots, so a
                 // reopen must not silently restore a slot another section now
@@ -542,6 +557,13 @@ public class AdminCatalogMutationService {
                         + " WHERE e.\"sectionId\" = :sectionId"
                         + " AND e.\"status\" IN ('ENROLLED', 'PENDING', 'CONFIRMED')",
                 new MapSqlParameterSource("sectionId", sectionId));
+        // The cap an enroll attempt would face NOW: the currently open,
+        // in-window round for the section's semester. Evaluating against the
+        // round each preserved enrollment came from misses credit-limit
+        // approvals granted on the later round — and applies a stale closed
+        // window's standard limit besides.
+        Map<String, Object> currentRound = affected.isEmpty() ? null
+                : currentRoundOrNull(String.valueOf(affected.get(0).get("semester_id")));
         List<Map<String, Object>> conflicts = new java.util.ArrayList<>();
         for (Map<String, Object> row : affected) {
             String studentId = String.valueOf(row.get("student_id"));
@@ -562,7 +584,9 @@ public class AdminCatalogMutationService {
                             .addValue("semesterId", semesterId)
                             .addValue("sectionId", sectionId),
                     Integer.class);
-            int limit = effectiveLimit(studentId, row.get("round_id"));
+            int limit = currentRound == null
+                    ? effectiveLimit(studentId, row.get("round_id"))
+                    : creditLimitApplications.effectiveLimit(studentId, currentRound);
             int other = otherCredits == null ? 0 : otherCredits;
             if (other + courseCredits > limit) {
                 details.add("CREDIT_CAP");
@@ -597,7 +621,54 @@ public class AdminCatalogMutationService {
         return conflicts;
     }
 
-    /** Effective credit cap for the round the preserved enrollment came from, else the standard limit. */
+    /**
+     * Locks every student still registered on the cancelled section under the
+     * same FOR UPDATE the enroll path takes first, in ascending id order, so
+     * a concurrent enroll serializes fully before the conflict scan or fully
+     * after this transaction commits. The sorted order also keeps two
+     * reopens, or a reopen and a retire-on-re-enroll, from inverting on each
+     * other.
+     */
+    private void lockReopenAffectedStudents(String sectionId) {
+        List<String> studentIds = jdbc.queryForList(
+                "SELECT DISTINCT e.\"studentId\" FROM " + ENROLLMENT + " e"
+                        + " WHERE e.\"sectionId\" = :sectionId"
+                        + " AND e.\"status\" IN ('ENROLLED', 'PENDING', 'CONFIRMED')"
+                        + " ORDER BY e.\"studentId\"",
+                new MapSqlParameterSource("sectionId", sectionId), String.class);
+        if (studentIds.isEmpty()) {
+            return;
+        }
+        jdbc.queryForList(
+                "SELECT \"id\" FROM " + STUDENT + " WHERE \"id\" IN (:studentIds)"
+                        + " ORDER BY \"id\" FOR UPDATE",
+                new MapSqlParameterSource("studentIds", studentIds), String.class);
+    }
+
+    /**
+     * The round an enroll would be judged under right now — OPEN status and
+     * inside its window, REGISTRATION preferred with the same ADD_DROP
+     * fallback the enroll path uses — or null when no window is open.
+     */
+    private Map<String, Object> currentRoundOrNull(String semesterId) {
+        List<Map<String, Object>> rounds = jdbc.queryForList(
+                "SELECT \"id\", \"kind\", \"creditLimit\" AS credit_limit"
+                        + " FROM \"academic\".\"RegistrationRound\""
+                        + " WHERE \"semesterId\" = :semesterId AND \"status\" = 'OPEN'"
+                        + " AND \"windowStart\" <= CURRENT_TIMESTAMP AND \"windowEnd\" >= CURRENT_TIMESTAMP"
+                        + " ORDER BY \"windowStart\"",
+                new MapSqlParameterSource("semesterId", semesterId));
+        for (String kind : List.of("REGISTRATION", "ADD_DROP")) {
+            for (Map<String, Object> round : rounds) {
+                if (kind.equals(String.valueOf(round.get("kind")))) {
+                    return round;
+                }
+            }
+        }
+        return null;
+    }
+
+    /** Cap from the enrollment's original round — fallback when no round window is open at reopen. */
     private int effectiveLimit(String studentId, Object roundId) {
         Integer configured = null;
         if (roundId != null) {

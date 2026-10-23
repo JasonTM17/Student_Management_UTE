@@ -43,6 +43,8 @@ class SectionReopenConflictPostgresIT {
 
     private static final String SECTION_TABLE = "\"academic\".\"Section\"";
     private static final String WORKER_NAME = "src-slip-worker";
+    private static final String REOPEN_NAME = "it-reopen-worker";
+    private static final String ENROLL_NAME = "it-enroll-worker";
 
     @Autowired private RegistrationService registration;
     @Autowired private AdminCatalogMutationService catalog;
@@ -268,6 +270,316 @@ class SectionReopenConflictPostgresIT {
         };
         doAnswer(pause).when(namedJdbc).queryForList(anyString(), any(SqlParameterSource.class));
         doAnswer(pause).when(namedJdbc).update(anyString(), any(SqlParameterSource.class));
+    }
+
+    /**
+     * The reopen's conflict scan must evaluate the same registration set the
+     * enroll path publishes under the Student FOR UPDATE. Parking the reopen
+     * after its scan but before commit used to leave a window where a
+     * concurrent enroll committed unseen: the student ended over the cap with
+     * no acknowledgement on the audit trail. With the affected student rows
+     * locked before the section write, the enroll serializes behind the
+     * reopen and is then refused by the very cap it would have skipped.
+     */
+    @Test
+    void enrollQueuedBehindAnUncommittedReopenCannotEscapeTheCap() throws Exception {
+        AcademicEnrollmentPostgresFixture fixture = AcademicEnrollmentPostgresFixture.seed(jdbc, 30);
+        String student = fixture.seedStudent(1);
+        String cancelled = fixture.sectionId;
+        String otherSection = otherCourseSection(fixture, "ra");
+
+        registration.enroll(student, cancelled, List.of("STUDENT"), "it-ra-" + cancelled);
+        catalog.update(SECTION_TABLE, cancelled, Map.of("status", "CANCELLED"));
+        jdbc.update("UPDATE academic.\"RegistrationRound\" SET \"creditLimit\" = 3 WHERE \"id\" = :id",
+                new MapSqlParameterSource("id", fixture.roundId));
+
+        CountDownLatch reopenPaused = new CountDownLatch(1);
+        CountDownLatch reopenResume = new CountDownLatch(1);
+        barrierReopenAtSlipDelete(reopenPaused, reopenResume);
+        var pool = Executors.newFixedThreadPool(2);
+        try {
+            var reopen = pool.submit(() -> {
+                Thread.currentThread().setName(REOPEN_NAME);
+                try {
+                    catalog.update(SECTION_TABLE, cancelled, Map.of("status", "OPEN"));
+                    return "REOPENED";
+                } catch (RuntimeException failure) {
+                    return failure;
+                }
+            });
+            assertThat(reopenPaused.await(10, TimeUnit.SECONDS))
+                    .as("reopen parked at the slip delete still holding its locks").isTrue();
+            var enroll = pool.submit(() -> {
+                Thread.currentThread().setName(ENROLL_NAME);
+                try {
+                    registration.enroll(student, otherSection, List.of("STUDENT"), "it-ra-enroll");
+                    return "ENROLLED";
+                } catch (RuntimeException failure) {
+                    return failure;
+                }
+            });
+            // The enroll must wait on the student's row lock until the reopen
+            // commits; before the locks it committed inside ~10ms.
+            try {
+                Object early = enroll.get(3, TimeUnit.SECONDS);
+                throw new AssertionError(
+                        "enroll committed while the reopen still held the student lock: " + early);
+            } catch (java.util.concurrent.TimeoutException blocked) {
+                // queued on the Student row lock — the serialized order
+            }
+            reopenResume.countDown();
+            assertThat(reopen.get(30, TimeUnit.SECONDS)).isEqualTo("REOPENED");
+            Object enrollOutcome = enroll.get(30, TimeUnit.SECONDS);
+            assertThat(enrollOutcome).isInstanceOf(DomainException.class);
+            assertThat(((DomainException) enrollOutcome).code()).isEqualTo("CREDIT_CAP_EXCEEDED");
+            assertThat(activeCredits(student, fixture.semesterId)).isEqualTo(3);
+            assertThat(acknowledgements(cancelled)).isZero();
+        } finally {
+            reopenResume.countDown();
+            pool.shutdownNow();
+            assertThat(pool.awaitTermination(10, TimeUnit.SECONDS)).isTrue();
+        }
+    }
+
+    /**
+     * The opposite interleaving: the enroll lands while the reopen is parked
+     * immediately before its affected-student FOR UPDATE — the reopen holds
+     * nothing yet — so the commit must land inside the conflict scan, which
+     * then refuses with REOPEN_CONFLICTS instead of restoring the cap breach.
+     */
+    @Test
+    void reopenEvaluatesAnEnrollThatCommittedBeforeItsStudentLocks() throws Exception {
+        AcademicEnrollmentPostgresFixture fixture = AcademicEnrollmentPostgresFixture.seed(jdbc, 30);
+        String student = fixture.seedStudent(1);
+        String cancelled = fixture.sectionId;
+        String otherSection = otherCourseSection(fixture, "rb");
+
+        registration.enroll(student, cancelled, List.of("STUDENT"), "it-rb-" + cancelled);
+        catalog.update(SECTION_TABLE, cancelled, Map.of("status", "CANCELLED"));
+        jdbc.update("UPDATE academic.\"RegistrationRound\" SET \"creditLimit\" = 3 WHERE \"id\" = :id",
+                new MapSqlParameterSource("id", fixture.roundId));
+
+        CountDownLatch atStudentLock = new CountDownLatch(1);
+        CountDownLatch resume = new CountDownLatch(1);
+        barrierReopenBeforeStudentLocks(atStudentLock, resume);
+        var pool = Executors.newSingleThreadExecutor();
+        try {
+            var reopen = pool.submit(() -> {
+                Thread.currentThread().setName(REOPEN_NAME);
+                try {
+                    catalog.update(SECTION_TABLE, cancelled, Map.of("status", "OPEN"));
+                    return "REOPENED";
+                } catch (RuntimeException failure) {
+                    return failure;
+                }
+            });
+            assertThat(atStudentLock.await(10, TimeUnit.SECONDS))
+                    .as("reopen reached the affected-student lock boundary").isTrue();
+            // The reopen holds nothing at the barrier, so this enroll commits
+            // first — and the locked scan must now see it.
+            registration.enroll(student, otherSection, List.of("STUDENT"), "it-rb-enroll");
+            resume.countDown();
+            Object outcome = reopen.get(30, TimeUnit.SECONDS);
+            assertThat(outcome).isInstanceOf(DomainException.class);
+            assertThat(((DomainException) outcome).code()).isEqualTo("REOPEN_CONFLICTS");
+            assertThat(sectionStatus(cancelled)).isEqualTo("CANCELLED");
+            assertThat(activeCredits(student, fixture.semesterId)).isEqualTo(3);
+            assertThat(acknowledgements(cancelled)).isZero();
+        } finally {
+            resume.countDown();
+            pool.shutdownNow();
+            assertThat(pool.awaitTermination(10, TimeUnit.SECONDS)).isTrue();
+        }
+    }
+
+    /**
+     * The deadlock schedule: the same-course replacement enroll holds the
+     * Student FOR UPDATE while the reopen starts. The reopen must wait on
+     * that row BEFORE it takes the section write lock — taking it afterwards
+     * closes a Student -> Section cycle against the enroll's retire UPDATE
+     * and Postgres kills one side with 40P01. Under the right order the
+     * enroll retires the preserved seat first, the reopen then finds no
+     * active row and lands cleanly.
+     */
+    @Test
+    void sameCourseReplacementSerializesAgainstReopenWithoutDeadlock() throws Exception {
+        AcademicEnrollmentPostgresFixture fixture = AcademicEnrollmentPostgresFixture.seed(jdbc, 30);
+        String student = fixture.seedStudent(1);
+        String cancelled = fixture.sectionId;
+        String replacement = secondSection(fixture, 30);
+
+        registration.enroll(student, cancelled, List.of("STUDENT"), "it-rc-" + cancelled);
+        catalog.update(SECTION_TABLE, cancelled, Map.of("status", "CANCELLED"));
+
+        CountDownLatch enrollAtEnrollments = new CountDownLatch(1);
+        CountDownLatch enrollResume = new CountDownLatch(1);
+        CountDownLatch reopenAtStudentLock = new CountDownLatch(1);
+        barrierRetireVersusReopen(enrollAtEnrollments, enrollResume, reopenAtStudentLock);
+        var pool = Executors.newFixedThreadPool(2);
+        try {
+            var enroll = pool.submit(() -> {
+                Thread.currentThread().setName(ENROLL_NAME);
+                try {
+                    registration.enroll(student, replacement, List.of("STUDENT"), "it-rc-enroll");
+                    return "ENROLLED";
+                } catch (RuntimeException failure) {
+                    return failure;
+                }
+            });
+            // Parked before its active-enrollment lock read, the enroll
+            // already holds Student and the replacement Section.
+            assertThat(enrollAtEnrollments.await(10, TimeUnit.SECONDS))
+                    .as("enroll parked holding the student lock").isTrue();
+            var reopen = pool.submit(() -> {
+                Thread.currentThread().setName(REOPEN_NAME);
+                try {
+                    catalog.update(SECTION_TABLE, cancelled, Map.of("status", "OPEN"));
+                    return "REOPENED";
+                } catch (RuntimeException failure) {
+                    return failure;
+                }
+            });
+            assertThat(reopenAtStudentLock.await(10, TimeUnit.SECONDS))
+                    .as("reopen issued its affected-student lock read").isTrue();
+            // It must be queued on the student row — a reopen that holds the
+            // section while waiting here would deadlock the retire below.
+            assertThat(reopen.isDone()).isFalse();
+            enrollResume.countDown();
+            Object enrollOutcome = enroll.get(30, TimeUnit.SECONDS);
+            Object reopenOutcome = reopen.get(30, TimeUnit.SECONDS);
+            assertThat(deadlockDetected(enrollOutcome))
+                    .as("enroll finished without a deadlock abort: %s", enrollOutcome).isFalse();
+            assertThat(deadlockDetected(reopenOutcome))
+                    .as("reopen finished without a deadlock abort: %s", reopenOutcome).isFalse();
+            assertThat(enrollOutcome).isEqualTo("ENROLLED");
+            assertThat(reopenOutcome).isEqualTo("REOPENED");
+            assertThat(preservedStatus(cancelled, student)).isEqualTo("DROPPED");
+            assertThat(sectionStatus(cancelled)).isEqualTo("OPEN");
+        } finally {
+            enrollResume.countDown();
+            pool.shutdownNow();
+            assertThat(pool.awaitTermination(10, TimeUnit.SECONDS)).isTrue();
+        }
+    }
+
+    /** Parks the reopen worker immediately before the post-scan slip DELETE. */
+    private void barrierReopenAtSlipDelete(CountDownLatch paused, CountDownLatch resume) {
+        Answer<Object> pause = call -> {
+            String sql = call.getArgument(0);
+            if (REOPEN_NAME.equals(Thread.currentThread().getName())
+                    && sql.startsWith("DELETE FROM \"academic\".\"RegistrationSlip\"")
+                    && sql.contains(":sectionId")) {
+                await(paused, resume);
+            }
+            return call.callRealMethod();
+        };
+        doAnswer(pause).when(namedJdbc).update(anyString(), any(SqlParameterSource.class));
+    }
+
+    /** Parks the reopen worker immediately before the affected-student FOR UPDATE. */
+    private void barrierReopenBeforeStudentLocks(CountDownLatch paused, CountDownLatch resume) {
+        Answer<Object> pause = call -> {
+            String sql = call.getArgument(0);
+            if (REOPEN_NAME.equals(Thread.currentThread().getName())
+                    && sql.contains("\"Student\"") && sql.contains("FOR UPDATE")
+                    && sql.contains(":studentIds")) {
+                await(paused, resume);
+            }
+            return call.callRealMethod();
+        };
+        doAnswer(pause).when(namedJdbc).queryForList(anyString(), any(SqlParameterSource.class));
+        doAnswer(pause).when(namedJdbc)
+                .queryForList(anyString(), any(SqlParameterSource.class), any(Class.class));
+    }
+
+    /**
+     * Two barriers in one schedule: the enroll worker parks before its
+     * active-enrollment lock read (already holding Student + the replacement
+     * Section), and the reopen worker only signals when it issues its
+     * affected-student lock read — the row lock itself then does the waiting.
+     */
+    private void barrierRetireVersusReopen(CountDownLatch enrollAtEnrollments,
+            CountDownLatch enrollResume, CountDownLatch reopenAtStudentLock) {
+        Answer<Object> pause = call -> {
+            String sql = call.getArgument(0);
+            String thread = Thread.currentThread().getName();
+            if (ENROLL_NAME.equals(thread) && sql.contains("course.\"credits\"")
+                    && sql.contains("FOR UPDATE OF enrollment")) {
+                await(enrollAtEnrollments, enrollResume);
+            } else if (REOPEN_NAME.equals(thread) && sql.contains("\"Student\"")
+                    && sql.contains("FOR UPDATE") && sql.contains(":studentIds")) {
+                reopenAtStudentLock.countDown();
+            }
+            return call.callRealMethod();
+        };
+        doAnswer(pause).when(namedJdbc).queryForList(anyString(), any(SqlParameterSource.class));
+        doAnswer(pause).when(namedJdbc)
+                .queryForList(anyString(), any(SqlParameterSource.class), any(Class.class));
+    }
+
+    private static void await(CountDownLatch paused, CountDownLatch resume) throws InterruptedException {
+        paused.countDown();
+        if (!resume.await(15, TimeUnit.SECONDS)) {
+            throw new IllegalStateException("race barrier timeout");
+        }
+    }
+
+    private static boolean deadlockDetected(Object outcome) {
+        return outcome instanceof Throwable failure
+                && (String.valueOf(failure).contains("deadlock")
+                || String.valueOf(failure).contains("40P01"));
+    }
+
+    /** A second section on a DIFFERENT course in the same semester. */
+    private String otherCourseSection(AcademicEnrollmentPostgresFixture fixture, String tag) {
+        String courseId = "course-" + tag + "-" + fixture.sectionId;
+        String sectionId = "section-" + tag + "-" + fixture.sectionId;
+        jdbc.update("INSERT INTO academic.\"Course\" (\"id\",\"code\",\"name\",\"credits\",\"departmentId\",\"isActive\")"
+                        + " VALUES (:id,:code,'Other',3,:dept,TRUE)",
+                new MapSqlParameterSource()
+                        .addValue("id", courseId)
+                        .addValue("code", "X" + tag + fixture.sectionId.substring(fixture.sectionId.length() - 8))
+                        .addValue("dept", fixture.departmentId));
+        jdbc.update("INSERT INTO academic.\"Section\" (\"id\",\"sectionNumber\",\"courseId\",\"semesterId\","
+                        + "\"capacity\",\"enrolledCount\",\"status\",\"version\")"
+                        + " VALUES (:id,'09',:courseId,:semesterId,30,0,'OPEN',0)",
+                new MapSqlParameterSource()
+                        .addValue("id", sectionId)
+                        .addValue("courseId", courseId)
+                        .addValue("semesterId", fixture.semesterId));
+        return sectionId;
+    }
+
+    private int activeCredits(String studentId, String semesterId) {
+        Integer credits = jdbc.queryForObject(
+                "SELECT COALESCE(SUM(course.\"credits\"), 0) FROM academic.\"Enrollment\" e"
+                        + " JOIN academic.\"Section\" s ON s.\"id\" = e.\"sectionId\""
+                        + " JOIN academic.\"Course\" course ON course.\"id\" = s.\"courseId\""
+                        + " WHERE e.\"studentId\" = :st AND e.\"semesterId\" = :sem"
+                        + " AND e.\"status\" IN ('ENROLLED', 'PENDING', 'CONFIRMED')"
+                        + " AND s.\"status\" <> 'CANCELLED'",
+                new MapSqlParameterSource().addValue("st", studentId).addValue("sem", semesterId),
+                Integer.class);
+        return credits == null ? 0 : credits;
+    }
+
+    private int acknowledgements(String sectionId) {
+        Integer count = jdbc.queryForObject(
+                "SELECT COUNT(*) FROM campuscore_audit.\"AdminAudit\""
+                        + " WHERE \"entityId\" = :id AND \"action\" = 'SECTION_REOPEN_CONFLICTS_ACKNOWLEDGED'",
+                new MapSqlParameterSource("id", sectionId), Integer.class);
+        return count == null ? 0 : count;
+    }
+
+    private String sectionStatus(String sectionId) {
+        return jdbc.queryForObject("SELECT \"status\" FROM academic.\"Section\" WHERE \"id\" = :id",
+                new MapSqlParameterSource("id", sectionId), String.class);
+    }
+
+    private String preservedStatus(String sectionId, String studentId) {
+        return jdbc.queryForObject(
+                "SELECT \"status\" FROM academic.\"Enrollment\" WHERE \"sectionId\" = :s AND \"studentId\" = :st",
+                new MapSqlParameterSource().addValue("s", sectionId).addValue("st", studentId), String.class);
     }
 
     private DomainException catchReopen(String sectionId, Map<String, Object> patch) {
