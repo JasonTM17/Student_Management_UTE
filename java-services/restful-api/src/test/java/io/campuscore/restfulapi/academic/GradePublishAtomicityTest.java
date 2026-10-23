@@ -51,7 +51,7 @@ class GradePublishAtomicityTest {
         jdbc.execute("CREATE TABLE IF NOT EXISTS \"academic\".\"Enrollment\" (\"id\" VARCHAR PRIMARY KEY, \"studentId\" VARCHAR, \"sectionId\" VARCHAR, \"status\" VARCHAR, \"gradeStatus\" VARCHAR, \"finalGrade\" DECIMAL, \"letterGrade\" VARCHAR, \"updatedAt\" TIMESTAMP)");
         jdbc.execute("CREATE TABLE IF NOT EXISTS \"academic\".\"GradeItem\" (\"id\" VARCHAR PRIMARY KEY, \"type\" VARCHAR, \"sectionId\" VARCHAR, \"name\" VARCHAR, \"maxScore\" DECIMAL, \"weight\" DECIMAL, \"gradedAt\" TIMESTAMP)");
         jdbc.execute("CREATE TABLE IF NOT EXISTS \"academic\".\"StudentGrade\" (\"id\" VARCHAR PRIMARY KEY, \"enrollmentId\" VARCHAR, \"gradeItemId\" VARCHAR, \"score\" DECIMAL)");
-        jdbc.execute("CREATE TABLE IF NOT EXISTS notifications.notification (id VARCHAR PRIMARY KEY, user_id VARCHAR, title VARCHAR, message VARCHAR, type VARCHAR, link VARCHAR, is_read BOOLEAN, read_at TIMESTAMP, created_at TIMESTAMP, updated_at TIMESTAMP)");
+        jdbc.execute("CREATE TABLE IF NOT EXISTS notifications.notification (id VARCHAR PRIMARY KEY, user_id VARCHAR, title VARCHAR, message VARCHAR, type VARCHAR, link VARCHAR, announcement_id VARCHAR(120), is_read BOOLEAN, read_at TIMESTAMP, created_at TIMESTAMP, updated_at TIMESTAMP)");
         for (String table : new String[]{"StudentGrade", "GradeItem", "Enrollment", "Student", "Section"}) {
             jdbc.execute("DELETE FROM \"academic\".\"" + table + "\"");
         }
