@@ -46,6 +46,26 @@ public class AuthLoginService {
     private static final Duration LOCK_DURATION = Duration.ofMinutes(30);
 
     /**
+     * Same-origin documents share one refresh cookie, so a queued second
+     * refresh can still present the token a sibling just rotated out — most
+     * often when the rotating response never reached the jar. Replays of that
+     * immediately-previous generation are tolerated for this short overlap;
+     * older replays keep the stolen-token semantics (family revocation).
+     * The overlap covers only the lost-response ordering: the delayed-
+     * duplicate ordering (second-processed request rotates and delivers its
+     * token, then the delayed duplicate recovers over it) still revokes on
+     * the superseded holder's next refresh — see the V138 migration header
+     * and docs/security/authorization-model.md.
+     */
+    private static final Duration REFRESH_ROTATION_OVERLAP = Duration.ofSeconds(30);
+    // "rotatedAt" is stamped by this same application clock at rotation time,
+    // so a future value should not occur in a single-instance deployment; the
+    // tolerance only covers small cross-instance skew and a wildly future
+    // timestamp still fails closed. Effective acceptance bound for a replay:
+    // REFRESH_ROTATION_OVERLAP + CLOCK_SKEW_TOLERANCE past the rotation.
+    private static final Duration CLOCK_SKEW_TOLERANCE = Duration.ofSeconds(2);
+
+    /**
      * Timing-oracle mitigation: a bcrypt comparison against a fixed hash costs
      * the same whether the account exists or not, so unknown-email logins no
      * longer return measurably faster than known-email ones.
@@ -180,25 +200,14 @@ public class AuthLoginService {
         // global order): taking the session FOR UPDATE first deadlocks against
         // admin mutations that lock the user and then delete sessions.
         users.lockUserRow(decoded.getSubject());
+        Instant now = clock.instant();
         String refreshTokenHash = hash(refreshTokenValue);
-        AuthUserRecord user = users.findByActiveRefreshSession(refreshTokenHash, clock.instant())
-                .orElseGet(() -> {
-                    // The token carries our signature, yet no active session
-                    // holds its hash: it was already rotated or revoked, so a
-                    // replay is the classic stolen-token signal. Fail the
-                    // family (every live session for the account) closed and
-                    // leave an audit trace instead of silently 401-ing.
-                    String subject = decoded.getSubject();
-                    users.findById(subject).ifPresent(owner -> {
-                        users.deleteAllRefreshSessions(owner.id());
-                        reuseLogger.warn(
-                                "REFRESH_TOKEN_REUSE subject={} ip={} userAgent={}",
-                                subject,
-                                ipAddress,
-                                userAgent);
-                    });
-                    throw new BadCredentialsException("Invalid refresh token");
-                });
+        Optional<AuthUserRecord> sessionUser = users.findByActiveRefreshSession(refreshTokenHash, now);
+        if (sessionUser.isEmpty()) {
+            return recoverRacedRefresh(decoded.getSubject(), refreshTokenHash, now, ipAddress, userAgent);
+        }
+
+        AuthUserRecord user = sessionUser.get();
         if (!user.id().equals(decoded.getSubject()) || !"ACTIVE".equals(user.status())) {
             throw new BadCredentialsException("Invalid refresh token");
         }
@@ -210,6 +219,7 @@ public class AuthLoginService {
                 user.id(),
                 refreshTokenHash,
                 hash(nextRefreshToken.refreshToken()),
+                now,
                 ipAddress,
                 userAgent,
                 nextRefreshToken.expiresAt());
@@ -218,6 +228,70 @@ public class AuthLoginService {
                 new LoginResponse(user.toResponse(), accessToken.accessToken(), nextRefreshToken.refreshToken()),
                 accessToken.expiresAt(),
                 nextRefreshToken.expiresAt());
+    }
+
+    /**
+     * No session row holds the presented hash. Two cases remain: the hash is
+     * the immediately-previous generation of a live row — the shared-cookie
+     * race where a sibling document's rotation committed but its response
+     * never reached the jar (navigation mid-flight, transport timeout, a
+     * dropped network answer) — which recovers inside the short overlap
+     * window; or it is a genuinely stale or foreign token, the stolen-token
+     * signal that still fails the whole family closed.
+     */
+    private LoginResult recoverRacedRefresh(
+            String subject, String refreshTokenHash, Instant now, String ipAddress, String userAgent) {
+        Optional<AuthUserRepository.RacedRotation> raced =
+                users.findByPreviousRefreshSession(refreshTokenHash, now)
+                        .filter(candidate -> withinRotationOverlap(candidate.rotatedAt(), now));
+        if (raced.isEmpty()) {
+            users.findById(subject).ifPresent(owner -> {
+                users.deleteAllRefreshSessions(owner.id());
+                reuseLogger.warn(
+                        "REFRESH_TOKEN_REUSE subject={} ip={} userAgent={}",
+                        subject,
+                        ipAddress,
+                        userAgent);
+            });
+            throw new BadCredentialsException("Invalid refresh token");
+        }
+
+        AuthUserRepository.RacedRotation candidate = raced.get();
+        AuthUserRecord user = candidate.user();
+        if (!user.id().equals(subject) || !"ACTIVE".equals(user.status())) {
+            throw new BadCredentialsException("Invalid refresh token");
+        }
+        // Same event class as REFRESH_TOKEN_REUSE — a superseded credential
+        // was replayed and accepted inside the window. Because detection is
+        // deferred there, this line is the only trace of a successful
+        // in-window theft, so it stays at warn level. Never log the token
+        // or its hash.
+        reuseLogger.warn(
+                "REFRESH_ROTATION_OVERLAP subject={} session={} ip={} userAgent={}",
+                subject,
+                candidate.sessionId(),
+                ipAddress,
+                userAgent);
+        AuthPrincipal principal = principal(user);
+        IssuedAccessToken accessToken = tokens.issueAccessToken(principal);
+        IssuedRefreshToken nextRefreshToken = tokens.issueRefreshToken(principal);
+        users.rotateRacedRefreshSession(
+                user.id(),
+                candidate.sessionId(),
+                hash(nextRefreshToken.refreshToken()),
+                ipAddress,
+                userAgent,
+                nextRefreshToken.expiresAt());
+        return LoginResult.session(
+                new LoginResponse(user.toResponse(), accessToken.accessToken(), nextRefreshToken.refreshToken()),
+                accessToken.expiresAt(),
+                nextRefreshToken.expiresAt());
+    }
+
+    private static boolean withinRotationOverlap(Instant rotatedAt, Instant now) {
+        return rotatedAt != null
+                && !rotatedAt.isBefore(now.minus(REFRESH_ROTATION_OVERLAP))
+                && !rotatedAt.isAfter(now.plus(CLOCK_SKEW_TOLERANCE));
     }
 
     @Transactional(readOnly = true)
