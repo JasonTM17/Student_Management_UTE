@@ -235,6 +235,34 @@ export const en = {
         THESIS_GROUP_NOT_FOUND: 'The thesis group could not be found.',
         TOPIC_DEPARTMENT_FORBIDDEN: 'This topic belongs to another department.',
         TOPIC_OWNER_REQUIRED: 'Only the topic owner or an approver can do this.',
+        // Thesis governance, roster overrides & reviews
+        COUNCIL_MEMBER_SCORED:
+          'A member who already submitted a defense score cannot be replaced.',
+        GOVERNANCE_ROLE_REQUIRED: 'This action requires an admin or faculty head role.',
+        GROUP_EMPTY: 'The group cannot be left with no members; cancel the group instead.',
+        GROUP_SCORES_EXIST:
+          'The roster cannot change once scoring has started for the topic.',
+        GROUP_SIZE_EXCEPTION_REQUIRED:
+          'This roster change leaves an approved group below the minimum size.',
+        GROUP_TOPIC_NOT_ORPHANED:
+          'The group has no withdrawn topic to re-point away from.',
+        GVPB_ALREADY_WAIVED: 'The counter-review requirement is already waived.',
+        GVPB_NOT_WAIVED: 'The counter-review requirement is not waived.',
+        GVPB_SCORE_EXISTS:
+          'A counter-review score already exists; it can only change through re-review.',
+        INVALID_NOTIFICATION_LINK: 'The notification link is not a safe internal path.',
+        LEADER_SUCCESSOR_REQUIRED: 'Removing the leader requires naming a successor member.',
+        REOPEN_CONFLICTS: 'Reopening this section would create student conflicts.',
+        RESULTS_ALL_EXCLUDED: 'Every approved topic is excluded from publication.',
+        RETRACT_ADMIN_REQUIRED: 'Only an administrator can retract published results.',
+        RETRACT_WINDOW_CLOSED: 'The retraction grace period has passed.',
+        REVIEW_WINDOW_OPEN: 'The counter-review window is still open for some topics.',
+        STUDENT_NOT_IN_GROUP: 'The student is not a member of this group.',
+        TOPIC_ALREADY_SCORED:
+          'A topic with submitted defense scores cannot leave its council.',
+        TOPIC_ALREADY_WITHDRAWN: 'This topic is already withdrawn from the round.',
+        TOPIC_NOT_WITHDRAWN: 'Only a withdrawn topic can be reinstated.',
+        TOPIC_WITHDRAWN: 'This topic has been withdrawn from the round.',
         // Grades
         GRADES_PUBLISHED_LOCKED: 'Published grades are locked and can no longer be edited.',
         GRADE_COMPONENTS_INCOMPLETE:
@@ -3265,6 +3293,34 @@ export const vi: I18nMessages = {
         THESIS_GROUP_NOT_FOUND: 'Không tìm thấy nhóm đồ án.',
         TOPIC_DEPARTMENT_FORBIDDEN: 'Đề tài này thuộc một bộ môn khác.',
         TOPIC_OWNER_REQUIRED: 'Chỉ chủ sở hữu đề tài hoặc người có thẩm quyền mới được thực hiện thao tác này.',
+        // Quản trị đề tài, điều chỉnh thành viên & phản biện
+        COUNCIL_MEMBER_SCORED:
+          'Không thể thay thế thành viên hội đồng đã chấm điểm bảo vệ.',
+        GOVERNANCE_ROLE_REQUIRED: 'Thao tác này yêu cầu quyền quản trị viên hoặc trưởng khoa.',
+        GROUP_EMPTY: 'Nhóm không thể trống thành viên; hãy hủy nhóm thay vì xóa hết.',
+        GROUP_SCORES_EXIST:
+          'Không thể thay đổi thành viên khi đề tài của nhóm đã bắt đầu chấm điểm.',
+        GROUP_SIZE_EXCEPTION_REQUIRED:
+          'Thay đổi này khiến nhóm đã duyệt xuống dưới sĩ số tối thiểu.',
+        GROUP_TOPIC_NOT_ORPHANED:
+          'Nhóm không có đề tài bị rút để chuyển sang đề tài khác.',
+        GVPB_ALREADY_WAIVED: 'Yêu cầu phản biện (GVPB) đã được miễn trước đó.',
+        GVPB_NOT_WAIVED: 'Yêu cầu phản biện (GVPB) chưa được miễn.',
+        GVPB_SCORE_EXISTS:
+          'Đã có điểm phản biện; chỉ có thể thay đổi qua phản biện lại.',
+        INVALID_NOTIFICATION_LINK: 'Liên kết thông báo không phải là đường dẫn nội bộ hợp lệ.',
+        LEADER_SUCCESSOR_REQUIRED: 'Xóa nhóm trưởng cần chỉ định thành viên kế nhiệm.',
+        REOPEN_CONFLICTS: 'Mở lại học phần này sẽ tạo xung đột cho sinh viên.',
+        RESULTS_ALL_EXCLUDED: 'Tất cả đề tài đã duyệt đều bị loại khỏi công bố.',
+        RETRACT_ADMIN_REQUIRED: 'Chỉ quản trị viên mới có thể thu hồi kết quả đã công bố.',
+        RETRACT_WINDOW_CLOSED: 'Đã hết thời hạn thu hồi kết quả.',
+        REVIEW_WINDOW_OPEN: 'Cửa sổ phản biện vẫn đang mở cho một số đề tài.',
+        STUDENT_NOT_IN_GROUP: 'Sinh viên không thuộc nhóm này.',
+        TOPIC_ALREADY_SCORED:
+          'Đề tài đã có điểm bảo vệ nên không thể rời hội đồng.',
+        TOPIC_ALREADY_WITHDRAWN: 'Đề tài đã được rút khỏi đợt này.',
+        TOPIC_NOT_WITHDRAWN: 'Chỉ đề tài đã rút mới có thể khôi phục.',
+        TOPIC_WITHDRAWN: 'Đề tài đã bị rút khỏi đợt.',
         // Điểm số
         GRADES_PUBLISHED_LOCKED: 'Điểm đã công bố được khóa và không thể sửa tiếp.',
         GRADE_COMPONENTS_INCOMPLETE:
