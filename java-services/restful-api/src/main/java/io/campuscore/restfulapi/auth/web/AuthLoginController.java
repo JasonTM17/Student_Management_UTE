@@ -7,6 +7,7 @@ import io.campuscore.restfulapi.auth.service.PasswordResetService;
 import io.campuscore.restfulapi.security.ratelimit.ClientIpResolver;
 import io.campuscore.restfulapi.auth.web.AuthDtos.AuthUserResponse;
 import io.campuscore.restfulapi.auth.web.AuthDtos.ChangePasswordRequest;
+import io.campuscore.restfulapi.auth.web.AuthDtos.ChangePasswordResponse;
 import io.campuscore.restfulapi.auth.web.AuthDtos.ForgotPasswordRequest;
 import io.campuscore.restfulapi.auth.web.AuthDtos.LoginRequest;
 import io.campuscore.restfulapi.auth.web.AuthDtos.LoginResponse;
@@ -23,6 +24,7 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.Valid;
 import java.util.Map;
+import java.util.Optional;
 import org.springframework.context.annotation.Profile;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.jwt.Jwt;
@@ -143,11 +145,36 @@ public class AuthLoginController {
             @ApiResponse(responseCode = "200", description = "Đổi mật khẩu thành công"),
             @ApiResponse(responseCode = "400", description = "Mật khẩu cũ không đúng hoặc mật khẩu mới không hợp lệ")
     })
-    public MessageResponse changePassword(
+    public ChangePasswordResponse changePassword(
             @AuthenticationPrincipal Jwt jwt,
-            @Valid @RequestBody ChangePasswordRequest request) {
-        auth.changePassword(jwt.getSubject(), request.oldPassword(), request.newPassword());
-        return new MessageResponse("Password changed successfully");
+            @Valid @RequestBody ChangePasswordRequest request,
+            HttpServletRequest servletRequest,
+            HttpServletResponse servletResponse) {
+        Optional<LoginResult> result = auth.changePassword(
+                jwt.getSubject(),
+                request.oldPassword(),
+                request.newPassword(),
+                cookies.refreshToken(servletRequest, request.refreshToken()));
+        if (result.isEmpty()) {
+            // No session could be pinned, so every session was revoked —
+            // clear the dead credential cookies and say so plainly.
+            cookies.clear(servletResponse);
+            return new ChangePasswordResponse(
+                    "Password changed successfully", false, null, null, null);
+        }
+        cookies.issue(
+                servletRequest,
+                servletResponse,
+                result.get().response().accessToken(),
+                result.get().response().refreshToken(),
+                result.get().accessTokenExpiresAt(),
+                result.get().refreshTokenExpiresAt());
+        return new ChangePasswordResponse(
+                "Password changed successfully",
+                true,
+                result.get().response().user(),
+                result.get().response().accessToken(),
+                result.get().response().refreshToken());
     }
 
     @PostMapping("forgot-password")

@@ -97,6 +97,14 @@ export interface LoginResponse {
   refreshToken: string;
 }
 
+export interface ChangePasswordResponse {
+  message: string;
+  sessionPreserved: boolean;
+  user: AuthUser | null;
+  accessToken: string | null;
+  refreshToken: string | null;
+}
+
 export interface MobileSection {
   id: string;
   sectionNumber: string;
@@ -201,6 +209,16 @@ export interface ApiClientOptions {
   onSessionExpired?: () => void;
 }
 
+export interface SessionBoundRequestInit extends RequestInit {
+  /**
+   * When set, the CURRENT refresh token is (re)injected into the JSON body
+   * at every attempt — including the retry after a 401-triggered rotation.
+   * Without it, a request serialized before a concurrent rotation would
+   * present a superseded token and pin nothing server-side.
+   */
+  sessionBoundRefresh?: boolean;
+}
+
 export type ApiMode = 'preview' | 'live';
 
 export interface ApiClient {
@@ -211,12 +229,12 @@ export interface ApiClient {
   getRefreshToken(): string | undefined;
   setOnSessionExpired(handler: (() => void) | undefined): void;
   clearAccessToken(): void;
-  request<TResponse>(path: string, init?: RequestInit): Promise<TResponse>;
-  requestWithMeta<TResponse>(path: string, init?: RequestInit): Promise<{ data: TResponse; headers: Headers; requestId: string }>;
-  get<TResponse>(path: string, init?: RequestInit): Promise<TResponse>;
-  post<TResponse>(path: string, body?: unknown, init?: RequestInit): Promise<TResponse>;
-  put<TResponse>(path: string, body?: unknown, init?: RequestInit): Promise<TResponse>;
-  patch<TResponse>(path: string, body?: unknown, init?: RequestInit): Promise<TResponse>;
+  request<TResponse>(path: string, init?: SessionBoundRequestInit): Promise<TResponse>;
+  requestWithMeta<TResponse>(path: string, init?: SessionBoundRequestInit): Promise<{ data: TResponse; headers: Headers; requestId: string }>;
+  get<TResponse>(path: string, init?: SessionBoundRequestInit): Promise<TResponse>;
+  post<TResponse>(path: string, body?: unknown, init?: SessionBoundRequestInit): Promise<TResponse>;
+  put<TResponse>(path: string, body?: unknown, init?: SessionBoundRequestInit): Promise<TResponse>;
+  patch<TResponse>(path: string, body?: unknown, init?: SessionBoundRequestInit): Promise<TResponse>;
   delete<TResponse>(path: string, init?: RequestInit): Promise<TResponse>;
 }
 
@@ -409,7 +427,7 @@ export function createApiClient(options: ApiClientOptions = {}): ApiClient {
       refreshToken = undefined;
     },
 
-    async requestWithMeta<TResponse>(path: string, init: RequestInit = {}) {
+    async requestWithMeta<TResponse>(path: string, init: SessionBoundRequestInit = {}) {
       const requestId = createRequestId();
       if (mode !== 'live') {
         throw new ApiClientError(
@@ -431,9 +449,23 @@ export function createApiClient(options: ApiClientOptions = {}): ApiClient {
         headers.set('Authorization', `Bearer ${token}`);
       }
 
+      // Session-bound requests name the session inside the JSON body. The
+      // body is re-serialized per attempt so a retry after an in-flight
+      // rotation presents the row's current token, not the superseded one
+      // captured when the caller built the request.
+      const attemptBody = () => {
+        if (!init.sessionBoundRefresh || typeof init.body !== 'string') {
+          return init.body;
+        }
+        const payload = JSON.parse(init.body) as JsonObject;
+        payload.refreshToken = refreshToken;
+        return JSON.stringify(payload);
+      };
+
       let response = await fetch(`${baseUrl}${normalizePath(path)}`, {
         ...init,
         headers,
+        body: attemptBody(),
       });
       let body = await readResponseBody(response);
 
@@ -444,6 +476,7 @@ export function createApiClient(options: ApiClientOptions = {}): ApiClient {
           response = await fetch(`${baseUrl}${normalizePath(path)}`, {
             ...init,
             headers,
+            body: attemptBody(),
           });
           body = await readResponseBody(response);
         }
@@ -462,16 +495,16 @@ export function createApiClient(options: ApiClientOptions = {}): ApiClient {
       return { data: body as TResponse, headers: response.headers, requestId };
     },
 
-    async request<TResponse>(path: string, init: RequestInit = {}) {
+    async request<TResponse>(path: string, init: SessionBoundRequestInit = {}) {
       const result = await client.requestWithMeta<TResponse>(path, init);
       return result.data;
     },
 
-    get<TResponse>(path: string, init: RequestInit = {}) {
+    get<TResponse>(path: string, init: SessionBoundRequestInit = {}) {
       return client.request<TResponse>(path, { ...init, method: 'GET' });
     },
 
-    post<TResponse>(path: string, body: unknown = undefined, init: RequestInit = {}) {
+    post<TResponse>(path: string, body: unknown = undefined, init: SessionBoundRequestInit = {}) {
       return client.request<TResponse>(path, {
         ...init,
         method: 'POST',
@@ -479,7 +512,7 @@ export function createApiClient(options: ApiClientOptions = {}): ApiClient {
       });
     },
 
-    put<TResponse>(path: string, body: unknown = undefined, init: RequestInit = {}) {
+    put<TResponse>(path: string, body: unknown = undefined, init: SessionBoundRequestInit = {}) {
       return client.request<TResponse>(path, {
         ...init,
         method: 'PUT',
@@ -487,7 +520,7 @@ export function createApiClient(options: ApiClientOptions = {}): ApiClient {
       });
     },
 
-    patch<TResponse>(path: string, body: unknown = undefined, init: RequestInit = {}) {
+    patch<TResponse>(path: string, body: unknown = undefined, init: SessionBoundRequestInit = {}) {
       return client.request<TResponse>(path, {
         ...init,
         method: 'PATCH',
@@ -577,8 +610,33 @@ export const campusApi = {
   transcript: () => apiClient.get<JsonObject>('/enrollments/my/transcript'),
   announcements: () => apiClient.get<{ data: JsonObject[] }>('/announcements/my'),
   updateProfile: (body: JsonObject) => apiClient.put<AuthUser>('/auth/profile', body),
-  changePassword: (oldPassword: string, newPassword: string) =>
-    apiClient.post<JsonObject>('/auth/change-password', { oldPassword, newPassword }),
+  changePassword: async (oldPassword: string, newPassword: string) => {
+    const response = await apiClient.post<ChangePasswordResponse>(
+      '/auth/change-password',
+      { oldPassword, newPassword },
+      // The session-bound flag keeps the body's refresh token current across
+      // the 401->refresh->retry transport path, so the server pin names this
+      // device's live session row.
+      { sessionBoundRefresh: true },
+    );
+    if (!response.sessionPreserved) {
+      // Nothing could be pinned server-side, so every session was revoked —
+      // the caller routes the user back to sign-in like an expired session.
+      return response;
+    }
+    if (!response.accessToken || !response.refreshToken) {
+      throw new ApiClientError(
+        'The Java auth change-password response did not include rotated tokens',
+        401,
+        createRequestId(),
+        'INVALID_CHANGE_PASSWORD_RESPONSE',
+      );
+    }
+    // The server re-issued this device's session inside the rotation: adopt
+    // the returned pair so the in-memory store matches the rotated row.
+    apiClient.setSessionTokens(response.accessToken, response.refreshToken);
+    return response;
+  },
   grades: (semesterId?: string) =>
     apiClient.get<MobileGrade[]>(
       apiRoutes.grades + (semesterId ? `?semesterId=${encodeURIComponent(semesterId)}` : ''),
