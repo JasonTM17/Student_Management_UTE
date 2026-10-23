@@ -661,9 +661,10 @@ public class ThesisMutationService {
      * extension must pair with a report-date change the normal way.
      */
     @Transactional
-    public RoundResponse extendGvpbDeadline(UUID id, Instant newDeadline, Jwt actor) {
+    public RoundResponse extendGvpbDeadline(UUID id, Instant newDeadline, String reason, Jwt actor) {
+        String cleanReason = requireReason(reason);
         Map<String, Object> current = one(
-                "SELECT status, thesis_type, gvpb_deadline, report_date FROM thesis.thesis_registration_round "
+                "SELECT status, thesis_type, gvpb_deadline, report_date, report_deadline FROM thesis.thesis_registration_round "
                         + "WHERE id = :id FOR UPDATE",
                 params().addValue("id", id), "ROUND_NOT_FOUND", "Thesis registration round not found");
         String status = (String) current.get("status");
@@ -688,16 +689,30 @@ public class ThesisMutationService {
         if (reportDate != null && newDeadline.isAfter(reportDate)) {
             throw invalid("gvpbDeadline must not be later than the report date; amend the schedule first");
         }
+        // The report write window falls back to gvpb_deadline when no
+        // report_deadline override exists, so extending GVPB would silently
+        // reopen report editing. Pin the override to the OLD deadline first —
+        // extending only the counter-review window, in the same transaction.
+        Instant currentReportDeadline = instantOf(current.get("report_deadline"));
+        if (currentReportDeadline == null && currentDeadline != null) {
+            jdbc.update(
+                    "UPDATE thesis.thesis_registration_round SET report_deadline = :reportDeadline, "
+                            + "updated_at = CURRENT_TIMESTAMP, version = version + 1 WHERE id = :id",
+                    params().addValue("id", id).addValue("reportDeadline", tsOf(currentDeadline)));
+        }
         Map<String, Object> beforeState = new LinkedHashMap<>();
         beforeState.put("gvpb_deadline", currentDeadline);
+        beforeState.put("report_deadline", currentReportDeadline);
         jdbc.update(
                 "UPDATE thesis.thesis_registration_round SET gvpb_deadline = :gvpbDeadline, "
                         + "updated_at = CURRENT_TIMESTAMP, version = version + 1 WHERE id = :id",
                 params().addValue("id", id).addValue("gvpbDeadline", tsOf(newDeadline)));
         Map<String, Object> afterState = new LinkedHashMap<>();
         afterState.put("gvpb_deadline", newDeadline);
+        afterState.put("report_deadline",
+                currentReportDeadline == null ? currentDeadline : currentReportDeadline);
         audit.record(subject(actor), null, "THESIS_ROUND_GVPB_DEADLINE_EXTENDED", "THESIS_ROUND", id.toString(),
-                "Counter-review deadline extended", beforeState, afterState);
+                "Counter-review deadline extended; reason: " + cleanReason, beforeState, afterState);
         return roundReads.get(id);
     }
 
@@ -707,7 +722,7 @@ public class ThesisMutationService {
      * outcome (REVIEW_FAILED or WITHDRAWN) before confirming.
      */
     @Transactional(readOnly = true)
-    public PublishResultsPreviewResponse publishResultsPreview(UUID roundId) {
+    public PublishResultsPreviewResponse publishResultsPreview(UUID roundId, Jwt actor) {
         one("SELECT id FROM thesis.thesis_registration_round WHERE id = :id",
                 params().addValue("id", roundId), "ROUND_NOT_FOUND", "Thesis registration round not found");
         Map<String, Object> counts = jdbc.queryForMap(
@@ -716,17 +731,27 @@ public class ThesisMutationService {
                         + "COUNT(*) FILTER (WHERE approval_status = 'PENDING') AS pending_count "
                         + "FROM thesis.thesis_group WHERE round_id = :roundId AND status <> 'CANCELLED'",
                 params().addValue("roundId", roundId));
+        // A sub-threshold counter-review while its window is still open is
+        // provisional — the reviewer may overwrite — so it neither excludes
+        // the topic nor blocks anything; the preview lists it separately.
         Map<String, Object> scoring = jdbc.queryForMap(
-                "SELECT COUNT(*) FILTER (WHERE t.result_status IS NULL "
-                        + "    OR t.result_status NOT IN ('REVIEW_FAILED', 'WITHDRAWN')) AS included_count, "
-                        + "COUNT(*) FILTER (WHERE t.final_score IS NULL AND (t.result_status IS NULL "
-                        + "    OR t.result_status NOT IN ('REVIEW_FAILED', 'WITHDRAWN'))) AS ungraded_count "
-                        + "FROM thesis.thesis_group g JOIN thesis.thesis_topic t ON t.id = g.topic_id "
-                        + "WHERE g.round_id = :roundId AND g.approval_status = 'APPROVED'",
+                "SELECT COUNT(*) FILTER (WHERE NOT excluded_condition) AS included_count, "
+                        + "COUNT(*) FILTER (WHERE t.final_score IS NULL AND NOT excluded_condition) AS ungraded_count "
+                        + "FROM (SELECT t.final_score, "
+                        + "  (t.result_status = 'WITHDRAWN' OR (t.result_status = 'REVIEW_FAILED' "
+                        + "    AND r.gvpb_deadline IS NOT NULL AND r.gvpb_deadline <= CURRENT_TIMESTAMP)) "
+                        + "  AS excluded_condition "
+                        + "  FROM thesis.thesis_group g "
+                        + "  JOIN thesis.thesis_topic t ON t.id = g.topic_id "
+                        + "  JOIN thesis.thesis_registration_round r ON r.id = t.round_id "
+                        + "  WHERE g.round_id = :roundId AND g.approval_status = 'APPROVED') t",
                 params().addValue("roundId", roundId));
-        List<PublishResultsExcludedTopic> excluded = jdbc.query(
+        List<PublishResultsExcludedTopic> excluded = excludedTopicsQuery(roundId, actor);
+        List<PublishResultsExcludedTopic> openReview = jdbc.query(
                 "SELECT t.id, t.title, t.result_status, t.result_reason FROM thesis.thesis_topic t "
-                        + "WHERE t.round_id = :roundId AND t.result_status IN ('REVIEW_FAILED', 'WITHDRAWN') "
+                        + "JOIN thesis.thesis_registration_round r ON r.id = t.round_id "
+                        + "WHERE t.round_id = :roundId AND t.result_status = 'REVIEW_FAILED' "
+                        + "AND (r.gvpb_deadline IS NULL OR r.gvpb_deadline > CURRENT_TIMESTAMP) "
                         + "ORDER BY t.title",
                 params().addValue("roundId", roundId),
                 (rs, ignored) -> new PublishResultsExcludedTopic(
@@ -738,7 +763,36 @@ public class ThesisMutationService {
                 ((Number) counts.get("pending_count")).longValue(),
                 ((Number) scoring.get("included_count")).longValue(),
                 ((Number) scoring.get("ungraded_count")).longValue(),
-                excluded);
+                excluded, openReview);
+    }
+
+    /**
+     * Excluded topics of a publish preview, scoped like every other
+     * topic-level governance read: global admins see the whole round, a
+     * faculty head sees only the exclusions inside their own faculty.
+     */
+    private List<PublishResultsExcludedTopic> excludedTopicsQuery(UUID roundId, Jwt actor) {
+        String facultyScope = "";
+        String facultyId = ThesisDeanScope.isFacultyHead(actor) && !ThesisDeanScope.isGlobalAdmin(actor)
+                ? ThesisDeanScope.facultyId(jdbc, actor) : null;
+        if (facultyId != null) {
+            facultyScope = " AND d.\"facultyId\" = :facultyId";
+        }
+        return jdbc.query(
+                "SELECT t.id, t.title, t.result_status, t.result_reason FROM thesis.thesis_topic t "
+                        + "JOIN thesis.thesis_registration_round r ON r.id = t.round_id "
+                        + "JOIN academic.\"Department\" d ON d.\"id\" = t.department_id "
+                        + "WHERE t.round_id = :roundId "
+                        + "AND (t.result_status = 'WITHDRAWN' OR (t.result_status = 'REVIEW_FAILED' "
+                        + "  AND r.gvpb_deadline IS NOT NULL AND r.gvpb_deadline <= CURRENT_TIMESTAMP)) "
+                        + facultyScope
+                        + " ORDER BY t.title",
+                facultyId == null
+                        ? params().addValue("roundId", roundId)
+                        : params().addValue("roundId", roundId).addValue("facultyId", facultyId),
+                (rs, ignored) -> new PublishResultsExcludedTopic(
+                        (UUID) rs.getObject("id"), rs.getString("title"),
+                        rs.getString("result_status"), rs.getString("result_reason")));
     }
 
     /**
@@ -759,6 +813,9 @@ public class ThesisMutationService {
      */
     @Transactional
     public TopicResponse withdrawTopic(UUID id, String reason, Jwt actor) {
+        // Service-level guard: the controller annotation alone must not be the
+        // only role check on a governance outcome.
+        requireGovernanceRole(actor);
         String cleanReason = requireReason(reason);
         requireMutableTopicRound(id);
         lockTopicForGovernance(id);
@@ -793,6 +850,7 @@ public class ThesisMutationService {
      */
     @Transactional
     public TopicResponse reinstateTopic(UUID id, String reason, Jwt actor) {
+        requireGovernanceRole(actor);
         String cleanReason = requireReason(reason);
         requireMutableTopicRound(id);
         lockTopicForGovernance(id);
@@ -807,15 +865,11 @@ public class ThesisMutationService {
         if (!"WITHDRAWN".equals(topic.get("result_status"))) {
             throw conflict("TOPIC_NOT_WITHDRAWN", "Only a withdrawn topic can be reinstated");
         }
-        // Derived rule mirrors ThesisCouncilService.syncReviewOutcome: a live
-        // sub-threshold counter-review without a waiver marks the topic again.
-        List<java.math.BigDecimal> gvpbScores = jdbc.queryForList(
-                "SELECT score FROM thesis.thesis_topic_score WHERE topic_id = :id AND component = 'GVPB' "
-                        + "ORDER BY graded_at DESC, created_at DESC",
-                params().addValue("id", id), java.math.BigDecimal.class);
-        boolean failed = topic.get("gvpb_waived_reason") == null && !gvpbScores.isEmpty()
-                && gvpbScores.get(0) != null
-                && gvpbScores.get(0).compareTo(java.math.BigDecimal.valueOf(5.0)) < 0;
+        // Derived rule mirrors ThesisCouncilService.syncReviewOutcome through
+        // the shared ThesisReviewOutcome helper: a live sub-threshold
+        // counter-review without a waiver marks the topic again.
+        boolean failed = topic.get("gvpb_waived_reason") == null
+                && ThesisReviewOutcome.isFailingScore(ThesisReviewOutcome.latestGvpbScore(jdbc, id));
         jdbc.update(
                 "UPDATE thesis.thesis_topic SET result_status = :outcome, "
                         + "result_reason = CASE WHEN :outcome = 'REVIEW_FAILED' THEN 'Counter-review score below the 5.0 pass threshold' ELSE NULL END, "
@@ -832,6 +886,13 @@ public class ThesisMutationService {
                 Map.of("result_status", failed ? "REVIEW_FAILED" : ""));
         return TopicResponse.from(topics.findById(id).orElseThrow(
                 () -> notFound("TOPIC_NOT_FOUND", "Thesis topic not found")));
+    }
+
+    private void requireGovernanceRole(Jwt actor) {
+        if (!isAdmin(actor)) {
+            throw new DomainException(HttpStatus.FORBIDDEN, "GOVERNANCE_ROLE_REQUIRED",
+                    "This action requires an admin or faculty head role");
+        }
     }
 
     private void requireMutableTopicRound(UUID topicId) {
@@ -899,11 +960,16 @@ public class ThesisMutationService {
      */
     @Transactional
     public RoundResponse publishResults(UUID id) {
-        return publishResults(id, null);
+        return publishResults(id, null, null);
     }
 
     @Transactional
     public RoundResponse publishResults(UUID id, Jwt actor) {
+        return publishResults(id, null, actor);
+    }
+
+    @Transactional
+    public RoundResponse publishResults(UUID id, Boolean confirmAllExcluded, Jwt actor) {
         roundReadPort.requireExisting(id);
         // Lock the round row so a concurrent approveGroup cannot commit between
         // the completeness check below and the guarded status transition.
@@ -913,24 +979,53 @@ public class ThesisMutationService {
         Integer approved = jdbc.queryForObject(
                 "SELECT COUNT(*) FROM thesis.thesis_group WHERE round_id = :id AND approval_status = 'APPROVED'",
                 params().addValue("id", id), Integer.class);
-        // Topics that can no longer complete — a counter-review below the pass
-        // threshold or a governance withdrawal — carry an explicit outcome on
-        // thesis_topic.result_status and are excluded from the completeness
-        // requirement. Without this a single ungradeable topic held every
-        // other group's publication hostage.
+        // A sub-threshold counter-review is provisional while its window stays
+        // open — the reviewer can still overwrite it — so it neither excludes
+        // the topic nor may the round publish past it. Listed by id so the
+        // operator can re-review, withdraw, or wait for the deadline.
+        List<String> openReview = jdbc.queryForList(
+                "SELECT CAST(t.id AS VARCHAR) || ' ' || t.title FROM thesis.thesis_topic t "
+                        + "JOIN thesis.thesis_registration_round r ON r.id = t.round_id "
+                        + "WHERE t.round_id = :id AND t.result_status = 'REVIEW_FAILED' "
+                        + "AND (r.gvpb_deadline IS NULL OR r.gvpb_deadline > CURRENT_TIMESTAMP) "
+                        + "ORDER BY t.id",
+                params().addValue("id", id), String.class);
+        if (!openReview.isEmpty()) {
+            throw conflict("REVIEW_WINDOW_OPEN",
+                    "The counter-review window is still open for " + openReview.size()
+                            + " topic(s): " + String.join(", ", openReview));
+        }
+        // Only definitive exclusions release the completeness check: WITHDRAWN
+        // always does, REVIEW_FAILED does once its window has closed.
+        String excludedCond = "(t.result_status = 'WITHDRAWN' OR (t.result_status = 'REVIEW_FAILED' "
+                + "AND r.gvpb_deadline IS NOT NULL AND r.gvpb_deadline <= CURRENT_TIMESTAMP))";
+        // NOT <cond> is NULL (never true) for a NULL result_status, so the
+        // included predicate must handle the no-outcome row explicitly.
+        String includedCond = "(t.result_status IS NULL OR NOT " + excludedCond + ")";
         Integer included = jdbc.queryForObject(
                 "SELECT COUNT(*) FROM thesis.thesis_group g JOIN thesis.thesis_topic t ON t.id = g.topic_id "
+                        + "JOIN thesis.thesis_registration_round r ON r.id = t.round_id "
                         + "WHERE g.round_id = :id AND g.approval_status = 'APPROVED' "
-                        + "AND (t.result_status IS NULL OR t.result_status NOT IN ('REVIEW_FAILED', 'WITHDRAWN'))",
+                        + "AND " + includedCond,
                 params().addValue("id", id), Integer.class);
         Integer ungraded = jdbc.queryForObject(
                 "SELECT COUNT(*) FROM thesis.thesis_group g JOIN thesis.thesis_topic t ON t.id = g.topic_id "
+                        + "JOIN thesis.thesis_registration_round r ON r.id = t.round_id "
                         + "WHERE g.round_id = :id AND g.approval_status = 'APPROVED' "
-                        + "AND t.final_score IS NULL "
-                        + "AND (t.result_status IS NULL OR t.result_status NOT IN ('REVIEW_FAILED', 'WITHDRAWN'))",
+                        + "AND t.final_score IS NULL AND " + includedCond,
                 params().addValue("id", id), Integer.class);
-        if (approved == null || approved == 0 || (included != null && included > 0
-                && ungraded != null && ungraded.equals(included))) {
+        if (approved == null || approved == 0) {
+            throw conflict("RESULTS_NOT_READY", "No approved group exists; there is nothing to publish");
+        }
+        // Publishing a result set where every approved group is excluded must
+        // be a deliberate act: the operator confirms in the request and the
+        // audit names the confirmation.
+        if ((included == null || included == 0) && !Boolean.TRUE.equals(confirmAllExcluded)) {
+            throw conflict("RESULTS_ALL_EXCLUDED",
+                    "Every approved group's topic is excluded from publication; "
+                            + "pass confirmAllExcluded to publish anyway");
+        }
+        if (included != null && included > 0 && ungraded != null && ungraded.equals(included)) {
             throw conflict("RESULTS_NOT_READY", "No topic has been graded yet; the chair must finalize scores first");
         }
         if (ungraded != null && ungraded > 0) {
@@ -955,10 +1050,16 @@ public class ThesisMutationService {
                         + "WHERE t.round_id = :id AND t.result_status IN ('REVIEW_FAILED', 'WITHDRAWN') ORDER BY t.id",
                 params().addValue("id", id), String.class);
         RoundResponse response = transitionRound(id, RoundStatus.REGISTRATION_CLOSED, RoundStatus.RESULTS_PUBLISHED, actor);
+        jdbc.update(
+                "UPDATE thesis.thesis_registration_round SET results_published_at = CURRENT_TIMESTAMP WHERE id = :id",
+                params().addValue("id", id));
         if (!excluded.isEmpty()) {
+            String confirmation = (included == null || included == 0)
+                    ? " (operator confirmed an all-excluded publication via confirmAllExcluded)" : "";
             audit.record(subject(actor), null, "THESIS_RESULTS_PUBLISHED_WITH_EXCLUSIONS", "THESIS_ROUND",
                     id.toString(),
-                    "Results published excluding " + excluded.size() + " topic(s): " + String.join(", ", excluded));
+                    "Results published excluding " + excluded.size() + " topic(s): " + String.join(", ", excluded)
+                            + confirmation);
         }
         if (notifier != null) {
             if (TransactionSynchronizationManager.isSynchronizationActive()) {

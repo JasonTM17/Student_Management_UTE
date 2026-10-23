@@ -70,7 +70,7 @@ public final class ThesisMutationDtos {
     }
 
     /** The audited counter-review deadline escape hatch for a live round. */
-    public record GvpbDeadlineUpdateRequest(Instant gvpbDeadline) {
+    public record GvpbDeadlineUpdateRequest(Instant gvpbDeadline, String reason) {
     }
 
     /** Reason-carrying payload for the topic outcome escape hatches. */
@@ -78,9 +78,19 @@ public final class ThesisMutationDtos {
     }
 
     /**
+     * Publish body: {@code confirmAllExcluded} is the explicit acknowledgement
+     * required when every approved group's topic is excluded — an otherwise
+     * silent empty publication.
+     */
+    public record PublishResultsRequest(Boolean confirmAllExcluded) {
+    }
+
+    /**
      * Consequence preview for publish-results: the group tallies and the
      * topics excluded from the completeness requirement with their outcome
      * (REVIEW_FAILED or WITHDRAWN) so the confirm dialog is never blind.
+     * {@code openReviewTopics} lists the topics whose counter-review verdict
+     * is still provisional while the GVPB window is open.
      */
     public record PublishResultsPreviewResponse(
             long groupCount,
@@ -88,7 +98,8 @@ public final class ThesisMutationDtos {
             long pendingApprovalGroupCount,
             long includedGroupCount,
             long ungradedGroupCount,
-            List<PublishResultsExcludedTopic> excludedTopics) {
+            List<PublishResultsExcludedTopic> excludedTopics,
+            List<PublishResultsExcludedTopic> openReviewTopics) {
     }
 
     /** One topic excluded from publication completeness, with its outcome. */
