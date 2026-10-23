@@ -105,9 +105,22 @@ public class AnnouncementStudentNotifier {
                     message,
                     TYPE,
                     LINK,
-                    now));
+                    now,
+                    announcement.id()));
         }
         return notifications.createBatch(commands);
+    }
+
+    /**
+     * Recalls the fan-out of an archived or deleted announcement: removes every
+     * inbox row this announcement delivered. Rows written before the link
+     * column existed carry NULL and are deliberately left alone — nothing on
+     * them identifies their origin safely. Owns its own transaction like the
+     * fan-out so a recall failure can never poison the lifecycle write.
+     */
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public int recallForAnnouncement(String announcementId) {
+        return notifications.deleteByAnnouncementId(announcementId);
     }
 
     private static String nullToEmpty(String value) {
