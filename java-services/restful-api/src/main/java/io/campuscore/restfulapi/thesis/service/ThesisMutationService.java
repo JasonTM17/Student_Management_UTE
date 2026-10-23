@@ -997,11 +997,14 @@ public class ThesisMutationService {
         // the opposite order deadlocks under real Postgres row locks.
         GroupRow group = lockGroup(groupId);
         requireRoundStatus(group.roundId(), RoundStatus.REGISTRATION_CLOSED);
-        // The dean must govern either the topic's department or (topicless
-        // groups only) a member's curriculum — identical to the sibling
-        // group-scope endpoints; a foreign dean otherwise reaches past their
-        // faculty through this escape hatch.
-        if (!isGroupAdmin(group, actor)) {
+        // Post-close roster writes are governance, not review: the dean must
+        // govern the faculty that owns the group (the topic's department or,
+        // for topicless groups, a member's curriculum). The dean-supervisor
+        // escape {@link #isGroupAdmin} keeps for ordinary review work would
+        // otherwise let a foreign dean rewrite an approved roster — including
+        // the size-exception marker the sibling waiver already reserves to
+        // the owning faculty.
+        if (!canGovernGroupScope(group, actor)) {
             throw notFound("THESIS_GROUP_NOT_FOUND", "Thesis group not found");
         }
         Integer topicScores = jdbc.queryForObject(
@@ -1192,11 +1195,13 @@ public class ThesisMutationService {
                 "SELECT round_id, status, max_groups, result_status, final_score FROM thesis.thesis_topic "
                         + "WHERE id = :id FOR UPDATE",
                 params().addValue("id", newTopicId), "TOPIC_NOT_FOUND", "Thesis topic not found");
-        // A dean may only re-point between topics inside their own faculty;
-        // foreign topics conceal as not-found on either end.
+        // Re-pointing is post-close governance, not supervision: a dean may
+        // only re-point between topics inside their own faculty — supervising
+        // either end from another faculty confers no write. Foreign topics
+        // conceal as not-found on either end.
         if (!ThesisDeanScope.isGlobalAdmin(actor)) {
-            ThesisDeanScope.requireTopicAccess(jdbc, actor, oldTopicId);
-            ThesisDeanScope.requireTopicAccess(jdbc, actor, newTopicId);
+            ThesisDeanScope.requireTopicGovernanceScope(jdbc, actor, oldTopicId);
+            ThesisDeanScope.requireTopicGovernanceScope(jdbc, actor, newTopicId);
         }
         // Any score on either side freezes the binding: re-pointing a scored
         // pair would silently move a verdict the group never earned.
@@ -2090,7 +2095,7 @@ public class ThesisMutationService {
             // The waiver is governance-only: a topic supervisor reviews normal
             // rosters but cannot approve under the faculty minimum — and a
             // dean supervising from another faculty is still only a reviewer.
-            if (!canWaiveGroupSize(group, actor)) {
+            if (!canGovernGroupScope(group, actor)) {
                 throw new DomainException(HttpStatus.FORBIDDEN, "GOVERNANCE_ROLE_REQUIRED",
                         "An under-size approval requires an admin or faculty head role");
             }
@@ -2340,18 +2345,25 @@ public class ThesisMutationService {
     }
 
     /**
-     * The under-minimum approval waiver is narrower than group governance:
-     * {@link #isGroupAdmin} lets a dean review the groups they personally
-     * supervise, but waiving the faculty minimum requires the topic's own
-     * faculty — supervising it from another faculty is still only review.
+     * Post-close group governance is narrower than {@link #isGroupAdmin}: the
+     * dean-supervisor branch there lets a dean review the groups they
+     * personally supervise, but writing post-close roster state — the
+     * override or the under-minimum waiver — requires the faculty that owns
+     * the group. Supervising its topic from another faculty is still only
+     * review.
      */
-    private boolean canWaiveGroupSize(GroupRow group, Jwt actor) {
+    private boolean canGovernGroupScope(GroupRow group, Jwt actor) {
         if (isGlobalAdmin(actor)) return true;
         if (!hasRole(actor, "TRUONG_KHOA")) return false;
         return groups.groupInFaculty(group.id(), requireDeanScope(actor).facultyId());
     }
 
-    /** Group governance is faculty-bound; round/topic lifecycle authority is separate. */
+    /**
+     * Ordinary group authority is faculty-bound OR supervisor-bound: a dean
+     * who supervises the group's topic keeps review/member-management rights
+     * across faculties. Post-close writes use {@link #canGovernGroupScope}
+     * instead, which drops that supervisor escape.
+     */
     private boolean isGroupAdmin(GroupRow group, Jwt actor) {
         if (isGlobalAdmin(actor)) return true;
         if (!hasRole(actor, "TRUONG_KHOA")) return false;
