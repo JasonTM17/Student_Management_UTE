@@ -8,7 +8,7 @@ import { tokens } from '../../design/tokens';
 import type { UserRole } from '../../navigation/routes';
 import type { MobileScreenProps } from '../../navigation/types';
 
-function resolveRole(roles: readonly string[] | undefined): UserRole {
+function resolveRole(roles: readonly string[] | undefined): UserRole | null {
   const normalizedRoles = new Set((roles ?? []).map((role) => role.toUpperCase()));
   if (normalizedRoles.has('ADMIN')) {
     return 'admin';
@@ -16,7 +16,10 @@ function resolveRole(roles: readonly string[] | undefined): UserRole {
   if (normalizedRoles.has('LECTURER') || normalizedRoles.has('FACULTY') || normalizedRoles.has('TEACHER')) {
     return 'lecturer';
   }
-  return 'student';
+  if (normalizedRoles.has('STUDENT')) {
+    return 'student';
+  }
+  return null;
 }
 
 export function SignInScreen({ navigation }: MobileScreenProps) {
