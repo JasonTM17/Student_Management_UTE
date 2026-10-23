@@ -20,6 +20,13 @@ import org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable;
 /**
  * Exercises the forward-only upgrade against a dedicated database. It never cleans or drops a
  * schema: V90's seeded member is turned into preserved cancelled history before V91 is applied.
+ *
+ * <p>The configured {@code CAMPUSCORE_E2E_POSTGRES_UPGRADE_URL} must name a database reserved
+ * for this IT alone: the scenario migrates and asserts absolute table state, so sharing the
+ * database with another upgrade IT (for example
+ * {@link ThesisReportApprovalConsistencyPostgresIT}, which self-provisions its own scratch
+ * databases alongside the configured one) makes both suites interfere. Point the variable at a
+ * per-run scratch database, or run the two classes against different databases.
  */
 @TestMethodOrder(OrderAnnotation.class)
 @EnabledIfEnvironmentVariable(named = "CAMPUSCORE_E2E_POSTGRES_UPGRADE_URL", matches = "jdbc:postgresql:.+")

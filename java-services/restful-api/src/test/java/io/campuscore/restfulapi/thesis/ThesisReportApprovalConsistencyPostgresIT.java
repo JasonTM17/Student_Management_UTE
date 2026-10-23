@@ -44,7 +44,7 @@ class ThesisReportApprovalConsistencyPostgresIT {
 
     @Test
     void reportBearingSeededGroupsAreApprovedAfterTheRepairMigration() throws Exception {
-        String url = System.getenv("CAMPUSCORE_E2E_POSTGRES_UPGRADE_URL");
+        String url = scratchDatabase("_repair");
         String user = valueOr("CAMPUSCORE_E2E_POSTGRES_UPGRADE_USER", "campuscore");
         String password = valueOr("CAMPUSCORE_E2E_POSTGRES_UPGRADE_PASSWORD", "postgres");
 

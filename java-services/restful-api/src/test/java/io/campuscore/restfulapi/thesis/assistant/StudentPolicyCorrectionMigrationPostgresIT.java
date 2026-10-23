@@ -74,7 +74,7 @@ class StudentPolicyCorrectionMigrationPostgresIT {
                       FROM assistant.knowledge_document d WHERE NOT (d.id=ANY(?::uuid[]))
                     """, (Object) seeds.toArray(UUID[]::new))).isEqualTo(nonSeedAuthoring);
             assertSourceAlignedPolicyCopy(connection);
-            assertLatestPublishedProjection(connection, V96_RELEASE);
+            assertSnapshotProjectionWithCorrections(connection, V96_RELEASE);
             String stableRelease = releaseFingerprint(connection, V96_RELEASE);
             String stableRuntime = runtimeFingerprint(connection, V96_RELEASE);
             fixture.migrate("96");
@@ -203,53 +203,92 @@ class StudentPolicyCorrectionMigrationPostgresIT {
                      WHERE document_id=ANY(?::uuid[]) AND version=2 AND state='PUBLISHED'
                     """, (Object) untouched)).isEqualTo(20);
             assertThat(activeRelease(observer)).isEqualTo(V96_RELEASE.toString());
-            assertLatestPublishedProjection(observer, V96_RELEASE);
+            assertSnapshotProjectionWithCorrections(observer, V96_RELEASE);
         }
     }
 
     private static void assertSourceAlignedPolicyCopy(Connection connection) throws SQLException {
         String attendanceVi = runtimeContent(connection, V96_RELEASE, "catalog-attendance-policy-vi");
         String attendanceEn = runtimeContent(connection, V96_RELEASE, "catalog-attendance-policy-en");
-        assertThat(attendanceVi).contains("20%").doesNotContain("vắng quá 80%");
-        assertThat(attendanceEn).contains("20%").doesNotContain("absent from more than 80%");
+        // The corrected copy states the 20% absence ban and contrasts it with
+        // the mistaken 80% reading, so the oracle must name the claim form —
+        // the bare phrase "vắng quá 80%" legitimately appears inside the
+        // negation that explains the correction.
+        assertThat(attendanceVi)
+                .contains("vắng quá 20% dẫn đến cấm thi")
+                .doesNotContain("vắng quá 80% dẫn đến cấm thi");
+        assertThat(attendanceEn)
+                .contains("20% absence results in an exam ban")
+                .doesNotContain("absent from more than 80%", "80% absence results in an exam ban");
         assertThat(runtimeContent(connection, V96_RELEASE, "faq-student-certificates-vi"))
                 .doesNotContain("gửi yêu cầu ngay trên cổng", "hệ thống ghi nhận trạng thái từ lúc tiếp nhận đến khi hoàn thành");
         assertThat(runtimeContent(connection, V96_RELEASE, "faq-student-certificates-en"))
                 .doesNotContain("request them directly in the portal", "system tracks the status from intake to completion");
+        // Same claim-form oracle as attendance: the corrected copy keeps the
+        // "first two weeks" / "hoàn đầy đủ" vocabulary inside an explicit
+        // non-commitment, so assert the corrected claim and reject the old
+        // affirmative promise form instead of bare phrases.
         assertThat(runtimeContent(connection, V96_RELEASE, "policy-tuition-refund-vi"))
-                .doesNotContain("trong hai tuần đầu", "hoàn đầy đủ");
+                .contains("không có căn cứ để cam kết hoàn toàn bộ trong hai tuần đầu")
+                .doesNotContain("thường được hoàn đầy đủ");
         assertThat(runtimeContent(connection, V96_RELEASE, "policy-tuition-refund-en"))
-                .doesNotContain("first two weeks", "usually fully refunded");
+                .contains("no verified basis here for promising a full refund during the first two weeks")
+                .doesNotContain("usually fully refunded");
         assertThat(runtimeContent(connection, V96_RELEASE, "reg-credit-transfer-vi"))
                 .doesNotContain("hai phần ba", "2/3");
         assertThat(runtimeContent(connection, V96_RELEASE, "reg-credit-transfer-en"))
                 .doesNotContain("two thirds", "2/3");
     }
 
-    private static void assertLatestPublishedProjection(Connection connection, UUID release) throws SQLException {
+    /**
+     * The release is an immutable snapshot — the previous release's projected
+     * rows verbatim except hash-guarded documents, which project the migration's
+     * corrective revision. Later human revisions stay in the authoring tables;
+     * they are deliberately not republished into this release (the migration's
+     * own comment says so), so a latest-published projection oracle would be
+     * asserting semantics the design explicitly rejects.
+     */
+    private static void assertSnapshotProjectionWithCorrections(Connection connection, UUID release) throws SQLException {
         assertThat(count(connection, "SELECT COUNT(*) FROM assistant.knowledge_runtime_document WHERE release_id=?", release))
                 .isEqualTo(count(connection, "SELECT row_count FROM assistant.knowledge_release WHERE id=?", release));
         assertThat(count(connection, """
                 SELECT COUNT(*) FROM assistant.knowledge_runtime_document p
-                 WHERE p.release_id=? AND (p.revision_id IS NULL OR p.version<>(
-                    SELECT MAX(r.version) FROM assistant.knowledge_document_revision r
-                     WHERE r.document_id::text=p.source_id AND r.state='PUBLISHED'))
-                """, release)).isZero();
+                 JOIN assistant.knowledge_document_revision r ON r.id = p.revision_id
+                WHERE p.release_id=? AND r.created_by='system-migration' AND r.version=2 AND r.state='PUBLISHED'
+                """, release)).isEqualTo(count(connection, """
+                SELECT COUNT(*) FROM assistant.knowledge_document_revision
+                 WHERE created_by='system-migration' AND version=2 AND state='PUBLISHED'
+                """));
         assertThat(count(connection, """
-                WITH latest AS (
-                    SELECT DISTINCT ON (document_id) * FROM assistant.knowledge_document_revision
-                     WHERE state='PUBLISHED' ORDER BY document_id,version DESC
-                ), expected AS (
-                    SELECT d.id::text AS source_id,r.id AS revision_id,r.version,r.domain,r.slug,r.locale,
-                           r.title,r.content,r.source,r.priority,TRUE AS active,'PUBLIC'::varchar AS visibility
-                      FROM assistant.knowledge_document d JOIN latest r ON r.document_id=d.id
-                     WHERE d.active AND d.visibility='PUBLIC'
-                ), actual AS (
-                    SELECT source_id,revision_id,version,domain,slug,locale,title,content,source,priority,active,visibility
-                      FROM assistant.knowledge_runtime_document WHERE release_id=?
-                ) SELECT COUNT(*) FROM ((SELECT * FROM expected EXCEPT SELECT * FROM actual)
-                    UNION ALL (SELECT * FROM actual EXCEPT SELECT * FROM expected)) differences
-                """, release)).isZero();
+                SELECT COUNT(*) FROM (
+                    (SELECT p.source_id,p.revision_id,p.version,p.domain,p.slug,p.locale,p.title,p.content,
+                            p.source,p.priority,p.active,p.visibility
+                       FROM assistant.knowledge_runtime_document p
+                      WHERE p.release_id=? AND NOT EXISTS (
+                         SELECT 1 FROM assistant.knowledge_document_revision r
+                          WHERE r.id=p.revision_id AND r.created_by='system-migration' AND r.version=2)
+                     EXCEPT
+                     SELECT p95.source_id,p95.revision_id,p95.version,p95.domain,p95.slug,p95.locale,p95.title,p95.content,
+                            p95.source,p95.priority,p95.active,p95.visibility
+                       FROM assistant.knowledge_runtime_document p95
+                      WHERE p95.release_id='00000000-0000-0000-0000-000000000095'::uuid)
+                    UNION ALL
+                    (SELECT p95.source_id,p95.revision_id,p95.version,p95.domain,p95.slug,p95.locale,p95.title,p95.content,
+                            p95.source,p95.priority,p95.active,p95.visibility
+                       FROM assistant.knowledge_runtime_document p95
+                      WHERE p95.release_id='00000000-0000-0000-0000-000000000095'::uuid
+                        AND NOT EXISTS (
+                         SELECT 1 FROM assistant.knowledge_document_revision r
+                          WHERE r.document_id::text=p95.source_id AND r.created_by='system-migration' AND r.version=2)
+                     EXCEPT
+                     SELECT p.source_id,p.revision_id,p.version,p.domain,p.slug,p.locale,p.title,p.content,
+                            p.source,p.priority,p.active,p.visibility
+                       FROM assistant.knowledge_runtime_document p
+                      WHERE p.release_id=? AND NOT EXISTS (
+                         SELECT 1 FROM assistant.knowledge_document_revision r
+                          WHERE r.id=p.revision_id AND r.created_by='system-migration' AND r.version=2))
+                ) differences
+                """, release, release)).isZero();
     }
 
     private static void assertV95(Connection connection) throws SQLException {
