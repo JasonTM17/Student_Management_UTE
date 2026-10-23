@@ -89,9 +89,11 @@ export default function GvpbReviewPanel({
                 <p className="text-xs text-muted-foreground italic">
                   {topic.finalScore != null
                     ? copy.finalizedLocked
-                    : roundTerminal
-                      ? copy.roundClosed
-                      : copy.deadlinePassed}
+                    : round?.status === 'CANCELLED'
+                      ? copy.roundCancelled
+                      : roundTerminal
+                        ? copy.roundClosed
+                        : copy.deadlinePassed}
                 </p>
               ) : (
                 <div className="flex flex-wrap items-end gap-3">

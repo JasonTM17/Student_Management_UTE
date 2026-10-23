@@ -30,7 +30,7 @@ import { useConfirmationDialog } from '@/components/ui/use-confirmation-dialog';
 import { metricToneClass, statusToneClass } from '@/components/ui/status';
 import { cn } from '@/lib/utils';
 import { toThesisLocalInput as toLocalInput } from '@/lib/thesis-datetime';
-import { sortThesisRoundsForOverview } from '@/lib/thesis-round';
+import { planThesisRoundRestore, sortThesisRoundsForOverview } from '@/lib/thesis-round';
 import {
   EmptyState,
   ForbiddenState,
@@ -48,6 +48,7 @@ import {
   type ThesisCouncilMemberRole,
   type ThesisGroup,
   type ThesisRound,
+  type ThesisRoundStatus,
   type ThesisTopic,
 } from '@/lib/thesis-api';
 
@@ -139,6 +140,13 @@ export default function AdminThesisPage() {
   const [extendDeadlineRoundId, setExtendDeadlineRoundId] = useState('');
   const [extendDeadlineValue, setExtendDeadlineValue] = useState('');
   const [extendDeadlineError, setExtendDeadlineError] = useState('');
+
+  // Restore-with-target modal: shown only when no implicit restore exists —
+  // a legacy cancellation that still holds groups, or a REGISTRATION_OPEN
+  // marker whose window already passed.
+  const [restoreTargetRound, setRestoreTargetRound] = useState<ThesisRound | null>(null);
+  const [restoreTargets, setRestoreTargets] = useState<ThesisRoundStatus[]>([]);
+  const [restoreStatusDraft, setRestoreStatusDraft] = useState<ThesisRoundStatus | ''>('');
 
   // GVPB counter-reviewer assignment drafts, keyed by topic id
   const [reviewerDrafts, setReviewerDrafts] = useState<Record<string, string>>({});
@@ -577,6 +585,55 @@ export default function AdminThesisPage() {
     }
   };
 
+  const performRestore = async (roundId: string, targetStatus?: ThesisRoundStatus) => {
+    setIsSaving(true);
+    setError('');
+    setSuccess('');
+    try {
+      await thesisApi.restoreRound(roundId, targetStatus);
+      setSuccess(messages.thesis.admin.roundRestored);
+      setRestoreTargetRound(null);
+      await loadData();
+      if (expandedRoundId === roundId) {
+        await loadRoundDetail(roundId);
+      }
+    } catch (err: unknown) {
+      setError(transitionErrorMessage(err));
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const restoreRound = async (round: ThesisRound) => {
+    // Whether a choice is required depends on the live groups still attached,
+    // so fetch them fresh — the roster can change while the row sits cancelled.
+    let hasLiveGroups = false;
+    try {
+      hasLiveGroups = (await thesisApi.listGroups(round.id))
+        .some((group) => group.status !== 'CANCELLED');
+    } catch {
+      setError(messages.thesis.loadFailed);
+      return;
+    }
+    const plan = planThesisRoundRestore(round, hasLiveGroups);
+    if (plan.requiresChoice) {
+      setRestoreTargetRound(round);
+      setRestoreTargets(plan.explicitTargets);
+      setRestoreStatusDraft(plan.explicitTargets[0]);
+      return;
+    }
+    const confirmed = await confirm({
+      title: messages.thesis.admin.restoreRoundTitle,
+      message: round.cancelledFromStatus
+        ? messages.thesis.admin.restoreRoundConfirm
+        : messages.thesis.admin.restoreRoundConfirmLegacy,
+      confirmText: messages.thesis.admin.restoreRound,
+      cancelText: messages.common.actions.cancel,
+    });
+    if (!confirmed) return;
+    await performRestore(round.id);
+  };
+
   const handleAssignReviewer = async (topicId: string, roundId: string) => {
     const lecturerId = reviewerDrafts[topicId];
     if (!lecturerId) return;
@@ -818,6 +875,17 @@ export default function AdminThesisPage() {
                               disabled={isSaving}
                             >
                               {messages.thesis.admin.editRound}
+                            </Button>
+                          ) : null}
+                          {round.status === 'CANCELLED' ? (
+                            <Button
+                              type="button"
+                              size="sm"
+                              variant="outline"
+                              onClick={() => void restoreRound(round)}
+                              disabled={isSaving}
+                            >
+                              {messages.thesis.admin.restoreRound}
                             </Button>
                           ) : null}
                           {round.status !== 'RESULTS_PUBLISHED'
@@ -1523,6 +1591,51 @@ export default function AdminThesisPage() {
               disabled={isSaving || !extendDeadlineValue}
             >
               {messages.thesis.admin.reportDeadlineExtend}
+            </Button>
+          </div>
+        </div>
+      </Modal>
+      <Modal
+        isOpen={restoreTargetRound !== null}
+        onClose={() => {
+          if (!isSaving) setRestoreTargetRound(null);
+        }}
+        title={messages.thesis.admin.restoreRoundTitle}
+      >
+        <div className="space-y-4">
+          <p className="text-sm text-muted-foreground">
+            {restoreTargetRound?.cancelledFromStatus
+              ? messages.thesis.admin.restoreRoundWindowPassed
+              : messages.thesis.admin.restoreRoundPickTargetRequired}
+          </p>
+          <Select
+            label={messages.thesis.admin.restoreTargetLabel}
+            value={restoreStatusDraft}
+            onChange={(e) => setRestoreStatusDraft(e.target.value as ThesisRoundStatus)}
+            options={restoreTargets.map((status) => ({
+              value: status,
+              label: messages.thesis.status[status] ?? status,
+            }))}
+          />
+          <div className="flex justify-end gap-2 pt-2">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setRestoreTargetRound(null)}
+              disabled={isSaving}
+            >
+              {messages.common.actions.cancel}
+            </Button>
+            <Button
+              type="button"
+              onClick={() => {
+                if (restoreTargetRound && restoreStatusDraft) {
+                  void performRestore(restoreTargetRound.id, restoreStatusDraft);
+                }
+              }}
+              disabled={isSaving || !restoreStatusDraft}
+            >
+              {messages.thesis.admin.restoreRound}
             </Button>
           </div>
         </div>

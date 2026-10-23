@@ -49,6 +49,33 @@ test('a cancelled membership yields to an active one', () => {
   assert.equal(pickPreferredThesisRound(rounds, mine), 'a');
 });
 
+test('a membership in a cancelled round is never pinned', () => {
+  // The seat is void: leaving the default selection alone lets the student
+  // land on a round they can actually join instead of the dead round.
+  const rounds = [
+    round('round-open', 'REGISTRATION_OPEN', '2027-01-10'),
+    round('round-cancelled', 'CANCELLED', '2026-09-15'),
+  ];
+  const mine = [group('round-cancelled', 'SUBMITTED')];
+  assert.equal(pickPreferredThesisRound(rounds, mine), undefined);
+});
+
+test('a live-round membership still wins over one in a cancelled round', () => {
+  const rounds = [
+    round('round-cancelled', 'CANCELLED', '2026-09-15'),
+    round('round-live', 'REGISTRATION_CLOSED', '2026-09-10'),
+  ];
+  const mine = [group('round-cancelled', 'SUBMITTED'), group('round-live', 'SUBMITTED')];
+  assert.equal(pickPreferredThesisRound(rounds, mine), 'round-live');
+});
+
+test('a cancelled group inside a live round still anchors to that round', () => {
+  // The round itself is alive — the student can form a new group there, so
+  // the historical membership still points them at it.
+  const rounds = [round('a', 'REGISTRATION_OPEN')];
+  assert.equal(pickPreferredThesisRound(rounds, [group('a', 'CANCELLED')]), 'a');
+});
+
 test('groups in unknown rounds are ignored', () => {
   const rounds = [round('a')];
   assert.equal(pickPreferredThesisRound(rounds, [group('ghost')]), undefined);

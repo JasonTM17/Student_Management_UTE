@@ -44,6 +44,10 @@ export interface ThesisRound {
   reportDate?: string | null;
   defenseDate?: string | null;
   status: ThesisRoundStatus;
+  /** Status captured when the round was cancelled; null unless it is
+   * currently CANCELLED (older cancellations carry nothing and restore to
+   * DRAFT). */
+  cancelledFromStatus?: ThesisRoundStatus | null;
 }
 
 export interface ThesisTopicSupervisor {
@@ -155,6 +159,7 @@ export interface ThesisProgressResponse {
   attentionState:
     | 'NONE'
     | 'NOT_PARTICIPATING'
+    | 'ROUND_CANCELLED'
     | 'GROUP_REJECTED'
     | 'GROUP_CANCELLED'
     | 'GROUP_INVALID_MEMBER_COUNT'
@@ -692,6 +697,19 @@ export const thesisApi = {
   cancelRound: async (roundId: string): Promise<ThesisRound> => {
     const response = await api.post<ThesisRound>(
       '/thesis/rounds/' + roundId + '/cancel',
+    );
+    return response.data;
+  },
+
+  /** Reverts a cancellation: the round returns to the status captured at
+   * cancel time (DRAFT for rows cancelled before the marker existed). */
+  restoreRound: async (
+    roundId: string,
+    targetStatus?: ThesisRoundStatus,
+  ): Promise<ThesisRound> => {
+    const response = await api.post<ThesisRound>(
+      '/thesis/rounds/' + roundId + '/restore',
+      targetStatus ? { targetStatus } : {},
     );
     return response.data;
   },
