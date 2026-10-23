@@ -56,6 +56,7 @@ class AcademicAdminAuditPersistenceTest {
                 message VARCHAR(2000) NOT NULL,
                 type VARCHAR(16) NOT NULL,
                 link VARCHAR(240),
+                announcement_id VARCHAR(120),
                 is_read BOOLEAN DEFAULT FALSE,
                 read_at TIMESTAMP,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,

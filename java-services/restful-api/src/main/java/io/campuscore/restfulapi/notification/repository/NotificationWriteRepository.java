@@ -22,8 +22,8 @@ public class NotificationWriteRepository {
     private static final String TABLE = "notifications.notification";
 
     private static final String INSERT_SQL = "INSERT INTO " + TABLE
-            + " (id, user_id, title, message, type, link, is_read, read_at, created_at, updated_at)"
-            + " VALUES (:id, :userId, :title, :message, :type, :link, FALSE, NULL, :createdAt, :createdAt)";
+            + " (id, user_id, title, message, type, link, announcement_id, is_read, read_at, created_at, updated_at)"
+            + " VALUES (:id, :userId, :title, :message, :type, :link, :announcementId, FALSE, NULL, :createdAt, :createdAt)";
 
     private static final String SELECT_COLUMNS = """
             id, user_id, title, message, type, link, is_read, read_at, created_at, updated_at
@@ -105,6 +105,7 @@ public class NotificationWriteRepository {
                 .addValue("message", command.message())
                 .addValue("type", command.type())
                 .addValue("link", command.link())
+                .addValue("announcementId", command.announcementId())
                 .addValue("createdAt", Timestamp.from(command.createdAt()));
     }
 
@@ -139,6 +140,17 @@ public class NotificationWriteRepository {
                 new MapSqlParameterSource()
                         .addValue("id", notificationId)
                         .addValue("userId", userId));
+    }
+
+    /**
+     * Recall path for the announcement fan-out: removes every inbox row a
+     * published announcement delivered. Rows predating the link column (or
+     * written by other producers) carry NULL and are deliberately untouched.
+     */
+    public int deleteByAnnouncementId(String announcementId) {
+        return jdbc.update(
+                "DELETE FROM " + TABLE + " WHERE announcement_id = :announcementId",
+                new MapSqlParameterSource("announcementId", announcementId));
     }
 
     /** Admin path: unscoped by design, guarded by the ADMIN-only route. */
@@ -204,7 +216,20 @@ public class NotificationWriteRepository {
             String message,
             String type,
             String link,
-            java.time.Instant createdAt) {
+            java.time.Instant createdAt,
+            String announcementId) {
+
+        /** Non-announcement notices carry no source link. */
+        public CreateNotificationCommand(
+                String id,
+                String userId,
+                String title,
+                String message,
+                String type,
+                String link,
+                java.time.Instant createdAt) {
+            this(id, userId, title, message, type, link, createdAt, null);
+        }
     }
 
     public record UpdateNotificationCommand(

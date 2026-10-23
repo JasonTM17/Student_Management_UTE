@@ -48,6 +48,7 @@ class AnnouncementStudentFanoutPersistenceTest {
                 message VARCHAR(2000) NOT NULL,
                 type VARCHAR(40) NOT NULL,
                 link VARCHAR(500),
+                announcement_id VARCHAR(120),
                 is_read BOOLEAN NOT NULL DEFAULT FALSE,
                 read_at TIMESTAMP,
                 created_at TIMESTAMP NOT NULL,
@@ -345,6 +346,114 @@ class AnnouncementStudentFanoutPersistenceTest {
                 .content("{\"title\":\"Other lecturer notice\",\"content\":\"Private body\",\"isGlobal\":false,\"targetRoles\":[\"STUDENT\"],\"targetYears\":[1],\"sectionId\":\"scoped-section\",\"lecturerId\":\"other-lecturer\"}"))
                 .andExpect(status().isCreated());
         assertEquals(0, jdbc.queryForObject("SELECT COUNT(*) FROM notifications.notification WHERE user_id='fanout-u-1'", Integer.class));
+    }
+
+    @Test
+    void archivingAnnouncementRecallsItsInboxNotifications() throws Exception {
+        // A notice fanned out before the linkage column existed carries no
+        // announcement_id; it is indistinguishable from authored inbox content
+        // and must survive the recall even when the title matches exactly.
+        jdbc.update("INSERT INTO notifications.notification "
+                + "(id, user_id, title, message, type, link, is_read, created_at, updated_at) "
+                + "VALUES ('legacy-unlinked', 'fanout-u-1', ?, 'older preview', 'INFO', "
+                + "'/dashboard/announcements', FALSE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)",
+                "[Announcement] Recalled notice");
+
+        mvc.perform(post("/api/v1/announcements")
+                        .with(adminJwt("fanout-admin"))
+                        .contentType("application/json")
+                        .content("{\"title\":\"Recalled notice\",\"content\":\"Body\",\"isGlobal\":true}"))
+                .andExpect(status().isCreated());
+
+        String announcementId = jdbc.queryForObject(
+                "SELECT \"id\" FROM \"engagement\".\"Announcement\" WHERE \"title\" = 'Recalled notice'",
+                String.class);
+        assertEquals(3, jdbc.queryForObject(
+                "SELECT COUNT(*) FROM notifications.notification WHERE announcement_id = ?",
+                Integer.class, announcementId));
+
+        mvc.perform(post("/api/v1/announcements/" + announcementId + "/archive")
+                        .with(adminJwt("fanout-admin"))
+                        .contentType("application/json")
+                        .content("{\"reason\":\"Withdrawn\",\"expectedVersion\":0}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.archivedAt").isNotEmpty());
+
+        assertEquals(0, jdbc.queryForObject(
+                "SELECT COUNT(*) FROM notifications.notification WHERE announcement_id = ?",
+                Integer.class, announcementId));
+        assertEquals(1, jdbc.queryForObject(
+                "SELECT COUNT(*) FROM notifications.notification WHERE id = 'legacy-unlinked'",
+                Integer.class));
+    }
+
+    @Test
+    void legacyDeleteAlsoRecallsInboxNotifications() throws Exception {
+        mvc.perform(post("/api/v1/announcements")
+                        .with(adminJwt("fanout-admin"))
+                        .contentType("application/json")
+                        .content("{\"title\":\"Deleted notice\",\"content\":\"Body\",\"isGlobal\":true}"))
+                .andExpect(status().isCreated());
+
+        String announcementId = jdbc.queryForObject(
+                "SELECT \"id\" FROM \"engagement\".\"Announcement\" WHERE \"title\" = 'Deleted notice'",
+                String.class);
+        assertEquals(3, jdbc.queryForObject(
+                "SELECT COUNT(*) FROM notifications.notification WHERE announcement_id = ?",
+                Integer.class, announcementId));
+
+        mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders
+                        .delete("/api/v1/announcements/" + announcementId)
+                        .with(adminJwt("fanout-admin")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.message").value("Announcement deleted successfully"));
+
+        assertEquals(0, jdbc.queryForObject(
+                "SELECT COUNT(*) FROM notifications.notification WHERE announcement_id = ?",
+                Integer.class, announcementId));
+    }
+
+    @Test
+    void restoringArchivedAnnouncementNeverDuplicatesInboxNotifications() throws Exception {
+        mvc.perform(post("/api/v1/announcements")
+                        .with(adminJwt("fanout-admin"))
+                        .contentType("application/json")
+                        .content("{\"title\":\"Restored notice\",\"content\":\"Body\",\"isGlobal\":true}"))
+                .andExpect(status().isCreated());
+
+        String announcementId = jdbc.queryForObject(
+                "SELECT \"id\" FROM \"engagement\".\"Announcement\" WHERE \"title\" = 'Restored notice'",
+                String.class);
+        assertEquals(3, jdbc.queryForObject(
+                "SELECT COUNT(*) FROM notifications.notification WHERE announcement_id = ?",
+                Integer.class, announcementId));
+
+        mvc.perform(post("/api/v1/announcements/" + announcementId + "/archive")
+                        .with(adminJwt("fanout-admin"))
+                        .contentType("application/json")
+                        .content("{\"reason\":\"Withdrawn\",\"expectedVersion\":0}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.version").value(1));
+        assertEquals(0, jdbc.queryForObject(
+                "SELECT COUNT(*) FROM notifications.notification WHERE announcement_id = ?",
+                Integer.class, announcementId));
+
+        mvc.perform(post("/api/v1/announcements/" + announcementId + "/restore")
+                        .with(adminJwt("fanout-admin"))
+                        .contentType("application/json")
+                        .content("{\"reason\":\"Reviewed\",\"expectedVersion\":1}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.archivedAt").doesNotExist());
+
+        // The notifiedAt marker stays stamped across archive/restore, so the
+        // scheduled sweep can never refire this announcement into the inboxes.
+        assertEquals(0, jdbc.queryForObject(
+                "SELECT COUNT(*) FROM notifications.notification WHERE announcement_id = ?",
+                Integer.class, announcementId));
+        assertEquals(1, jdbc.queryForObject(
+                "SELECT COUNT(*) FROM \"engagement\".\"Announcement\""
+                        + " WHERE \"id\" = ? AND \"notifiedAt\" IS NOT NULL",
+                Integer.class, announcementId));
     }
 
     private static io.campuscore.restfulapi.engagement.web.AnnouncementReadDtos.AnnouncementResponse scopedNotice(
