@@ -162,7 +162,9 @@ export default function AdminThesisPage() {
   const [lateTopicForm, setLateTopicForm] = useState({
     departmentId: '', title: '', description: '', supervisorId: '', maxGroups: '1',
   });
-  const [overrideForm, setOverrideForm] = useState({ groupId: '', studentId: '', allowSize: false });
+  const [overrideForm, setOverrideForm] = useState({
+    groupId: '', studentId: '', action: 'ADD' as 'ADD' | 'REMOVE', successorId: '', allowSize: false,
+  });
   const [reassignForm, setReassignForm] = useState({ groupId: '', topicId: '' });
   const [retractConfirmation, setRetractConfirmation] = useState('');
 
@@ -732,7 +734,7 @@ export default function AdminThesisPage() {
     setReasonText('');
     setReplacementLecturerId('');
     setLateTopicForm({ departmentId: '', title: '', description: '', supervisorId: '', maxGroups: '1' });
-    setOverrideForm({ groupId: '', studentId: '', allowSize: false });
+    setOverrideForm({ groupId: '', studentId: '', action: 'ADD', successorId: '', allowSize: false });
     setReassignForm({ groupId: '', topicId: '' });
     setRetractConfirmation('');
     setReasonActionError('');
@@ -797,8 +799,12 @@ export default function AdminThesisPage() {
         }
         await thesisApi.overrideGroupRoster(overrideForm.groupId.trim(), {
           studentId: overrideForm.studentId.trim(),
+          action: overrideForm.action,
           reason,
           allowSizeException: overrideForm.allowSize,
+          ...(overrideForm.action === 'REMOVE' && overrideForm.successorId.trim()
+            ? { successorStudentId: overrideForm.successorId.trim() }
+            : {}),
         });
         setSuccess(messages.thesis.admin.rosterOverrideSuccess);
       } else if (action.kind === 'topicReassign') {
@@ -2093,6 +2099,19 @@ export default function AdminThesisPage() {
           {reasonAction?.kind === 'rosterOverride' ? (
             <>
               <label className="flex flex-col gap-2 text-sm font-medium text-foreground">
+                {messages.thesis.admin.rosterOverrideAction}
+                <Select
+                  value={overrideForm.action}
+                  onChange={(e) =>
+                    setOverrideForm({ ...overrideForm, action: e.target.value as 'ADD' | 'REMOVE' })
+                  }
+                  options={[
+                    { value: 'ADD', label: messages.thesis.admin.rosterOverrideActionAdd },
+                    { value: 'REMOVE', label: messages.thesis.admin.rosterOverrideActionRemove },
+                  ]}
+                />
+              </label>
+              <label className="flex flex-col gap-2 text-sm font-medium text-foreground">
                 {messages.thesis.admin.rosterOverrideGroup}
                 <Input
                   value={overrideForm.groupId}
@@ -2108,6 +2127,15 @@ export default function AdminThesisPage() {
                   required
                 />
               </label>
+              {overrideForm.action === 'REMOVE' ? (
+                <label className="flex flex-col gap-2 text-sm font-medium text-foreground">
+                  {messages.thesis.admin.rosterOverrideSuccessor}
+                  <Input
+                    value={overrideForm.successorId}
+                    onChange={(e) => setOverrideForm({ ...overrideForm, successorId: e.target.value })}
+                  />
+                </label>
+              ) : null}
               <label className="flex items-center gap-2 text-sm font-medium text-foreground">
                 <input
                   type="checkbox"
