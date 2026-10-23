@@ -8,8 +8,10 @@ import io.campuscore.restfulapi.thesis.web.ThesisGroupReadDtos.GroupResponse;
 import io.campuscore.restfulapi.thesis.web.ThesisMutationDtos.CloseRegistrationPreviewResponse;
 import io.campuscore.restfulapi.thesis.web.ThesisMutationDtos.GroupCreateRequest;
 import io.campuscore.restfulapi.thesis.web.ThesisMutationDtos.GroupRejectionRequest;
+import io.campuscore.restfulapi.thesis.web.ThesisMutationDtos.GvpbDeadlineUpdateRequest;
 import io.campuscore.restfulapi.thesis.web.ThesisMutationDtos.MemberRequest;
 import io.campuscore.restfulapi.thesis.web.ThesisMutationDtos.ProgressRequest;
+import io.campuscore.restfulapi.thesis.web.ThesisMutationDtos.PublishResultsPreviewResponse;
 import io.campuscore.restfulapi.thesis.web.ThesisMutationDtos.ReportDeadlineUpdateRequest;
 import io.campuscore.restfulapi.thesis.web.ThesisMutationDtos.ReportUpdateRequest;
 import io.campuscore.restfulapi.thesis.web.ThesisMutationDtos.RoundCreateRequest;
@@ -17,6 +19,7 @@ import io.campuscore.restfulapi.thesis.web.ThesisMutationDtos.RoundRestoreReques
 import io.campuscore.restfulapi.thesis.web.ThesisMutationDtos.StudentSearchResponse;
 import io.campuscore.restfulapi.thesis.web.ThesisMutationDtos.TopicAssignmentRequest;
 import io.campuscore.restfulapi.thesis.web.ThesisMutationDtos.TopicCreateRequest;
+import io.campuscore.restfulapi.thesis.web.ThesisMutationDtos.TopicOutcomeRequest;
 import io.campuscore.restfulapi.thesis.web.ThesisMutationDtos.TopicUpdateRequest;
 import io.campuscore.restfulapi.thesis.service.ThesisReportService.ReportResponse;
 import io.campuscore.restfulapi.thesis.service.ThesisReportService.RepositoryReportResponse;
@@ -177,6 +180,21 @@ public class ThesisMutationController {
         return mutations.extendReportDeadline(id, request == null ? null : request.reportDeadline(), actor);
     }
 
+    /**
+     * Escape hatch for the counter-review dead-end: while the round is live
+     * the GVPB deadline may be extended forward (never backwards, never past
+     * the report date). The change is audited.
+     */
+    @Operation(summary = "Gia hạn chấm phản biện (GVPB)", description = "Dời hạn chấm phản biện (gvpbDeadline) của đợt đang mở sang thời điểm mới; thao tác được ghi audit")
+    @PutMapping("/rounds/{id}/gvpb-deadline")
+    @PreAuthorize("hasAnyRole('ADMIN','TRUONG_KHOA','SUPER_ADMIN')")
+    public RoundResponse extendGvpbDeadline(
+            @Parameter(description = "Mã UUID của đợt", required = true) @PathVariable UUID id,
+            @RequestBody GvpbDeadlineUpdateRequest request,
+            @AuthenticationPrincipal Jwt actor) {
+        return mutations.extendGvpbDeadline(id, request == null ? null : request.gvpbDeadline(), actor);
+    }
+
     /** Brief R9: publish graded results to the students of the round. */
     @Operation(summary = "Công bố điểm và kết quả bảo vệ khóa luận", description = "Chuyển đợt sang RESULTS_PUBLISHED để sinh viên xem điểm đánh giá chính thức")
     @PostMapping("/rounds/{id}/publish-results")
@@ -184,6 +202,45 @@ public class ThesisMutationController {
     public RoundResponse publishResults(@Parameter(description = "Mã UUID của đợt", required = true) @PathVariable UUID id,
             @AuthenticationPrincipal Jwt actor) {
         return mutations.publishResults(id, actor);
+    }
+
+    /**
+     * The publish must name its exclusions: the admin reviews which topics are
+     * left out of the completeness check (counter-review failed or withdrawn)
+     * before confirming.
+     */
+    @Operation(summary = "Xem trước hệ quả khi công bố kết quả", description = "Trả về số nhóm sẽ công bố điểm và danh sách đề tài bị loại khỏi yêu cầu hoàn tất (trượt phản biện hoặc bị rút)")
+    @GetMapping("/rounds/{id}/publish-results-preview")
+    @PreAuthorize("hasAnyRole('ADMIN','TRUONG_KHOA','SUPER_ADMIN')")
+    public PublishResultsPreviewResponse publishResultsPreview(
+            @Parameter(description = "Mã UUID của đợt", required = true) @PathVariable UUID id,
+            @AuthenticationPrincipal Jwt actor) {
+        return mutations.publishResultsPreview(id);
+    }
+
+    /**
+     * Governance outcome escape hatch: a topic that can no longer complete the
+     * round stops blocking publication for the rest. Audited and reversible
+     * through reinstate while unfinalized.
+     */
+    @Operation(summary = "Rút đề tài khỏi đợt", description = "Ghi nhận đề tài không thể hoàn tất đợt (kết quả WITHDRAWN) để các nhóm còn lại được công bố; ghi audit kèm lý do")
+    @PostMapping("/topics/{id}/withdraw")
+    @PreAuthorize("hasAnyRole('ADMIN','TRUONG_KHOA','SUPER_ADMIN')")
+    public TopicResponse withdrawTopic(
+            @Parameter(description = "Mã UUID của đề tài", required = true) @PathVariable UUID id,
+            @RequestBody(required = false) TopicOutcomeRequest request,
+            @AuthenticationPrincipal Jwt actor) {
+        return mutations.withdrawTopic(id, request == null ? null : request.reason(), actor);
+    }
+
+    @Operation(summary = "Hoàn tác rút đề tài", description = "Đưa đề tài WITHDRAWN trở lại đợt khi chưa chốt điểm; ghi audit kèm lý do")
+    @PostMapping("/topics/{id}/reinstate")
+    @PreAuthorize("hasAnyRole('ADMIN','TRUONG_KHOA','SUPER_ADMIN')")
+    public TopicResponse reinstateTopic(
+            @Parameter(description = "Mã UUID của đề tài", required = true) @PathVariable UUID id,
+            @RequestBody(required = false) TopicOutcomeRequest request,
+            @AuthenticationPrincipal Jwt actor) {
+        return mutations.reinstateTopic(id, request == null ? null : request.reason(), actor);
     }
 
     @PostMapping("/topics")
