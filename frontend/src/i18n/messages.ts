@@ -3184,7 +3184,7 @@ export const vi: I18nMessages = {
         STUDENT_ID_EXISTS: 'Mã số sinh viên đã tồn tại.',
         EMPLOYEE_ID_EXISTS: 'Mã số giảng viên đã tồn tại.',
         ROLE_ESCALATION:
-          'Chỉ siêu quản trị viên mới được cấp vai trò này hoặc quản lý tài khoản quản trị viên, Trưởng khoa và Trưởng bộ môn.',
+          'Chỉ quản trị viên cấp cao mới được cấp vai trò này hoặc quản lý tài khoản quản trị viên, Trưởng khoa và Trưởng bộ môn.',
         DEAN_ALREADY_ASSIGNED:
           'Khoa này đã có Trưởng khoa đang hoạt động. Hãy chuyển Trưởng khoa hiện tại về Giảng viên trước khi bổ nhiệm người khác.',
         // Chính sách mật khẩu & khôi phục
@@ -4303,7 +4303,7 @@ export const vi: I18nMessages = {
         STUDENT: 'Sinh viên',
         LECTURER: 'Giảng viên',
         ADMIN: 'Quản trị',
-        SUPER_ADMIN: 'Quản trị cao cấp',
+        SUPER_ADMIN: 'Quản trị viên cấp cao',
         TRUONG_KHOA: 'Trưởng khoa',
       },
     },
