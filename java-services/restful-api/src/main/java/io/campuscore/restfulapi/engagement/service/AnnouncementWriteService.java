@@ -264,7 +264,45 @@ public class AnnouncementWriteService {
                     id, actor, sanitizedElements);
         }
         appendAudit("UPDATED", actor, label, auditReason, before, after, now);
+        // An audience change must not strand delivered inbox notices: once the
+        // update commits, removed students lose their notice and newly included
+        // students are notified — never a second row for anyone already reached.
+        if (audienceFieldsChanged(request)) {
+            reconcileInboxAudience(id);
+        }
         return after;
+    }
+
+    private static boolean audienceFieldsChanged(UpdateAnnouncementRequest request) {
+        return request.has("targetRoles") || request.has("targetYears")
+                || request.has("sectionId") || request.has("isGlobal")
+                || request.has("lecturerId");
+    }
+
+    private void reconcileInboxAudience(String id) {
+        if (org.springframework.transaction.support.TransactionSynchronizationManager.isSynchronizationActive()) {
+            org.springframework.transaction.support.TransactionSynchronizationManager.registerSynchronization(
+                    new org.springframework.transaction.support.TransactionSynchronization() {
+                        @Override
+                        public void afterCommit() {
+                            reconcileAudience(id);
+                        }
+                    });
+        } else {
+            reconcileAudience(id);
+        }
+    }
+
+    private void reconcileAudience(String id) {
+        try {
+            int[] result = studentNotifier.reconcileAudience(id);
+            LOGGER.info("Announcement {} audience reconciled: {} retracted, {} notified",
+                    id, result[0], result[1]);
+        } catch (RuntimeException exception) {
+            // Fail-soft like recall: a reconciliation failure must never roll
+            // back the already-committed update.
+            LOGGER.warn("Announcement {} committed but inbox audience reconciliation failed", id);
+        }
     }
 
     private void requireLecturerAnnouncement(

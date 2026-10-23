@@ -144,3 +144,9 @@ Hai PR squash-merge kế tiếp chốt đợt audit toàn diện (cross-role the
 - **Git hygiene**: 10 branch đã merge/patch-equivalent xóa local + remote (verify bằng `git cherry`/diff trước khi xóa); draft PR #60 đóng; repo chỉ còn `main`.
 - **Rollback**: giữ nguyên phương án Render manual rollback và `vercel rollback` — **chưa thực thi**, `NOT_RUN`.
 - **Ranh giới honest**: luồng mail 2FA/reset `NOT_RUN` trên prod (chưa cấu hình provider thật); đường compose `ASSISTANT_DB_*` là bề mặt self-hosted — Render đã mang env này từ cutover Neon; diff nội dung hàng V123 `NOT_RUN` (không có quyền đọc DB trực tiếp).
+
+### Cấu hình thu hồi công bố kết quả khóa luận (thesis results retraction)
+
+- `THESIS_RESULTS_RETRACTGRACEDAYS` (property `thesis.results.retract-grace-days`, mặc định `7`): số ngày sau `RESULTS_PUBLISHED` mà admin toàn cục được phép thu hồi công bố qua `POST /api/v1/thesis/rounds/{id}/results/retract`.
+- Thu hồi đòi lý do + xác nhận gõ `RETRACT`; không bao giờ sửa điểm; inbox "kết quả đã công bố" bị thu hồi và sinh viên nhận thông báo chỉnh chính; email đã gửi **không** thu hồi được (ghi rõ trong audit). Vòng quay về `REGISTRATION_CLOSED` để chạy lại luồng preview → publish bình thường.
+- Sai sót phát hiện sau khi hết hạn ân hạn đi qua đường khiếu nại từng đề tài (chưa xây dựng — follow-up sản phẩm).

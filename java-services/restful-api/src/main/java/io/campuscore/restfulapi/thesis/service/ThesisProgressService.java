@@ -172,12 +172,21 @@ public class ThesisProgressService {
             attention = "GROUP_INVALID_MEMBER_COUNT";
         } else if (inconsistentLaterEvidence) {
             attention = "PROGRESS_INCONSISTENT";
+        } else if ("RESULTS_PUBLISHED".equals(roundStatus)
+                && "REVIEW_FAILED".equals(string(row.get("result_status")))) {
+            // A counter-review exclusion is a definitive published outcome,
+            // not a pending one — it must never render as "result pending".
+            attention = "TOPIC_REVIEW_FAILED";
+        } else if ("RESULTS_PUBLISHED".equals(roundStatus)
+                && "WITHDRAWN".equals(string(row.get("result_status")))) {
+            attention = "TOPIC_WITHDRAWN";
         } else if ("RESULTS_PUBLISHED".equals(roundStatus) && finalScore == null) {
             attention = "RESULT_NOT_AVAILABLE";
         }
 
         String current = completed.isEmpty() ? "ROUND_SELECTED" : completed.get(completed.size() - 1);
-        if ("RESULT_NOT_AVAILABLE".equals(attention) || "GROUP_INVALID_MEMBER_COUNT".equals(attention)) {
+        if ("RESULT_NOT_AVAILABLE".equals(attention) || "GROUP_INVALID_MEMBER_COUNT".equals(attention)
+                || "TOPIC_REVIEW_FAILED".equals(attention) || "TOPIC_WITHDRAWN".equals(attention)) {
             current = completed.get(completed.size() - 1);
         }
         return new ProgressResponse(

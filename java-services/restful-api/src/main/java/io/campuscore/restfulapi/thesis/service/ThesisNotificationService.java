@@ -105,13 +105,76 @@ public class ThesisNotificationService {
                 "INFO", STUDENT_LINK);
     }
 
-    /** Notifies every student in an approved group when the round publishes results. */
+    /**
+     * Notifies every student in an approved group when the round publishes
+     * results. Groups whose topic carries a governance exclusion outcome
+     * (REVIEW_FAILED / WITHDRAWN) never see the success "view your score"
+     * notice — they get a separate non-success notice that states the outcome
+     * without academic-fail wording.
+     */
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public int notifyResultsPublished(UUID roundId) {
         String roundName = publishedRoundName(roundId);
         if (roundName == null) {
             return 0;
         }
+        String sourceKey = resultsSourceKey(roundId);
+        int sent = 0;
+        List<String> includedIds = jdbc.queryForList(
+                "SELECT DISTINCT s.\"userId\" FROM thesis.thesis_group_member m"
+                        + " JOIN thesis.thesis_group g ON g.id = m.group_id"
+                        + " JOIN thesis.thesis_topic t ON t.id = g.topic_id"
+                        + " JOIN campuscore_auth.\"Student\" s ON s.\"id\" = m.student_id"
+                        + " WHERE g.round_id = :roundId AND g.approval_status = 'APPROVED'"
+                        + " AND g.status <> 'CANCELLED'"
+                        + " AND (t.result_status IS NULL OR t.result_status NOT IN ('REVIEW_FAILED', 'WITHDRAWN'))",
+                new MapSqlParameterSource("roundId", roundId), String.class);
+        if (includedIds != null && !includedIds.isEmpty()) {
+            sent += fanOut(includedIds, "Kết quả khóa luận đã công bố",
+                    "Kết quả đợt " + roundName.trim()
+                            + " đã công bố. Mở trang khóa luận để xem điểm của bạn.",
+                    "SUCCESS", STUDENT_LINK, sourceKey);
+        }
+        List<String> excludedIds = jdbc.queryForList(
+                "SELECT DISTINCT s.\"userId\" FROM thesis.thesis_group_member m"
+                        + " JOIN thesis.thesis_group g ON g.id = m.group_id"
+                        + " JOIN thesis.thesis_topic t ON t.id = g.topic_id"
+                        + " JOIN campuscore_auth.\"Student\" s ON s.\"id\" = m.student_id"
+                        + " WHERE g.round_id = :roundId AND g.approval_status = 'APPROVED'"
+                        + " AND g.status <> 'CANCELLED'"
+                        + " AND t.result_status IN ('REVIEW_FAILED', 'WITHDRAWN')",
+                new MapSqlParameterSource("roundId", roundId), String.class);
+        if (excludedIds != null && !excludedIds.isEmpty()) {
+            // "Not eligible to defend in this round" — never "fail/trượt": the
+            // outcome is a counter-review governance result, not a mark.
+            sent += fanOut(excludedIds, "Kết quả khóa luận đã công bố",
+                    "Kết quả đợt " + roundName.trim()
+                            + " đã công bố. Đề tài của nhóm bạn không đủ điều kiện"
+                            + " bảo vệ trong đợt này — xem chi tiết tại trang khóa luận.",
+                    "WARNING", STUDENT_LINK, sourceKey);
+        }
+        return sent;
+    }
+
+    /** Inbox recall for retracted publication, keyed by the producer tag. */
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public int recallResultsPublished(UUID roundId) {
+        int removed = notifications.deleteBySourceKey(resultsSourceKey(roundId));
+        // Rows fanned out before the source_key column existed carry no tag;
+        // match them by the exact title/link/round-name prefix they used.
+        removed += jdbc.update(
+                "DELETE FROM notifications.notification WHERE source_key IS NULL"
+                        + " AND title = 'Kết quả khóa luận đã công bố' AND link = :link"
+                        + " AND message LIKE :prefix ESCAPE '!'",
+                new MapSqlParameterSource("link", STUDENT_LINK)
+                        .addValue("prefix", "Kết quả đợt " + likeEscape(roundNameOf(roundId)) + "%"));
+        return removed;
+    }
+
+    /** Correction notice after a retracted publication. */
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public int notifyResultsRetracted(UUID roundId) {
+        String roundName = roundNameOf(roundId);
         List<String> userIds = jdbc.queryForList(
                 "SELECT DISTINCT s.\"userId\" FROM thesis.thesis_group_member m"
                         + " JOIN thesis.thesis_group g ON g.id = m.group_id"
@@ -122,10 +185,62 @@ public class ThesisNotificationService {
         if (userIds == null || userIds.isEmpty()) {
             return 0;
         }
-        return fanOut(userIds, "Kết quả khóa luận đã công bố",
+        return fanOut(userIds, "Kết quả khóa luận đã được thu hồi",
                 "Kết quả đợt " + roundName.trim()
-                        + " đã công bố. Mở trang khóa luận để xem điểm của bạn.",
-                "SUCCESS", STUDENT_LINK);
+                        + " đã được thu hồi để hiệu chỉnh và sẽ được công bố lại sau.",
+                "WARNING", STUDENT_LINK, "THESIS_RESULTS_RETRACTED:" + roundId);
+    }
+
+    /** Roster-override notice: every current member hears who governs the change. */
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public int notifyGroupRosterChanged(UUID groupId) {
+        List<String> userIds = memberUserIds(groupId);
+        if (userIds.isEmpty()) {
+            return 0;
+        }
+        String topic = topicTitleByGroup(groupId);
+        return fanOut(userIds, "Danh sách thành viên nhóm đã thay đổi",
+                "Danh sách thành viên nhóm của bạn"
+                        + (topic.isBlank() ? "" : " (đề tài \"" + topic + "\")")
+                        + " đã được điều chỉnh bởi phòng quản lý.",
+                "INFO", STUDENT_LINK, null);
+    }
+
+    /**
+     * Post-close roster removal: the removed student is no longer a member, so
+     * the group notice cannot reach them — they get a dedicated message, and
+     * the surviving roster still gets the shared roster-changed notice.
+     */
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public int notifyGroupMemberRemoved(UUID groupId, String studentId) {
+        int sent = 0;
+        List<String> removedUserIds = jdbc.queryForList(
+                "SELECT s.\"userId\" FROM campuscore_auth.\"Student\" s WHERE s.\"id\" = :studentId",
+                new MapSqlParameterSource("studentId", studentId), String.class);
+        if (!removedUserIds.isEmpty()) {
+            String topic = topicTitleByGroup(groupId);
+            sent += fanOut(removedUserIds, "Bạn đã được gỡ khỏi nhóm",
+                    "Phòng quản lý đã gỡ bạn khỏi danh sách thành viên nhóm"
+                            + (topic.isBlank() ? "" : " (đề tài \"" + topic + "\")")
+                            + ".",
+                    "INFO", STUDENT_LINK, null);
+        }
+        return sent + notifyGroupRosterChanged(groupId);
+    }
+
+    private static String resultsSourceKey(UUID roundId) {
+        return "THESIS_RESULTS:" + roundId;
+    }
+
+    private String roundNameOf(UUID roundId) {
+        List<String> names = jdbc.queryForList(
+                "SELECT name FROM thesis.thesis_registration_round WHERE id = :id",
+                new MapSqlParameterSource("id", roundId), String.class);
+        return names.isEmpty() ? "" : names.getFirst();
+    }
+
+    private static String likeEscape(String value) {
+        return value.replace("!", "!!").replace("%", "!%").replace("_", "!_");
     }
 
     /**
@@ -269,6 +384,11 @@ public class ThesisNotificationService {
     }
 
     private int fanOut(List<String> userIds, String title, String message, String type, String link) {
+        return fanOut(userIds, title, message, type, link, null);
+    }
+
+    private int fanOut(List<String> userIds, String title, String message, String type, String link,
+            String sourceKey) {
         Instant now = Instant.now(clock);
         String safeTitle = capCodePoints(title, TITLE_CODE_POINTS);
         String safeMessage = capCodePoints(message, MESSAGE_CODE_POINTS);
@@ -277,7 +397,7 @@ public class ThesisNotificationService {
             commands.add(new CreateNotificationCommand(
                     UUID.randomUUID().toString(), userId, safeTitle, safeMessage, type, link, now));
         }
-        return notifications.createBatch(commands);
+        return notifications.createBatch(commands, sourceKey);
     }
 
     /** Truncates by code points so Vietnamese diacritics are never split. */

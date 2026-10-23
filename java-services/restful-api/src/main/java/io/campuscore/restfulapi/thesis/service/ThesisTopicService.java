@@ -160,7 +160,11 @@ public class ThesisTopicService {
         // unrelated lecturers must not learn who counter-reviews a topic.
         boolean reviewerMasked = topic.gvpbLecturerId() != null
                 && !internalGrader;
-        if (!scoreMasked && !reviewerMasked) {
+        // The waiver and outcome annotations are governance context: they ship
+        // with the same visibility as the outcome fields they describe.
+        boolean governanceMasked = (topic.gvpbWaivedReason() != null || topic.resultReason() != null)
+                && !internalGrader;
+        if (!scoreMasked && !reviewerMasked && !governanceMasked) {
             return topic;
         }
         return new TopicResponse(
@@ -168,7 +172,9 @@ public class ThesisTopicService {
                 topic.maxGroups(), topic.status(), topic.createdBy(),
                 scoreMasked ? null : topic.finalScore(),
                 scoreMasked ? null : topic.resultStatus(),
-                reviewerMasked ? null : topic.gvpbLecturerId());
+                reviewerMasked ? null : topic.gvpbLecturerId(),
+                governanceMasked ? null : topic.gvpbWaivedReason(),
+                governanceMasked ? null : topic.resultReason());
     }
 
     private boolean isCouncilGraderOf(UUID topicId, Jwt actor) {

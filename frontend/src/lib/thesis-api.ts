@@ -106,6 +106,29 @@ export interface ThesisCloseRegistrationPreview {
   reportDeadlinePassed: boolean;
 }
 
+/**
+ * Server preview for `publish-results`: which approved groups will publish
+ * and which topics are excluded from the completeness requirement with their
+ * outcome (REVIEW_FAILED or WITHDRAWN).
+ */
+export interface ThesisPublishResultsPreview {
+  groupCount: number;
+  approvedGroupCount: number;
+  pendingApprovalGroupCount: number;
+  includedGroupCount: number;
+  ungradedGroupCount: number;
+  excludedTopics: ThesisExcludedTopic[];
+  /** Topics whose counter-review verdict is still provisional (window open). */
+  openReviewTopics: ThesisExcludedTopic[];
+}
+
+export interface ThesisExcludedTopic {
+  id: string;
+  title: string;
+  resultStatus: string | null;
+  resultReason: string | null;
+}
+
 export interface ThesisRepositorySupervisor {
   displayName: string;
   supervisorOrder: number;
@@ -164,6 +187,8 @@ export interface ThesisProgressResponse {
     | 'GROUP_CANCELLED'
     | 'GROUP_INVALID_MEMBER_COUNT'
     | 'PROGRESS_INCONSISTENT'
+    | 'TOPIC_REVIEW_FAILED'
+    | 'TOPIC_WITHDRAWN'
     | 'RESULT_NOT_AVAILABLE';
   groupId?: string | null;
   groupStatus?: string | null;
@@ -206,6 +231,9 @@ export interface ThesisRoundResult {
   finalScore: number;
   councilName: string;
   leaderStudentId: string;
+  /** Governance outcome visible to the group's members after publication. */
+  resultStatus?: string | null;
+  resultReason?: string | null;
   comments?: ThesisScoreComment[];
 }
 
@@ -342,7 +370,9 @@ export interface ThesisTopic {
   createdBy: string;
   finalScore?: number | null;
   resultStatus?: string | null;
+  resultReason?: string | null;
   gvpbLecturerId?: string | null;
+  gvpbWaivedReason?: string | null;
 }
 
 /** UI capabilities for a topic returned by the authenticated staff catalog.
@@ -667,9 +697,118 @@ export const thesisApi = {
     return response.data;
   },
 
-  publishResults: async (roundId: string): Promise<ThesisRound> => {
+  publishResults: async (
+    roundId: string,
+    confirmAllExcluded?: boolean,
+  ): Promise<ThesisRound> => {
     const response = await api.post<ThesisRound>(
       '/thesis/rounds/' + roundId + '/publish-results',
+      confirmAllExcluded ? { confirmAllExcluded: true } : {},
+    );
+    return response.data;
+  },
+
+  /**
+   * Reads the publish-results consequence preview — the included/excluded
+   * topics — so the confirm dialog is never blind. Read-only.
+   */
+  publishResultsPreview: async (
+    roundId: string,
+  ): Promise<ThesisPublishResultsPreview> => {
+    const response = await api.get<ThesisPublishResultsPreview>(
+      '/thesis/rounds/' + roundId + '/publish-results-preview',
+    );
+    return response.data;
+  },
+
+  /**
+   * Escape hatch for a live round whose counter-review deadline already
+   * passed: moves `gvpb_deadline` forward (audited server-side, never past
+   * the report date).
+   */
+  extendGvpbDeadline: async (
+    roundId: string,
+    gvpbDeadline: string,
+    reason: string,
+  ): Promise<ThesisRound> => {
+    const response = await api.put<ThesisRound>(
+      '/thesis/rounds/' + roundId + '/gvpb-deadline',
+      { gvpbDeadline, reason },
+    );
+    return response.data;
+  },
+
+  /**
+   * Late-topic escape for a missed lecturer window: creates a PUBLISHED topic
+   * for a named supervisor while registration is still possible (audited).
+   */
+  createLateTopic: async (
+    roundId: string,
+    data: {
+      departmentId: string;
+      title: string;
+      description: string;
+      maxGroups?: number;
+      supervisorId: string;
+      reason: string;
+    },
+  ): Promise<ThesisTopic> => {
+    const response = await api.post<ThesisTopic>(
+      '/thesis/rounds/' + roundId + '/late-topic',
+      data,
+    );
+    return response.data;
+  },
+
+  /**
+   * Post-registration roster override: adds an active student to a group of a
+   * REGISTRATION_CLOSED round whose topic has no scores, or removes a member
+   * (action REMOVE; a leader removal names successorStudentId). Audited.
+   */
+  overrideGroupRoster: async (
+    groupId: string,
+    data: {
+      studentId: string;
+      action?: 'ADD' | 'REMOVE';
+      reason: string;
+      allowSizeException?: boolean;
+      successorStudentId?: string;
+    },
+  ): Promise<ThesisGroup> => {
+    const response = await api.post<ThesisGroup>(
+      '/thesis/groups/' + groupId + '/roster-override',
+      data,
+    );
+    return response.data;
+  },
+
+  /**
+   * Re-points an approved group whose topic was withdrawn after registration
+   * closed to a live topic in the same round (audited).
+   */
+  reassignOrphanedTopic: async (
+    groupId: string,
+    data: { topicId: string; reason: string },
+  ): Promise<ThesisGroup> => {
+    const response = await api.post<ThesisGroup>(
+      '/thesis/groups/' + groupId + '/topic-reassign',
+      data,
+    );
+    return response.data;
+  },
+
+  /**
+   * Retracts a premature publication inside the grace period: reason plus the
+   * typed confirmation "RETRACT"; scores are never modified.
+   */
+  retractResults: async (
+    roundId: string,
+    reason: string,
+    confirmation: string,
+  ): Promise<ThesisRound> => {
+    const response = await api.post<ThesisRound>(
+      '/thesis/rounds/' + roundId + '/retract-results',
+      { reason, confirmation },
     );
     return response.data;
   },
@@ -750,6 +889,48 @@ export const thesisApi = {
     const response = await api.post<ThesisCouncilScore>(
       '/thesis/topics/' + topicId + '/reviewer-score',
       { score, ...(comment ? { comment } : {}) },
+    );
+    return response.data;
+  },
+
+  /** Waives the counter-review requirement for one topic (audited). */
+  waiveCounterReview: async (
+    topicId: string,
+    reason: string,
+  ): Promise<{ gvpb_waived_reason?: string | null; result_status?: string | null }> => {
+    const response = await api.post<{ gvpb_waived_reason?: string | null; result_status?: string | null }>(
+      '/thesis/topics/' + topicId + '/gvpb-waiver',
+      { reason },
+    );
+    return response.data;
+  },
+
+  /** Re-arms the counter-review requirement a waiver lifted (audited). */
+  revokeCounterReviewWaiver: async (
+    topicId: string,
+    reason: string,
+  ): Promise<{ gvpb_waived_reason?: string | null; result_status?: string | null }> => {
+    const response = await api.post<{ gvpb_waived_reason?: string | null; result_status?: string | null }>(
+      '/thesis/topics/' + topicId + '/gvpb-waiver/revoke',
+      { reason },
+    );
+    return response.data;
+  },
+
+  /** Withdraws a topic from the round's completeness requirement (audited). */
+  withdrawTopic: async (topicId: string, reason: string): Promise<ThesisTopic> => {
+    const response = await api.post<ThesisTopic>(
+      '/thesis/topics/' + topicId + '/withdraw',
+      { reason },
+    );
+    return response.data;
+  },
+
+  /** Reverses a withdrawal while the topic is unfinalized (audited). */
+  reinstateTopic: async (topicId: string, reason: string): Promise<ThesisTopic> => {
+    const response = await api.post<ThesisTopic>(
+      '/thesis/topics/' + topicId + '/reinstate',
+      { reason },
     );
     return response.data;
   },
@@ -1075,6 +1256,39 @@ export const thesisApi = {
     topicId: string,
   ): Promise<void> => {
     await api.post('/thesis/councils/' + councilId + '/topics', { topicId });
+  },
+
+  /**
+   * Releases a topic from its council before any defense score exists so it
+   * can be reassigned (audited, reason required).
+   */
+  unassignCouncilTopic: async (
+    councilId: string,
+    topicId: string,
+    reason: string,
+  ): Promise<ThesisCouncil> => {
+    const response = await api.post<ThesisCouncil>(
+      '/thesis/councils/' + councilId + '/topics/' + topicId + '/unassign',
+      { reason },
+    );
+    return response.data;
+  },
+
+  /**
+   * Swaps the lecturer sitting one council seat in place — the roster size and
+   * role seats are preserved (audited, reason required).
+   */
+  replaceCouncilMember: async (
+    councilId: string,
+    outgoingLecturerId: string,
+    incomingLecturerId: string,
+    reason: string,
+  ): Promise<ThesisCouncil> => {
+    const response = await api.put<ThesisCouncil>(
+      '/thesis/councils/' + councilId + '/members/' + outgoingLecturerId,
+      { lecturerId: incomingLecturerId, reason },
+    );
+    return response.data;
   },
 
   submitScore: async (

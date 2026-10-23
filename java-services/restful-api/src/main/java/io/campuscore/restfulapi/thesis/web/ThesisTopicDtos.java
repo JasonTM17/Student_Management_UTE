@@ -21,7 +21,9 @@ public final class ThesisTopicDtos {
             String createdBy,
             BigDecimal finalScore,
             String resultStatus,
-            String gvpbLecturerId) {
+            String gvpbLecturerId,
+            String gvpbWaivedReason,
+            String resultReason) {
 
         public static TopicResponse from(ThesisTopic topic) {
             return new TopicResponse(
@@ -35,7 +37,9 @@ public final class ThesisTopicDtos {
                     topic.getCreatedBy(),
                     topic.getFinalScore(),
                     topic.getResultStatus(),
-                    topic.getGvpbLecturerId());
+                    topic.getGvpbLecturerId(),
+                    topic.getGvpbWaivedReason(),
+                    topic.getResultReason());
         }
     }
 }
