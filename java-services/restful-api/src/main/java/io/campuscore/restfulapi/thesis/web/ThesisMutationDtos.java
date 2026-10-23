@@ -99,6 +99,10 @@ public final class ThesisMutationDtos {
     public record PublishResultsRequest(Boolean confirmAllExcluded) {
     }
 
+    /** Reason plus typed confirmation ("RETRACT") for the retract escape. */
+    public record RetractPublicationRequest(String reason, String confirmation) {
+    }
+
     /**
      * Consequence preview for publish-results: the group tallies and the
      * topics excluded from the completeness requirement with their outcome

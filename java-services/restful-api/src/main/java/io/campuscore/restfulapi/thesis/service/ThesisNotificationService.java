@@ -156,6 +156,41 @@ public class ThesisNotificationService {
         return sent;
     }
 
+    /** Inbox recall for retracted publication, keyed by the producer tag. */
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public int recallResultsPublished(UUID roundId) {
+        int removed = notifications.deleteBySourceKey(resultsSourceKey(roundId));
+        // Rows fanned out before the source_key column existed carry no tag;
+        // match them by the exact title/link/round-name prefix they used.
+        removed += jdbc.update(
+                "DELETE FROM notifications.notification WHERE source_key IS NULL"
+                        + " AND title = 'Kết quả khóa luận đã công bố' AND link = :link"
+                        + " AND message LIKE :prefix ESCAPE '!'",
+                new MapSqlParameterSource("link", STUDENT_LINK)
+                        .addValue("prefix", "Kết quả đợt " + likeEscape(roundNameOf(roundId)) + "%"));
+        return removed;
+    }
+
+    /** Correction notice after a retracted publication. */
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public int notifyResultsRetracted(UUID roundId) {
+        String roundName = roundNameOf(roundId);
+        List<String> userIds = jdbc.queryForList(
+                "SELECT DISTINCT s.\"userId\" FROM thesis.thesis_group_member m"
+                        + " JOIN thesis.thesis_group g ON g.id = m.group_id"
+                        + " JOIN campuscore_auth.\"Student\" s ON s.\"id\" = m.student_id"
+                        + " WHERE g.round_id = :roundId AND g.approval_status = 'APPROVED'"
+                        + " AND g.status <> 'CANCELLED'",
+                new MapSqlParameterSource("roundId", roundId), String.class);
+        if (userIds == null || userIds.isEmpty()) {
+            return 0;
+        }
+        return fanOut(userIds, "Kết quả khóa luận đã được thu hồi",
+                "Kết quả đợt " + roundName.trim()
+                        + " đã được thu hồi để hiệu chỉnh và sẽ được công bố lại sau.",
+                "WARNING", STUDENT_LINK, "THESIS_RESULTS_RETRACTED:" + roundId);
+    }
+
     /** Roster-override notice: every current member hears who governs the change. */
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public int notifyGroupRosterChanged(UUID groupId) {
@@ -173,6 +208,17 @@ public class ThesisNotificationService {
 
     private static String resultsSourceKey(UUID roundId) {
         return "THESIS_RESULTS:" + roundId;
+    }
+
+    private String roundNameOf(UUID roundId) {
+        List<String> names = jdbc.queryForList(
+                "SELECT name FROM thesis.thesis_registration_round WHERE id = :id",
+                new MapSqlParameterSource("id", roundId), String.class);
+        return names.isEmpty() ? "" : names.getFirst();
+    }
+
+    private static String likeEscape(String value) {
+        return value.replace("!", "!!").replace("%", "!%").replace("_", "!_");
     }
 
     /**

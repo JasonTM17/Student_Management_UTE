@@ -11,6 +11,7 @@ import io.campuscore.restfulapi.thesis.web.ThesisMutationDtos.GroupRejectionRequ
 import io.campuscore.restfulapi.thesis.web.ThesisMutationDtos.GvpbDeadlineUpdateRequest;
 import io.campuscore.restfulapi.thesis.web.ThesisMutationDtos.LateTopicRequest;
 import io.campuscore.restfulapi.thesis.web.ThesisMutationDtos.PublishResultsRequest;
+import io.campuscore.restfulapi.thesis.web.ThesisMutationDtos.RetractPublicationRequest;
 import io.campuscore.restfulapi.thesis.web.ThesisMutationDtos.RosterOverrideRequest;
 import io.campuscore.restfulapi.thesis.web.ThesisMutationDtos.MemberRequest;
 import io.campuscore.restfulapi.thesis.web.ThesisMutationDtos.ProgressRequest;
@@ -249,6 +250,21 @@ public class ThesisMutationController {
             @RequestBody RosterOverrideRequest request,
             @AuthenticationPrincipal Jwt actor) {
         return mutations.overrideGroupRoster(id, request, actor);
+    }
+
+    /**
+     * Narrow retraction of a premature publication inside the grace period:
+     * recalls the inbox notices, returns the round to REGISTRATION_CLOSED so
+     * the normal publish path runs again; scores are never modified.
+     */
+    @Operation(summary = "Thu hồi công bố kết quả", description = "Thu hồi RESULTS_PUBLISHED trong thời hạn ân hạn; thư điện tử đã gửi không thể thu hồi; ghi audit kèm lý do và xác nhận")
+    @PostMapping("/rounds/{id}/retract-results")
+    @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN')")
+    public RoundResponse retractResults(
+            @Parameter(description = "Mã UUID của đợt", required = true) @PathVariable UUID id,
+            @RequestBody RetractPublicationRequest request,
+            @AuthenticationPrincipal Jwt actor) {
+        return mutations.retractResults(id, request, actor);
     }
 
     /**
