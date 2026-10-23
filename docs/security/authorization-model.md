@@ -106,6 +106,19 @@ still revokes every session and leaves a `REFRESH_TOKEN_REUSE` line. The
 executable contract lives in `AuthLoginPersistenceTest`; window and
 tolerance are code constants, not configuration.
 
+Session-bound refresh tokens additionally carry a `sid` claim naming their
+`Session` row, which lets a hash miss distinguish "the row is gone or has
+expired" — an administratively revoked, logged-out, or naturally elapsed
+session whose replay is a dead-session refresh and fails quietly — from
+"the row lives but the token is superseded", the stolen-token signal that
+still revokes the family. Refresh tokens minted before `sid` existed carry
+no claim and keep the legacy semantics: every signed token that matches no
+live row revokes the whole family. That legacy exposure is bounded by one
+refresh-token lifetime (`JWT_REFRESH_TOKEN_TTL_SECONDS`, 604800 seconds):
+rotation on every exchange means any pre-deploy token is either consumed
+or naturally expired within its own lifetime, and the oldest surviving
+sid-less token dies with the family it would otherwise have wiped.
+
 Credential verification and replacement serialize on the account's User row
 lock, so login, refresh, reset issuance/redemption, and password writes for the
 same account queue rather than interleave. Row-lock contention is per account,

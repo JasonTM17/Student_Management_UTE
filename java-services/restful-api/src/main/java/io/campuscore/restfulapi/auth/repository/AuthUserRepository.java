@@ -142,18 +142,21 @@ public class AuthUserRepository {
     }
 
     /**
-     * Whether the session row itself still exists, whatever its expiry —
-     * refresh reuse detection asks this to separate "the row was deleted
-     * administratively" (quiet rejection) from "the row lives but the
-     * presented token is superseded" (stolen-token signal).
+     * Whether a live session row still exists — refresh reuse detection asks
+     * this to separate "the row was deleted or already expired" (quiet
+     * rejection) from "a live row stands behind a superseded token"
+     * (stolen-token signal). An expired-but-not-yet-deleted row must read as
+     * gone: a just-expired token is a dead-session refresh, not theft.
      */
-    public boolean sessionExistsForUser(String userId, String sessionId) {
+    public boolean sessionExistsForUser(String userId, String sessionId, Instant now) {
         Integer count = jdbc.queryForObject(
                 "SELECT COUNT(*) FROM " + SESSION_TABLE
-                        + " WHERE \"userId\" = :userId AND \"id\" = :sessionId",
+                        + " WHERE \"userId\" = :userId AND \"id\" = :sessionId"
+                        + " AND \"expiresAt\" > :now",
                 new MapSqlParameterSource()
                         .addValue("userId", userId)
-                        .addValue("sessionId", sessionId),
+                        .addValue("sessionId", sessionId)
+                        .addValue("now", localDateTime(now)),
                 Integer.class);
         return count != null && count > 0;
     }
