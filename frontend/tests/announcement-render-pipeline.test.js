@@ -574,3 +574,15 @@ test('the cover keeps the author alt text while skipping an unusable image', () 
   assert.equal(details?.url, 'https://cdn.test/x.png');
   assert.equal(details?.alt, 'Hội thảo', 'the usable candidate carries its own alt');
 });
+
+test('a card excerpt and reading time show text, not escaped markup entities', () => {
+  // The backend sanitizer stores an edited ampersand as `&amp;`; the card must
+  // show `&`, and the entity must not count as a word of its own.
+  const html = '<p>Nghiên cứu &amp; Phát triển Samsung &quot;STP&quot; &#39;2026&#39;&nbsp;mới</p>';
+  assert.equal(
+    presentation.extractAnnouncementExcerpt(html, 200),
+    'Nghiên cứu & Phát triển Samsung "STP" \'2026\' mới',
+  );
+  assert.equal(presentation.extractAnnouncementExcerpt('<p>A &amp;lt; B</p>', 200), 'A &lt; B', 'one decode pass only');
+  assert.equal(presentation.calculateReadingTime('<p>Một &amp; hai</p>', 'vi').wordCount, 3);
+});

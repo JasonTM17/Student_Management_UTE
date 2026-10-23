@@ -727,8 +727,7 @@ export function calculateReadingTime(
     };
   }
   // Strip html and markdown
-  const clean = content
-    .replace(/<[^>]+>/g, ' ')
+  const clean = decodeBasicEntities(content.replace(/<[^>]+>/g, ' '))
     .replace(/[#*`_~[\]()|>-]/g, ' ')
     .replace(/\s+/g, ' ')
     .trim();
@@ -783,6 +782,21 @@ export function formatRelativeTime(
 }
 
 /**
+ * The backend sanitizer stores an ampersand as `&amp;`; text previews read the
+ * markup, not the DOM, so they decode the few entities it can emit. `&amp;`
+ * goes last so `&amp;lt;` stays the literal text `&lt;`.
+ */
+function decodeBasicEntities(text: string): string {
+  return text
+    .replace(/&nbsp;/gi, ' ')
+    .replace(/&lt;/gi, '<')
+    .replace(/&gt;/gi, '>')
+    .replace(/&quot;/gi, '"')
+    .replace(/&#39;|&apos;/gi, "'")
+    .replace(/&amp;/gi, '&');
+}
+
+/**
  * Extracts a clean textual excerpt (Sapo) from raw Markdown/HTML.
  */
 export function extractAnnouncementExcerpt(
@@ -790,9 +804,11 @@ export function extractAnnouncementExcerpt(
   maxLength = 160,
 ): string {
   if (!content) return '';
-  const clean = content
-    .replace(/<figure[^>]*>[\s\S]*?<\/figure>/gi, '') // drop figures and figcaptions from sapo excerpt
-    .replace(/<[^>]+>/g, ' ')
+  const clean = decodeBasicEntities(
+    content
+      .replace(/<figure[^>]*>[\s\S]*?<\/figure>/gi, '') // drop figures and figcaptions from sapo excerpt
+      .replace(/<[^>]+>/g, ' '),
+  )
     .replace(/!\[[^\]]*\]\([^)]+\)/g, '') // remove images
     .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1') // unwrap links
     .replace(/[#*`_~|>-]/g, '')
