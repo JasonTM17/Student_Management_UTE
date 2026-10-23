@@ -713,7 +713,7 @@ export default function LoginPage() {
               <p className="text-xs leading-5 text-muted-foreground">
                 <LocalizedLink
                   href="/forgot-password"
-                  className="font-medium text-primary hover:underline"
+                  className="inline-block py-1 font-medium text-primary hover:underline"
                 >
                   {locale === 'vi' ? 'Quên mật khẩu?' : 'Forgot your password?'}
                 </LocalizedLink>{' '}
