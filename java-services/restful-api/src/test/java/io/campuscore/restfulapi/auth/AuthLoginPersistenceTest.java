@@ -161,6 +161,8 @@ class AuthLoginPersistenceTest {
                     "id" VARCHAR(120) PRIMARY KEY,
                     "userId" VARCHAR(120) NOT NULL,
                     "refreshToken" VARCHAR(200) NOT NULL,
+                    "previousRefreshToken" VARCHAR(200),
+                    "rotatedAt" TIMESTAMP,
                     "userAgent" VARCHAR(500),
                     "ipAddress" VARCHAR(80),
                     "expiresAt" TIMESTAMP NOT NULL,
@@ -514,7 +516,10 @@ class AuthLoginPersistenceTest {
      * then replayed is the classic stolen-token signal. The replay must be
      * refused AND the whole session family for that account must die — the
      * freshly rotated token included — instead of silently 401-ing while the
-     * thief keeps the current session.
+     * thief keeps the current session. The only exception is the brief
+     * rotation overlap right after the rotation commits, which covers the
+     * same-cookie document race; this test ages the row past that window so
+     * the replay is a true stale-token reuse again.
      */
     @Test
     void replayingARotatedRefreshTokenRevokesTheWholeSessionFamily() throws Exception {
@@ -537,6 +542,16 @@ class AuthLoginPersistenceTest {
                 .asText();
         assertNotEquals(staleRefreshToken, liveRefreshToken);
 
+        // Age the rotation past the overlap window: a replay arriving later is
+        // indistinguishable from theft and must keep the SEC-P1-1 contract.
+        // Session timestamps are stored as UTC wall-clock values, matching the
+        // repository's localDateTime()/instant() conversion helpers.
+        jdbc.update(
+                "UPDATE \"campuscore_auth\".\"Session\" SET \"rotatedAt\" = ? WHERE \"userId\" = 'student-user'",
+                java.sql.Timestamp.valueOf(
+                        java.time.LocalDateTime.ofInstant(
+                                Instant.now().minusSeconds(120), java.time.ZoneOffset.UTC)));
+
         // Replaying the stale token: refused, and the family is revoked.
         mvc.perform(post("/api/v1/auth/refresh")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -555,6 +570,68 @@ class AuthLoginPersistenceTest {
                         .header("User-Agent", "reuse-test-after")
                         .content("{\"refreshToken\":\"" + liveRefreshToken + "\"}"))
                 .andExpect(status().isUnauthorized());
+    }
+
+    /**
+     * Several same-origin documents share one refresh cookie. When a refresh
+     * request rotates the token but its response never reaches the jar — the
+     * document was navigated away mid-flight, the transport timed out, or the
+     * network dropped it — the next document's refresh still presents the
+     * previous token. The User row lock serializes the two calls, so the
+     * queued request lands exactly where a stolen-token replay would. Inside
+     * the rotation overlap it must recover with fresh tokens instead of
+     * revoking the whole session family and signing every document out.
+     */
+    @Test
+    void aQueuedSameCookieRefreshRecoversInsideTheRotationOverlap() throws Exception {
+        MvcResult login = loginStudent().andReturn();
+        JsonNode loginBody = objectMapper.readTree(login.getResponse().getContentAsString());
+        String firstRefreshToken = loginBody.get("refreshToken").asText();
+        Cookie refreshCookie = login.getResponse().getCookie("cc_refresh_token");
+        Cookie csrfCookie = login.getResponse().getCookie("cc_csrf");
+
+        // Document A rotates the session to a second-generation token.
+        MvcResult rotation = mvc.perform(post("/api/v1/auth/refresh")
+                        .cookie(refreshCookie, csrfCookie)
+                        .header("X-CSRF-Token", csrfCookie.getValue())
+                        .header("User-Agent", "doc-a"))
+                .andExpect(status().isOk())
+                .andReturn();
+        String rotatedRefreshToken = objectMapper
+                .readTree(rotation.getResponse().getContentAsString())
+                .get("refreshToken").asText();
+
+        // Documents B and C still hold the pre-rotation cookie — e.g. A's
+        // response was lost mid-flight, or they queued on a shared lock with
+        // a stale jar view. Each one must recover, not kill the session.
+        for (String agent : new String[]{"doc-b", "doc-c"}) {
+            mvc.perform(post("/api/v1/auth/refresh")
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .header("User-Agent", agent)
+                            .content("{\"refreshToken\":\"" + firstRefreshToken + "\"}"))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.accessToken", notNullValue()))
+                    .andExpect(jsonPath("$.refreshToken", notNullValue()));
+        }
+
+        Integer liveSessions = jdbc.queryForObject(
+                "SELECT COUNT(*) FROM \"campuscore_auth\".\"Session\" WHERE \"userId\" = 'student-user'",
+                Integer.class);
+        org.junit.jupiter.api.Assertions.assertEquals(1, liveSessions,
+                "a same-cookie refresh race must not revoke the session family");
+
+        // A skipped-generation token is the theft shape: it was rotated out
+        // more than one generation ago, so replaying it still revokes the
+        // family even inside the overlap window.
+        mvc.perform(post("/api/v1/auth/refresh")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .header("User-Agent", "skipped-generation")
+                        .content("{\"refreshToken\":\"" + rotatedRefreshToken + "\"}"))
+                .andExpect(status().isUnauthorized());
+        Integer remaining = jdbc.queryForObject(
+                "SELECT COUNT(*) FROM \"campuscore_auth\".\"Session\" WHERE \"userId\" = 'student-user'",
+                Integer.class);
+        org.junit.jupiter.api.Assertions.assertEquals(0, remaining);
     }
 
     @Test

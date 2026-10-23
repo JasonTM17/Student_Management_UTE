@@ -74,6 +74,24 @@ bookkeeping (the five-strikes lock) still persists. See `TwoFactorService`
 and `TwoFactorLoginPersistenceTest` for the executable cases; the raced
 rotation schedules live in `CredentialSessionLockOrderPostgresIT`.
 
+Browser refresh sessions rotate on every exchange: the `Session` row carries
+the current refresh-token hash plus the hash it replaced
+(`previousRefreshToken`) and the rotation instant (`rotatedAt`, written from
+the application clock in UTC). A signed refresh token that matches no live
+row is the stolen-token signal and revokes the whole session family — with
+one bounded exception. Same-origin documents share one cookie jar, so a
+document can legitimately present the immediately-previous token after a
+sibling rotated it, most often when the rotating response never reached the
+jar (navigation mid-flight, transport timeout, dropped network answer).
+Inside a short rotation-overlap window such a replay recovers: the same
+`Session.id` rotates forward again, the family survives, and the overlap
+anchor is not extended by repeated replays. Any other mismatch — a hash that
+never owned the row, a generation older than the previous one, or a replay
+arriving after the window closed — still revokes every session and leaves a
+`REFRESH_TOKEN_REUSE` audit line. The executable contract lives in
+`AuthLoginPersistenceTest`; the window width is a code constant, not
+configuration, so a deployed token age never depends on environment tuning.
+
 Credential verification and replacement serialize on the account's User row
 lock, so login, refresh, reset issuance/redemption, and password writes for the
 same account queue rather than interleave. Row-lock contention is per account,
