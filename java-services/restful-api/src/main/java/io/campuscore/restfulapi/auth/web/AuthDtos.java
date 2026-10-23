@@ -54,6 +54,21 @@ public final class AuthDtos {
             String refreshToken) {
     }
 
+    /**
+     * {@code sessionPreserved} tells the client whether the server could
+     * keep the calling device's session. When true the credential pair is
+     * returned like login/refresh do (cookies plus body fields for
+     * body-token clients); when false every session was revoked and the
+     * client should land on the rotated-credential login notice.
+     */
+    public record ChangePasswordResponse(
+            String message,
+            boolean sessionPreserved,
+            AuthUserResponse user,
+            String accessToken,
+            String refreshToken) {
+    }
+
     public record ForgotPasswordRequest(
             @NotBlank @jakarta.validation.constraints.Email @Size(max = 320) String email) {
     }

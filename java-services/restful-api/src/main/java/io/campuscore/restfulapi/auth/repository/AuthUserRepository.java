@@ -89,13 +89,19 @@ public class AuthUserRepository {
                 new MapSqlParameterSource("id", userId), String.class);
     }
 
-    public Optional<AuthUserRecord> findByActiveRefreshSession(String refreshTokenHash, Instant now) {
-        List<AuthUserRecord> matches = jdbc.query(
+    /**
+     * The live session row behind a refresh-token hash, together with the
+     * account it belongs to. The row id rides along so the replacement
+     * token can carry the same "sid" binding.
+     */
+    public Optional<ActiveRefreshSession> findByActiveRefreshSession(String refreshTokenHash, Instant now) {
+        List<ActiveRefreshSession> matches = jdbc.query(
                 "SELECT u.\"id\", u.\"email\", u.\"password\", u.\"firstName\", u.\"lastName\","
                         + " u.\"phone\", u.\"gender\", u.\"dateOfBirth\", u.\"address\", u.\"avatar\","
                         + " u.\"status\", u.\"mustChangePassword\", u.\"credentialVersion\", u.\"failedLoginAttempts\", u.\"lockedUntil\", u.\"createdAt\","
                         + " st.\"id\" AS student_id, st.\"year\" AS student_year,"
-                        + " l.\"id\" AS lecturer_id"
+                        + " l.\"id\" AS lecturer_id,"
+                        + " se.\"id\" AS active_session_id"
                         + " FROM " + SESSION_TABLE + " se"
                         + " INNER JOIN " + USER_TABLE + " u ON u.\"id\" = se.\"userId\""
                         + " LEFT JOIN " + STUDENT_TABLE + " st ON st.\"userId\" = u.\"id\""
@@ -105,10 +111,81 @@ public class AuthUserRepository {
                 new MapSqlParameterSource()
                         .addValue("refreshToken", refreshTokenHash)
                         .addValue("now", localDateTime(now)),
-                USER_MAPPER);
-        return matches.stream().findFirst().map(user -> user.withAuthorities(
-                findRoles(user.id()),
-                findPermissions(user.id())));
+                (resultSet, rowNum) -> new ActiveRefreshSession(
+                        mapUser(resultSet, rowNum),
+                        resultSet.getString("active_session_id")));
+        return matches.stream().findFirst().map(session -> new ActiveRefreshSession(
+                session.user().withAuthorities(
+                        findRoles(session.user().id()),
+                        findPermissions(session.user().id())),
+                session.sessionId()));
+    }
+
+    public record ActiveRefreshSession(AuthUserRecord user, String sessionId) {
+    }
+
+    /**
+     * Re-checks a session pinned by stable row id under the account's User
+     * row lock. Returns the row's expiry instant; the caller decides
+     * whether the pinned session is still usable.
+     */
+    public Optional<Instant> findSessionExpiryForUpdate(String userId, String sessionId) {
+        return jdbc.query(
+                        "SELECT \"expiresAt\" FROM " + SESSION_TABLE
+                                + " WHERE \"userId\" = :userId AND \"id\" = :sessionId FOR UPDATE",
+                        new MapSqlParameterSource()
+                                .addValue("userId", userId)
+                                .addValue("sessionId", sessionId),
+                        (rs, rowNum) -> instant(rs.getTimestamp("expiresAt")))
+                .stream()
+                .findFirst();
+    }
+
+    /**
+     * Whether the session row itself still exists, whatever its expiry —
+     * refresh reuse detection asks this to separate "the row was deleted
+     * administratively" (quiet rejection) from "the row lives but the
+     * presented token is superseded" (stolen-token signal).
+     */
+    public boolean sessionExistsForUser(String userId, String sessionId) {
+        Integer count = jdbc.queryForObject(
+                "SELECT COUNT(*) FROM " + SESSION_TABLE
+                        + " WHERE \"userId\" = :userId AND \"id\" = :sessionId",
+                new MapSqlParameterSource()
+                        .addValue("userId", userId)
+                        .addValue("sessionId", sessionId),
+                Integer.class);
+        return count != null && count > 0;
+    }
+
+    /**
+     * Re-issues the kept session during a credential rotation: the row id
+     * survives but every token artifact is replaced — a fresh hash, no
+     * "previousRefreshToken" grace window, a fresh expiry. A credential
+     * change is exactly the moment no replay of the password-era token may
+     * recover. Callers must hold the account's User row lock.
+     */
+    public void reissueRefreshSession(
+            String userId,
+            String sessionId,
+            String refreshTokenHash,
+            Instant expiresAt) {
+        MapSqlParameterSource parameters = new MapSqlParameterSource()
+                .addValue("userId", userId)
+                .addValue("sessionId", sessionId)
+                .addValue("refreshToken", refreshTokenHash)
+                .addValue("expiresAt", localDateTime(expiresAt));
+        jdbc.update(
+                "UPDATE " + SESSION_TABLE
+                        + " SET \"refreshToken\" = :refreshToken,"
+                        + " \"previousRefreshToken\" = NULL, \"rotatedAt\" = NULL,"
+                        + " \"expiresAt\" = :expiresAt"
+                        + " WHERE \"userId\" = :userId AND \"id\" = :sessionId",
+                parameters);
+        jdbc.update(
+                "UPDATE " + USER_TABLE + " SET \"refreshToken\" = :refreshToken, \"updatedAt\" = CURRENT_TIMESTAMP"
+                        + " WHERE \"id\" = :userId",
+                parameters);
     }
 
     public void recordFailedLogin(String userId, int nextAttemptCount, Instant lockedUntil) {

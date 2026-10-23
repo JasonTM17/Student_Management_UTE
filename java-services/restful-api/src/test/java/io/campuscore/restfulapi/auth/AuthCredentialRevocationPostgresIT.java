@@ -107,7 +107,7 @@ class AuthCredentialRevocationPostgresIT {
         try {
             Future<?> rotation = pool.submit(() -> {
                 Thread.currentThread().setName(rotationThread);
-                authLogin.changePassword(userId, rawPassword, rotatedPassword, null);
+                authLogin.changePassword(userId, rawPassword, rotatedPassword, staleRefresh);
                 return null;
             });
             assertThat(rotationHoldsLock.await(WAIT_SECONDS, TimeUnit.SECONDS))
@@ -184,13 +184,21 @@ class AuthCredentialRevocationPostgresIT {
                         + " VALUES (?, ?, 'LOGIN', ?, CURRENT_TIMESTAMP + INTERVAL '1 hour', 0)",
                 challengeId, userId, "0".repeat(64));
 
-        authLogin.changePassword(userId, rawPassword, rawPassword + "-rotated", null);
+        AuthLoginService.LoginResult preRotation =
+                authLogin.login(email, rawPassword, "127.0.0.1", "cred-it");
+        authLogin.changePassword(userId, rawPassword, rawPassword + "-rotated",
+                preRotation.response().refreshToken());
 
         assertThat(jdbc.queryForObject(
                         "SELECT COUNT(*) FROM campuscore_auth.\"TwoFactorChallenge\""
                                 + " WHERE \"id\" = ? AND \"consumedAt\" IS NOT NULL",
                         Integer.class, challengeId))
                 .as("the pending LOGIN challenge is consumed inside the rotation transaction")
+                .isEqualTo(1);
+        assertThat(jdbc.queryForObject(
+                        "SELECT COUNT(*) FROM campuscore_auth.\"Session\" WHERE \"userId\" = ?",
+                        Integer.class, userId))
+                .as("the calling device's session survives, re-issued under the same row")
                 .isEqualTo(1);
         assertThatThrownBy(() -> authLogin.completeLogin(challengeId, "000000", "127.0.0.1", "cred-it"))
                 .as("a challenge consumed by credential replacement can no longer mint a session")

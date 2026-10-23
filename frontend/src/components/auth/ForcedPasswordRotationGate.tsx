@@ -5,6 +5,7 @@ import { ShieldCheck } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import { authApi } from '@/lib/api';
 import { campusCodeMessage } from '@/lib/campus-error';
+import { loginHref, portalFromUser } from '@/lib/login-portal';
 import { checkPasswordPolicy } from '@/lib/password-policy';
 import { useI18n } from '@/i18n';
 import { Modal } from '@/components/ui/modal';
@@ -18,8 +19,8 @@ import { Input } from '@/components/ui/input';
  * APIs with PASSWORD_CHANGE_REQUIRED, so the overlay is UX, not the gate.
  */
 export function ForcedPasswordRotationGate() {
-  const { user, refreshUser } = useAuth();
-  const { locale, messages } = useI18n();
+  const { user, refreshUser, logout } = useAuth();
+  const { locale, messages, href } = useI18n();
   const [oldPassword, setOldPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -70,12 +71,18 @@ export function ForcedPasswordRotationGate() {
     }
     setIsSaving(true);
     try {
-      await authApi.changePassword(oldPassword, newPassword);
-      // The server keeps this device's session through the rotation: the
-      // pre-rotation access token is retired, so the first identity probe
-      // refreshes through the kept session and comes back with the flag
-      // cleared — the gate closes and the portal opens without a sign-out.
-      await refreshUser();
+      const result = await authApi.changePassword(oldPassword, newPassword);
+      if (result.sessionPreserved) {
+        // The server re-issued this device's session inside the rotation and
+        // the fresh cookies are already in the jar — re-read the identity and
+        // the flag-cleared user opens the portal without a sign-out.
+        await refreshUser();
+      } else {
+        // No refresh credential reached the pin, so every session was
+        // revoked. Land on the rotated-credential notice rather than a bare
+        // session-expired redirect.
+        await logout({ redirect: loginHref(href, portalFromUser(user), 'password-rotated') });
+      }
     } catch (error: unknown) {
       setError(campusCodeMessage(error, messages.common.campusErrors, copy.failed));
     } finally {

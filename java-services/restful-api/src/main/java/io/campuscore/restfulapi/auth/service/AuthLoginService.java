@@ -202,19 +202,20 @@ public class AuthLoginService {
         users.lockUserRow(decoded.getSubject());
         Instant now = clock.instant();
         String refreshTokenHash = hash(refreshTokenValue);
-        Optional<AuthUserRecord> sessionUser = users.findByActiveRefreshSession(refreshTokenHash, now);
-        if (sessionUser.isEmpty()) {
-            return recoverRacedRefresh(decoded.getSubject(), refreshTokenHash, now, ipAddress, userAgent);
+        Optional<AuthUserRepository.ActiveRefreshSession> sessionRow =
+                users.findByActiveRefreshSession(refreshTokenHash, now);
+        if (sessionRow.isEmpty()) {
+            return recoverRacedRefresh(decoded, refreshTokenHash, now, ipAddress, userAgent);
         }
 
-        AuthUserRecord user = sessionUser.get();
+        AuthUserRecord user = sessionRow.get().user();
         if (!user.id().equals(decoded.getSubject()) || !"ACTIVE".equals(user.status())) {
             throw new BadCredentialsException("Invalid refresh token");
         }
 
         AuthPrincipal principal = principal(user);
         IssuedAccessToken accessToken = tokens.issueAccessToken(principal);
-        IssuedRefreshToken nextRefreshToken = tokens.issueRefreshToken(principal);
+        IssuedRefreshToken nextRefreshToken = tokens.issueRefreshToken(principal, sessionRow.get().sessionId());
         users.rotateRefreshSession(
                 user.id(),
                 refreshTokenHash,
@@ -240,11 +241,25 @@ public class AuthLoginService {
      * signal that still fails the whole family closed.
      */
     private LoginResult recoverRacedRefresh(
-            String subject, String refreshTokenHash, Instant now, String ipAddress, String userAgent) {
+            Jwt decoded, String refreshTokenHash, Instant now, String ipAddress, String userAgent) {
+        String subject = decoded.getSubject();
         Optional<AuthUserRepository.RacedRotation> raced =
                 users.findByPreviousRefreshSession(refreshTokenHash, now)
                         .filter(candidate -> withinRotationOverlap(candidate.rotatedAt(), now));
         if (raced.isEmpty()) {
+            // Two genuinely different cases land here. When the token names
+            // its session ("sid") and that row is already gone, the session
+            // was revoked administratively — a password change, single-device
+            // logout, a two-factor posture change, or an admin. That is not a
+            // theft signal and there is no family left to protect, so the
+            // replay fails quietly instead of wiping the caller's other
+            // sessions. A superseded token whose row still exists — and any
+            // token minted before "sid" existed — keeps the stolen-token
+            // semantics and fails the whole family closed.
+            String sessionId = decoded.getClaimAsString("sid");
+            if (sessionId != null && !users.sessionExistsForUser(subject, sessionId)) {
+                throw new BadCredentialsException("Invalid refresh token");
+            }
             users.findById(subject).ifPresent(owner -> {
                 users.deleteAllRefreshSessions(owner.id());
                 reuseLogger.warn(
@@ -274,7 +289,7 @@ public class AuthLoginService {
                 userAgent);
         AuthPrincipal principal = principal(user);
         IssuedAccessToken accessToken = tokens.issueAccessToken(principal);
-        IssuedRefreshToken nextRefreshToken = tokens.issueRefreshToken(principal);
+        IssuedRefreshToken nextRefreshToken = tokens.issueRefreshToken(principal, candidate.sessionId());
         users.rotateRacedRefreshSession(
                 user.id(),
                 candidate.sessionId(),
@@ -344,13 +359,24 @@ public class AuthLoginService {
         return trimmed;
     }
 
+    /**
+     * Rotates the account password and revokes the other sessions. The
+     * calling device's session — when the presented refresh credential pins
+     * a live row — is re-issued inside the same locked transaction: fresh
+     * refresh and access tokens at the new credential revision, no overlap
+     * window for the superseded token. The response carries the new pair so
+     * cookie and body-token clients both land already signed in; an empty
+     * result means no session could be preserved and every session was
+     * revoked.
+     */
     @Transactional
-    public void changePassword(String userId, String oldPassword, String newPassword, String refreshTokenValue) {
+    public Optional<LoginResult> changePassword(
+            String userId, String oldPassword, String newPassword, String refreshTokenValue) {
         // Pin the caller's session by stable row id BEFORE the User lock —
         // the same contract as logout(): a refresh holding that lock can
         // rotate the row's token hash while this call waits, and a hash
         // resolved only afterwards would point nowhere.
-        String keepSessionId = refreshTokenValue == null || refreshTokenValue.isBlank()
+        String pinnedSessionId = refreshTokenValue == null || refreshTokenValue.isBlank()
                 ? null
                 : users.findSessionIdByRefreshHash(userId, hash(refreshTokenValue)).orElse(null);
         users.lockUserRow(userId);
@@ -373,34 +399,63 @@ public class AuthLoginService {
         // Read before rotation: the flag says whether the credential being
         // replaced was office-issued, which decides the audit action below.
         boolean rotatingOfficeIssuedCredential = user.mustChangePassword();
-        users.changePassword(user.id(), passwordEncoder.encode(newPassword), clock.instant());
-        // Rotation clears the office-issued flag and the credential-version
-        // bump retires every issued access token. The caller's refresh
-        // session survives — the device that just proved the old credential
-        // stays signed in and mints new-revision access tokens on its next
-        // rotation — while every other session of the account is revoked.
-        // When no session could be pinned (no refresh token, or the row was
-        // rotated away first), all sessions are revoked: the safe direction.
+        Instant now = clock.instant();
+        users.changePassword(user.id(), passwordEncoder.encode(newPassword), now);
+        // The pin ran before the User lock, so under the lock the row can
+        // already be gone (concurrent logout or admin revocation) or dead
+        // (expired). Re-verify it FOR UPDATE and only then promise the
+        // device stays signed in — anything else falls back to revoking
+        // every session: the safe direction.
+        String keepSessionId = pinnedSessionId != null
+                && users.findSessionExpiryForUpdate(userId, pinnedSessionId)
+                        .map(expiresAt -> expiresAt.isAfter(now))
+                        .orElse(false)
+                ? pinnedSessionId
+                : null;
         users.setMustChangePassword(user.id(), false);
         if (keepSessionId == null) {
             users.deleteAllRefreshSessions(user.id());
             users.clearUserRefreshToken(user.id());
-        } else {
-            users.deleteOtherRefreshSessions(user.id(), keepSessionId);
+            auditChange(userId, rotatingOfficeIssuedCredential, false);
+            return Optional.empty();
         }
-        // Round-3 ct-4: a self-service credential rotation is exactly the
-        // operation whose author an investigation needs to know — the trail
-        // previously covered only admin-initiated resets (PASSWORD_RESET).
-        // An office-issued temporary credential reaching its rotation is
-        // marked separately so a takeover of an admin-issued password is
-        // distinguishable from an ordinary change.
+        users.deleteOtherRefreshSessions(user.id(), keepSessionId);
+        // Re-issue rather than merely keep: a stolen copy of the
+        // password-era refresh token must meet the superseded-token path
+        // (its row still exists, so it stays reuse and fails closed), and
+        // the response hands the caller a working pair at the new revision
+        // — no 401->refresh round trip on the way back into the portal.
+        AuthUserRecord rotatedUser = requireActiveUser(userId);
+        AuthPrincipal principal = principal(rotatedUser);
+        IssuedAccessToken accessToken = tokens.issueAccessToken(principal);
+        IssuedRefreshToken nextRefreshToken = tokens.issueRefreshToken(principal, keepSessionId);
+        users.reissueRefreshSession(
+                user.id(), keepSessionId, hash(nextRefreshToken.refreshToken()), nextRefreshToken.expiresAt());
+        auditChange(userId, rotatingOfficeIssuedCredential, true);
+        return Optional.of(LoginResult.session(
+                new LoginResponse(
+                        rotatedUser.toResponse(), accessToken.accessToken(), nextRefreshToken.refreshToken()),
+                accessToken.expiresAt(),
+                nextRefreshToken.expiresAt()));
+    }
+
+    /**
+     * Round-3 ct-4: a self-service credential rotation is exactly the
+     * operation whose author an investigation needs to know — the trail
+     * previously covered only admin-initiated resets (PASSWORD_RESET).
+     * An office-issued temporary credential reaching its rotation is
+     * marked separately so a takeover of an admin-issued password is
+     * distinguishable from an ordinary change. The message must describe
+     * the outcome that actually committed.
+     */
+    private void auditChange(String userId, boolean rotatingOfficeIssuedCredential, boolean sessionKept) {
         audit.record(userId, null,
                 rotatingOfficeIssuedCredential ? "TEMP_CREDENTIAL_ROTATED" : "PASSWORD_CHANGED",
                 "USER", userId,
                 (rotatingOfficeIssuedCredential
                         ? "User rotated an office-issued temporary password; "
                         : "User rotated their own password; ")
-                        + (keepSessionId != null
+                        + (sessionKept
                                 ? "other sessions were revoked; the rotating device stays signed in"
                                 : "all sessions were revoked"));
     }
@@ -462,10 +517,11 @@ public class AuthLoginService {
     private LoginResult issueSession(AuthUserRecord user, String ipAddress, String userAgent) {
         AuthPrincipal principal = principal(user);
         IssuedAccessToken accessToken = tokens.issueAccessToken(principal);
-        IssuedRefreshToken refreshToken = tokens.issueRefreshToken(principal);
+        String sessionId = UUID.randomUUID().toString();
+        IssuedRefreshToken refreshToken = tokens.issueRefreshToken(principal, sessionId);
         users.insertRefreshSession(
                 user.id(),
-                UUID.randomUUID().toString(),
+                sessionId,
                 hash(refreshToken.refreshToken()),
                 ipAddress,
                 userAgent,
