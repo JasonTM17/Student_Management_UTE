@@ -217,3 +217,40 @@ test('admin portal shell holds at 1440, 768, and 390', async (t) => {
     await browser.close();
   }
 });
+
+test('Super Admin has its own identity in both portal shells and locales', async (t) => {
+  const browser = await openShellBrowserOrSkip(t);
+  if (!browser) return;
+  try {
+    for (const locale of ['vi', 'en']) {
+      const expectedName = locale === 'vi' ? 'Quản trị viên cấp cao' : 'Super administrator';
+      const officeName = locale === 'vi' ? 'Phòng Đào tạo' : 'Office of Academic Affairs';
+      for (const route of ['/admin', '/dashboard/thesis']) {
+        const context = await browser.newContext({ viewport: viewports[0] });
+        const page = await context.newPage();
+        await mockPortalApi(page, ['ADMIN', 'SUPER_ADMIN']);
+        await page.goto(`${baseURL}/${locale}${route}`, { waitUntil: 'networkidle' });
+        const sidebar = page.locator(route === '/admin' ? '#admin-sidebar' : '#dashboard-sidebar');
+        await sidebar.waitFor({ state: 'visible', timeout: 60_000 });
+        assert.ok(await sidebar.getByText(expectedName, { exact: true }).count() >= 1);
+        assert.equal(await sidebar.getByText(officeName, { exact: true }).count(), 0);
+        assert.equal(await sidebar.getByText('SA', { exact: true }).count(), 1);
+        const profile = page.getByRole('banner').locator('button[aria-haspopup="menu"]');
+        assert.equal(await profile.getByText(expectedName, { exact: true }).count(), 1);
+        assert.equal(await profile.getByText('SA', { exact: true }).count(), 1);
+        assert.equal(await profile.getByText(/Demo/).count(), 0);
+        await profile.click();
+        const menu = page.locator(route === '/admin' ? '#admin-profile-menu' : '#dashboard-profile-menu');
+        await menu.waitFor({ state: 'visible' });
+        assert.ok(await menu.getByText(expectedName, { exact: true }).count() >= 1);
+        assert.equal(await menu.getByText('SA', { exact: true }).count(), 1);
+        assert.equal(await menu.getByText(officeName, { exact: true }).count(), 0);
+        assert.equal(await menu.getByText(/Demo/).count(), 0);
+        await assertNoHorizontalOverflow(page, `${locale}${route} Super Admin`);
+        await context.close();
+      }
+    }
+  } finally {
+    await browser.close();
+  }
+});

@@ -854,10 +854,11 @@ export default function DashboardLayout({
             : messages.dashboardShell.roles.student;
 
   const fullName = fullAdminAccess
-    ? messages.adminShell.officeName
+    ? isSuperAdmin ? messages.adminShell.superAdminRole : messages.adminShell.officeName
     : user
       ? (`${user.lastName ?? ''} ${user.firstName ?? ''}`.trim() || `${user.firstName ?? ''} ${user.lastName ?? ''}`.trim() || user.email)
       : '';
+  const adminBadge = isSuperAdmin ? 'SA' : messages.adminShell.officeBadge;
 
   return (
     <div className="portal-shell">
@@ -989,7 +990,7 @@ export default function DashboardLayout({
                 )}
               >
                 {fullAdminAccess ? (
-                  messages.adminShell.officeBadge
+                  adminBadge
                 ) : avatarPhoto ? (
                   // eslint-disable-next-line @next/next/no-img-element
                   <img src={avatarPhoto} alt="" className="h-full w-full object-cover" />
@@ -1015,7 +1016,7 @@ export default function DashboardLayout({
                     <span className="inline-flex items-center rounded-md border border-portal-brand-gold/40 bg-portal-brand-gold/15 px-2.5 py-0.5 text-xs font-semibold uppercase tracking-wider text-portal-sidebar-text shadow-xs">
                       {roleLabel}
                     </span>
-                    {isDemoUser(user) && (
+                    {!isSuperAdmin && isDemoUser(user) && (
                       <span className="inline-flex items-center gap-1 rounded-md border border-portal-brand-gold/35 bg-portal-brand-gold/15 px-2 py-0.5 text-[11px] font-medium text-portal-sidebar-text">
                         <span className="h-1.5 w-1.5 rounded-full bg-portal-brand-gold shadow-xs" />
                         {locale === 'vi' ? 'TK Demo trải nghiệm' : 'Demo account'}
@@ -1361,7 +1362,7 @@ export default function DashboardLayout({
                 >
                   <div className="flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-full bg-primary text-xs font-bold text-primary-foreground">
                     {fullAdminAccess ? (
-                      messages.adminShell.officeBadge
+                      adminBadge
                     ) : avatarPhoto ? (
                       // eslint-disable-next-line @next/next/no-img-element
                       <img src={avatarPhoto} alt="" className="h-full w-full object-cover" />
@@ -1378,7 +1379,7 @@ export default function DashboardLayout({
                     </div>
                     <div className="text-xs text-muted-foreground flex items-center gap-1">
                       <span className="min-w-0 truncate" title={user.email ?? undefined}>{user.email}</span>
-                      {isDemoUser(user) && (
+                      {!isSuperAdmin && isDemoUser(user) && (
                         <span className="inline-flex items-center gap-1 text-[11px] font-medium text-muted-foreground">
                           <span
                             className="h-1.5 w-1.5 rounded-full bg-portal-brand-gold"
@@ -1400,7 +1401,7 @@ export default function DashboardLayout({
                     <div className="flex items-center gap-3 border-b border-border/70 px-4 py-4">
                       <div className="flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-full bg-primary text-sm font-bold text-primary-foreground">
                         {fullAdminAccess ? (
-                          messages.adminShell.officeBadge
+                          adminBadge
                         ) : avatarPhoto ? (
                           // eslint-disable-next-line @next/next/no-img-element
                           <img src={avatarPhoto} alt="" className="h-full w-full object-cover" />
@@ -1420,11 +1421,11 @@ export default function DashboardLayout({
                         </p>
                         <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
                           <div className="inline-flex rounded-md bg-secondary px-2.5 py-0.5 text-xs font-medium text-foreground">
-                            {messages.common.roles[
+                            {isSuperAdmin ? messages.adminShell.superAdminRole : (messages.common.roles[
                               (user.roles?.[0] || 'USER').toUpperCase() as keyof typeof messages.common.roles
-                            ] ?? user.roles?.[0] ?? messages.common.roles.USER}
+                            ] ?? user.roles?.[0] ?? messages.common.roles.USER)}
                           </div>
-                          {isDemoUser(user) && (
+                          {!isSuperAdmin && isDemoUser(user) && (
                             <div className="inline-flex items-center gap-1 rounded-md bg-amber-500/15 border border-amber-500/30 px-2.5 py-0.5 text-[11px] font-medium text-amber-700 dark:text-amber-300">
                               <span className="h-1.5 w-1.5 rounded-full bg-amber-500" />
                               {locale === 'vi' ? 'Tài khoản demo để trải nghiệm' : 'Demo experience account'}
