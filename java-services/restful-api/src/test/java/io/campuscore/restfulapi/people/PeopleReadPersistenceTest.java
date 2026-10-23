@@ -64,7 +64,7 @@ class PeopleReadPersistenceTest {
         mvc.perform(get("/api/v1/students")
                         .queryParam("page", "1")
                         .queryParam("limit", "2")
-                        .with(lecturerJwt()))
+                        .with(adminJwt()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.length()").value(2))
                 .andExpect(jsonPath("$.data[0].id").value("student-other"))
