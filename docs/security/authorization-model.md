@@ -79,18 +79,32 @@ the current refresh-token hash plus the hash it replaced
 (`previousRefreshToken`) and the rotation instant (`rotatedAt`, written from
 the application clock in UTC). A signed refresh token that matches no live
 row is the stolen-token signal and revokes the whole session family — with
-one bounded exception. Same-origin documents share one cookie jar, so a
-document can legitimately present the immediately-previous token after a
-sibling rotated it, most often when the rotating response never reached the
-jar (navigation mid-flight, transport timeout, dropped network answer).
-Inside a short rotation-overlap window such a replay recovers: the same
-`Session.id` rotates forward again, the family survives, and the overlap
-anchor is not extended by repeated replays. Any other mismatch — a hash that
-never owned the row, a generation older than the previous one, or a replay
-arriving after the window closed — still revokes every session and leaves a
-`REFRESH_TOKEN_REUSE` audit line. The executable contract lives in
-`AuthLoginPersistenceTest`; the window width is a code constant, not
-configuration, so a deployed token age never depends on environment tuning.
+one bounded exception, scoped to exactly one ordering.
+
+The covered ordering is the lost-response case: a document's refresh commits
+a rotation but its response never reaches the shared cookie jar (navigation
+mid-flight, transport timeout, dropped network answer), so the jar — and any
+sibling document — still holds the immediately-previous token. Replaying
+that token inside the overlap window recovers: the same `Session.id`
+rotates forward again, the family survives, and the overlap anchor is not
+extended by repeated replays. The window is 30 seconds from `rotatedAt`,
+with a 2-second forward tolerance for cross-instance clock skew, so the
+real upper bound on acceptance is 32 seconds after the rotation commit; a
+`rotatedAt` further in the future fails closed.
+
+The delayed-duplicate ordering is NOT covered: two requests carrying the
+same token, where the second-processed one rotates and delivers its new
+token to the jar, then the delayed first request recovers inside the window
+and overwrites the row with a token whose response may itself be lost — the
+delivered token is then neither current nor previous, so the jar's next
+refresh still revokes the family. Stolen-token detection inside the window
+is likewise deferred, not removed: an in-window replay yields the replayer a
+fresh pair and evicts the legitimate holder, who is signed out at their next
+refresh. Accepted recoveries leave a `REFRESH_ROTATION_OVERLAP` warn line
+(session id, IP, user agent — never token material); every other mismatch
+still revokes every session and leaves a `REFRESH_TOKEN_REUSE` line. The
+executable contract lives in `AuthLoginPersistenceTest`; window and
+tolerance are code constants, not configuration.
 
 Credential verification and replacement serialize on the account's User row
 lock, so login, refresh, reset issuance/redemption, and password writes for the

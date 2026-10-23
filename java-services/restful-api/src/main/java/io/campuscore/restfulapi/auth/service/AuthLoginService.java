@@ -51,13 +51,19 @@ public class AuthLoginService {
      * often when the rotating response never reached the jar. Replays of that
      * immediately-previous generation are tolerated for this short overlap;
      * older replays keep the stolen-token semantics (family revocation).
+     * The overlap covers only the lost-response ordering: the delayed-
+     * duplicate ordering (second-processed request rotates and delivers its
+     * token, then the delayed duplicate recovers over it) still revokes on
+     * the superseded holder's next refresh — see the V138 migration header
+     * and docs/security/authorization-model.md.
      */
     private static final Duration REFRESH_ROTATION_OVERLAP = Duration.ofSeconds(30);
-    // "rotatedAt" is stamped by the application clock at rotation time, so it
-    // normally precedes the reading instant; a small forward tolerance covers
-    // clock steps (e.g. an NTP correction between the two reads) while a
-    // wildly future timestamp still fails closed.
-    private static final Duration CLOCK_SKEW_TOLERANCE = Duration.ofSeconds(30);
+    // "rotatedAt" is stamped by this same application clock at rotation time,
+    // so a future value should not occur in a single-instance deployment; the
+    // tolerance only covers small cross-instance skew and a wildly future
+    // timestamp still fails closed. Effective acceptance bound for a replay:
+    // REFRESH_ROTATION_OVERLAP + CLOCK_SKEW_TOLERANCE past the rotation.
+    private static final Duration CLOCK_SKEW_TOLERANCE = Duration.ofSeconds(2);
 
     /**
      * Timing-oracle mitigation: a bcrypt comparison against a fixed hash costs
@@ -255,7 +261,12 @@ public class AuthLoginService {
         if (!user.id().equals(subject) || !"ACTIVE".equals(user.status())) {
             throw new BadCredentialsException("Invalid refresh token");
         }
-        reuseLogger.debug(
+        // Same event class as REFRESH_TOKEN_REUSE — a superseded credential
+        // was replayed and accepted inside the window. Because detection is
+        // deferred there, this line is the only trace of a successful
+        // in-window theft, so it stays at warn level. Never log the token
+        // or its hash.
+        reuseLogger.warn(
                 "REFRESH_ROTATION_OVERLAP subject={} session={} ip={} userAgent={}",
                 subject,
                 candidate.sessionId(),
