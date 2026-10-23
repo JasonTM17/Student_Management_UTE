@@ -577,6 +577,33 @@ export default function AdminThesisPage() {
     }
   };
 
+  const restoreRound = async (round: ThesisRound) => {
+    const confirmed = await confirm({
+      title: messages.thesis.admin.restoreRoundTitle,
+      message: round.cancelledFromStatus
+        ? messages.thesis.admin.restoreRoundConfirm
+        : messages.thesis.admin.restoreRoundConfirmLegacy,
+      confirmText: messages.thesis.admin.restoreRound,
+      cancelText: messages.common.actions.cancel,
+    });
+    if (!confirmed) return;
+    setIsSaving(true);
+    setError('');
+    setSuccess('');
+    try {
+      await thesisApi.restoreRound(round.id);
+      setSuccess(messages.thesis.admin.roundRestored);
+      await loadData();
+      if (expandedRoundId === round.id) {
+        await loadRoundDetail(round.id);
+      }
+    } catch (err: unknown) {
+      setError(transitionErrorMessage(err));
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
   const handleAssignReviewer = async (topicId: string, roundId: string) => {
     const lecturerId = reviewerDrafts[topicId];
     if (!lecturerId) return;
@@ -818,6 +845,17 @@ export default function AdminThesisPage() {
                               disabled={isSaving}
                             >
                               {messages.thesis.admin.editRound}
+                            </Button>
+                          ) : null}
+                          {round.status === 'CANCELLED' ? (
+                            <Button
+                              type="button"
+                              size="sm"
+                              variant="outline"
+                              onClick={() => void restoreRound(round)}
+                              disabled={isSaving}
+                            >
+                              {messages.thesis.admin.restoreRound}
                             </Button>
                           ) : null}
                           {round.status !== 'RESULTS_PUBLISHED'

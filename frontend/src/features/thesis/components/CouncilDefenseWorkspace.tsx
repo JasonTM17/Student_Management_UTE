@@ -116,6 +116,11 @@ export default function CouncilDefenseWorkspace({
             {profileClaimMissingLabel}
           </p>
         ) : null}
+        {round?.status === 'CANCELLED' ? (
+          <p className="rounded-lg border border-status-warning/30 bg-status-warning/10 px-4 py-3 text-sm text-foreground">
+            {messages.thesis.grading.roundCancelled}
+          </p>
+        ) : null}
         {councils.length === 0 && !councilLoadError && !showProfileClaimNotice ? (
           <p className="rounded-lg border border-border/70 bg-muted/40 px-4 py-3 text-sm text-muted-foreground">
             {messages.thesis.councils.noVisibleCouncils}

@@ -13,6 +13,7 @@ import io.campuscore.restfulapi.thesis.web.ThesisMutationDtos.ProgressRequest;
 import io.campuscore.restfulapi.thesis.web.ThesisMutationDtos.ReportDeadlineUpdateRequest;
 import io.campuscore.restfulapi.thesis.web.ThesisMutationDtos.ReportUpdateRequest;
 import io.campuscore.restfulapi.thesis.web.ThesisMutationDtos.RoundCreateRequest;
+import io.campuscore.restfulapi.thesis.web.ThesisMutationDtos.RoundRestoreRequest;
 import io.campuscore.restfulapi.thesis.web.ThesisMutationDtos.StudentSearchResponse;
 import io.campuscore.restfulapi.thesis.web.ThesisMutationDtos.TopicAssignmentRequest;
 import io.campuscore.restfulapi.thesis.web.ThesisMutationDtos.TopicCreateRequest;
@@ -100,6 +101,16 @@ public class ThesisMutationController {
             @Parameter(description = "Mã UUID của đợt", required = true) @PathVariable UUID id,
             @AuthenticationPrincipal Jwt actor) {
         return mutations.cancelRound(id, actor);
+    }
+
+    @Operation(summary = "Khôi phục đợt đã hủy", description = "Đưa đợt CANCELLED về trạng thái trước khi hủy (DRAFT với dữ liệu hủy cũ); bị chặn khi có sinh viên đã sang đợt khác còn hiệu lực")
+    @PostMapping("/rounds/{id}/restore")
+    @PreAuthorize("hasAnyRole('ADMIN','TRUONG_KHOA','SUPER_ADMIN')")
+    public RoundResponse restoreRound(
+            @Parameter(description = "Mã UUID của đợt", required = true) @PathVariable UUID id,
+            @RequestBody(required = false) RoundRestoreRequest request,
+            @AuthenticationPrincipal Jwt actor) {
+        return mutations.restoreRound(id, request == null ? null : request.targetStatus(), actor);
     }
 
     /** Brief phase one: the faculty head opens the lecturer topic-submission window. */

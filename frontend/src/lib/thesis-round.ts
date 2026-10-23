@@ -7,17 +7,25 @@ import type { ThesisGroup, ThesisRound } from './thesis-api';
  * so a round containing one of the caller's own groups always wins. Groups are
  * expected newest-first; the newest non-cancelled membership decides, with a
  * cancelled-only history still preferring the latest round it touched.
+ * A membership inside a cancelled *round* is never preferred: the seat is
+ * void and pinning the student there would hide the rounds they can join.
  */
 export function pickPreferredThesisRound(
   rounds: ThesisRound[],
   myGroups: ReadonlyArray<Pick<ThesisGroup, 'roundId' | 'status'>> | null | undefined,
 ): string | undefined {
   if (!myGroups || myGroups.length === 0 || rounds.length === 0) return undefined;
-  const roundIds = new Set(rounds.map((round) => round.id));
-  const usable = myGroups.filter((group) => roundIds.has(group.roundId));
+  const statusByRoundId = new Map(rounds.map((round) => [round.id, round.status]));
+  const usable = myGroups.filter((group) => statusByRoundId.has(group.roundId));
   if (usable.length === 0) return undefined;
-  const active = usable.filter((group) => group.status !== 'CANCELLED');
-  return (active.length > 0 ? active[0] : usable[0]).roundId;
+  const inLiveRound = (group: Pick<ThesisGroup, 'roundId'>) =>
+    statusByRoundId.get(group.roundId) !== 'CANCELLED';
+  const active = usable.filter(
+    (group) => group.status !== 'CANCELLED' && inLiveRound(group),
+  );
+  if (active.length > 0) return active[0].roundId;
+  const live = usable.find(inLiveRound);
+  return live?.roundId;
 }
 
 const ROUND_STATUS_PRIORITY: Readonly<Record<string, number>> = {

@@ -667,7 +667,11 @@ export default function ThesisPage() {
 
   useEffect(() => {
     if (!isSupervisorOrAdmin || !lecturerWorkload || explicitRoundId || hasAutoSelectedRoundRef.current) return;
-    const withGroups = lecturerWorkload.topics.filter((topic) => topic.groupCount > 0);
+    // A cancelled round has frozen grading — it must never be the default a
+    // lecturer lands on, or the workspace looks inert for no visible reason.
+    const withGroups = lecturerWorkload.topics.filter(
+      (topic) => topic.groupCount > 0 && topic.roundStatus !== 'CANCELLED',
+    );
     if (withGroups.length === 0) return;
     hasAutoSelectedRoundRef.current = true;
     if (withGroups.some((topic) => topic.roundId === selectedRoundId)) return;
@@ -3035,6 +3039,7 @@ export default function ThesisPage() {
                 <StudentGroupCard
                   messages={messages}
                   group={currentGroup ?? null}
+                  roundCancelled={selectedRound.status === 'CANCELLED'}
                   groupStatusLabel={groupStatusLabel}
                   roleLabel={isGroupLeader ? pageCopy.roleGroupLeaderReport : pageCopy.roleMember}
                   topicTitle={currentGroup?.topicId ? getTopicTitle(currentGroup.topicId) : null}
