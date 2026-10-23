@@ -2,24 +2,46 @@
 
 import * as React from 'react';
 import { usePathname, useSearchParams } from 'next/navigation';
+import {
+  NavigationProgressController,
+  shouldStartProgress,
+  type NavigationProgressState,
+} from '@/lib/navigation-progress';
+
+function subscribeReducedMotion(onChange: () => void) {
+  const media = window.matchMedia('(prefers-reduced-motion: reduce)');
+  media.addEventListener('change', onChange);
+  return () => media.removeEventListener('change', onChange);
+}
 
 function ProgressBarInner() {
   const pathname = usePathname();
   const searchParams = useSearchParams();
-  const [loading, setLoading] = React.useState(false);
-  const [progress, setProgress] = React.useState(0);
+  const [{ active, progress }, setState] = React.useState<NavigationProgressState>({
+    active: false,
+    progress: 0,
+  });
+  const controllerRef = React.useRef<NavigationProgressController | null>(null);
+  controllerRef.current ??= new NavigationProgressController(setState);
 
-  // Complete progress whenever route or search parameters finish changing
+  const reducedMotion = React.useSyncExternalStore(
+    subscribeReducedMotion,
+    () => window.matchMedia('(prefers-reduced-motion: reduce)').matches,
+    () => false,
+  );
+
+  // A committed route ends whatever navigation the click started; with no
+  // click pending it is a no-op (mount, Back/Forward, programmatic pushes).
   React.useEffect(() => {
-    setProgress(100);
-    const finishTimer = setTimeout(() => {
-      setLoading(false);
-      setProgress(0);
-    }, 250);
-    return () => clearTimeout(finishTimer);
+    controllerRef.current?.handleRouteCommitted();
   }, [pathname, searchParams]);
 
-  // Listen to navigation clicks globally to provide instant visual feedback
+  React.useEffect(() => () => controllerRef.current?.dispose(), []);
+
+  // Listen on the bubble phase, not capture: interceptors that swallow a
+  // click in capture (the unsaved-changes guard stops propagation there)
+  // then never reach this listener, so the bar cannot pin for navigations
+  // that were cancelled before they began.
   React.useEffect(() => {
     const handleDocumentClick = (event: MouseEvent) => {
       // Ignore right clicks or modified clicks (Ctrl, Cmd, Shift)
@@ -27,47 +49,21 @@ function ProgressBarInner() {
         return;
       }
 
-      const anchor = (event.target as HTMLElement)?.closest('a');
-      if (!anchor) return;
+      const anchor =
+        event.target instanceof Element ? event.target.closest('a') : null;
+      if (!anchor || !shouldStartProgress(anchor, window.location)) return;
 
-      const href = anchor.getAttribute('href');
-      if (
-        !href ||
-        href.startsWith('#') ||
-        href.startsWith('mailto:') ||
-        href.startsWith('tel:') ||
-        href.startsWith('javascript:') ||
-        anchor.target === '_blank' ||
-        anchor.hasAttribute('download')
-      ) {
-        return;
-      }
-
-      try {
-        const targetUrl = new URL(anchor.href, window.location.href);
-        if (targetUrl.origin === window.location.origin) {
-          const nextTarget = targetUrl.pathname + targetUrl.search;
-          const currentTarget = window.location.pathname + window.location.search;
-          if (nextTarget !== currentTarget) {
-            setLoading(true);
-            setProgress(30);
-            setTimeout(() => setProgress(70), 120);
-          }
-        }
-      } catch {
-        // ignore invalid URL
-      }
+      controllerRef.current?.handleNavigationStart();
     };
 
-    document.addEventListener('click', handleDocumentClick, { capture: true });
-    return () => document.removeEventListener('click', handleDocumentClick, { capture: true });
+    document.addEventListener('click', handleDocumentClick);
+    return () => document.removeEventListener('click', handleDocumentClick);
   }, []);
 
-  if (!loading && progress === 0) return null;
+  if (!active) return null;
 
   return (
     <div
-      role="progressbar"
       aria-hidden="true"
       className="pointer-events-none fixed inset-x-0 top-0 z-[9999] h-[2.5px] w-full"
     >
@@ -76,8 +72,9 @@ function ProgressBarInner() {
         style={{
           width: `${progress}%`,
           opacity: progress === 100 ? 0 : 1,
-          transition:
-            progress === 100
+          transition: reducedMotion
+            ? 'none'
+            : progress === 100
               ? 'width 100ms ease-out, opacity 250ms ease-in'
               : 'width 250ms cubic-bezier(0.4, 0, 0.2, 1)',
         }}
