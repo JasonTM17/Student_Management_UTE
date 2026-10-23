@@ -457,7 +457,7 @@ export default function ProfilePage() {
     }
 
     try {
-      await authApi.changePassword(oldPassword, newPassword);
+      const result = await authApi.changePassword(oldPassword, newPassword);
       toast.success(messages.profile.passwordUpdated);
       form.reset();
       setVisiblePasswordFields({
@@ -466,7 +466,16 @@ export default function ProfilePage() {
         confirmPassword: false,
         twoFactorPassword: false,
       });
-      await logout({ redirect: loginHref(href, portalFromUser(user), 'password-rotated') });
+      if (result.sessionPreserved) {
+        // The server re-issued this device's session inside the rotation;
+        // the fresh cookies are already in the jar, so re-read the identity
+        // instead of signing the user out.
+        await refreshUser();
+      } else {
+        // No refresh credential reached the pin and every session was
+        // revoked — land on the rotated-credential login notice.
+        await logout({ redirect: loginHref(href, portalFromUser(user), 'password-rotated') });
+      }
     } catch (error: any) {
       // The inline error sits directly under the form, so a toast with the
       // same copy read as a duplicated message.

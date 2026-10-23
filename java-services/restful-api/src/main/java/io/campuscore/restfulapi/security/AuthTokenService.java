@@ -115,6 +115,18 @@ public class AuthTokenService {
     }
 
     public IssuedRefreshToken issueRefreshToken(AuthPrincipal principal) {
+        return issueRefreshToken(principal, null);
+    }
+
+    /**
+     * {@code sessionId} binds the token to its Session row id ("sid" claim).
+     * When the token's hash no longer matches the row, refresh can then tell
+     * "row still exists, superseded token replayed" (theft — revoke the
+     * family) from "row already deleted administratively" (quiet 401).
+     * Tokens minted before the claim existed carry no sid and keep the
+     * legacy fail-closed behavior.
+     */
+    public IssuedRefreshToken issueRefreshToken(AuthPrincipal principal, String sessionId) {
         Objects.requireNonNull(principal, "principal");
         requireText(principal.id(), "subject");
         requireText(principal.email(), "email");
@@ -123,18 +135,18 @@ public class AuthTokenService {
 
         Instant issuedAt = clock.instant();
         Instant expiresAt = issuedAt.plus(refreshTokenTtl);
-        JwtClaimsSet claims = JwtClaimsSet.builder()
+        JwtClaimsSet.Builder claims = JwtClaimsSet.builder()
                 .issuer("campuscore-restful-api")
                 .issuedAt(issuedAt)
                 .expiresAt(expiresAt)
                 .id(UUID.randomUUID().toString())
                 .subject(principal.id())
                 .claim("email", principal.email())
-                .claim("tokenType", "refresh")
-                .build();
+                .claim("tokenType", "refresh");
+        claimIfPresent(claims, "sid", sessionId);
         String token = refreshJwtEncoder.encode(JwtEncoderParameters.from(
                         JwsHeader.with(MacAlgorithm.HS256).build(),
-                        claims))
+                        claims.build()))
                 .getTokenValue();
         return new IssuedRefreshToken(token, expiresAt);
     }
