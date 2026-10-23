@@ -32,6 +32,8 @@ public class AdminCatalogMutationService {
     private static final String CLASSROOM = "\"academic\".\"Classroom\"";
     private static final String SECTION = "\"academic\".\"Section\"";
     private static final String SECTION_SCHEDULE = "\"academic\".\"SectionSchedule\"";
+    private static final String ENROLLMENT = "\"academic\".\"Enrollment\"";
+    private static final String SLIP = "\"academic\".\"RegistrationSlip\"";
     /** Section.lecturerId joins the academic profile table (the auth schema exposes it as a view). */
     private static final String LECTURER = "\"academic\".\"Lecturer\"";
     /** Statuses the academic services and the admin console understand. */
@@ -205,6 +207,7 @@ public class AdminCatalogMutationService {
         String classroomId = text(input, "classroomId", null);
         if (classroomId != null) {
             requireCatalogReference(CLASSROOM, "classroomId", classroomId);
+            requireActiveClassroom(classroomId);
             requireRoomFitsCapacity(classroomId, capacity);
         }
         jdbc.update(
@@ -299,6 +302,29 @@ public class AdminCatalogMutationService {
             }
             if (input.containsKey("lecturerId") || input.containsKey("semesterId")) {
                 assertNoSectionConflicts(id);
+            }
+        }
+        if (SECTION.equals(table) && input.containsKey("status") && before != null) {
+            boolean cancelled = "CANCELLED".equals(before.get("status"));
+            boolean cancelling = !cancelled && "CANCELLED".equals(input.get("status"));
+            boolean reopening = cancelled && !"CANCELLED".equals(input.get("status"));
+            if (reopening) {
+                // The cancelled section released its room/lecturer slots, so a
+                // reopen must not silently restore a slot another section now
+                // holds — nor one whose room was deactivated in the meantime.
+                requireScheduledRoomsActive(id);
+                assertNoSectionConflicts(id);
+            }
+            if (cancelling) {
+                // Persisted slips assert active registrations; leaving them in
+                // place would keep offering the cancelled course on the
+                // downloaded slip.
+                jdbc.update(
+                        "DELETE FROM " + SLIP + " WHERE (\"studentId\", \"semesterId\") IN"
+                                + " (SELECT e.\"studentId\", e.\"semesterId\" FROM " + ENROLLMENT + " e"
+                                + " WHERE e.\"sectionId\" = :sectionId"
+                                + " AND e.\"status\" IN ('ENROLLED', 'PENDING', 'CONFIRMED'))",
+                        new MapSqlParameterSource("sectionId", id));
             }
         }
         Map<String, Object> after = get(table, id);
@@ -436,6 +462,7 @@ public class AdminCatalogMutationService {
                 throw problem(HttpStatus.BAD_REQUEST, "INVALID_SCHEDULE",
                         "startTime must be before endTime");
             }
+            requireActiveClassroom(requiredScheduleText(schedule, "classroomId"));
         }
         jdbc.update(
                 "DELETE FROM " + SECTION_SCHEDULE + " WHERE \"sectionId\" = :sectionId",
@@ -481,12 +508,16 @@ public class AdminCatalogMutationService {
     private void assertNoSectionConflicts(String sectionId) {
         // Compare individual slots: MIN(start)/MAX(end) would occupy the free
         // gap between two sessions and incorrectly reject another class there.
+        // Cancelled sections hold no rooms or lecturer time: neither the
+        // checked section nor its peers participate while CANCELLED, which is
+        // also what lets a slot be reclaimed and the cancellation be reversed.
         String overlappingSlots = " FROM " + SECTION_SCHEDULE + " ss"
                 + " JOIN " + SECTION + " me ON me.\"id\" = ss.\"sectionId\""
                 + " JOIN " + SECTION_SCHEDULE + " ss2 ON ss2.\"dayOfWeek\" = ss.\"dayOfWeek\""
                 + " AND ss2.\"startTime\" < ss.\"endTime\" AND ss2.\"endTime\" > ss.\"startTime\""
                 + " JOIN " + SECTION + " s2 ON s2.\"id\" = ss2.\"sectionId\""
                 + " WHERE ss.\"sectionId\" = :sectionId AND ss2.\"sectionId\" <> ss.\"sectionId\""
+                + " AND me.\"status\" <> 'CANCELLED' AND s2.\"status\" <> 'CANCELLED'"
                 + " AND s2.\"semesterId\" = me.\"semesterId\"";
         Long roomClash = jdbc.queryForObject(
                 "SELECT COUNT(*)" + overlappingSlots
@@ -635,6 +666,33 @@ public class AdminCatalogMutationService {
         }
     }
 
+    /** A section cannot be scheduled into a classroom that has been deactivated. */
+    private void requireActiveClassroom(String classroomId) {
+        Boolean active;
+        try {
+            active = jdbc.queryForObject(
+                    "SELECT \"isActive\" FROM " + CLASSROOM + " WHERE \"id\" = :id",
+                    new MapSqlParameterSource("id", classroomId), Boolean.class);
+        } catch (EmptyResultDataAccessException exception) {
+            throw problem(HttpStatus.NOT_FOUND, "REFERENCE_NOT_FOUND",
+                    "classroomId '" + classroomId + "' does not exist");
+        }
+        if (!Boolean.TRUE.equals(active)) {
+            throw problem(HttpStatus.CONFLICT, "CLASSROOM_INACTIVE",
+                    "Classroom '" + classroomId + "' is inactive");
+        }
+    }
+
+    /** Rooms assigned while the section was live must still be usable when it reopens. */
+    private void requireScheduledRoomsActive(String sectionId) {
+        List<String> classroomIds = jdbc.queryForList(
+                "SELECT DISTINCT \"classroomId\" FROM " + SECTION_SCHEDULE + " WHERE \"sectionId\" = :sectionId",
+                new MapSqlParameterSource("sectionId", sectionId), String.class);
+        for (String classroomId : classroomIds) {
+            requireActiveClassroom(classroomId);
+        }
+    }
+
     /** A section must not promise more seats than the room it meets in. */
     private void requireRoomFitsCapacity(String classroomId, int capacity) {
         Integer roomCapacity = jdbc.queryForObject(
@@ -674,6 +732,9 @@ public class AdminCatalogMutationService {
                     : (String) current.get("classroomId");
             if (classroomId != null) {
                 requireCatalogReference(CLASSROOM, "classroomId", classroomId);
+                if (touchesRoom) {
+                    requireActiveClassroom(classroomId);
+                }
                 requireRoomFitsCapacity(classroomId, capacity);
             }
         }
