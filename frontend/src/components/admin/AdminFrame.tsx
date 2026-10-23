@@ -70,6 +70,8 @@ export function AdminFrame({
   const fullAdminAccess = isAdmin || isSuperAdmin;
   const resolvedBackHref = backHref ?? (fullAdminAccess ? '/admin' : '/dashboard/dean');
   const { messages } = useI18n();
+  const accountName = isSuperAdmin ? messages.adminShell.superAdminRole : messages.adminShell.officeName;
+  const accountBadge = isSuperAdmin ? 'SA' : messages.adminShell.officeBadge;
   const pathname = stripLocaleFromPathname(usePathname() ?? '/').pathname;
   const [sidebarOpen, setSidebarOpen] = React.useState(false);
   const [isDesktopSidebar, setIsDesktopSidebar] = React.useState(false);
@@ -302,11 +304,11 @@ export function AdminFrame({
         <div className="border-b border-white/10 bg-portal-sidebar-strong px-5 py-3">
           <div className="flex min-w-0 items-center gap-3">
             <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-portal-yellow text-xs font-bold text-portal-yellow-ink shadow-xs">
-              {messages.adminShell.officeBadge}
+              {accountBadge}
             </div>
             <div className="min-w-0 flex-1">
               <div className="truncate text-sm font-semibold text-portal-sidebar-text">
-                {messages.adminShell.officeName}
+                {accountName}
               </div>
               <div className="truncate text-xs text-portal-sidebar-muted">
                 {user?.email ?? (messages.adminShell.noEmail)}
@@ -430,21 +432,21 @@ export function AdminFrame({
                   type="button"
                   onClick={() => setProfileOpen((current) => !current)}
                   className="flex min-h-11 items-center gap-3 rounded-md border border-border/70 bg-card px-1.5 py-1 transition-[background-color,border-color] duration-150 hover:bg-secondary/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 sm:px-3"
-                  aria-label={messages.adminShell.toggleProfile}
+                  aria-label={messages.dashboardShell.controls.toggleProfile}
                   aria-expanded={profileOpen}
                   aria-controls="admin-profile-menu"
                   aria-haspopup="menu"
                 >
                   <div className="flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-full bg-primary text-xs font-bold text-primary-foreground shadow-xs">
-                    {messages.adminShell.officeBadge}
+                    {accountBadge}
                   </div>
                   <div className="hidden min-w-0 text-left md:block">
                     <div className="truncate text-sm font-semibold text-foreground">
-                      {messages.adminShell.officeName}
+                      {accountName}
                     </div>
                     <div className="truncate text-xs text-muted-foreground flex items-center gap-1">
                       <span>{user?.email ?? (messages.adminShell.noEmail)}</span>
-                      {isDemoUser(user) && (
+                      {!isSuperAdmin && isDemoUser(user) && (
                         <span className="text-[11px] text-status-warning-foreground font-medium">
                           ({messages.adminShell.demoTag})
                         </span>
@@ -461,11 +463,11 @@ export function AdminFrame({
                   >
                     <div className="flex items-center gap-3 border-b border-border/70 px-4 py-4">
                       <div className="flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-full bg-primary text-sm font-bold text-primary-foreground">
-                        {messages.adminShell.officeBadge}
+                        {accountBadge}
                       </div>
                       <div className="min-w-0 flex-1">
                         <p className="truncate font-semibold text-foreground text-sm">
-                          {messages.adminShell.officeName}
+                          {accountName}
                         </p>
                         <p className="truncate text-xs text-muted-foreground">
                           {user?.email ?? (messages.adminShell.noEmail)}
@@ -474,7 +476,7 @@ export function AdminFrame({
                           <div className="inline-flex rounded-none bg-primary/10 border border-primary/20 px-2 py-0.5 text-[11px] font-medium text-primary">
                             {messages.adminShell.systemBadge}
                           </div>
-                          {isDemoUser(user) && (
+                          {!isSuperAdmin && isDemoUser(user) && (
                             <div className="inline-flex items-center gap-1 rounded-none bg-amber-500/15 border border-amber-500/30 px-2 py-0.5 text-[11px] font-medium text-amber-700 dark:text-amber-300">
                               <span className="h-1.5 w-1.5 rounded-full bg-amber-500" />
                               {messages.adminShell.demoAccount}
