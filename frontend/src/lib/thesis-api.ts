@@ -1335,9 +1335,13 @@ export const thesisApi = {
     return response.data;
   },
 
-  approveGroup: async (groupId: string): Promise<ThesisGroup> => {
+  approveGroup: async (
+    groupId: string,
+    exception?: { allowSizeException: boolean; reason: string },
+  ): Promise<ThesisGroup> => {
     const response = await api.post<ThesisGroup>(
       `/thesis/groups/${groupId}/approve`,
+      exception,
     );
     return response.data;
   },

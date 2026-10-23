@@ -13,6 +13,7 @@ import io.campuscore.restfulapi.thesis.repository.ThesisRoundReadPort;
 import io.campuscore.restfulapi.thesis.repository.ThesisTopicRepository;
 import io.campuscore.restfulapi.thesis.web.ThesisGroupReadDtos.GroupResponse;
 import io.campuscore.restfulapi.thesis.web.ThesisMutationDtos.CloseRegistrationPreviewResponse;
+import io.campuscore.restfulapi.thesis.web.ThesisMutationDtos.GroupApprovalRequest;
 import io.campuscore.restfulapi.thesis.web.ThesisMutationDtos.GroupCreateRequest;
 import io.campuscore.restfulapi.thesis.web.ThesisMutationDtos.MemberRequest;
 import io.campuscore.restfulapi.thesis.web.ThesisMutationDtos.ProgressRequest;
@@ -1027,7 +1028,12 @@ public class ThesisMutationService {
         }
         requireActiveStudent(studentId);
         requireNotInAnotherActiveGroup(group.roundId(), studentId);
-        boolean underSize = memberCount + 1 < MIN_GROUP_MEMBERS;
+        // The minimum only binds an APPROVED roster — the deferred membership
+        // validator enforces it there and accepts a documented marker. A
+        // pending roster has no minimum: growth toward it must always be
+        // possible without the exception flag.
+        boolean underSize = memberCount + 1 < MIN_GROUP_MEMBERS
+                && group.approvalStatus() == ApprovalStatus.APPROVED;
         if (underSize && !Boolean.TRUE.equals(request.allowSizeException())) {
             throw conflict("GROUP_SIZE_EXCEPTION_REQUIRED",
                     "The roster stays below the minimum of " + MIN_GROUP_MEMBERS
@@ -1038,10 +1044,9 @@ public class ThesisMutationService {
                         .addValue("roundId", group.roundId()).addValue("studentId", studentId)
                         .addValue("memberOrder", nextMemberOrder(groupId)));
         // The deferred membership validator only permits a size-exception
-        // marker on an APPROVED group; a PENDING/REJECTED group has no
-        // minimum, so its exception lives on the audit row alone — writing
-        // the marker would be rejected at commit time.
-        if (underSize && group.approvalStatus() == ApprovalStatus.APPROVED) {
+        // marker on an APPROVED group — and underSize already implies one —
+        // so the marker is written exactly when the exception was required.
+        if (underSize) {
             jdbc.update(
                     "UPDATE thesis.thesis_group SET size_exception_reason = :reason, size_exception_by = :by, "
                             + "size_exception_at = CURRENT_TIMESTAMP WHERE id = :groupId",
@@ -2028,6 +2033,11 @@ public class ThesisMutationService {
      */
     @Transactional
     public GroupResponse approveGroup(UUID groupId, Jwt actor) {
+        return approveGroup(groupId, null, actor);
+    }
+
+    @Transactional
+    public GroupResponse approveGroup(UUID groupId, GroupApprovalRequest request, Jwt actor) {
         GroupRow group = lockGroup(groupId);
         authorizeReviewer(group, actor);
         // The round row is locked so an approval cannot slip between
@@ -2061,12 +2071,22 @@ public class ThesisMutationService {
                     "This topic's defense score is finalized; new groups can no longer be approved for it");
         }
         Integer memberCount = count("SELECT COUNT(*) FROM thesis.thesis_group_member WHERE group_id = :groupId", "groupId", groupId);
+        String sizeExceptionReason = null;
         if (memberCount == null || memberCount < MIN_GROUP_MEMBERS) {
             int present = memberCount == null ? 0 : memberCount;
-            throw conflict("GROUP_TOO_SMALL", "A thesis group needs " + MIN_GROUP_MEMBERS + " to " + MAX_GROUP_MEMBERS
-                    + " members before it can be approved; this group has " + present + " ("
-                    + (MIN_GROUP_MEMBERS - present) + " short of the minimum of " + MIN_GROUP_MEMBERS
-                    + ", invite more classmates first)");
+            if (request == null || !Boolean.TRUE.equals(request.allowSizeException())) {
+                throw conflict("GROUP_TOO_SMALL", "A thesis group needs " + MIN_GROUP_MEMBERS + " to " + MAX_GROUP_MEMBERS
+                        + " members before it can be approved; this group has " + present + " ("
+                        + (MIN_GROUP_MEMBERS - present) + " short of the minimum of " + MIN_GROUP_MEMBERS
+                        + ", invite more classmates first)");
+            }
+            // The waiver is governance-only: a topic supervisor reviews normal
+            // rosters but cannot approve under the faculty minimum.
+            if (!isGroupAdmin(group, actor)) {
+                throw new DomainException(HttpStatus.FORBIDDEN, "GOVERNANCE_ROLE_REQUIRED",
+                        "An under-size approval requires an admin or faculty head role");
+            }
+            sizeExceptionReason = requireReason(request.reason());
         }
         if (memberCount > MAX_GROUP_MEMBERS) {
             throw conflict("GROUP_TOO_LARGE", "A thesis group can have " + MIN_GROUP_MEMBERS + " to "
@@ -2083,14 +2103,25 @@ public class ThesisMutationService {
         if (leaderCount == null || leaderCount != 1 || matchingLeader == null || matchingLeader != 1) {
             throw conflict("GROUP_LEADER_INVALID", "A thesis group must have exactly one matching leader");
         }
-        int changed = jdbc.update("UPDATE thesis.thesis_group SET approval_status='APPROVED', approved_by=:actor, approved_at=CURRENT_TIMESTAMP, rejection_reason=NULL, updated_at=CURRENT_TIMESTAMP, version=version+1 WHERE id=:id AND approval_status='PENDING'",
-                params().addValue("id", groupId).addValue("actor", subject(actor)));
+        int changed;
+        if (sizeExceptionReason == null) {
+            changed = jdbc.update("UPDATE thesis.thesis_group SET approval_status='APPROVED', approved_by=:actor, approved_at=CURRENT_TIMESTAMP, rejection_reason=NULL, updated_at=CURRENT_TIMESTAMP, version=version+1 WHERE id=:id AND approval_status='PENDING'",
+                    params().addValue("id", groupId).addValue("actor", subject(actor)));
+        } else {
+            // The marker lands in the same statement as the approval so the
+            // deferred membership validator sees both at commit — an
+            // under-size APPROVED roster is only legal while it carries one.
+            changed = jdbc.update("UPDATE thesis.thesis_group SET approval_status='APPROVED', approved_by=:actor, approved_at=CURRENT_TIMESTAMP, rejection_reason=NULL, size_exception_reason=:sizeReason, size_exception_by=:actor, size_exception_at=CURRENT_TIMESTAMP, updated_at=CURRENT_TIMESTAMP, version=version+1 WHERE id=:id AND approval_status='PENDING'",
+                    params().addValue("id", groupId).addValue("actor", subject(actor))
+                            .addValue("sizeReason", sizeExceptionReason));
+        }
         if (changed != 1) throw conflict("GROUP_APPROVAL_STATE_CONFLICT", "Only pending groups can be approved");
         // Symmetric with THESIS_GROUP_REJECTED below: an approval decides who
         // proceeds to the defense phase, so the approving actor must be
         // traceable even though approved_by already stores them on the row.
         audit.record(subject(actor), null, "THESIS_GROUP_APPROVED", "THESIS_GROUP", groupId.toString(),
-                "Thesis group approved");
+                "Thesis group approved" + (sizeExceptionReason == null
+                        ? "" : "; below-minimum size exception: " + sizeExceptionReason));
         if (notifier != null) {
             afterCommit(() -> {
                 try {
