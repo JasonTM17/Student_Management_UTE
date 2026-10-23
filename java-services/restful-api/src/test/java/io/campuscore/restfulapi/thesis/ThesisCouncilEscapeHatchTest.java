@@ -735,6 +735,74 @@ class ThesisCouncilEscapeHatchTest {
     }
 
     @Test
+    void retractPublicationRestoresClosedAndRequiresTypedConfirmation() {
+        Instant now = Instant.now();
+        UUID roundId = insertRound("Esc Round Retract", "REGISTRATION_CLOSED",
+                now.plusSeconds(86_400), now.plusSeconds(5 * 86_400));
+        UUID topicId = insertTopic(roundId, "Esc Retract Topic");
+        insertApprovedGroup(roundId, topicId, "esc-rt");
+        jdbc.update("UPDATE thesis.thesis_topic SET final_score = 8.0, "
+                + "final_score_finalized_by = 'esc-chair', final_score_finalized_at = CURRENT_TIMESTAMP, "
+                + "result_status = 'GRADED' WHERE id = ?", topicId);
+        mutations.publishResults(roundId, null, admin());
+        assertThat(jdbc.queryForObject(
+                "SELECT results_published_at FROM thesis.thesis_registration_round WHERE id = ?",
+                Timestamp.class, roundId)).isNotNull();
+        // A "results published" inbox row tagged with the producer key must be
+        // recalled by the retraction; unrelated rows stay.
+        jdbc.update("INSERT INTO notifications.notification "
+                        + "(id, user_id, title, message, type, link, source_key, is_read, created_at, updated_at) "
+                        + "VALUES ('esc-rt-note', 'esc-rt-user', 'Kết quả khóa luận đã công bố', 'm', 'SUCCESS', "
+                        + "'/dashboard/thesis', 'THESIS_RESULTS:" + roundId + "', FALSE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)");
+        jdbc.update("INSERT INTO notifications.notification "
+                        + "(id, user_id, title, message, type, link, source_key, is_read, created_at, updated_at) "
+                        + "VALUES ('esc-rt-other', 'esc-rt-user', 'other', 'm', 'INFO', NULL, 'OTHER', FALSE, "
+                        + "CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)");
+
+        var req = new java.util.function.Function<String,
+                io.campuscore.restfulapi.thesis.web.ThesisMutationDtos.RetractPublicationRequest>() {
+            @Override
+            public io.campuscore.restfulapi.thesis.web.ThesisMutationDtos.RetractPublicationRequest apply(String c) {
+                return new io.campuscore.restfulapi.thesis.web.ThesisMutationDtos
+                        .RetractPublicationRequest("published before appeal resolved", c);
+            }
+        };
+        // Typed confirmation and admin-only at service level.
+        assertThatThrownBy(() -> mutations.retractResults(roundId, req.apply("yes"), admin()))
+                .isInstanceOf(DomainException.class);
+        ensureLecturer("esc-rt-dean-user");
+        Jwt dean = Jwt.withTokenValue("escape-fixture").header("alg", "none")
+                .subject("esc-rt-dean").claim("roles", List.of("TRUONG_KHOA")).build();
+        assertThatThrownBy(() -> mutations.retractResults(roundId, req.apply("RETRACT"), dean))
+                .isInstanceOf(DomainException.class);
+
+        mutations.retractResults(roundId, req.apply("RETRACT"), admin());
+        assertThat(jdbc.queryForObject(
+                "SELECT status FROM thesis.thesis_registration_round WHERE id = ?", String.class, roundId))
+                .isEqualTo("REGISTRATION_CLOSED");
+        assertThat(jdbc.queryForObject(
+                "SELECT results_published_at FROM thesis.thesis_registration_round WHERE id = ?",
+                Timestamp.class, roundId)).isNull();
+        // Scores are never modified by the retraction.
+        assertThat(jdbc.queryForObject(
+                "SELECT final_score FROM thesis.thesis_topic WHERE id = ?", BigDecimal.class, topicId))
+                .isEqualByComparingTo("8.00");
+        assertThat(auditCount(roundId.toString(), "THESIS_RESULTS_RETRACTED")).isEqualTo(1);
+        assertThat(jdbc.queryForObject(
+                "SELECT COUNT(*) FROM notifications.notification WHERE id = 'esc-rt-note'", Integer.class))
+                .isZero();
+        assertThat(jdbc.queryForObject(
+                "SELECT COUNT(*) FROM notifications.notification WHERE id = 'esc-rt-other'", Integer.class))
+                .isEqualTo(1);
+        // Student visibility is governed by the round status: a retracted
+        // round hides results again even though scores still exist.
+        assertThatThrownBy(() -> councils.studentResults(roundId, "esc-rt-student-1"))
+                .isInstanceOf(DomainException.class)
+                .isInstanceOfSatisfying(DomainException.class,
+                        e -> assertThat(e.getCode()).isEqualTo("RESULTS_NOT_PUBLISHED"));
+    }
+
+    @Test
     void aForeignFacultyDeanCannotWithdrawOrReinstateAnotherFacultysTopic() {
         Instant now = Instant.now();
         // A resolved but foreign faculty scope: the dean's lecturer profile is

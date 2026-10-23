@@ -25,6 +25,7 @@ import io.campuscore.restfulapi.thesis.web.ThesisMutationDtos.TopicCreateRequest
 import io.campuscore.restfulapi.thesis.web.ThesisMutationDtos.TopicUpdateRequest;
 import io.campuscore.restfulapi.thesis.web.ThesisMutationDtos.GroupRejectionRequest;
 import io.campuscore.restfulapi.thesis.web.ThesisMutationDtos.LateTopicRequest;
+import io.campuscore.restfulapi.thesis.web.ThesisMutationDtos.RetractPublicationRequest;
 import io.campuscore.restfulapi.thesis.web.ThesisMutationDtos.RosterOverrideRequest;
 import io.campuscore.restfulapi.thesis.web.ThesisRoundDtos.RoundResponse;
 import io.campuscore.restfulapi.thesis.web.ThesisTopicDtos.TopicResponse;
@@ -65,6 +66,13 @@ public class ThesisMutationService {
     private final ThesisRoundReadService roundReads;
     private final AdminAuditRecorder audit;
     private final ThesisNotificationService notifier;
+
+    /**
+     * Retract-publication grace window in days
+     * (thesis.results.retract-grace-days, default 7).
+     */
+    @org.springframework.beans.factory.annotation.Value("${thesis.results.retract-grace-days:7}")
+    private int retractGraceDays;
 
     /**
      * Wires the write boundary over the shared JDBC template and the thesis repositories.
@@ -1022,6 +1030,60 @@ public class ThesisMutationService {
             }
         });
         return groups.findById(groupId);
+    }
+
+    /**
+     * Retracts a prematurely published result set: allowed only inside the
+     * configured grace period after publication, requires a reason plus the
+     * typed confirmation "RETRACT", never touches scores, recalls the
+     * "results published" inbox notices, notifies the affected students that
+     * publication was corrected, and returns the round to REGISTRATION_CLOSED
+     * so the normal preview + publish path can republish.
+     */
+    @Transactional
+    public RoundResponse retractResults(UUID id, RetractPublicationRequest request, Jwt actor) {
+        if (!ThesisDeanScope.isGlobalAdmin(actor)) {
+            throw new DomainException(HttpStatus.FORBIDDEN, "RETRACT_ADMIN_REQUIRED",
+                    "Only a global admin can retract published results");
+        }
+        String cleanReason = requireReason(request == null ? null : request.reason());
+        if (!"RETRACT".equals(request == null ? null : request.confirmation())) {
+            throw invalid("confirmation must be the literal RETRACT");
+        }
+        Map<String, Object> round = one(
+                "SELECT status, results_published_at FROM thesis.thesis_registration_round WHERE id = :id FOR UPDATE",
+                params().addValue("id", id), "ROUND_NOT_FOUND", "Thesis registration round not found");
+        if (!RoundStatus.RESULTS_PUBLISHED.name().equals(round.get("status"))) {
+            throw conflict("ROUND_STATE_CONFLICT", "Only a published round can be retracted");
+        }
+        Instant publishedAt = instantOf(round.get("results_published_at"));
+        if (publishedAt == null || Instant.now().isAfter(publishedAt.plus(java.time.Duration.ofDays(retractGraceDays)))) {
+            throw conflict("RETRACT_WINDOW_CLOSED",
+                    "The " + retractGraceDays + "-day retraction grace period has passed; "
+                            + "later corrections need the per-topic appeal path");
+        }
+        int moved = jdbc.update(
+                "UPDATE thesis.thesis_registration_round SET status = 'REGISTRATION_CLOSED', "
+                        + "results_published_at = NULL, updated_at = CURRENT_TIMESTAMP, version = version + 1 "
+                        + "WHERE id = :id AND status = 'RESULTS_PUBLISHED'",
+                params().addValue("id", id));
+        if (moved != 1) {
+            throw conflict("ROUND_STATE_CONFLICT", "Only a published round can be retracted");
+        }
+        // Inbox rows are recalled; e-mails already delivered cannot be —
+        // the audit record states that limitation explicitly.
+        audit.record(subject(actor), null, "THESIS_RESULTS_RETRACTED", "THESIS_ROUND", id.toString(),
+                "Published results retracted; reason: " + cleanReason
+                        + "; typed confirmation accepted; e-mail notifications already sent cannot be recalled",
+                Map.of("status", RoundStatus.RESULTS_PUBLISHED.name()),
+                Map.of("status", RoundStatus.REGISTRATION_CLOSED.name()));
+        afterCommit(() -> {
+            if (notifier != null) {
+                notifier.recallResultsPublished(id);
+                notifier.notifyResultsRetracted(id);
+            }
+        });
+        return roundReads.get(id);
     }
 
     private void requireGovernanceRole(Jwt actor) {
