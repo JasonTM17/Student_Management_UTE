@@ -7,6 +7,7 @@ import io.campuscore.restfulapi.academic.registration.RegistrationDtos.RoundResp
 import io.campuscore.restfulapi.academic.registration.RegistrationDtos.SectionScheduleView;
 import io.campuscore.restfulapi.academic.registration.RegistrationDtos.SummaryResponse;
 import io.campuscore.restfulapi.academic.service.AcademicEnrollmentReadService;
+import io.campuscore.restfulapi.academic.service.SemesterStatuses;
 import io.campuscore.restfulapi.academic.web.AcademicEnrollmentReadDtos.EnrollmentResponse;
 import io.campuscore.restfulapi.web.DomainException;
 import java.nio.charset.StandardCharsets;
@@ -530,6 +531,10 @@ public class RegistrationService {
         if (!"OPEN".equals(String.valueOf(section.get("status")))) {
             throw problem(HttpStatus.CONFLICT, "SECTION_CLOSED", "Section is not open for registration");
         }
+        // The semester lifecycle gates registration independently of the round
+        // rows: a CLOSED semester must refuse enroll even if a round is still
+        // flagged OPEN, and reopening the semester restores it unchanged.
+        requireOpenSemester(semesterId);
         Map<String, Object> round = openRoundReadOnly(semesterId, "REGISTRATION");
         assertEligible(student, round, Instant.now());
         List<Map<String, Object>> active = lockActiveEnrollments(studentId, semesterId);
@@ -829,6 +834,16 @@ public class RegistrationService {
 
     private Map<String, Object> openRound(String semesterId, String preferredKind) {
         return openRound(semesterId, preferredKind, true);
+    }
+
+    private void requireOpenSemester(String semesterId) {
+        Long count = jdbc.queryForObject(
+                "SELECT COUNT(*) FROM " + SEMESTER + " WHERE \"id\" = :id AND \"status\" IN (:openStatuses)",
+                new MapSqlParameterSource().addValue("id", semesterId).addValue("openStatuses", SemesterStatuses.OPEN),
+                Long.class);
+        if (count == null || count == 0) {
+            throw problem(HttpStatus.CONFLICT, "SEMESTER_CLOSED", "Semester is closed for registration");
+        }
     }
 
     /** Read paths must not hold exclusive round locks; only enroll/drop serialize on them. */
