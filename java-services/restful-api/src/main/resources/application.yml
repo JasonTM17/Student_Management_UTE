@@ -219,7 +219,7 @@ spring:
       minimum-idle: ${DB_POOL_MIN:0}
       connection-timeout: ${DB_CONNECTION_TIMEOUT_MS:15000}
       validation-timeout: ${DB_VALIDATION_TIMEOUT_MS:3000}
-      idle-timeout: ${DB_POOL_IDLE_TIMEOUT_MS:300000}
+      idle-timeout: ${DB_POOL_IDLE_TIMEOUT_MS:60000}
       keepalive-time: ${DB_POOL_KEEPALIVE_MS:0}
   jpa:
     hibernate:
@@ -252,6 +252,11 @@ app:
   # Host/X-Forwarded-Host are client-controlled and would let an attacker
   # point reset links at their own domain.
   public-base-url: ${APP_PUBLIC_BASE_URL:http://localhost:3100}
+  keepalive:
+    # Periodic SELECT 1 probe against the datasource. Off by default so the
+    # hosted Postgres free tier can autosuspend between requests; set true on
+    # demo day to trade idle savings for warm pool borrows.
+    enabled: ${APP_KEEPALIVE_ENABLED:false}
   rate-limit:
     enabled: ${RATE_LIMIT_ENABLED:true}
     # Enable only when behind a trusted reverse proxy that sets X-Real-IP /

@@ -11,12 +11,14 @@ import org.springframework.stereotype.Component;
 
 /**
  * Scheduled database keep-alive heartbeat.
- * Periodically executes a lightweight query against PostgreSQL to maintain
- * connection pool vitality and prevent Supabase free-tier dormancy.
+ * Periodically executes a lightweight query against PostgreSQL to keep pooled
+ * connections warm. Disabled by default so the Neon free-tier compute may
+ * autosuspend between requests; each probe counts as query activity and
+ * would keep the compute awake.
  */
 @Component
 @Profile("persistence")
-@ConditionalOnProperty(prefix = "app.keepalive", name = "enabled", havingValue = "true", matchIfMissing = true)
+@ConditionalOnProperty(prefix = "app.keepalive", name = "enabled", havingValue = "true", matchIfMissing = false)
 public class DatabaseKeepAliveScheduler {
 
     private static final Logger log = LoggerFactory.getLogger(DatabaseKeepAliveScheduler.class);

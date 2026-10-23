@@ -15,24 +15,25 @@ function defaultFor(yamlKey) {
   return Number(match[1]);
 }
 
-test('pool keepalive stays disabled or probes before idle retirement', () => {
+test('primary pool retires idle connections inside the Neon autosuspend window', () => {
   const idleTimeoutMs = defaultFor('idle-timeout');
   const keepaliveMs = defaultFor('keepalive-time');
 
   // Neon suspends a free-tier compute after ~5 minutes without query
-  // activity, and every keepalive probe counts as activity. The deployment
-  // budget therefore prefers keepalive-time 0 (disabled) so the database may
-  // sleep between requests: Hikari's borrow-time validation already covers
-  // the odd connection the proxy drops while pooled. If keepalive is ever
-  // enabled it must fire before idle-timeout retires the connection, or it
-  // is dead weight. The idle-timeout value is a separate decision: open but
-  // idle sockets do not count as query activity, so suspension still happens
-  // once the pool goes quiet — at 60s the pool drains early, at 300s it holds
-  // sockets until roughly the same moment the compute suspends
-  // (idle-timeout + ~30s borrow margin vs the 300s Neon window).
+  // activity; every probe or borrow counts as activity. The recorded owner
+  // decision keeps the database asleep between requests (~180 CU-h/month
+  // continuously awake vs a 100 CU-h free allowance), so the pool must
+  // retire its idle connections comfortably inside that window — leaving
+  // ~30s of borrow-and-validate margin — and must not ping them while
+  // pooled. If keepalive is ever enabled it must fire before idle-timeout
+  // retires the connection, or it is dead weight.
   console.info(
-    `note: idle-timeout ${idleTimeoutMs}ms + ~30s vs Neon autosuspend ~300s; ` +
+    `note: idle-timeout ${idleTimeoutMs}ms + ~30s borrow margin vs Neon autosuspend ~300s; ` +
       `keepalive ${keepaliveMs}ms ${keepaliveMs === 0 ? '(disabled, DB may sleep)' : '(enabled)'}`,
+  );
+  assert.ok(
+    idleTimeoutMs + 30_000 < 300_000,
+    `idle-timeout ${idleTimeoutMs}ms + 30s borrow margin must stay below the ~300s Neon autosuspend window`,
   );
   assert.ok(
     keepaliveMs === 0 || keepaliveMs < idleTimeoutMs,
