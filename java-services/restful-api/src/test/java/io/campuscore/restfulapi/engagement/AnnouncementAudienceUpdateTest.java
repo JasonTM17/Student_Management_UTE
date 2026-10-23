@@ -110,11 +110,16 @@ class AnnouncementAudienceUpdateTest {
                     type VARCHAR(40) NOT NULL,
                     link VARCHAR(500),
                     announcement_id VARCHAR(120),
+                    source_key VARCHAR(160),
                     is_read BOOLEAN NOT NULL DEFAULT FALSE,
                     read_at TIMESTAMP,
                     created_at TIMESTAMP NOT NULL,
                     updated_at TIMESTAMP NOT NULL
                 )
+                """);
+        jdbc.execute("""
+                CREATE UNIQUE INDEX IF NOT EXISTS notification_announcement_user_uniq
+                ON notifications.notification (announcement_id, user_id)
                 """);
         jdbc.execute("DROP TABLE IF EXISTS academic.\"Student\"");
         jdbc.execute("""

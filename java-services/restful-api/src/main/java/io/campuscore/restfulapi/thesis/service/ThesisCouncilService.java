@@ -39,12 +39,12 @@ public class ThesisCouncilService {
     private static final int MAX_COUNCIL_SIZE = 5;
     private static final String SCORE_COMPONENT = "DEFENSE";
     private static final String GVPB_COMPONENT = "GVPB";
-    private static final BigDecimal GVPB_PASS_THRESHOLD = new BigDecimal("5.0");
+    private static final BigDecimal GVPB_PASS_THRESHOLD = ThesisReviewOutcome.PASS_THRESHOLD;
     // Non-score topic results: REVIEW_FAILED is derived from the latest
     // counter-review score, WITHDRAWN is set explicitly by governance. Both
     // are excluded from the publication completeness check.
-    private static final String RESULT_REVIEW_FAILED = "REVIEW_FAILED";
-    private static final String RESULT_WITHDRAWN = "WITHDRAWN";
+    private static final String RESULT_REVIEW_FAILED = ThesisReviewOutcome.REVIEW_FAILED;
+    private static final String RESULT_WITHDRAWN = ThesisReviewOutcome.WITHDRAWN;
 
     private static final org.slf4j.Logger log =
             org.slf4j.LoggerFactory.getLogger(ThesisCouncilService.class);
@@ -558,10 +558,15 @@ public class ThesisCouncilService {
             throw invalid("component must be " + SCORE_COMPONENT);
         }
         Map<String, Object> topicRow = one(
-                "SELECT id, final_score FROM thesis.thesis_topic WHERE id = :topicId FOR UPDATE",
+                "SELECT id, final_score, result_status FROM thesis.thesis_topic WHERE id = :topicId FOR UPDATE",
                 params().addValue("topicId", topicId), "TOPIC_NOT_FOUND", "Thesis topic not found");
         if (topicRow.get("final_score") != null) {
             throw conflict("SCORE_ALREADY_FINALIZED", "The topic score has been finalized by the chair");
+        }
+        // A withdrawn topic left the round: scoring it would resurrect a topic
+        // governance removed — reinstate it first, never score over it.
+        if (RESULT_WITHDRAWN.equals(topicRow.get("result_status"))) {
+            throw conflict("TOPIC_WITHDRAWN", "A withdrawn topic cannot receive defense scores");
         }
         requireApprovedGroupForTopic(topicId);
         // K16: the row is overwritten DELETE-then-INSERT, so the outgoing value
@@ -732,7 +737,7 @@ public class ThesisCouncilService {
         }
         lockMutableTopicRound(topicId);
         Map<String, Object> topic = one(
-                "SELECT t.id, t.round_id, t.status, t.final_score, t.gvpb_lecturer_id, r.gvpb_deadline, r.status AS round_status "
+                "SELECT t.id, t.round_id, t.status, t.final_score, t.gvpb_lecturer_id, t.result_status, r.gvpb_deadline, r.status AS round_status "
                         + "FROM thesis.thesis_topic t "
                         + "JOIN thesis.thesis_registration_round r ON r.id = t.round_id "
                         + "WHERE t.id = :topicId FOR UPDATE OF t",
@@ -751,6 +756,9 @@ public class ThesisCouncilService {
         }
         if (topic.get("final_score") != null) {
             throw conflict("SCORE_ALREADY_FINALIZED", "The topic score has been finalized by the chair");
+        }
+        if (RESULT_WITHDRAWN.equals(topic.get("result_status"))) {
+            throw conflict("TOPIC_WITHDRAWN", "A withdrawn topic cannot receive counter-review scores");
         }
         requireNotSupervisor(topicId, lecturerId);
         Instant deadline = instantOf(topic.get("gvpb_deadline"));
@@ -886,8 +894,14 @@ public class ThesisCouncilService {
             throw conflict("TOPIC_NOT_ASSIGNED", "This council has not been assigned the topic");
         }
         // Lock topic row to prevent concurrent score submission during finalization
-        one("SELECT id FROM thesis.thesis_topic WHERE id = :topicId FOR UPDATE",
+        Map<String, Object> topicLock = one(
+                "SELECT id, result_status FROM thesis.thesis_topic WHERE id = :topicId FOR UPDATE",
                 params().addValue("topicId", topicId), "TOPIC_NOT_FOUND", "Thesis topic not found");
+        // WITHDRAWN is a governance outcome: finalize must never overwrite it
+        // with GRADED — reinstate is the only audited way back.
+        if (RESULT_WITHDRAWN.equals(topicLock.get("result_status"))) {
+            throw conflict("TOPIC_WITHDRAWN", "A withdrawn topic cannot be finalized; reinstate it first");
+        }
         requireApprovedGroupForTopic(topicId);
         int expectedScores = eligibleGraderCount(councilId, topicId);
         if (expectedScores < MIN_COUNCIL_SIZE) {
@@ -1093,11 +1107,32 @@ public class ThesisCouncilService {
                     return row;
                 }).stream().findFirst()
                 .orElseThrow(() -> notFound("COUNCIL_MEMBER_NOT_FOUND", "Council member not found"));
+        // lecturer_id may store either a Lecturer.id or a legacy User.id, so
+        // resolve the profile under both keys before deciding whether the seat
+        // can still score — a member stored under the legacy key used to look
+        // "departed" and skipped the freeze check entirely.
+        LecturerProfile outgoing = resolveLecturer(outgoingLecturerId.trim());
         Integer councilScores = count(
                 "SELECT COUNT(*) FROM thesis.thesis_topic_score WHERE council_id = :councilId",
                 params().addValue("councilId", councilId));
         boolean rosterFrozen = councilScores != null && councilScores > 0;
-        if (rosterFrozen && lecturerExists(outgoingLecturerId.trim())) {
+        // A score already cast belongs to the member who cast it: swapping the
+        // seat afterwards would silently orphan that vote, so the member is
+        // never replaceable once their own score exists.
+        Integer memberScores = count(
+                "SELECT COUNT(*) FROM thesis.thesis_topic_score s "
+                        + "WHERE s.council_id = :councilId AND s.component = :component AND ("
+                        + "  s.lecturer_id = :storedId"
+                        + "  OR EXISTS (SELECT 1 FROM campuscore_auth.\"Lecturer\" ol "
+                        + "             WHERE (ol.\"id\" = :storedId OR ol.\"userId\" = :storedId) "
+                        + "             AND s.lecturer_id IN (ol.\"id\", ol.\"userId\")))",
+                params().addValue("councilId", councilId).addValue("component", SCORE_COMPONENT)
+                        .addValue("storedId", outgoingLecturerId.trim()));
+        if (memberScores != null && memberScores > 0) {
+            throw conflict("COUNCIL_MEMBER_SCORED",
+                    "A member who already submitted a defense score cannot be replaced");
+        }
+        if (rosterFrozen && outgoing != null && outgoing.active()) {
             throw conflict("COUNCIL_STATE_CONFLICT",
                     "Council membership cannot change after scoring has started");
         }
@@ -1193,6 +1228,17 @@ public class ThesisCouncilService {
         if (topic.get("gvpb_waived_reason") != null) {
             throw conflict("GVPB_ALREADY_WAIVED", "The counter-review requirement is already waived");
         }
+        // A waiver covers a counter-review that can never happen — reviewer
+        // gone, deadline irrecoverable. Once a verdict exists it is an academic
+        // record, not an obstacle: a below-threshold score is only fixed by a
+        // re-review inside the window (extending the deadline if needed).
+        Integer existingScores = count(
+                "SELECT COUNT(*) FROM thesis.thesis_topic_score WHERE topic_id = :topicId AND component = :component",
+                params().addValue("topicId", topicId).addValue("component", GVPB_COMPONENT));
+        if (existingScores != null && existingScores > 0) {
+            throw conflict("GVPB_SCORE_EXISTS",
+                    "A counter-review score already exists; it can only change through re-review, not a waiver");
+        }
         RoundType roundType = null;
         try {
             roundType = RoundType.valueOf((String) topic.get("thesis_type"));
@@ -1210,9 +1256,8 @@ public class ThesisCouncilService {
                         + "version = version + 1 WHERE id = :topicId",
                 params().addValue("topicId", topicId).addValue("reason", cleanReason)
                         .addValue("by", subject(actor)));
-        // The waiver overrides a derived REVIEW_FAILED marker; the stored
-        // failing score remains for the record.
-        syncReviewOutcome(topicId, subject(actor));
+        // No score exists at this point (GVPB_SCORE_EXISTS above), so the
+        // waiver never masks a stored verdict: REVIEW_FAILED is untouched.
         Map<String, Object> beforeState = new LinkedHashMap<>();
         beforeState.put("gvpb_waived_reason", null);
         beforeState.put("result_status", topic.get("result_status"));
@@ -1297,7 +1342,8 @@ public class ThesisCouncilService {
             throw conflict("RESULTS_NOT_PUBLISHED", "Results for this round have not been published yet");
         }
         return jdbc.query(
-                "SELECT t.id AS topic_id, t.title, t.final_score, t.final_score_finalized_at, g.id AS group_id, g.leader_student_id, c.name AS council_name "
+                "SELECT t.id AS topic_id, t.title, t.final_score, t.final_score_finalized_at, "
+                        + "t.result_status, t.result_reason, g.id AS group_id, g.leader_student_id, c.name AS council_name "
                         + "FROM thesis.thesis_group_member m "
                         + "JOIN thesis.thesis_group g ON g.id = m.group_id "
                         + "JOIN thesis.thesis_topic t ON t.id = g.topic_id "
@@ -1313,6 +1359,11 @@ public class ThesisCouncilService {
                             rs.getBigDecimal("final_score"),
                             rs.getString("council_name"),
                             rs.getString("leader_student_id"),
+                            rs.getString("result_status"),
+                            // The outcome reason is governance context the
+                            // affected members are entitled to read once the
+                            // round published; non-members never reach this row.
+                            rs.getString("result_reason"),
                             evaluationComments(topicId));
                 });
     }
@@ -1358,6 +1409,9 @@ public class ThesisCouncilService {
         boolean waived = row.get("gvpb_waived_reason") != null;
         boolean failed = !waived && latest != null && latest.compareTo(GVPB_PASS_THRESHOLD) < 0;
         if (failed && !RESULT_REVIEW_FAILED.equals(current)) {
+            String reason = "Counter-review score "
+                    + latest.stripTrailingZeros().toPlainString()
+                    + " is below the 5.0 pass threshold";
             jdbc.update(
                     "UPDATE thesis.thesis_topic SET result_status = 'REVIEW_FAILED', "
                             + "result_reason = :reason, result_by = :by, result_at = CURRENT_TIMESTAMP, "
@@ -1365,10 +1419,14 @@ public class ThesisCouncilService {
                             + "WHERE id = :topicId AND final_score IS NULL "
                             + "AND result_status IS DISTINCT FROM 'WITHDRAWN'",
                     params().addValue("topicId", topicId)
-                            .addValue("reason", "Counter-review score "
-                                    + latest.stripTrailingZeros().toPlainString()
-                                    + " is below the 5.0 pass threshold")
+                            .addValue("reason", reason)
                             .addValue("by", actorId));
+            // Every stored outcome carries an audit row: who set it and why.
+            Map<String, Object> beforeState = new LinkedHashMap<>();
+            beforeState.put("result_status", current);
+            audit.record(actorId, null, "TOPIC_RESULT_CHANGED", "THESIS_TOPIC", topicId.toString(),
+                    "Topic outcome set to REVIEW_FAILED; " + reason,
+                    beforeState, Map.of("result_status", RESULT_REVIEW_FAILED, "reason", reason));
         } else if (!failed && RESULT_REVIEW_FAILED.equals(current)) {
             jdbc.update(
                     "UPDATE thesis.thesis_topic SET result_status = NULL, result_reason = NULL, "
@@ -1376,6 +1434,9 @@ public class ThesisCouncilService {
                             + "version = version + 1 "
                             + "WHERE id = :topicId AND final_score IS NULL AND result_status = 'REVIEW_FAILED'",
                     params().addValue("topicId", topicId));
+            audit.record(actorId, null, "TOPIC_RESULT_CHANGED", "THESIS_TOPIC", topicId.toString(),
+                    "Topic outcome REVIEW_FAILED cleared after a passing counter-review",
+                    Map.of("result_status", RESULT_REVIEW_FAILED), Map.of("result_status", ""));
         }
     }
 
@@ -1616,6 +1677,26 @@ public class ThesisCouncilService {
         return count != null && count > 0;
     }
 
+    /**
+     * The dual-key lecturer resolution the read repositories use: a stored
+     * identifier is either a Lecturer.id or a legacy User.id, so both are
+     * matched. Returns null when no profile exists under either key.
+     */
+    private LecturerProfile resolveLecturer(String storedId) {
+        if (storedId == null || storedId.isBlank()) {
+            return null;
+        }
+        return jdbc.query(
+                "SELECT l.\"id\", l.\"isActive\" FROM campuscore_auth.\"Lecturer\" l "
+                        + "WHERE l.\"id\" = :key OR l.\"userId\" = :key",
+                params().addValue("key", storedId),
+                (rs, ignored) -> new LecturerProfile(
+                        rs.getString("id"), rs.getBoolean("isActive")))
+                .stream().findFirst().orElse(null);
+    }
+
+    private record LecturerProfile(String id, boolean active) { }
+
     private static String normalizeRole(String role) {
         String normalized = normalize(role).toUpperCase(java.util.Locale.ROOT);
         if (!StringUtils.hasText(normalized)) {
@@ -1704,6 +1785,8 @@ public class ThesisCouncilService {
             BigDecimal finalScore,
             String councilName,
             String leaderStudentId,
+            String resultStatus,
+            String resultReason,
             List<ScoreComment> comments) { }
 
     public record ScoreComment(String component, String comment) { }

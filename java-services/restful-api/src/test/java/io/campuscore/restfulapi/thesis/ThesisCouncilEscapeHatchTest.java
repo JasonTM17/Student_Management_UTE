@@ -2,6 +2,7 @@ package io.campuscore.restfulapi.thesis;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.assertj.core.api.Assertions.within;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -14,6 +15,7 @@ import io.campuscore.restfulapi.web.DomainException;
 import java.math.BigDecimal;
 import java.sql.Timestamp;
 import java.time.Instant;
+import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
@@ -58,6 +60,31 @@ class ThesisCouncilEscapeHatchTest {
 
     @BeforeEach
     void cleanDatabase() {
+        // The inbox lives outside the H2 thesis schema; the retract path
+        // recalls tagged rows, so the test needs the table and its unique
+        // (announcement_id, user_id) delivery index.
+        jdbc.execute("CREATE SCHEMA IF NOT EXISTS notifications");
+        jdbc.execute("""
+                CREATE TABLE IF NOT EXISTS notifications.notification (
+                    id VARCHAR(120) PRIMARY KEY,
+                    user_id VARCHAR(120) NOT NULL,
+                    title VARCHAR(240) NOT NULL,
+                    message VARCHAR(2000) NOT NULL,
+                    type VARCHAR(40) NOT NULL,
+                    link VARCHAR(500),
+                    announcement_id VARCHAR(120),
+                    source_key VARCHAR(160),
+                    is_read BOOLEAN NOT NULL DEFAULT FALSE,
+                    read_at TIMESTAMP,
+                    created_at TIMESTAMP NOT NULL,
+                    updated_at TIMESTAMP NOT NULL
+                )
+                """);
+        jdbc.execute("""
+                CREATE UNIQUE INDEX IF NOT EXISTS notification_announcement_user_uniq
+                ON notifications.notification (announcement_id, user_id)
+                """);
+        jdbc.update("DELETE FROM notifications.notification");
         jdbc.update("DELETE FROM thesis.thesis_group_report");
         jdbc.update("DELETE FROM thesis.thesis_topic_score");
         jdbc.update("DELETE FROM thesis.thesis_council_topic");
@@ -71,6 +98,8 @@ class ThesisCouncilEscapeHatchTest {
         jdbc.update("DELETE FROM campuscore_auth.\"Lecturer\" WHERE \"id\" LIKE 'esc-%'");
         jdbc.update("DELETE FROM campuscore_auth.\"Student\" WHERE \"id\" LIKE 'esc-%'");
         jdbc.update("DELETE FROM campuscore_auth.\"User\" WHERE \"id\" LIKE 'esc-%'");
+        jdbc.update("DELETE FROM academic.\"Department\" WHERE \"id\" LIKE 'esc-%'");
+        jdbc.update("DELETE FROM academic.\"Faculty\" WHERE \"id\" LIKE 'esc-%'");
     }
 
     @Test
@@ -102,16 +131,16 @@ class ThesisCouncilEscapeHatchTest {
 
         // Invalid targets stay invalid: the past, the old deadline, and beyond
         // the report date all fail before the row moves.
-        assertThatThrownBy(() -> mutations.extendGvpbDeadline(roundId, now.minusSeconds(60), admin()))
+        assertThatThrownBy(() -> mutations.extendGvpbDeadline(roundId, now.minusSeconds(60), "reason", admin()))
                 .isInstanceOf(DomainException.class);
-        assertThatThrownBy(() -> mutations.extendGvpbDeadline(roundId, now.minusSeconds(3_600), admin()))
+        assertThatThrownBy(() -> mutations.extendGvpbDeadline(roundId, now.minusSeconds(3_600), "reason", admin()))
                 .isInstanceOf(DomainException.class);
         assertThatThrownBy(() -> mutations.extendGvpbDeadline(
-                roundId, now.plusSeconds(10 * 86_400), admin()))
+                roundId, now.plusSeconds(10 * 86_400), "reason", admin()))
                 .isInstanceOf(DomainException.class)
                 .hasMessageContaining("report date");
 
-        mutations.extendGvpbDeadline(roundId, now.plusSeconds(2 * 86_400), admin());
+        mutations.extendGvpbDeadline(roundId, now.plusSeconds(2 * 86_400), "reviewer came back", admin());
         councils.submitReviewerScore(topicId, BigDecimal.valueOf(7), null, lecturer("esc-md-reviewer"));
         assertThat(jdbc.queryForObject(
                 "SELECT COUNT(*) FROM thesis.thesis_topic_score WHERE topic_id = ? AND component = 'GVPB'",
@@ -123,12 +152,12 @@ class ThesisCouncilEscapeHatchTest {
     void nonGvpbAndTerminalRoundsRejectDeadlineExtension() {
         UUID nckh = insertRoundOfType("Esc NCKH Round", "NCKH", "REGISTRATION_CLOSED", null, null);
         assertThatThrownBy(() -> mutations.extendGvpbDeadline(
-                nckh, Instant.now().plusSeconds(86_400), admin()))
+                nckh, Instant.now().plusSeconds(86_400), "reason", admin()))
                 .isInstanceOf(DomainException.class);
         UUID published = insertRound("Esc Published Round", "RESULTS_PUBLISHED",
                 Instant.now().minusSeconds(3_600), Instant.now().plusSeconds(5 * 86_400));
         assertThatThrownBy(() -> mutations.extendGvpbDeadline(
-                published, Instant.now().plusSeconds(86_400), admin()))
+                published, Instant.now().plusSeconds(86_400), "reason", admin()))
                 .isInstanceOf(DomainException.class);
     }
 
@@ -154,13 +183,28 @@ class ThesisCouncilEscapeHatchTest {
                 "SELECT result_status FROM thesis.thesis_topic WHERE id = ?", String.class, failedTopic))
                 .isEqualTo("REVIEW_FAILED");
 
-        PublishResultsPreviewResponse preview = mutations.publishResultsPreview(roundId);
+        // While the counter-review window is still open the verdict is
+        // provisional: the preview flags it separately and publish refuses
+        // until the window closes — the reviewer may still overwrite.
+        PublishResultsPreviewResponse openPreview = mutations.publishResultsPreview(roundId, admin());
+        assertThat(openPreview.excludedTopics()).isEmpty();
+        assertThat(openPreview.openReviewTopics()).extracting(t -> t.id()).containsExactly(failedTopic);
+        assertThatThrownBy(() -> mutations.publishResults(roundId, null, admin()))
+                .isInstanceOf(DomainException.class)
+                .isInstanceOfSatisfying(DomainException.class,
+                        e -> assertThat(e.getCode()).isEqualTo("REVIEW_WINDOW_OPEN"));
+
+        // Once the window closes the topic is a definite exclusion.
+        jdbc.update("UPDATE thesis.thesis_registration_round SET gvpb_deadline = ? WHERE id = ?",
+                Timestamp.from(Instant.now().minusSeconds(3_600)), roundId);
+        PublishResultsPreviewResponse preview = mutations.publishResultsPreview(roundId, admin());
         assertThat(preview.ungradedGroupCount()).isZero();
+        assertThat(preview.openReviewTopics()).isEmpty();
         assertThat(preview.excludedTopics()).extracting(t -> t.id()).containsExactly(failedTopic);
         assertThat(preview.excludedTopics().get(0).resultStatus()).isEqualTo("REVIEW_FAILED");
 
         // One permanently failed topic no longer holds the round hostage.
-        mutations.publishResults(roundId, admin());
+        mutations.publishResults(roundId, null, admin());
         assertThat(jdbc.queryForObject(
                 "SELECT status FROM thesis.thesis_registration_round WHERE id = ?", String.class, roundId))
                 .isEqualTo("RESULTS_PUBLISHED");
@@ -233,7 +277,7 @@ class ThesisCouncilEscapeHatchTest {
         assertThat(auditCount(topicId.toString(), "THESIS_TOPIC_REINSTATED")).isEqualTo(1);
 
         mutations.withdrawTopic(topicId, "final withdrawal", admin());
-        mutations.publishResults(roundId, admin());
+        mutations.publishResults(roundId, null, admin());
         assertThat(jdbc.queryForObject(
                 "SELECT status FROM thesis.thesis_registration_round WHERE id = ?", String.class, roundId))
                 .isEqualTo("RESULTS_PUBLISHED");
@@ -411,7 +455,256 @@ class ThesisCouncilEscapeHatchTest {
                 Integer.class, topicId)).isEqualTo(1);
     }
 
+    @Test
+    void withdrawnTopicRejectsEveryScoringPathUntilReinstated() {
+        Instant now = Instant.now();
+        UUID roundId = insertRound("Esc Round Withdrawn Scoring", "REGISTRATION_CLOSED",
+                now.plusSeconds(86_400), now.plusSeconds(5 * 86_400));
+        UUID councilId = insertCouncil(roundId, "Esc Withdrawn Council");
+        seat(councilId, "esc-ws-chair", "CHAIR");
+        seat(councilId, "esc-ws-secretary", "SECRETARY");
+        seat(councilId, "esc-ws-member", "MEMBER");
+        UUID topicId = insertTopic(roundId, "Esc Withdrawn Score Topic");
+        insertApprovedGroup(roundId, topicId, "esc-ws");
+        assignCouncilTopic(councilId, topicId);
+        ensureLecturer("esc-ws-reviewer");
+        assignReviewerRow(topicId, "esc-ws-reviewer");
+
+        mutations.withdrawTopic(topicId, "department pulled the topic", admin());
+
+        // A withdrawn topic accepts no scores on any path: member defense
+        // scores, the reviewer's counter-review, and finalize all refuse and
+        // the stored WITHDRAWN outcome is never overwritten by GRADED.
+        assertThatThrownBy(() -> submitDefense(councilId, topicId, "esc-ws-member", 8))
+                .isInstanceOf(DomainException.class)
+                .isInstanceOfSatisfying(DomainException.class,
+                        e -> assertThat(e.getCode()).isEqualTo("TOPIC_WITHDRAWN"));
+        assertThatThrownBy(() -> councils.submitReviewerScore(
+                topicId, BigDecimal.valueOf(7), null, lecturer("esc-ws-reviewer")))
+                .isInstanceOf(DomainException.class)
+                .isInstanceOfSatisfying(DomainException.class,
+                        e -> assertThat(e.getCode()).isEqualTo("TOPIC_WITHDRAWN"));
+        assertThatThrownBy(() -> councils.finalizeScores(councilId, topicId, lecturer("esc-ws-chair")))
+                .isInstanceOf(DomainException.class)
+                .isInstanceOfSatisfying(DomainException.class,
+                        e -> assertThat(e.getCode()).isEqualTo("TOPIC_WITHDRAWN"));
+        assertThat(jdbc.queryForObject(
+                "SELECT result_status FROM thesis.thesis_topic WHERE id = ?", String.class, topicId))
+                .isEqualTo("WITHDRAWN");
+
+        // Reinstate is the only way back — audited — and then scoring works.
+        mutations.reinstateTopic(topicId, "roster dispute resolved", admin());
+        submitDefense(councilId, topicId, "esc-ws-member", 8);
+    }
+
+    @Test
+    void waiverCannotOverruleAnExistingVerdict() {
+        Instant now = Instant.now();
+        UUID roundId = insertRound("Esc Round Waiver After Score", "REGISTRATION_CLOSED",
+                now.plusSeconds(86_400), now.plusSeconds(5 * 86_400));
+        UUID topicId = insertTopic(roundId, "Esc Scored Waive Topic");
+        insertApprovedGroup(roundId, topicId, "esc-sv");
+        ensureLecturer("esc-sv-reviewer");
+        assignReviewerRow(topicId, "esc-sv-reviewer");
+
+        // A below-threshold verdict is an academic record, not an obstacle a
+        // waiver may erase: waiving after a score exists is refused and the
+        // REVIEW_FAILED outcome stays.
+        councils.submitReviewerScore(topicId, BigDecimal.valueOf(3.0), "yếu", lecturer("esc-sv-reviewer"));
+        assertThatThrownBy(() -> councils.waiveCounterReview(topicId, "paper over the verdict", admin()))
+                .isInstanceOf(DomainException.class)
+                .isInstanceOfSatisfying(DomainException.class,
+                        e -> assertThat(e.getCode()).isEqualTo("GVPB_SCORE_EXISTS"));
+        assertThat(jdbc.queryForObject(
+                "SELECT result_status FROM thesis.thesis_topic WHERE id = ?", String.class, topicId))
+                .isEqualTo("REVIEW_FAILED");
+
+        // The only correction path is re-review inside the still-open window:
+        // a passing overwrite clears the provisional outcome again.
+        councils.submitReviewerScore(topicId, BigDecimal.valueOf(7.5), "đủ", lecturer("esc-sv-reviewer"));
+        assertThat(jdbc.queryForObject(
+                "SELECT result_status FROM thesis.thesis_topic WHERE id = ?", String.class, topicId))
+                .isNull();
+    }
+
+    @Test
+    void scoredMemberAndLegacyKeyedMemberCannotBeReplaced() {
+        Instant now = Instant.now();
+        UUID roundId = insertRound("Esc Round Member Scores", "REGISTRATION_CLOSED",
+                now.plusSeconds(86_400), now.plusSeconds(5 * 86_400));
+        UUID councilId = insertCouncil(roundId, "Esc Score Seat Council");
+        seat(councilId, "esc-ms-chair", "CHAIR");
+        seat(councilId, "esc-ms-secretary", "SECRETARY");
+        seat(councilId, "esc-ms-member", "MEMBER");
+        UUID topicId = insertTopic(roundId, "Esc Score Seat Topic");
+        insertApprovedGroup(roundId, topicId, "esc-ms");
+        assignCouncilTopic(councilId, topicId);
+        ensureLecturer("esc-ms-new");
+
+        // A score already cast belongs to the member who cast it: the seat is
+        // never replaceable once that member's own defense score exists.
+        submitDefense(councilId, topicId, "esc-ms-member", 8);
+        assertThatThrownBy(() -> councils.replaceMember(
+                councilId, "esc-ms-member", "esc-ms-new", "late swap", admin()))
+                .isInstanceOf(DomainException.class)
+                .isInstanceOfSatisfying(DomainException.class,
+                        e -> assertThat(e.getCode()).isEqualTo("COUNCIL_MEMBER_SCORED"));
+
+        // The freeze check resolves the member under BOTH lecturer keys: a
+        // seat stored under the legacy userId must not look departed.
+        UUID legacyCouncil = insertCouncil(roundId, "Esc Legacy Key Council");
+        seat(legacyCouncil, "esc-lk-chair", "CHAIR");
+        seat(legacyCouncil, "esc-lk-secretary", "SECRETARY");
+        seat(legacyCouncil, "esc-lk-member", "MEMBER");
+        // Rewrite the member seat to the legacy userId form.
+        jdbc.update("UPDATE thesis.thesis_council_member SET lecturer_id = ? "
+                        + "WHERE council_id = ? AND member_role = 'MEMBER'",
+                "esc-user-esc-lk-member", legacyCouncil);
+        UUID legacyTopic = insertTopic(roundId, "Esc Legacy Key Topic");
+        insertApprovedGroup(roundId, legacyTopic, "esc-lk");
+        assignCouncilTopic(legacyCouncil, legacyTopic);
+        ensureLecturer("esc-lk-new");
+        // Score exists for the council but NOT from this member, and the
+        // member is ACTIVE — the freeze check must still block the swap.
+        submitDefense(legacyCouncil, legacyTopic, "esc-lk-chair", 7);
+        assertThatThrownBy(() -> councils.replaceMember(
+                legacyCouncil, "esc-user-esc-lk-member", "esc-lk-new", "swap", admin()))
+                .isInstanceOf(DomainException.class);
+    }
+
+    @Test
+    void gvpbExtensionRequiresReasonAndPinsReportDeadline() {
+        Instant now = Instant.now();
+        Instant oldDeadline = now.plusSeconds(86_400);
+        UUID roundId = insertRound("Esc Round Report Pin", "REGISTRATION_CLOSED",
+                oldDeadline, now.plusSeconds(5 * 86_400));
+        // Fixture leaves report_deadline NULL, so report editing falls back to
+        // gvpb_deadline: extending the review window must not reopen reports.
+        assertThatThrownBy(() -> mutations.extendGvpbDeadline(
+                roundId, now.plusSeconds(2 * 86_400), "  ", admin()))
+                .isInstanceOf(DomainException.class);
+        mutations.extendGvpbDeadline(roundId, now.plusSeconds(2 * 86_400), "reviewer returned", admin());
+        // The report window stayed pinned at the OLD counter-review deadline.
+        assertThat(jdbc.queryForObject(
+                "SELECT report_deadline FROM thesis.thesis_registration_round WHERE id = ?",
+                Timestamp.class, roundId).toInstant())
+                .isCloseTo(oldDeadline, within(1, ChronoUnit.MILLIS));
+        assertThat(auditCount(roundId.toString(), "THESIS_ROUND_GVPB_DEADLINE_EXTENDED")).isEqualTo(1);
+    }
+
+    @Test
+    void allExcludedPublicationRequiresTheExplicitConfirmation() {
+        Instant now = Instant.now();
+        UUID roundId = insertRound("Esc Round All Excluded", "REGISTRATION_CLOSED",
+                now.plusSeconds(86_400), now.plusSeconds(5 * 86_400));
+        UUID topicId = insertTopic(roundId, "Esc All Withdrawn Topic");
+        insertApprovedGroup(roundId, topicId, "esc-ae");
+        mutations.withdrawTopic(topicId, "topic cannot be defended", admin());
+
+        // Publishing an empty result set silently is refused without the
+        // explicit flag; with it the publication proceeds and the audit names
+        // the confirmation.
+        assertThatThrownBy(() -> mutations.publishResults(roundId, null, admin()))
+                .isInstanceOf(DomainException.class)
+                .isInstanceOfSatisfying(DomainException.class,
+                        e -> assertThat(e.getCode()).isEqualTo("RESULTS_ALL_EXCLUDED"));
+        mutations.publishResults(roundId, true, admin());
+        assertThat(jdbc.queryForObject(
+                "SELECT status FROM thesis.thesis_registration_round WHERE id = ?", String.class, roundId))
+                .isEqualTo("RESULTS_PUBLISHED");
+        Integer named = jdbc.queryForObject(
+                "SELECT COUNT(*) FROM campuscore_audit.\"AdminAudit\" "
+                        + "WHERE \"entityId\" = ? AND \"action\" = 'THESIS_RESULTS_PUBLISHED_WITH_EXCLUSIONS' "
+                        + "AND \"summary\" LIKE '%confirmAllExcluded%'",
+                Integer.class, roundId.toString());
+        assertThat(named).isEqualTo(1);
+    }
+
+    @Test
+    void withdrawAndReinstateRejectNonGovernanceActors() {
+        Instant now = Instant.now();
+        UUID roundId = insertRound("Esc Round Role Guard", "REGISTRATION_CLOSED",
+                now.plusSeconds(86_400), now.plusSeconds(5 * 86_400));
+        UUID topicId = insertTopic(roundId, "Esc Role Guard Topic");
+        insertApprovedGroup(roundId, topicId, "esc-rg");
+        ensureLecturer("esc-rg-lecturer");
+        // The controller annotation is no longer the only check: the service
+        // itself refuses a non-governance caller before touching the outcome.
+        assertThatThrownBy(() -> mutations.withdrawTopic(
+                topicId, "reason", lecturer("esc-rg-lecturer")))
+                .isInstanceOf(DomainException.class);
+        mutations.withdrawTopic(topicId, "admin withdraw", admin());
+        assertThatThrownBy(() -> mutations.reinstateTopic(
+                topicId, "reason", lecturer("esc-rg-lecturer")))
+                .isInstanceOf(DomainException.class);
+        assertThat(jdbc.queryForObject(
+                "SELECT result_status FROM thesis.thesis_topic WHERE id = ?", String.class, topicId))
+                .isEqualTo("WITHDRAWN");
+    }
+
+    @Test
+    void aForeignFacultyDeanCannotWithdrawOrReinstateAnotherFacultysTopic() {
+        Instant now = Instant.now();
+        // A resolved but foreign faculty scope: the dean's lecturer profile is
+        // active and bound to a faculty that does not contain the topic's
+        // department, so every topic-level governance write conceals as 404.
+        jdbc.update("INSERT INTO academic.\"Faculty\" (\"id\",\"name\",\"isActive\") "
+                + "VALUES ('esc-faculty-foreign','Foreign faculty',TRUE)");
+        jdbc.update("INSERT INTO academic.\"Department\" (\"id\",\"name\",\"nameEn\",\"nameVi\",\"code\",\"facultyId\",\"isActive\") "
+                + "VALUES ('esc-department-foreign','Foreign','Foreign','Foreign','FR','esc-faculty-foreign',TRUE)");
+        String deanUser = "esc-user-foreign-dean";
+        jdbc.update("INSERT INTO campuscore_auth.\"User\" (\"id\", \"email\", \"password\", \"firstName\", \"lastName\", "
+                        + "\"status\", \"emailVerified\", \"isSuperAdmin\", \"failedLoginAttempts\", \"createdAt\", \"updatedAt\") "
+                        + "VALUES (?, 'esc-foreign-dean@fixture.test', 'test-password', 'Esc', 'Dean', 'ACTIVE', FALSE, "
+                        + "FALSE, 0, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)",
+                deanUser);
+        jdbc.update("INSERT INTO campuscore_auth.\"Lecturer\" (\"id\",\"userId\",\"departmentId\",\"employeeId\",\"isActive\") "
+                        + "VALUES ('esc-foreign-dean','esc-user-foreign-dean','esc-department-foreign','GV-foreign-dean',TRUE)");
+        Jwt foreignDean = Jwt.withTokenValue("escape-fixture").header("alg", "none")
+                .subject(deanUser)
+                .claim("roles", List.of("TRUONG_KHOA"))
+                .claim("lecturerId", "esc-foreign-dean").build();
+
+        UUID roundId = insertRound("Esc Round Foreign Dean", "REGISTRATION_CLOSED",
+                now.plusSeconds(86_400), now.plusSeconds(5 * 86_400));
+        UUID topicId = insertTopic(roundId, "Esc Foreign Dean Topic");
+        insertApprovedGroup(roundId, topicId, "esc-fd");
+
+        assertThatThrownBy(() -> mutations.withdrawTopic(topicId, "not their faculty", foreignDean))
+                .isInstanceOfSatisfying(DomainException.class,
+                        e -> assertThat(e.getCode()).isEqualTo("TOPIC_NOT_FOUND"));
+        mutations.withdrawTopic(topicId, "admin withdraw", admin());
+        assertThatThrownBy(() -> mutations.reinstateTopic(topicId, "not their faculty", foreignDean))
+                .isInstanceOfSatisfying(DomainException.class,
+                        e -> assertThat(e.getCode()).isEqualTo("TOPIC_NOT_FOUND"));
+
+        // A dean with NO resolvable faculty profile fails closed the same way —
+        // scope cannot be bypassed by an unbound JWT.
+        Jwt unboundDean = Jwt.withTokenValue("escape-fixture").header("alg", "none")
+                .subject("esc-nobody")
+                .claim("roles", List.of("TRUONG_KHOA"))
+                .claim("lecturerId", "esc-foreign-dean").build();
+        assertThatThrownBy(() -> mutations.withdrawTopic(topicId, "no profile", unboundDean))
+                .isInstanceOf(DomainException.class);
+    }
+
     // ---------- fixtures ----------
+
+    private UUID insertGroupWithMembers(UUID roundId, UUID topicId, String tag, int memberCount) {
+        UUID groupId = UUID.randomUUID();
+        jdbc.update("INSERT INTO thesis.thesis_group "
+                        + "(id, round_id, leader_student_id, topic_id, status, approval_status) "
+                        + "VALUES (?, ?, ?, ?, 'SUBMITTED', 'APPROVED')",
+                groupId, roundId, tag + "-leader", topicId);
+        for (int order = 1; order <= memberCount; order++) {
+            ensureStudent(tag + "-student-" + order);
+            jdbc.update("INSERT INTO thesis.thesis_group_member "
+                            + "(id, group_id, round_id, student_id, member_order, is_leader) "
+                            + "VALUES (?, ?, ?, ?, ?, ?)",
+                    UUID.randomUUID(), groupId, roundId, tag + "-student-" + order, order, order == 1);
+        }
+        return groupId;
+    }
 
     private Jwt admin() {
         return Jwt.withTokenValue("escape-fixture").header("alg", "none")

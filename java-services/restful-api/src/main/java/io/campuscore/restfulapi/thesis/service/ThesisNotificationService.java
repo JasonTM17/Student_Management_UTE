@@ -105,27 +105,59 @@ public class ThesisNotificationService {
                 "INFO", STUDENT_LINK);
     }
 
-    /** Notifies every student in an approved group when the round publishes results. */
+    /**
+     * Notifies every student in an approved group when the round publishes
+     * results. Groups whose topic carries a governance exclusion outcome
+     * (REVIEW_FAILED / WITHDRAWN) never see the success "view your score"
+     * notice — they get a separate non-success notice that states the outcome
+     * without academic-fail wording.
+     */
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public int notifyResultsPublished(UUID roundId) {
         String roundName = publishedRoundName(roundId);
         if (roundName == null) {
             return 0;
         }
-        List<String> userIds = jdbc.queryForList(
+        String sourceKey = resultsSourceKey(roundId);
+        int sent = 0;
+        List<String> includedIds = jdbc.queryForList(
                 "SELECT DISTINCT s.\"userId\" FROM thesis.thesis_group_member m"
                         + " JOIN thesis.thesis_group g ON g.id = m.group_id"
+                        + " JOIN thesis.thesis_topic t ON t.id = g.topic_id"
                         + " JOIN campuscore_auth.\"Student\" s ON s.\"id\" = m.student_id"
                         + " WHERE g.round_id = :roundId AND g.approval_status = 'APPROVED'"
-                        + " AND g.status <> 'CANCELLED'",
+                        + " AND g.status <> 'CANCELLED'"
+                        + " AND (t.result_status IS NULL OR t.result_status NOT IN ('REVIEW_FAILED', 'WITHDRAWN'))",
                 new MapSqlParameterSource("roundId", roundId), String.class);
-        if (userIds == null || userIds.isEmpty()) {
-            return 0;
+        if (includedIds != null && !includedIds.isEmpty()) {
+            sent += fanOut(includedIds, "Kết quả khóa luận đã công bố",
+                    "Kết quả đợt " + roundName.trim()
+                            + " đã công bố. Mở trang khóa luận để xem điểm của bạn.",
+                    "SUCCESS", STUDENT_LINK, sourceKey);
         }
-        return fanOut(userIds, "Kết quả khóa luận đã công bố",
-                "Kết quả đợt " + roundName.trim()
-                        + " đã công bố. Mở trang khóa luận để xem điểm của bạn.",
-                "SUCCESS", STUDENT_LINK);
+        List<String> excludedIds = jdbc.queryForList(
+                "SELECT DISTINCT s.\"userId\" FROM thesis.thesis_group_member m"
+                        + " JOIN thesis.thesis_group g ON g.id = m.group_id"
+                        + " JOIN thesis.thesis_topic t ON t.id = g.topic_id"
+                        + " JOIN campuscore_auth.\"Student\" s ON s.\"id\" = m.student_id"
+                        + " WHERE g.round_id = :roundId AND g.approval_status = 'APPROVED'"
+                        + " AND g.status <> 'CANCELLED'"
+                        + " AND t.result_status IN ('REVIEW_FAILED', 'WITHDRAWN')",
+                new MapSqlParameterSource("roundId", roundId), String.class);
+        if (excludedIds != null && !excludedIds.isEmpty()) {
+            // "Not eligible to defend in this round" — never "fail/trượt": the
+            // outcome is a counter-review governance result, not a mark.
+            sent += fanOut(excludedIds, "Kết quả khóa luận đã công bố",
+                    "Kết quả đợt " + roundName.trim()
+                            + " đã công bố. Đề tài của nhóm bạn không đủ điều kiện"
+                            + " bảo vệ trong đợt này — xem chi tiết tại trang khóa luận.",
+                    "WARNING", STUDENT_LINK, sourceKey);
+        }
+        return sent;
+    }
+
+    private static String resultsSourceKey(UUID roundId) {
+        return "THESIS_RESULTS:" + roundId;
     }
 
     /**
@@ -269,6 +301,11 @@ public class ThesisNotificationService {
     }
 
     private int fanOut(List<String> userIds, String title, String message, String type, String link) {
+        return fanOut(userIds, title, message, type, link, null);
+    }
+
+    private int fanOut(List<String> userIds, String title, String message, String type, String link,
+            String sourceKey) {
         Instant now = Instant.now(clock);
         String safeTitle = capCodePoints(title, TITLE_CODE_POINTS);
         String safeMessage = capCodePoints(message, MESSAGE_CODE_POINTS);
@@ -277,7 +314,7 @@ public class ThesisNotificationService {
             commands.add(new CreateNotificationCommand(
                     UUID.randomUUID().toString(), userId, safeTitle, safeMessage, type, link, now));
         }
-        return notifications.createBatch(commands);
+        return notifications.createBatch(commands, sourceKey);
     }
 
     /** Truncates by code points so Vietnamese diacritics are never split. */

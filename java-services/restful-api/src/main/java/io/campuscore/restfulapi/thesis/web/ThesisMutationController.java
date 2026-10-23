@@ -9,6 +9,7 @@ import io.campuscore.restfulapi.thesis.web.ThesisMutationDtos.CloseRegistrationP
 import io.campuscore.restfulapi.thesis.web.ThesisMutationDtos.GroupCreateRequest;
 import io.campuscore.restfulapi.thesis.web.ThesisMutationDtos.GroupRejectionRequest;
 import io.campuscore.restfulapi.thesis.web.ThesisMutationDtos.GvpbDeadlineUpdateRequest;
+import io.campuscore.restfulapi.thesis.web.ThesisMutationDtos.PublishResultsRequest;
 import io.campuscore.restfulapi.thesis.web.ThesisMutationDtos.MemberRequest;
 import io.campuscore.restfulapi.thesis.web.ThesisMutationDtos.ProgressRequest;
 import io.campuscore.restfulapi.thesis.web.ThesisMutationDtos.PublishResultsPreviewResponse;
@@ -185,14 +186,15 @@ public class ThesisMutationController {
      * the GVPB deadline may be extended forward (never backwards, never past
      * the report date). The change is audited.
      */
-    @Operation(summary = "Gia hạn chấm phản biện (GVPB)", description = "Dời hạn chấm phản biện (gvpbDeadline) của đợt đang mở sang thời điểm mới; thao tác được ghi audit")
+    @Operation(summary = "Gia hạn chấm phản biện (GVPB)", description = "Dời hạn chấm phản biện (gvpbDeadline) của đợt đang mở sang thời điểm mới; thao tác được ghi audit kèm lý do")
     @PutMapping("/rounds/{id}/gvpb-deadline")
     @PreAuthorize("hasAnyRole('ADMIN','TRUONG_KHOA','SUPER_ADMIN')")
     public RoundResponse extendGvpbDeadline(
             @Parameter(description = "Mã UUID của đợt", required = true) @PathVariable UUID id,
             @RequestBody GvpbDeadlineUpdateRequest request,
             @AuthenticationPrincipal Jwt actor) {
-        return mutations.extendGvpbDeadline(id, request == null ? null : request.gvpbDeadline(), actor);
+        return mutations.extendGvpbDeadline(id, request == null ? null : request.gvpbDeadline(),
+                request == null ? null : request.reason(), actor);
     }
 
     /** Brief R9: publish graded results to the students of the round. */
@@ -200,8 +202,9 @@ public class ThesisMutationController {
     @PostMapping("/rounds/{id}/publish-results")
     @PreAuthorize("hasAnyRole('ADMIN','TRUONG_KHOA','SUPER_ADMIN')")
     public RoundResponse publishResults(@Parameter(description = "Mã UUID của đợt", required = true) @PathVariable UUID id,
+            @RequestBody(required = false) PublishResultsRequest request,
             @AuthenticationPrincipal Jwt actor) {
-        return mutations.publishResults(id, actor);
+        return mutations.publishResults(id, request == null ? null : request.confirmAllExcluded(), actor);
     }
 
     /**
@@ -215,7 +218,7 @@ public class ThesisMutationController {
     public PublishResultsPreviewResponse publishResultsPreview(
             @Parameter(description = "Mã UUID của đợt", required = true) @PathVariable UUID id,
             @AuthenticationPrincipal Jwt actor) {
-        return mutations.publishResultsPreview(id);
+        return mutations.publishResultsPreview(id, actor);
     }
 
     /**
