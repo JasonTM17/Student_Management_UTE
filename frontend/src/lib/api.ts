@@ -679,13 +679,57 @@ export const authApi = {
     // so a queued rotation must land first — sending mid-refresh would pin a
     // stale hash, resolve nothing, and revoke every session instead.
     await waitForPendingSessionRefresh();
-    const response = await api.post<{
-      message: string;
-      sessionPreserved: boolean;
-      user: User | null;
-      accessToken: string | null;
-      refreshToken: string | null;
-    }>('/auth/change-password', { oldPassword, newPassword });
+    const postChange = () =>
+      api.post<{
+        message: string;
+        sessionPreserved: boolean;
+        user: User | null;
+        accessToken: string | null;
+        refreshToken: string | null;
+      }>(
+        '/auth/change-password',
+        { oldPassword, newPassword },
+        // The rotation runs inside the shared session transport: a sibling
+        // document's refresh carrying the pre-rotation cookie would land
+        // after the commit and read as token replay. A 401 here must not
+        // re-enter the interceptor's refresh — that path takes this lock.
+        {
+          skipAuthRefresh: true,
+          skipAuthRedirect: true,
+          timeout: SESSION_TRANSPORT_TIMEOUT_MS,
+        } as AuthRequestConfig,
+      );
+    const response = await withSessionTransport(async () => {
+      try {
+        return await postChange();
+      } catch (error) {
+        if (
+          (error as { response?: { status?: number } } | undefined)?.response
+            ?.status !== 401
+        ) {
+          throw error;
+        }
+        // The access token died before the rotation could authenticate.
+        // Rotate inline while the lock is still held so neither the retry
+        // nor the rotation can interleave with another document's write.
+        try {
+          await api.post('/auth/refresh', {}, {
+            skipAuthRefresh: true,
+            skipAuthRedirect: true,
+            timeout: SESSION_TRANSPORT_TIMEOUT_MS,
+          } as AuthRequestConfig);
+        } catch (refreshError) {
+          if (
+            (refreshError as { response?: { status?: number } } | undefined)
+              ?.response?.status === 401
+          ) {
+            redirectToLogin('session-expired');
+          }
+          throw refreshError;
+        }
+        return postChange();
+      }
+    });
     return response.data;
   },
 

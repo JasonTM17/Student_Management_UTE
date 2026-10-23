@@ -1290,6 +1290,32 @@ class AuthLoginPersistenceTest {
     }
 
     @Test
+    void anExpiredSessionsStaleRefreshDoesNotCascadeIntoSiblingSessions() throws Exception {
+        // Reuse detection distinguishes "the session row is gone" (quiet
+        // rejection) from "the row lives but the token is superseded"
+        // (stolen-token signal). An expired-but-not-yet-deleted row is
+        // neither live nor administratively revoked — replaying its token
+        // must not wipe the sibling's still-live session.
+        MvcResult deviceA = loginStudent().andExpect(status().isOk()).andReturn();
+        loginStudent().andExpect(status().isOk());
+        Cookie refreshA = deviceA.getResponse().getCookie("cc_refresh_token");
+        jdbc.update("UPDATE \"campuscore_auth\".\"Session\" SET \"expiresAt\" = ?"
+                        + " WHERE \"refreshToken\" = ?",
+                LocalDateTime.now(ZoneOffset.UTC).minusHours(1),
+                sha256(refreshA.getValue()));
+
+        mvc.perform(post("/api/v1/auth/refresh")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"refreshToken\":\"" + refreshA.getValue() + "\"}"))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.code").value("UNAUTHENTICATED"));
+        // The expired row stays until cleanup; the sibling's live row is
+        // what must survive the replay.
+        org.junit.jupiter.api.Assertions.assertEquals(1, liveSessionCount(),
+                "an expired session's stale refresh must not cascade into the sibling session");
+    }
+
+    @Test
     void aRevokedDevicesStaleRefreshDoesNotCascadeThroughAdministrativeRevocation() throws Exception {
         // Single-device logout deletes only the caller's row. The
         // logged-out device's stale refresh afterwards is a revoked-token
@@ -1882,6 +1908,15 @@ class AuthLoginPersistenceTest {
         Integer count = jdbc.queryForObject(
                 "SELECT COUNT(*) FROM \"campuscore_auth\".\"Session\" WHERE \"userId\" = 'student-user'",
                 Integer.class);
+        return count == null ? 0 : count;
+    }
+
+    private int liveSessionCount() {
+        Integer count = jdbc.queryForObject(
+                "SELECT COUNT(*) FROM \"campuscore_auth\".\"Session\" WHERE \"userId\" = 'student-user'"
+                        + " AND \"expiresAt\" > ?",
+                Integer.class,
+                LocalDateTime.now(ZoneOffset.UTC));
         return count == null ? 0 : count;
     }
 

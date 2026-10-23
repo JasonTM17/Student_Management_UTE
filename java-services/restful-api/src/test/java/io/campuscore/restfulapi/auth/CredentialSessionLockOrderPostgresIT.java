@@ -373,6 +373,73 @@ class CredentialSessionLockOrderPostgresIT {
         }
     }
 
+    /**
+     * Documents the server-side hazard the clients must serialize around: a
+     * same-device refresh carrying the pre-rotation token, queued on the
+     * User lock while the password change commits, lands after the pinned
+     * row was re-issued (new hash, overlap cleared). It matches neither
+     * current nor previous while its row still exists — the
+     * superseded-token path reads it as theft and revokes the family,
+     * including the row the rotation just kept. The clients therefore run
+     * credential rotation inside the session transport so a pre-rotation
+     * refresh can never reach this schedule; the server keeps its
+     * fail-closed semantics for genuinely replayed tokens.
+     */
+    @Test
+    void queuedPreRotationRefreshRevokesTheFamilyIncludingTheKeptSession() throws Exception {
+        Fixture f = fixture();
+        String refresh0 = auth.login(f.email(), f.before(), "127.0.0.1", "race-it").response().refreshToken();
+        var writerHoldsUser = new CountDownLatch(1);
+        var releaseWriter = new CountDownLatch(1);
+        var waiterAtUser = new CountDownLatch(1);
+        String writerName = "rotation-writer-" + f.id(), waiterName = "rotation-waiter-" + f.id();
+        doAnswer(invocation -> {
+            String sql = invocation.getArgument(0, String.class);
+            Object result = invocation.callRealMethod();
+            if (Thread.currentThread().getName().equals(writerName)
+                    && sql.contains("SET \"password\"") && sql.contains("\"credentialVersion\" + 1")) {
+                writerHoldsUser.countDown();
+                await(releaseWriter);
+            }
+            return result;
+        }).when(namedJdbc).update(anyString(), any(SqlParameterSource.class));
+        doAnswer(invocation -> {
+            if (Thread.currentThread().getName().equals(waiterName)) waiterAtUser.countDown();
+            return invocation.callRealMethod();
+        }).when(users).lockUserRow(f.id());
+
+        var pool = Executors.newFixedThreadPool(2);
+        try {
+            Future<?> writer = pool.submit(() -> {
+                Thread.currentThread().setName(writerName);
+                auth.changePassword(f.id(), f.before(), f.after(), refresh0);
+                return null;
+            });
+            await(writerHoldsUser);
+            Future<AuthLoginService.LoginResult> waiter = pool.submit(() -> {
+                Thread.currentThread().setName(waiterName);
+                return auth.refresh(refresh0, "127.0.0.1", "race-it");
+            });
+            await(waiterAtUser);
+            assertThat(waiter.isDone()).isFalse();
+            releaseWriter.countDown();
+            writer.get(WAIT_SECONDS, TimeUnit.SECONDS);
+            try {
+                waiter.get(WAIT_SECONDS, TimeUnit.SECONDS);
+                throw new AssertionError("the queued pre-rotation refresh must not mint a session");
+            } catch (ExecutionException expected) {
+                assertThat(expected.getCause()).isInstanceOf(BadCredentialsException.class);
+            }
+            assertThat(jdbc.queryForObject(
+                    "SELECT count(*) FROM campuscore_auth.\"Session\" WHERE \"userId\"=?",
+                    Integer.class, f.id())).isZero();
+        } finally {
+            releaseWriter.countDown();
+            pool.shutdownNow();
+            assertThat(pool.awaitTermination(WAIT_SECONDS, TimeUnit.SECONDS)).isTrue();
+        }
+    }
+
     private void assertChildRowFree(String table, String userId) throws Exception {
         try (Connection probe = connection()) {
             probe.setAutoCommit(false);
