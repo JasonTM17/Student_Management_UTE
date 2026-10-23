@@ -62,6 +62,20 @@ public final class ThesisCouncilRequestDtos {
             String lecturerId) {
     }
 
+    /** Governance reason payload shared by the escape-hatch endpoints. */
+    public record ReasonRequest(
+            @Size(max = 500, message = "reason must contain at most 500 characters")
+            String reason) {
+    }
+
+    /** In-place council seat replacement payload. */
+    public record ReplaceCouncilMemberRequest(
+            @NotBlank(message = "lecturerId is required")
+            String lecturerId,
+            @Size(max = 500, message = "reason must contain at most 500 characters")
+            String reason) {
+    }
+
     /** GVPB counter-review score payload; the range is enforced by the service. */
     public record ReviewerScoreRequest(
             @Pattern(

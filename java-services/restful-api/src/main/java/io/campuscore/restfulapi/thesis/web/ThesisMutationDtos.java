@@ -2,6 +2,7 @@ package io.campuscore.restfulapi.thesis.web;
 
 import io.campuscore.restfulapi.thesis.domain.GroupStatus;
 import java.time.Instant;
+import java.util.List;
 import java.util.UUID;
 
 public final class ThesisMutationDtos {
@@ -66,6 +67,33 @@ public final class ThesisMutationDtos {
 
     /** The audited report-deadline escape hatch for a REGISTRATION_CLOSED round. */
     public record ReportDeadlineUpdateRequest(Instant reportDeadline) {
+    }
+
+    /** The audited counter-review deadline escape hatch for a live round. */
+    public record GvpbDeadlineUpdateRequest(Instant gvpbDeadline) {
+    }
+
+    /** Reason-carrying payload for the topic outcome escape hatches. */
+    public record TopicOutcomeRequest(String reason) {
+    }
+
+    /**
+     * Consequence preview for publish-results: the group tallies and the
+     * topics excluded from the completeness requirement with their outcome
+     * (REVIEW_FAILED or WITHDRAWN) so the confirm dialog is never blind.
+     */
+    public record PublishResultsPreviewResponse(
+            long groupCount,
+            long approvedGroupCount,
+            long pendingApprovalGroupCount,
+            long includedGroupCount,
+            long ungradedGroupCount,
+            List<PublishResultsExcludedTopic> excludedTopics) {
+    }
+
+    /** One topic excluded from publication completeness, with its outcome. */
+    public record PublishResultsExcludedTopic(
+            UUID id, String title, String resultStatus, String resultReason) {
     }
 
     /**

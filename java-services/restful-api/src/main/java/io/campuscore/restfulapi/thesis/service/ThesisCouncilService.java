@@ -39,6 +39,12 @@ public class ThesisCouncilService {
     private static final int MAX_COUNCIL_SIZE = 5;
     private static final String SCORE_COMPONENT = "DEFENSE";
     private static final String GVPB_COMPONENT = "GVPB";
+    private static final BigDecimal GVPB_PASS_THRESHOLD = new BigDecimal("5.0");
+    // Non-score topic results: REVIEW_FAILED is derived from the latest
+    // counter-review score, WITHDRAWN is set explicitly by governance. Both
+    // are excluded from the publication completeness check.
+    private static final String RESULT_REVIEW_FAILED = "REVIEW_FAILED";
+    private static final String RESULT_WITHDRAWN = "WITHDRAWN";
 
     private static final org.slf4j.Logger log =
             org.slf4j.LoggerFactory.getLogger(ThesisCouncilService.class);
@@ -790,6 +796,7 @@ public class ThesisCouncilService {
                 previousRow == null
                         ? "Counter-review score " + score + " recorded for topic " + topicId
                         : "Counter-review score for topic " + topicId + " changed from " + previousRow.get("score") + " to " + score);
+        syncReviewOutcome(topicId, subject(actor));
         return new ScoreResponse(topicId, lecturerId, GVPB_COMPONENT, score, trimmedComment);
     }
 
@@ -893,7 +900,7 @@ public class ThesisCouncilService {
                     "Every eligible council member must submit a defense score before finalizing");
         }
         Map<String, Object> roundAndTopic = one(
-                "SELECT r.thesis_type, r.gvpb_deadline, t.gvpb_lecturer_id "
+                "SELECT r.thesis_type, r.gvpb_deadline, t.gvpb_lecturer_id, t.gvpb_waived_reason "
                         + "FROM thesis.thesis_topic t "
                         + "JOIN thesis.thesis_registration_round r ON r.id = t.round_id "
                         + "WHERE t.id = :topicId",
@@ -909,8 +916,12 @@ public class ThesisCouncilService {
         }
         Object gvpbDeadline = roundAndTopic.get("gvpb_deadline");
         String gvpbLecturerId = (String) roundAndTopic.get("gvpb_lecturer_id");
-        boolean requiresGvpb = (roundType != null && roundType.requiresGvpbDeadline() && gvpbDeadline != null)
-                || (gvpbLecturerId != null);
+        // A governance waiver lifts the whole counter-review gate for this
+        // topic; the stored score (if any) no longer decides finalization.
+        boolean waived = roundAndTopic.get("gvpb_waived_reason") != null;
+        boolean requiresGvpb = !waived
+                && ((roundType != null && roundType.requiresGvpbDeadline() && gvpbDeadline != null)
+                || (gvpbLecturerId != null));
         if (requiresGvpb) {
             List<BigDecimal> gvpbScores = jdbc.queryForList(
                     "SELECT score FROM thesis.thesis_topic_score WHERE topic_id = :topicId AND component = :component",
@@ -930,6 +941,7 @@ public class ThesisCouncilService {
                         + "JOIN thesis.thesis_council_member m "
                         + "  ON m.council_id = s.council_id AND m.lecturer_id = s.lecturer_id "
                         + "WHERE s.council_id = :councilId AND s.topic_id = :topicId AND s.component = :component "
+                        + activeMemberClause("s.lecturer_id")
                         + "AND NOT EXISTS ("
                         + "  SELECT 1 FROM thesis.thesis_topic_supervisor sup "
                         + "  JOIN campuscore_auth.\"Lecturer\" l "
@@ -976,6 +988,290 @@ public class ThesisCouncilService {
             });
         }
         return new TopicResult(topicId, average, subject(actor), Instant.now(), "GRADED");
+    }
+
+    /**
+     * Removes one topic from its council. The wedged path this closes:
+     * council officers could not be removed while topics stayed assigned and
+     * the unique index on thesis_council_topic.topic_id made direct
+     * reassignment impossible, so a council that could not grade held its
+     * topics forever. The release is only legal before any DEFENSE score —
+     * after that the grade belongs to this council's verdict.
+     *
+     * @param councilId council releasing the topic
+     * @param topicId topic to detach; afterwards it can be re-assigned through
+     *        the normal assignTopic flow
+     * @param reason governance reason (required, at most 500 characters)
+     * @param actor caller JWT; a faculty head or admin is required
+     * @return the council after the detachment
+     * @throws DomainException with code TOPIC_NOT_ASSIGNED when the council
+     *         does not grade the topic or TOPIC_ALREADY_SCORED once a defense
+     *         score exists
+     */
+    @Transactional
+    public CouncilResponse unassignTopic(UUID councilId, UUID topicId, String reason, Jwt actor) {
+        requireGovernanceRole(actor, "Only a faculty head or admin can unassign topics from a council");
+        requireCouncilGovernanceAccess(councilId, actor);
+        String cleanReason = requireReason(reason);
+        lockMutableCouncilRound(councilId);
+        lockCouncil(councilId);
+        if (topicId == null) {
+            throw invalid("topicId is required");
+        }
+        lockTopic(topicId);
+        if (!councilHasTopic(councilId, topicId)) {
+            throw conflict("TOPIC_NOT_ASSIGNED", "This council has not been assigned the topic");
+        }
+        Integer defenseScores = count(
+                "SELECT COUNT(*) FROM thesis.thesis_topic_score WHERE topic_id = :topicId AND component = :component",
+                params().addValue("topicId", topicId).addValue("component", SCORE_COMPONENT));
+        if (defenseScores != null && defenseScores > 0) {
+            throw conflict("TOPIC_ALREADY_SCORED",
+                    "A topic with submitted defense scores cannot leave its council");
+        }
+        jdbc.update(
+                "DELETE FROM thesis.thesis_council_topic WHERE council_id = :councilId AND topic_id = :topicId",
+                params().addValue("councilId", councilId).addValue("topicId", topicId));
+        Map<String, Object> beforeState = new LinkedHashMap<>();
+        beforeState.put("topic_id", topicId.toString());
+        audit.record(subject(actor), null, "COUNCIL_TOPIC_UNASSIGNED", "THESIS_COUNCIL", councilId.toString(),
+                "Topic " + topicId + " unassigned from the council; reason: " + cleanReason,
+                beforeState, Map.of());
+        return getCouncil(councilId);
+    }
+
+    /**
+     * Replaces the lecturer sitting in one council seat while keeping the seat
+     * and its role. Two traps share this escape: a member whose lecturer
+     * profile was deactivated can no longer submit a score (hasMember gates
+     * them out) yet still counted toward the expected graders, and removing a
+     * member from a three-seat council was refused outright while topics
+     * stayed assigned. An in-place swap preserves the roster size, the role
+     * seats, and every independence check the original addMember enforced.
+     *
+     * <p>Once any council score exists the roster is frozen exactly as
+     * {@link #requireRosterMutable} rules — except when the outgoing member's
+     * lecturer profile is already gone or deactivated: that seat can never
+     * score again, so swapping it cannot rewrite a cast vote (the departed
+     * member's scores stay stored but stop counting toward the eligible
+     * average, the same way the seat check treats them).
+     *
+     * @param councilId council being staffed
+     * @param outgoingLecturerId lecturer leaving the seat
+     * @param incomingLecturerId active lecturer taking the seat
+     * @param reason governance reason (required, at most 500 characters)
+     * @param actor caller JWT; a faculty head or admin is required
+     * @return the council roster after the swap
+     * @throws DomainException with code COUNCIL_MEMBER_NOT_FOUND when the
+     *         outgoing lecturer is not a member, COUNCIL_MEMBER_EXISTS when the
+     *         incoming one already sits there, COUNCIL_STATE_CONFLICT when
+     *         scoring started and the outgoing member can still submit, or
+     *         REVIEWER_MUST_BE_INDEPENDENT / SUPERVISOR_CANNOT_CHAIR_COUNCIL
+     *         when the swap would break the independence rules
+     */
+    @Transactional
+    public CouncilResponse replaceMember(UUID councilId, String outgoingLecturerId,
+            String incomingLecturerId, String reason, Jwt actor) {
+        requireGovernanceRole(actor, "Only a faculty head or admin can manage council members");
+        requireCouncilGovernanceAccess(councilId, actor);
+        String cleanReason = requireReason(reason);
+        requireText(outgoingLecturerId, "outgoingLecturerId");
+        requireText(incomingLecturerId, "lecturerId");
+        if (outgoingLecturerId.trim().equals(incomingLecturerId.trim())) {
+            throw invalid("The replacement must be a different lecturer");
+        }
+        lockMutableCouncilRound(councilId);
+        lockCouncil(councilId);
+        Map<String, Object> seat = jdbc.query(
+                "SELECT lecturer_id, member_role FROM thesis.thesis_council_member "
+                        + "WHERE council_id = :councilId AND lecturer_id = :lecturerId",
+                params().addValue("councilId", councilId).addValue("lecturerId", outgoingLecturerId.trim()),
+                (rs, ignored) -> {
+                    Map<String, Object> row = new LinkedHashMap<>();
+                    row.put("lecturer_id", rs.getString("lecturer_id"));
+                    row.put("member_role", rs.getString("member_role"));
+                    return row;
+                }).stream().findFirst()
+                .orElseThrow(() -> notFound("COUNCIL_MEMBER_NOT_FOUND", "Council member not found"));
+        Integer councilScores = count(
+                "SELECT COUNT(*) FROM thesis.thesis_topic_score WHERE council_id = :councilId",
+                params().addValue("councilId", councilId));
+        boolean rosterFrozen = councilScores != null && councilScores > 0;
+        if (rosterFrozen && lecturerExists(outgoingLecturerId.trim())) {
+            throw conflict("COUNCIL_STATE_CONFLICT",
+                    "Council membership cannot change after scoring has started");
+        }
+        String incoming = incomingLecturerId.trim();
+        if (!lecturerExists(incoming)) {
+            throw invalid("Unknown or inactive lecturer: " + incoming);
+        }
+        Integer alreadyMember = count(
+                "SELECT COUNT(*) FROM thesis.thesis_council_member WHERE council_id = :councilId AND lecturer_id = :lecturerId",
+                params().addValue("councilId", councilId).addValue("lecturerId", incoming));
+        if (alreadyMember != null && alreadyMember > 0) {
+            throw conflict("COUNCIL_MEMBER_EXISTS", "The lecturer already sits on this council");
+        }
+        // Same independence edges addMember enforces: the incoming member must
+        // neither counter-review nor supervise any topic this council grades.
+        Integer reviewingAssignedTopic = count(
+                "SELECT COUNT(*) FROM thesis.thesis_council_topic ct "
+                        + "JOIN thesis.thesis_topic t ON t.id = ct.topic_id "
+                        + "WHERE ct.council_id = :councilId AND t.gvpb_lecturer_id = :lecturerId",
+                params().addValue("councilId", councilId).addValue("lecturerId", incoming));
+        if (reviewingAssignedTopic != null && reviewingAssignedTopic > 0) {
+            throw conflict("REVIEWER_MUST_BE_INDEPENDENT",
+                    "The assigned counter-reviewer cannot sit on the defense council for this topic");
+        }
+        Integer supervisingAssignedTopic = count(
+                "SELECT COUNT(*) FROM thesis.thesis_council_topic ct "
+                        + "JOIN thesis.thesis_topic_supervisor sup ON sup.topic_id = ct.topic_id "
+                        + "JOIN campuscore_auth.\"Lecturer\" l "
+                        + "  ON (l.\"id\" = sup.lecturer_id OR l.\"userId\" = sup.lecturer_id) "
+                        + "WHERE ct.council_id = :councilId "
+                        + "  AND (sup.lecturer_id = :lecturerId OR l.\"id\" = :lecturerId OR l.\"userId\" = :lecturerId)",
+                params().addValue("councilId", councilId).addValue("lecturerId", incoming));
+        if (supervisingAssignedTopic != null && supervisingAssignedTopic > 0) {
+            throw conflict("SUPERVISOR_CANNOT_CHAIR_COUNCIL",
+                    "The topic supervisor cannot chair or sit on the defense council for an assigned topic");
+        }
+        jdbc.update(
+                "UPDATE thesis.thesis_council_member SET lecturer_id = :incoming "
+                        + "WHERE council_id = :councilId AND lecturer_id = :outgoing",
+                params().addValue("councilId", councilId)
+                        .addValue("incoming", incoming).addValue("outgoing", outgoingLecturerId.trim()));
+        Map<String, Object> afterState = new LinkedHashMap<>();
+        afterState.put("lecturer_id", incoming);
+        afterState.put("member_role", seat.get("member_role"));
+        audit.record(subject(actor), null, "COUNCIL_MEMBER_REPLACED", "THESIS_COUNCIL", councilId.toString(),
+                "Council seat " + seat.get("member_role") + " passed from " + outgoingLecturerId.trim()
+                        + " to " + incoming + "; reason: " + cleanReason,
+                seat, afterState);
+        return getCouncil(councilId);
+    }
+
+    /**
+     * Waives the counter-review requirement for one topic. The wedge this
+     * closes: a missed GVPB deadline (or a reviewer who never submits) left
+     * finalizeScores permanently rejected while publishResults still counted
+     * the topic, so one reviewer absence held the whole round hostage. With
+     * the waiver the topic finalizes on defense scores alone; the reason is
+     * stored on the row so the lifted requirement stays self-describing.
+     * Reversible through {@link #revokeCounterReviewWaiver} while the topic
+     * has no final score.
+     *
+     * @param topicId topic whose counter-review requirement is lifted
+     * @param reason governance reason (required, at most 500 characters)
+     * @param actor caller JWT; a faculty head (topic in faculty scope) or admin
+     * @return the topic with the waiver fields set
+     * @throws DomainException with code GVPB_ALREADY_WAIVED when the topic is
+     *         already waived, SCORE_ALREADY_FINALIZED for a graded topic, or
+     *         VALIDATION_ERROR when the topic has no counter-review to waive
+     */
+    @Transactional
+    public Map<String, Object> waiveCounterReview(UUID topicId, String reason, Jwt actor) {
+        requireGovernanceRole(actor, "Only a faculty head or admin can waive a counter-review");
+        String cleanReason = requireReason(reason);
+        if (topicId == null) {
+            throw invalid("topicId is required");
+        }
+        lockMutableTopicRound(topicId);
+        Map<String, Object> topic = one(
+                "SELECT t.id, t.status, t.final_score, t.gvpb_lecturer_id, t.gvpb_waived_reason, "
+                        + "t.result_status, r.gvpb_deadline, r.thesis_type "
+                        + "FROM thesis.thesis_topic t "
+                        + "JOIN thesis.thesis_registration_round r ON r.id = t.round_id "
+                        + "WHERE t.id = :topicId FOR UPDATE OF t",
+                params().addValue("topicId", topicId), "TOPIC_NOT_FOUND", "Thesis topic not found");
+        ThesisDeanScope.requireTopicAccess(jdbc, actor, topicId);
+        if (!TopicStatus.PUBLISHED.name().equals(topic.get("status"))
+                && !TopicStatus.APPROVED.name().equals(topic.get("status"))) {
+            throw conflict("TOPIC_NOT_PUBLISHED", "Only published topics can waive a counter-review");
+        }
+        if (topic.get("final_score") != null) {
+            throw conflict("SCORE_ALREADY_FINALIZED", "A finalized topic cannot change its counter-review requirement");
+        }
+        if (topic.get("gvpb_waived_reason") != null) {
+            throw conflict("GVPB_ALREADY_WAIVED", "The counter-review requirement is already waived");
+        }
+        RoundType roundType = null;
+        try {
+            roundType = RoundType.valueOf((String) topic.get("thesis_type"));
+        } catch (IllegalArgumentException ignored) {
+            roundType = null;
+        }
+        boolean requiresGvpb = (roundType != null && roundType.requiresGvpbDeadline()
+                && topic.get("gvpb_deadline") != null) || topic.get("gvpb_lecturer_id") != null;
+        if (!requiresGvpb) {
+            throw invalid("This topic has no counter-review requirement to waive");
+        }
+        jdbc.update(
+                "UPDATE thesis.thesis_topic SET gvpb_waived_reason = :reason, gvpb_waived_by = :by, "
+                        + "gvpb_waived_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP, "
+                        + "version = version + 1 WHERE id = :topicId",
+                params().addValue("topicId", topicId).addValue("reason", cleanReason)
+                        .addValue("by", subject(actor)));
+        // The waiver overrides a derived REVIEW_FAILED marker; the stored
+        // failing score remains for the record.
+        syncReviewOutcome(topicId, subject(actor));
+        Map<String, Object> beforeState = new LinkedHashMap<>();
+        beforeState.put("gvpb_waived_reason", null);
+        beforeState.put("result_status", topic.get("result_status"));
+        Map<String, Object> afterState = new LinkedHashMap<>();
+        afterState.put("gvpb_waived_reason", cleanReason);
+        afterState.put("result_status", topicResultStatus(topicId));
+        audit.record(subject(actor), null, "GVPB_WAIVED", "THESIS_TOPIC", topicId.toString(),
+                "Counter-review requirement waived; reason: " + cleanReason, beforeState, afterState);
+        return afterState;
+    }
+
+    /**
+     * Restores the counter-review requirement a waiver lifted. Only legal
+     * while the topic has no final score; a stored sub-threshold counter-
+     * review score marks the topic REVIEW_FAILED again.
+     *
+     * @param topicId topic whose counter-review requirement is re-armed
+     * @param reason governance reason (required, at most 500 characters)
+     * @param actor caller JWT; a faculty head (topic in faculty scope) or admin
+     * @return the topic's counter-review state after revocation
+     * @throws DomainException with code GVPB_NOT_WAIVED when no waiver exists
+     *         or SCORE_ALREADY_FINALIZED for a graded topic
+     */
+    @Transactional
+    public Map<String, Object> revokeCounterReviewWaiver(UUID topicId, String reason, Jwt actor) {
+        requireGovernanceRole(actor, "Only a faculty head or admin can restore a counter-review");
+        String cleanReason = requireReason(reason);
+        if (topicId == null) {
+            throw invalid("topicId is required");
+        }
+        lockMutableTopicRound(topicId);
+        Map<String, Object> topic = one(
+                "SELECT t.id, t.final_score, t.gvpb_waived_reason, t.result_status "
+                        + "FROM thesis.thesis_topic t "
+                        + "JOIN thesis.thesis_registration_round r ON r.id = t.round_id "
+                        + "WHERE t.id = :topicId FOR UPDATE OF t",
+                params().addValue("topicId", topicId), "TOPIC_NOT_FOUND", "Thesis topic not found");
+        ThesisDeanScope.requireTopicAccess(jdbc, actor, topicId);
+        if (topic.get("gvpb_waived_reason") == null) {
+            throw conflict("GVPB_NOT_WAIVED", "The counter-review requirement is not waived");
+        }
+        if (topic.get("final_score") != null) {
+            throw conflict("SCORE_ALREADY_FINALIZED", "A finalized topic cannot change its counter-review requirement");
+        }
+        jdbc.update(
+                "UPDATE thesis.thesis_topic SET gvpb_waived_reason = NULL, gvpb_waived_by = NULL, "
+                        + "gvpb_waived_at = NULL, updated_at = CURRENT_TIMESTAMP, "
+                        + "version = version + 1 WHERE id = :topicId",
+                params().addValue("topicId", topicId));
+        syncReviewOutcome(topicId, subject(actor));
+        Map<String, Object> beforeState = new LinkedHashMap<>();
+        beforeState.put("gvpb_waived_reason", topic.get("gvpb_waived_reason"));
+        beforeState.put("result_status", topic.get("result_status"));
+        Map<String, Object> afterState = new LinkedHashMap<>();
+        afterState.put("gvpb_waived_reason", null);
+        afterState.put("result_status", topicResultStatus(topicId));
+        audit.record(subject(actor), null, "GVPB_WAIVER_REVOKED", "THESIS_TOPIC", topicId.toString(),
+                "Counter-review requirement restored; reason: " + cleanReason, beforeState, afterState);
+        return afterState;
     }
 
     // ---------- student results ----------
@@ -1035,6 +1331,68 @@ public class ThesisCouncilService {
     }
 
     // ---------- helpers ----------
+
+    /**
+     * Deterministic outcome for the counter-review result: the latest GVPB
+     * score decides. Below {@link #GVPB_PASS_THRESHOLD} the topic is marked
+     * REVIEW_FAILED — a stored, admin-visible outcome instead of the old
+     * silent wedge where finalize kept rejecting the topic while
+     * publishResults kept counting it. A resubmission at or above the
+     * threshold clears the marker. An explicit waiver or withdrawal always
+     * dominates: those are governance decisions, not score derivations.
+     */
+    private void syncReviewOutcome(UUID topicId, String actorId) {
+        Map<String, Object> row = one(
+                "SELECT gvpb_waived_reason, result_status FROM thesis.thesis_topic WHERE id = :topicId",
+                params().addValue("topicId", topicId), "TOPIC_NOT_FOUND", "Thesis topic not found");
+        String current = (String) row.get("result_status");
+        if (RESULT_WITHDRAWN.equals(current)) {
+            return;
+        }
+        List<BigDecimal> scores = jdbc.queryForList(
+                "SELECT score FROM thesis.thesis_topic_score WHERE topic_id = :topicId AND component = :component "
+                        + "ORDER BY graded_at DESC, created_at DESC",
+                params().addValue("topicId", topicId).addValue("component", GVPB_COMPONENT),
+                BigDecimal.class);
+        BigDecimal latest = scores.isEmpty() ? null : scores.get(0);
+        boolean waived = row.get("gvpb_waived_reason") != null;
+        boolean failed = !waived && latest != null && latest.compareTo(GVPB_PASS_THRESHOLD) < 0;
+        if (failed && !RESULT_REVIEW_FAILED.equals(current)) {
+            jdbc.update(
+                    "UPDATE thesis.thesis_topic SET result_status = 'REVIEW_FAILED', "
+                            + "result_reason = :reason, result_by = :by, result_at = CURRENT_TIMESTAMP, "
+                            + "updated_at = CURRENT_TIMESTAMP, version = version + 1 "
+                            + "WHERE id = :topicId AND final_score IS NULL "
+                            + "AND result_status IS DISTINCT FROM 'WITHDRAWN'",
+                    params().addValue("topicId", topicId)
+                            .addValue("reason", "Counter-review score "
+                                    + latest.stripTrailingZeros().toPlainString()
+                                    + " is below the 5.0 pass threshold")
+                            .addValue("by", actorId));
+        } else if (!failed && RESULT_REVIEW_FAILED.equals(current)) {
+            jdbc.update(
+                    "UPDATE thesis.thesis_topic SET result_status = NULL, result_reason = NULL, "
+                            + "result_by = NULL, result_at = NULL, updated_at = CURRENT_TIMESTAMP, "
+                            + "version = version + 1 "
+                            + "WHERE id = :topicId AND final_score IS NULL AND result_status = 'REVIEW_FAILED'",
+                    params().addValue("topicId", topicId));
+        }
+    }
+
+    private String topicResultStatus(UUID topicId) {
+        List<String> rows = jdbc.queryForList(
+                "SELECT result_status FROM thesis.thesis_topic WHERE id = :topicId",
+                params().addValue("topicId", topicId), String.class);
+        return rows.isEmpty() ? null : rows.get(0);
+    }
+
+    private static String requireReason(String value) {
+        String reason = normalize(value);
+        if (reason.isBlank() || reason.length() > 500) {
+            throw invalid("reason is required and must contain at most 500 characters");
+        }
+        return reason;
+    }
 
     private boolean councilHasTopic(UUID councilId, UUID topicId) {
         Integer count = count(
@@ -1100,10 +1458,25 @@ public class ThesisCouncilService {
                 "Only council members or governance staff can read topic scores");
     }
 
+    /**
+     * A member who can still grade: the seat resolves to an active lecturer
+     * profile (either stored key form). Deactivated or profile-less members
+     * can never submit again — hasMember gates them out at write time — so
+     * leaving them in the expected set wedges SCORES_INCOMPLETE forever.
+     */
+    private static String activeMemberClause(String keyColumn) {
+        return "AND EXISTS ("
+                + "  SELECT 1 FROM campuscore_auth.\"Lecturer\" lm "
+                + "  WHERE (lm.\"id\" = " + keyColumn + " OR lm.\"userId\" = " + keyColumn + ") "
+                + "    AND lm.\"isActive\" = TRUE"
+                + ") ";
+    }
+
     private int eligibleGraderCount(UUID councilId, UUID topicId) {
         return count(
                 "SELECT COUNT(*) FROM thesis.thesis_council_member m "
                         + "WHERE m.council_id = :councilId "
+                        + activeMemberClause("m.lecturer_id")
                         + "AND NOT EXISTS ("
                         + "  SELECT 1 FROM thesis.thesis_topic_supervisor sup "
                         + "  JOIN campuscore_auth.\"Lecturer\" l "
@@ -1120,6 +1493,7 @@ public class ThesisCouncilService {
                         + "JOIN thesis.thesis_council_member m "
                         + "  ON m.council_id = s.council_id AND m.lecturer_id = s.lecturer_id "
                         + "WHERE s.council_id = :councilId AND s.topic_id = :topicId AND s.component = :component "
+                        + activeMemberClause("s.lecturer_id")
                         + "AND NOT EXISTS ("
                         + "  SELECT 1 FROM thesis.thesis_topic_supervisor sup "
                         + "  JOIN campuscore_auth.\"Lecturer\" l "
