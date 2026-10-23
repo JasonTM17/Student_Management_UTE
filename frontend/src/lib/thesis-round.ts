@@ -28,6 +28,51 @@ export function pickPreferredThesisRound(
   return live?.roundId;
 }
 
+/** The restore decision an admin has to make for a cancelled round. */
+export interface RoundRestorePlan {
+  /** The status a restore with no explicit choice returns to; null when the
+   * admin must pick one of {@link explicitTargets} instead. */
+  implicitTarget: ThesisRound['cancelledFromStatus'] | null;
+  /** Statuses the admin may explicitly choose; empty means a plain confirm. */
+  explicitTargets: ThesisRound['status'][];
+  /** True when no implicit restore exists and a choice is mandatory. */
+  requiresChoice: boolean;
+}
+
+/**
+ * Mirrors the backend restore rules so the admin dialog only offers targets
+ * the server would accept: a recorded marker replays itself (or, when it is
+ * REGISTRATION_OPEN whose window already passed, can only land on
+ * REGISTRATION_CLOSED); a legacy row without a recorded status restores to
+ * DRAFT only when no live groups survive, otherwise the admin must pick a
+ * target at or after REGISTRATION_OPEN — the phase the groups prove.
+ */
+export function planThesisRoundRestore(
+  round: Pick<ThesisRound, 'status' | 'cancelledFromStatus' | 'registrationStart' | 'registrationEnd'>,
+  hasLiveGroups: boolean,
+  now: number = Date.now(),
+): RoundRestorePlan {
+  const none: RoundRestorePlan = { implicitTarget: null, explicitTargets: [], requiresChoice: false };
+  if (round.status !== 'CANCELLED') return none;
+  const recorded = round.cancelledFromStatus ?? null;
+  const start = round.registrationStart ? Date.parse(round.registrationStart) : NaN;
+  const end = round.registrationEnd ? Date.parse(round.registrationEnd) : NaN;
+  const windowLive = Number.isFinite(start) && Number.isFinite(end) && now >= start && now < end;
+  if (recorded) {
+    if (recorded === 'REGISTRATION_OPEN' && !windowLive) {
+      return { implicitTarget: null, explicitTargets: ['REGISTRATION_CLOSED'], requiresChoice: true };
+    }
+    return { implicitTarget: recorded, explicitTargets: [], requiresChoice: false };
+  }
+  if (!hasLiveGroups) {
+    return { implicitTarget: 'DRAFT', explicitTargets: [], requiresChoice: false };
+  }
+  const targets: RoundRestorePlan['explicitTargets'] = windowLive
+    ? ['REGISTRATION_OPEN', 'REGISTRATION_CLOSED']
+    : ['REGISTRATION_CLOSED'];
+  return { implicitTarget: null, explicitTargets: targets, requiresChoice: true };
+}
+
 const ROUND_STATUS_PRIORITY: Readonly<Record<string, number>> = {
   REGISTRATION_OPEN: 0,
   REGISTRATION_CLOSED: 1,

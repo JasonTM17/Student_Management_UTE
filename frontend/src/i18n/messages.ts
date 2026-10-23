@@ -159,6 +159,10 @@ export const en = {
           'Some students already hold an active seat in another live round; restoring this round would give them two active groups.',
         ROUND_RESTORE_FROZEN_HISTORY:
           'This round contains frozen historical groups and cannot be reopened.',
+        ROUND_RESTORE_TARGET_REQUIRED:
+          'This round was cancelled before its previous status was recorded — pick the status it returns to.',
+        ROUND_RESTORE_TARGET_INVALID:
+          'That status is not a reachable restore target for this round.',
         VALIDATION_ERROR: 'Some submitted values are invalid. Review them and try again.',
         // Thesis results and council
         RESULTS_NOT_READY: 'No topic has been graded yet; the chair must finalize scores first.',
@@ -2606,6 +2610,11 @@ export const en = {
         'The round returns to the status it had before cancellation.',
       restoreRoundConfirmLegacy:
         'This round was cancelled before restore tracking existed, so it will return to Draft.',
+      restoreTargetLabel: 'Status to restore',
+      restoreRoundPickTargetRequired:
+        'This round was cancelled before its previous status was recorded and it still has groups — pick the status it returns to.',
+      restoreRoundWindowPassed:
+        'This round was cancelled while registration was open, but that window has passed — it can only return as registration closed.',
       roundRestored: 'Round restored.',
       assignReviewer: 'Assign reviewer (GVPB)',
       reassignReviewer: 'Reassign',
@@ -3113,6 +3122,10 @@ export const vi: I18nMessages = {
           'Một số sinh viên đã có suất tham gia ở đợt khác còn hiệu lực; khôi phục đợt này sẽ khiến họ có hai nhóm đang hoạt động.',
         ROUND_RESTORE_FROZEN_HISTORY:
           'Đợt này chứa nhóm lịch sử đã đóng băng nên không thể mở lại.',
+        ROUND_RESTORE_TARGET_REQUIRED:
+          'Đợt này bị hủy trước khi hệ thống ghi lại trạng thái trước đó — hãy chọn trạng thái khôi phục.',
+        ROUND_RESTORE_TARGET_INVALID:
+          'Trạng thái đó không phải đích khôi phục hợp lệ của đợt này.',
         VALIDATION_ERROR: 'Một số giá trị đã nhập chưa hợp lệ. Hãy kiểm tra rồi thử lại.',
         // Kết quả và hội đồng
         RESULTS_NOT_READY: 'Chưa có đề tài nào được chấm điểm; hội đồng cần chốt điểm trước.',
@@ -5552,6 +5565,11 @@ export const vi: I18nMessages = {
       restoreRoundTitle: 'Khôi phục đợt này?',
       restoreRoundConfirm:
         'Đợt sẽ trở về trạng thái trước khi bị hủy.',
+      restoreTargetLabel: 'Trạng thái khôi phục',
+      restoreRoundPickTargetRequired:
+        'Đợt này bị hủy trước khi hệ thống ghi lại trạng thái trước đó và vẫn còn nhóm — hãy chọn trạng thái khôi phục.',
+      restoreRoundWindowPassed:
+        'Đợt bị hủy khi đang mở đăng ký nhưng khung thời gian đó đã qua — đợt chỉ có thể trở về trạng thái đã đóng đăng ký.',
       restoreRoundConfirmLegacy:
         'Đợt này bị hủy trước khi có theo dõi khôi phục, nên sẽ trở về trạng thái Bản nháp.',
       roundRestored: 'Đã khôi phục đợt.',
