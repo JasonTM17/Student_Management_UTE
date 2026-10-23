@@ -144,6 +144,37 @@ public class AnnouncementWriteService {
         }
     }
 
+    /**
+     * Recalls the announcement's delivered inbox notices once the archive or
+     * delete write commits. Mirrors the publish fan-out's fail-soft contract:
+     * a notification-side failure is logged and swallowed so it can never roll
+     * back a lifecycle change that already succeeded. Restore deliberately does
+     * not run this — the stamped notifiedAt marker keeps the scheduled sweep
+     * from ever refiring, so restoring cannot duplicate inbox rows.
+     */
+    private void recallInboxNotifications(String id) {
+        if (org.springframework.transaction.support.TransactionSynchronizationManager.isSynchronizationActive()) {
+            org.springframework.transaction.support.TransactionSynchronizationManager.registerSynchronization(
+                    new org.springframework.transaction.support.TransactionSynchronization() {
+                        @Override
+                        public void afterCommit() {
+                            recallFanout(id);
+                        }
+                    });
+        } else {
+            recallFanout(id);
+        }
+    }
+
+    private void recallFanout(String id) {
+        try {
+            int recalled = studentNotifier.recallForAnnouncement(id);
+            LOGGER.info("Announcement {} archived; recalled {} inbox notification(s)", id, recalled);
+        } catch (RuntimeException exception) {
+            LOGGER.warn("Announcement {} committed but inbox recall failed; delivered notices may remain", id);
+        }
+    }
+
     @Transactional
     public AnnouncementResponse update(
             String actorId,
@@ -320,6 +351,8 @@ public class AnnouncementWriteService {
         AnnouncementResponse before = requireAnnouncementForUpdate(id);
         requireAnnouncementOwner(roles, lecturerId, before);
         if (before.archivedAt() != null) {
+            // Idempotent: also retries a recall that failed on the first archive.
+            recallInboxNotifications(id);
             return new DeleteAnnouncementResponse("Announcement deleted successfully");
         }
         Instant now = Instant.now(clock);
@@ -341,6 +374,7 @@ public class AnnouncementWriteService {
                 before,
                 after,
                 now);
+        recallInboxNotifications(id);
         return new DeleteAnnouncementResponse("Announcement deleted successfully");
     }
 
@@ -458,6 +492,9 @@ public class AnnouncementWriteService {
         }
         AnnouncementResponse after = requireAnnouncement(id);
         appendAudit(archive ? "ARCHIVED" : "RESTORED", actor, label, reason, before, after, now);
+        if (archive) {
+            recallInboxNotifications(id);
+        }
         return after;
     }
 
