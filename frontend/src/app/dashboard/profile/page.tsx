@@ -414,11 +414,11 @@ export default function ProfilePage() {
     setIsLoading(true);
 
     try {
-      // The full name is school-managed (see the update endpoint), so it is
-      // deliberately not part of the self-service payload.
+      // Names and date of birth are school-managed (the update endpoint keeps
+      // the stored values), so they are deliberately not part of the
+      // self-service payload.
       await authApi.updateProfile({
         phone: formData.phone.trim(),
-        dateOfBirth: formData.dateOfBirth || undefined,
         address: formData.address.trim(),
         avatar: avatarPreview,
       });
@@ -656,9 +656,7 @@ export default function ProfilePage() {
                     id="profile-date-of-birth"
                     type="date"
                     value={formData.dateOfBirth}
-                    onChange={(e) =>
-                      setFormData((current) => ({ ...current, dateOfBirth: e.target.value }))
-                    }
+                    disabled
                     icon={<Calendar className="h-4 w-4" />}
                   />
                 </div>

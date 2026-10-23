@@ -51,6 +51,7 @@ import {
 import { useConfirmationDialog } from '@/components/ui/use-confirmation-dialog';
 import { useI18n } from '@/i18n';
 import { cn } from '@/lib/utils';
+import { isSafeInternalPath } from '@/lib/safe-path';
 import { toast } from 'sonner';
 import { campusErrorMessage } from '@/lib/campus-error';
 
@@ -212,7 +213,7 @@ export default function AdminNotificationsPage() {
   const titleValid = trimmedTitle.length >= 1 && title.length <= TITLE_MAX;
   const messageValid =
     trimmedMessage.length >= 1 && message.length <= MESSAGE_MAX;
-  const linkValid = trimmedLink === '' || trimmedLink.startsWith('/');
+  const linkValid = trimmedLink === '' || isSafeInternalPath(trimmedLink);
   const isValid = Boolean(recipient) && titleValid && messageValid && linkValid;
 
   const clearDraft = () => {
