@@ -69,6 +69,16 @@ public final class ThesisMutationDtos {
     }
 
     /**
+     * Optional restore override for a cancelled round. When {@code targetStatus}
+     * is absent the round returns to the status captured at cancel time; when
+     * present it must equal that marker — or REGISTRATION_CLOSED for a round
+     * cancelled while REGISTRATION_OPEN — and a legacy row (no recorded marker)
+     * with live groups requires it explicitly.
+     */
+    public record RoundRestoreRequest(String targetStatus) {
+    }
+
+    /**
      * Consequence preview the admin reviews before confirming
      * close-registration: non-cancelled group counts by approval state, the
      * number of report rows already submitted in the round, and the effective

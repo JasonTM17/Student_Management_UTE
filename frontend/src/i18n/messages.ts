@@ -155,6 +155,14 @@ export const en = {
           'A report needs a link or an attached document — add one before removing the other.',
         GROUP_STATE_CONFLICT: 'This group is not in a state that allows that action.',
         ROUND_STATE_CONFLICT: 'This round is not in a state that allows that action.',
+        ROUND_RESTORE_MEMBER_CONFLICT:
+          'Some students already hold an active seat in another live round; restoring this round would give them two active groups.',
+        ROUND_RESTORE_FROZEN_HISTORY:
+          'This round contains frozen historical groups and cannot be reopened.',
+        ROUND_RESTORE_TARGET_REQUIRED:
+          'This round was cancelled before its previous status was recorded — pick the status it returns to.',
+        ROUND_RESTORE_TARGET_INVALID:
+          'That status is not a reachable restore target for this round.',
         VALIDATION_ERROR: 'Some submitted values are invalid. Review them and try again.',
         // Thesis results and council
         RESULTS_NOT_READY: 'No topic has been graded yet; the chair must finalize scores first.',
@@ -2334,6 +2342,8 @@ export const en = {
     noGroupDescription: 'Create a group when registration opens.',
     groupCancelledNotice:
       'Your previous group was cancelled. You can create a new group while registration is open.',
+    roundCancelledNotice:
+      'This round was cancelled. Your group is kept as history but no longer counts as participation — you can join another open round.',
     membershipRoundHint:
       'Your group belongs to “{round}” — switch to that round to see its details and report.',
     membershipRoundOpen: 'Open my group’s round',
@@ -2360,6 +2370,7 @@ export const en = {
     progressInconsistent: 'Some later records exist without their required prerequisite. The official progress stops at the last verified milestone; thesis staff should review the record.',
     progressGroupRejected: 'Your group was rejected. Review the reason with the thesis office.',
     progressGroupCancelled: 'Your group was cancelled and no longer advances this round.',
+    progressRoundCancelled: 'This round was cancelled. Your seat no longer counts — you can join another round while registration is open.',
     progressReportedStatus: 'Self-reported status',
     progressSteps: [
       'Round selected',
@@ -2491,6 +2502,7 @@ export const en = {
       commentInputLabel: 'Comment',
       commentPlaceholder: 'Optional evaluation shown to students after results are published',
       scoresLoadFailed: 'Could not load the score list — retry from the round selector before grading.',
+      roundCancelled: 'This round was cancelled — grading is closed.',
     },
     review: {
       title: 'Counter-review (GVPB)',
@@ -2502,6 +2514,7 @@ export const en = {
       finalizedLocked: 'The council already finalized this topic — the counter-review is locked.',
       deadlinePassed: 'The counter-review deadline for this round has passed.',
       roundClosed: 'This round has ended — reviews are read-only.',
+      roundCancelled: 'This round was cancelled — reviews are closed.',
     },
     supervisorAssignFailed: 'The topic was created, but the supervisor assignment failed — retry it from the topic page.',
     supervisorInvalid: 'The topic was created, but one supervisor id is not a valid lecturer.',
@@ -2589,8 +2602,20 @@ export const en = {
       cancelRound: 'Cancel round',
       cancelRoundTitle: 'Cancel this round?',
       cancelRoundConfirm:
-        'Cancelling releases every group of this round and is only possible before results are published. The round keeps its history but cannot be reopened.',
+        'Cancelling freezes grading and releases students so they can join another round. Groups, topics and reports are kept, and the round can be restored afterwards.',
       roundCancelled: 'Round cancelled.',
+      restoreRound: 'Restore round',
+      restoreRoundTitle: 'Restore this round?',
+      restoreRoundConfirm:
+        'The round returns to the status it had before cancellation.',
+      restoreRoundConfirmLegacy:
+        'This round was cancelled before restore tracking existed, so it will return to Draft.',
+      restoreTargetLabel: 'Status to restore',
+      restoreRoundPickTargetRequired:
+        'This round was cancelled before its previous status was recorded and it still has groups — pick the status it returns to.',
+      restoreRoundWindowPassed:
+        'This round was cancelled while registration was open, but that window has passed — it can only return as registration closed.',
+      roundRestored: 'Round restored.',
       assignReviewer: 'Assign reviewer (GVPB)',
       reassignReviewer: 'Reassign',
       currentReviewer: 'Counter-reviewer',
@@ -3093,6 +3118,14 @@ export const vi: I18nMessages = {
           'Bài nộp cần một liên kết hoặc tài liệu đính kèm — hãy thêm một phần trước khi gỡ phần còn lại.',
         GROUP_STATE_CONFLICT: 'Nhóm hiện không ở trạng thái cho phép thao tác này.',
         ROUND_STATE_CONFLICT: 'Đợt hiện không ở trạng thái cho phép thao tác này.',
+        ROUND_RESTORE_MEMBER_CONFLICT:
+          'Một số sinh viên đã có suất tham gia ở đợt khác còn hiệu lực; khôi phục đợt này sẽ khiến họ có hai nhóm đang hoạt động.',
+        ROUND_RESTORE_FROZEN_HISTORY:
+          'Đợt này chứa nhóm lịch sử đã đóng băng nên không thể mở lại.',
+        ROUND_RESTORE_TARGET_REQUIRED:
+          'Đợt này bị hủy trước khi hệ thống ghi lại trạng thái trước đó — hãy chọn trạng thái khôi phục.',
+        ROUND_RESTORE_TARGET_INVALID:
+          'Trạng thái đó không phải đích khôi phục hợp lệ của đợt này.',
         VALIDATION_ERROR: 'Một số giá trị đã nhập chưa hợp lệ. Hãy kiểm tra rồi thử lại.',
         // Kết quả và hội đồng
         RESULTS_NOT_READY: 'Chưa có đề tài nào được chấm điểm; hội đồng cần chốt điểm trước.',
@@ -5266,6 +5299,8 @@ export const vi: I18nMessages = {
     noGroupDescription: 'Tạo nhóm khi đợt đăng ký mở.',
     groupCancelledNotice:
       'Nhóm trước đây của bạn đã bị hủy. Bạn có thể tạo nhóm mới khi đợt đăng ký đang mở.',
+    roundCancelledNotice:
+      'Đợt này đã bị hủy. Nhóm của bạn được giữ làm lịch sử nhưng không còn tính là tham gia — bạn có thể tham gia đợt khác đang mở.',
     membershipRoundHint:
       'Nhóm của bạn thuộc đợt “{round}” — hãy chuyển sang đợt đó để xem thông tin và báo cáo.',
     membershipRoundOpen: 'Mở đợt của nhóm tôi',
@@ -5292,6 +5327,7 @@ export const vi: I18nMessages = {
     progressInconsistent: 'Có dữ liệu mốc sau nhưng thiếu điều kiện trước đó. Tiến độ chính thức dừng ở mốc đã xác minh cuối cùng; bộ phận luận văn cần kiểm tra hồ sơ.',
     progressGroupRejected: 'Nhóm của bạn bị từ chối. Hãy trao đổi với bộ phận luận văn để biết lý do.',
     progressGroupCancelled: 'Nhóm của bạn đã bị hủy và không tiếp tục trong đợt này.',
+    progressRoundCancelled: 'Đợt này đã bị hủy. Suất tham gia của bạn không còn hiệu lực — bạn có thể tham gia đợt khác khi còn mở đăng ký.',
     progressReportedStatus: 'Trạng thái tự báo cáo',
     progressSteps: [
       'Đã chọn đợt',
@@ -5423,6 +5459,7 @@ export const vi: I18nMessages = {
       commentInputLabel: 'Nhận xét',
       commentPlaceholder: 'Nhận xét đánh giá — sinh viên chỉ thấy sau khi công bố kết quả',
       scoresLoadFailed: 'Không tải được danh sách điểm — hãy tải lại đợt trước khi chấm.',
+      roundCancelled: 'Đợt này đã bị hủy — việc chấm điểm đã đóng.',
     },
     review: {
       title: 'Phản biện (GVPB)',
@@ -5434,6 +5471,7 @@ export const vi: I18nMessages = {
       finalizedLocked: 'Hội đồng đã chốt điểm đề tài này — phản biện đã khóa.',
       deadlinePassed: 'Đã quá hạn phản biện của đợt này.',
       roundClosed: 'Đợt này đã kết thúc — phản biện chỉ còn ở chế độ xem.',
+      roundCancelled: 'Đợt này đã bị hủy — phản biện đã đóng.',
     },
     supervisorAssignFailed: 'Đề tài đã được tạo nhưng phân công hướng dẫn thất bại — hãy thử lại từ trang đề tài.',
     supervisorInvalid: 'Đề tài đã được tạo nhưng một mã giảng viên hướng dẫn không hợp lệ.',
@@ -5521,8 +5559,20 @@ export const vi: I18nMessages = {
       cancelRound: 'Hủy đợt',
       cancelRoundTitle: 'Hủy đợt này?',
       cancelRoundConfirm:
-        'Hủy đợt sẽ giải phóng toàn bộ nhóm trong đợt và chỉ khả dụng trước khi công bố kết quả. Đợt giữ lại lịch sử nhưng không thể mở lại.',
+        'Hủy đợt sẽ đóng việc chấm điểm và giải phóng sinh viên để họ tham gia đợt khác. Nhóm, đề tài và báo cáo được giữ lại, và đợt có thể được khôi phục sau đó.',
       roundCancelled: 'Đã hủy đợt.',
+      restoreRound: 'Khôi phục đợt',
+      restoreRoundTitle: 'Khôi phục đợt này?',
+      restoreRoundConfirm:
+        'Đợt sẽ trở về trạng thái trước khi bị hủy.',
+      restoreTargetLabel: 'Trạng thái khôi phục',
+      restoreRoundPickTargetRequired:
+        'Đợt này bị hủy trước khi hệ thống ghi lại trạng thái trước đó và vẫn còn nhóm — hãy chọn trạng thái khôi phục.',
+      restoreRoundWindowPassed:
+        'Đợt bị hủy khi đang mở đăng ký nhưng khung thời gian đó đã qua — đợt chỉ có thể trở về trạng thái đã đóng đăng ký.',
+      restoreRoundConfirmLegacy:
+        'Đợt này bị hủy trước khi có theo dõi khôi phục, nên sẽ trở về trạng thái Bản nháp.',
+      roundRestored: 'Đã khôi phục đợt.',
       assignReviewer: 'Phân công phản biện (GVPB)',
       reassignReviewer: 'Đổi phản biện',
       currentReviewer: 'Phản biện',
