@@ -342,7 +342,7 @@ class CredentialSessionLockOrderPostgresIT {
         }).when(users).lockUserRow(f.id());
         var pool = Executors.newFixedThreadPool(2);
         try {
-            Future<?> writer = pool.submit(() -> { Thread.currentThread().setName(writerName); auth.changePassword(f.id(), f.before(), f.after(), null); return null; });
+            Future<?> writer = pool.submit(() -> { Thread.currentThread().setName(writerName); auth.changePassword(f.id(), f.before(), f.after(), refresh); return null; });
             await(writerHoldsUser);
             Future<?> waiter = pool.submit(() -> {
                 Thread.currentThread().setName(waiterName);
@@ -356,7 +356,14 @@ class CredentialSessionLockOrderPostgresIT {
             writer.get(WAIT_SECONDS, TimeUnit.SECONDS);
             try { waiter.get(WAIT_SECONDS, TimeUnit.SECONDS); throw new AssertionError("Stale authentication must not mint a session"); }
             catch (ExecutionException expected) { assertThat(expected.getCause()).isInstanceOf(challenge ? AppException.class : BadCredentialsException.class); }
-            assertThat(jdbc.queryForObject("SELECT count(*) FROM campuscore_auth.\"Session\" WHERE \"userId\"=?", Integer.class, f.id())).isZero();
+            // The writer kept the caller's own session: its refresh token
+            // pinned a live row, so the rotation re-issued it instead of
+            // revoking the family. A queued stale login challenge then
+            // leaves that survivor in place; a queued replay of the
+            // superseded refresh meets the superseded-token path (its row
+            // still exists) and revokes the whole family.
+            assertThat(jdbc.queryForObject("SELECT count(*) FROM campuscore_auth.\"Session\" WHERE \"userId\"=?", Integer.class, f.id()))
+                    .isEqualTo(challenge ? 1 : 0);
             if (challenge) assertThat(jdbc.queryForObject("SELECT \"consumedAt\" IS NOT NULL FROM campuscore_auth.\"TwoFactorChallenge\" WHERE id=?", Boolean.class, challengeId)).isTrue();
             assertThat(auth.login(f.email(), f.after(), "127.0.0.1", "credential-lock-it").response().user().id()).isEqualTo(f.id());
             assertThat(users.findById(f.id()).orElseThrow().credentialVersion()).isEqualTo(1);
@@ -394,7 +401,15 @@ class CredentialSessionLockOrderPostgresIT {
     static boolean postgresTargetConfigured() {
         String url = System.getenv("CAMPUSCORE_COUNCIL_POSTGRES_URL");
         if (url == null || !url.startsWith("jdbc:postgresql:")) return false;
-        try { URI uri = URI.create(url.substring(5)); return "127.0.0.1".equals(uri.getHost()) && uri.getPort() == 5452 && "/campuscore_council_race_credential_20261016".equals(uri.getPath()); }
+        try {
+            URI uri = URI.create(url.substring(5));
+            String host = uri.getHost();
+            boolean loopback = "localhost".equalsIgnoreCase(host)
+                    || "127.0.0.1".equals(host) || "::1".equals(host) || "[::1]".equals(host);
+            String path = uri.getPath();
+            String database = path != null && path.startsWith("/") ? path.substring(1) : null;
+            return loopback && database != null && database.startsWith("campuscore_council_race_");
+        }
         catch (IllegalArgumentException invalid) { return false; }
     }
     private record Fixture(String id, String email, String before, String after) { }

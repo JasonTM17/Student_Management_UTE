@@ -668,15 +668,24 @@ export const authApi = {
   changePassword: async (
     oldPassword: string,
     newPassword: string,
-  ): Promise<{ message: string }> => {
+  ): Promise<{
+    message: string;
+    sessionPreserved: boolean;
+    user: User | null;
+    accessToken: string | null;
+    refreshToken: string | null;
+  }> => {
     // The server pins the session to keep by this request's refresh cookie,
     // so a queued rotation must land first — sending mid-refresh would pin a
     // stale hash, resolve nothing, and revoke every session instead.
     await waitForPendingSessionRefresh();
-    const response = await api.post<{ message: string }>(
-      '/auth/change-password',
-      { oldPassword, newPassword },
-    );
+    const response = await api.post<{
+      message: string;
+      sessionPreserved: boolean;
+      user: User | null;
+      accessToken: string | null;
+      refreshToken: string | null;
+    }>('/auth/change-password', { oldPassword, newPassword });
     return response.data;
   },
 
