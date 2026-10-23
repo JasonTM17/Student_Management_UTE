@@ -533,7 +533,10 @@ export function RegistrationScreen({ navigation }: MobileScreenProps) {
     { sections: [], enrollments: [], roundOpen: true },
     async () => {
       const enrollmentResponse = await campusApi.enrollments();
-      const catalog = await loadRegistrationCatalog(campusApi);
+      const catalog = await loadRegistrationCatalog({
+        registrationRounds: () => campusApi.registrationRounds(),
+        registrationSections: () => campusApi.registrationSections(),
+      });
       return {
         sections: catalog.sections,
         enrollments: enrollmentResponse,
