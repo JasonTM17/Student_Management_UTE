@@ -6,6 +6,7 @@ import io.campuscore.restfulapi.thesis.service.ThesisReportService;
 import io.campuscore.restfulapi.thesis.service.ThesisSupervisorService;
 import io.campuscore.restfulapi.thesis.web.ThesisGroupReadDtos.GroupResponse;
 import io.campuscore.restfulapi.thesis.web.ThesisMutationDtos.CloseRegistrationPreviewResponse;
+import io.campuscore.restfulapi.thesis.web.ThesisMutationDtos.GroupApprovalRequest;
 import io.campuscore.restfulapi.thesis.web.ThesisMutationDtos.GroupCreateRequest;
 import io.campuscore.restfulapi.thesis.web.ThesisMutationDtos.GroupRejectionRequest;
 import io.campuscore.restfulapi.thesis.web.ThesisMutationDtos.GvpbDeadlineUpdateRequest;
@@ -541,8 +542,10 @@ public class ThesisMutationController {
 
     @PostMapping("/groups/{id}/approve")
     @PreAuthorize("hasAnyRole('ADMIN','TRUONG_KHOA','LECTURER','SUPER_ADMIN')")
-    public GroupResponse approveGroup(@PathVariable UUID id, @AuthenticationPrincipal Jwt actor) {
-        return mutations.approveGroup(id, actor);
+    public GroupResponse approveGroup(@PathVariable UUID id,
+            @RequestBody(required = false) GroupApprovalRequest request,
+            @AuthenticationPrincipal Jwt actor) {
+        return mutations.approveGroup(id, request, actor);
     }
 
     @PostMapping("/groups/{id}/reject")

@@ -2327,6 +2327,13 @@ export const en = {
       'Please provide a clear reason to help students understand what needs revision.',
     approveSuccess: 'Group approved successfully.',
     rejectSuccess: 'Group rejected.',
+    approveExceptionModalTitle: 'Approve under minimum size',
+    approveExceptionModalDescription:
+      'This group has fewer than 3 members. Approving anyway records a documented size exception on the group.',
+    sizeExceptionReason: 'Size exception reason',
+    sizeExceptionReasonPlaceholder:
+      'Document why the under-size roster is approved (required)...',
+    approveWithException: 'Approve with exception',
     groupTooSmall:
       'A thesis group needs 3 to 5 members, with exactly one group leader, before it can be approved. A draft with 1 or 2 members can be completed before approval.',
     groupStateConflict:
@@ -5344,6 +5351,13 @@ export const vi: I18nMessages = {
       'Vui lòng cung cấp lý do cụ thể để sinh viên chỉnh sửa đề xuất.',
     approveSuccess: 'Đã duyệt nhóm đề tài.',
     rejectSuccess: 'Đã từ chối nhóm đề tài.',
+    approveExceptionModalTitle: 'Duyệt nhóm thiếu sĩ số',
+    approveExceptionModalDescription:
+      'Nhóm này có ít hơn 3 thành viên. Duyệt sẽ ghi nhận ngoại lệ sĩ số có lý do trên nhóm.',
+    sizeExceptionReason: 'Lý do ngoại lệ sĩ số',
+    sizeExceptionReasonPlaceholder:
+      'Ghi rõ lý do duyệt nhóm dưới sĩ số tối thiểu (bắt buộc)...',
+    approveWithException: 'Duyệt kèm ngoại lệ',
     groupTooSmall:
       'Nhóm khóa luận cần từ 3 đến 5 thành viên, với đúng một nhóm trưởng, trước khi được xét duyệt. Nhóm nháp có 1 hoặc 2 thành viên có thể tiếp tục bổ sung trước khi duyệt.',
     groupStateConflict:

@@ -58,6 +58,15 @@ public final class ThesisMutationDtos {
     }
 
     /**
+     * Optional approval body. {@code allowSizeException} lets governance
+     * (admin or the in-scope faculty head — never a plain topic supervisor)
+     * approve a below-minimum roster; {@code reason} is the documented
+     * exception recorded on the marker in the same transaction.
+     */
+    public record GroupApprovalRequest(Boolean allowSizeException, String reason) {
+    }
+
+    /**
      * Non-destructive report edit. Absent fields keep the stored value;
      * {@code clearUrl} explicitly removes the link and is only legal while a
      * file artifact remains (the report must keep at least one artifact).
@@ -91,9 +100,10 @@ public final class ThesisMutationDtos {
      * Audited post-registration roster override. {@code action} is ADD
      * (default, also when omitted) or REMOVE. {@code successorStudentId} names
      * the member who takes over leadership when a REMOVE targets the leader;
-     * it is required then and ignored otherwise. A removal that leaves the
-     * approved roster below the minimum needs {@code allowSizeException} just
-     * like an addition does.
+     * it is required then and ignored otherwise. {@code allowSizeException}
+     * is the documented waiver a roster change needs when it would leave an
+     * APPROVED group below the minimum; a non-approved roster has no minimum
+     * to waive, so ADD never checks it.
      */
     public record RosterOverrideRequest(String studentId, String action, String reason,
             Boolean allowSizeException, String successorStudentId) {

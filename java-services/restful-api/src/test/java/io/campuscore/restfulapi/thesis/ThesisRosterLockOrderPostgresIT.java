@@ -1,15 +1,19 @@
 package io.campuscore.restfulapi.thesis;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.doAnswer;
 
 import io.campuscore.restfulapi.thesis.service.ThesisMutationService;
+import io.campuscore.restfulapi.thesis.web.ThesisMutationDtos.GroupApprovalRequest;
 import io.campuscore.restfulapi.thesis.web.ThesisMutationDtos.RosterOverrideRequest;
+import io.campuscore.restfulapi.web.DomainException;
 import java.sql.Timestamp;
 import java.time.Instant;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Executors;
@@ -140,6 +144,68 @@ class ThesisRosterLockOrderPostgresIT {
     }
 
     /**
+     * A non-approved roster has no minimum: a one-member pending group must
+     * grow without the exception flag (the deferred validator would refuse a
+     * marker it anyway cannot carry), approval without the flag still
+     * enforces the minimum, and a governance approval with flag + reason
+     * lands the marker in the same commit the validator inspects.
+     */
+    @Test
+    void pendingRosterGrowsFreelyAndUnderSizeApprovalNeedsTheExceptionFlag() {
+        UUID topicId = insertTopic("Rlo Grow Topic");
+        UUID groupId = insertGroup(topicId, "rlo-g", 1);
+        ensureStudent("rlo-grow-student");
+
+        mutations.overrideGroupRoster(groupId,
+                new RosterOverrideRequest("rlo-grow-student", "post-close seat", null),
+                admin());
+        Integer members = jdbc.queryForObject(
+                "SELECT COUNT(*) FROM thesis.thesis_group_member WHERE group_id = ?",
+                Integer.class, groupId);
+        assertThat(members).isEqualTo(2);
+        assertThat(jdbc.queryForObject(
+                "SELECT size_exception_reason FROM thesis.thesis_group WHERE id = ?",
+                String.class, groupId)).isNull();
+
+        assertThatThrownBy(() -> mutations.approveGroup(groupId, admin()))
+                .isInstanceOf(DomainException.class)
+                .satisfies(failure -> assertThat(((DomainException) failure).code())
+                        .isEqualTo("GROUP_TOO_SMALL"));
+
+        // A topic supervisor reviews the group but is not governance: the
+        // flag alone cannot waive the minimum for them.
+        ensureLecturer("rlo-sup");
+        jdbc.update("INSERT INTO thesis.thesis_topic_supervisor (id, topic_id, lecturer_id, supervisor_order)"
+                        + " VALUES (?, ?, ?, 1)",
+                UUID.randomUUID(), topicId, "rlo-sup");
+        assertThatThrownBy(() -> mutations.approveGroup(groupId,
+                new GroupApprovalRequest(true, "documented post-close seat"),
+                lecturer("rlo-sup")))
+                .isInstanceOf(DomainException.class)
+                .satisfies(failure -> assertThat(((DomainException) failure).code())
+                        .isEqualTo("GOVERNANCE_ROLE_REQUIRED"));
+
+        // Governance approval records the documented exception atomically;
+        // the deferred membership validator accepts a two-member APPROVED
+        // roster carrying it.
+        mutations.approveGroup(groupId,
+                new GroupApprovalRequest(true, "documented post-close seat"),
+                admin());
+        Map<String, Object> approved = jdbc.queryForMap(
+                "SELECT approval_status, size_exception_reason, size_exception_by"
+                        + " FROM thesis.thesis_group WHERE id = ?",
+                groupId);
+        assertThat(approved.get("approval_status")).isEqualTo("APPROVED");
+        assertThat(approved.get("size_exception_reason")).isEqualTo("documented post-close seat");
+        assertThat(approved.get("size_exception_by")).isEqualTo("rlo-admin");
+        Integer auditRows = jdbc.queryForObject(
+                "SELECT COUNT(*) FROM campuscore_audit.\"AdminAudit\""
+                        + " WHERE \"entityId\" = ? AND \"action\" = 'THESIS_GROUP_APPROVED'",
+                Integer.class, groupId.toString());
+        assertThat(auditRows).isEqualTo(1);
+    }
+
+    /**
      * Lock-order proof: the override used to take round -> group while
      * approveGroup takes group -> round — a guaranteed deadlock when the two
      * paths interleave on one group. Two barriers make the schedule
@@ -264,6 +330,25 @@ class ThesisRosterLockOrderPostgresIT {
                     UUID.randomUUID(), groupId, roundId, student, order, order == 1);
         }
         return groupId;
+    }
+
+    private void ensureLecturer(String lecturerId) {
+        String userId = "rlo-user-" + lecturerId;
+        jdbc.update("INSERT INTO campuscore_auth.\"User\" (\"id\",\"email\",\"password\",\"firstName\",\"lastName\","
+                        + "\"status\",\"emailVerified\",\"isSuperAdmin\",\"failedLoginAttempts\",\"createdAt\",\"updatedAt\") "
+                        + "VALUES (?,'" + lecturerId + "@test.invalid','test','Lock','Lecturer','ACTIVE',FALSE,FALSE,0,"
+                        + "CURRENT_TIMESTAMP,CURRENT_TIMESTAMP)",
+                userId);
+        jdbc.update("INSERT INTO campuscore_auth.\"Lecturer\" (\"id\",\"userId\",\"departmentId\",\"employeeId\",\"isActive\") "
+                        + "VALUES (?,?,'department-demo',?,TRUE)",
+                lecturerId, userId, "GV-" + lecturerId);
+    }
+
+    private Jwt lecturer(String lecturerId) {
+        return Jwt.withTokenValue("roster-lock-fixture").header("alg", "none")
+                .subject("rlo-user-" + lecturerId)
+                .claim("roles", List.of("LECTURER"))
+                .claim("lecturerId", lecturerId).build();
     }
 
     private void ensureStudent(String studentId) {
