@@ -2,16 +2,23 @@
 -- PENDING: the progress timeline derives a missing GROUP_APPROVED milestone
 -- before a present REPORT_SUBMITTED one and reports the group as inconsistent
 -- to its members. V65 reopened under-sized rosters while deliberately
--- retaining their report rows, and V112 re-pins the canonical demo group to
--- SUBMITTED + PENDING on environments where it was already approved, so both
--- fresh deployments and long-lived databases can strand a retained report
--- behind a missing approval. This restores the seeded approval the same way
+-- retaining their report rows; V112 re-pins the canonical demo group to
+-- SUBMITTED + PENDING on environments where it was already approved; and the
+-- two seeded ASSIGNED groups were deliberately left PENDING afterwards.
+-- This reverses that earlier leave-pending decision: ASSIGNED groups cannot
+-- be approved or rejected through the app (approveGroup requires SUBMITTED),
+-- so they would sit PENDING forever and permanently wedge their round --
+-- publishResults refuses with GROUPS_PENDING_APPROVAL while any non-cancelled
+-- group is pending. Their seeded reports are proof the deliverable was
+-- accepted, so the approval they were seeded with is restored the same way
 -- the admin approval flow records it.
 --
--- The guard is deliberately narrow so real user data is never touched: only
--- the three seeded group ids below qualify, the leader must be a demo
--- profile, a live report row must exist (databases without one stay
--- unchanged), and the roster must still satisfy every condition
+-- The guard is deliberately narrow so real user data is never touched and the
+-- migration never creates a state the app's own approval forbids: only the
+-- three seeded group ids below qualify, the leader must be a demo profile, a
+-- live report row must exist (databases without one stay unchanged), the
+-- round must still accept approval decisions, the assigned topic must be
+-- ungraded, and the roster must still satisfy every condition
 -- thesis.validate_group_membership_state enforces for approved groups.
 UPDATE thesis.thesis_group g
 SET approval_status = 'APPROVED',
@@ -30,6 +37,13 @@ WHERE g.id IN (
   AND g.leader_student_id LIKE 'student-profile%'
   AND EXISTS (SELECT 1 FROM thesis.thesis_group_report rep
               WHERE rep.group_id = g.id)
+  AND EXISTS (SELECT 1 FROM thesis.thesis_registration_round r
+              WHERE r.id = g.round_id
+                AND r.status IN ('PROPOSALS_PUBLISHED', 'REGISTRATION_OPEN',
+                                 'REGISTRATION_CLOSED'))
+  AND g.topic_id IS NOT NULL
+  AND EXISTS (SELECT 1 FROM thesis.thesis_topic t
+              WHERE t.id = g.topic_id AND t.final_score IS NULL)
   AND (SELECT COUNT(*) FROM thesis.thesis_group_member gm
        WHERE gm.group_id = g.id) BETWEEN 3 AND 5
   AND (SELECT COUNT(*) FROM thesis.thesis_group_member gm
