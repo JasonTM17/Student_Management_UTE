@@ -35,7 +35,7 @@ import {
 } from '@/components/ui/state-block';
 import { useConfirmationDialog } from '@/components/ui/use-confirmation-dialog';
 import { useI18n } from '@/i18n';
-import { campusErrorCode, campusErrorMessage } from '@/lib/campus-error';
+import { campusCodeMessage, campusErrorCode, campusErrorMessage } from '@/lib/campus-error';
 import {
   getLocalizedCourseLabel,
   getLocalizedName,
@@ -633,7 +633,7 @@ export default function AdminSectionsPage() {
     setIsSaving(true);
 
     try {
-      const payload = {
+      const payload: Record<string, unknown> = {
         ...formData,
         capacity: Number(formData.capacity),
         // An empty known list means delete every meeting. An unavailable read
@@ -645,6 +645,11 @@ export default function AdminSectionsPage() {
           ? { acknowledgeConflicts: true, reason: acknowledgement.reason }
           : {}),
       };
+      // An unchanged status is not a transition — resubmitting the loaded
+      // value would stamp stale state over a concurrent change.
+      if (editingSection && formData.status === editingSection.status) {
+        delete payload.status;
+      }
 
       if (editingSection) {
         await adminSectionsApi.update(editingSection.id, payload);
@@ -672,6 +677,16 @@ export default function AdminSectionsPage() {
           setReopenConflicts(conflictRows);
           setReopenReason('');
         }
+      } else if (campusErrorCode(requestError) === 'SECTION_STATUS_CHANGED') {
+        // The row moved under the open dialog: drop the stale copy, reload
+        // the list and let the admin retry from the committed state.
+        toast.error(
+          campusCodeMessage(requestError, messages.common.campusErrors, copy.saveFailed),
+        );
+        setReopenConflicts([]);
+        setReopenReason('');
+        closeModal();
+        await fetchSections();
       } else {
         toast.error(
           campusErrorMessage(
