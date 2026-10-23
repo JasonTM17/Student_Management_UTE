@@ -96,15 +96,31 @@ async function assertViewportIntegrity(page: Page, route: string) {
   expect.soft(metrics.body, `${route} body overflow`).toBeLessThanOrEqual(metrics.viewport + 1);
 }
 
+// A group that has not submitted yet answers 404 REPORT_NOT_FOUND by contract;
+// the thesis pages treat it as an empty state. Whether a report exists depends
+// on which earlier spec uploaded one, so the matrix must not count it.
+const GROUP_REPORT_PATH = /^\/api\/v1\/thesis\/groups\/[0-9a-f-]{36}\/report$/i;
+
 function observeRuntimeFailures(page: Page) {
   const errors: string[] = [];
+  let expectedReportMisses = 0;
   page.on('console', (message) => {
-    if (message.type() === 'error') errors.push(`console: ${message.text()}`);
+    if (message.type() !== 'error') return;
+    // Chromium logs the 404 as a bare "Failed to load resource" line with no URL.
+    if (expectedReportMisses > 0 && /Failed to load resource.*\b404\b/.test(message.text())) {
+      expectedReportMisses -= 1;
+      return;
+    }
+    errors.push(`console: ${message.text()}`);
   });
   page.on('pageerror', (error) => errors.push(`pageerror: ${error.message}`));
   page.on('response', (response) => {
     const url = new URL(response.url());
     if (url.pathname.startsWith('/api/') && response.status() >= 400) {
+      if (response.status() === 404 && GROUP_REPORT_PATH.test(url.pathname)) {
+        expectedReportMisses += 1;
+        return;
+      }
       errors.push(`network: ${response.status()} ${url.pathname}`);
     }
   });
