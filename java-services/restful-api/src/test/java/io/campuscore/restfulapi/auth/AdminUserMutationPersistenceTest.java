@@ -576,6 +576,77 @@ class AdminUserMutationPersistenceTest {
     }
 
     @Test
+    void ordinaryAdminAppointsAFacultyHeadWhenTheFacultyHasNone() throws Exception {
+        insertLecturer("appoint-user", "appoint@campuscore.edu", "GV-APPOINT", "department-demo", false);
+
+        mvc.perform(put("/api/v1/users/appoint-user")
+                        .with(adminJwt())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"role\":\"TRUONG_KHOA\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.roles", org.hamcrest.Matchers.containsInAnyOrder("LECTURER", "TRUONG_KHOA")));
+
+        assertThat(roleNames("appoint-user")).containsExactlyInAnyOrder("LECTURER", "TRUONG_KHOA");
+    }
+
+    @Test
+    void secondFacultyHeadInTheSameFacultyIsRejectedForEveryActor() throws Exception {
+        // The incumbent sits in a sibling department: the rule is per faculty, not
+        // per department.
+        insertLecturer("incumbent-dean", "incumbent@campuscore.edu", "GV-INCUMBENT", "department-sibling", true);
+        insertLecturer("candidate-user", "candidate@campuscore.edu", "GV-CANDIDATE", "department-demo", false);
+
+        for (RequestPostProcessor actor : List.of(adminJwt(), superJwt())) {
+            mvc.perform(put("/api/v1/users/candidate-user")
+                            .with(actor)
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content("{\"role\":\"TRUONG_KHOA\"}"))
+                    .andExpect(status().isConflict())
+                    .andExpect(jsonPath("$.code").value("DEAN_ALREADY_ASSIGNED"));
+        }
+
+        // The refusal lands before any write: the candidate keeps exactly the
+        // roles it had and the incumbent keeps the title.
+        assertThat(roleNames("candidate-user")).containsExactly("LECTURER");
+        assertThat(roleNames("incumbent-dean")).containsExactlyInAnyOrder("LECTURER", "TRUONG_KHOA");
+    }
+
+    @Test
+    void facultyHeadOfAnotherFacultyOrAnInactiveIncumbentDoesNotBlockTheAppointment() throws Exception {
+        insertLecturer("other-faculty-dean", "otherdean@campuscore.edu", "GV-OTHERDEAN", "department-other", true);
+        insertLecturer("suspended-dean", "suspendeddean@campuscore.edu", "GV-SUSPDEAN", "department-sibling", true);
+        jdbc.update("UPDATE \"campuscore_auth\".\"User\" SET \"status\" = 'SUSPENDED' WHERE \"id\" = 'suspended-dean'");
+        insertLecturer("free-candidate", "freecandidate@campuscore.edu", "GV-FREE", "department-demo", false);
+
+        mvc.perform(put("/api/v1/users/free-candidate")
+                        .with(adminJwt())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"role\":\"TRUONG_KHOA\"}"))
+                .andExpect(status().isOk());
+
+        assertThat(roleNames("free-candidate")).containsExactlyInAnyOrder("LECTURER", "TRUONG_KHOA");
+    }
+
+    @Test
+    void creatingASecondFacultyHeadInTheSameFacultyIsRejectedBeforeAnyAccountExists() throws Exception {
+        insertLecturer("create-incumbent", "createincumbent@campuscore.edu", "GV-CINC", "department-demo", true);
+
+        mvc.perform(post("/api/v1/users")
+                        .with(adminJwt())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"email":"second.dean@campuscore.edu","firstName":"Second","lastName":"Dean","role":"TRUONG_KHOA","employeeId":"GV-SECOND","departmentId":"department-sibling"}
+                                """))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("DEAN_ALREADY_ASSIGNED"));
+
+        assertThat(jdbc.queryForObject(
+                "SELECT COUNT(*) FROM \"campuscore_auth\".\"User\" WHERE \"email\" = 'second.dean@campuscore.edu'",
+                Integer.class))
+                .isZero();
+    }
+
+    @Test
     void demotingDeanBackToLecturerRevokesSessionsAndKeepsTheProfile() throws Exception {
         insertUser("dean-user", "dean@campuscore.edu", "Dean", "User");
         insertUserRole("dean-user-tk", "dean-user", "role-truong-khoa");
@@ -1409,9 +1480,17 @@ class AdminUserMutationPersistenceTest {
                 """);
         jdbc.execute("CREATE SCHEMA IF NOT EXISTS academic");
         jdbc.execute("""
+                CREATE TABLE IF NOT EXISTS academic."Faculty" (
+                    "id" VARCHAR(120) PRIMARY KEY,
+                    "name" VARCHAR(180) NOT NULL,
+                    "isActive" BOOLEAN NOT NULL DEFAULT TRUE
+                )
+                """);
+        jdbc.execute("""
                 CREATE TABLE IF NOT EXISTS academic."Department" (
                     "id" VARCHAR(120) PRIMARY KEY,
                     "name" VARCHAR(180) NOT NULL,
+                    "facultyId" VARCHAR(120) REFERENCES academic."Faculty" ("id"),
                     "isActive" BOOLEAN NOT NULL DEFAULT TRUE
                 )
                 """);
@@ -1487,6 +1566,7 @@ class AdminUserMutationPersistenceTest {
         jdbc.update("DELETE FROM academic.\"Lecturer\"");
         jdbc.update("DELETE FROM academic.\"Curriculum\"");
         jdbc.update("DELETE FROM academic.\"Department\"");
+        jdbc.update("DELETE FROM academic.\"Faculty\"");
         jdbc.update("DELETE FROM academic.\"Enrollment\"");
         jdbc.update("DELETE FROM academic.\"Attendance\"");
         jdbc.update("DELETE FROM academic.\"RegistrationSlip\"");
@@ -1514,10 +1594,18 @@ class AdminUserMutationPersistenceTest {
         insertRole("role-lecturer", "LECTURER", true);
         insertRole("role-truong-khoa", "TRUONG_KHOA", true);
         insertRole("role-auditor", "AUDITOR", false);
-        jdbc.update("INSERT INTO academic.\"Department\" (\"id\", \"name\", \"isActive\")"
-                + " VALUES ('department-demo', 'Demo Department', TRUE)");
-        jdbc.update("INSERT INTO academic.\"Department\" (\"id\", \"name\", \"isActive\")"
-                + " VALUES ('department-inactive', 'Retired Department', FALSE)");
+        jdbc.update("INSERT INTO academic.\"Faculty\" (\"id\", \"name\", \"isActive\")"
+                + " VALUES ('faculty-demo', 'Demo Faculty', TRUE)");
+        jdbc.update("INSERT INTO academic.\"Faculty\" (\"id\", \"name\", \"isActive\")"
+                + " VALUES ('faculty-other', 'Other Faculty', TRUE)");
+        jdbc.update("INSERT INTO academic.\"Department\" (\"id\", \"name\", \"facultyId\", \"isActive\")"
+                + " VALUES ('department-demo', 'Demo Department', 'faculty-demo', TRUE)");
+        jdbc.update("INSERT INTO academic.\"Department\" (\"id\", \"name\", \"facultyId\", \"isActive\")"
+                + " VALUES ('department-sibling', 'Sibling Department', 'faculty-demo', TRUE)");
+        jdbc.update("INSERT INTO academic.\"Department\" (\"id\", \"name\", \"facultyId\", \"isActive\")"
+                + " VALUES ('department-other', 'Other Department', 'faculty-other', TRUE)");
+        jdbc.update("INSERT INTO academic.\"Department\" (\"id\", \"name\", \"facultyId\", \"isActive\")"
+                + " VALUES ('department-inactive', 'Retired Department', 'faculty-demo', FALSE)");
         jdbc.update("INSERT INTO academic.\"Curriculum\" (\"id\", \"name\", \"departmentId\", \"isActive\")"
                 + " VALUES ('curriculum-demo', 'Demo Curriculum', 'department-demo', TRUE)");
         jdbc.update("INSERT INTO academic.\"Curriculum\" (\"id\", \"name\", \"departmentId\", \"isActive\")"
@@ -1545,6 +1633,18 @@ class AdminUserMutationPersistenceTest {
         jdbc.update("INSERT INTO \"campuscore_auth\".\"Lecturer\""
                         + " (\"id\", \"userId\", \"departmentId\", \"employeeId\", \"isActive\")"
                         + " VALUES ('target-lecturer-profile', 'target-user', 'department-demo', 'GV-TARGET', TRUE)");
+    }
+
+    private void insertLecturer(String userId, String email, String employeeId, String departmentId, boolean dean) {
+        insertUser(userId, email, "Lect", userId);
+        insertUserRole(userId + "-lect", userId, "role-lecturer");
+        if (dean) {
+            insertUserRole(userId + "-tk", userId, "role-truong-khoa");
+        }
+        jdbc.update("INSERT INTO \"campuscore_auth\".\"Lecturer\""
+                + " (\"id\", \"userId\", \"departmentId\", \"employeeId\", \"isActive\")"
+                + " VALUES (?, ?, ?, ?, TRUE)",
+                userId + "-profile", userId, departmentId, employeeId);
     }
 
     private void insertRole(String id, String name, boolean system) {
