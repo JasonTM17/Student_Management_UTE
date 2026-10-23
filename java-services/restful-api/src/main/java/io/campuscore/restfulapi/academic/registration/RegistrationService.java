@@ -399,53 +399,7 @@ public class RegistrationService {
                 String enrollmentId = String.valueOf(first.get("id"));
                 String sectionId = String.valueOf(first.get("section_id"));
 
-                String studentCode = studentId;
-                String studentName = null;
-                try {
-                    Map<String, Object> stuInfo = jdbc.queryForMap(
-                            "SELECT s.\"studentId\" AS student_code, u.\"firstName\" AS first_name, u.\"lastName\" AS last_name"
-                                    + " FROM " + STUDENT + " s"
-                                    + " LEFT JOIN \"campuscore_auth\".\"User\" u ON u.\"id\" = s.\"userId\""
-                                    + " WHERE s.\"id\" = :studentId",
-                            new MapSqlParameterSource("studentId", studentId));
-                    if (stuInfo.get("student_code") != null) {
-                        studentCode = String.valueOf(stuInfo.get("student_code"));
-                    }
-                    studentName = displayName(
-                            (String) stuInfo.get("first_name"),
-                            (String) stuInfo.get("last_name"));
-                } catch (Exception ignored) {
-                }
-
-                String semesterName = targetSemesterId;
-                try {
-                    Map<String, Object> semInfo = jdbc.queryForMap(
-                            "SELECT \"name\" FROM " + SEMESTER + " WHERE \"id\" = :semesterId",
-                            new MapSqlParameterSource("semesterId", targetSemesterId));
-                    if (semInfo.get("name") != null) {
-                        semesterName = String.valueOf(semInfo.get("name"));
-                    }
-                } catch (Exception ignored) {
-                }
-
-                List<RegistrationPdfRenderer.CourseItem> courseItems = active.stream().map(row -> new RegistrationPdfRenderer.CourseItem(
-                        String.valueOf(row.get("course_code")),
-                        String.valueOf(row.get("course_name")),
-                        String.valueOf(row.get("section_number")),
-                        ((Number) row.get("credits")).intValue(),
-                        String.valueOf(row.get("id")),
-                        String.valueOf(row.get("section_id"))
-                )).toList();
-
-                byte[] pdf = pdfRenderer.renderEnriched(
-                        studentId,
-                        studentCode,
-                        studentName,
-                        targetSemesterId,
-                        semesterName,
-                        enrollmentId,
-                        sectionId,
-                        courseItems);
+                byte[] pdf = renderSlipPdf(studentId, targetSemesterId, enrollmentId, sectionId, active);
                 String digest = sha256(pdf);
 
                 String roundId = first.get("round_id") != null ? String.valueOf(first.get("round_id")) : null;
@@ -498,6 +452,64 @@ public class RegistrationService {
     }
 
     public record SlipPayload(String sha256, byte[] payload) {
+    }
+
+    /**
+     * Renders the slip from live registration data: every course row carries
+     * its code, name, section number and credits, plus the student code/name
+     * and semester name. Both the enroll-time persist and the on-demand
+     * fallback go through here so a stored slip never shows the placeholder
+     * row of internal ids the legacy {@code render} overload produced.
+     */
+    private byte[] renderSlipPdf(String studentId, String semesterId, String enrollmentId, String sectionId,
+            List<Map<String, Object>> active) {
+        String studentCode = studentId;
+        String studentName = null;
+        try {
+            Map<String, Object> stuInfo = jdbc.queryForMap(
+                    "SELECT s.\"studentId\" AS student_code, u.\"firstName\" AS first_name, u.\"lastName\" AS last_name"
+                            + " FROM " + STUDENT + " s"
+                            + " LEFT JOIN \"campuscore_auth\".\"User\" u ON u.\"id\" = s.\"userId\""
+                            + " WHERE s.\"id\" = :studentId",
+                    new MapSqlParameterSource("studentId", studentId));
+            if (stuInfo.get("student_code") != null) {
+                studentCode = String.valueOf(stuInfo.get("student_code"));
+            }
+            studentName = displayName(
+                    (String) stuInfo.get("first_name"),
+                    (String) stuInfo.get("last_name"));
+        } catch (Exception ignored) {
+        }
+
+        String semesterName = semesterId;
+        try {
+            Map<String, Object> semInfo = jdbc.queryForMap(
+                    "SELECT \"name\" FROM " + SEMESTER + " WHERE \"id\" = :semesterId",
+                    new MapSqlParameterSource("semesterId", semesterId));
+            if (semInfo.get("name") != null) {
+                semesterName = String.valueOf(semInfo.get("name"));
+            }
+        } catch (Exception ignored) {
+        }
+
+        List<RegistrationPdfRenderer.CourseItem> courseItems = active.stream().map(row -> new RegistrationPdfRenderer.CourseItem(
+                String.valueOf(row.get("course_code")),
+                String.valueOf(row.get("course_name")),
+                String.valueOf(row.get("section_number")),
+                ((Number) row.get("credits")).intValue(),
+                String.valueOf(row.get("id")),
+                String.valueOf(row.get("section_id"))
+        )).toList();
+
+        return pdfRenderer.renderEnriched(
+                studentId,
+                studentCode,
+                studentName,
+                semesterId,
+                semesterName,
+                enrollmentId,
+                sectionId,
+                courseItems);
     }
 
     private EnrollmentResponse enrollLocked(
@@ -668,7 +680,12 @@ public class RegistrationService {
         if (response == null) {
             throw problem(HttpStatus.INTERNAL_SERVER_ERROR, "SLIP_PERSIST_FAILED", "Enrollment response missing after enroll");
         }
-        byte[] pdf = pdfRenderer.render(studentId, response.semesterId(), response.id(), response.sectionId());
+        byte[] pdf = renderSlipPdf(
+                studentId,
+                response.semesterId(),
+                response.id(),
+                response.sectionId(),
+                activeEnrollments(studentId, response.semesterId()));
         String digest = sha256(pdf);
         int inserted = jdbc.update(
                 "INSERT INTO " + SLIP

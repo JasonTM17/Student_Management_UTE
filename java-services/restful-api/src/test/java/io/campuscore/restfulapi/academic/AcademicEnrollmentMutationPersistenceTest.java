@@ -764,7 +764,8 @@ class AcademicEnrollmentMutationPersistenceTest {
     void enrollmentRollsBackWhenRegistrationSlipCannotBeStored() throws Exception {
         doThrow(new IllegalStateException("renderer unavailable"))
                 .when(pdfRenderer)
-                .render(anyString(), anyString(), anyString(), anyString());
+                .renderEnriched(anyString(), anyString(), anyString(), anyString(), anyString(), anyString(),
+                        anyString(), org.mockito.ArgumentMatchers.anyList());
 
         mvc.perform(post("/api/v1/me/enrollments")
                         .with(studentJwt("student-user-1", "student-1"))
