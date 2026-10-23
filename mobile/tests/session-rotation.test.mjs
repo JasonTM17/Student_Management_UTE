@@ -251,6 +251,91 @@ test('a 401-refresh fired mid-rotation waits, then carries the adopted pair', as
   );
 });
 
+test('a refresh fired while the rotation waits on an earlier refresh still pauses', async () => {
+  const { apiClient, campusApi } = loadClientModule();
+  apiClient.setSessionTokens('access-a0', 'refresh-r0');
+  const calls = [];
+  const attemptCounts = new Map();
+  let releaseEarlierRefresh;
+  const earlierGate = new Promise(resolve => { releaseEarlierRefresh = resolve; });
+  const respond = (status, body) =>
+    new Response(JSON.stringify(body), {
+      status,
+      headers: { 'content-type': 'application/json' },
+    });
+  globalThis.fetch = async (url, init) => {
+    const call = {
+      url: String(url),
+      body: typeof init?.body === 'string' ? JSON.parse(init.body) : undefined,
+      authorization: init?.headers?.get?.('authorization') ?? null,
+    };
+    calls.push(call);
+    if (call.url.endsWith('/auth/refresh')) {
+      if (call.body.refreshToken === 'refresh-r0') {
+        await earlierGate;
+        return respond(200, {
+          user: { id: 'student-user' },
+          accessToken: 'access-a1',
+          refreshToken: 'refresh-r1',
+        });
+      }
+      return respond(200, {
+        user: { id: 'student-user' },
+        accessToken: 'access-a3',
+        refreshToken: 'refresh-r3',
+      });
+    }
+    if (call.url.endsWith('/auth/change-password')) {
+      return respond(200, {
+        message: 'Password changed successfully',
+        sessionPreserved: true,
+        user: { id: 'student-user' },
+        accessToken: 'access-a2',
+        refreshToken: 'refresh-r2',
+      });
+    }
+    const attempts = (attemptCounts.get(call.url) ?? 0) + 1;
+    attemptCounts.set(call.url, attempts);
+    return attempts === 1
+      ? respond(401, { code: 'SESSION_INVALID' })
+      : respond(200, { id: 'student-user' });
+  };
+  const tick = () => new Promise(resolve => setTimeout(resolve, 0));
+
+  // An unrelated 401 starts a session refresh; the credential rotation then
+  // queues behind it inside withPausedSessionRefresh.
+  const earlier = apiClient.get('/me');
+  await tick();
+  const rotation = campusApi.changePassword('old-secret', 'new-secret-9');
+  await tick();
+
+  // A second 401 lands while the rotation is still waiting on the earlier
+  // refresh. The pause must already be armed — joining that refresh would
+  // retry the request before the rotation commits.
+  const later = apiClient.get('/me/enrollments');
+  await tick();
+  await tick();
+
+  releaseEarlierRefresh();
+  await Promise.all([earlier, rotation, later]);
+
+  const order = calls.map(call => call.url);
+  const changeIndex = order.findIndex(url => url.endsWith('/auth/change-password'));
+  const retryIndex = order.findIndex(
+    (url, index) => url.endsWith('/me/enrollments') && index > 0 && calls[index].authorization === 'Bearer access-a3',
+  );
+  assert.ok(changeIndex > -1, 'the rotation request ran');
+  const secondRefresh = calls.find(
+    call => call.url.endsWith('/auth/refresh') && call.body.refreshToken === 'refresh-r2',
+  );
+  assert.ok(
+    secondRefresh,
+    'the later 401 must wait out the rotation and refresh on the adopted pair',
+  );
+  assert.ok(retryIndex > changeIndex,
+    'the held request retries only after the rotation commits');
+});
+
 test('a rejected rotation releases waiting refreshes', async () => {
   const { apiClient, campusApi } = loadClientModule();
   apiClient.setSessionTokens('access-a0', 'refresh-r0');
