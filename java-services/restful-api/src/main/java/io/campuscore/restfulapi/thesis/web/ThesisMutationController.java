@@ -103,7 +103,7 @@ public class ThesisMutationController {
         return mutations.cancelRound(id, actor);
     }
 
-    @Operation(summary = "Khôi phục đợt đã hủy", description = "Đưa đợt CANCELLED về trạng thái trước khi hủy (DRAFT với dữ liệu hủy cũ); bị chặn khi có sinh viên đã sang đợt khác còn hiệu lực")
+    @Operation(summary = "Khôi phục đợt đã hủy", description = "Đưa đợt CANCELLED về trạng thái trước khi hủy (đợt hủy cũ không có dấu trạng thái mà còn nhóm phải chọn targetStatus rõ ràng); bị chặn khi có sinh viên đã sang đợt khác còn hiệu lực")
     @PostMapping("/rounds/{id}/restore")
     @PreAuthorize("hasAnyRole('ADMIN','TRUONG_KHOA','SUPER_ADMIN')")
     public RoundResponse restoreRound(

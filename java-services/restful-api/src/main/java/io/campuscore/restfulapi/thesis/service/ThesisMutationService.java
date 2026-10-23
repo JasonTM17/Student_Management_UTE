@@ -393,20 +393,28 @@ public class ThesisMutationService {
         return roundReads.get(id);
     }
 
+    /** Restore targets in lifecycle order — a request may never name RESULTS_PUBLISHED, CLOSED or CANCELLED. */
+    private static final List<RoundStatus> RESTORE_TARGET_ORDER = List.of(
+            RoundStatus.DRAFT, RoundStatus.PROPOSAL_OPEN, RoundStatus.PROPOSALS_PUBLISHED,
+            RoundStatus.REGISTRATION_OPEN, RoundStatus.REGISTRATION_CLOSED);
+
     /**
      * Reverses a cancellation (the admin escape hatch). The round returns to
      * the status captured at cancel time; a caller may instead name an
-     * explicit {@code targetStatus} among the live pre-terminal statuses —
-     * needed when the stored target is no longer reachable, e.g. a
-     * REGISTRATION_OPEN snapshot whose window has since closed. Rounds
-     * cancelled before {@code cancelled_from_status} existed carry NULL and
-     * fall back to DRAFT, the only status that fabricates no progress.
+     * explicit {@code targetStatus} — the only override the lifecycle allows
+     * is REGISTRATION_CLOSED in place of a recorded REGISTRATION_OPEN whose
+     * window has since closed. Rounds cancelled before
+     * {@code cancelled_from_status} existed carry NULL: a legacy round that
+     * still has live groups requires an explicit target
+     * (ROUND_RESTORE_TARGET_REQUIRED), because its data proves registration
+     * ran and DRAFT would silently re-hold seats; an empty legacy round falls
+     * back to DRAFT, the only status that fabricates no progress.
      *
      * <p>Nothing else was mutated by the cancel, so nothing is resurrected
      * here — the UPDATE is a pure status flip guarded by the row lock and the
      * {@code status = 'CANCELLED'} predicate, which keeps the optimistic
-     * version check honest against a concurrent restore or cancel. Two safety
-     * checks run under that lock before the flip:
+     * version check honest against a concurrent restore or cancel. Three
+     * guards run under the locks before the flip:
      *
      * <ul>
      *   <li>a student who joined another still-live round while this one was
@@ -414,12 +422,17 @@ public class ThesisMutationService {
      *   with ROUND_RESTORE_MEMBER_CONFLICT rather than corrupting rosters;</li>
      *   <li>a round containing frozen historical small groups must not be
      *   reopened — the V113 trigger is the backstop, and the explicit
-     *   ROUND_RESTORE_FROZEN_HISTORY check gives the admin a clear reason.</li>
+     *   ROUND_RESTORE_FROZEN_HISTORY check gives the admin a clear reason;</li>
+     *   <li>the members' Student rows are locked before the seat count, in the
+     *   same round-then-student order createGroup/addMember take them, so a
+     *   registration in flight either commits first (and is counted) or waits
+     *   for this flip and then sees the round live again — no interleaving can
+     *   leave a student seated in two live rounds.</li>
      * </ul>
      *
      * @param id round to restore
      * @param targetStatus explicit restore target, or null to use the recorded
-     *        pre-cancel status (DRAFT when nothing was recorded)
+     *        pre-cancel status (DRAFT for a group-less legacy cancellation)
      * @param actor caller JWT recorded in the audit row
      * @return the round after restoration
      */
@@ -431,7 +444,24 @@ public class ThesisMutationService {
         if (!RoundStatus.CANCELLED.name().equals(row.get("status"))) {
             throw conflict("ROUND_STATE_CONFLICT", "Only a cancelled round can be restored");
         }
-        RoundStatus target = resolveRestoreTarget((String) row.get("cancelled_from_status"), targetStatus);
+        String recorded = (String) row.get("cancelled_from_status");
+        // Same order as registration (requireRoundStatus locks the round, then
+        // requireActiveStudent locks the Student row): round first, students in
+        // id order — so this transaction and an in-flight registration for one
+        // of these students serialize on the Student row either way.
+        jdbc.queryForList(
+                "SELECT s.\"id\" FROM campuscore_auth.\"Student\" s "
+                        + "WHERE s.\"id\" IN ("
+                        + "SELECT m.student_id FROM thesis.thesis_group_member m "
+                        + "JOIN thesis.thesis_group g ON g.id = m.group_id "
+                        + "WHERE g.round_id = :id AND g.status <> 'CANCELLED' AND m.active_participation) "
+                        + "ORDER BY s.\"id\" FOR UPDATE",
+                params().addValue("id", id), String.class);
+        boolean hasLiveGroups = count(
+                "SELECT COUNT(*) FROM thesis.thesis_group WHERE round_id = :id AND status <> 'CANCELLED'",
+                "id", id) > 0;
+        boolean explicitTarget = targetStatus != null && !targetStatus.isBlank();
+        RoundStatus target = resolveRestoreTarget(recorded, targetStatus, hasLiveGroups);
         // Restoring to an open registration replays the same window guard the
         // open-registration transition enforces; otherwise the round would
         // come back "open" while every roster action still fails.
@@ -468,34 +498,69 @@ public class ThesisMutationService {
         if (updated != 1) {
             throw conflict("ROUND_STATE_CONFLICT", "The round is no longer cancelled");
         }
+        String targetSource = explicitTarget ? "EXPLICIT"
+                : recorded == null ? "LEGACY_DEFAULT" : "RECORDED";
         audit.record(subject(actor), null, "THESIS_ROUND_RESTORED", "THESIS_ROUND", id.toString(),
                 "Round restored CANCELLED -> " + target.name(),
                 Map.of("status", "CANCELLED",
-                        "cancelled_from_status", row.get("cancelled_from_status") == null
-                                ? "" : String.valueOf(row.get("cancelled_from_status"))),
-                Map.of("status", target.name()));
+                        "cancelled_from_status", recorded == null ? "" : recorded),
+                Map.of("status", target.name(), "target_source", targetSource));
         return roundReads.get(id);
     }
 
-    private RoundStatus resolveRestoreTarget(String recorded, String requested) {
-        String name = requested != null && !requested.isBlank() ? requested.trim() : recorded;
-        if (name == null || name.isBlank()) {
-            // Legacy cancellation: no prior status survived, so land on the
-            // status that fabricates nothing and re-uses the normal chain.
-            return RoundStatus.DRAFT;
-        }
-        try {
-            RoundStatus target = RoundStatus.valueOf(name);
-            if (target == RoundStatus.CANCELLED
-                    || target == RoundStatus.RESULTS_PUBLISHED
-                    || target == RoundStatus.CLOSED) {
-                throw invalid("targetStatus must be a live status: DRAFT, PROPOSAL_OPEN, "
-                        + "PROPOSALS_PUBLISHED, REGISTRATION_OPEN or REGISTRATION_CLOSED");
+    /**
+     * A restore may never skip the lifecycle. With a recorded marker the only
+     * legal targets are that marker itself and — the documented escape hatch —
+     * REGISTRATION_CLOSED when the marker is REGISTRATION_OPEN (the window may
+     * legitimately have closed while the round sat cancelled). Without a
+     * marker the round's own data is the only evidence: live groups prove
+     * registration ran, so no target earlier than REGISTRATION_OPEN is honest,
+     * while an empty legacy round may return to any live status and defaults
+     * to DRAFT.
+     */
+    private RoundStatus resolveRestoreTarget(String recorded, String requested, boolean hasLiveGroups) {
+        RoundStatus marker = recorded == null || recorded.isBlank() ? null : parseRestoreTarget(recorded);
+        if (requested == null || requested.isBlank()) {
+            if (marker != null) {
+                return marker;
             }
-            return target;
-        } catch (IllegalArgumentException exception) {
-            throw invalid("targetStatus must be a valid round status");
+            if (!hasLiveGroups) {
+                return RoundStatus.DRAFT;
+            }
+            throw conflict("ROUND_RESTORE_TARGET_REQUIRED",
+                    "This round was cancelled before its previous status was recorded and it still has "
+                            + "groups; choose an explicit targetStatus (REGISTRATION_OPEN or REGISTRATION_CLOSED)");
         }
+        RoundStatus requestedStatus = parseRestoreTarget(requested);
+        if (marker != null) {
+            boolean allowed = requestedStatus == marker
+                    || (marker == RoundStatus.REGISTRATION_OPEN
+                            && requestedStatus == RoundStatus.REGISTRATION_CLOSED);
+            if (!allowed) {
+                throw conflict("ROUND_RESTORE_TARGET_INVALID",
+                        "targetStatus must be " + marker + (marker == RoundStatus.REGISTRATION_OPEN
+                                ? " or REGISTRATION_CLOSED" : ""));
+            }
+            return requestedStatus;
+        }
+        int floor = hasLiveGroups ? RESTORE_TARGET_ORDER.indexOf(RoundStatus.REGISTRATION_OPEN) : 0;
+        if (RESTORE_TARGET_ORDER.indexOf(requestedStatus) < floor) {
+            throw conflict("ROUND_RESTORE_TARGET_INVALID",
+                    "This round still has groups, so its target cannot be earlier than REGISTRATION_OPEN");
+        }
+        return requestedStatus;
+    }
+
+    private static RoundStatus parseRestoreTarget(String name) {
+        try {
+            RoundStatus status = RoundStatus.valueOf(name.trim());
+            if (RESTORE_TARGET_ORDER.contains(status)) {
+                return status;
+            }
+        } catch (IllegalArgumentException ignored) {
+        }
+        throw invalid("targetStatus must be a live status: DRAFT, PROPOSAL_OPEN, "
+                + "PROPOSALS_PUBLISHED, REGISTRATION_OPEN or REGISTRATION_CLOSED");
     }
 
     /**
@@ -1549,9 +1614,11 @@ public class ThesisMutationService {
 
     /**
      * Locks the round row and rejects any write once the round is historical.
-     * A round can never leave CANCELLED, RESULTS_PUBLISHED or CLOSED, so the
-     * FOR UPDATE read both fences a concurrent cancel/publish transition and
-     * freezes every topic/group mutation behind it.
+     * RESULTS_PUBLISHED and CLOSED are terminal, and the only way out of
+     * CANCELLED is {@link #restoreRound}, which takes this same row lock
+     * first — so the FOR UPDATE read still fences a concurrent
+     * cancel/restore/publish transition and freezes every topic/group
+     * mutation behind it.
      */
     private void requireMutableRound(UUID roundId) {
         Map<String, Object> round = one(

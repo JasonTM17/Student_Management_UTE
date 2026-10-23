@@ -12,13 +12,16 @@ import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.mockito.Mockito;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.TestPropertySource;
+import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.request.RequestPostProcessor;
 
@@ -46,6 +49,9 @@ class ThesisRoundRestoreTest {
 
     @Autowired
     private MockMvc mvc;
+
+    @MockitoSpyBean
+    private NamedParameterJdbcTemplate jdbcSpy;
 
     @BeforeEach
     void cleanDatabase() {
@@ -90,6 +96,7 @@ class ThesisRoundRestoreTest {
 
         List<String> actions = auditActions(roundId);
         assertThat(actions).contains("THESIS_ROUND_CANCELLED", "THESIS_ROUND_RESTORED");
+        assertThat(auditAfterState(roundId)).contains("target_source=RECORDED");
 
         // A restored round is live again: it can be cancelled a second time,
         // and that cancel records the same previous status.
@@ -122,10 +129,10 @@ class ThesisRoundRestoreTest {
     }
 
     @Test
-    void aLegacyCancelledRowRestoresToDraft() throws Exception {
-        // Rows cancelled before the marker column existed carry NULL; they
-        // restore to DRAFT so the admin re-advances the round deliberately
-        // instead of guessing a status nobody recorded.
+    void aLegacyCancelledRowWithoutGroupsRestoresToDraft() throws Exception {
+        // Rows cancelled before the marker column existed carry NULL; with no
+        // live groups nothing proves the round ever opened, so DRAFT is the
+        // only target that fabricates no progress.
         UUID roundId = insertRound("rr-round-legacy", "DRAFT");
         jdbc.update("UPDATE thesis.thesis_registration_round SET status = 'CANCELLED', "
                 + "cancelled_from_status = NULL, version = version + 1 WHERE id = ?", roundId);
@@ -133,10 +140,42 @@ class ThesisRoundRestoreTest {
         mvc.perform(post("/api/v1/thesis/rounds/{id}/restore", roundId).with(truongKhoaJwt()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.status").value("DRAFT"));
+        assertThat(auditAfterState(roundId)).contains("target_source=LEGACY_DEFAULT");
     }
 
     @Test
-    void anExplicitLiveTargetOverridesTheRecordedStatus() throws Exception {
+    void aLegacyCancelledRowWithLiveGroupsRequiresAnExplicitTarget() throws Exception {
+        UUID roundId = insertRound("rr-round-legacy-groups", "DRAFT");
+        insertGroupWithMember(roundId, "rr-legacy-student", "APPROVED");
+        jdbc.update("UPDATE thesis.thesis_registration_round SET status = 'CANCELLED', "
+                + "cancelled_from_status = NULL, version = version + 1 WHERE id = ?", roundId);
+
+        // The live groups prove registration ran, so restoring straight to
+        // DRAFT would silently re-hold seats the admin never chose to revive.
+        mvc.perform(post("/api/v1/thesis/rounds/{id}/restore", roundId).with(truongKhoaJwt()))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("ROUND_RESTORE_TARGET_REQUIRED"));
+
+        // Evidence floor: groups exist, so the round was at least
+        // REGISTRATION_OPEN — nothing earlier is an honest target.
+        mvc.perform(post("/api/v1/thesis/rounds/{id}/restore", roundId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"targetStatus\":\"DRAFT\"}")
+                        .with(truongKhoaJwt()))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("ROUND_RESTORE_TARGET_INVALID"));
+
+        mvc.perform(post("/api/v1/thesis/rounds/{id}/restore", roundId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"targetStatus\":\"REGISTRATION_CLOSED\"}")
+                        .with(truongKhoaJwt()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("REGISTRATION_CLOSED"));
+        assertThat(auditAfterState(roundId)).contains("target_source=EXPLICIT");
+    }
+
+    @Test
+    void anExplicitTargetMayOnlyReplayOrAdvancePastAnOpenRegistration() throws Exception {
         UUID roundId = insertRound("rr-round-target", "REGISTRATION_OPEN");
         mvc.perform(post("/api/v1/thesis/rounds/{id}/cancel", roundId).with(truongKhoaJwt()))
                 .andExpect(status().isOk());
@@ -148,12 +187,111 @@ class ThesisRoundRestoreTest {
                         .with(truongKhoaJwt()))
                 .andExpect(status().isBadRequest());
 
+        // A backward target would roll the status over later-phase data.
         mvc.perform(post("/api/v1/thesis/rounds/{id}/restore", roundId)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"targetStatus\":\"DRAFT\"}")
                         .with(truongKhoaJwt()))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("ROUND_RESTORE_TARGET_INVALID"));
+
+        // The one override: REGISTRATION_OPEN whose window may have passed can
+        // land directly on REGISTRATION_CLOSED.
+        mvc.perform(post("/api/v1/thesis/rounds/{id}/restore", roundId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"targetStatus\":\"REGISTRATION_CLOSED\"}")
+                        .with(truongKhoaJwt()))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.status").value("DRAFT"));
+                .andExpect(jsonPath("$.status").value("REGISTRATION_CLOSED"));
+        assertThat(auditAfterState(roundId)).contains("target_source=EXPLICIT");
+    }
+
+    @Test
+    void aTargetEarlierOrLaterThanTheRecordedMarkerIsRejected() throws Exception {
+        UUID roundId = insertRound("rr-round-skip", "REGISTRATION_CLOSED");
+        mvc.perform(post("/api/v1/thesis/rounds/{id}/cancel", roundId).with(truongKhoaJwt()))
+                .andExpect(status().isOk());
+
+        // Backward over registration data.
+        mvc.perform(post("/api/v1/thesis/rounds/{id}/restore", roundId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"targetStatus\":\"PROPOSAL_OPEN\"}")
+                        .with(truongKhoaJwt()))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("ROUND_RESTORE_TARGET_INVALID"));
+
+        // Skip-ahead: a closed-registration round cannot return to
+        // RESULTS-adjacent ground it never reached (and terminal targets are
+        // rejected outright as 400).
+        mvc.perform(post("/api/v1/thesis/rounds/{id}/restore", roundId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"targetStatus\":\"REGISTRATION_OPEN\"}")
+                        .with(truongKhoaJwt()))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("ROUND_RESTORE_TARGET_INVALID"));
+
+        mvc.perform(post("/api/v1/thesis/rounds/{id}/restore", roundId).with(truongKhoaJwt()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("REGISTRATION_CLOSED"));
+    }
+
+    @Test
+    void anOpenRegistrationCancelledAfterItsWindowClosedRestoresAsClosed() throws Exception {
+        Instant now = Instant.now();
+        UUID roundId = insertRound("rr-round-expired", "REGISTRATION_OPEN",
+                Timestamp.from(now.minusSeconds(14_400)), Timestamp.from(now.minusSeconds(3_600)));
+        mvc.perform(post("/api/v1/thesis/rounds/{id}/cancel", roundId).with(truongKhoaJwt()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.cancelledFromStatus").value("REGISTRATION_OPEN"));
+
+        // The recorded target is unreachable: the window it would reopen is
+        // already gone (and a cancelled round rejects schedule edits).
+        mvc.perform(post("/api/v1/thesis/rounds/{id}/restore", roundId).with(truongKhoaJwt()))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("REGISTRATION_WINDOW_CLOSED"));
+
+        mvc.perform(post("/api/v1/thesis/rounds/{id}/restore", roundId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"targetStatus\":\"REGISTRATION_CLOSED\"}")
+                        .with(truongKhoaJwt()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("REGISTRATION_CLOSED"));
+    }
+
+    @Test
+    void restoreLocksMemberStudentRowsBeforeCountingSeatConflicts() throws Exception {
+        // The race this pins: a concurrent createGroup holds the Student row
+        // while it reads this round's still-CANCELLED status. Restore must take
+        // the same Student lock first so that registration either commits (and
+        // is counted) or waits until the flip makes the round live again.
+        UUID roundId = insertRound("rr-round-lockorder", "REGISTRATION_CLOSED");
+        ensureStudent("rr-lockorder-student");
+        insertGroupWithMember(roundId, "rr-lockorder-student", "PENDING");
+        mvc.perform(post("/api/v1/thesis/rounds/{id}/cancel", roundId).with(truongKhoaJwt()))
+                .andExpect(status().isOk());
+        Mockito.clearInvocations(jdbcSpy);
+
+        mvc.perform(post("/api/v1/thesis/rounds/{id}/restore", roundId).with(truongKhoaJwt()))
+                .andExpect(status().isOk());
+
+        List<String> statements = Mockito.mockingDetails(jdbcSpy).getInvocations().stream()
+                .map(invocation -> invocation.getArguments())
+                .filter(arguments -> arguments.length > 0 && arguments[0] instanceof String)
+                .map(arguments -> (String) arguments[0])
+                .toList();
+        int studentLock = indexWhere(statements,
+                sql -> sql.contains("campuscore_auth.\"Student\"") && sql.contains("FOR UPDATE"));
+        int seatCount = indexWhere(statements,
+                sql -> sql.contains("JOIN thesis.thesis_group_member other"));
+        assertThat(studentLock)
+                .as("the member Student-row lock must be issued inside restore")
+                .isGreaterThanOrEqualTo(0);
+        assertThat(seatCount)
+                .as("the cross-round seat-conflict count must run inside restore")
+                .isGreaterThanOrEqualTo(0);
+        assertThat(studentLock)
+                .as("the Student-row lock must be acquired before the seat-conflict count")
+                .isLessThan(seatCount);
     }
 
     @Test
@@ -258,18 +396,55 @@ class ThesisRoundRestoreTest {
                 String.class, entityId.toString());
     }
 
+    private String auditAfterState(UUID entityId) {
+        return jdbc.queryForObject(
+                "SELECT \"afterState\" FROM campuscore_audit.\"AdminAudit\" "
+                        + "WHERE \"entityId\" = ? AND \"action\" = 'THESIS_ROUND_RESTORED' "
+                        + "ORDER BY \"createdAt\" DESC LIMIT 1",
+                String.class, entityId.toString());
+    }
+
+    private static int indexWhere(List<String> values, java.util.function.Predicate<String> predicate) {
+        for (int index = 0; index < values.size(); index++) {
+            if (predicate.test(values.get(index))) {
+                return index;
+            }
+        }
+        return -1;
+    }
+
+    private UUID insertGroupWithMember(UUID roundId, String studentId, String groupStatus) {
+        ensureStudent(studentId);
+        UUID groupId = UUID.randomUUID();
+        jdbc.update("INSERT INTO thesis.thesis_group (id, round_id, leader_student_id, status, approval_status) "
+                        + "VALUES (?, ?, ?, ?, 'PENDING')",
+                groupId, roundId, studentId, groupStatus);
+        jdbc.update("INSERT INTO thesis.thesis_group_member (id, group_id, round_id, student_id, member_order, is_leader) "
+                        + "VALUES (?, ?, ?, ?, 1, TRUE)",
+                UUID.randomUUID(), groupId, roundId, studentId);
+        return groupId;
+    }
+
     private UUID insertRound(String name, String status) {
-        UUID roundId = UUID.randomUUID();
         Instant now = Instant.now();
+        return insertRound(name, status,
+                Timestamp.from(now.minusSeconds(7_200)), Timestamp.from(now.plusSeconds(86_400)));
+    }
+
+    private UUID insertRound(String name, String status, Timestamp registrationStart, Timestamp registrationEnd) {
+        UUID roundId = UUID.randomUUID();
+        // Schedule-order constraint: lecturer_submit_end <= registration_start
+        // and registration_end <= gvpb_deadline, so every bound derives from
+        // the caller's window instead of a second Instant.now().
         jdbc.update(
                 "INSERT INTO thesis.thesis_registration_round "
                         + "(id, name, thesis_type, lecturer_submit_start, lecturer_submit_end, "
                         + "registration_start, registration_end, gvpb_deadline, status) "
                         + "VALUES (?, ?, 'KLTN', ?, ?, ?, ?, ?, ?)",
                 roundId, name,
-                Timestamp.from(now.minusSeconds(14_400)), Timestamp.from(now.minusSeconds(7_200)),
-                Timestamp.from(now.minusSeconds(7_200)), Timestamp.from(now.plusSeconds(86_400)),
-                Timestamp.from(now.plusSeconds(172_800)),
+                Timestamp.from(registrationStart.toInstant().minusSeconds(7_200)), registrationStart,
+                registrationStart, registrationEnd,
+                Timestamp.from(registrationEnd.toInstant().plusSeconds(86_400)),
                 status);
         return roundId;
     }
