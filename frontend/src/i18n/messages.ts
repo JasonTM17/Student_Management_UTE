@@ -257,6 +257,8 @@ export const en = {
         RETRACT_ADMIN_REQUIRED: 'Only an administrator can retract published results.',
         RETRACT_WINDOW_CLOSED: 'The retraction grace period has passed.',
         REVIEW_WINDOW_OPEN: 'The counter-review window is still open for some topics.',
+        SECTION_STATUS_CHANGED:
+          'This section changed while the edit was open. Review the latest version and try again.',
         STUDENT_NOT_IN_GROUP: 'The student is not a member of this group.',
         TOPIC_ALREADY_SCORED:
           'A topic with submitted defense scores cannot leave its council.',
@@ -3315,6 +3317,8 @@ export const vi: I18nMessages = {
         RETRACT_ADMIN_REQUIRED: 'Chỉ quản trị viên mới có thể thu hồi kết quả đã công bố.',
         RETRACT_WINDOW_CLOSED: 'Đã hết thời hạn thu hồi kết quả.',
         REVIEW_WINDOW_OPEN: 'Cửa sổ phản biện vẫn đang mở cho một số đề tài.',
+        SECTION_STATUS_CHANGED:
+          'Lớp học phần đã thay đổi trong lúc chỉnh sửa. Hãy xem lại phiên bản mới nhất rồi thử lại.',
         STUDENT_NOT_IN_GROUP: 'Sinh viên không thuộc nhóm này.',
         TOPIC_ALREADY_SCORED:
           'Đề tài đã có điểm bảo vệ nên không thể rời hội đồng.',
