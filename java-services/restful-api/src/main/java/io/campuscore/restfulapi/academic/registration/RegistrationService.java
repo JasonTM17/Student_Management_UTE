@@ -1038,12 +1038,14 @@ public class RegistrationService {
             "F", 0, "D", 1, "D+", 2, "C", 3, "C+", 4, "B", 5, "B+", 6, "A", 7, "A+", 8);
 
     private boolean hasCompleted(String studentId, String courseId, String minLetter) {
+        // Same predicate as the transcript read: a COMPLETED enrollment whose
+        // grade is published (or under appeal) is completed history, and stays
+        // completed even if its section was later cancelled.
         List<String> letters = jdbc.queryForList(
                 "SELECT enrollment.\"letterGrade\" FROM " + ENROLLMENT + " enrollment"
-                        + " JOIN " + SECTION + " section ON section.\"id\" = enrollment.\"sectionId\""
                         + " WHERE enrollment.\"studentId\" = :studentId AND enrollment.\"courseId\" = :courseId"
-                        + " AND enrollment.\"gradeStatus\" IN ('COMPLETED', 'PUBLISHED')"
-                        + " AND section.\"status\" <> 'CANCELLED'"
+                        + " AND enrollment.\"status\" = 'COMPLETED'"
+                        + " AND enrollment.\"gradeStatus\" IN ('PUBLISHED', 'APPEALED')"
                         // A passing letter is required: a graded row without a
                         // letter (a producer bug) must never silently unlock a
                         // prerequisite, matching the knowledge-base copy.
