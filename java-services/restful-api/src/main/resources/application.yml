@@ -220,12 +220,7 @@ spring:
       connection-timeout: ${DB_CONNECTION_TIMEOUT_MS:15000}
       validation-timeout: ${DB_VALIDATION_TIMEOUT_MS:3000}
       idle-timeout: ${DB_POOL_IDLE_TIMEOUT_MS:300000}
-      # Keepalive probes idle pooled connections every 2 min. Without it, a
-      # connection held up to idle-timeout can be silently dropped by the
-      # hosted Postgres front-end and Hikari only notices the dead socket on
-      # borrow — a stall this tuning was meant to remove. Must stay below
-      # idle-timeout so the probe runs before the connection retires.
-      keepalive-time: ${DB_POOL_KEEPALIVE_MS:120000}
+      keepalive-time: ${DB_POOL_KEEPALIVE_MS:0}
   jpa:
     hibernate:
       # Flyway owns two identifier families: snake_case (thesis, academic) and quoted
