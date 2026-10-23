@@ -152,6 +152,18 @@ function loadResolver(relativePath, exportSnippet) {
   return moduleRef.exports.__resolve;
 }
 
+test('shared link corpus classifies identically through safe-path', () => {
+  const corpus = JSON.parse(
+    read('../java-services/restful-api/src/test/resources/notification/link-corpus.json'),
+  );
+  for (const value of corpus.safe) {
+    assert.equal(safePath.isSafeInternalPath(value), true, JSON.stringify(value));
+  }
+  for (const { value, why } of corpus.unsafe) {
+    assert.equal(safePath.isSafeInternalPath(value), false, `${JSON.stringify(value)} (${why})`);
+  }
+});
+
 test('notification targets ignore unsafe authored links and keep the type fallback', () => {
   const resolvers = [
     loadResolver(
