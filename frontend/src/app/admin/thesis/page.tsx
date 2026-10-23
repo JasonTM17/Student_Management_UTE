@@ -460,13 +460,10 @@ export default function AdminThesisPage() {
       ].join(' ');
     }
     // A publication where every approved group is excluded needs the explicit
-    // server-side flag — the copy states the consequence before confirming.
+    // server-side flag — gated behind its own confirmation below.
     const allExcluded = publishPreview != null
       && publishPreview.approvedGroupCount > 0
       && publishPreview.includedGroupCount === 0;
-    if (allExcluded) {
-      message = [message, messages.thesis.admin.publishAllExcluded].join(' ');
-    }
     if (closePreview) {
       const adminCopy = messages.thesis.admin;
       message = [
@@ -489,6 +486,19 @@ export default function AdminThesisPage() {
       warning,
     });
     if (!confirmed) return;
+    // The server-side flag only goes out when the user explicitly confirms the
+    // all-excluded consequence — never inferred silently from preview data.
+    let confirmAllExcluded: boolean | undefined;
+    if (allExcluded) {
+      confirmAllExcluded = await confirm({
+        title: messages.thesis.admin.transitionConfirmTitle,
+        message: messages.thesis.admin.publishAllExcluded,
+        confirmText: messages.common.actions.confirm,
+        cancelText: messages.common.actions.cancel,
+        variant: 'destructive',
+      });
+      if (!confirmAllExcluded) return;
+    }
     setIsSaving(true);
     setError('');
     setSuccess('');
@@ -506,7 +516,7 @@ export default function AdminThesisPage() {
         await thesisApi.publishProposals(roundId);
         setSuccess(messages.thesis.admin.proposalsPublished);
       } else {
-        await thesisApi.publishResults(roundId, allExcluded ? true : undefined);
+        await thesisApi.publishResults(roundId, confirmAllExcluded);
         setSuccess(messages.thesis.admin.resultsPublished);
       }
       await loadData();
