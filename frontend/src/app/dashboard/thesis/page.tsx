@@ -483,16 +483,22 @@ export default function ThesisPage() {
     [canLoadStaffRelations, myLecturerId, topics],
   );
 
+  // Topics whose reviewer score was already requested. topics refreshes mint a
+  // new array on every mutation, so without this each refresh re-fired the
+  // whole parallel fan-out — duplicate reads on the shared per-user thesis
+  // rate limit that lose the reviewer's saved scores to swallowed 429s.
+  const requestedReviewerScoresRef = useRef(new Set<string>());
+
   // Load the reviewer's own stored score for each assigned topic.
-  useEffect(() => {
-    if (myReviewTopics.length === 0) return;
-    let cancelled = false;
-    void (async () => {
-      await Promise.all(
-        myReviewTopics.map(async (t) => {
+  const loadMyReviewerScores = useCallback(async (reviewTopics: ThesisTopic[]) => {
+    const requested = requestedReviewerScoresRef.current;
+    await Promise.all(
+      reviewTopics
+        .filter((t) => !requested.has(t.id))
+        .map(async (t) => {
+          requested.add(t.id);
           try {
             const row = await thesisApi.reviewerScore(t.id);
-            if (cancelled) return;
             setGvpbScores((prev) => ({ ...prev, [t.id]: row }));
             if (row) {
               setGvpbDraftScores((prev) => ({ ...prev, [t.id]: String(row.score) }));
@@ -502,15 +508,17 @@ export default function ThesisPage() {
             }
           } catch {
             // A read failure leaves the form usable; the submit stays the
-            // authoritative path.
+            // authoritative path. Drop the mark so the next refresh retries.
+            requested.delete(t.id);
           }
         }),
-      );
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [myReviewTopics]);
+    );
+  }, []);
+
+  useEffect(() => {
+    if (myReviewTopics.length === 0) return;
+    void loadMyReviewerScores(myReviewTopics);
+  }, [myReviewTopics, loadMyReviewerScores]);
 
   const handleSubmitReviewerScore = async (topicId: string) => {
     const scoreVal = parseFloat(gvpbDraftScores[topicId] || '');
