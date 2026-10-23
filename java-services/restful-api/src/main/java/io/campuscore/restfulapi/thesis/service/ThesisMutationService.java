@@ -966,6 +966,14 @@ public class ThesisMutationService {
      * requires the explicit size-exception flag and records it on the group —
      * the V113 legacy exception cannot serve because its trigger freezes the
      * whole group.
+     *
+     * <p>Action REMOVE drops a member under the same guards — the departed or
+     * deactivated student case. The member row is deleted, which frees the
+     * (round_id, student_id) seat: the student can immediately join another
+     * group in this round (the unique index only covers live rows) and in any
+     * later round. Removing the leader requires {@code successorStudentId}
+     * naming a remaining member so the one-leader invariant holds; emptying
+     * the group is refused — dissolving it stays on the existing cancel path.
      */
     @Transactional
     public GroupResponse overrideGroupRoster(UUID groupId, RosterOverrideRequest request, Jwt actor) {
@@ -973,6 +981,11 @@ public class ThesisMutationService {
         String cleanReason = requireReason(request == null ? null : request.reason());
         requireText(request == null ? null : request.studentId(), "studentId", 120);
         String studentId = request.studentId().trim();
+        String action = request.action() == null || request.action().isBlank()
+                ? "ADD" : request.action().trim().toUpperCase(java.util.Locale.ROOT);
+        if (!"ADD".equals(action) && !"REMOVE".equals(action)) {
+            throw invalid("action must be ADD or REMOVE");
+        }
         // Lock order matches the rest of the roster paths: round -> group ->
         // student row. The group's round id is read unlocked first; the locks
         // below take it in the shared order.
@@ -988,6 +1001,9 @@ public class ThesisMutationService {
         if (topicScores != null && topicScores > 0) {
             throw conflict("GROUP_SCORES_EXIST",
                     "The roster cannot change once scoring has started for the group's topic");
+        }
+        if ("REMOVE".equals(action)) {
+            return removeOverriddenMember(group, request, actor, studentId, cleanReason);
         }
         int memberCount = count("SELECT COUNT(*) FROM thesis.thesis_group_member WHERE group_id = :groupId",
                 "groupId", groupId);
@@ -1031,6 +1047,81 @@ public class ThesisMutationService {
             }
         });
         return groups.findById(groupId);
+    }
+
+    /**
+     * The REMOVE branch of the roster override. Shares the entry method's
+     * governance role, reason, REGISTRATION_CLOSED round state, dean scope and
+     * no-scores guards; the member row is already inside the round -> group ->
+     * student lock order because the FOR UPDATE read happens after the group
+     * lock.
+     */
+    private GroupResponse removeOverriddenMember(GroupRow group, RosterOverrideRequest request,
+            Jwt actor, String studentId, String cleanReason) {
+        requireActiveRoster(group);
+        Map<String, Object> member = one(
+                "SELECT id, is_leader FROM thesis.thesis_group_member "
+                        + "WHERE group_id = :groupId AND student_id = :studentId FOR UPDATE",
+                params().addValue("groupId", group.id()).addValue("studentId", studentId),
+                "STUDENT_NOT_IN_GROUP", "The student is not a member of this group");
+        int memberCount = count("SELECT COUNT(*) FROM thesis.thesis_group_member WHERE group_id = :groupId",
+                "groupId", group.id());
+        int remaining = memberCount - 1;
+        if (remaining == 0) {
+            throw conflict("GROUP_EMPTY",
+                    "The group cannot be left with no members; cancel the group instead");
+        }
+        String successorId = null;
+        if (Boolean.TRUE.equals(member.get("is_leader"))) {
+            successorId = request.successorStudentId() == null ? null : request.successorStudentId().trim();
+            if (successorId == null || successorId.isEmpty() || successorId.equals(studentId)) {
+                throw conflict("LEADER_SUCCESSOR_REQUIRED",
+                        "Removing the leader requires successorStudentId naming a remaining member");
+            }
+            one("SELECT id FROM thesis.thesis_group_member "
+                            + "WHERE group_id = :groupId AND student_id = :studentId FOR UPDATE",
+                    params().addValue("groupId", group.id()).addValue("studentId", successorId),
+                    "STUDENT_NOT_IN_GROUP", "The successor is not a member of this group");
+        }
+        boolean underSize = remaining < MIN_GROUP_MEMBERS;
+        if (underSize && !Boolean.TRUE.equals(request.allowSizeException())) {
+            throw conflict("GROUP_SIZE_EXCEPTION_REQUIRED",
+                    "The roster stays below the minimum of " + MIN_GROUP_MEMBERS
+                            + "; pass allowSizeException to accept a documented exception");
+        }
+        jdbc.update("DELETE FROM thesis.thesis_group_member WHERE group_id = :groupId AND student_id = :studentId",
+                params().addValue("groupId", group.id()).addValue("studentId", studentId));
+        if (successorId != null) {
+            jdbc.update("UPDATE thesis.thesis_group_member SET is_leader = TRUE "
+                            + "WHERE group_id = :groupId AND student_id = :studentId",
+                    params().addValue("groupId", group.id()).addValue("studentId", successorId));
+            jdbc.update("UPDATE thesis.thesis_group SET leader_student_id = :successor WHERE id = :groupId",
+                    params().addValue("groupId", group.id()).addValue("successor", successorId));
+        }
+        // The deferred membership validator accepts a 1-2 member approved
+        // roster only while size_exception_reason is set; a non-approved group
+        // has no minimum, so the marker is written for approved groups only.
+        if (underSize && group.approvalStatus() == ApprovalStatus.APPROVED) {
+            jdbc.update(
+                    "UPDATE thesis.thesis_group SET size_exception_reason = :reason, size_exception_by = :by, "
+                            + "size_exception_at = CURRENT_TIMESTAMP WHERE id = :groupId",
+                    params().addValue("groupId", group.id()).addValue("reason", cleanReason)
+                            .addValue("by", subject(actor)));
+        }
+        jdbc.update("UPDATE thesis.thesis_group SET updated_at = CURRENT_TIMESTAMP, version = version + 1 WHERE id = :groupId",
+                params().addValue("groupId", group.id()));
+        audit.record(subject(actor), null, "THESIS_GROUP_ROSTER_OVERRIDE", "THESIS_GROUP", group.id().toString(),
+                "Member " + studentId + " removed after registration closed; reason: " + cleanReason
+                        + (successorId != null ? "; leadership passed to " + successorId : "")
+                        + (underSize ? "; below-minimum size exception accepted" : ""),
+                Map.of("memberCount", memberCount),
+                Map.of("memberCount", remaining, "sizeException", underSize));
+        afterCommit(() -> {
+            if (notifier != null) {
+                notifier.notifyGroupMemberRemoved(group.id(), studentId);
+            }
+        });
+        return groups.findById(group.id());
     }
 
     /**
