@@ -23,6 +23,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.oauth2.jwt.Jwt;
@@ -1345,6 +1346,62 @@ class ThesisCouncilEscapeHatchTest {
                 "SELECT status FROM thesis.thesis_registration_round WHERE id = ?",
                 String.class, broken)).isEqualTo("REGISTRATION_CLOSED");
         assertThat(auditCount(broken.toString(), "THESIS_RESULTS_RETRACT_NOTIFY_FAILED")).isEqualTo(1);
+    }
+
+    /**
+     * A topic whose department resolves to no faculty cannot be scoped to any
+     * dean — even the dean who supervises it used to read TOPIC_NOT_FOUND for
+     * a row that plainly exists, pointing operators at the wrong repair. The
+     * refusal is explicit now; a derivable-but-foreign topic still conceals
+     * as not-found, and a global admin can still act on the row.
+     */
+    @Test
+    void anUnresolvableTopicReportsScopeFailureInsteadOfNotFound() {
+        Instant now = Instant.now();
+        UUID roundId = insertRound("Esc Unscoped Round", "REGISTRATION_CLOSED",
+                now.plusSeconds(5 * 86_400), now.plusSeconds(10 * 86_400));
+        UUID ghostTopic = UUID.randomUUID();
+        jdbc.update("INSERT INTO thesis.thesis_topic "
+                        + "(id, round_id, department_id, title, description, max_groups, status, created_by) "
+                        + "VALUES (?, ?, 'esc-department-ghost', ?, 'Escape fixture topic', 2, 'PUBLISHED', 'esc-admin')",
+                ghostTopic, roundId, "Esc Ghost-Department Topic");
+        jdbc.update("INSERT INTO thesis.thesis_topic_supervisor (id, topic_id, lecturer_id, supervisor_order)"
+                        + " VALUES (?, ?, ?, 1)",
+                UUID.randomUUID(), ghostTopic, "esc-ghdean");
+        Jwt homeDean = facultyDean("esc-ghdean");
+
+        assertThatThrownBy(() -> mutations.withdrawTopic(ghostTopic,
+                "department no longer resolves", homeDean))
+                .isInstanceOf(DomainException.class)
+                .satisfies(failure -> {
+                    DomainException denied = (DomainException) failure;
+                    assertThat(denied.code()).isEqualTo("TOPIC_SCOPE_UNRESOLVABLE");
+                    assertThat(denied.getStatus()).isEqualTo(HttpStatus.CONFLICT);
+                });
+        assertThat(jdbc.queryForObject(
+                "SELECT result_status FROM thesis.thesis_topic WHERE id = ?",
+                String.class, ghostTopic)).isNull();
+
+        // A derivable-but-foreign topic still conceals as not-found.
+        jdbc.update("INSERT INTO academic.\"Faculty\" (\"id\",\"name\",\"isActive\") "
+                + "VALUES ('esc-faculty-x','Other faculty',TRUE)");
+        jdbc.update("INSERT INTO academic.\"Department\" (\"id\",\"name\",\"nameEn\",\"nameVi\",\"code\",\"facultyId\",\"isActive\") "
+                + "VALUES ('esc-department-x','X','X','X','XX','esc-faculty-x',TRUE)");
+        UUID foreignTopic = UUID.randomUUID();
+        jdbc.update("INSERT INTO thesis.thesis_topic "
+                        + "(id, round_id, department_id, title, description, max_groups, status, created_by) "
+                        + "VALUES (?, ?, 'esc-department-x', ?, 'Escape fixture topic', 2, 'PUBLISHED', 'esc-admin')",
+                foreignTopic, roundId, "Esc Foreign Topic");
+        assertThatThrownBy(() -> mutations.withdrawTopic(foreignTopic, "scope check", homeDean))
+                .isInstanceOf(DomainException.class)
+                .satisfies(failure -> assertThat(((DomainException) failure).code())
+                        .isEqualTo("TOPIC_NOT_FOUND"));
+
+        // A global admin still withdraws the unresolvable row for repair.
+        mutations.withdrawTopic(ghostTopic, "department no longer resolves", admin());
+        assertThat(jdbc.queryForObject(
+                "SELECT result_status FROM thesis.thesis_topic WHERE id = ?",
+                String.class, ghostTopic)).isEqualTo("WITHDRAWN");
     }
 
     private UUID insertTopiclessGroup(UUID roundId, String tag, int memberCount) {

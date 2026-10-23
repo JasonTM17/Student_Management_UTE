@@ -192,6 +192,8 @@ export const en = {
           'The council roster is incomplete or the seat order does not match.',
         COUNCIL_STATE_CONFLICT: 'This council is not in a state that allows that action.',
         TOPIC_NOT_FOUND: 'Thesis topic not found.',
+        TOPIC_SCOPE_UNRESOLVABLE:
+          'This topic has no resolvable faculty; only a global admin can act on it.',
         TOPIC_NOT_PUBLISHED: 'Only published topics can be used for this action.',
         TOPIC_ROUND_MISMATCH: 'The topic belongs to a different round.',
         TOPIC_ALREADY_ASSIGNED: 'This topic is already assigned to a council.',
@@ -3252,6 +3254,8 @@ export const vi: I18nMessages = {
           'Danh sách hội đồng chưa đầy đủ hoặc thứ tự ghế không đúng.',
         COUNCIL_STATE_CONFLICT: 'Hội đồng hiện không ở trạng thái cho phép thao tác này.',
         TOPIC_NOT_FOUND: 'Không tìm thấy đề tài.',
+        TOPIC_SCOPE_UNRESOLVABLE:
+          'Đề tài này không xác định được khoa; chỉ quản trị viên toàn hệ thống mới được thao tác.',
         TOPIC_NOT_PUBLISHED: 'Chỉ đề tài đã công bố mới được dùng cho thao tác này.',
         TOPIC_ROUND_MISMATCH: 'Đề tài thuộc một đợt đăng ký khác.',
         TOPIC_ALREADY_ASSIGNED: 'Đề tài này đã được phân cho một hội đồng.',
