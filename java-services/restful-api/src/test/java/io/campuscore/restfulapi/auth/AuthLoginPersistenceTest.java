@@ -544,13 +544,7 @@ class AuthLoginPersistenceTest {
 
         // Age the rotation past the overlap window: a replay arriving later is
         // indistinguishable from theft and must keep the SEC-P1-1 contract.
-        // Session timestamps are stored as UTC wall-clock values, matching the
-        // repository's localDateTime()/instant() conversion helpers.
-        jdbc.update(
-                "UPDATE \"campuscore_auth\".\"Session\" SET \"rotatedAt\" = ? WHERE \"userId\" = 'student-user'",
-                java.sql.Timestamp.valueOf(
-                        java.time.LocalDateTime.ofInstant(
-                                Instant.now().minusSeconds(120), java.time.ZoneOffset.UTC)));
+        stampRotatedAt(Instant.now().minusSeconds(120));
 
         // Replaying the stale token: refused, and the family is revoked.
         mvc.perform(post("/api/v1/auth/refresh")
@@ -620,18 +614,177 @@ class AuthLoginPersistenceTest {
         org.junit.jupiter.api.Assertions.assertEquals(1, liveSessions,
                 "a same-cookie refresh race must not revoke the session family");
 
-        // A skipped-generation token is the theft shape: it was rotated out
-        // more than one generation ago, so replaying it still revokes the
-        // family even inside the overlap window.
+        // The token doc-a received is superseded: the recoveries rotated the
+        // row forward while keeping the previous-generation slot anchored to
+        // the first token, so the rotated token is now neither current nor
+        // previous. Replaying it is the delayed-duplicate ordering — a
+        // stolen-token shape that still revokes the family.
         mvc.perform(post("/api/v1/auth/refresh")
                         .contentType(MediaType.APPLICATION_JSON)
-                        .header("User-Agent", "skipped-generation")
+                        .header("User-Agent", "superseded-token")
                         .content("{\"refreshToken\":\"" + rotatedRefreshToken + "\"}"))
                 .andExpect(status().isUnauthorized());
         Integer remaining = jdbc.queryForObject(
                 "SELECT COUNT(*) FROM \"campuscore_auth\".\"Session\" WHERE \"userId\" = 'student-user'",
                 Integer.class);
         org.junit.jupiter.api.Assertions.assertEquals(0, remaining);
+    }
+
+    /**
+     * The overlap is measured from the anchored rotation instant: stamped
+     * exactly at window-1s a previous-generation replay recovers, and at
+     * window+1s the same replay is theft-shaped and revokes the family.
+     * Boundary stamps are written directly because "rotatedAt" — the value
+     * under test — is stored as UTC wall-clock like the other columns.
+     */
+    @Test
+    void overlapRecoveryHonoursTheAnchoredWindowBoundary() throws Exception {
+        MvcResult login = loginStudent().andReturn();
+        JsonNode loginBody = objectMapper.readTree(login.getResponse().getContentAsString());
+        String firstRefreshToken = loginBody.get("refreshToken").asText();
+        Cookie refreshCookie = login.getResponse().getCookie("cc_refresh_token");
+        Cookie csrfCookie = login.getResponse().getCookie("cc_csrf");
+
+        mvc.perform(post("/api/v1/auth/refresh")
+                        .cookie(refreshCookie, csrfCookie)
+                        .header("X-CSRF-Token", csrfCookie.getValue())
+                        .header("User-Agent", "doc-a"))
+                .andExpect(status().isOk());
+
+        // One second inside the window: the replay recovers.
+        Instant stamped = Instant.now().minusSeconds(29);
+        stampRotatedAt(stamped);
+        mvc.perform(post("/api/v1/auth/refresh")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .header("User-Agent", "doc-b")
+                        .content("{\"refreshToken\":\"" + firstRefreshToken + "\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.refreshToken", notNullValue()));
+
+        // The recovery rotated the row forward but did NOT re-stamp the
+        // anchor: "rotatedAt" still equals the stamped instant and
+        // "previousRefreshToken" still holds the first token's hash.
+        java.sql.Timestamp rowStamp = jdbc.queryForObject(
+                "SELECT \"rotatedAt\" FROM \"campuscore_auth\".\"Session\" WHERE \"userId\" = 'student-user'",
+                java.sql.Timestamp.class);
+        org.junit.jupiter.api.Assertions.assertTrue(
+                java.time.Duration.between(stamped, rowStamp.toLocalDateTime()
+                                .toInstant(ZoneOffset.UTC)).abs().getSeconds() < 2,
+                "recovery must not move the rotation anchor");
+        String previousHash = jdbc.queryForObject(
+                "SELECT \"previousRefreshToken\" FROM \"campuscore_auth\".\"Session\" WHERE \"userId\" = 'student-user'",
+                String.class);
+        org.junit.jupiter.api.Assertions.assertEquals(sha256(firstRefreshToken), previousHash);
+
+        // Replaying again once the anchor is one second past the window —
+        // the equivalent of a t=35s replay — is reuse and revokes the family.
+        stampRotatedAt(Instant.now().minusSeconds(31));
+        mvc.perform(post("/api/v1/auth/refresh")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .header("User-Agent", "doc-c")
+                        .content("{\"refreshToken\":\"" + firstRefreshToken + "\"}"))
+                .andExpect(status().isUnauthorized());
+        Integer liveSessions = jdbc.queryForObject(
+                "SELECT COUNT(*) FROM \"campuscore_auth\".\"Session\" WHERE \"userId\" = 'student-user'",
+                Integer.class);
+        org.junit.jupiter.api.Assertions.assertEquals(0, liveSessions);
+    }
+
+    /**
+     * "rotatedAt" is stamped by the application clock, so a value far in the
+     * future is corrupt or hostile state, not a raced rotation: beyond the
+     * small skew tolerance the replay falls through to reuse revocation.
+     */
+    @Test
+    void aFutureRotationStampBeyondTheSkewToleranceStillRevokes() throws Exception {
+        MvcResult login = loginStudent().andReturn();
+        JsonNode loginBody = objectMapper.readTree(login.getResponse().getContentAsString());
+        String firstRefreshToken = loginBody.get("refreshToken").asText();
+        Cookie refreshCookie = login.getResponse().getCookie("cc_refresh_token");
+        Cookie csrfCookie = login.getResponse().getCookie("cc_csrf");
+
+        mvc.perform(post("/api/v1/auth/refresh")
+                        .cookie(refreshCookie, csrfCookie)
+                        .header("X-CSRF-Token", csrfCookie.getValue()))
+                .andExpect(status().isOk());
+
+        stampRotatedAt(Instant.now().plusSeconds(5));
+        mvc.perform(post("/api/v1/auth/refresh")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"refreshToken\":\"" + firstRefreshToken + "\"}"))
+                .andExpect(status().isUnauthorized());
+        Integer liveSessions = jdbc.queryForObject(
+                "SELECT COUNT(*) FROM \"campuscore_auth\".\"Session\" WHERE \"userId\" = 'student-user'",
+                Integer.class);
+        org.junit.jupiter.api.Assertions.assertEquals(0, liveSessions);
+    }
+
+    /**
+     * A recovered rotation keeps the same stable Session.id, so logout's
+     * pin-by-id still deletes exactly that row afterwards.
+     */
+    @Test
+    void logoutAfterAnOverlapRecoveryDeletesTheSameSessionRow() throws Exception {
+        MvcResult login = loginStudent().andReturn();
+        JsonNode loginBody = objectMapper.readTree(login.getResponse().getContentAsString());
+        String firstRefreshToken = loginBody.get("refreshToken").asText();
+        Cookie refreshCookie = login.getResponse().getCookie("cc_refresh_token");
+        Cookie csrfCookie = login.getResponse().getCookie("cc_csrf");
+
+        mvc.perform(post("/api/v1/auth/refresh")
+                        .cookie(refreshCookie, csrfCookie)
+                        .header("X-CSRF-Token", csrfCookie.getValue()))
+                .andExpect(status().isOk());
+        String sessionId = jdbc.queryForObject(
+                "SELECT \"id\" FROM \"campuscore_auth\".\"Session\" WHERE \"userId\" = 'student-user'",
+                String.class);
+
+        MvcResult recovery = mvc.perform(post("/api/v1/auth/refresh")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"refreshToken\":\"" + firstRefreshToken + "\"}"))
+                .andExpect(status().isOk())
+                .andReturn();
+        JsonNode recovered = objectMapper.readTree(recovery.getResponse().getContentAsString());
+        String recoveredId = jdbc.queryForObject(
+                "SELECT \"id\" FROM \"campuscore_auth\".\"Session\" WHERE \"userId\" = 'student-user'",
+                String.class);
+        org.junit.jupiter.api.Assertions.assertEquals(sessionId, recoveredId);
+
+        mvc.perform(post("/api/v1/auth/logout")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .header("Authorization", "Bearer " + recovered.get("accessToken").asText())
+                        .content("{\"refreshToken\":\"" + recovered.get("refreshToken").asText() + "\"}"))
+                .andExpect(status().isOk());
+        Integer liveSessions = jdbc.queryForObject(
+                "SELECT COUNT(*) FROM \"campuscore_auth\".\"Session\" WHERE \"userId\" = 'student-user'",
+                Integer.class);
+        org.junit.jupiter.api.Assertions.assertEquals(0, liveSessions);
+    }
+
+    /**
+     * Recovery does not bypass the account gate: a suspended account's
+     * in-window replay is refused exactly like a current-token refresh would
+     * be — no rotation, no fresh pair.
+     */
+    @Test
+    void overlapRecoveryRejectsANonActiveAccount() throws Exception {
+        MvcResult login = loginStudent().andReturn();
+        JsonNode loginBody = objectMapper.readTree(login.getResponse().getContentAsString());
+        String firstRefreshToken = loginBody.get("refreshToken").asText();
+        Cookie refreshCookie = login.getResponse().getCookie("cc_refresh_token");
+        Cookie csrfCookie = login.getResponse().getCookie("cc_csrf");
+
+        mvc.perform(post("/api/v1/auth/refresh")
+                        .cookie(refreshCookie, csrfCookie)
+                        .header("X-CSRF-Token", csrfCookie.getValue()))
+                .andExpect(status().isOk());
+        jdbc.update("UPDATE \"campuscore_auth\".\"User\" SET \"status\" = 'SUSPENDED'"
+                + " WHERE \"id\" = 'student-user'");
+
+        mvc.perform(post("/api/v1/auth/refresh")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"refreshToken\":\"" + firstRefreshToken + "\"}"))
+                .andExpect(status().isUnauthorized());
     }
 
     @Test
@@ -1267,6 +1420,16 @@ class AuthLoginPersistenceTest {
                                 {"email":"expired@campuscore.edu","password":"password123"}
                                 """))
                 .andExpect(status().isUnauthorized());
+    }
+
+    /**
+     * Rewrites the session row's rotation anchor for the demo student. Stored
+     * as UTC wall-clock, matching the repository's timestamp convention.
+     */
+    private void stampRotatedAt(Instant instant) {
+        jdbc.update(
+                "UPDATE \"campuscore_auth\".\"Session\" SET \"rotatedAt\" = ? WHERE \"userId\" = 'student-user'",
+                localDateTime(instant));
     }
 
     private void insertSession(String sessionId, String userId, String ipAddress, Instant expiresAt) {

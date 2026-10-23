@@ -247,6 +247,68 @@ class CredentialSessionLockOrderPostgresIT {
         }
     }
 
+    /**
+     * Deterministic lost-response schedule: a rotation T0->T1 commits first;
+     * a second T0 refresh then queues on the User row lock — proving the
+     * overlap lookup still honours User-before-Session ordering — and on
+     * release recovers on the same stable Session.id instead of revoking the
+     * family. The superseded T1 (the delayed-duplicate victim) is then dead.
+     */
+    @Test
+    void queuedReplayOfThePreviousGenerationRecoversOnTheSameSessionRow() throws Exception {
+        Fixture f = fixture();
+        String refresh0 = auth.login(f.email(), f.before(), "127.0.0.1", "race-it").response().refreshToken();
+        String sessionId = jdbc.queryForObject(
+                "SELECT \"id\" FROM campuscore_auth.\"Session\" WHERE \"userId\"=?",
+                String.class, f.id());
+        String refresh1 = auth.refresh(refresh0, "127.0.0.1", "race-it").response().refreshToken();
+
+        var waiterAtUser = new CountDownLatch(1);
+        String waiterName = "replay-waiter-" + f.id();
+        doAnswer(invocation -> {
+            if (Thread.currentThread().getName().equals(waiterName)) waiterAtUser.countDown();
+            return invocation.callRealMethod();
+        }).when(users).lockUserRow(f.id());
+
+        var pool = Executors.newSingleThreadExecutor();
+        try (Connection holder = connection()) {
+            holder.setAutoCommit(false);
+            lockRow(holder, "User", "id", f.id());
+            Future<AuthLoginService.LoginResult> waiter;
+            try {
+                waiter = pool.submit(() -> {
+                    Thread.currentThread().setName(waiterName);
+                    return auth.refresh(refresh0, "127.0.0.1", "race-it");
+                });
+                await(waiterAtUser);
+                assertThat(waiter.isDone()).isFalse();
+                // Parked at the User lock, the queued replay cannot hold the
+                // Session row: a probe can still take it FOR UPDATE NOWAIT.
+                assertChildRowFree("Session", f.id());
+            } finally { holder.rollback(); }
+
+            AuthLoginService.LoginResult recovered = waiter.get(WAIT_SECONDS, TimeUnit.SECONDS);
+            assertThat(recovered.response().refreshToken()).isNotEqualTo(refresh0).isNotEqualTo(refresh1);
+            String keptId = jdbc.queryForObject(
+                    "SELECT \"id\" FROM campuscore_auth.\"Session\" WHERE \"userId\"=?",
+                    String.class, f.id());
+            assertThat(keptId).isEqualTo(sessionId);
+            assertThat(jdbc.queryForObject(
+                    "SELECT count(*) FROM campuscore_auth.\"Session\" WHERE \"userId\"=?",
+                    Integer.class, f.id())).isEqualTo(1);
+            // The delayed-duplicate casualty: the superseded T1 is neither
+            // current nor previous, so its replay revokes the whole family.
+            assertThatThrownBy(() -> auth.refresh(refresh1, "127.0.0.1", "race-it"))
+                    .isInstanceOf(BadCredentialsException.class);
+            assertThat(jdbc.queryForObject(
+                    "SELECT count(*) FROM campuscore_auth.\"Session\" WHERE \"userId\"=?",
+                    Integer.class, f.id())).isZero();
+        } finally {
+            pool.shutdownNow();
+            assertThat(pool.awaitTermination(WAIT_SECONDS, TimeUnit.SECONDS)).isTrue();
+        }
+    }
+
     @Test
     void loginChallengeWaitsOnUserBeforeChallengeAndCannotResurrectRevokedCredentials() throws Exception {
         queuedAuthentication(true);
