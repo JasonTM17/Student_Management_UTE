@@ -35,16 +35,15 @@ public class AdminUserMutationService {
     private static final String ACADEMIC_DEPARTMENT = "academic.\"Department\"";
     private static final String ACADEMIC_CURRICULUM = "academic.\"Curriculum\"";
     /**
-     * Roles whose existing holders a plain administrator may not take over,
-     * disable, delete or strip. Granting {@code TRUONG_KHOA} is the one exception
-     * the Academic Office keeps (see {@link #guardRoleMutation}): a faculty head
-     * governs the thesis round lifecycle, so once appointed the account is
-     * protected like the other reserved roles.
+     * Roles a plain administrator may not hand out. {@code TRUONG_KHOA} is here
+     * because a faculty head governs the thesis round lifecycle, which the role
+     * ceiling reserves above a plain administrator: without it one administrator
+     * could mint a dean and escalate through that account.
      *
      * <p>The same set governs {@link #requireSuperAdminForProtectedAccount}: a role
-     * a plain administrator may not manage is one whose existing holders it may
-     * not take over, disable or delete. Blocking only the grant would leave the
-     * identical escalation reachable through the account instead of the role.
+     * a plain administrator may not grant is also one whose existing holders it may
+     * not take over, disable or delete. Blocking only the grant leaves the identical
+     * escalation reachable through the account instead of the role.
      *
      * <p>Ordered so the refusal message names the same role every time.
      */
@@ -626,20 +625,17 @@ public class AdminUserMutationService {
                     "ROLE_ESCALATION",
                     "Only a super administrator can manage super administrator accounts");
         }
-        // The Academic Office appoints faculty heads (TRUONG_KHOA): the grant is
-        // bounded by one active head per faculty (requireNoOtherDean), and every
-        // account-side power over an existing head stays with a super administrator.
-        // A department head is still a super-administrator grant. Re-sending the
-        // role a user already holds is not a grant, though: the admin edit form
-        // echoes the unchanged role back, and refusing that would make every other
-        // field on the account unsavable.
+        // A dean account carries the thesis round lifecycle, so granting it is a
+        // super-administrator action. Re-sending the role a user already holds is
+        // not a grant, though: the admin edit form echoes the unchanged role back,
+        // and refusing that would make every other field on the account unsavable.
         if (!canManageSuperAdmin
-                && "TRUONG_BO_MON".equals(roleName)
+                && ("TRUONG_KHOA".equals(roleName) || "TRUONG_BO_MON".equals(roleName))
                 && !(userId != null && hasRole(userId, roleName))) {
             throw problem(
                     HttpStatus.FORBIDDEN,
                     "ROLE_ESCALATION",
-                    "Only a super administrator can assign governance roles");
+                    "Only a super administrator can appoint a faculty or department head");
         }
         // Re-assigning a system role to a custom-role holder is still a take-over
         // of an account whose powers the caller may not grant.

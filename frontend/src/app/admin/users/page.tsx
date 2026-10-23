@@ -1467,6 +1467,8 @@ export default function AdminUsersPage() {
                     active={formData.role === 'TRUONG_KHOA'}
                     activeClassName={roleSolidClass('TRUONG_KHOA')}
                     onClick={() => setFormData((c) => ({ ...c, role: 'TRUONG_KHOA' }))}
+                    disabled={!isSuperAdmin}
+                    title={!isSuperAdmin ? copy.errors.adminReserved : undefined}
                   >
                     <School className="h-3.5 w-3.5" />
                     {copy.rolesShort.TRUONG_KHOA}
@@ -1603,10 +1605,10 @@ export default function AdminUsersPage() {
                         const options = [
                           { value: 'STUDENT', label: copy.roles.STUDENT },
                           { value: 'LECTURER', label: copy.roles.LECTURER },
-                          { value: 'TRUONG_KHOA', label: copy.roles.TRUONG_KHOA },
                           ...(isSuperAdmin
                             ? [
                                 { value: 'ADMIN', label: copy.roles.ADMIN },
+                                { value: 'TRUONG_KHOA', label: copy.roles.TRUONG_KHOA },
                                 { value: 'TRUONG_BO_MON', label: copy.roles.TRUONG_BO_MON },
                                 { value: 'SUPER_ADMIN', label: copy.roles.SUPER_ADMIN },
                               ]

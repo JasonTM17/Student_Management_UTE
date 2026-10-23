@@ -576,11 +576,22 @@ class AdminUserMutationPersistenceTest {
     }
 
     @Test
-    void ordinaryAdminAppointsAFacultyHeadWhenTheFacultyHasNone() throws Exception {
+    void onlyASuperAdministratorAppointsAFacultyOrDepartmentHead() throws Exception {
+        insertRole("role-truong-bo-mon", "TRUONG_BO_MON", true);
         insertLecturer("appoint-user", "appoint@campuscore.edu", "GV-APPOINT", "department-demo", false);
 
+        for (String head : List.of("TRUONG_KHOA", "TRUONG_BO_MON")) {
+            mvc.perform(put("/api/v1/users/appoint-user")
+                            .with(adminJwt())
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content("{\"role\":\"" + head + "\"}"))
+                    .andExpect(status().isForbidden())
+                    .andExpect(jsonPath("$.code").value("ROLE_ESCALATION"));
+        }
+        assertThat(roleNames("appoint-user")).containsExactly("LECTURER");
+
         mvc.perform(put("/api/v1/users/appoint-user")
-                        .with(adminJwt())
+                        .with(superJwt())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"role\":\"TRUONG_KHOA\"}"))
                 .andExpect(status().isOk())
@@ -590,20 +601,18 @@ class AdminUserMutationPersistenceTest {
     }
 
     @Test
-    void secondFacultyHeadInTheSameFacultyIsRejectedForEveryActor() throws Exception {
+    void secondFacultyHeadInTheSameFacultyIsRejected() throws Exception {
         // The incumbent sits in a sibling department: the rule is per faculty, not
         // per department.
         insertLecturer("incumbent-dean", "incumbent@campuscore.edu", "GV-INCUMBENT", "department-sibling", true);
         insertLecturer("candidate-user", "candidate@campuscore.edu", "GV-CANDIDATE", "department-demo", false);
 
-        for (RequestPostProcessor actor : List.of(adminJwt(), superJwt())) {
-            mvc.perform(put("/api/v1/users/candidate-user")
-                            .with(actor)
-                            .contentType(MediaType.APPLICATION_JSON)
-                            .content("{\"role\":\"TRUONG_KHOA\"}"))
-                    .andExpect(status().isConflict())
-                    .andExpect(jsonPath("$.code").value("DEAN_ALREADY_ASSIGNED"));
-        }
+        mvc.perform(put("/api/v1/users/candidate-user")
+                        .with(superJwt())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"role\":\"TRUONG_KHOA\"}"))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("DEAN_ALREADY_ASSIGNED"));
 
         // The refusal lands before any write: the candidate keeps exactly the
         // roles it had and the incumbent keeps the title.
@@ -619,7 +628,7 @@ class AdminUserMutationPersistenceTest {
         insertLecturer("free-candidate", "freecandidate@campuscore.edu", "GV-FREE", "department-demo", false);
 
         mvc.perform(put("/api/v1/users/free-candidate")
-                        .with(adminJwt())
+                        .with(superJwt())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"role\":\"TRUONG_KHOA\"}"))
                 .andExpect(status().isOk());
@@ -632,7 +641,7 @@ class AdminUserMutationPersistenceTest {
         insertLecturer("create-incumbent", "createincumbent@campuscore.edu", "GV-CINC", "department-demo", true);
 
         mvc.perform(post("/api/v1/users")
-                        .with(adminJwt())
+                        .with(superJwt())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {"email":"second.dean@campuscore.edu","firstName":"Second","lastName":"Dean","role":"TRUONG_KHOA","employeeId":"GV-SECOND","departmentId":"department-sibling"}

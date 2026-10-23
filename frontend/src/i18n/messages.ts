@@ -245,9 +245,10 @@ export const en = {
         EMAIL_EXISTS: 'This email is already registered.',
         STUDENT_ID_EXISTS: 'This student ID already exists.',
         EMPLOYEE_ID_EXISTS: 'This employee ID already exists.',
-        ROLE_ESCALATION: 'Only a super administrator can manage administrator accounts.',
+        ROLE_ESCALATION:
+          'Only a super administrator can grant this role or manage administrator, faculty-head and department-head accounts.',
         DEAN_ALREADY_ASSIGNED:
-          'This faculty already has an active dean. Remove the dean role from the current holder first; a super administrator does that.',
+          'This faculty already has an active dean. Move the current dean back to lecturer before appointing another.',
         // Password policy & recovery
         PASSWORD_TOO_SHORT: 'Choose a password with at least 8 characters.',
         PASSWORD_TOO_LONG: 'Choose a password no longer than 128 characters.',
@@ -3182,9 +3183,10 @@ export const vi: I18nMessages = {
         EMAIL_EXISTS: 'Email này đã có trong hệ thống.',
         STUDENT_ID_EXISTS: 'Mã số sinh viên đã tồn tại.',
         EMPLOYEE_ID_EXISTS: 'Mã số giảng viên đã tồn tại.',
-        ROLE_ESCALATION: 'Chỉ siêu quản trị viên mới được quản lý tài khoản quản trị viên.',
+        ROLE_ESCALATION:
+          'Chỉ siêu quản trị viên mới được cấp vai trò này hoặc quản lý tài khoản quản trị viên, Trưởng khoa và Trưởng bộ môn.',
         DEAN_ALREADY_ASSIGNED:
-          'Khoa này đã có Trưởng khoa đang hoạt động. Hãy miễn nhiệm Trưởng khoa hiện tại trước (do quản trị viên tối cao thực hiện) rồi mới bổ nhiệm người khác.',
+          'Khoa này đã có Trưởng khoa đang hoạt động. Hãy chuyển Trưởng khoa hiện tại về Giảng viên trước khi bổ nhiệm người khác.',
         // Chính sách mật khẩu & khôi phục
         PASSWORD_TOO_SHORT: 'Hãy chọn mật khẩu có ít nhất 8 ký tự.',
         PASSWORD_TOO_LONG: 'Hãy chọn mật khẩu không quá 128 ký tự.',

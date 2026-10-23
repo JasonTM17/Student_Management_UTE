@@ -91,36 +91,35 @@ class AdminRoleCeilingTest {
     // ---------------------------------------------------------------- grant side
 
     @Test
-    void plainAdminCannotMintADepartmentHeadButMayResubmitTheRoleUnchanged() {
-        AdminUserMutationService service = service();
+    void plainAdminCannotAppointAFacultyOrDepartmentHeadButMayResubmitTheRoleUnchanged() {
+        for (String head : List.of(FACULTY_HEAD, DEPARTMENT_HEAD)) {
+            // Fresh mock per role: the echo below legitimately writes, and those
+            // writes must not leak into the next role's "nothing written" check.
+            setUp();
+            AdminUserMutationService service = service();
 
-        DomainException denied = assertThrows(DomainException.class,
-                () -> service.update(TARGET, Map.of("role", DEPARTMENT_HEAD), false, ACTOR));
-        assertThat(denied.getStatus()).isEqualTo(HttpStatus.FORBIDDEN);
-        assertThat(denied.getCode()).isEqualTo("ROLE_ESCALATION");
+            DomainException denied = assertThrows(DomainException.class,
+                    () -> service.update(TARGET, Map.of("role", head), false, ACTOR), head);
+            assertThat(denied.getStatus()).isEqualTo(HttpStatus.FORBIDDEN);
+            assertThat(denied.getCode()).isEqualTo("ROLE_ESCALATION");
+            // Refused before any write: no role row may have been replaced.
+            verify(jdbc, never()).update(contains("DELETE FROM"), any(SqlParameterSource.class));
 
-        // The account already holds the role, so an edit form echoing it back is
-        // not a grant. Later stages of update() may still fail for unrelated
-        // reasons; what is asserted is that the escalation guard stays silent.
-        rolesTheTargetHolds.put(DEPARTMENT_HEAD, true);
-        try {
-            service.update(TARGET, Map.of("role", DEPARTMENT_HEAD), false, ACTOR);
-        } catch (DomainException unexpected) {
-            assertNotEquals("ROLE_ESCALATION", unexpected.getCode(),
-                    "re-sending the role an account already holds must not read as escalation");
-        }
-    }
+            assertThat(assertThrows(DomainException.class,
+                    () -> service.create(Map.of("email", "head@campuscore.edu", "firstName", "Head",
+                            "lastName", "Candidate", "role", head), false, ACTOR)).getCode())
+                    .isEqualTo("ROLE_ESCALATION");
 
-    @Test
-    void plainAdminMayAppointAFacultyHead() {
-        AdminUserMutationService service = service();
-
-        // The Academic Office appoints the dean; later stages of update() may still
-        // fail on the mocked schema, but the escalation guard must stay silent.
-        try {
-            service.update(TARGET, Map.of("role", FACULTY_HEAD), false, ACTOR);
-        } catch (DomainException unexpected) {
-            assertNotEquals("ROLE_ESCALATION", unexpected.getCode());
+            // The account already holds the role, so an edit form echoing it back is
+            // not a grant. Later stages of update() may still fail for unrelated
+            // reasons; what is asserted is that the escalation guard stays silent.
+            rolesTheTargetHolds.put(head, true);
+            try {
+                service.update(TARGET, Map.of("role", head), false, ACTOR);
+            } catch (DomainException unexpected) {
+                assertNotEquals("ROLE_ESCALATION", unexpected.getCode(),
+                        "re-sending the role an account already holds must not read as escalation");
+            }
         }
     }
 

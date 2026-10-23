@@ -361,16 +361,23 @@ test('narrow-screen layouts keep their content inside the card', () => {
   assert.match(read('src/app/dashboard/lecturer/attendance/page.tsx'), /flex flex-wrap items-center gap-2">\s*<Button[\s\S]{0,120}handleMarkAllPresent/);
 });
 
-test('a plain administrator can appoint a faculty head and sees why a second one is refused', () => {
+test('only a super administrator is offered the faculty and department head roles', () => {
   const users = read('src/app/admin/users/page.tsx');
   const messages = read('src/i18n/messages.ts');
+  // Edit form: the head roles live only in the super-administrator branch.
   const afterLecturer = users.slice(users.indexOf("value: 'LECTURER', label: copy.roles.LECTURER"));
-  assert.match(afterLecturer.slice(0, afterLecturer.indexOf('...(isSuperAdmin')), /value: 'TRUONG_KHOA'/);
-  const deanChip = users.slice(
-    users.indexOf("active={formData.role === 'TRUONG_KHOA'}"),
-    users.indexOf("active={formData.role === 'TRUONG_BO_MON'}"),
-  );
-  assert.doesNotMatch(deanChip, /disabled=\{!isSuperAdmin\}/);
+  const superOnly = afterLecturer.indexOf('...(isSuperAdmin');
+  assert.doesNotMatch(afterLecturer.slice(0, superOnly), /TRUONG_KHOA|TRUONG_BO_MON/);
+  assert.match(afterLecturer.slice(superOnly, superOnly + 400), /value: 'TRUONG_KHOA'[\s\S]*value: 'TRUONG_BO_MON'/);
+  // Create form: both head chips are disabled for a plain administrator.
+  for (const [from, to] of [["'TRUONG_KHOA'}", "'TRUONG_BO_MON'}"], ["'TRUONG_BO_MON'}", "'ADMIN'}"]]) {
+    const chip = users.slice(
+      users.indexOf(`active={formData.role === ${from}`),
+      users.indexOf(`active={formData.role === ${to}`),
+    );
+    assert.match(chip, /disabled=\{!isSuperAdmin\}/, from);
+  }
+  // Refusals are explained by their business code, not a generic HTTP message.
   assert.match(users, /campusCodeMessage\(/);
   assert.equal((messages.match(/DEAN_ALREADY_ASSIGNED:/g) || []).length, 2);
 });
