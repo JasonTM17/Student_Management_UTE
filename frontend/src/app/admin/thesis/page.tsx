@@ -148,7 +148,8 @@ export default function AdminThesisPage() {
   // replace a council seat, waive/restore a counter-review, withdraw or
   // reinstate a topic. Each call is audited server-side with the reason.
   const [reasonAction, setReasonAction] = useState<{
-    kind: 'unassignTopic' | 'replaceMember' | 'waiveGvpb' | 'revokeGvpbWaiver' | 'withdrawTopic' | 'reinstateTopic';
+    kind: 'unassignTopic' | 'replaceMember' | 'waiveGvpb' | 'revokeGvpbWaiver' | 'withdrawTopic' | 'reinstateTopic'
+        | 'lateTopic' | 'rosterOverride' | 'topicReassign' | 'retractResults';
     roundId: string;
     councilId?: string;
     topicId?: string;
@@ -157,6 +158,13 @@ export default function AdminThesisPage() {
   const [reasonText, setReasonText] = useState('');
   const [replacementLecturerId, setReplacementLecturerId] = useState('');
   const [reasonActionError, setReasonActionError] = useState('');
+  const [extendDeadlineReason, setExtendDeadlineReason] = useState('');
+  const [lateTopicForm, setLateTopicForm] = useState({
+    departmentId: '', title: '', description: '', supervisorId: '', maxGroups: '1',
+  });
+  const [overrideForm, setOverrideForm] = useState({ groupId: '', studentId: '', allowSize: false });
+  const [reassignForm, setReassignForm] = useState({ groupId: '', topicId: '' });
+  const [retractConfirmation, setRetractConfirmation] = useState('');
 
   // Restore-with-target modal: shown only when no implicit restore exists —
   // a legacy cancellation that still holds groups, or a REGISTRATION_OPEN
@@ -440,6 +448,23 @@ export default function AdminThesisPage() {
         ),
       ].join(' ');
     }
+    if (publishPreview && publishPreview.openReviewTopics.length > 0) {
+      message = [
+        message,
+        messages.thesis.admin.publishReviewOpen.replace(
+          '{titles}',
+          publishPreview.openReviewTopics.map((t) => t.title).join(', '),
+        ),
+      ].join(' ');
+    }
+    // A publication where every approved group is excluded needs the explicit
+    // server-side flag — the copy states the consequence before confirming.
+    const allExcluded = publishPreview != null
+      && publishPreview.approvedGroupCount > 0
+      && publishPreview.includedGroupCount === 0;
+    if (allExcluded) {
+      message = [message, messages.thesis.admin.publishAllExcluded].join(' ');
+    }
     if (closePreview) {
       const adminCopy = messages.thesis.admin;
       message = [
@@ -479,7 +504,7 @@ export default function AdminThesisPage() {
         await thesisApi.publishProposals(roundId);
         setSuccess(messages.thesis.admin.proposalsPublished);
       } else {
-        await thesisApi.publishResults(roundId);
+        await thesisApi.publishResults(roundId, allExcluded ? true : undefined);
         setSuccess(messages.thesis.admin.resultsPublished);
       }
       await loadData();
@@ -507,6 +532,7 @@ export default function AdminThesisPage() {
     setExtendDeadlineRoundId(round.id);
     setExtendDeadlineKind(kind);
     setExtendDeadlineValue(toLocalInput(kind === 'gvpb' ? round.gvpbDeadline : round.reportDeadline ?? round.gvpbDeadline));
+    setExtendDeadlineReason('');
     setExtendDeadlineError('');
     setShowExtendDeadlineModal(true);
   };
@@ -528,7 +554,11 @@ export default function AdminThesisPage() {
     setExtendDeadlineError('');
     try {
       if (extendDeadlineKind === 'gvpb') {
-        await thesisApi.extendGvpbDeadline(extendDeadlineRoundId, parsed.toISOString());
+        if (!extendDeadlineReason.trim()) {
+          setExtendDeadlineError(messages.thesis.admin.governanceReasonRequired);
+          return;
+        }
+        await thesisApi.extendGvpbDeadline(extendDeadlineRoundId, parsed.toISOString(), extendDeadlineReason.trim());
         setSuccess(messages.thesis.admin.gvpbDeadlineSuccess);
       } else {
         await thesisApi.extendReportDeadline(extendDeadlineRoundId, parsed.toISOString());
@@ -701,6 +731,10 @@ export default function AdminThesisPage() {
     setReasonAction(action);
     setReasonText('');
     setReplacementLecturerId('');
+    setLateTopicForm({ departmentId: '', title: '', description: '', supervisorId: '', maxGroups: '1' });
+    setOverrideForm({ groupId: '', studentId: '', allowSize: false });
+    setReassignForm({ groupId: '', topicId: '' });
+    setRetractConfirmation('');
     setReasonActionError('');
   };
 
@@ -739,6 +773,51 @@ export default function AdminThesisPage() {
       } else if (action.kind === 'reinstateTopic' && action.topicId) {
         await thesisApi.reinstateTopic(action.topicId, reason);
         setSuccess(messages.thesis.admin.governanceActionSuccess);
+      } else if (action.kind === 'lateTopic') {
+        const maxGroups = Number.parseInt(lateTopicForm.maxGroups, 10);
+        if (!lateTopicForm.departmentId.trim() || !lateTopicForm.title.trim()
+            || !lateTopicForm.description.trim() || !lateTopicForm.supervisorId.trim()
+            || !Number.isFinite(maxGroups) || maxGroups < 1 || maxGroups > 20) {
+          setReasonActionError(messages.thesis.admin.governanceReasonRequired);
+          return;
+        }
+        await thesisApi.createLateTopic(action.roundId, {
+          departmentId: lateTopicForm.departmentId.trim(),
+          title: lateTopicForm.title.trim(),
+          description: lateTopicForm.description.trim(),
+          maxGroups,
+          supervisorId: lateTopicForm.supervisorId.trim(),
+          reason,
+        });
+        setSuccess(messages.thesis.admin.lateTopicSuccess);
+      } else if (action.kind === 'rosterOverride') {
+        if (!overrideForm.groupId.trim() || !overrideForm.studentId.trim()) {
+          setReasonActionError(messages.thesis.admin.governanceReasonRequired);
+          return;
+        }
+        await thesisApi.overrideGroupRoster(overrideForm.groupId.trim(), {
+          studentId: overrideForm.studentId.trim(),
+          reason,
+          allowSizeException: overrideForm.allowSize,
+        });
+        setSuccess(messages.thesis.admin.rosterOverrideSuccess);
+      } else if (action.kind === 'topicReassign') {
+        if (!reassignForm.groupId.trim() || !reassignForm.topicId.trim()) {
+          setReasonActionError(messages.thesis.admin.governanceReasonRequired);
+          return;
+        }
+        await thesisApi.reassignOrphanedTopic(reassignForm.groupId.trim(), {
+          topicId: reassignForm.topicId.trim(),
+          reason,
+        });
+        setSuccess(messages.thesis.admin.topicReassignSuccess);
+      } else if (action.kind === 'retractResults') {
+        if (retractConfirmation.trim() !== 'RETRACT') {
+          setReasonActionError(messages.thesis.admin.retractResultsConfirmLabel);
+          return;
+        }
+        await thesisApi.retractResults(action.roundId, reason, 'RETRACT');
+        setSuccess(messages.thesis.admin.retractResultsSuccess);
       } else {
         return;
       }
@@ -760,6 +839,10 @@ export default function AdminThesisPage() {
         revokeGvpbWaiver: messages.thesis.admin.revokeGvpbWaiverTitle,
         withdrawTopic: messages.thesis.admin.withdrawTopicTitle,
         reinstateTopic: messages.thesis.admin.reinstateTopicTitle,
+        lateTopic: messages.thesis.admin.lateTopicTitle,
+        rosterOverride: messages.thesis.admin.rosterOverrideTitle,
+        topicReassign: messages.thesis.admin.topicReassignTitle,
+        retractResults: messages.thesis.admin.retractResultsTitle,
       }[reasonAction.kind]
     : '';
 
@@ -986,6 +1069,57 @@ export default function AdminThesisPage() {
                               disabled={isSaving}
                             >
                               {messages.thesis.admin.gvpbDeadlineExtend}
+                            </Button>
+                          ) : null}
+                          {/* Late-topic escape: a supervisor who missed the
+                              proposal window still gets a publishable topic
+                              while students can register (audited). */}
+                          {(round.status === 'PROPOSALS_PUBLISHED' ||
+                            round.status === 'REGISTRATION_OPEN') ? (
+                            <Button
+                              type="button"
+                              size="sm"
+                              variant="outline"
+                              onClick={() => openReasonAction({ kind: 'lateTopic', roundId: round.id })}
+                              disabled={isSaving}
+                            >
+                              {messages.thesis.admin.lateTopic}
+                            </Button>
+                          ) : null}
+                          {/* Roster override: a group still below size after
+                              registration closed gets an audited admin add. */}
+                          {round.status === 'REGISTRATION_CLOSED' ? (
+                            <Button
+                              type="button"
+                              size="sm"
+                              variant="outline"
+                              onClick={() => openReasonAction({ kind: 'rosterOverride', roundId: round.id })}
+                              disabled={isSaving}
+                            >
+                              {messages.thesis.admin.rosterOverride}
+                            </Button>
+                          ) : null}
+                          {round.status === 'REGISTRATION_CLOSED' ? (
+                            <Button
+                              type="button"
+                              size="sm"
+                              variant="outline"
+                              onClick={() => openReasonAction({ kind: 'topicReassign', roundId: round.id })}
+                              disabled={isSaving}
+                            >
+                              {messages.thesis.admin.topicReassign}
+                            </Button>
+                          ) : null}
+                          {round.status === 'RESULTS_PUBLISHED' ? (
+                            <Button
+                              type="button"
+                              size="sm"
+                              variant="ghost"
+                              className="text-destructive hover:text-destructive"
+                              onClick={() => openReasonAction({ kind: 'retractResults', roundId: round.id })}
+                              disabled={isSaving}
+                            >
+                              {messages.thesis.admin.retractResults}
                             </Button>
                           ) : null}
                           {(round.status === 'DRAFT' || round.status === 'PROPOSAL_OPEN' || round.status === 'PROPOSALS_PUBLISHED') ? (
@@ -1838,6 +1972,18 @@ export default function AdminThesisPage() {
               required
             />
           </label>
+          {extendDeadlineKind === 'gvpb' ? (
+            <label className="flex flex-col gap-2 text-sm font-medium text-foreground">
+              {messages.thesis.admin.governanceReasonLabel}
+              <Input
+                type="text"
+                value={extendDeadlineReason}
+                onChange={(e) => setExtendDeadlineReason(e.target.value)}
+                maxLength={500}
+                required
+              />
+            </label>
+          ) : null}
           <div className="flex justify-end gap-2 pt-2">
             <Button
               type="button"
@@ -1895,6 +2041,117 @@ export default function AdminThesisPage() {
                   })),
               ]}
             />
+          ) : null}
+          {reasonAction?.kind === 'lateTopic' ? (
+            <>
+              <label className="flex flex-col gap-2 text-sm font-medium text-foreground">
+                {messages.thesis.admin.lateTopicDepartment}
+                <Input
+                  value={lateTopicForm.departmentId}
+                  onChange={(e) => setLateTopicForm({ ...lateTopicForm, departmentId: e.target.value })}
+                  required
+                />
+              </label>
+              <label className="flex flex-col gap-2 text-sm font-medium text-foreground">
+                {messages.thesis.admin.lateTopicTitleField}
+                <Input
+                  value={lateTopicForm.title}
+                  onChange={(e) => setLateTopicForm({ ...lateTopicForm, title: e.target.value })}
+                  maxLength={240}
+                  required
+                />
+              </label>
+              <label className="flex flex-col gap-2 text-sm font-medium text-foreground">
+                {messages.thesis.admin.lateTopicDescription}
+                <Input
+                  value={lateTopicForm.description}
+                  onChange={(e) => setLateTopicForm({ ...lateTopicForm, description: e.target.value })}
+                  required
+                />
+              </label>
+              <label className="flex flex-col gap-2 text-sm font-medium text-foreground">
+                {messages.thesis.admin.lateTopicSupervisor}
+                <Input
+                  value={lateTopicForm.supervisorId}
+                  onChange={(e) => setLateTopicForm({ ...lateTopicForm, supervisorId: e.target.value })}
+                  required
+                />
+              </label>
+              <label className="flex flex-col gap-2 text-sm font-medium text-foreground">
+                {messages.thesis.admin.lateTopicMaxGroups}
+                <Input
+                  type="number"
+                  min={1}
+                  max={20}
+                  value={lateTopicForm.maxGroups}
+                  onChange={(e) => setLateTopicForm({ ...lateTopicForm, maxGroups: e.target.value })}
+                  required
+                />
+              </label>
+            </>
+          ) : null}
+          {reasonAction?.kind === 'rosterOverride' ? (
+            <>
+              <label className="flex flex-col gap-2 text-sm font-medium text-foreground">
+                {messages.thesis.admin.rosterOverrideGroup}
+                <Input
+                  value={overrideForm.groupId}
+                  onChange={(e) => setOverrideForm({ ...overrideForm, groupId: e.target.value })}
+                  required
+                />
+              </label>
+              <label className="flex flex-col gap-2 text-sm font-medium text-foreground">
+                {messages.thesis.admin.rosterOverrideStudent}
+                <Input
+                  value={overrideForm.studentId}
+                  onChange={(e) => setOverrideForm({ ...overrideForm, studentId: e.target.value })}
+                  required
+                />
+              </label>
+              <label className="flex items-center gap-2 text-sm font-medium text-foreground">
+                <input
+                  type="checkbox"
+                  checked={overrideForm.allowSize}
+                  onChange={(e) => setOverrideForm({ ...overrideForm, allowSize: e.target.checked })}
+                />
+                {messages.thesis.admin.rosterOverrideSizeException}
+              </label>
+            </>
+          ) : null}
+          {reasonAction?.kind === 'topicReassign' ? (
+            <>
+              <label className="flex flex-col gap-2 text-sm font-medium text-foreground">
+                {messages.thesis.admin.topicReassignGroup}
+                <Input
+                  value={reassignForm.groupId}
+                  onChange={(e) => setReassignForm({ ...reassignForm, groupId: e.target.value })}
+                  required
+                />
+              </label>
+              <label className="flex flex-col gap-2 text-sm font-medium text-foreground">
+                {messages.thesis.admin.topicReassignTopic}
+                <Input
+                  value={reassignForm.topicId}
+                  onChange={(e) => setReassignForm({ ...reassignForm, topicId: e.target.value })}
+                  required
+                />
+              </label>
+            </>
+          ) : null}
+          {reasonAction?.kind === 'retractResults' ? (
+            <>
+              <p className="text-sm text-muted-foreground">
+                {messages.thesis.admin.retractResultsHint}
+              </p>
+              <label className="flex flex-col gap-2 text-sm font-medium text-foreground">
+                {messages.thesis.admin.retractResultsConfirmLabel}
+                <Input
+                  value={retractConfirmation}
+                  onChange={(e) => setRetractConfirmation(e.target.value)}
+                  required
+                />
+              </label>
+            </>
           ) : null}
           <label className="flex flex-col gap-2 text-sm font-medium text-foreground">
             {messages.thesis.admin.governanceReasonLabel} <span className="text-destructive">*</span>

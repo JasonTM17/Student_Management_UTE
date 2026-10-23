@@ -118,6 +118,8 @@ export interface ThesisPublishResultsPreview {
   includedGroupCount: number;
   ungradedGroupCount: number;
   excludedTopics: ThesisExcludedTopic[];
+  /** Topics whose counter-review verdict is still provisional (window open). */
+  openReviewTopics: ThesisExcludedTopic[];
 }
 
 export interface ThesisExcludedTopic {
@@ -185,6 +187,8 @@ export interface ThesisProgressResponse {
     | 'GROUP_CANCELLED'
     | 'GROUP_INVALID_MEMBER_COUNT'
     | 'PROGRESS_INCONSISTENT'
+    | 'TOPIC_REVIEW_FAILED'
+    | 'TOPIC_WITHDRAWN'
     | 'RESULT_NOT_AVAILABLE';
   groupId?: string | null;
   groupStatus?: string | null;
@@ -227,6 +231,9 @@ export interface ThesisRoundResult {
   finalScore: number;
   councilName: string;
   leaderStudentId: string;
+  /** Governance outcome visible to the group's members after publication. */
+  resultStatus?: string | null;
+  resultReason?: string | null;
   comments?: ThesisScoreComment[];
 }
 
@@ -690,9 +697,13 @@ export const thesisApi = {
     return response.data;
   },
 
-  publishResults: async (roundId: string): Promise<ThesisRound> => {
+  publishResults: async (
+    roundId: string,
+    confirmAllExcluded?: boolean,
+  ): Promise<ThesisRound> => {
     const response = await api.post<ThesisRound>(
       '/thesis/rounds/' + roundId + '/publish-results',
+      confirmAllExcluded ? { confirmAllExcluded: true } : {},
     );
     return response.data;
   },
@@ -718,10 +729,79 @@ export const thesisApi = {
   extendGvpbDeadline: async (
     roundId: string,
     gvpbDeadline: string,
+    reason: string,
   ): Promise<ThesisRound> => {
     const response = await api.put<ThesisRound>(
       '/thesis/rounds/' + roundId + '/gvpb-deadline',
-      { gvpbDeadline },
+      { gvpbDeadline, reason },
+    );
+    return response.data;
+  },
+
+  /**
+   * Late-topic escape for a missed lecturer window: creates a PUBLISHED topic
+   * for a named supervisor while registration is still possible (audited).
+   */
+  createLateTopic: async (
+    roundId: string,
+    data: {
+      departmentId: string;
+      title: string;
+      description: string;
+      maxGroups?: number;
+      supervisorId: string;
+      reason: string;
+    },
+  ): Promise<ThesisTopic> => {
+    const response = await api.post<ThesisTopic>(
+      '/thesis/rounds/' + roundId + '/late-topic',
+      data,
+    );
+    return response.data;
+  },
+
+  /**
+   * Post-registration roster override: adds an active student to a group of a
+   * REGISTRATION_CLOSED round whose topic has no scores (audited).
+   */
+  overrideGroupRoster: async (
+    groupId: string,
+    data: { studentId: string; reason: string; allowSizeException?: boolean },
+  ): Promise<ThesisGroup> => {
+    const response = await api.post<ThesisGroup>(
+      '/thesis/groups/' + groupId + '/roster-override',
+      data,
+    );
+    return response.data;
+  },
+
+  /**
+   * Re-points an approved group whose topic was withdrawn after registration
+   * closed to a live topic in the same round (audited).
+   */
+  reassignOrphanedTopic: async (
+    groupId: string,
+    data: { topicId: string; reason: string },
+  ): Promise<ThesisGroup> => {
+    const response = await api.post<ThesisGroup>(
+      '/thesis/groups/' + groupId + '/topic-reassign',
+      data,
+    );
+    return response.data;
+  },
+
+  /**
+   * Retracts a premature publication inside the grace period: reason plus the
+   * typed confirmation "RETRACT"; scores are never modified.
+   */
+  retractResults: async (
+    roundId: string,
+    reason: string,
+    confirmation: string,
+  ): Promise<ThesisRound> => {
+    const response = await api.post<ThesisRound>(
+      '/thesis/rounds/' + roundId + '/retract-results',
+      { reason, confirmation },
     );
     return response.data;
   },
