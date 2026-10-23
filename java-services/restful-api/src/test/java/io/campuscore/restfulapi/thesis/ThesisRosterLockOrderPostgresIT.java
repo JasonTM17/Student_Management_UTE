@@ -105,8 +105,11 @@ class ThesisRosterLockOrderPostgresIT {
         jdbc.update("DELETE FROM thesis.thesis_topic WHERE round_id IN "
                 + "(SELECT id FROM thesis.thesis_registration_round WHERE name = ?)", ROUND_NAME);
         jdbc.update("DELETE FROM thesis.thesis_registration_round WHERE name = ?", ROUND_NAME);
+        jdbc.update("DELETE FROM campuscore_auth.\"Lecturer\" WHERE \"id\" LIKE 'rlo-%'");
         jdbc.update("DELETE FROM campuscore_auth.\"Student\" WHERE \"id\" LIKE 'rlo-%'");
         jdbc.update("DELETE FROM campuscore_auth.\"User\" WHERE \"id\" LIKE 'rlo-user-%'");
+        jdbc.update("DELETE FROM academic.\"Department\" WHERE \"id\" LIKE 'rlo-%'");
+        jdbc.update("DELETE FROM academic.\"Faculty\" WHERE \"id\" LIKE 'rlo-%'");
     }
 
     /**
@@ -203,6 +206,98 @@ class ThesisRosterLockOrderPostgresIT {
                         + " WHERE \"entityId\" = ? AND \"action\" = 'THESIS_GROUP_APPROVED'",
                 Integer.class, groupId.toString());
         assertThat(auditRows).isEqualTo(1);
+    }
+
+    /**
+     * The under-minimum approval waiver is a governance act, not a review
+     * act: it belongs to a global admin or the faculty head whose faculty
+     * contains the group's topic. A dean from another faculty who happens to
+     * supervise the topic keeps ordinary review rights through the
+     * dean-supervisor path but must not waive the minimum.
+     */
+    @Test
+    void underSizeApprovalWaiverBelongsToTheOwningFacultyNotTheSupervisor() {
+        UUID topicId = insertTopic("Rlo Waiver Scope Topic");
+        UUID groupId = insertGroup(topicId, "rlo-w", 2);
+
+        // A foreign dean supervising the topic passes reviewer authorization
+        // but the waiver itself must stay closed to them.
+        Jwt foreignDean = dean("rlo-dean-foreign", "rlo-dept-foreign", "rlo-fac-foreign");
+        jdbc.update("INSERT INTO thesis.thesis_topic_supervisor (id, topic_id, lecturer_id, supervisor_order)"
+                        + " VALUES (?, ?, ?, 1)",
+                UUID.randomUUID(), topicId, "rlo-dean-foreign");
+        assertThatThrownBy(() -> mutations.approveGroup(groupId,
+                new GroupApprovalRequest(true, "documented below-minimum exception"),
+                foreignDean))
+                .isInstanceOf(DomainException.class)
+                .satisfies(failure -> assertThat(((DomainException) failure).code())
+                        .isEqualTo("GOVERNANCE_ROLE_REQUIRED"));
+        assertThat(jdbc.queryForObject(
+                "SELECT approval_status FROM thesis.thesis_group WHERE id = ?",
+                String.class, groupId)).isEqualTo("PENDING");
+
+        // The head of the faculty that owns the topic's department does hold
+        // the waiver — supervising the topic is irrelevant to that.
+        Jwt ownDean = dean("rlo-dean-own", "department-demo", "faculty-demo");
+        mutations.approveGroup(groupId,
+                new GroupApprovalRequest(true, "documented below-minimum exception"), ownDean);
+        Map<String, Object> approved = jdbc.queryForMap(
+                "SELECT approval_status, size_exception_reason, size_exception_by"
+                        + " FROM thesis.thesis_group WHERE id = ?",
+                groupId);
+        assertThat(approved.get("approval_status")).isEqualTo("APPROVED");
+        assertThat(approved.get("size_exception_reason"))
+                .isEqualTo("documented below-minimum exception");
+        assertThat(approved.get("size_exception_by")).isEqualTo("rlo-user-rlo-dean-own");
+
+        // A global admin on a fresh under-size group approves as before.
+        UUID adminGroup = insertGroup(insertTopic("Rlo Admin Waiver Topic"), "rlo-a", 2);
+        mutations.approveGroup(adminGroup,
+                new GroupApprovalRequest(true, "documented below-minimum exception"), admin());
+        assertThat(jdbc.queryForObject(
+                "SELECT approval_status FROM thesis.thesis_group WHERE id = ?",
+                String.class, adminGroup)).isEqualTo("APPROVED");
+    }
+
+    /**
+     * A pending roster has no minimum to waive: removing a member must not
+     * demand the exception flag, while the audit row still records the
+     * below-minimum outcome. The same removal on an APPROVED group keeps
+     * requiring the flag the deferred validator enforces.
+     */
+    @Test
+    void removingFromAPendingGroupNeverAsksForTheExceptionFlag() {
+        UUID topicId = insertTopic("Rlo Remove Topic");
+        UUID groupId = insertGroup(topicId, "rlo-r", 3);
+
+        mutations.overrideGroupRoster(groupId,
+                new RosterOverrideRequest("rlo-r-student-3", "REMOVE", "stepped back", null, null),
+                admin());
+        Integer members = jdbc.queryForObject(
+                "SELECT COUNT(*) FROM thesis.thesis_group_member WHERE group_id = ?",
+                Integer.class, groupId);
+        assertThat(members).isEqualTo(2);
+        assertThat(jdbc.queryForObject(
+                "SELECT size_exception_reason FROM thesis.thesis_group WHERE id = ?",
+                String.class, groupId))
+                .as("a non-approved group can never carry the marker")
+                .isNull();
+        String summary = jdbc.queryForObject(
+                "SELECT \"summary\" FROM campuscore_audit.\"AdminAudit\""
+                        + " WHERE \"entityId\" = ? AND \"action\" = 'THESIS_GROUP_ROSTER_OVERRIDE'"
+                        + " ORDER BY \"createdAt\" DESC LIMIT 1",
+                String.class, groupId.toString());
+        assertThat(summary).contains("below-minimum");
+
+        // The flag still binds where the minimum does: an APPROVED roster.
+        UUID approvedGroup = insertGroup(topicId, "rlo-ap", 3);
+        mutations.approveGroup(approvedGroup, admin());
+        assertThatThrownBy(() -> mutations.overrideGroupRoster(approvedGroup,
+                new RosterOverrideRequest("rlo-ap-student-3", "REMOVE", "stepped back", null, null),
+                admin()))
+                .isInstanceOf(DomainException.class)
+                .satisfies(failure -> assertThat(((DomainException) failure).code())
+                        .isEqualTo("GROUP_SIZE_EXCEPTION_REQUIRED"));
     }
 
     /**
@@ -330,6 +425,36 @@ class ThesisRosterLockOrderPostgresIT {
                     UUID.randomUUID(), groupId, roundId, student, order, order == 1);
         }
         return groupId;
+    }
+
+    /**
+     * A faculty head bound to a live lecturer profile in the given
+     * department/faculty pair, with a JWT carrying both roles: the dean
+     * scope check resolves the faculty through the profile while the
+     * supervisor path reads the LECTURER role.
+     */
+    private Jwt dean(String lecturerId, String departmentId, String facultyId) {
+        if (!"faculty-demo".equals(facultyId)) {
+            jdbc.update("INSERT INTO academic.\"Faculty\" (\"id\", \"name\", \"code\", \"isActive\")"
+                            + " VALUES (?, ?, ?, TRUE)",
+                    facultyId, "Faculty " + facultyId, facultyId);
+            jdbc.update("INSERT INTO academic.\"Department\" (\"id\", \"name\", \"code\", \"facultyId\", \"isActive\")"
+                            + " VALUES (?, ?, ?, ?, TRUE)",
+                    departmentId, "Department " + departmentId, departmentId, facultyId);
+        }
+        String userId = "rlo-user-" + lecturerId;
+        jdbc.update("INSERT INTO campuscore_auth.\"User\" (\"id\",\"email\",\"password\",\"firstName\",\"lastName\","
+                        + "\"status\",\"emailVerified\",\"isSuperAdmin\",\"failedLoginAttempts\",\"createdAt\",\"updatedAt\") "
+                        + "VALUES (?,'" + lecturerId + "@test.invalid','test','Faculty','Head','ACTIVE',FALSE,FALSE,0,"
+                        + "CURRENT_TIMESTAMP,CURRENT_TIMESTAMP)",
+                userId);
+        jdbc.update("INSERT INTO campuscore_auth.\"Lecturer\" (\"id\",\"userId\",\"departmentId\",\"employeeId\",\"isActive\") "
+                        + "VALUES (?,?,?,?,TRUE)",
+                lecturerId, userId, departmentId, "GV-" + lecturerId);
+        return Jwt.withTokenValue("roster-lock-fixture").header("alg", "none")
+                .subject(userId)
+                .claim("roles", List.of("TRUONG_KHOA", "LECTURER"))
+                .claim("lecturerId", lecturerId).build();
     }
 
     private void ensureLecturer(String lecturerId) {

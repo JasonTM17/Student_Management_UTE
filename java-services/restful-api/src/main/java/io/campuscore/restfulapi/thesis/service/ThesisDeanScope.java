@@ -90,6 +90,34 @@ final class ThesisDeanScope {
     }
 
     /**
+     * Governance outcomes are faculty-bound without the supervisor escape
+     * {@link #requireTopicAccess} keeps for ordinary topic work: waiving or
+     * restoring a counter-review, withdrawing or reinstating a topic, and
+     * approving under the faculty minimum must come from a global admin or
+     * the head of the faculty that owns the topic. Supervising it — even as
+     * a dean — is never a waiver.
+     */
+    static void requireTopicGovernanceScope(NamedParameterJdbcTemplate jdbc, Jwt actor, UUID topicId) {
+        if (isGlobalAdmin(actor) || !isFacultyHead(actor) || topicId == null) {
+            return;
+        }
+        String facultyId = facultyId(jdbc, actor);
+        if (facultyId == null) {
+            throw new DomainException(HttpStatus.FORBIDDEN, "FACULTY_PROFILE_REQUIRED",
+                    "An active lecturer profile bound to the faculty head is required");
+        }
+        Integer inFaculty = jdbc.queryForObject(
+                "SELECT COUNT(*) FROM thesis.thesis_topic t "
+                        + "JOIN academic.\"Department\" d ON d.\"id\" = t.department_id "
+                        + "WHERE t.id = :topicId AND d.\"facultyId\" = :facultyId",
+                new MapSqlParameterSource("topicId", topicId).addValue("facultyId", facultyId),
+                Integer.class);
+        if (inFaculty == null || inFaculty == 0) {
+            throw new DomainException(HttpStatus.NOT_FOUND, "TOPIC_NOT_FOUND", "Thesis topic not found");
+        }
+    }
+
+    /**
      * Read-side counterpart to {@link #requireTopicAccess}: true when the topic
      * belongs to the dean's active faculty or the dean personally supervises it.
      */

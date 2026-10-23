@@ -1244,7 +1244,9 @@ public class ThesisCouncilService {
                         + "JOIN thesis.thesis_registration_round r ON r.id = t.round_id "
                         + "WHERE t.id = :topicId FOR UPDATE OF t",
                 params().addValue("topicId", topicId), "TOPIC_NOT_FOUND", "Thesis topic not found");
-        ThesisDeanScope.requireTopicAccess(jdbc, actor, topicId);
+        // A waiver is a governance outcome: supervising the topic — even as
+        // a dean from another faculty — must not grant it.
+        ThesisDeanScope.requireTopicGovernanceScope(jdbc, actor, topicId);
         if (!TopicStatus.PUBLISHED.name().equals(topic.get("status"))
                 && !TopicStatus.APPROVED.name().equals(topic.get("status"))) {
             throw conflict("TOPIC_NOT_PUBLISHED", "Only published topics can waive a counter-review");
@@ -1322,7 +1324,7 @@ public class ThesisCouncilService {
                         + "JOIN thesis.thesis_registration_round r ON r.id = t.round_id "
                         + "WHERE t.id = :topicId FOR UPDATE OF t",
                 params().addValue("topicId", topicId), "TOPIC_NOT_FOUND", "Thesis topic not found");
-        ThesisDeanScope.requireTopicAccess(jdbc, actor, topicId);
+        ThesisDeanScope.requireTopicGovernanceScope(jdbc, actor, topicId);
         if (topic.get("gvpb_waived_reason") == null) {
             throw conflict("GVPB_NOT_WAIVED", "The counter-review requirement is not waived");
         }
