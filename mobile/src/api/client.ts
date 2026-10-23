@@ -97,6 +97,28 @@ export interface LoginResponse {
   refreshToken: string;
 }
 
+export interface TwoFactorChallengeResponse {
+  twoFactorRequired: boolean;
+  challengeId: string;
+  email: string | null;
+  user: null;
+  accessToken: null;
+  refreshToken: null;
+}
+
+export type SignInResponse = LoginResponse | TwoFactorChallengeResponse;
+
+export function isTwoFactorChallenge(
+  response: SignInResponse | null | undefined,
+): response is TwoFactorChallengeResponse {
+  return Boolean(
+    response
+      && response.twoFactorRequired === true
+      && typeof (response as TwoFactorChallengeResponse).challengeId === 'string'
+      && (response as TwoFactorChallengeResponse).challengeId.trim().length > 0,
+  );
+}
+
 export interface ChangePasswordResponse {
   message: string;
   sessionPreserved: boolean;
@@ -317,7 +339,8 @@ function shouldRefreshAfterUnauthorized(path: string, status: number) {
     status === 401 &&
     !normalizedPath.startsWith('/auth/login') &&
     !normalizedPath.startsWith('/auth/refresh') &&
-    !normalizedPath.startsWith('/auth/logout')
+    !normalizedPath.startsWith('/auth/logout') &&
+    !normalizedPath.startsWith('/auth/two-factor')
   );
 }
 
@@ -544,6 +567,7 @@ export const apiRoutes = {
     refresh: '/auth/refresh',
     logout: '/auth/logout',
     me: '/auth/me',
+    twoFactorVerify: '/auth/two-factor/verify',
   },
   identity: '/me',
   health: '/health/liveness',
@@ -572,7 +596,15 @@ export const campusApi = {
   me: () => apiClient.get<JsonObject>(apiRoutes.identity),
   account: () => apiClient.get<AuthUser>(apiRoutes.auth.me),
   login: (email: string, password: string) =>
-    apiClient.post<LoginResponse>(apiRoutes.auth.login, { email, password }),
+    apiClient.post<SignInResponse>(apiRoutes.auth.login, { email, password }),
+  verifyTwoFactor: async (challengeId: string, code: string) => {
+    const response = await apiClient.post<LoginResponse>(
+      apiRoutes.auth.twoFactorVerify,
+      { challengeId, code },
+    );
+    apiClient.setSessionTokens(response.accessToken, response.refreshToken);
+    return response;
+  },
   refresh: async () => {
     const response = await apiClient.post<LoginResponse>(
       apiRoutes.auth.refresh,
