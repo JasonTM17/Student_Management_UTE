@@ -18,6 +18,11 @@ services:
       # them here keeps per-client limits accurate (anti-brute-force).
       - key: RATE_LIMIT_TRUST_PROXY_HEADERS
         value: "true"
+      # The hosted Postgres free tier autosuspends without query activity;
+      # the keep-alive probe would keep it awake. Flip to "true" on demo day
+      # if warm pool borrows matter more than the compute-time allowance.
+      - key: APP_KEEPALIVE_ENABLED
+        value: "false"
       - key: JAVA_TOOL_OPTIONS
         value: "-XX:+UseSerialGC -Xmx300m -Xss512k -XX:MaxMetaspaceSize=128m -XX:ReservedCodeCacheSize=36m -XX:+ExitOnOutOfMemoryError"
       - key: SECURITY_JWT_REJECT_KNOWN_DEFAULTS
