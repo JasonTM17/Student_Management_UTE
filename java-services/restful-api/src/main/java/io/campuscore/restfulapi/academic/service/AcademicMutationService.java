@@ -623,8 +623,8 @@ public class AcademicMutationService {
 
     private boolean semesterOpen(String semesterId) {
         Long count = jdbc.queryForObject(
-                "SELECT COUNT(*) FROM " + SEMESTER + " WHERE \"id\" = :id AND \"status\" IN ('OPEN', 'REGISTRATION_OPEN', 'ADD_DROP_OPEN', 'ACTIVE')",
-                new MapSqlParameterSource("id", semesterId),
+                "SELECT COUNT(*) FROM " + SEMESTER + " WHERE \"id\" = :id AND \"status\" IN (:openStatuses)",
+                new MapSqlParameterSource().addValue("id", semesterId).addValue("openStatuses", SemesterStatuses.OPEN),
                 Long.class);
         return count != null && count > 0;
     }
