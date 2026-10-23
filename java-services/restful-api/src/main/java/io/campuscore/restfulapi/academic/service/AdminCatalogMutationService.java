@@ -32,6 +32,8 @@ public class AdminCatalogMutationService {
     private static final String CLASSROOM = "\"academic\".\"Classroom\"";
     private static final String SECTION = "\"academic\".\"Section\"";
     private static final String SECTION_SCHEDULE = "\"academic\".\"SectionSchedule\"";
+    private static final String ENROLLMENT = "\"academic\".\"Enrollment\"";
+    private static final String SLIP = "\"academic\".\"RegistrationSlip\"";
     /** Section.lecturerId joins the academic profile table (the auth schema exposes it as a view). */
     private static final String LECTURER = "\"academic\".\"Lecturer\"";
     /** Statuses the academic services and the admin console understand. */
@@ -301,6 +303,28 @@ public class AdminCatalogMutationService {
                 assertNoSectionConflicts(id);
             }
         }
+        if (SECTION.equals(table) && input.containsKey("status") && before != null) {
+            boolean cancelled = "CANCELLED".equals(before.get("status"));
+            boolean cancelling = !cancelled && "CANCELLED".equals(input.get("status"));
+            boolean reopening = cancelled && !"CANCELLED".equals(input.get("status"));
+            if (reopening) {
+                // The cancelled section released its room/lecturer slots, so a
+                // reopen must not silently restore a slot another section now
+                // holds.
+                assertNoSectionConflicts(id);
+            }
+            if (cancelling) {
+                // Persisted slips assert active registrations; leaving them in
+                // place would keep offering the cancelled course on the
+                // downloaded slip.
+                jdbc.update(
+                        "DELETE FROM " + SLIP + " WHERE (\"studentId\", \"semesterId\") IN"
+                                + " (SELECT e.\"studentId\", e.\"semesterId\" FROM " + ENROLLMENT + " e"
+                                + " WHERE e.\"sectionId\" = :sectionId"
+                                + " AND e.\"status\" IN ('ENROLLED', 'PENDING', 'CONFIRMED'))",
+                        new MapSqlParameterSource("sectionId", id));
+            }
+        }
         Map<String, Object> after = get(table, id);
         audit.record(actor(), null, "UPDATED", entityType(table), id,
                 entityType(table) + " " + id + " updated by " + actorLabel(),
@@ -481,12 +505,16 @@ public class AdminCatalogMutationService {
     private void assertNoSectionConflicts(String sectionId) {
         // Compare individual slots: MIN(start)/MAX(end) would occupy the free
         // gap between two sessions and incorrectly reject another class there.
+        // Cancelled sections hold no rooms or lecturer time: neither the
+        // checked section nor its peers participate while CANCELLED, which is
+        // also what lets a slot be reclaimed and the cancellation be reversed.
         String overlappingSlots = " FROM " + SECTION_SCHEDULE + " ss"
                 + " JOIN " + SECTION + " me ON me.\"id\" = ss.\"sectionId\""
                 + " JOIN " + SECTION_SCHEDULE + " ss2 ON ss2.\"dayOfWeek\" = ss.\"dayOfWeek\""
                 + " AND ss2.\"startTime\" < ss.\"endTime\" AND ss2.\"endTime\" > ss.\"startTime\""
                 + " JOIN " + SECTION + " s2 ON s2.\"id\" = ss2.\"sectionId\""
                 + " WHERE ss.\"sectionId\" = :sectionId AND ss2.\"sectionId\" <> ss.\"sectionId\""
+                + " AND me.\"status\" <> 'CANCELLED' AND s2.\"status\" <> 'CANCELLED'"
                 + " AND s2.\"semesterId\" = me.\"semesterId\"";
         Long roomClash = jdbc.queryForObject(
                 "SELECT COUNT(*)" + overlappingSlots
