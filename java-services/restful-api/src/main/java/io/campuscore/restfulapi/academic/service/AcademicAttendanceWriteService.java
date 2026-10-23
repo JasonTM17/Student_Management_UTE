@@ -42,8 +42,14 @@ public class AcademicAttendanceWriteService {
             throw new DomainException(HttpStatus.BAD_REQUEST, "INVALID_SECTION_ID", "sectionId is required");
         }
         String normalizedSectionId = sectionId.trim();
-        if (!repository.sectionExists(normalizedSectionId)) {
+        String sectionStatus = repository.sectionStatus(normalizedSectionId);
+        if (sectionStatus == null) {
             throw new DomainException(HttpStatus.NOT_FOUND, "SECTION_NOT_FOUND", "Section not found: " + sectionId);
+        }
+        // A cancelled section held no sessions; recording attendance for it
+        // fabricates participation data. The 409 matches the grading guard.
+        if ("CANCELLED".equals(sectionStatus)) {
+            throw new DomainException(HttpStatus.CONFLICT, "SECTION_CANCELLED", "Section is cancelled");
         }
 
         boolean isAdmin = roles != null && (roles.contains("ADMIN") || roles.contains("SUPER_ADMIN"));

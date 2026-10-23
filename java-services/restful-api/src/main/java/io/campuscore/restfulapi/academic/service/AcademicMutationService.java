@@ -611,7 +611,14 @@ public class AcademicMutationService {
     }
 
     private void requireSection(String sectionId) {
-        section(sectionId);
+        Map<String, Object> section = section(sectionId);
+        // Grades are the official record of a class that actually met; writing
+        // or publishing them for a cancelled section fabricates results for
+        // sessions that never ran. Reads stay untouched: published history
+        // from before the cancellation remains on the transcript.
+        if ("CANCELLED".equals(String.valueOf(section.get("status")))) {
+            throw problem(HttpStatus.CONFLICT, "SECTION_CANCELLED", "Section is cancelled");
+        }
     }
 
     private boolean semesterOpen(String semesterId) {
