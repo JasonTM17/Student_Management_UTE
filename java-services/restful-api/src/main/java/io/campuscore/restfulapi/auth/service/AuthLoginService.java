@@ -271,7 +271,14 @@ public class AuthLoginService {
     }
 
     @Transactional
-    public void changePassword(String userId, String oldPassword, String newPassword) {
+    public void changePassword(String userId, String oldPassword, String newPassword, String refreshTokenValue) {
+        // Pin the caller's session by stable row id BEFORE the User lock —
+        // the same contract as logout(): a refresh holding that lock can
+        // rotate the row's token hash while this call waits, and a hash
+        // resolved only afterwards would point nowhere.
+        String keepSessionId = refreshTokenValue == null || refreshTokenValue.isBlank()
+                ? null
+                : users.findSessionIdByRefreshHash(userId, hash(refreshTokenValue)).orElse(null);
         users.lockUserRow(userId);
         AuthUserRecord user = requireActiveUser(userId);
         if (oldPassword == null || oldPassword.isBlank() || newPassword == null || newPassword.isBlank()) {
@@ -293,11 +300,20 @@ public class AuthLoginService {
         // replaced was office-issued, which decides the audit action below.
         boolean rotatingOfficeIssuedCredential = user.mustChangePassword();
         users.changePassword(user.id(), passwordEncoder.encode(newPassword), clock.instant());
-        // Rotation clears the office-issued flag; sessions are revoked so the
-        // user signs back in with the new credential.
+        // Rotation clears the office-issued flag and the credential-version
+        // bump retires every issued access token. The caller's refresh
+        // session survives — the device that just proved the old credential
+        // stays signed in and mints new-revision access tokens on its next
+        // rotation — while every other session of the account is revoked.
+        // When no session could be pinned (no refresh token, or the row was
+        // rotated away first), all sessions are revoked: the safe direction.
         users.setMustChangePassword(user.id(), false);
-        users.deleteAllRefreshSessions(user.id());
-        users.clearUserRefreshToken(user.id());
+        if (keepSessionId == null) {
+            users.deleteAllRefreshSessions(user.id());
+            users.clearUserRefreshToken(user.id());
+        } else {
+            users.deleteOtherRefreshSessions(user.id(), keepSessionId);
+        }
         // Round-3 ct-4: a self-service credential rotation is exactly the
         // operation whose author an investigation needs to know — the trail
         // previously covered only admin-initiated resets (PASSWORD_RESET).
@@ -307,9 +323,12 @@ public class AuthLoginService {
         audit.record(userId, null,
                 rotatingOfficeIssuedCredential ? "TEMP_CREDENTIAL_ROTATED" : "PASSWORD_CHANGED",
                 "USER", userId,
-                rotatingOfficeIssuedCredential
-                        ? "User rotated an office-issued temporary password; all sessions were revoked"
-                        : "User rotated their own password; all sessions were revoked");
+                (rotatingOfficeIssuedCredential
+                        ? "User rotated an office-issued temporary password; "
+                        : "User rotated their own password; ")
+                        + (keepSessionId != null
+                                ? "other sessions were revoked; the rotating device stays signed in"
+                                : "all sessions were revoked"));
     }
 
     @Transactional

@@ -145,8 +145,13 @@ public class AuthLoginController {
     })
     public MessageResponse changePassword(
             @AuthenticationPrincipal Jwt jwt,
-            @Valid @RequestBody ChangePasswordRequest request) {
-        auth.changePassword(jwt.getSubject(), request.oldPassword(), request.newPassword());
+            @Valid @RequestBody ChangePasswordRequest request,
+            HttpServletRequest servletRequest) {
+        auth.changePassword(
+                jwt.getSubject(),
+                request.oldPassword(),
+                request.newPassword(),
+                cookies.refreshToken(servletRequest, request.refreshToken()));
         return new MessageResponse("Password changed successfully");
     }
 

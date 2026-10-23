@@ -5,7 +5,6 @@ import { ShieldCheck } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import { authApi } from '@/lib/api';
 import { campusCodeMessage } from '@/lib/campus-error';
-import { loginHref, portalFromUser } from '@/lib/login-portal';
 import { checkPasswordPolicy } from '@/lib/password-policy';
 import { useI18n } from '@/i18n';
 import { Modal } from '@/components/ui/modal';
@@ -19,8 +18,8 @@ import { Input } from '@/components/ui/input';
  * APIs with PASSWORD_CHANGE_REQUIRED, so the overlay is UX, not the gate.
  */
 export function ForcedPasswordRotationGate() {
-  const { user, logout } = useAuth();
-  const { href, locale, messages } = useI18n();
+  const { user, refreshUser } = useAuth();
+  const { locale, messages } = useI18n();
   const [oldPassword, setOldPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -40,9 +39,8 @@ export function ForcedPasswordRotationGate() {
         newLabel: 'Mật khẩu mới',
         confirmLabel: 'Nhập lại mật khẩu mới',
         hint: 'Từ 8 đến 128 ký tự, có ít nhất một chữ cái và một chữ số; không được chứa địa chỉ email của bạn.',
-        submit: 'Đổi mật khẩu và đăng nhập lại',
+        submit: 'Đổi mật khẩu',
         saving: 'Đang cập nhật...',
-        success: 'Đã đổi mật khẩu. Vui lòng đăng nhập lại bằng mật khẩu mới.',
         failed: 'Không thể đổi mật khẩu. Hãy kiểm tra mật khẩu tạm thời và thử lại.',
       }
     : {
@@ -53,9 +51,8 @@ export function ForcedPasswordRotationGate() {
         newLabel: 'New password',
         confirmLabel: 'Confirm new password',
         hint: 'Between 8 and 128 characters with at least one letter and one digit; it must not contain your email address.',
-        submit: 'Rotate and sign in again',
+        submit: 'Set new password',
         saving: 'Updating...',
-        success: 'Password rotated. Please sign in again with the new one.',
         failed: 'Could not rotate the password. Check the temporary credential and retry.',
       };
 
@@ -74,7 +71,11 @@ export function ForcedPasswordRotationGate() {
     setIsSaving(true);
     try {
       await authApi.changePassword(oldPassword, newPassword);
-      await logout({ redirect: loginHref(href, portalFromUser(user), 'password-rotated') });
+      // The server keeps this device's session through the rotation: the
+      // pre-rotation access token is retired, so the first identity probe
+      // refreshes through the kept session and comes back with the flag
+      // cleared — the gate closes and the portal opens without a sign-out.
+      await refreshUser();
     } catch (error: unknown) {
       setError(campusCodeMessage(error, messages.common.campusErrors, copy.failed));
     } finally {

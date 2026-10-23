@@ -726,6 +726,143 @@ class AuthLoginPersistenceTest {
     }
 
     @Test
+    void changePasswordKeepsTheCallingDeviceSessionAndRevokesOtherDevices() throws Exception {
+        // The device that proves the old credential must stay signed in —
+        // its refresh session survives the rotation while every other
+        // session of the account is revoked.
+        String newSecret = "new-" + UUID.randomUUID();
+        MvcResult deviceA = loginStudent().andExpect(status().isOk()).andReturn();
+        MvcResult deviceB = loginStudent().andExpect(status().isOk()).andReturn();
+        Cookie aAccess = deviceA.getResponse().getCookie("cc_access_token");
+        Cookie aRefresh = deviceA.getResponse().getCookie("cc_refresh_token");
+        Cookie aCsrf = deviceA.getResponse().getCookie("cc_csrf");
+        String aAccessToken = objectMapper.readTree(deviceA.getResponse().getContentAsString())
+                .get("accessToken").asText();
+        String bAccessToken = objectMapper.readTree(deviceB.getResponse().getContentAsString())
+                .get("accessToken").asText();
+        String bRefreshToken = objectMapper.readTree(deviceB.getResponse().getContentAsString())
+                .get("refreshToken").asText();
+        org.junit.jupiter.api.Assertions.assertEquals(2, sessionCount());
+
+        // The real browser transport: session cookies only, no Authorization
+        // header — so the double-submit CSRF pair is required.
+        mvc.perform(post("/api/v1/auth/change-password")
+                        .cookie(aAccess, aRefresh, aCsrf)
+                        .header("X-CSRF-Token", aCsrf.getValue())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"oldPassword\":\"password123\",\"newPassword\":\"" + newSecret + "\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.message").value("Password changed successfully"));
+
+        org.junit.jupiter.api.Assertions.assertEquals(1, sessionCount(),
+                "every session except the caller's must be revoked");
+        org.junit.jupiter.api.Assertions.assertEquals(sha256(aRefresh.getValue()), onlySessionHash(),
+                "the calling device keeps its refresh session");
+
+        // The revision bump retires every access token issued before the
+        // rotation — the other device's and the caller's own.
+        mvc.perform(get("/api/v1/auth/me").header("Authorization", "Bearer " + bAccessToken))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.code").value("SESSION_INVALID"));
+        mvc.perform(get("/api/v1/auth/me").header("Authorization", "Bearer " + aAccessToken))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.code").value("SESSION_INVALID"));
+        mvc.perform(get("/api/v1/auth/me").cookie(aAccess))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.code").value("SESSION_INVALID"));
+
+        // The kept session rotates normally: the refreshed access token
+        // carries the new revision and authenticates again — this is the
+        // browser's silent path back to a working session.
+        MvcResult refreshed = mvc.perform(post("/api/v1/auth/refresh")
+                        .cookie(aRefresh, aCsrf)
+                        .header("X-CSRF-Token", aCsrf.getValue())
+                        .header("User-Agent", "jest-java-change-password"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.accessToken", notNullValue()))
+                .andReturn();
+        String rotatedAccess = objectMapper.readTree(refreshed.getResponse().getContentAsString())
+                .get("accessToken").asText();
+        mvc.perform(get("/api/v1/auth/me").header("Authorization", "Bearer " + rotatedAccess))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value("student-user"));
+
+        // The revoked session's refresh token is dead: it reads as reuse and
+        // fails the whole family closed (this also clears the kept row).
+        mvc.perform(post("/api/v1/auth/refresh")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"refreshToken\":\"" + bRefreshToken + "\"}"))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.code").value("UNAUTHENTICATED"));
+        org.junit.jupiter.api.Assertions.assertEquals(0, sessionCount());
+
+        // The rotated credential is the only working one.
+        mvc.perform(post("/api/v1/auth/login")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"email\":\"student@campuscore.edu\",\"password\":\"password123\"}"))
+                .andExpect(status().isUnauthorized());
+        mvc.perform(post("/api/v1/auth/login")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"email\":\"student@campuscore.edu\",\"password\":\"" + newSecret + "\"}"))
+                .andExpect(status().isOk());
+    }
+
+    @Test
+    void issuedAccountRotationKeepsTheCurrentDeviceSignedIn() throws Exception {
+        // The reported flow: an office-issued account signs in with its
+        // temporary password, rotates it at the forced gate, and must land
+        // in the portal still signed in — not back at the login page.
+        String issuedSecret = "issued-" + UUID.randomUUID();
+        String rotatedSecret = "rotated-" + UUID.randomUUID();
+        jdbc.update(
+                "UPDATE \"campuscore_auth\".\"User\" SET \"password\" = ?, \"mustChangePassword\" = TRUE"
+                        + " WHERE \"id\" = 'student-user'",
+                passwordEncoder.encode(issuedSecret));
+
+        MvcResult login = mvc.perform(post("/api/v1/auth/login")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"email\":\"student@campuscore.edu\",\"password\":\"" + issuedSecret + "\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.user.mustChangePassword").value(true))
+                .andReturn();
+        Cookie access = login.getResponse().getCookie("cc_access_token");
+        Cookie refresh = login.getResponse().getCookie("cc_refresh_token");
+        Cookie csrf = login.getResponse().getCookie("cc_csrf");
+
+        mvc.perform(post("/api/v1/auth/change-password")
+                        .cookie(access, refresh, csrf)
+                        .header("X-CSRF-Token", csrf.getValue())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"oldPassword\":\"" + issuedSecret
+                                + "\",\"newPassword\":\"" + rotatedSecret + "\"}"))
+                .andExpect(status().isOk());
+
+        Boolean flag = jdbc.queryForObject(
+                "SELECT \"mustChangePassword\" FROM \"campuscore_auth\".\"User\" WHERE \"id\" = 'student-user'",
+                Boolean.class);
+        org.junit.jupiter.api.Assertions.assertFalse(flag);
+        org.junit.jupiter.api.Assertions.assertEquals(1, sessionCount(),
+                "the rotating device's session must survive the forced rotation");
+
+        // The pre-rotation access cookie is retired, but the kept refresh
+        // session mints a working session on the new credential revision —
+        // after this the account-state filter lets the portal through.
+        MvcResult refreshed = mvc.perform(post("/api/v1/auth/refresh")
+                        .cookie(refresh, csrf)
+                        .header("X-CSRF-Token", csrf.getValue()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.user.mustChangePassword").value(false))
+                .andReturn();
+        Cookie rotatedAccess = refreshed.getResponse().getCookie("cc_access_token");
+        mvc.perform(put("/api/v1/auth/profile")
+                        .cookie(rotatedAccess, csrf)
+                        .header("X-CSRF-Token", csrf.getValue())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"phone\":\"0900000000\"}"))
+                .andExpect(status().isOk());
+    }
+
+    @Test
     void tempCredentialRotationAuditsSeparatelyFromOrdinaryPasswordChange() throws Exception {
         // An office-issued credential that gets rotated is the audit trail's
         // only signal that an admin-issued temporary password reached its
@@ -1274,6 +1411,19 @@ class AuthLoginPersistenceTest {
                 localDateTime(BASE_TIME),
                 localDateTime(BASE_TIME),
                 localDateTime(BASE_TIME));
+    }
+
+    private int sessionCount() {
+        Integer count = jdbc.queryForObject(
+                "SELECT COUNT(*) FROM \"campuscore_auth\".\"Session\" WHERE \"userId\" = 'student-user'",
+                Integer.class);
+        return count == null ? 0 : count;
+    }
+
+    private String onlySessionHash() {
+        return jdbc.queryForObject(
+                "SELECT \"refreshToken\" FROM \"campuscore_auth\".\"Session\" WHERE \"userId\" = 'student-user'",
+                String.class);
     }
 
     private static LocalDateTime localDateTime(Instant value) {

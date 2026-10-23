@@ -10,7 +10,7 @@ import { PageHeader, SectionEyebrow } from '@/components/ui/page-header';
 import { LoadingState } from '@/components/ui/state-block';
 import { WorkspacePanel } from '@/components/dashboard/WorkspaceSurface';
 import { useI18n } from '@/i18n';
-import { isDemoUser, loginHref, portalFromUser } from '@/lib/login-portal';
+import { isDemoUser } from '@/lib/login-portal';
 import { campusCodeMessage, type CampusErrorCopy } from '@/lib/campus-error';
 import { checkPasswordPolicy } from '@/lib/password-policy';
 import { maskEmail, normalizeOtpCode } from '@/lib/two-factor';
@@ -161,8 +161,8 @@ function PasswordField({
 }
 
 export default function ProfilePage() {
-  const { user, refreshUser, logout } = useAuth();
-  const { messages, locale, href } = useI18n();
+  const { user, refreshUser } = useAuth();
+  const { messages, locale } = useI18n();
   const [isLoading, setIsLoading] = useState(false);
   const [isUpdatingPassword, setIsUpdatingPassword] = useState(false);
   const [profileError, setProfileError] = useState('');
@@ -466,7 +466,10 @@ export default function ProfilePage() {
         confirmPassword: false,
         twoFactorPassword: false,
       });
-      await logout({ redirect: loginHref(href, portalFromUser(user), 'password-rotated') });
+      // The server keeps this device's session through the rotation; re-read
+      // the identity (the first probe silently refreshes the retired access
+      // token through the kept session) instead of signing the user out.
+      await refreshUser();
     } catch (error: any) {
       // The inline error sits directly under the form, so a toast with the
       // same copy read as a duplicated message.
