@@ -230,6 +230,40 @@ class SectionReopenConflictPostgresIT {
     }
 
     /**
+     * The terminal match normalizes what the column stores, not only what
+     * the admin API writes: a lower-case or whitespace-padded CLOSED,
+     * COMPLETED or ARCHIVED value landing through a direct write still
+     * refuses the reopen, while every other stored value stays ungated.
+     */
+    @Test
+    void reopenRefusesTerminalStatusesOutsideTheAdminVocabulary() {
+        for (String status : List.of("closed", "Closed", "CLOSED ", " completed ", "archived")) {
+            AcademicEnrollmentPostgresFixture fixture = AcademicEnrollmentPostgresFixture.seed(jdbc, 30);
+            jdbc.update("UPDATE academic.\"Semester\" SET \"status\" = :st WHERE \"id\" = :id",
+                    new MapSqlParameterSource().addValue("st", status).addValue("id", fixture.semesterId));
+            catalog.update(SECTION_TABLE, fixture.sectionId, Map.of("status", "CANCELLED"));
+            DomainException refusal = catchReopen(fixture.sectionId, Map.of("status", "OPEN"));
+            assertThat(refusal)
+                    .as("reopen must refuse a stored '%s'", status)
+                    .isNotNull();
+            assertThat(refusal.code()).isEqualTo("SEMESTER_CLOSED");
+            assertThat(sectionStatus(fixture.sectionId)).isEqualTo("CANCELLED");
+        }
+
+        for (String status : List.of("ENDED", "FINISHED", "CANCELLED", "")) {
+            AcademicEnrollmentPostgresFixture fixture = AcademicEnrollmentPostgresFixture.seed(jdbc, 30);
+            jdbc.update("UPDATE academic.\"Semester\" SET \"status\" = :st WHERE \"id\" = :id",
+                    new MapSqlParameterSource().addValue("st", status).addValue("id", fixture.semesterId));
+            catalog.update(SECTION_TABLE, fixture.sectionId, Map.of("status", "CANCELLED"));
+            Map<String, Object> reopened = catalog.update(SECTION_TABLE, fixture.sectionId,
+                    Map.of("status", "OPEN"));
+            assertThat(String.valueOf(reopened.get("status")))
+                    .as("reopen must still allow a stored '%s'", status)
+                    .isEqualTo("OPEN");
+        }
+    }
+
+    /**
      * A slip rendered from pre-cancel state must not commit over the cancel:
      * the render locks the affected section rows and re-reads the active set
      * under the lock, so parking the slip worker before its section FOR

@@ -1019,7 +1019,7 @@ public class AdminCatalogMutationService {
      */
     private void requireNonTerminalSemesterForReopen(Object semesterId) {
         Long count = jdbc.queryForObject(
-                "SELECT COUNT(*) FROM " + SEMESTER + " WHERE \"id\" = :id AND \"status\" NOT IN (:terminalStatuses)",
+                "SELECT COUNT(*) FROM " + SEMESTER + " WHERE \"id\" = :id AND UPPER(TRIM(\"status\")) NOT IN (:terminalStatuses)",
                 new MapSqlParameterSource().addValue("id", semesterId)
                         .addValue("terminalStatuses", SemesterStatuses.TERMINAL),
                 Long.class);
