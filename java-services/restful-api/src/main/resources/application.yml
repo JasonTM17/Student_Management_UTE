@@ -219,7 +219,7 @@ spring:
       minimum-idle: ${DB_POOL_MIN:0}
       connection-timeout: ${DB_CONNECTION_TIMEOUT_MS:15000}
       validation-timeout: ${DB_VALIDATION_TIMEOUT_MS:3000}
-      idle-timeout: ${DB_POOL_IDLE_TIMEOUT_MS:60000}
+      idle-timeout: ${DB_POOL_IDLE_TIMEOUT_MS:300000}
       keepalive-time: ${DB_POOL_KEEPALIVE_MS:0}
   jpa:
     hibernate:
