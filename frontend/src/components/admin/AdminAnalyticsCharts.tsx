@@ -2,6 +2,7 @@
 
 import * as React from 'react';
 import { useEffect, useMemo, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import {
   BarChart3,
   GraduationCap,
@@ -16,6 +17,7 @@ import { EmptyState } from '@/components/ui/state-block';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useI18n } from '@/i18n';
 import { cn } from '@/lib/utils';
+import { LocalizedLink } from '@/components/LocalizedLink';
 import {
   campusDistributionApi,
   type AdminAnalyticsOverview,
@@ -45,8 +47,14 @@ const GRADE_BAND_TOKENS = [
   'bg-status-danger',
 ] as const;
 
+/** Course catalog pre-filtered to one faculty; the page resolves the code to its id. */
+function departmentCoursesHref(code: string) {
+  return `/admin/courses?department=${encodeURIComponent(code)}`;
+}
+
 export function AdminAnalyticsCharts({ stats, className }: AdminAnalyticsChartsProps) {
-  const { messages, formatNumber, locale } = useI18n();
+  const { messages, formatNumber, locale, href: localizeHref } = useI18n();
+  const router = useRouter();
   const copy = messages.admin.analytics;
   const isVi = locale === 'vi';
   const [activeTab, setActiveTab] = useState<'departments' | 'enrollments' | 'faculty' | 'grades'>('departments');
@@ -345,8 +353,29 @@ export function AdminAnalyticsCharts({ stats, className }: AdminAnalyticsChartsP
                           ? copy.coursesShort
                           : copy.sectionsShort;
 
+                    const openDepartment = () => router.push(localizeHref(departmentCoursesHref(dept.code)));
+
                     return (
-                      <g key={dept.code} className="group">
+                      <g
+                        key={dept.code}
+                        className="group cursor-pointer focus-visible:outline-none"
+                        role="link"
+                        tabIndex={0}
+                        aria-label={
+                          isVi
+                            ? `Xem môn học của ${dept.name} (${dept.code})`
+                            : `View courses of ${dept.name} (${dept.code})`
+                        }
+                        onClick={openDepartment}
+                        onKeyDown={(event) => {
+                          if (event.key === 'Enter' || event.key === ' ') {
+                            event.preventDefault();
+                            openDepartment();
+                          }
+                        }}
+                      >
+                        {/* Full-height hit area so short bars stay easy to hit */}
+                        <rect x={x - 4} y={20} width={barWidth + 8} height={190} fill="transparent" />
                         <rect
                           x={x}
                           y={y}
@@ -395,7 +424,16 @@ export function AdminAnalyticsCharts({ stats, className }: AdminAnalyticsChartsP
             {departments.length > 0 && (
               <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
                 {departments.map((dept) => (
-                  <div key={dept.code} className="flex items-center gap-2.5 rounded-lg border border-border/60 bg-secondary/20 p-2.5">
+                  <LocalizedLink
+                    key={dept.code}
+                    href={departmentCoursesHref(dept.code)}
+                    aria-label={
+                      isVi
+                        ? `Xem môn học của ${dept.name} (${dept.code})`
+                        : `View courses of ${dept.name} (${dept.code})`
+                    }
+                    className="flex items-center gap-2.5 rounded-lg border border-border/60 bg-secondary/20 p-2.5 transition-colors hover:border-primary/40 hover:bg-primary/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                  >
                     <span className="flex h-7 min-w-7 shrink-0 items-center justify-center rounded-md bg-primary/10 px-1.5 text-[11px] font-bold text-primary">
                       {dept.code}
                     </span>
@@ -406,7 +444,7 @@ export function AdminAnalyticsCharts({ stats, className }: AdminAnalyticsChartsP
                         {formatNumber(dept.courses)} {copy.courseShortBadge}
                       </p>
                     </div>
-                  </div>
+                  </LocalizedLink>
                 ))}
               </div>
             )}

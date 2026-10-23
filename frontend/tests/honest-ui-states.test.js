@@ -343,6 +343,15 @@ test('narrow-screen layouts keep their content inside the card', () => {
   assert.match(read('src/app/dashboard/transcript/page.tsx'), /grid grid-cols-1 gap-4 lg:grid-cols-2/);
   assert.match(read('src/components/admin/AdminSurface.tsx'), /function AdminRowActions[\s\S]{0,200}'flex flex-wrap items-center justify-end gap-2 md:flex-nowrap'/);
   assert.match(read('src/app/admin/users/page.tsx'), /<div className="min-w-0">\s*<h3 className="break-words font-semibold text-foreground">[\s\S]{0,300}<StatusPill tone=\{userStatusTone\(record\.status\)\} className="shrink-0 py-1">/);
+  // Fixed-height controls (h-7/h-8/h-9) lose their text when the base class
+  // still carries py-2: the admin reviewer picker cut its label in half.
+  assert.doesNotMatch(read('src/components/ui/select.tsx'), /px-3 py-2 pr-10/);
+  assert.doesNotMatch(read('src/components/ui/input.tsx'), /bg-background px-3 py-2/);
+  // Faculty tiles and chart bars on the admin overview must be real links.
+  const charts = read('src/components/admin/AdminAnalyticsCharts.tsx');
+  assert.match(charts, /<LocalizedLink\s+key=\{dept\.code\}\s+href=\{departmentCoursesHref\(dept\.code\)\}/);
+  assert.match(charts, /role="link"[\s\S]{0,200}tabIndex=\{0\}[\s\S]{0,400}onClick=\{openDepartment\}/);
+  assert.match(read('src/app/admin/courses/page.tsx'), /get\('department'\)[\s\S]{0,300}setDepartmentFilter\(match\.id\)/);
   // The report row sits in a proportional column: the file name must take the
   // remaining width (it shrank to ~26px at 1280px) and the actions must wrap.
   const thesis = read('src/app/dashboard/thesis/page.tsx');

@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { BookOpen, Pencil, Plus, Search, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
@@ -54,6 +54,7 @@ interface Course {
 
 interface Department {
   id: string;
+  code?: string;
   name: string;
   nameEn?: string;
   nameVi?: string;
@@ -116,6 +117,25 @@ export default function AdminCoursesPage() {
       );
     }
   }, [locale]);
+
+  // The admin overview links here with ?department=<code>. Resolve it to the
+  // faculty id once the list is loaded; an unknown code leaves the filter off.
+  const appliedDepartmentParam = useRef(false);
+  useEffect(() => {
+    if (appliedDepartmentParam.current || departments.length === 0) {
+      return;
+    }
+    appliedDepartmentParam.current = true;
+    const code = new URLSearchParams(window.location.search).get('department')?.trim().toLowerCase();
+    if (!code) {
+      return;
+    }
+    const match = departments.find((department) => department.code?.toLowerCase() === code);
+    if (match) {
+      setDepartmentFilter(match.id);
+      setPage(1);
+    }
+  }, [departments]);
 
   const fetchCourses = useCallback(async () => {
     setIsLoading(true);
