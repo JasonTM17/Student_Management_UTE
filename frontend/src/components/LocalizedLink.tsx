@@ -3,6 +3,7 @@
 import Link, { type LinkProps } from 'next/link';
 import * as React from 'react';
 import { useI18n } from '@/i18n';
+import { isSafeInternalPath } from '@/lib/safe-path';
 
 type LocalizedLinkProps = LinkProps &
   Omit<React.AnchorHTMLAttributes<HTMLAnchorElement>, keyof LinkProps> & {
@@ -15,6 +16,10 @@ export const LocalizedLink = React.forwardRef<HTMLAnchorElement, LocalizedLinkPr
     ref,
   ) {
     const { href: localizeHref, isPrefixed } = useI18n();
+
+    if (typeof href === 'string' && !isSafeInternalPath(href)) {
+      return <a ref={ref} {...props} />;
+    }
 
     const resolvedHref =
       typeof href === 'string'
