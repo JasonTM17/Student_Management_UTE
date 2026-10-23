@@ -45,6 +45,8 @@ class SectionReopenConflictPostgresIT {
     private static final String WORKER_NAME = "src-slip-worker";
     private static final String REOPEN_NAME = "it-reopen-worker";
     private static final String ENROLL_NAME = "it-enroll-worker";
+    private static final String CANCEL_NAME = "it-cancel-worker";
+    private static final String EDIT_NAME = "it-edit-worker";
 
     @Autowired private RegistrationService registration;
     @Autowired private AdminCatalogMutationService catalog;
@@ -246,6 +248,201 @@ class SectionReopenConflictPostgresIT {
             pool.shutdownNow();
             assertThat(pool.awaitTermination(10, TimeUnit.SECONDS)).isTrue();
         }
+    }
+
+    /**
+     * A stale section edit carrying {@code status:'OPEN'} can queue behind a
+     * concurrent cancel: the edit's unlocked pre-read still sees OPEN, so it
+     * never enters the reopen path — no student locks, no conflict scan, no
+     * acknowledgement — and the write then stamps its stale status back over
+     * the committed CANCELLED. The status write must verify the observed
+     * state instead: once the cancel commits the guarded update matches
+     * nothing and the edit refuses with SECTION_STATUS_CHANGED, while the
+     * student spends the freed credits elsewhere under a cap of 3.
+     */
+    @Test
+    void staleEditQueuedBehindACancelCannotReopenTheSection() throws Exception {
+        AcademicEnrollmentPostgresFixture fixture = AcademicEnrollmentPostgresFixture.seed(jdbc, 30);
+        String student = fixture.seedStudent(1);
+        String section = fixture.sectionId;
+        String otherSection = otherCourseSection(fixture, "cv");
+
+        registration.enroll(student, section, List.of("STUDENT"), "it-cv-" + section);
+        jdbc.update("UPDATE academic.\"RegistrationRound\" SET \"creditLimit\" = 3 WHERE \"id\" = :id",
+                new MapSqlParameterSource("id", fixture.roundId));
+
+        CountDownLatch cancelPaused = new CountDownLatch(1);
+        CountDownLatch cancelResume = new CountDownLatch(1);
+        CountDownLatch editAtUpdate = new CountDownLatch(1);
+        barrierCancelAtSlipDeleteAndEditAtUpdate(cancelPaused, cancelResume, editAtUpdate);
+        var pool = Executors.newFixedThreadPool(2);
+        try {
+            var cancel = pool.submit(() -> {
+                Thread.currentThread().setName(CANCEL_NAME);
+                try {
+                    catalog.update(SECTION_TABLE, section, Map.of("status", "CANCELLED"));
+                    return "CANCELLED";
+                } catch (RuntimeException failure) {
+                    return failure;
+                }
+            });
+            assertThat(cancelPaused.await(10, TimeUnit.SECONDS))
+                    .as("cancel parked at its slip purge still holding the section row").isTrue();
+            var edit = pool.submit(() -> {
+                Thread.currentThread().setName(EDIT_NAME);
+                try {
+                    catalog.update(SECTION_TABLE, section, Map.of("status", "OPEN"));
+                    return "EDITED";
+                } catch (RuntimeException failure) {
+                    return failure;
+                }
+            });
+            // The edit read the stale OPEN row and is now queued on the
+            // section row lock, never having entered the reopen path.
+            assertThat(editAtUpdate.await(10, TimeUnit.SECONDS))
+                    .as("edit issued its section update behind the cancel").isTrue();
+            cancelResume.countDown();
+            assertThat(cancel.get(30, TimeUnit.SECONDS)).isEqualTo("CANCELLED");
+
+            Object outcome = edit.get(30, TimeUnit.SECONDS);
+            assertThat(outcome)
+                    .as("stale edit must refuse, not resurrect the cancelled section: %s", outcome)
+                    .isInstanceOf(DomainException.class);
+            assertThat(((DomainException) outcome).code()).isEqualTo("SECTION_STATUS_CHANGED");
+            assertThat(((DomainException) outcome).getStatus().value()).isEqualTo(409);
+            assertThat(sectionStatus(section)).isEqualTo("CANCELLED");
+
+            // The freed seat is then spent elsewhere: the failed edit held no
+            // student row and no phantom reopen counted against the cap.
+            registration.enroll(student, otherSection, List.of("STUDENT"), "it-cv-enroll");
+            assertThat(activeCredits(student, fixture.semesterId)).isEqualTo(3);
+            assertThat(acknowledgements(section)).isZero();
+        } finally {
+            cancelResume.countDown();
+            pool.shutdownNow();
+            assertThat(pool.awaitTermination(10, TimeUnit.SECONDS)).isTrue();
+        }
+    }
+
+    /**
+     * A slip render can sit between its active-set read and the persist
+     * INSERT while a reopen commits: without the student's row lock the
+     * render used to write a slip missing the reopened course and every
+     * later download kept serving it. With the student row share-locked
+     * first — the same global order the reopen's conflict pass takes — the
+     * reopen queues behind the render and its slip purge then removes the
+     * render's output, so the next download re-renders the committed set.
+     */
+    @Test
+    void slipRenderQueuedAheadOfAReopenCannotServeAStaleSet() throws Exception {
+        AcademicEnrollmentPostgresFixture fixture = AcademicEnrollmentPostgresFixture.seed(jdbc, 30);
+        String student = fixture.seedStudent(1);
+        String section = fixture.sectionId;
+        String otherSection = otherCourseSection(fixture, "sl");
+
+        registration.enroll(student, section, List.of("STUDENT"), "it-sl-" + section);
+        registration.enroll(student, otherSection, List.of("STUDENT"), "it-sl-" + otherSection);
+        catalog.update(SECTION_TABLE, section, Map.of("status", "CANCELLED"));
+        // A render-path race needs the worker to miss the fast path and
+        // rebuild the slip itself rather than serve a persisted row.
+        jdbc.update("DELETE FROM academic.\"RegistrationSlip\" WHERE \"studentId\" = :st",
+                new MapSqlParameterSource("st", student));
+
+        CountDownLatch renderPaused = new CountDownLatch(1);
+        CountDownLatch renderResume = new CountDownLatch(1);
+        pauseSlipWorkerBeforePersist(renderPaused, renderResume);
+        var pool = Executors.newFixedThreadPool(2);
+        try {
+            var render = pool.submit(() -> {
+                Thread.currentThread().setName(WORKER_NAME);
+                try {
+                    registration.slip(student, fixture.semesterId);
+                    return "RENDERED";
+                } catch (RuntimeException failure) {
+                    return failure;
+                }
+            });
+            assertThat(renderPaused.await(10, TimeUnit.SECONDS))
+                    .as("render parked before the slip insert holding its locks").isTrue();
+            var reopen = pool.submit(() -> {
+                Thread.currentThread().setName(REOPEN_NAME);
+                try {
+                    catalog.update(SECTION_TABLE, section, Map.of("status", "OPEN"));
+                    return "REOPENED";
+                } catch (RuntimeException failure) {
+                    return failure;
+                }
+            });
+            // The reopen's affected-student FOR UPDATE must queue behind the
+            // render's share lock — a reopen that commits here proves the
+            // render never serialized on the student row.
+            try {
+                Object early = reopen.get(3, TimeUnit.SECONDS);
+                throw new AssertionError(
+                        "reopen committed while the render still held the student share lock: " + early);
+            } catch (java.util.concurrent.TimeoutException blocked) {
+                // queued on the Student row lock — the serialized order
+            }
+            renderResume.countDown();
+            assertThat(render.get(30, TimeUnit.SECONDS)).isEqualTo("RENDERED");
+            assertThat(reopen.get(30, TimeUnit.SECONDS)).isEqualTo("REOPENED");
+
+            // The reopen's slip purge removes what the parked render wrote,
+            // so the next download re-renders the committed set — reopened
+            // course included — instead of serving the stale slip.
+            Integer persisted = jdbc.queryForObject(
+                    "SELECT COUNT(*) FROM academic.\"RegistrationSlip\" WHERE \"studentId\" = :st",
+                    new MapSqlParameterSource("st", student), Integer.class);
+            assertThat(persisted).as("stale render must not survive the reopen").isZero();
+            var served = registration.slip(student, fixture.semesterId);
+            Integer servedFromPersisted = jdbc.queryForObject(
+                    "SELECT COUNT(*) FROM academic.\"RegistrationSlip\" WHERE \"studentId\" = :st"
+                            + " AND TRIM(\"sha256\") = :sha",
+                    new MapSqlParameterSource().addValue("st", student).addValue("sha", served.sha256()),
+                    Integer.class);
+            assertThat(servedFromPersisted)
+                    .as("the re-rendered slip persists for later downloads").isEqualTo(1);
+        } finally {
+            renderResume.countDown();
+            pool.shutdownNow();
+            assertThat(pool.awaitTermination(10, TimeUnit.SECONDS)).isTrue();
+        }
+    }
+
+    /**
+     * Two barriers in one schedule: the cancel worker parks before its slip
+     * purge while holding the section row, and the edit worker only signals
+     * when it issues its section UPDATE — the row lock then does the waiting.
+     */
+    private void barrierCancelAtSlipDeleteAndEditAtUpdate(CountDownLatch cancelPaused,
+            CountDownLatch cancelResume, CountDownLatch editAtUpdate) {
+        Answer<Object> pause = call -> {
+            String sql = call.getArgument(0);
+            String thread = Thread.currentThread().getName();
+            if (CANCEL_NAME.equals(thread)
+                    && sql.startsWith("DELETE FROM \"academic\".\"RegistrationSlip\"")
+                    && sql.contains(":sectionId")) {
+                await(cancelPaused, cancelResume);
+            } else if (EDIT_NAME.equals(thread)
+                    && sql.startsWith("UPDATE \"academic\".\"Section\"")) {
+                editAtUpdate.countDown();
+            }
+            return call.callRealMethod();
+        };
+        doAnswer(pause).when(namedJdbc).update(anyString(), any(SqlParameterSource.class));
+    }
+
+    /** Parks the slip worker immediately before the persist INSERT. */
+    private void pauseSlipWorkerBeforePersist(CountDownLatch paused, CountDownLatch resume) {
+        Answer<Object> pause = call -> {
+            String sql = call.getArgument(0);
+            if (WORKER_NAME.equals(Thread.currentThread().getName())
+                    && sql.contains("INSERT INTO academic.\"RegistrationSlip\"")) {
+                await(paused, resume);
+            }
+            return call.callRealMethod();
+        };
+        doAnswer(pause).when(namedJdbc).update(anyString(), any(SqlParameterSource.class));
     }
 
     /**

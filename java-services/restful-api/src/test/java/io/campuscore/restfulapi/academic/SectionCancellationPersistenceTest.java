@@ -648,6 +648,41 @@ class SectionCancellationPersistenceTest {
     }
 
     @Test
+    void reopeningIsRejectedWhileSemesterIsClosedButCancellingStillWorks() throws Exception {
+        // Enroll first so the cancelled section carries a preserved seat.
+        mvc.perform(post("/api/v1/enrollments/enroll")
+                        .with(studentJwt())
+                        .header("Idempotency-Key", "closed-semester-enroll")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"sectionId\":\"section-two\"}"))
+                .andExpect(status().isOk());
+        cancelSection("section-two");
+
+        mvc.perform(put("/api/v1/semesters/semester-1")
+                        .with(adminJwt())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"status\":\"CLOSED\"}"))
+                .andExpect(status().isOk());
+
+        // A reopen re-adds enrollment capacity, so it shares the
+        // registration path's open-semester gate.
+        mvc.perform(put("/api/v1/sections/section-two")
+                        .with(adminJwt())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"status\":\"OPEN\"}"))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("SEMESTER_CLOSED"));
+
+        // Cancelling only removes seats; it stays allowed in any semester.
+        mvc.perform(put("/api/v1/sections/section-open")
+                        .with(adminJwt())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"status\":\"CANCELLED\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("CANCELLED"));
+    }
+
+    @Test
     void schedulingSectionIntoInactiveClassroomIsRejected() throws Exception {
         deactivateRoom("room-1");
 

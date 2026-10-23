@@ -362,6 +362,13 @@ public class RegistrationService {
 
     @Transactional
     public SlipPayload slip(String studentId, String semesterId) {
+        // Lock order Student -> Section -> Round: a slip asserts the
+        // student's committed active set, and every path that changes it
+        // (enroll, drop, cancel/reopen purge) serializes on this row first.
+        // Share-lock it before reading anything — renders stay parallel but
+        // a reopen can neither commit past the render's active-set read nor
+        // leave a persisted slip missing the reopened course.
+        shareLockStudent(studentId);
         MapSqlParameterSource parameters = new MapSqlParameterSource("studentId", studentId);
         String sql = "SELECT \"sha256\", \"payload\" FROM " + SLIP + " WHERE \"studentId\" = :studentId";
         if (semesterId != null && !semesterId.isBlank()) {
@@ -900,6 +907,19 @@ public class RegistrationService {
         } catch (EmptyResultDataAccessException exception) {
             throw problem(HttpStatus.FORBIDDEN, "STUDENT_PROFILE_REQUIRED", "Student profile is required");
         }
+    }
+
+    /**
+     * The read-side half of the student row lock: shares with other renders
+     * but conflicts with the FOR UPDATE every mutating path takes first, so
+     * a slip never serves or persists against a set a committed write has
+     * already changed.
+     */
+    private void shareLockStudent(String studentId) {
+        jdbc.queryForList(
+                "SELECT \"id\" FROM " + STUDENT + " WHERE \"id\" = :id"
+                        + (postgres ? " FOR SHARE" : " FOR UPDATE"),
+                new MapSqlParameterSource("id", studentId));
     }
 
     private Map<String, Object> lockSection(String sectionId) {

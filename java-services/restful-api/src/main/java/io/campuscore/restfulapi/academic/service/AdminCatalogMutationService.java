@@ -278,6 +278,10 @@ public class AdminCatalogMutationService {
                 && "CANCELLED".equals(before.get("status"))
                 && input.containsKey("status") && !"CANCELLED".equals(input.get("status"));
         if (reopening) {
+            // A reopen re-adds enrollment capacity, so it shares the
+            // registration path's open-semester gate; cancelling stays
+            // allowed in any semester state because it only removes seats.
+            requireOpenSemesterForReopen(before.get("semesterId"));
             lockReopenAffectedStudents(id);
         }
         MapSqlParameterSource parameters = new MapSqlParameterSource("id", id);
@@ -306,10 +310,29 @@ public class AdminCatalogMutationService {
             }
             requireExists(table, id);
         } else {
+            // The transition decision above read `before` without a lock, so
+            // a status write must verify that observed state: a transition
+            // committed in between (a cancel behind a queued edit, another
+            // admin's reopen) makes the guarded write match no row and the
+            // edit refuses instead of stamping stale status over the commit.
+            // IS NOT DISTINCT FROM keeps a null status comparable on both
+            // engines; the row itself is never locked before the student
+            // locks the reopen path takes first.
+            boolean statusGuarded = SECTION.equals(table) && before != null
+                    && input.containsKey("status");
             sql.append(", \"updatedAt\" = CURRENT_TIMESTAMP WHERE \"id\" = :id");
+            if (statusGuarded) {
+                sql.append(" AND \"status\" IS NOT DISTINCT FROM :beforeStatus");
+                parameters.addValue("beforeStatus", before.get("status"));
+            }
             int updated = jdbc.update(sql.toString(), parameters);
             if (updated == 0) {
-                throw problem(HttpStatus.NOT_FOUND, "RESOURCE_NOT_FOUND", "Resource not found");
+                if (!statusGuarded) {
+                    throw problem(HttpStatus.NOT_FOUND, "RESOURCE_NOT_FOUND", "Resource not found");
+                }
+                requireExists(table, id);
+                throw problem(HttpStatus.CONFLICT, "SECTION_STATUS_CHANGED",
+                        "The section changed while the edit was open; reload and try again");
             }
         }
         if (replacesSchedules) {
@@ -983,6 +1006,22 @@ public class AdminCatalogMutationService {
                 throw problem(HttpStatus.BAD_REQUEST, "INVALID_DATE_VALUE",
                         field + " '" + text + "' is not a valid ISO date");
             }
+        }
+    }
+
+    /**
+     * A reopen re-adds enrollment capacity to a semester, so it shares the
+     * registration path's open-semester gate. Cancel is not gated: it only
+     * removes seats and stays legal in any semester state.
+     */
+    private void requireOpenSemesterForReopen(Object semesterId) {
+        Long count = jdbc.queryForObject(
+                "SELECT COUNT(*) FROM " + SEMESTER + " WHERE \"id\" = :id AND \"status\" IN (:openStatuses)",
+                new MapSqlParameterSource().addValue("id", semesterId)
+                        .addValue("openStatuses", SemesterStatuses.OPEN),
+                Long.class);
+        if (count == null || count == 0) {
+            throw problem(HttpStatus.CONFLICT, "SEMESTER_CLOSED", "Semester is closed for registration");
         }
     }
 
