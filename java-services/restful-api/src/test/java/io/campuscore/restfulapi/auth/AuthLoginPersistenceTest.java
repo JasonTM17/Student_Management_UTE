@@ -1080,6 +1080,78 @@ class AuthLoginPersistenceTest {
     }
 
     @Test
+    void changePasswordWithBodyTokenRotatesAndPreservesTheSession() throws Exception {
+        // The bearer/body-token transport — the mobile client's wire shape —
+        // authenticates by Authorization header and names its session in the
+        // JSON body. The rotation must pin that session, re-issue it, and
+        // return the rotated pair in the body the way login and refresh do.
+        String newSecret = "new-" + UUID.randomUUID();
+        MvcResult deviceA = loginStudent().andExpect(status().isOk()).andReturn();
+        MvcResult deviceB = loginStudent().andExpect(status().isOk()).andReturn();
+        String aAccessToken = objectMapper.readTree(deviceA.getResponse().getContentAsString())
+                .get("accessToken").asText();
+        String aRefreshToken = objectMapper.readTree(deviceA.getResponse().getContentAsString())
+                .get("refreshToken").asText();
+        String bRefreshToken = objectMapper.readTree(deviceB.getResponse().getContentAsString())
+                .get("refreshToken").asText();
+        org.junit.jupiter.api.Assertions.assertEquals(2, sessionCount());
+
+        MvcResult changed = mvc.perform(post("/api/v1/auth/change-password")
+                        .header("Authorization", "Bearer " + aAccessToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"oldPassword\":\"password123\",\"newPassword\":\"" + newSecret
+                                + "\",\"refreshToken\":\"" + aRefreshToken + "\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.message").value("Password changed successfully"))
+                .andExpect(jsonPath("$.sessionPreserved").value(true))
+                .andExpect(jsonPath("$.user.id").value("student-user"))
+                .andExpect(jsonPath("$.accessToken", notNullValue()))
+                .andExpect(jsonPath("$.refreshToken", notNullValue()))
+                .andReturn();
+        String keptAccessToken = objectMapper.readTree(changed.getResponse().getContentAsString())
+                .get("accessToken").asText();
+        String keptRefreshToken = objectMapper.readTree(changed.getResponse().getContentAsString())
+                .get("refreshToken").asText();
+        assertNotEquals(aAccessToken, keptAccessToken);
+        assertNotEquals(aRefreshToken, keptRefreshToken);
+
+        org.junit.jupiter.api.Assertions.assertEquals(1, sessionCount(),
+                "the rotation revokes every session except the caller's");
+        org.junit.jupiter.api.Assertions.assertEquals(sha256(keptRefreshToken), onlySessionHash(),
+                "the kept row carries the freshly issued hash");
+
+        // The pre-rotation access token dies at the revision bump; the
+        // returned pair authenticates at the new revision immediately.
+        mvc.perform(get("/api/v1/auth/me").header("Authorization", "Bearer " + aAccessToken))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.code").value("SESSION_INVALID"));
+        mvc.perform(get("/api/v1/auth/me").header("Authorization", "Bearer " + keptAccessToken))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value("student-user"));
+        mvc.perform(post("/api/v1/auth/refresh")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"refreshToken\":\"" + keptRefreshToken + "\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.accessToken", notNullValue()));
+
+        // The revoked sibling's stale refresh stays a quiet rejection — it
+        // must not cascade into the session the rotation just re-issued.
+        mvc.perform(post("/api/v1/auth/refresh")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"refreshToken\":\"" + bRefreshToken + "\"}"))
+                .andExpect(status().isUnauthorized());
+        org.junit.jupiter.api.Assertions.assertEquals(1, sessionCount());
+
+        // The caller's own superseded token is the theft signal: its row
+        // still exists, so replaying it revokes the whole family.
+        mvc.perform(post("/api/v1/auth/refresh")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"refreshToken\":\"" + aRefreshToken + "\"}"))
+                .andExpect(status().isUnauthorized());
+        org.junit.jupiter.api.Assertions.assertEquals(0, sessionCount());
+    }
+
+    @Test
     void issuedAccountRotationKeepsTheCurrentDeviceSignedIn() throws Exception {
         // The reported flow: an office-issued account signs in with its
         // temporary password, rotates it at the forced gate, and must land
