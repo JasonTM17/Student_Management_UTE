@@ -107,8 +107,7 @@ export function SignInScreen({ navigation }: MobileScreenProps) {
   const isPreview = apiClient.mode === 'preview';
   const canSubmit = isPreview || (email.trim().length > 0 && password.length > 0);
 
-  const completeStudentSignIn = async (roles: readonly string[] | undefined) => {
-    const role = resolveRole(roles);
+  const completeStudentSignIn = async (role: UserRole | null) => {
     if (role !== 'student') {
       await campusApi.logout().catch(() => undefined);
       apiClient.clearAccessToken();
@@ -142,7 +141,8 @@ export function SignInScreen({ navigation }: MobileScreenProps) {
         throw new Error('The Java auth response did not include an access token.');
       }
       apiClient.setSessionTokens(response.accessToken, response.refreshToken);
-      await completeStudentSignIn(response.user?.roles);
+      const role = resolveRole(response.user?.roles);
+      await completeStudentSignIn(role);
     } catch (signInError) {
       apiClient.clearAccessToken();
       setError(
@@ -171,7 +171,8 @@ export function SignInScreen({ navigation }: MobileScreenProps) {
       const response = await campusApi.verifyTwoFactor(challenge.challengeId, code);
       setChallenge(null);
       setOtpCode('');
-      await completeStudentSignIn(response.user?.roles);
+      const role = resolveRole(response.user?.roles);
+      await completeStudentSignIn(role);
     } catch (verifyError) {
       setError(twoFactorErrorMessage(verifyError, tf));
     } finally {
