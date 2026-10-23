@@ -207,6 +207,7 @@ public class AdminCatalogMutationService {
         String classroomId = text(input, "classroomId", null);
         if (classroomId != null) {
             requireCatalogReference(CLASSROOM, "classroomId", classroomId);
+            requireActiveClassroom(classroomId);
             requireRoomFitsCapacity(classroomId, capacity);
         }
         jdbc.update(
@@ -310,7 +311,8 @@ public class AdminCatalogMutationService {
             if (reopening) {
                 // The cancelled section released its room/lecturer slots, so a
                 // reopen must not silently restore a slot another section now
-                // holds.
+                // holds — nor one whose room was deactivated in the meantime.
+                requireScheduledRoomsActive(id);
                 assertNoSectionConflicts(id);
             }
             if (cancelling) {
@@ -460,6 +462,7 @@ public class AdminCatalogMutationService {
                 throw problem(HttpStatus.BAD_REQUEST, "INVALID_SCHEDULE",
                         "startTime must be before endTime");
             }
+            requireActiveClassroom(requiredScheduleText(schedule, "classroomId"));
         }
         jdbc.update(
                 "DELETE FROM " + SECTION_SCHEDULE + " WHERE \"sectionId\" = :sectionId",
@@ -663,6 +666,33 @@ public class AdminCatalogMutationService {
         }
     }
 
+    /** A section cannot be scheduled into a classroom that has been deactivated. */
+    private void requireActiveClassroom(String classroomId) {
+        Boolean active;
+        try {
+            active = jdbc.queryForObject(
+                    "SELECT \"isActive\" FROM " + CLASSROOM + " WHERE \"id\" = :id",
+                    new MapSqlParameterSource("id", classroomId), Boolean.class);
+        } catch (EmptyResultDataAccessException exception) {
+            throw problem(HttpStatus.NOT_FOUND, "REFERENCE_NOT_FOUND",
+                    "classroomId '" + classroomId + "' does not exist");
+        }
+        if (!Boolean.TRUE.equals(active)) {
+            throw problem(HttpStatus.CONFLICT, "CLASSROOM_INACTIVE",
+                    "Classroom '" + classroomId + "' is inactive");
+        }
+    }
+
+    /** Rooms assigned while the section was live must still be usable when it reopens. */
+    private void requireScheduledRoomsActive(String sectionId) {
+        List<String> classroomIds = jdbc.queryForList(
+                "SELECT DISTINCT \"classroomId\" FROM " + SECTION_SCHEDULE + " WHERE \"sectionId\" = :sectionId",
+                new MapSqlParameterSource("sectionId", sectionId), String.class);
+        for (String classroomId : classroomIds) {
+            requireActiveClassroom(classroomId);
+        }
+    }
+
     /** A section must not promise more seats than the room it meets in. */
     private void requireRoomFitsCapacity(String classroomId, int capacity) {
         Integer roomCapacity = jdbc.queryForObject(
@@ -702,6 +732,9 @@ public class AdminCatalogMutationService {
                     : (String) current.get("classroomId");
             if (classroomId != null) {
                 requireCatalogReference(CLASSROOM, "classroomId", classroomId);
+                if (touchesRoom) {
+                    requireActiveClassroom(classroomId);
+                }
                 requireRoomFitsCapacity(classroomId, capacity);
             }
         }

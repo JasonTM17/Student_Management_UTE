@@ -21,7 +21,6 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
@@ -205,7 +204,8 @@ class AdminCatalogMutationPersistenceTest {
                         "schedules", List.of(
                                 Map.of("dayOfWeek", 3, "startTime", "08:00", "endTime", "10:00", "classroomId", "room-2"),
                                 Map.of("dayOfWeek", 5, "startTime", "08:00", "endTime", "10:00", "classroomId", "missing-room")))))
-                .isInstanceOf(DataIntegrityViolationException.class);
+                .isInstanceOf(io.campuscore.restfulapi.web.DomainException.class)
+                .hasMessageContaining("missing-room");
 
         assertThat(jdbc.queryForObject(
                 "SELECT \"sectionNumber\" FROM \"academic\".\"Section\" WHERE \"id\" = ?",
