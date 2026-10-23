@@ -280,7 +280,7 @@ class CredentialSessionLockOrderPostgresIT {
         }).when(users).lockUserRow(f.id());
         var pool = Executors.newFixedThreadPool(2);
         try {
-            Future<?> writer = pool.submit(() -> { Thread.currentThread().setName(writerName); auth.changePassword(f.id(), f.before(), f.after()); return null; });
+            Future<?> writer = pool.submit(() -> { Thread.currentThread().setName(writerName); auth.changePassword(f.id(), f.before(), f.after(), null); return null; });
             await(writerHoldsUser);
             Future<?> waiter = pool.submit(() -> {
                 Thread.currentThread().setName(waiterName);

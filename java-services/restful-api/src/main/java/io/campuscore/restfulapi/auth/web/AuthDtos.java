@@ -43,9 +43,15 @@ public final class AuthDtos {
             @Size(max = 200_000, message = "avatar must be a data URL of at most 200k characters") String avatar) {
     }
 
+    /**
+     * The optional refreshToken lets a bearer-token client (mobile) pin the
+     * session it wants to keep through the rotation, the same role the
+     * refresh cookie plays for browsers — identical to {@link LogoutRequest}.
+     */
     public record ChangePasswordRequest(
             @NotBlank @Size(max = 128) String oldPassword,
-            @NotBlank @Size(min = 8, max = 128) String newPassword) {
+            @NotBlank @Size(min = 8, max = 128) String newPassword,
+            String refreshToken) {
     }
 
     public record ForgotPasswordRequest(

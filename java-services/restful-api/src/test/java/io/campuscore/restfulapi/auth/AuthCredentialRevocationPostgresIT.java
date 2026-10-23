@@ -107,7 +107,7 @@ class AuthCredentialRevocationPostgresIT {
         try {
             Future<?> rotation = pool.submit(() -> {
                 Thread.currentThread().setName(rotationThread);
-                authLogin.changePassword(userId, rawPassword, rotatedPassword);
+                authLogin.changePassword(userId, rawPassword, rotatedPassword, null);
                 return null;
             });
             assertThat(rotationHoldsLock.await(WAIT_SECONDS, TimeUnit.SECONDS))
@@ -184,7 +184,7 @@ class AuthCredentialRevocationPostgresIT {
                         + " VALUES (?, ?, 'LOGIN', ?, CURRENT_TIMESTAMP + INTERVAL '1 hour', 0)",
                 challengeId, userId, "0".repeat(64));
 
-        authLogin.changePassword(userId, rawPassword, rawPassword + "-rotated");
+        authLogin.changePassword(userId, rawPassword, rawPassword + "-rotated", null);
 
         assertThat(jdbc.queryForObject(
                         "SELECT COUNT(*) FROM campuscore_auth.\"TwoFactorChallenge\""
