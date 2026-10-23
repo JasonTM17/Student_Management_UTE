@@ -397,7 +397,8 @@ export default function LoginPage() {
                       setPassword(demoCredentials.password);
                     }}
                     className={cn(
-                      'flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left transition-colors cursor-pointer',
+                      // Phones drop the email under the name so the leader badge stays whole.
+                      'flex w-full flex-wrap items-center gap-x-2 gap-y-0.5 rounded-lg px-2 py-1.5 text-left transition-colors cursor-pointer sm:flex-nowrap',
                       active ? 'bg-primary/10 ring-1 ring-primary/30' : 'hover:bg-primary/5',
                     )}
                   >
@@ -412,7 +413,7 @@ export default function LoginPage() {
                     </span>
                     {/* The @ sits in its own element so Cloudflare Email Address Obfuscation, which
                         rewrites email-shaped text nodes before hydration, leaves this row alone. */}
-                    <code className="shrink-0 truncate text-[11px] text-muted-foreground" title={account.email}>
+                    <code className="basis-full truncate pl-3.5 text-[11px] text-muted-foreground sm:shrink-0 sm:basis-auto sm:pl-0" title={account.email}>
                       {account.email.split('@')[0]}
                       <span>@</span>
                       {account.email.split('@')[1]}
