@@ -191,6 +191,45 @@ class SectionReopenConflictPostgresIT {
     }
 
     /**
+     * The reopen gate used to share the enroll path's open-semester list, so a
+     * cancelled section could not be restored in a DRAFT or IN_PROGRESS
+     * semester even though no terminal state had been reached. Only the
+     * terminal lifecycle states now refuse the write; every earlier state
+     * reopens subject to the conflict checks.
+     */
+    @Test
+    void reopenRefusesOnlyInTerminalSemesterStates() {
+        for (String status : List.of("DRAFT", "UPCOMING", "OPEN", "REGISTRATION_OPEN",
+                "ADD_DROP_OPEN", "ACTIVE", "IN_PROGRESS")) {
+            AcademicEnrollmentPostgresFixture fixture = AcademicEnrollmentPostgresFixture.seed(jdbc, 30);
+            jdbc.update("UPDATE academic.\"Semester\" SET \"status\" = :st WHERE \"id\" = :id",
+                    new MapSqlParameterSource().addValue("st", status).addValue("id", fixture.semesterId));
+            catalog.update(SECTION_TABLE, fixture.sectionId, Map.of("status", "CANCELLED"));
+            assertThat(sectionStatus(fixture.sectionId)).isEqualTo("CANCELLED");
+
+            Map<String, Object> reopened = catalog.update(SECTION_TABLE, fixture.sectionId,
+                    Map.of("status", "OPEN"));
+            assertThat(String.valueOf(reopened.get("status")))
+                    .as("reopen must be allowed in %s", status)
+                    .isEqualTo("OPEN");
+        }
+
+        for (String status : List.of("CLOSED", "COMPLETED", "ARCHIVED")) {
+            AcademicEnrollmentPostgresFixture fixture = AcademicEnrollmentPostgresFixture.seed(jdbc, 30);
+            jdbc.update("UPDATE academic.\"Semester\" SET \"status\" = :st WHERE \"id\" = :id",
+                    new MapSqlParameterSource().addValue("st", status).addValue("id", fixture.semesterId));
+            // Cancelling still only removes seats, so it stays legal here too.
+            catalog.update(SECTION_TABLE, fixture.sectionId, Map.of("status", "CANCELLED"));
+            DomainException refusal = catchReopen(fixture.sectionId, Map.of("status", "OPEN"));
+            assertThat(refusal)
+                    .as("reopen must refuse in %s", status)
+                    .isNotNull();
+            assertThat(refusal.code()).isEqualTo("SEMESTER_CLOSED");
+            assertThat(sectionStatus(fixture.sectionId)).isEqualTo("CANCELLED");
+        }
+    }
+
+    /**
      * A slip rendered from pre-cancel state must not commit over the cancel:
      * the render locks the affected section rows and re-reads the active set
      * under the lock, so parking the slip worker before its section FOR
