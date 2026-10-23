@@ -395,16 +395,19 @@ export function createApiClient(options: ApiClientOptions = {}): ApiClient {
   async function withPausedSessionRefresh<T>(task: () => Promise<T>): Promise<T> {
     // A rotation committed but not yet adopted must land in the store first,
     // and session mutations serialize among themselves too.
-    if (sessionRefreshPromise) {
-      await sessionRefreshPromise.catch(() => false);
-    }
     if (sessionRefreshPause) {
       await sessionRefreshPause;
     }
+    // Arm the pause before any further awaiting: a 401-triggered refresh that
+    // fires while we wait out an earlier in-flight refresh must still be
+    // captured instead of running ahead on the pre-change token.
     sessionRefreshPause = new Promise<void>((resolve) => {
       releaseSessionRefreshPause = resolve;
     });
     try {
+      if (sessionRefreshPromise) {
+        await sessionRefreshPromise.catch(() => false);
+      }
       return await task();
     } finally {
       const release = releaseSessionRefreshPause;
