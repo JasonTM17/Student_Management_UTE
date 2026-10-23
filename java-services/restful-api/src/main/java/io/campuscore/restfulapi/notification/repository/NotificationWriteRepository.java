@@ -153,6 +153,29 @@ public class NotificationWriteRepository {
                 new MapSqlParameterSource("announcementId", announcementId));
     }
 
+    /** The users this announcement already delivered an inbox row to. */
+    public List<String> findUserIdsByAnnouncementId(String announcementId) {
+        return jdbc.queryForList(
+                "SELECT user_id FROM " + TABLE + " WHERE announcement_id = :announcementId",
+                new MapSqlParameterSource("announcementId", announcementId), String.class);
+    }
+
+    /**
+     * Targeted recall: removes the announcement's inbox rows only for the
+     * listed users — the audience-shrink half of an audience update.
+     */
+    public int deleteByAnnouncementIdAndUserIds(String announcementId, List<String> userIds) {
+        if (userIds == null || userIds.isEmpty()) {
+            return 0;
+        }
+        return jdbc.update(
+                "DELETE FROM " + TABLE
+                        + " WHERE announcement_id = :announcementId AND user_id IN (:userIds)",
+                new MapSqlParameterSource()
+                        .addValue("announcementId", announcementId)
+                        .addValue("userIds", userIds));
+    }
+
     /** Admin path: unscoped by design, guarded by the ADMIN-only route. */
     public int deleteAny(String notificationId) {
         return jdbc.update(
