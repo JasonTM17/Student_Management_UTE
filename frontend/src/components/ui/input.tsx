@@ -34,7 +34,7 @@ const Input = React.forwardRef<HTMLInputElement, InputProps>(
             aria-invalid={error ? true : undefined}
             aria-describedby={describedBy || undefined}
             className={cn(
-              'flex h-11 w-full rounded-lg border border-input bg-background px-3 py-2 text-base text-foreground ring-offset-background transition-[border-color,box-shadow,background-color] placeholder:text-muted-foreground/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60 sm:text-sm',
+              'flex h-11 w-full rounded-lg border border-input bg-background px-3 py-0 text-base text-foreground ring-offset-background transition-[border-color,box-shadow,background-color] placeholder:text-muted-foreground/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60 sm:text-sm',
               icon && 'pl-10',
               endAction && 'pr-11',
               error && 'border-destructive focus-visible:ring-destructive',
