@@ -409,7 +409,7 @@ export default function AdminUsersPage() {
             emailExists: 'Email này đã có trong hệ thống.',
             studentIdExists: 'Mã số sinh viên đã tồn tại.',
             employeeIdExists: 'Mã số giảng viên đã tồn tại.',
-            adminReserved: 'Chỉ siêu quản trị viên mới được cấp vai trò này.',
+            adminReserved: 'Chỉ quản trị viên cấp cao mới được cấp vai trò này.',
           },
           firstName: 'Tên',
           lastName: 'Họ và tên đệm',
@@ -421,7 +421,7 @@ export default function AdminUsersPage() {
             ADMIN: 'Quản trị viên',
             TRUONG_KHOA: 'Trưởng khoa',
             TRUONG_BO_MON: 'Trưởng bộ môn',
-            SUPER_ADMIN: 'Siêu quản trị viên',
+            SUPER_ADMIN: 'Quản trị viên cấp cao',
           },
           saving: 'Đang lưu dữ liệu...',
           editAction: messages.common.actions.saveChanges,
@@ -441,7 +441,7 @@ export default function AdminUsersPage() {
             ADMIN: 'Quản trị',
             TRUONG_KHOA: 'Trưởng khoa',
             TRUONG_BO_MON: 'Trưởng BM',
-            SUPER_ADMIN: 'Siêu QTV',
+            SUPER_ADMIN: 'QTV cấp cao',
           },
           accountSectionTitle: '1. Thông tin tài khoản & đăng nhập',
           accountSectionHint: 'Định danh đăng nhập và bảo mật tài khoản',
@@ -460,7 +460,7 @@ export default function AdminUsersPage() {
             TRUONG_KHOA: 'Hồ sơ giảng viên chính thức gắn với vai trò trưởng khoa',
             TRUONG_BO_MON: 'Hồ sơ giảng viên chính thức gắn với vai trò trưởng bộ môn',
             ADMIN: 'Phân quyền quản trị hệ thống',
-            SUPER_ADMIN: 'Phân quyền siêu quản trị toàn hệ thống',
+            SUPER_ADMIN: 'Toàn quyền quản trị cấp cao trên hệ thống',
           },
           studentIdLabel: 'Mã số sinh viên (MSSV) *',
           studentIdDescription: 'Mã định danh sinh viên dùng tra cứu điểm, ĐRL và ĐKHP',
@@ -752,7 +752,7 @@ export default function AdminUsersPage() {
     if (!isSuperAdmin && isRecordSuperAdmin(userRecord)) {
       toast.error(
         locale === 'vi'
-          ? 'Chỉ siêu quản trị viên mới có thể chỉnh sửa tài khoản siêu quản trị viên.'
+          ? 'Chỉ quản trị viên cấp cao mới có thể chỉnh sửa tài khoản quản trị viên cấp cao.'
           : 'Only super administrators can edit super administrator accounts.',
       );
       return;
@@ -847,7 +847,7 @@ export default function AdminUsersPage() {
     if (!isSuperAdmin && isRecordSuperAdmin(userRecord)) {
       toast.error(
         locale === 'vi'
-          ? 'Chỉ siêu quản trị viên mới có thể xóa tài khoản siêu quản trị viên.'
+          ? 'Chỉ quản trị viên cấp cao mới có thể xóa tài khoản quản trị viên cấp cao.'
           : 'Only super administrators can delete super administrator accounts.',
       );
       return;

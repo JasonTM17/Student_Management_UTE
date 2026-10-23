@@ -381,3 +381,17 @@ test('only a super administrator is offered the faculty and department head role
   assert.match(users, /campusCodeMessage\(/);
   assert.equal((messages.match(/DEAN_ALREADY_ASSIGNED:/g) || []).length, 2);
 });
+
+test('the super administrator carries one Vietnamese name across every screen', () => {
+  const sources = [
+    read('src/app/admin/users/page.tsx'),
+    read('src/i18n/messages.ts'),
+    read('src/lib/announcement-presentation.ts'),
+  ].join('\n');
+  // Older screens called the role "Siêu quản trị viên" or "Quản trị cao cấp"
+  // while the shell said "Quản trị viên cấp cao", so one account read as three.
+  assert.doesNotMatch(sources, /[Ss]iêu (quản trị|QTV)|Quản trị cao cấp/);
+  const viLabels = sources.match(/SUPER_ADMIN: '[^']*cấp cao'/g) || [];
+  assert.ok(viLabels.length >= 4, `expected every VI role map to name the super administrator, got ${viLabels.length}`);
+  assert.ok(viLabels.every((label) => label !== "SUPER_ADMIN: 'Quản trị viên'"));
+});
