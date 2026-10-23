@@ -2,6 +2,7 @@ package io.campuscore.restfulapi.thesis.web;
 
 import io.campuscore.restfulapi.thesis.domain.GroupStatus;
 import java.time.Instant;
+import java.util.List;
 import java.util.UUID;
 
 public final class ThesisMutationDtos {
@@ -66,6 +67,77 @@ public final class ThesisMutationDtos {
 
     /** The audited report-deadline escape hatch for a REGISTRATION_CLOSED round. */
     public record ReportDeadlineUpdateRequest(Instant reportDeadline) {
+    }
+
+    /** The audited counter-review deadline escape hatch for a live round. */
+    public record GvpbDeadlineUpdateRequest(Instant gvpbDeadline, String reason) {
+    }
+
+    /** Reason-carrying payload for the topic outcome escape hatches. */
+    public record TopicOutcomeRequest(String reason) {
+    }
+
+    /** The audited "late topic" creation for a missed lecturer window. */
+    public record LateTopicRequest(
+            String departmentId,
+            String title,
+            String description,
+            Integer maxGroups,
+            String supervisorId,
+            String reason) {
+    }
+
+    /**
+     * Audited post-registration roster override. {@code action} is ADD
+     * (default, also when omitted) or REMOVE. {@code successorStudentId} names
+     * the member who takes over leadership when a REMOVE targets the leader;
+     * it is required then and ignored otherwise. A removal that leaves the
+     * approved roster below the minimum needs {@code allowSizeException} just
+     * like an addition does.
+     */
+    public record RosterOverrideRequest(String studentId, String action, String reason,
+            Boolean allowSizeException, String successorStudentId) {
+        public RosterOverrideRequest(String studentId, String reason, Boolean allowSizeException) {
+            this(studentId, null, reason, allowSizeException, null);
+        }
+    }
+
+    /**
+     * Publish body: {@code confirmAllExcluded} is the explicit acknowledgement
+     * required when every approved group's topic is excluded — an otherwise
+     * silent empty publication.
+     */
+    public record PublishResultsRequest(Boolean confirmAllExcluded) {
+    }
+
+    /** Reason plus typed confirmation ("RETRACT") for the retract escape. */
+    public record RetractPublicationRequest(String reason, String confirmation) {
+    }
+
+    /** Re-points an approved group orphaned by a withdrawn topic (audited). */
+    public record TopicReassignRequest(UUID topicId, String reason) {
+    }
+
+    /**
+     * Consequence preview for publish-results: the group tallies and the
+     * topics excluded from the completeness requirement with their outcome
+     * (REVIEW_FAILED or WITHDRAWN) so the confirm dialog is never blind.
+     * {@code openReviewTopics} lists the topics whose counter-review verdict
+     * is still provisional while the GVPB window is open.
+     */
+    public record PublishResultsPreviewResponse(
+            long groupCount,
+            long approvedGroupCount,
+            long pendingApprovalGroupCount,
+            long includedGroupCount,
+            long ungradedGroupCount,
+            List<PublishResultsExcludedTopic> excludedTopics,
+            List<PublishResultsExcludedTopic> openReviewTopics) {
+    }
+
+    /** One topic excluded from publication completeness, with its outcome. */
+    public record PublishResultsExcludedTopic(
+            UUID id, String title, String resultStatus, String resultReason) {
     }
 
     /**

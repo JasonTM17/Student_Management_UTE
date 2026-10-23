@@ -50,6 +50,24 @@ public class ThesisTopic {
     @Column(name = "gvpb_lecturer_id", length = 120)
     private String gvpbLecturerId;
 
+    @Column(name = "gvpb_waived_reason", length = 500)
+    private String gvpbWaivedReason;
+
+    @Column(name = "gvpb_waived_by", length = 120)
+    private String gvpbWaivedBy;
+
+    @Column(name = "gvpb_waived_at")
+    private Instant gvpbWaivedAt;
+
+    @Column(name = "result_reason", length = 500)
+    private String resultReason;
+
+    @Column(name = "result_by", length = 120)
+    private String resultBy;
+
+    @Column(name = "result_at")
+    private Instant resultAt;
+
     @Version
     private long version;
 
@@ -166,5 +184,29 @@ public class ThesisTopic {
 
     public String getGvpbLecturerId() {
         return gvpbLecturerId;
+    }
+
+    public String getGvpbWaivedReason() {
+        return gvpbWaivedReason;
+    }
+
+    public String getGvpbWaivedBy() {
+        return gvpbWaivedBy;
+    }
+
+    public Instant getGvpbWaivedAt() {
+        return gvpbWaivedAt;
+    }
+
+    public String getResultReason() {
+        return resultReason;
+    }
+
+    public String getResultBy() {
+        return resultBy;
+    }
+
+    public Instant getResultAt() {
+        return resultAt;
     }
 }

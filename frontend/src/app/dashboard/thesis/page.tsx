@@ -3100,14 +3100,33 @@ export default function ThesisPage() {
                           <p className="text-xs text-muted-foreground">
                             {messages.thesis.results.council}: {result.councilName}
                           </p>
+                          {result.resultStatus === 'REVIEW_FAILED' ? (
+                            <p className="text-xs text-muted-foreground">
+                              {messages.thesis.results.notEligible}
+                            </p>
+                          ) : result.resultStatus === 'WITHDRAWN' ? (
+                            <p className="text-xs text-muted-foreground">
+                              {messages.thesis.results.withdrawn}
+                            </p>
+                          ) : null}
                         </div>
                         <div className="text-left sm:text-right">
-                          <p className="text-lg font-semibold text-foreground">
-                            {result.finalScore}
-                          </p>
-                          <p className="text-xs text-muted-foreground">
-                            {messages.thesis.results.finalScore}
-                          </p>
+                          {result.resultStatus === 'REVIEW_FAILED' || result.resultStatus === 'WITHDRAWN' ? (
+                            <p className="text-sm font-medium text-muted-foreground">
+                              {result.resultStatus === 'REVIEW_FAILED'
+                                ? messages.thesis.results.notEligible
+                                : messages.thesis.results.withdrawn}
+                            </p>
+                          ) : (
+                            <>
+                              <p className="text-lg font-semibold text-foreground">
+                                {result.finalScore}
+                              </p>
+                              <p className="text-xs text-muted-foreground">
+                                {messages.thesis.results.finalScore}
+                              </p>
+                            </>
+                          )}
                         </div>
                       </div>
                     ))}

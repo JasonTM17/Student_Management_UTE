@@ -50,7 +50,7 @@ class ThesisNotificationServiceTest {
                     message VARCHAR(2000) NOT NULL,
                     type VARCHAR(60) NOT NULL,
                     link VARCHAR(500),
-                    announcement_id VARCHAR(120),
+                    announcement_id VARCHAR(120), source_key VARCHAR(160),
                     is_read BOOLEAN NOT NULL DEFAULT FALSE,
                     read_at TIMESTAMP,
                     created_at TIMESTAMP NOT NULL,
