@@ -603,6 +603,10 @@ class ThesisRosterLockOrderPostgresIT {
                         .isEqualTo("TOPIC_NOT_FOUND"));
         assertThat(supervisorIds(topicId)).containsExactly("rlo-home", "rlo-dean-foreign");
 
+        // The read side keeps the supervisor escape: the same dean still
+        // reads the roster — only the write moved to the owning faculty.
+        assertThat(supervisors.list(topicId, foreignDean)).hasSize(2);
+
         // The owning faculty head performs the swap the foreign dean
         // attempted; review power then follows the roster — the ousted home
         // supervisor loses it and the new supervisor approves.
@@ -702,6 +706,13 @@ class ThesisRosterLockOrderPostgresIT {
         councils.addMember(mixed, "rlo-crony", "MEMBER", admin());
         assertThat(councilMemberIds(mixed))
                 .containsExactlyInAnyOrder("rlo-chair", "rlo-sec", "rlo-m1", "rlo-crony");
+
+        // A council grading nothing yet has no topics to scope against, so
+        // the dean who owns it keeps staffing it.
+        UUID empty = insertCouncil("rlo-user-rlo-dean-own");
+        councils.addMember(empty, "rlo-crony", "CHAIR", ownDean);
+        councils.removeMember(empty, "rlo-crony", ownDean);
+        assertThat(councilMemberIds(empty)).isEmpty();
     }
 
     /**
@@ -748,6 +759,15 @@ class ThesisRosterLockOrderPostgresIT {
         assertThat(jdbc.queryForObject(
                 "SELECT status FROM thesis.thesis_group WHERE id = ?",
                 String.class, approved)).isEqualTo("SUBMITTED");
+
+        // Ordinary progress writes on a supervised group stay ordinary: the
+        // foreign dean still moves it between DRAFT and SUBMITTED.
+        UUID ordinary = insertGroup(topicId, "rlo-og", 3);
+        mutations.updateProgress(ordinary, new ProgressRequest(GroupStatus.DRAFT), foreignDean);
+        mutations.updateProgress(ordinary, new ProgressRequest(GroupStatus.SUBMITTED), foreignDean);
+        assertThat(jdbc.queryForObject(
+                "SELECT status FROM thesis.thesis_group WHERE id = ?",
+                String.class, ordinary)).isEqualTo("SUBMITTED");
 
         // The owning faculty head cancels and completes both groups, and a
         // global admin still performs the same transitions on fresh rows.
