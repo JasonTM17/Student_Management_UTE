@@ -9,6 +9,7 @@ import io.campuscore.restfulapi.thesis.web.ThesisMutationDtos.CloseRegistrationP
 import io.campuscore.restfulapi.thesis.web.ThesisMutationDtos.GroupCreateRequest;
 import io.campuscore.restfulapi.thesis.web.ThesisMutationDtos.GroupRejectionRequest;
 import io.campuscore.restfulapi.thesis.web.ThesisMutationDtos.GvpbDeadlineUpdateRequest;
+import io.campuscore.restfulapi.thesis.web.ThesisMutationDtos.LateTopicRequest;
 import io.campuscore.restfulapi.thesis.web.ThesisMutationDtos.PublishResultsRequest;
 import io.campuscore.restfulapi.thesis.web.ThesisMutationDtos.MemberRequest;
 import io.campuscore.restfulapi.thesis.web.ThesisMutationDtos.ProgressRequest;
@@ -219,6 +220,20 @@ public class ThesisMutationController {
             @Parameter(description = "Mã UUID của đợt", required = true) @PathVariable UUID id,
             @AuthenticationPrincipal Jwt actor) {
         return mutations.publishResultsPreview(id, actor);
+    }
+
+    /**
+     * Late-topic escape for a missed lecturer window: creates a PUBLISHED
+     * topic for a named supervisor while students can still register.
+     */
+    @Operation(summary = "Thêm đề tài muộn", description = "Tạo đề tài PUBLISHED cho một giảng viên sau khi hết hạn nộp đề xuất, khi đợt đang cho sinh viên đăng ký; ghi audit kèm lý do")
+    @PostMapping("/rounds/{id}/late-topic")
+    @PreAuthorize("hasAnyRole('ADMIN','TRUONG_KHOA','SUPER_ADMIN')")
+    public TopicResponse createLateTopic(
+            @Parameter(description = "Mã UUID của đợt", required = true) @PathVariable UUID id,
+            @RequestBody LateTopicRequest request,
+            @AuthenticationPrincipal Jwt actor) {
+        return mutations.createLateTopic(id, request, actor);
     }
 
     /**

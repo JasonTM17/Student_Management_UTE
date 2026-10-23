@@ -77,6 +77,16 @@ public final class ThesisMutationDtos {
     public record TopicOutcomeRequest(String reason) {
     }
 
+    /** The audited "late topic" creation for a missed lecturer window. */
+    public record LateTopicRequest(
+            String departmentId,
+            String title,
+            String description,
+            Integer maxGroups,
+            String supervisorId,
+            String reason) {
+    }
+
     /**
      * Publish body: {@code confirmAllExcluded} is the explicit acknowledgement
      * required when every approved group's topic is excluded — an otherwise

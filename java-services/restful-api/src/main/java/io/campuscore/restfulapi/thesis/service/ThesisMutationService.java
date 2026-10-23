@@ -24,6 +24,7 @@ import io.campuscore.restfulapi.thesis.web.ThesisMutationDtos.TopicAssignmentReq
 import io.campuscore.restfulapi.thesis.web.ThesisMutationDtos.TopicCreateRequest;
 import io.campuscore.restfulapi.thesis.web.ThesisMutationDtos.TopicUpdateRequest;
 import io.campuscore.restfulapi.thesis.web.ThesisMutationDtos.GroupRejectionRequest;
+import io.campuscore.restfulapi.thesis.web.ThesisMutationDtos.LateTopicRequest;
 import io.campuscore.restfulapi.thesis.web.ThesisRoundDtos.RoundResponse;
 import io.campuscore.restfulapi.thesis.web.ThesisTopicDtos.TopicResponse;
 import io.campuscore.restfulapi.web.DomainException;
@@ -886,6 +887,65 @@ public class ThesisMutationService {
                 Map.of("result_status", failed ? "REVIEW_FAILED" : ""));
         return TopicResponse.from(topics.findById(id).orElseThrow(
                 () -> notFound("TOPIC_NOT_FOUND", "Thesis topic not found")));
+    }
+
+    /**
+     * Governance-only escape hatch for a missed lecturer window: a topic whose
+     * supervisor could not submit in time is created directly in PUBLISHED
+     * state while students can still register, never by extending a window the
+     * PROPOSAL_OPEN gate no longer consults. The normal topic validation —
+     * text fields, department, group limit, an active supervisor, dean faculty
+     * scope — still applies, and the reason is audited.
+     */
+    @Transactional
+    public TopicResponse createLateTopic(UUID roundId, LateTopicRequest request, Jwt actor) {
+        requireGovernanceRole(actor);
+        String cleanReason = requireReason(request == null ? null : request.reason());
+        requireText(request == null ? null : request.departmentId(), "departmentId");
+        requireText(request == null ? null : request.title(), "title", 240);
+        requireText(request == null ? null : request.description(), "description");
+        requireText(request.supervisorId(), "supervisorId", 120);
+        String supervisorId = request.supervisorId().trim();
+        int maxGroups = request.maxGroups() == null ? 1 : request.maxGroups();
+        if (maxGroups < 1 || maxGroups > 20) {
+            throw invalid("maxGroups must be between 1 and 20");
+        }
+        // Students must still be able to pick the topic up: once registration
+        // closed a late topic would strand it with no group.
+        requireRoundStatusAny(roundId, RoundStatus.PROPOSALS_PUBLISHED, RoundStatus.REGISTRATION_OPEN);
+        String departmentId = request.departmentId().trim();
+        requireTopicDepartmentScope(actor, departmentId);
+        // The named supervisor must be a real active lecturer — the supervisor
+        // row key joins the Lecturer directory, so storing an unresolvable id
+        // would break supervision the way a legacy User.id did.
+        Integer active = jdbc.queryForObject(
+                "SELECT COUNT(*) FROM campuscore_auth.\"Lecturer\" WHERE \"id\" = :key AND \"isActive\" = TRUE",
+                params().addValue("key", supervisorId), Integer.class);
+        if (active == null || active == 0) {
+            throw invalid("Unknown or inactive supervisor: " + supervisorId);
+        }
+        // Created via the DRAFT path like every topic, then promoted to
+        // PUBLISHED in the same transaction — the escape hatch never exposes
+        // a draft the round already closed proposal submission for.
+        ThesisTopic topic = new ThesisTopic(
+                roundId, departmentId, request.title().trim(), request.description().trim(),
+                maxGroups, subject(actor));
+        topic.publish();
+        topics.saveAndFlush(topic);
+        UUID lateTopicId = topic.getId();
+        jdbc.update(
+                "INSERT INTO thesis.thesis_topic_supervisor (id, topic_id, lecturer_id, supervisor_order) VALUES (:id, :topicId, :lecturerId, 1)",
+                params().addValue("id", UUID.randomUUID()).addValue("topicId", topic.getId())
+                        .addValue("lecturerId", supervisorId));
+        audit.record(subject(actor), null, "THESIS_TOPIC_LATE_CREATED", "THESIS_TOPIC", topic.getId().toString(),
+                "Late topic created for supervisor " + supervisorId + "; reason: " + cleanReason,
+                Map.of("status", ""), Map.of("status", TopicStatus.PUBLISHED.name(), "supervisorId", supervisorId));
+        afterCommit(() -> {
+            if (notifier != null) {
+                notifier.notifySupervisorsAssigned(lateTopicId, List.of(supervisorId));
+            }
+        });
+        return topics.findById(lateTopicId).map(TopicResponse::from).orElseGet(() -> TopicResponse.from(topic));
     }
 
     private void requireGovernanceRole(Jwt actor) {
@@ -1955,6 +2015,20 @@ public class ThesisMutationService {
                 .contains(round.get("status"))) {
             throw conflict("ROUND_STATE_CONFLICT", "The round has finished; its topics and groups are historical");
         }
+    }
+
+    private void requireRoundStatusAny(UUID id, RoundStatus... accepted) {
+        String status = (String) one(
+                "SELECT status FROM thesis.thesis_registration_round WHERE id = :id FOR UPDATE",
+                params().addValue("id", id), "ROUND_NOT_FOUND", "Thesis registration round not found")
+                .get("status");
+        for (RoundStatus candidate : accepted) {
+            if (candidate.name().equals(status)) {
+                return;
+            }
+        }
+        throw conflict("ROUND_STATE_CONFLICT", "Round must be in " + accepted[0].name()
+                + (accepted.length > 1 ? " or " + accepted[1].name() : ""));
     }
 
     private void requireRoundStatus(UUID id, RoundStatus required) {

@@ -643,6 +643,39 @@ class ThesisCouncilEscapeHatchTest {
     }
 
     @Test
+    void lateTopicPublishesForNamedSupervisorAndAudits() {
+        Instant now = Instant.now();
+        UUID roundId = insertRound("Esc Round Late Topic", "REGISTRATION_OPEN",
+                now.plusSeconds(86_400), now.plusSeconds(5 * 86_400));
+        ensureLecturer("esc-lt-supervisor");
+        var request = new io.campuscore.restfulapi.thesis.web.ThesisMutationDtos.LateTopicRequest(
+                "department-demo", "Esc Late Topic", "Late topic description",
+                2, "esc-lt-supervisor", "supervisor missed the window");
+        var topic = mutations.createLateTopic(roundId, request, admin());
+        assertThat(topic.status().name()).isEqualTo("PUBLISHED");
+        assertThat(jdbc.queryForObject(
+                "SELECT COUNT(*) FROM thesis.thesis_topic_supervisor WHERE topic_id = ? AND lecturer_id = 'esc-lt-supervisor'",
+                Integer.class, topic.id())).isEqualTo(1);
+        assertThat(auditCount(topic.id().toString(), "THESIS_TOPIC_LATE_CREATED")).isEqualTo(1);
+
+        // Validation still applies: unknown supervisor and a closed round both
+        // refuse, and a non-governance caller is rejected at service level.
+        assertThatThrownBy(() -> mutations.createLateTopic(roundId,
+                new io.campuscore.restfulapi.thesis.web.ThesisMutationDtos.LateTopicRequest(
+                        "department-demo", "T", "D", 1, "esc-lt-missing", "reason"), admin()))
+                .isInstanceOf(DomainException.class);
+        UUID closedRound = insertRound("Esc Round Late Closed", "REGISTRATION_CLOSED",
+                now.plusSeconds(86_400), now.plusSeconds(5 * 86_400));
+        assertThatThrownBy(() -> mutations.createLateTopic(closedRound, request, admin()))
+                .isInstanceOf(DomainException.class)
+                .isInstanceOfSatisfying(DomainException.class,
+                        e -> assertThat(e.getCode()).isEqualTo("ROUND_STATE_CONFLICT"));
+        ensureLecturer("esc-lt-lecturer");
+        assertThatThrownBy(() -> mutations.createLateTopic(roundId, request, lecturer("esc-lt-lecturer")))
+                .isInstanceOf(DomainException.class);
+    }
+
+    @Test
     void aForeignFacultyDeanCannotWithdrawOrReinstateAnotherFacultysTopic() {
         Instant now = Instant.now();
         // A resolved but foreign faculty scope: the dean's lecturer profile is
