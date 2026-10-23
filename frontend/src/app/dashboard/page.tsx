@@ -18,7 +18,7 @@ import { useRequireAuth } from '@/context/AuthContext';
 import { enrollmentsApi, registrationApi, semestersApi } from '@/lib/api';
 import { STATIC_STALE_TIME_MS, useApiQuery } from '@/lib/query';
 import { hasCsrfSessionHint } from '@/lib/session-hint';
-import { isActiveEnrollment } from '@/lib/enrollment-status';
+import { isActiveEnrollment, isCancelledSection } from '@/lib/enrollment-status';
 import { getLocalizedName } from '@/lib/academic-content';
 import { pickPreferredSemesterId } from '@/lib/semesters';
 import { WorkspaceForbiddenState } from '@/components/ProtectedRoute';
@@ -41,6 +41,7 @@ interface Enrollment {
       credits?: number;
     };
     sectionNumber: string;
+    status?: string;
     schedules?: {
       dayOfWeek: number;
       startTime: string;
@@ -249,10 +250,10 @@ export default function DashboardPage() {
   // Seat accounting mirrors the backend: PENDING rows occupy a seat and count
   // toward the credit cap exactly like ENROLLED ones (lib/enrollment-status).
   const activeCourses = enrollments.filter((enrollment) =>
-    isActiveEnrollment(enrollment.status),
+    isActiveEnrollment(enrollment.status) && !isCancelledSection(enrollment),
   );
   const pendingCourses = enrollments.filter(
-    (enrollment) => enrollment.status === 'PENDING',
+    (enrollment) => enrollment.status === 'PENDING' && !isCancelledSection(enrollment),
   );
   const highlightedCourses = activeCourses.slice(0, 3);
 
@@ -329,7 +330,7 @@ export default function DashboardPage() {
       // seats only. Counting activeCourses here would duplicate the term
       // chip above and silently promote PENDING requests to active status.
       label: copy.stats.active,
-      value: formatNumber(enrollments.filter((enrollment) => enrollment.status === 'ENROLLED').length),
+      value: formatNumber(enrollments.filter((enrollment) => enrollment.status === 'ENROLLED' && !isCancelledSection(enrollment)).length),
       icon: GraduationCap,
       tone: metricToneClass('success'),
       href: '/dashboard/enrollments',

@@ -53,3 +53,14 @@ test('helpers tolerate missing status values', () => {
   assert.equal(status.isDroppableEnrollment(undefined), false);
   assert.equal(status.isDroppableEnrollment(null), false);
 });
+
+test('cancelled-section flag only follows the section status', () => {
+  assert.equal(typeof status.isCancelledSection, 'function');
+  assert.equal(status.isCancelledSection({ status: 'ENROLLED', section: { status: 'CANCELLED' } }), true);
+  assert.equal(status.isCancelledSection({ status: 'ENROLLED', section: { status: 'OPEN' } }), false);
+  assert.equal(status.isCancelledSection({ status: 'ENROLLED', section: { status: 'CLOSED' } }), false);
+  assert.equal(status.isCancelledSection({ status: 'DROPPED', section: { status: 'CANCELLED' } }), true);
+  assert.equal(status.isCancelledSection({ status: 'ENROLLED' }), false);
+  assert.equal(status.isCancelledSection(undefined), false);
+  assert.equal(status.isCancelledSection(null), false);
+});

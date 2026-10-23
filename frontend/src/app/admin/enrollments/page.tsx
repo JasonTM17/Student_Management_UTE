@@ -56,6 +56,7 @@ interface Enrollment {
   };
   section?: {
     sectionNumber: string;
+    status?: string;
     course?: { code?: string; name?: string; nameEn?: string; nameVi?: string };
     lecturer?: { user?: { firstName?: string; lastName?: string } };
   };
@@ -788,6 +789,11 @@ export default function AdminEnrollmentsPage() {
                           </dt>
                           <dd className="mt-1 break-words text-foreground">
                             {enrollment.section?.sectionNumber || copy.unknownSection}
+                            {enrollment.section?.status === 'CANCELLED' ? (
+                              <span className={`ml-2 inline-flex rounded-md px-2 py-0.5 text-[11px] font-medium ${metricToneClass('danger')}`}>
+                                {messages.common.statuses.CANCELLED}
+                              </span>
+                            ) : null}
                           </dd>
                         </div>
                         <div className="min-w-0">
@@ -901,6 +907,11 @@ export default function AdminEnrollmentsPage() {
                           </td>
                           <td className="px-2 py-4 text-muted-foreground">
                             {enrollment.section?.sectionNumber || copy.unknownSection}
+                            {enrollment.section?.status === 'CANCELLED' ? (
+                              <span className={`ml-2 inline-flex rounded-md px-2 py-0.5 text-[11px] font-medium ${metricToneClass('danger')}`}>
+                                {messages.common.statuses.CANCELLED}
+                              </span>
+                            ) : null}
                           </td>
                           <td className="px-2 py-4 text-muted-foreground">
                             {semesterLabel}
@@ -1032,6 +1043,11 @@ export default function AdminEnrollmentsPage() {
                 </label>
                 <p className="mt-1 text-foreground">
                   {selectedEnrollment.section?.sectionNumber}
+                  {selectedEnrollment.section?.status === 'CANCELLED' ? (
+                    <span className={`ml-2 inline-flex rounded-md px-2 py-0.5 text-[11px] font-medium ${metricToneClass('danger')}`}>
+                      {messages.common.statuses.CANCELLED}
+                    </span>
+                  ) : null}
                 </p>
               </div>
             </div>
