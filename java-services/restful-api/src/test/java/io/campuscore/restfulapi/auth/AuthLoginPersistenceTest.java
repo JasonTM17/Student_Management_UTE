@@ -880,7 +880,8 @@ class AuthLoginPersistenceTest {
         Cookie accessCookie = login.getResponse().getCookie("cc_access_token");
         Cookie csrfCookie = login.getResponse().getCookie("cc_csrf");
 
-        java.sql.Timestamp managedDateOfBirth = java.sql.Timestamp.from(Instant.parse("1999-12-31T00:00:00Z"));
+        // The repository reads this timestamp-without-zone column as UTC.
+        LocalDateTime managedDateOfBirth = LocalDateTime.parse("1999-12-31T00:00:00");
         jdbc.update(
                 "UPDATE \"campuscore_auth\".\"User\" SET \"dateOfBirth\" = ? WHERE \"id\" = 'student-user'",
                 managedDateOfBirth);
@@ -901,8 +902,9 @@ class AuthLoginPersistenceTest {
                 .andReturn();
 
         JsonNode updatedBody = objectMapper.readTree(updated.getResponse().getContentAsString());
-        assertThat(updatedBody.path("dateOfBirth").asText())
-                .isEqualTo(managedDateOfBirth.toInstant().toString());
+        org.junit.jupiter.api.Assertions.assertEquals(
+                managedDateOfBirth.toInstant(ZoneOffset.UTC).toString(),
+                updatedBody.path("dateOfBirth").asText());
     }
 
     @Test
