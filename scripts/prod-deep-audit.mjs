@@ -79,16 +79,19 @@ async function get(jar, path, label, { doScan = true, quiet = false } = {}) {
 }
 
 async function getAll(jar, base, label) {
-  // paginate with limit=100 until exhausted (cap 10 pages)
+  // paginate with limit=100 until exhausted (dynamic page limit based on totalPages)
   const all = [];
-  for (let page = 1; page <= 10; page++) {
+  let page = 1;
+  while (page <= 100) {
     const sep = base.includes('?') ? '&' : '?';
     const { status, body } = await get(jar, `${base}${sep}page=${page}&limit=100`, label, { quiet: true });
     if (status !== 200) break;
     const rows = body?.data || (Array.isArray(body) ? body : body?.content || []);
     all.push(...rows);
     const total = body?.meta?.total ?? rows.length;
-    if (all.length >= total || rows.length === 0) break;
+    const totalPages = body?.meta?.totalPages;
+    if (all.length >= total || rows.length === 0 || (totalPages && page >= totalPages)) break;
+    page++;
   }
   console.log(`OK* ${label} ${base} -> ${all.length} rows`);
   scan(all, '$', `${label} ${base}`);
