@@ -119,6 +119,15 @@ rotation on every exchange means any pre-deploy token is either consumed
 or naturally expired within its own lifetime, and the oldest surviving
 sid-less token dies with the family it would otherwise have wiped.
 
+The same lost-response boundary applies to session-bound credential changes
+(mobile change-password): the rotation commits server-side and re-issues the
+kept row, but if the response never reaches the client the stored pair is now
+superseded. The client's next 401-triggered refresh presents that stale token,
+the reuse detector revokes the family, and the user lands at sign-in — where
+the new password works, because the credential write itself already committed.
+The mobile client narrows the window by pausing sibling refreshes until the
+rotated pair is adopted (`withPausedSessionRefresh`); it cannot remove it.
+
 Credential verification and replacement serialize on the account's User row
 lock, so login, refresh, reset issuance/redemption, and password writes for the
 same account queue rather than interleave. Row-lock contention is per account,

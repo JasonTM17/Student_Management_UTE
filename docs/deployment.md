@@ -147,6 +147,6 @@ Hai PR squash-merge kế tiếp chốt đợt audit toàn diện (cross-role the
 
 ### Cấu hình thu hồi công bố kết quả khóa luận (thesis results retraction)
 
-- `THESIS_RESULTS_RETRACTGRACEDAYS` (property `thesis.results.retract-grace-days`, mặc định `7`): số ngày sau `RESULTS_PUBLISHED` mà admin toàn cục được phép thu hồi công bố qua `POST /api/v1/thesis/rounds/{id}/results/retract`.
+- `THESIS_RESULTS_RETRACTGRACEDAYS` (property `thesis.results.retract-grace-days`, mặc định `7`): số ngày sau `RESULTS_PUBLISHED` mà admin toàn cục được phép thu hồi công bố qua `POST /api/v1/thesis/rounds/{id}/retract-results`.
 - Thu hồi đòi lý do + xác nhận gõ `RETRACT`; không bao giờ sửa điểm; inbox "kết quả đã công bố" bị thu hồi và sinh viên nhận thông báo chỉnh chính; email đã gửi **không** thu hồi được (ghi rõ trong audit). Vòng quay về `REGISTRATION_CLOSED` để chạy lại luồng preview → publish bình thường.
 - Sai sót phát hiện sau khi hết hạn ân hạn đi qua đường khiếu nại từng đề tài (chưa xây dựng — follow-up sản phẩm).
