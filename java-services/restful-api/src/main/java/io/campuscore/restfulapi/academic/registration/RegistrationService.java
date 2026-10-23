@@ -626,8 +626,14 @@ public class RegistrationService {
         Map<String, Object> section = lockSection(String.valueOf(enrollment.get("section_id")));
         String droppedCourseId = String.valueOf(section.get("course_id"));
         String semesterId = String.valueOf(enrollment.get("semester_id"));
-        assertNoActiveCorequisiteDependents(targetStudentId, droppedCourseId, semesterId, enrollmentId);
-        openRoundReadOnly(semesterId, "ADD_DROP");
+        // A cancelled section is already out of every active calculation: its
+        // enrollment cannot satisfy a corequisite, so keeping it would protect
+        // nothing while trapping the student. Its drop therefore bypasses the
+        // corequisite guard and the add/drop window entirely.
+        if (!"CANCELLED".equals(String.valueOf(section.get("status")))) {
+            assertNoActiveCorequisiteDependents(targetStudentId, droppedCourseId, semesterId, enrollmentId);
+            openRoundReadOnly(semesterId, "ADD_DROP");
+        }
         jdbc.update(
                 "UPDATE " + ENROLLMENT + " SET \"status\" = 'DROPPED', \"droppedAt\" = CURRENT_TIMESTAMP,"
                         + " \"updatedAt\" = CURRENT_TIMESTAMP WHERE \"id\" = :id",
@@ -926,6 +932,7 @@ public class RegistrationService {
                         + " JOIN " + COURSE + " course ON course.\"id\" = section.\"courseId\""
                         + " WHERE enrollment.\"studentId\" = :studentId AND enrollment.\"semesterId\" = :semesterId"
                         + " AND enrollment.\"status\" IN ('ENROLLED', 'PENDING', 'CONFIRMED')"
+                        + " AND section.\"status\" <> 'CANCELLED'"
                         + " ORDER BY course.\"code\", section.\"sectionNumber\"",
                 new MapSqlParameterSource().addValue("studentId", studentId).addValue("semesterId", semesterId));
     }
@@ -938,6 +945,7 @@ public class RegistrationService {
                         + " JOIN " + COURSE + " course ON course.\"id\" = section.\"courseId\""
                         + " WHERE enrollment.\"studentId\" = :studentId AND enrollment.\"semesterId\" = :semesterId"
                         + " AND enrollment.\"status\" IN ('ENROLLED', 'PENDING', 'CONFIRMED')"
+                        + " AND section.\"status\" <> 'CANCELLED'"
                         // PostgreSQL otherwise locks the joined Section/Course rows too,
                         // inverting Section -> Round for a different student's drop.
                         + (postgres ? " FOR UPDATE OF enrollment" : " FOR UPDATE"),
@@ -956,7 +964,8 @@ public class RegistrationService {
                         + " JOIN " + SECTION + " section ON section.\"id\" = enrollment.\"sectionId\""
                         + " JOIN " + COURSE + " course ON course.\"id\" = section.\"courseId\""
                         + " WHERE enrollment.\"studentId\" = :studentId AND enrollment.\"semesterId\" = :semesterId"
-                        + " AND enrollment.\"status\" IN ('ENROLLED', 'PENDING', 'CONFIRMED')",
+                        + " AND enrollment.\"status\" IN ('ENROLLED', 'PENDING', 'CONFIRMED')"
+                        + " AND section.\"status\" <> 'CANCELLED'",
                 new MapSqlParameterSource().addValue("studentId", studentId).addValue("semesterId", semesterId),
                 Integer.class);
         return used == null ? 0 : used;
@@ -1013,14 +1022,16 @@ public class RegistrationService {
 
     private boolean hasCompleted(String studentId, String courseId, String minLetter) {
         List<String> letters = jdbc.queryForList(
-                "SELECT \"letterGrade\" FROM " + ENROLLMENT
-                        + " WHERE \"studentId\" = :studentId AND \"courseId\" = :courseId"
-                        + " AND \"gradeStatus\" IN ('COMPLETED', 'PUBLISHED')"
+                "SELECT enrollment.\"letterGrade\" FROM " + ENROLLMENT + " enrollment"
+                        + " JOIN " + SECTION + " section ON section.\"id\" = enrollment.\"sectionId\""
+                        + " WHERE enrollment.\"studentId\" = :studentId AND enrollment.\"courseId\" = :courseId"
+                        + " AND enrollment.\"gradeStatus\" IN ('COMPLETED', 'PUBLISHED')"
+                        + " AND section.\"status\" <> 'CANCELLED'"
                         // A passing letter is required: a graded row without a
                         // letter (a producer bug) must never silently unlock a
                         // prerequisite, matching the knowledge-base copy.
-                        + " AND \"letterGrade\" IS NOT NULL"
-                        + " AND \"letterGrade\" NOT IN ('F', 'W')",
+                        + " AND enrollment.\"letterGrade\" IS NOT NULL"
+                        + " AND enrollment.\"letterGrade\" NOT IN ('F', 'W')",
                 new MapSqlParameterSource().addValue("studentId", studentId).addValue("courseId", courseId),
                 String.class);
         if (letters.isEmpty()) {
@@ -1039,9 +1050,12 @@ public class RegistrationService {
 
     private boolean hasActiveCourse(String studentId, String semesterId, String courseId) {
         Long count = jdbc.queryForObject(
-                "SELECT COUNT(*) FROM " + ENROLLMENT
-                        + " WHERE \"studentId\" = :studentId AND \"semesterId\" = :semesterId AND \"courseId\" = :courseId"
-                        + " AND \"status\" IN ('ENROLLED', 'PENDING', 'CONFIRMED')",
+                "SELECT COUNT(*) FROM " + ENROLLMENT + " enrollment"
+                        + " JOIN " + SECTION + " section ON section.\"id\" = enrollment.\"sectionId\""
+                        + " WHERE enrollment.\"studentId\" = :studentId AND enrollment.\"semesterId\" = :semesterId"
+                        + " AND enrollment.\"courseId\" = :courseId"
+                        + " AND enrollment.\"status\" IN ('ENROLLED', 'PENDING', 'CONFIRMED')"
+                        + " AND section.\"status\" <> 'CANCELLED'",
                 new MapSqlParameterSource()
                         .addValue("studentId", studentId)
                         .addValue("semesterId", semesterId)
