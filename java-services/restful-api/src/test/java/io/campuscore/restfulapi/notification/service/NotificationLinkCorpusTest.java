@@ -29,7 +29,7 @@ class NotificationLinkCorpusTest {
         for (JsonNode safe : root.get("safe")) {
             assertThat(NotificationLinkPolicy.requireSafe(safe.asText()))
                     .as("safe value %s", safe.asText())
-                    .isEqualTo(safe.asText().trim());
+                    .isEqualTo(safe.asText());
         }
 
         for (JsonNode unsafe : root.get("unsafe")) {

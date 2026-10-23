@@ -28,15 +28,16 @@ final class NotificationLinkPolicy {
         if (link == null) {
             return null;
         }
-        String trimmed = link.trim();
-        if (!SAFE.matcher(trimmed).matches()
-                || DOT_SEGMENT.matcher(trimmed).find()
-                || ENCODED_SEPARATOR_OR_DOT.matcher(trimmed).find()) {
+        // Edge whitespace rejects rather than trims: the stored link must be
+        // the byte-exact path a client later navigates to.
+        if (!SAFE.matcher(link).matches()
+                || DOT_SEGMENT.matcher(link).find()
+                || ENCODED_SEPARATOR_OR_DOT.matcher(link).find()) {
             throw new DomainException(
                     HttpStatus.BAD_REQUEST,
                     "INVALID_NOTIFICATION_LINK",
                     "link must be a same-origin path starting with a single /");
         }
-        return trimmed;
+        return link;
     }
 }

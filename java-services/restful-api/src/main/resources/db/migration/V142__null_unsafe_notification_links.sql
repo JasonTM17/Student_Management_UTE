@@ -9,6 +9,9 @@
 -- code-point ranges instead of locale-sensitive classes, so the cleanup is
 -- identical under any server locale. Safe values are untouched, and an
 -- already-clean database is a no-op.
+-- The cleanup is intentionally narrower than the runtime allowlists on
+-- private-use/unassigned points (a new-write rule, not a cleanup target) and
+-- intentionally wider on the U+E0100 variation-selector supplement.
 --
 -- Edited in place pre-deploy; local scratch databases that already ran the
 -- earlier revision need a flyway_schema_history checksum refresh or a

@@ -209,11 +209,13 @@ export default function AdminNotificationsPage() {
 
   const trimmedTitle = title.trim();
   const trimmedMessage = message.trim();
-  const trimmedLink = link.trim();
+  // A blank link means "no link", but edge whitespace on a real value is an
+  // error — the backend stores the byte-exact path, never a trimmed one.
+  const linkBlank = link.trim() === '';
   const titleValid = trimmedTitle.length >= 1 && title.length <= TITLE_MAX;
   const messageValid =
     trimmedMessage.length >= 1 && message.length <= MESSAGE_MAX;
-  const linkValid = trimmedLink === '' || isSafeInternalPath(trimmedLink);
+  const linkValid = linkBlank || isSafeInternalPath(link);
   const isValid = Boolean(recipient) && titleValid && messageValid && linkValid;
 
   const clearDraft = () => {
@@ -241,8 +243,8 @@ export default function AdminNotificationsPage() {
         message: trimmedMessage,
         type,
       };
-      if (trimmedLink) {
-        body.link = trimmedLink;
+      if (!linkBlank) {
+        body.link = link;
       }
 
       await adminNotificationsApi.adminCreate(body);
@@ -582,11 +584,11 @@ export default function AdminNotificationsPage() {
                             </span>
                           </>
                         ) : null}
-                        {trimmedLink ? (
+                        {!linkBlank ? (
                           <>
                             <span aria-hidden="true">·</span>
                             <span className="font-mono text-[11px] text-primary">
-                              {trimmedLink}
+                              {link}
                             </span>
                           </>
                         ) : null}
