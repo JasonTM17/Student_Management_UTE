@@ -257,7 +257,7 @@ public class AuthLoginService {
             // token minted before "sid" existed — keeps the stolen-token
             // semantics and fails the whole family closed.
             String sessionId = decoded.getClaimAsString("sid");
-            if (sessionId != null && !users.sessionExistsForUser(subject, sessionId)) {
+            if (sessionId != null && !users.sessionExistsForUser(subject, sessionId, now)) {
                 throw new BadCredentialsException("Invalid refresh token");
             }
             users.findById(subject).ifPresent(owner -> {
