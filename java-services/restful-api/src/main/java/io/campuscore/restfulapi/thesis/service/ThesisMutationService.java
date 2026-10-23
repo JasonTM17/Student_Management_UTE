@@ -834,7 +834,9 @@ public class ThesisMutationService {
         String cleanReason = requireReason(reason);
         requireMutableTopicRound(id);
         lockTopicForGovernance(id);
-        ThesisDeanScope.requireTopicAccess(jdbc, actor, id);
+        // An outcome decision is governance-only: the dean must own the
+        // topic's faculty, not merely supervise it.
+        ThesisDeanScope.requireTopicGovernanceScope(jdbc, actor, id);
         Map<String, Object> topic = one(
                 "SELECT status, final_score, result_status, title FROM thesis.thesis_topic WHERE id = :id",
                 params().addValue("id", id), "TOPIC_NOT_FOUND", "Thesis topic not found");
@@ -869,7 +871,7 @@ public class ThesisMutationService {
         String cleanReason = requireReason(reason);
         requireMutableTopicRound(id);
         lockTopicForGovernance(id);
-        ThesisDeanScope.requireTopicAccess(jdbc, actor, id);
+        ThesisDeanScope.requireTopicGovernanceScope(jdbc, actor, id);
         Map<String, Object> topic = one(
                 "SELECT status, final_score, result_status, gvpb_waived_reason, title "
                         + "FROM thesis.thesis_topic WHERE id = :id",
@@ -1101,8 +1103,12 @@ public class ThesisMutationService {
                     params().addValue("groupId", group.id()).addValue("studentId", successorId),
                     "STUDENT_NOT_IN_GROUP", "The successor is not a member of this group");
         }
-        boolean underSize = remaining < MIN_GROUP_MEMBERS;
-        if (underSize && !Boolean.TRUE.equals(request.allowSizeException())) {
+        // The minimum only binds an APPROVED roster — the same rule the ADD
+        // branch applies. A non-approved group can drop under it freely, so
+        // the exception flag has nothing to waive and must not be demanded.
+        boolean belowMinimum = remaining < MIN_GROUP_MEMBERS;
+        boolean sizeException = belowMinimum && group.approvalStatus() == ApprovalStatus.APPROVED;
+        if (sizeException && !Boolean.TRUE.equals(request.allowSizeException())) {
             throw conflict("GROUP_SIZE_EXCEPTION_REQUIRED",
                     "The roster stays below the minimum of " + MIN_GROUP_MEMBERS
                             + "; pass allowSizeException to accept a documented exception");
@@ -1119,7 +1125,7 @@ public class ThesisMutationService {
         // The deferred membership validator accepts a 1-2 member approved
         // roster only while size_exception_reason is set; a non-approved group
         // has no minimum, so the marker is written for approved groups only.
-        if (underSize && group.approvalStatus() == ApprovalStatus.APPROVED) {
+        if (sizeException) {
             jdbc.update(
                     "UPDATE thesis.thesis_group SET size_exception_reason = :reason, size_exception_by = :by, "
                             + "size_exception_at = CURRENT_TIMESTAMP WHERE id = :groupId",
@@ -1131,9 +1137,10 @@ public class ThesisMutationService {
         audit.record(subject(actor), null, "THESIS_GROUP_ROSTER_OVERRIDE", "THESIS_GROUP", group.id().toString(),
                 "Member " + studentId + " removed after registration closed; reason: " + cleanReason
                         + (successorId != null ? "; leadership passed to " + successorId : "")
-                        + (underSize ? "; below-minimum size exception accepted" : ""),
+                        + (belowMinimum ? (sizeException
+                                ? "; below-minimum size exception accepted" : "; below-minimum roster") : ""),
                 Map.of("memberCount", memberCount),
-                Map.of("memberCount", remaining, "sizeException", underSize));
+                Map.of("memberCount", remaining, "sizeException", sizeException));
         afterCommit(() -> {
             if (notifier != null) {
                 notifier.notifyGroupMemberRemoved(group.id(), studentId);
@@ -2081,8 +2088,9 @@ public class ThesisMutationService {
                         + ", invite more classmates first)");
             }
             // The waiver is governance-only: a topic supervisor reviews normal
-            // rosters but cannot approve under the faculty minimum.
-            if (!isGroupAdmin(group, actor)) {
+            // rosters but cannot approve under the faculty minimum — and a
+            // dean supervising from another faculty is still only a reviewer.
+            if (!canWaiveGroupSize(group, actor)) {
                 throw new DomainException(HttpStatus.FORBIDDEN, "GOVERNANCE_ROLE_REQUIRED",
                         "An under-size approval requires an admin or faculty head role");
             }
@@ -2329,6 +2337,18 @@ public class ThesisMutationService {
         }
 
         throw new DomainException(HttpStatus.FORBIDDEN, "GROUP_REVIEWER_REQUIRED", "Only an assigned supervisor or admin can review this group");
+    }
+
+    /**
+     * The under-minimum approval waiver is narrower than group governance:
+     * {@link #isGroupAdmin} lets a dean review the groups they personally
+     * supervise, but waiving the faculty minimum requires the topic's own
+     * faculty — supervising it from another faculty is still only review.
+     */
+    private boolean canWaiveGroupSize(GroupRow group, Jwt actor) {
+        if (isGlobalAdmin(actor)) return true;
+        if (!hasRole(actor, "TRUONG_KHOA")) return false;
+        return groups.groupInFaculty(group.id(), requireDeanScope(actor).facultyId());
     }
 
     /** Group governance is faculty-bound; round/topic lifecycle authority is separate. */
