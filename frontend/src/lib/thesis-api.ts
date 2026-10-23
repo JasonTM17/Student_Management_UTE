@@ -762,11 +762,18 @@ export const thesisApi = {
 
   /**
    * Post-registration roster override: adds an active student to a group of a
-   * REGISTRATION_CLOSED round whose topic has no scores (audited).
+   * REGISTRATION_CLOSED round whose topic has no scores, or removes a member
+   * (action REMOVE; a leader removal names successorStudentId). Audited.
    */
   overrideGroupRoster: async (
     groupId: string,
-    data: { studentId: string; reason: string; allowSizeException?: boolean },
+    data: {
+      studentId: string;
+      action?: 'ADD' | 'REMOVE';
+      reason: string;
+      allowSizeException?: boolean;
+      successorStudentId?: string;
+    },
   ): Promise<ThesisGroup> => {
     const response = await api.post<ThesisGroup>(
       '/thesis/groups/' + groupId + '/roster-override',
