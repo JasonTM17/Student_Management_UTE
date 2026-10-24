@@ -4,6 +4,8 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import io.campuscore.restfulapi.auth.model.IssuedAccessToken;
+import io.campuscore.restfulapi.auth.model.IssuedRefreshToken;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
@@ -37,7 +39,7 @@ class AuthTokenServiceTest {
                 Duration.ofMinutes(15),
                 Duration.ofDays(7));
 
-        AuthTokenService.IssuedAccessToken issued = service.issueAccessToken(new AuthPrincipal(
+        IssuedAccessToken issued = service.issueAccessToken(new AuthPrincipal(
                 "user-1",
                 "student@campuscore.edu",
                 "Student",
@@ -77,7 +79,7 @@ class AuthTokenServiceTest {
                 Duration.ofMinutes(15),
                 Duration.ofDays(7));
 
-        AuthTokenService.IssuedRefreshToken issued = service.issueRefreshToken(new AuthPrincipal(
+        IssuedRefreshToken issued = service.issueRefreshToken(new AuthPrincipal(
                 "user-1",
                 "student@campuscore.edu",
                 "Student",
@@ -119,7 +121,7 @@ class AuthTokenServiceTest {
                 Duration.ofMinutes(15),
                 Duration.ofDays(7));
 
-        AuthTokenService.IssuedRefreshToken issued = service.issueRefreshToken(new AuthPrincipal(
+        IssuedRefreshToken issued = service.issueRefreshToken(new AuthPrincipal(
                 "user-1",
                 "student@campuscore.edu",
                 "Student",
@@ -148,7 +150,7 @@ class AuthTokenServiceTest {
                 Duration.ofMinutes(15),
                 Duration.ofDays(7));
 
-        AuthTokenService.IssuedAccessToken issued = service.issueAccessToken(new AuthPrincipal(
+        IssuedAccessToken issued = service.issueAccessToken(new AuthPrincipal(
                 "user-1",
                 "student@campuscore.edu",
                 "Student",

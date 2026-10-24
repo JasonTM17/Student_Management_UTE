@@ -2,6 +2,11 @@ package io.campuscore.restfulapi.auth.repository;
 
 import io.campuscore.restfulapi.auth.dto.AuthDtos.AuthUserResponse;
 import io.campuscore.restfulapi.auth.dto.AuthDtos.StudentContext;
+import io.campuscore.restfulapi.auth.model.AccountAuthorization;
+import io.campuscore.restfulapi.auth.model.AccountState;
+import io.campuscore.restfulapi.auth.model.ActiveRefreshSession;
+import io.campuscore.restfulapi.auth.model.AuthUserRecord;
+import io.campuscore.restfulapi.auth.model.RacedRotation;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Timestamp;
@@ -119,9 +124,6 @@ public class AuthUserRepository {
                         findRoles(session.user().id()),
                         findPermissions(session.user().id())),
                 session.sessionId()));
-    }
-
-    public record ActiveRefreshSession(AuthUserRecord user, String sessionId) {
     }
 
     /**
@@ -290,11 +292,6 @@ public class AuthUserRepository {
                 });
     }
 
-    public record AccountAuthorization(String status, boolean mustChangePassword, String studentId,
-            Integer studentYear, String lecturerId, java.util.Set<String> roles, java.util.Set<String> permissions,
-            long credentialVersion) {
-    }
-
     /** Opt-in email OTP switch added by V85; read per login, never cached. */
     public boolean isTwoFactorEnabled(String userId) {
         Boolean enabled = jdbc.queryForObject(
@@ -344,9 +341,6 @@ public class AuthUserRepository {
                         + " SET \"consumedAt\" = CURRENT_TIMESTAMP"
                         + " WHERE \"userId\" = :id AND \"purpose\" = 'LOGIN' AND \"consumedAt\" IS NULL",
                 new MapSqlParameterSource("id", userId));
-    }
-
-    public record AccountState(String status, boolean mustChangePassword) {
     }
 
     /**
@@ -489,9 +483,6 @@ public class AuthUserRepository {
                 "UPDATE " + USER_TABLE + " SET \"refreshToken\" = :refreshToken, \"updatedAt\" = CURRENT_TIMESTAMP"
                         + " WHERE \"id\" = :userId",
                 parameters);
-    }
-
-    public record RacedRotation(AuthUserRecord user, String sessionId, Instant rotatedAt) {
     }
 
     public void deleteRefreshSession(String userId, String refreshTokenHash) {
@@ -709,74 +700,4 @@ public class AuthUserRepository {
         return instant == null ? null : LocalDateTime.ofInstant(instant, ZoneOffset.UTC);
     }
 
-    public record AuthUserRecord(
-            String id,
-            String email,
-            String passwordHash,
-            String firstName,
-            String lastName,
-            String phone,
-            String gender,
-            Instant dateOfBirth,
-            String address,
-            String avatar,
-            String status,
-            boolean mustChangePassword,
-            int failedLoginAttempts,
-            Instant lockedUntil,
-            Instant createdAt,
-            String studentId,
-            Integer studentYear,
-            String lecturerId,
-            List<String> roles,
-            List<String> permissions,
-            long credentialVersion) {
-
-        AuthUserRecord withAuthorities(List<String> roles, List<String> permissions) {
-            return new AuthUserRecord(
-                    id,
-                    email,
-                    passwordHash,
-                    firstName,
-                    lastName,
-                    phone,
-                    gender,
-                    dateOfBirth,
-                    address,
-                    avatar,
-                    status,
-                    mustChangePassword,
-                    failedLoginAttempts,
-                    lockedUntil,
-                    createdAt,
-                    studentId,
-                    studentYear,
-                    lecturerId,
-                    List.copyOf(Objects.requireNonNullElse(roles, List.of())),
-                    List.copyOf(Objects.requireNonNullElse(permissions, List.of())),
-                    credentialVersion);
-        }
-
-        public AuthUserResponse toResponse() {
-            StudentContext student = studentYear == null ? null : new StudentContext(studentYear);
-            return new AuthUserResponse(
-                    id,
-                    email,
-                    firstName,
-                    lastName,
-                    phone,
-                    gender,
-                    dateOfBirth,
-                    address,
-                    avatar,
-                    status,
-                    mustChangePassword,
-                    createdAt,
-                    roles,
-                    permissions,
-                    studentId,
-                    lecturerId,
-                    student);
-        }
-    }
 }

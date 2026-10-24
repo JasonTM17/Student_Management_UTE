@@ -1,7 +1,7 @@
 package io.campuscore.restfulapi.auth.controller;
 
 import io.campuscore.restfulapi.auth.service.AuthLoginService;
-import io.campuscore.restfulapi.auth.service.AuthLoginService.LoginResult;
+import io.campuscore.restfulapi.auth.model.LoginResult;
 import io.campuscore.restfulapi.auth.service.PasswordResetRequestDispatcher;
 import io.campuscore.restfulapi.auth.service.PasswordResetService;
 import io.campuscore.restfulapi.security.ratelimit.ClientIpResolver;

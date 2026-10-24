@@ -8,6 +8,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import io.campuscore.restfulapi.auth.model.AccountAuthorization;
 import io.campuscore.restfulapi.auth.repository.AuthUserRepository;
 import io.campuscore.restfulapi.exception.response.ApiErrorWriter;
 import jakarta.servlet.FilterChain;
@@ -60,12 +61,12 @@ class AccountStateFilterTest {
                 new JwtAuthenticationToken(jwt, Collections.emptyList()));
     }
 
-    private static AuthUserRepository.AccountAuthorization state(String status, boolean mustChangePassword) {
+    private static AccountAuthorization state(String status, boolean mustChangePassword) {
         return state(status, mustChangePassword, 0L);
     }
 
-    private static AuthUserRepository.AccountAuthorization state(String status, boolean mustChangePassword, long version) {
-        return new AuthUserRepository.AccountAuthorization(status, mustChangePassword, null, null, null,
+    private static AccountAuthorization state(String status, boolean mustChangePassword, long version) {
+        return new AccountAuthorization(status, mustChangePassword, null, null, null,
                 java.util.Set.of(), java.util.Set.of(), version);
     }
 

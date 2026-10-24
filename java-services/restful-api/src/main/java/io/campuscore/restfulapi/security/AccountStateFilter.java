@@ -1,5 +1,6 @@
 package io.campuscore.restfulapi.security;
 
+import io.campuscore.restfulapi.auth.model.AccountAuthorization;
 import io.campuscore.restfulapi.auth.repository.AuthUserRepository;
 import io.campuscore.restfulapi.exception.response.ApiErrorWriter;
 import jakarta.servlet.FilterChain;
@@ -48,7 +49,7 @@ public class AccountStateFilter extends OncePerRequestFilter {
                     return;
                 }
 
-                Optional<AuthUserRepository.AccountAuthorization> state;
+                Optional<AccountAuthorization> state;
                 try {
                     state = repository.findAccountAuthorization(jwtToken.getToken().getSubject());
                     DatabaseAvailabilityTracker.recordSuccess();
@@ -90,7 +91,7 @@ public class AccountStateFilter extends OncePerRequestFilter {
     }
 
     private static boolean matchesCurrentAuthorization(org.springframework.security.oauth2.jwt.Jwt token,
-            AuthUserRepository.AccountAuthorization state) {
+            AccountAuthorization state) {
         if (!matchesCredentialVersion(token, state.credentialVersion())
                 || !matchesSet(token.getClaims().get("roles"), state.roles())
                 || !matchesSet(token.getClaims().get("permissions"), state.permissions())
