@@ -38,11 +38,40 @@ before. A future postgraduate round type opts in by returning `true` from
 single owner is `ThesisGovernanceCapabilities`, which feeds both the write
 path and the round read model (`counterReviewWaiverAllowed`).
 
+## Registration eligibility (accumulated credits + CPA)
+
+A student may register (create a group, be added as a member, or pick the
+group's topic) only when their published transcript meets the regulation's
+condition: at least `thesis.eligibility.min-credits` accumulated credits
+(default `110`) and a cumulative GPA of at least `thesis.eligibility.min-cpa`
+(default `2.0`, 4.0 scale). Both numbers come from the canonical transcript
+summary — published grades only, best attempt per course, letter `F` earns
+nothing. A student with no published academic data fails closed
+(`ACADEMIC_DATA_UNAVAILABLE`).
+
+- `thesis.eligibility.enforcement` = `ENFORCE` (default) refuses the mutation
+  with `409 THESIS_ELIGIBILITY_NOT_MET` plus `details` carrying
+  `earnedCredits`, `requiredCredits`, `cpa`, `requiredCpa` and a `reasons`
+  list. `ADVISORY` still evaluates and reports in the read model but never
+  blocks.
+- The round read model carries `eligibility` for student callers; group
+  members carry an `eligible` flag for roster chips. No extra round trip.
+- Governance escape hatches are deliberately not blocked: the audited roster
+  override admits an ineligible student, and the audit row records the
+  ineligibility note (`student does not meet thesis eligibility (...)` +
+  `studentEligible=false`). A reason remains required, as before.
+- The regulation's academic-warning and disciplinary-sanction prerequisites
+  have no data model in this schema, so they are not evaluated.
+
 ## Executable owners
 
 - [Group mutations](../../java-services/restful-api/src/main/java/io/campuscore/restfulapi/thesis/service/ThesisMutationService.java):
   `isGroupAdmin`, `requireDeanScope` and `requireDeanTopicAccess` own the group
   authorization boundary; the separate `isAdmin` owner governs other lifecycle operations.
+- [Eligibility policy](../../java-services/restful-api/src/main/java/io/campuscore/restfulapi/thesis/service/ThesisEligibilityService.java)
+  owns the credit/CPA rule; the batch transcript summary lives in
+  `AcademicEnrollmentReadService.findTranscriptSummaries`, reusing the
+  single-source grade reduction.
 - [Faculty identity and ownership](../../java-services/restful-api/src/main/java/io/campuscore/restfulapi/thesis/repository/ThesisGroupReadRepository.java):
   `findLecturerScope` and `groupInFaculty`.
 - [Group mutation faculty-scope regressions](../../java-services/restful-api/src/test/java/io/campuscore/restfulapi/thesis/ThesisGroupMutationFacultyScopeTest.java)
