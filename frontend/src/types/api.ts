@@ -138,7 +138,7 @@ export interface Enrollment {
   studentId: string;
   sectionId: string;
   semesterId: string;
-  status: 'ENROLLED' | 'PENDING' | 'CONFIRMED' | 'DROPPED' | 'COMPLETED' | 'CANCELLED';
+  status: 'ENROLLED' | 'PENDING' | 'CONFIRMED' | 'DROPPED' | 'COMPLETED' | 'CANCELLED' | 'WITHDRAWN';
   enrolledAt: string;
   droppedAt?: string;
   gradeStatus: 'NOT_GRADED' | 'DRAFT' | 'PUBLISHED' | 'APPEALED';
@@ -259,7 +259,7 @@ export interface StudentGradeRecord {
   letterGrade: string | null;
   gradePoint?: number | null;
   gradeStatus: 'NOT_GRADED' | 'DRAFT' | 'PUBLISHED' | 'APPEALED';
-  enrollmentStatus: 'ENROLLED' | 'PENDING' | 'CONFIRMED' | 'DROPPED' | 'COMPLETED' | 'CANCELLED';
+  enrollmentStatus: 'ENROLLED' | 'PENDING' | 'CONFIRMED' | 'DROPPED' | 'COMPLETED' | 'CANCELLED' | 'WITHDRAWN';
 }
 
 export interface StudentTranscriptSemester {
@@ -380,7 +380,7 @@ export interface SectionGrades {
     finalGrade?: number;
     letterGrade?: string;
     gradeStatus?: 'DRAFT' | 'PUBLISHED' | 'APPEALED';
-    enrollmentStatus?: 'PENDING' | 'CONFIRMED' | 'DROPPED' | 'COMPLETED' | 'CANCELLED';
+    enrollmentStatus?: 'PENDING' | 'CONFIRMED' | 'DROPPED' | 'COMPLETED' | 'CANCELLED' | 'WITHDRAWN';
   }[];
 }
 
