@@ -264,6 +264,32 @@ class SectionReopenConflictPostgresIT {
     }
 
     /**
+     * The terminal comparison normalizes the stored value in Java, not with
+     * the database's TRIM — PostgreSQL TRIM strips only the space character —
+     * so a direct write padding a terminal status with a tab, newline, CRLF
+     * or Unicode space still refuses the reopen.
+     */
+    @Test
+    void reopenRefusesTerminalStatusesPaddedWithNonSpaceWhitespace() {
+        for (String status : List.of("CLOSED\t", "\nCLOSED", "CLOSED\r\n",
+                "CLOSED\u00A0", "CLOSED\u2007", "CLOSED\u202F", "\u202FARCHIVED\u202F")) {
+            AcademicEnrollmentPostgresFixture fixture = AcademicEnrollmentPostgresFixture.seed(jdbc, 30);
+            jdbc.update("UPDATE academic.\"Semester\" SET \"status\" = :st WHERE \"id\" = :id",
+                    new MapSqlParameterSource().addValue("st", status).addValue("id", fixture.semesterId));
+            catalog.update(SECTION_TABLE, fixture.sectionId, Map.of("status", "CANCELLED"));
+            DomainException refusal = catchReopen(fixture.sectionId, Map.of("status", "OPEN"));
+            assertThat(refusal)
+                    .as("reopen must refuse a stored terminal value padded with %s",
+                            status.replace("\t", "\\t").replace("\n", "\\n")
+                                    .replace("\r", "\\r").replace("\u00A0", "<NBSP>")
+                                    .replace("\u2007", "<U+2007>").replace("\u202F", "<U+202F>"))
+                    .isNotNull();
+            assertThat(refusal.code()).isEqualTo("SEMESTER_CLOSED");
+            assertThat(sectionStatus(fixture.sectionId)).isEqualTo("CANCELLED");
+        }
+    }
+
+    /**
      * A slip rendered from pre-cancel state must not commit over the cancel:
      * the render locks the affected section rows and re-reads the active set
      * under the lock, so parking the slip worker before its section FOR

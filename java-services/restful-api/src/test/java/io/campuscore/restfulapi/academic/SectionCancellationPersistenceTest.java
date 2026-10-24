@@ -10,6 +10,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.ZoneOffset;
+import java.util.List;
 import io.campuscore.restfulapi.testsupport.AccountAuthorityFixture;
 import io.campuscore.restfulapi.testsupport.CurrentAccountJwt;
 import org.junit.jupiter.api.BeforeEach;
@@ -680,6 +681,39 @@ class SectionCancellationPersistenceTest {
                         .content("{\"status\":\"CANCELLED\"}"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.status").value("CANCELLED"));
+    }
+
+    @Test
+    void reopeningIsRejectedWhenAStoredTerminalStatusCarriesNonSpacePadding() throws Exception {
+        // The terminal gate compares a normalized value, so a direct write
+        // padding CLOSED with a tab, newline, CRLF or a Unicode space —
+        // padding a database TRIM would not strip — still refuses the
+        // reopen. Cancelling stays legal in every one of them.
+        for (String stored : List.of("CLOSED\t", "\nCLOSED", "CLOSED\r\n",
+                "CLOSED\u00A0", "CLOSED\u2007", "CLOSED\u202F")) {
+            jdbc.update("UPDATE \"academic\".\"Semester\" SET \"status\" = ? WHERE \"id\" = 'semester-1'", stored);
+            mvc.perform(put("/api/v1/sections/section-two")
+                            .with(adminJwt())
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content("{\"status\":\"CANCELLED\"}"))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.status").value("CANCELLED"));
+
+            MvcResult refused = mvc.perform(put("/api/v1/sections/section-two")
+                            .with(adminJwt())
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content("{\"status\":\"OPEN\"}"))
+                    .andExpect(status().isConflict())
+                    .andReturn();
+            assertThat(refused.getResponse().getContentAsString())
+                    .as("reopen must refuse a stored terminal value padded with %s",
+                            stored.replace("\t", "\\t").replace("\n", "\\n")
+                                    .replace("\r", "\\r").replace("\u00A0", "<NBSP>")
+                                    .replace("\u2007", "<U+2007>").replace("\u202F", "<U+202F>"))
+                    .contains("\"code\":\"SEMESTER_CLOSED\"");
+
+            jdbc.update("UPDATE \"academic\".\"Section\" SET \"status\" = 'OPEN' WHERE \"id\" = 'section-two'");
+        }
     }
 
     @Test
