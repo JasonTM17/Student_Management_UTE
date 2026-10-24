@@ -1,6 +1,7 @@
 'use client';
 
 import {
+  AlertCircle,
   ArrowUpRight,
   Building2,
   Check,
@@ -230,6 +231,12 @@ export default function StudentGroupCard({
                             <span className="inline-flex items-center gap-1 rounded-md bg-indigo-500/15 px-2 py-0.5 text-[11px] font-semibold text-indigo-700 dark:text-indigo-300">
                               <Building2 className="h-3 w-3" />
                               {messages.thesis.externalBadge}
+                            </span>
+                          ) : null}
+                          {member.eligible === false ? (
+                            <span className="inline-flex items-center gap-1 rounded-md bg-amber-500/15 px-2 py-0.5 text-[11px] font-semibold text-amber-700 dark:text-amber-300">
+                              <AlertCircle className="h-3 w-3" />
+                              {messages.thesis.memberIneligibleBadge}
                             </span>
                           ) : null}
                         </div>
