@@ -142,6 +142,8 @@ export const en = {
         GROUP_MEMBER_REQUIRED: 'Only group members can perform this action.',
         GROUP_OWNER_REQUIRED: 'Only the group leader can perform this action.',
         REGISTRATION_WINDOW_CLOSED: 'The registration window for this round has already closed.',
+        THESIS_ELIGIBILITY_NOT_MET:
+          'Thesis registration requires enough accumulated credits and a minimum cumulative GPA. Check the eligibility card for your numbers.',
         // Thesis reports
         REPORT_NOT_FOUND: 'No report has been submitted for this group yet.',
         REPORT_DEADLINE_PASSED: 'The report submission deadline has passed.',
@@ -2383,6 +2385,14 @@ export const en = {
     noProposedTopics: 'You have not proposed any topics in this round yet.',
     memberCount: '{count}/5 members',
     membersNeededForApproval: 'A draft with 1 or 2 members can be completed before approval. Add {count} more member(s) to reach the minimum of 3; approval requires 3 to 5 members.',
+    eligibilityTitle: 'Thesis eligibility',
+    eligibilityEligible: 'Eligible',
+    eligibilityIneligible: 'Not eligible yet',
+    eligibilityCredits: '{earned}/{required} accumulated credits',
+    eligibilityCpa: 'CPA {cpa} (min {required})',
+    eligibilityCpaMissing: 'No published GPA yet',
+    eligibilityAction: 'Course registration',
+    memberIneligibleBadge: 'Not eligible',
     noGroup: 'You do not have a group in this round yet.',
     noGroupDescription: 'Create a group when registration opens.',
     groupCancelledNotice:
@@ -3219,6 +3229,8 @@ export const vi: I18nMessages = {
         GROUP_MEMBER_REQUIRED: 'Chỉ thành viên trong nhóm mới thực hiện được thao tác này.',
         GROUP_OWNER_REQUIRED: 'Chỉ nhóm trưởng mới thực hiện được thao tác này.',
         REGISTRATION_WINDOW_CLOSED: 'Cửa sổ đăng ký của đợt này đã đóng.',
+        THESIS_ELIGIBILITY_NOT_MET:
+          'Đăng ký khóa luận yêu cầu đủ tín chỉ tích lũy và CPA tối thiểu. Xem thẻ điều kiện để biết số liệu của bạn.',
         // Nộp tài liệu khóa luận (Word/PDF) và hạn nộp
         REPORT_NOT_FOUND: 'Nhóm này chưa nộp tài liệu khóa luận.',
         REPORT_DEADLINE_PASSED: 'Đã quá hạn nộp tài liệu khóa luận.',
@@ -5454,6 +5466,14 @@ export const vi: I18nMessages = {
     noProposedTopics: 'Bạn chưa đề xuất đề tài nào trong đợt này.',
     memberCount: '{count}/5 thành viên',
     membersNeededForApproval: 'Nhóm nháp có 1 hoặc 2 thành viên có thể tiếp tục bổ sung trước khi duyệt. Cần thêm {count} thành viên để đủ mức tối thiểu 3; nhóm được duyệt phải có từ 3 đến 5 thành viên.',
+    eligibilityTitle: 'Điều kiện khóa luận',
+    eligibilityEligible: 'Đủ điều kiện',
+    eligibilityIneligible: 'Chưa đủ điều kiện',
+    eligibilityCredits: '{earned}/{required} tín chỉ tích lũy',
+    eligibilityCpa: 'CPA {cpa} (tối thiểu {required})',
+    eligibilityCpaMissing: 'Chưa có CPA công bố',
+    eligibilityAction: 'Đăng ký học phần',
+    memberIneligibleBadge: 'Chưa đủ điều kiện',
     noGroup: 'Bạn chưa có nhóm trong đợt này.',
     noGroupDescription: 'Tạo nhóm khi đợt đăng ký mở.',
     groupCancelledNotice:
