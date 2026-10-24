@@ -1,6 +1,12 @@
 package io.campuscore.restfulapi.thesis.service;
 
+import io.campuscore.restfulapi.thesis.domain.LecturerScope;
 import io.campuscore.restfulapi.thesis.domain.RoundStatus;
+import io.campuscore.restfulapi.thesis.domain.StoredReport;
+import io.campuscore.restfulapi.thesis.dto.ReportResponse;
+import io.campuscore.restfulapi.thesis.dto.RepositoryMemberResponse;
+import io.campuscore.restfulapi.thesis.dto.RepositoryReportResponse;
+import io.campuscore.restfulapi.thesis.dto.RepositorySupervisorResponse;
 import io.campuscore.restfulapi.thesis.repository.ThesisGroupReadRepository;
 import io.campuscore.restfulapi.thesis.dto.ThesisMutationDtos.ReportUpdateRequest;
 import io.campuscore.restfulapi.exception.DomainException;
@@ -569,7 +575,7 @@ public class ThesisReportService {
     }
 
     private String requireDeanFaculty(Jwt actor) {
-        ThesisGroupReadRepository.LecturerScope scope = groups.findLecturerScope(lecturerId(actor), actor.getSubject());
+        LecturerScope scope = groups.findLecturerScope(lecturerId(actor), actor.getSubject());
         if (scope == null) {
             throw new DomainException(HttpStatus.FORBIDDEN, "LECTURER_PROFILE_REQUIRED",
                     "An active lecturer profile bound to the faculty head is required");
@@ -670,46 +676,6 @@ public class ThesisReportService {
 
     private record StoredObjectRef(String provider, String bucket, String key) { }
 
-    public record ReportResponse(
-            UUID groupId,
-            String title,
-            String url,
-            String note,
-            String submittedBy,
-            Instant submittedAt,
-            Instant updatedAt,
-            String fileName,
-            String fileType,
-            Long fileSize) { }
-
-    public record RepositoryReportResponse(
-            UUID reportId,
-            String title,
-            String url,
-            String note,
-            Instant submittedAt,
-            Instant updatedAt,
-            String fileName,
-            String fileType,
-            Long fileSize,
-            String topicTitle,
-            String topicDescription,
-            String departmentName,
-            String groupStatus,
-            String approvalStatus,
-            String submittedByDisplayName,
-            String submittedByStudentNumber,
-            List<RepositorySupervisorResponse> supervisors,
-            List<RepositoryMemberResponse> members) { }
-
-    public record RepositorySupervisorResponse(String displayName, int supervisorOrder) { }
-
-    public record RepositoryMemberResponse(
-            String displayName,
-            String studentNumber,
-            boolean isExternal,
-            boolean isLeader) { }
-
     private static final class RepositoryBuilder {
         private final UUID reportId;
         private final String title;
@@ -760,9 +726,6 @@ public class ThesisReportService {
                     List.copyOf(supervisors.values()), List.copyOf(members.values()));
         }
     }
-
-    /** The attached document bytes, served only through the authorized download path. */
-    public record StoredReport(String fileName, String contentType, byte[] data) { }
 
     private void requireWriteAccess(GroupContext group, Jwt actor) {
         if (!group.leaderStudentId().equals(studentId(actor))) {

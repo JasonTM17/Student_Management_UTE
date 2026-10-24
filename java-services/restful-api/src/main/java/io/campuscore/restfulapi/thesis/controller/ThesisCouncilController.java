@@ -1,10 +1,10 @@
 package io.campuscore.restfulapi.thesis.controller;
 
 import io.campuscore.restfulapi.thesis.service.ThesisCouncilService;
-import io.campuscore.restfulapi.thesis.service.ThesisCouncilService.CouncilResponse;
-import io.campuscore.restfulapi.thesis.service.ThesisCouncilService.ScoreResponse;
-import io.campuscore.restfulapi.thesis.service.ThesisCouncilService.StudentResultRow;
-import io.campuscore.restfulapi.thesis.service.ThesisCouncilService.TopicResult;
+import io.campuscore.restfulapi.thesis.dto.CouncilResponse;
+import io.campuscore.restfulapi.thesis.dto.ScoreResponse;
+import io.campuscore.restfulapi.thesis.dto.StudentResultRow;
+import io.campuscore.restfulapi.thesis.dto.TopicResult;
 import io.campuscore.restfulapi.thesis.dto.ThesisCouncilRequestDtos.AddCouncilMemberRequest;
 import io.campuscore.restfulapi.thesis.dto.ThesisCouncilRequestDtos.AssignReviewerRequest;
 import io.campuscore.restfulapi.thesis.dto.ThesisCouncilRequestDtos.AssignTopicRequest;

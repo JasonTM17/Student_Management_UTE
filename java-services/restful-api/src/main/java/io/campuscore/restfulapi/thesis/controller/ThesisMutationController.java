@@ -1,6 +1,8 @@
 package io.campuscore.restfulapi.thesis.controller;
 
 import io.campuscore.restfulapi.thesis.domain.RoundStatus;
+import io.campuscore.restfulapi.thesis.domain.StoredReport;
+import io.campuscore.restfulapi.thesis.dto.SupervisorRow;
 import io.campuscore.restfulapi.thesis.service.ThesisMutationService;
 import io.campuscore.restfulapi.thesis.service.ThesisReportService;
 import io.campuscore.restfulapi.thesis.service.ThesisSupervisorService;
@@ -27,8 +29,8 @@ import io.campuscore.restfulapi.thesis.dto.ThesisMutationDtos.TopicAssignmentReq
 import io.campuscore.restfulapi.thesis.dto.ThesisMutationDtos.TopicCreateRequest;
 import io.campuscore.restfulapi.thesis.dto.ThesisMutationDtos.TopicOutcomeRequest;
 import io.campuscore.restfulapi.thesis.dto.ThesisMutationDtos.TopicUpdateRequest;
-import io.campuscore.restfulapi.thesis.service.ThesisReportService.ReportResponse;
-import io.campuscore.restfulapi.thesis.service.ThesisReportService.RepositoryReportResponse;
+import io.campuscore.restfulapi.thesis.dto.ReportResponse;
+import io.campuscore.restfulapi.thesis.dto.RepositoryReportResponse;
 import io.campuscore.restfulapi.thesis.dto.ThesisRoundDtos.RoundResponse;
 import io.campuscore.restfulapi.thesis.dto.ThesisTopicDtos.TopicResponse;
 import java.util.List;
@@ -344,7 +346,7 @@ public class ThesisMutationController {
     /** Brief R3: replace the topic's supervisor list (one or two lecturers). */
     @PutMapping("/topics/{id}/supervisors")
     @PreAuthorize("hasAnyRole('ADMIN','TRUONG_KHOA','TRUONG_BO_MON','LECTURER','SUPER_ADMIN')")
-    public List<ThesisSupervisorService.SupervisorRow> setSupervisors(
+    public List<SupervisorRow> setSupervisors(
             @PathVariable UUID id,
             @RequestBody Map<String, List<String>> request,
             @AuthenticationPrincipal Jwt actor) {
@@ -359,7 +361,7 @@ public class ThesisMutationController {
      */
     @GetMapping("/topics/{id}/supervisors")
     @PreAuthorize("hasAnyRole('ADMIN','TRUONG_KHOA','TRUONG_BO_MON','LECTURER','STUDENT','SUPER_ADMIN')")
-    public List<ThesisSupervisorService.SupervisorRow> listSupervisors(
+    public List<SupervisorRow> listSupervisors(
             @PathVariable UUID id,
             @AuthenticationPrincipal Jwt actor) {
         return supervisors.list(id, actor);
@@ -476,7 +478,7 @@ public class ThesisMutationController {
     public org.springframework.http.ResponseEntity<byte[]> downloadReportFile(
             @PathVariable UUID id,
             @AuthenticationPrincipal Jwt actor) {
-        ThesisReportService.StoredReport stored = reports.download(id, actor);
+        StoredReport stored = reports.download(id, actor);
         String fileName = stored.fileName() == null ? "report" : stored.fileName();
         String encoded = java.net.URLEncoder.encode(fileName, java.nio.charset.StandardCharsets.UTF_8)
                 .replace("+", "%20");
@@ -497,7 +499,7 @@ public class ThesisMutationController {
     public org.springframework.http.ResponseEntity<byte[]> downloadRepositoryReportFile(
             @PathVariable UUID id,
             @AuthenticationPrincipal Jwt actor) {
-        ThesisReportService.StoredReport stored = reports.downloadByReport(id, actor);
+        StoredReport stored = reports.downloadByReport(id, actor);
         String fileName = stored.fileName() == null ? "report" : stored.fileName();
         String encoded = java.net.URLEncoder.encode(fileName, java.nio.charset.StandardCharsets.UTF_8)
                 .replace("+", "%20");

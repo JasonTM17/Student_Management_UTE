@@ -1,5 +1,9 @@
 package io.campuscore.restfulapi.thesis.service;
 
+import io.campuscore.restfulapi.thesis.dto.CouncilAssignment;
+import io.campuscore.restfulapi.thesis.dto.GradingTask;
+import io.campuscore.restfulapi.thesis.dto.LecturerWorkload;
+import io.campuscore.restfulapi.thesis.dto.SupervisedTopic;
 import java.util.List;
 import java.util.UUID;
 import org.springframework.context.annotation.Profile;
@@ -105,39 +109,4 @@ public class ThesisLecturerWorkloadService {
         return value == null ? null : value.toInstant();
     }
 
-    public record SupervisedTopic(
-            UUID topicId,
-            String title,
-            String topicStatus,
-            UUID roundId,
-            String roundName,
-            String roundStatus,
-            java.time.Instant reportDate,
-            int groupCount,
-            int pendingGroupCount) { }
-
-    public record CouncilAssignment(
-            UUID councilId,
-            String name,
-            String memberRole,
-            UUID roundId,
-            String roundName,
-            String roundStatus,
-            java.time.Instant reportDate,
-            java.time.Instant gvpbDeadline,
-            int topicCount) { }
-
-    public record GradingTask(
-            UUID topicId,
-            String title,
-            UUID councilId,
-            String councilName,
-            String roundName,
-            String roundStatus,
-            int myScoreRows) { }
-
-    public record LecturerWorkload(
-            List<SupervisedTopic> topics,
-            List<CouncilAssignment> councils,
-            List<GradingTask> gradingTasks) { }
 }

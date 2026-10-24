@@ -31,6 +31,9 @@ import io.campuscore.restfulapi.academic.dto.AcademicSectionReadDtos.LecturerGra
 import io.campuscore.restfulapi.academic.dto.AcademicSectionReadDtos.LecturerScheduleResponse;
 import io.campuscore.restfulapi.thesis.assistant.dto.ThesisAssistantDtos.ChatRequest;
 import io.campuscore.restfulapi.thesis.assistant.dto.ThesisAssistantDtos.ChatResponse;
+import io.campuscore.restfulapi.thesis.dto.CouncilAssignment;
+import io.campuscore.restfulapi.thesis.dto.LecturerWorkload;
+import io.campuscore.restfulapi.thesis.dto.SupervisedTopic;
 import io.campuscore.restfulapi.thesis.service.ThesisLecturerWorkloadService;
 import java.text.Normalizer;
 import java.time.Instant;
@@ -627,16 +630,16 @@ class AssistantPersonalContextAdvisorTest {
         AssistantPersonalContextAdvisor thesisAdvisor =
                 new AssistantPersonalContextAdvisor(enrollmentService, sectionService, workloadService, null, null);
 
-        var topic = new ThesisLecturerWorkloadService.SupervisedTopic(
+        var topic = new SupervisedTopic(
                 UUID.randomUUID(), "Hệ thống AI gợi ý học tập", "PUBLISHED",
                 UUID.randomUUID(), "Đợt 1 KLTN 2026", "REGISTRATION_OPEN",
                 null, 2, 1);
-        var council = new ThesisLecturerWorkloadService.CouncilAssignment(
+        var council = new CouncilAssignment(
                 UUID.randomUUID(), "Hội đồng 01 - KTPM", "CHAIR",
                 UUID.randomUUID(), "Đợt 1 KLTN 2026", "REGISTRATION_OPEN",
                 null, null, 5);
         when(workloadService.workload("lecturer-profile")).thenReturn(
-                new ThesisLecturerWorkloadService.LecturerWorkload(List.of(topic), List.of(council), List.of()));
+                new LecturerWorkload(List.of(topic), List.of(council), List.of()));
 
         ChatResponse response = thesisAdvisor.answer(chatRequest("vi", "Tôi có đề tài đồ án nào đang hướng dẫn?"), jwtLecturer());
 
@@ -1531,14 +1534,14 @@ class AssistantPersonalContextAdvisorTest {
         ThesisLecturerWorkloadService workloadService = mock(ThesisLecturerWorkloadService.class);
         AssistantPersonalContextAdvisor workloadAdvisor =
                 new AssistantPersonalContextAdvisor(enrollmentService, sectionService, workloadService, null, null);
-        var topicA = new ThesisLecturerWorkloadService.SupervisedTopic(
+        var topicA = new SupervisedTopic(
                 UUID.randomUUID(), "Đề tài A", "PUBLISHED",
                 UUID.randomUUID(), "Đợt 1 KLTN 2026", "REGISTRATION_OPEN", null, 3, 1);
-        var topicB = new ThesisLecturerWorkloadService.SupervisedTopic(
+        var topicB = new SupervisedTopic(
                 UUID.randomUUID(), "Đề tài B", "PUBLISHED",
                 UUID.randomUUID(), "Đợt 1 KLTN 2026", "REGISTRATION_OPEN", null, 2, 0);
         when(workloadService.workload("lecturer-profile")).thenReturn(
-                new ThesisLecturerWorkloadService.LecturerWorkload(List.of(topicA, topicB), List.of(), List.of()));
+                new LecturerWorkload(List.of(topicA, topicB), List.of(), List.of()));
 
         ChatResponse response = workloadAdvisor.answer(
                 chatRequest("vi", "Khối lượng hướng dẫn của tôi hiện tại là bao nhiêu?"), jwtLecturer());
@@ -1875,14 +1878,14 @@ class AssistantPersonalContextAdvisorTest {
         ThesisLecturerWorkloadService workloadService = mock(ThesisLecturerWorkloadService.class);
         AssistantPersonalContextAdvisor workloadAdvisor =
                 new AssistantPersonalContextAdvisor(enrollmentService, sectionService, workloadService, null, null);
-        var topicA = new ThesisLecturerWorkloadService.SupervisedTopic(
+        var topicA = new SupervisedTopic(
                 UUID.randomUUID(), "Đề tài A", "PUBLISHED",
                 UUID.randomUUID(), "Đợt 1 KLTN 2026", "REGISTRATION_OPEN", null, 3, 1);
-        var topicB = new ThesisLecturerWorkloadService.SupervisedTopic(
+        var topicB = new SupervisedTopic(
                 UUID.randomUUID(), "Đề tài B", "PUBLISHED",
                 UUID.randomUUID(), "Đợt 1 KLTN 2026", "REGISTRATION_OPEN", null, 2, 0);
         when(workloadService.workload("lecturer-profile")).thenReturn(
-                new ThesisLecturerWorkloadService.LecturerWorkload(List.of(topicA, topicB), List.of(), List.of()));
+                new LecturerWorkload(List.of(topicA, topicB), List.of(), List.of()));
 
         ChatResponse response = workloadAdvisor.answer(
                 chatRequest("vi", "Những nhóm sinh viên nào tôi đang hướng dẫn?"), jwtLecturer());
