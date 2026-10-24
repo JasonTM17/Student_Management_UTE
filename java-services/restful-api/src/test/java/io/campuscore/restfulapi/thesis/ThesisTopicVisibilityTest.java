@@ -34,7 +34,7 @@ class ThesisTopicVisibilityTest {
     void setUp() {
         repository = mock(ThesisTopicRepository.class);
         rounds = mock(ThesisRoundReadPort.class);
-        service = new ThesisTopicService(repository, rounds, mock(NamedParameterJdbcTemplate.class));
+        service = new ThesisTopicService(repository, rounds, mock(io.campuscore.restfulapi.thesis.repository.ThesisScopeRepository.class));
     }
 
     @Test
