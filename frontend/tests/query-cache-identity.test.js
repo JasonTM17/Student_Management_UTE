@@ -3173,3 +3173,111 @@ test('session sync: a retried sign-in response publishes its cookie arrival even
     'every cookie-bearing login response publishes, including the retry',
   );
 });
+
+// ---------------------------------------------------------------------------
+// Forced password rotation keeps the session alive (sessionPreserved), but the
+// user id does not change, so the identity-transition clear in setUserIdentity
+// never runs. Business queries fired while mustChangePassword was still true
+// are rejected by the server (PASSWORD_CHANGE_REQUIRED) and sit in the cache in
+// error state; mounted observers do not refetch on their own, so the portal
+// surfaces "unavailable" cards until a manual retry or remount. The gate must
+// drop the shared cache once the rotation commits so the pages recover.
+// ---------------------------------------------------------------------------
+
+function mountRotationGate(overrides = {}) {
+  const calls = [];
+  const queryClient = { clear: () => calls.push('clear') };
+  const react = {
+    createElement: (type, props, ...children) => ({
+      type,
+      props: { ...(props ?? {}), children },
+    }),
+    useState: (initial) => [
+      typeof initial === 'function' ? initial() : initial,
+      () => {},
+    ],
+  };
+  const stubs = {
+    react,
+    'lucide-react': { ShieldCheck: 'svg' },
+    '@/context/AuthContext': {
+      useAuth: () => ({
+        user: { email: 'issued@campus.test', mustChangePassword: true, roles: ['STUDENT'] },
+        refreshUser: () => {
+          calls.push('refreshUser');
+          return Promise.resolve();
+        },
+        logout: () => {
+          calls.push('logout');
+          return Promise.resolve();
+        },
+      }),
+    },
+    '@/lib/api': {
+      authApi: {
+        changePassword: () => {
+          calls.push('changePassword');
+          return Promise.resolve({ sessionPreserved: overrides.sessionPreserved ?? true });
+        },
+      },
+    },
+    '@/lib/campus-error': { campusCodeMessage: () => 'error' },
+    '@/lib/login-portal': { loginHref: () => '/en/login', portalFromUser: () => 'student' },
+    '@/lib/password-policy': { checkPasswordPolicy: () => null },
+    '@/i18n': {
+      useI18n: () => ({
+        locale: 'en',
+        messages: { common: { campusErrors: { codes: {} } } },
+        href: (p) => `/en${p}`,
+      }),
+    },
+    '@/lib/query': { getBrowserQueryClient: () => queryClient },
+    '@/components/ui/modal': { Modal: 'div' },
+    '@/components/ui/button': { Button: 'button' },
+    '@/components/ui/input': { Input: 'input' },
+  };
+  const source = readSource('src/components/auth/ForcedPasswordRotationGate.tsx');
+  const { outputText } = ts.transpileModule(source, {
+    compilerOptions: {
+      module: ts.ModuleKind.CommonJS,
+      target: ts.ScriptTarget.ES2020,
+      jsx: ts.JsxEmit.React,
+      esModuleInterop: true,
+    },
+    fileName: 'ForcedPasswordRotationGate.tsx',
+  });
+  const moduleRecord = { exports: {} };
+  const stubRequire = (specifier) => {
+    if (Object.prototype.hasOwnProperty.call(stubs, specifier)) return stubs[specifier];
+    throw new Error(`unexpected import in ForcedPasswordRotationGate.tsx: ${specifier}`);
+  };
+  Function('module', 'exports', 'require', 'React', outputText)(
+    moduleRecord,
+    moduleRecord.exports,
+    stubRequire,
+    react,
+  );
+  const element = moduleRecord.exports.ForcedPasswordRotationGate();
+  const findSubmit = (node) => {
+    if (!node || typeof node !== 'object') return null;
+    if (typeof node.props?.onSubmit === 'function') return node.props.onSubmit;
+    const children = Array.isArray(node.props?.children) ? node.props.children : [node.props?.children];
+    for (const child of children) {
+      const found = findSubmit(child);
+      if (found) return found;
+    }
+    return null;
+  };
+  return { calls, onSubmit: findSubmit(element) };
+}
+
+test('forced rotation: a session-preserving rotation clears the query cache after refresh', async () => {
+  const mounted = mountRotationGate();
+  assert.equal(typeof mounted.onSubmit, 'function', 'the rotation form must render');
+  await mounted.onSubmit({ preventDefault: () => {} });
+  assert.deepEqual(
+    mounted.calls,
+    ['changePassword', 'refreshUser', 'clear'],
+    'queries rejected under the gate must be dropped once the session is confirmed live',
+  );
+});
