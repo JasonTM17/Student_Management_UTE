@@ -132,6 +132,44 @@ class AcademicMutationServiceBatchGradeTest {
     }
 
     @Test
+    void batchGradeUpdateAcceptsInclusiveZeroToTenAndRejectsScoresOutsideIt() {
+        jdbc.update("INSERT INTO \"academic\".\"Section\" (\"id\", \"semesterId\", \"lecturerId\", \"status\") VALUES (?, ?, ?, ?)",
+                "sec-bounds", "sem-01", "lec-01", "OPEN");
+        jdbc.update("INSERT INTO \"academic\".\"Enrollment\" (\"id\", \"studentId\", \"sectionId\", \"status\", \"gradeStatus\") VALUES (?, ?, ?, ?, ?)",
+                "enr-zero", "stu-zero", "sec-bounds", "ENROLLED", "DRAFT");
+        jdbc.update("INSERT INTO \"academic\".\"Enrollment\" (\"id\", \"studentId\", \"sectionId\", \"status\", \"gradeStatus\") VALUES (?, ?, ?, ?, ?)",
+                "enr-ten", "stu-ten", "sec-bounds", "ENROLLED", "DRAFT");
+        jdbc.update("INSERT INTO \"academic\".\"Enrollment\" (\"id\", \"studentId\", \"sectionId\", \"status\", \"gradeStatus\") VALUES (?, ?, ?, ?, ?)",
+                "enr-negative", "stu-negative", "sec-bounds", "ENROLLED", "DRAFT");
+        jdbc.update("INSERT INTO \"academic\".\"Enrollment\" (\"id\", \"studentId\", \"sectionId\", \"status\", \"gradeStatus\") VALUES (?, ?, ?, ?, ?)",
+                "enr-over", "stu-over", "sec-bounds", "ENROLLED", "DRAFT");
+
+        service.updateGrades("sec-bounds", "lec-01", false, List.of(
+                new GradeUpdate("enr-zero", BigDecimal.ZERO, BigDecimal.ZERO),
+                new GradeUpdate("enr-ten", BigDecimal.TEN, BigDecimal.TEN)));
+
+        assertEquals(new BigDecimal("0.00"), jdbc.queryForObject(
+                "SELECT \"finalGrade\" FROM \"academic\".\"Enrollment\" WHERE \"id\" = 'enr-zero'", BigDecimal.class));
+        assertEquals("F", jdbc.queryForObject(
+                "SELECT \"letterGrade\" FROM \"academic\".\"Enrollment\" WHERE \"id\" = 'enr-zero'", String.class));
+        assertEquals(new BigDecimal("10.00"), jdbc.queryForObject(
+                "SELECT \"finalGrade\" FROM \"academic\".\"Enrollment\" WHERE \"id\" = 'enr-ten'", BigDecimal.class));
+        assertEquals("A+", jdbc.queryForObject(
+                "SELECT \"letterGrade\" FROM \"academic\".\"Enrollment\" WHERE \"id\" = 'enr-ten'", String.class));
+
+        DomainException below = assertThrows(DomainException.class, () -> service.updateGrades(
+                "sec-bounds", "lec-01", false,
+                List.of(new GradeUpdate("enr-negative", new BigDecimal("-0.01"), BigDecimal.ZERO))));
+        assertEquals(HttpStatus.BAD_REQUEST, below.getStatus());
+        assertEquals("GRADE_SCORE_OUT_OF_RANGE", below.getCode());
+        DomainException above = assertThrows(DomainException.class, () -> service.updateGrades(
+                "sec-bounds", "lec-01", false,
+                List.of(new GradeUpdate("enr-over", BigDecimal.TEN, new BigDecimal("10.01")))));
+        assertEquals(HttpStatus.BAD_REQUEST, above.getStatus());
+        assertEquals("GRADE_SCORE_OUT_OF_RANGE", above.getCode());
+    }
+
+    @Test
     void batchGradeUpdateWithEmptyListReturnsWithoutError() {
         jdbc.update("INSERT INTO \"academic\".\"Section\" (\"id\", \"semesterId\", \"lecturerId\", \"status\") VALUES (?, ?, ?, ?)",
                 "sec-01", "sem-01", "lec-01", "OPEN");
@@ -144,6 +182,30 @@ class AcademicMutationServiceBatchGradeTest {
         // empty-list early return, so a silent no-op cannot skip authorization.
         assertThrows(DomainException.class, () ->
                 service.updateGrades("sec-missing", "lec-01", true, List.of()));
+    }
+
+    @Test
+    void lecturerCannotUpdateOrPublishGradesForAnotherLecturersSection() {
+        jdbc.update("INSERT INTO \"academic\".\"Section\" (\"id\", \"semesterId\", \"lecturerId\", \"status\") VALUES (?, ?, ?, ?)",
+                "sec-foreign", "sem-01", "lec-02", "OPEN");
+        jdbc.update("INSERT INTO \"academic\".\"Enrollment\" (\"id\", \"studentId\", \"sectionId\", \"status\", \"gradeStatus\") VALUES (?, ?, ?, ?, ?)",
+                "enr-foreign", "stu-01", "sec-foreign", "ENROLLED", "DRAFT");
+        List<GradeUpdate> grades = List.of(
+                new GradeUpdate("enr-foreign", new BigDecimal("8.0"), new BigDecimal("9.0")));
+
+        DomainException updateDenied = assertThrows(DomainException.class,
+                () -> service.updateGrades("sec-foreign", "lec-01", false, grades));
+        assertEquals(HttpStatus.FORBIDDEN, updateDenied.getStatus());
+        assertEquals("SECTION_FORBIDDEN", updateDenied.getCode());
+
+        DomainException publishDenied = assertThrows(DomainException.class,
+                () -> service.publishGrades("sec-foreign", "lec-01", false));
+        assertEquals(HttpStatus.FORBIDDEN, publishDenied.getStatus());
+        assertEquals("SECTION_FORBIDDEN", publishDenied.getCode());
+        assertEquals(0, jdbc.queryForObject("SELECT COUNT(*) FROM \"academic\".\"StudentGrade\"", Integer.class));
+        assertEquals("DRAFT", jdbc.queryForObject(
+                "SELECT \"gradeStatus\" FROM \"academic\".\"Enrollment\" WHERE \"id\" = 'enr-foreign'",
+                String.class));
     }
 
     @Test

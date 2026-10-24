@@ -233,6 +233,11 @@ class AcademicSectionReadPersistenceTest {
                 .andExpect(status().isForbidden())
                 .andExpect(jsonPath("$.code").value("SECTION_FORBIDDEN"));
 
+        mvc.perform(get("/api/v1/sections/section-1/grades")
+                        .with(studentJwt("student-user-1", "student-1")))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("ACCESS_DENIED"));
+
         mvc.perform(get("/api/v1/sections/missing").with(adminJwt()))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.code").value("NOT_FOUND"));
