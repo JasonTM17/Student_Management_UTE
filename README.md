@@ -645,6 +645,7 @@ mvn test -f java-services/pom.xml -Dtest=AcademicEnrollmentMutationPersistenceTe
 - **Race Condition Concurrency Test**: `AcademicEnrollmentMutationPersistenceTest` kích hoạt các thread độc lập tranh chấp vị trí cuối cùng trong lớp học phần. Chỉ đúng một thread thành công, các thread còn lại nhận lỗi 409 Conflict, sĩ số lớp không bao giờ vượt ngưỡng.
 - **Bilingual Injection Test**: Bộ kiểm thử của `AssistantInputGuard` phủ các biến thể tấn công prompt injection bằng cả tiếng Anh và tiếng Việt; câu hỏi vi phạm bị phát hiện và từ chối ở tầng cổng API.
 - **Two-Admin Governance Test**: Luồng Admin tự duyệt bài viết do chính mình tạo ra sẽ nhận lỗi `409 Conflict` (`KNOWLEDGE_SECOND_REVIEW_REQUIRED`) đúng như thiết kế.
+- **PostgreSQL Integration Tests**: Các lớp `*PostgresIT` (race giữ chỗ, thứ tự khoá, RLS của assistant, race hội đồng/công bố đề tài) chỉ chạy trên PostgreSQL thật — mỗi lớp tự tắt khi biến môi trường JDBC của nó vắng mặt, nên `mvn verify` thông thường bỏ qua chúng một cách âm thầm. Job `postgres-it` trên CI dựng một service `postgres:15` dùng-một-lần, tạo sẵn các database riêng cho từng nhóm env (danh sách biến `CAMPUSCORE_*`/`ASSISTANT_*` và quy ước tên database nằm trong `.github/workflows/ci.yml`), rồi chạy `mvn -f java-services/pom.xml -P assistant-postgres-it verify`; `scripts/check-postgres-its.mjs` chặn cuối job và báo đỏ nếu có lớp IT nào bị skip. Muốn chạy local: tạo database trống tương ứng trên PostgreSQL của bạn, export đúng các biến môi trường đó, rồi chạy cùng câu lệnh Maven.
 
 ---
 
