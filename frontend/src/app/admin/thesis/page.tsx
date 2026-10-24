@@ -25,6 +25,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Input } from '@/components/ui/input';
 import { Modal } from '@/components/ui/modal';
 import { Select } from '@/components/ui/select';
+import { Combobox } from '@/components/ui/combobox';
 import { AdminFrame } from '@/components/admin/AdminFrame';
 import { AdminMetricCard } from '@/components/admin/AdminSurface';
 import { useConfirmationDialog } from '@/components/ui/use-confirmation-dialog';
@@ -32,6 +33,7 @@ import { metricToneClass, statusToneClass } from '@/components/ui/status';
 import { cn } from '@/lib/utils';
 import { toThesisLocalInput as toLocalInput } from '@/lib/thesis-datetime';
 import { planThesisRoundRestore, sortThesisRoundsForOverview } from '@/lib/thesis-round';
+import { reviewerConflict } from '@/lib/thesis-picker-rules';
 import {
   EmptyState,
   ForbiddenState,
@@ -183,6 +185,10 @@ export default function AdminThesisPage() {
 
   // GVPB counter-reviewer assignment drafts, keyed by topic id
   const [reviewerDrafts, setReviewerDrafts] = useState<Record<string, string>>({});
+  // topicId -> supervisor lecturer ids (either stored key form), lazily fetched
+  // so the person pickers can explain disabled options; empty while loading.
+  const [topicSupervisors, setTopicSupervisors] = useState<Record<string, string[]>>({});
+  const topicSupervisorRequestsRef = useRef(new Set<string>());
 
   const thesisAdminAccess = Boolean(isAdmin || isSuperAdmin || isFacultyHead);
   const canAccess = Boolean(user && thesisAdminAccess);
@@ -216,6 +222,30 @@ export default function AdminThesisPage() {
     }
   };
 
+  /**
+   * Warms the per-topic supervisor cache the pickers read for disabled-with-
+   * reason hints. Fire-and-forget: the backend remains the authority, so a
+   * topic whose rows have not landed yet simply shows no disabled hint.
+   */
+  const ensureTopicSupervisors = useCallback((topicIds: string[]) => {
+    for (const topicId of topicIds) {
+      if (topicSupervisorRequestsRef.current.has(topicId)) continue;
+      topicSupervisorRequestsRef.current.add(topicId);
+      void thesisApi
+        .listSupervisors(topicId)
+        .then((sups) => {
+          setTopicSupervisors((prev) => ({
+            ...prev,
+            [topicId]: sups.map((s) => s.lecturerId),
+          }));
+        })
+        .catch(() => {
+          // Drop the in-flight mark so the next picker open can retry.
+          topicSupervisorRequestsRef.current.delete(topicId);
+        });
+    }
+  }, []);
+
   const loadRoundDetail = async (roundId: string) => {
     if (expandedRoundRef.current !== roundId) return;
     const requestId = ++detailRequestRef.current;
@@ -241,6 +271,7 @@ export default function AdminThesisPage() {
       setTopics(Array.from(byId.values()));
       setGroups(g);
       if (expandedRoundRef.current === roundId) setCouncils(c);
+      ensureTopicSupervisors(c.flatMap((council) => council.topicIds ?? []));
       if (lecturers.length === 0) {
         await loadLecturers();
       }
@@ -1497,28 +1528,42 @@ export default function AdminThesisPage() {
                                               {/* GVPB counter-reviewer (spec: one reviewer per defended topic) */}
                                               {!councilLocked ? (
                                               <div className="flex items-center gap-1.5">
-                                                <Select
+                                                <Combobox
                                                   aria-label={messages.thesis.admin.assignReviewer}
-                                                  className="h-7 flex-1 text-xs"
+                                                  className="h-7 text-xs"
+                                                  wrapperClassName="flex-1"
                                                   value={reviewerDrafts[tid] ?? reviewerId}
-                                                  onChange={(e) =>
+                                                  onChange={(next) =>
                                                     setReviewerDrafts((prev) => ({
                                                       ...prev,
-                                                      [tid]: e.target.value,
+                                                      [tid]: next,
                                                     }))
                                                   }
-                                                  options={[
-                                                    {
-                                                      value: '',
-                                                      label: `-- ${messages.thesis.admin.assignReviewer} --`,
-                                                    },
-                                                    ...lecturers.map((l) => ({
+                                                  allowClear
+                                                  placeholder={`-- ${messages.thesis.admin.assignReviewer} --`}
+                                                  options={lecturers.map((l) => {
+                                                    const conflict = reviewerConflict({
+                                                      lecturer: l,
+                                                      supervisorIds: topicSupervisors[tid] ?? [],
+                                                      councilMemberIds: (council.members ?? []).map(
+                                                        (m) => m.lecturerId,
+                                                      ),
+                                                    });
+                                                    return {
                                                       value: l.id,
                                                       label: l.user
                                                         ? `${l.user.lastName} ${l.user.firstName}`
                                                         : l.id,
-                                                    })),
-                                                  ]}
+                                                      description: l.department?.name,
+                                                      keywords: [l.employeeId, l.user?.email]
+                                                        .filter(Boolean)
+                                                        .join(' '),
+                                                      disabled: conflict != null,
+                                                      disabledReason: conflict
+                                                        ? messages.thesis.councils.conflicts[conflict]
+                                                        : undefined,
+                                                    };
+                                                  })}
                                                 />
                                                 <Button
                                                   type="button"

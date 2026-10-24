@@ -2539,6 +2539,15 @@ export const en = {
       replaceMemberTitle: 'Replace council member',
       memberReplacedSuccess: 'Council member replaced.',
       topicUnassignedSuccess: 'Topic unassigned from council.',
+      conflicts: {
+        conflictSupervisorOfTopic: 'Supervises this topic',
+        conflictCouncilMemberOfTopic: 'Sits on the defense council',
+        conflictReviewsAssignedTopic: 'Counter-reviews an assigned topic',
+        conflictSupervisesAssignedTopic: 'Supervises an assigned topic',
+        conflictSupervisorOfficer: 'A supervisor is chair or secretary',
+        conflictReviewerOnCouncil: 'Its counter-reviewer sits on this council',
+        conflictTooFewGraders: 'Leaves fewer than 3 eligible members',
+      },
     },
     grading: {
       title: 'Defense council grading',
@@ -5614,6 +5623,15 @@ export const vi: I18nMessages = {
       replaceMemberTitle: 'Thay thế thành viên hội đồng',
       memberReplacedSuccess: 'Đã thay thế thành viên hội đồng.',
       topicUnassignedSuccess: 'Đã gỡ đề tài khỏi hội đồng.',
+      conflicts: {
+        conflictSupervisorOfTopic: 'Giảng viên hướng dẫn đề tài này',
+        conflictCouncilMemberOfTopic: 'Nằm trong hội đồng bảo vệ',
+        conflictReviewsAssignedTopic: 'Phản biện một đề tài đã gán',
+        conflictSupervisesAssignedTopic: 'Hướng dẫn một đề tài đã gán',
+        conflictSupervisorOfficer: 'Người hướng dẫn là chủ tịch hoặc thư ký',
+        conflictReviewerOnCouncil: 'Người phản biện nằm trong hội đồng',
+        conflictTooFewGraders: 'Còn lại dưới 3 thành viên hợp lệ',
+      },
     },
     grading: {
       title: 'Chấm điểm bảo vệ hội đồng',
