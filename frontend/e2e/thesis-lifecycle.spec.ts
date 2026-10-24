@@ -648,7 +648,7 @@ test('stages 2-9: proposal through published results and reporting', async ({ pa
   }
 });
 
-test('credit ineligibility shows the warning card and blocks registration', async ({ page }) => {
+test('credit ineligibility shows the warning card; blocking follows enforced flag', async ({ page }) => {
   const stamp = Date.now().toString(36);
   const name = `Eligibility ${stamp}`;
 
@@ -675,26 +675,37 @@ test('credit ineligibility shows the warning card and blocks registration', asyn
   await login(page, STUDENT.email, STUDENT.password);
   const roundsRes = await api(page, 'GET', '/thesis/rounds');
   expect(roundsRes.status(), 'student reads rounds').toBe(200);
-  const rounds = await roundsRes.json() as Array<{ id: string; eligibility?: { eligible: boolean; earnedCredits: number; requiredCredits: number } }>;
+  const rounds = await roundsRes.json() as Array<{ id: string; eligibility?: { eligible: boolean; earnedCredits: number; requiredCredits: number; enforced: boolean } }>;
   const mine = rounds.find((r) => r.id === round.id);
   expect(mine?.eligibility, 'round carries the caller eligibility').toBeTruthy();
   expect(mine?.eligibility?.eligible, 'seeded student is ineligible').toBe(false);
   expect(mine?.eligibility?.earnedCredits).toBeLessThan(mine?.eligibility?.requiredCredits ?? 0);
+  expect(typeof mine?.eligibility?.enforced, 'round reports enforcement mode').toBe('boolean');
+  const enforced = mine?.eligibility?.enforced === true;
 
-  const refused = await api(page, 'POST', '/thesis/groups', { roundId: round.id });
-  expect(refused.status(), 'ineligible create refused').toBe(409);
-  const refusedBody = await refused.json();
-  expect(refusedBody.code).toBe('THESIS_ELIGIBILITY_NOT_MET');
-  expect(refusedBody.details?.reasons).toContain('INSUFFICIENT_CREDITS');
+  const createAttempt = await api(page, 'POST', '/thesis/groups', { roundId: round.id });
+  if (enforced) {
+    expect(createAttempt.status(), 'ineligible create refused').toBe(409);
+    const refusedBody = await createAttempt.json();
+    expect(refusedBody.code).toBe('THESIS_ELIGIBILITY_NOT_MET');
+    expect(refusedBody.details?.reasons).toContain('INSUFFICIENT_CREDITS');
+  } else {
+    // ADVISORY: the warning is displayed but the action is never blocked.
+    expect(createAttempt.status(), 'advisory mode does not block').toBe(200);
+  }
 
-  // The page surfaces the same state as a warning card for the round.
+  // The page surfaces the same state as a warning card for the round; the
+  // create affordance is hidden only under ENFORCE (and only while the caller
+  // has no group — under ADVISORY the POST above already created one).
   await page.goto(`/en/dashboard/thesis?roundId=${round.id}`);
   await expect(
     page.getByText(/not eligible yet|chưa đủ điều kiện/i).first(),
   ).toBeVisible({ timeout: 30_000 });
-  await expect(
-    page.getByRole('button', { name: /create a thesis group|tạo nhóm đề tài/i }),
-  ).toHaveCount(0);
+  if (enforced) {
+    await expect(
+      page.getByRole('button', { name: /create a thesis group|tạo nhóm đề tài/i }),
+    ).toHaveCount(0);
+  }
 
   // An eligible demo student still registers (the seeded trio carries 110+).
   const leaderToken = await tokenFor(page, LEADER.email, LEADER.password);

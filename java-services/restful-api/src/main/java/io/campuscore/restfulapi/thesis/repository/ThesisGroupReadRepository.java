@@ -200,6 +200,21 @@ public class ThesisGroupReadRepository {
         return count != null && count > 0;
     }
 
+    /**
+     * thesis_type per round id — the group read paths need the round type to
+     * decide whether the credit/CPA eligibility policy covers a roster.
+     */
+    public Map<UUID, String> findRoundTypes(Collection<UUID> roundIds) {
+        if (roundIds == null || roundIds.isEmpty()) {
+            return Map.of();
+        }
+        Map<UUID, String> types = new LinkedHashMap<>();
+        jdbc.query("SELECT id, thesis_type FROM thesis.thesis_registration_round WHERE id IN (:ids)",
+                new MapSqlParameterSource("ids", roundIds), (RowCallbackHandler) rs ->
+                types.put(rs.getObject("id", UUID.class), rs.getString("thesis_type")));
+        return types;
+    }
+
     public boolean isTopicSupervisedBy(UUID topicId, String lecturerId) {
         Integer count = jdbc.queryForObject(
                 "SELECT COUNT(*) FROM thesis.thesis_topic_supervisor ts "

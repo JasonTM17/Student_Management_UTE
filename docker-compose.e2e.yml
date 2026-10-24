@@ -91,6 +91,10 @@ services:
       FINANCE_READ_ENABLED: ${FINANCE_READ_ENABLED:-false}
       ANALYTICS_READ_ENABLED: ${ANALYTICS_READ_ENABLED:-false}
       THESIS_ASSISTANT_ENABLED: ${THESIS_ASSISTANT_ENABLED:-true}
+      # ENFORCE keeps the ineligibility-block journey exercised on this stack;
+      # production release-2 defaults to ADVISORY (see docs/deployment.md).
+      THESIS_ELIGIBILITY_ENFORCEMENT: ${THESIS_ELIGIBILITY_ENFORCEMENT:-ENFORCE}
+      THESIS_ELIGIBILITY_ROUND_TYPES: ${THESIS_ELIGIBILITY_ROUND_TYPES:-KLTN}
     ports:
       - "127.0.0.1:${E2E_API_HOST_PORT:-4100}:4100"
     depends_on:

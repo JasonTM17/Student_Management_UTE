@@ -1105,7 +1105,7 @@ public class ThesisMutationService {
         // sibling group mutation uses (approve, update, assign, roster edits);
         // the opposite order deadlocks under real Postgres row locks.
         GroupRow group = lockGroup(groupId);
-        requireRoundStatus(group.roundId(), RoundStatus.REGISTRATION_CLOSED);
+        String thesisType = requireRoundStatus(group.roundId(), RoundStatus.REGISTRATION_CLOSED);
         // Post-close roster writes are governance, not review: the dean must
         // govern the faculty that owns the group (the topic's department or,
         // for topicless groups, a member's curriculum). The dean-supervisor
@@ -1144,7 +1144,9 @@ public class ThesisMutationService {
         requireNotInAnotherActiveGroup(group.roundId(), studentId);
         // Governance override is never blocked by eligibility, but admitting
         // an ineligible student must stay visible in the audit record.
-        String ineligibilityNote = eligibility == null ? null : eligibility.describeIneligibility(studentId);
+        boolean coveredRound = eligibility != null && eligibility.covers(thesisType);
+        String ineligibilityNote = !coveredRound ? null
+                : eligibility.describeIneligibility(studentId, thesisType);
         // The minimum only binds an APPROVED roster — the deferred membership
         // validator enforces it there and accepts a documented marker. A
         // pending roster has no minimum: growth toward it must always be
@@ -1174,7 +1176,9 @@ public class ThesisMutationService {
         Map<String, Object> overrideAfter = new LinkedHashMap<>();
         overrideAfter.put("memberCount", memberCount + 1);
         overrideAfter.put("sizeException", underSize);
-        overrideAfter.put("studentEligible", ineligibilityNote == null);
+        // null records "not evaluated" — the credit rule does not cover this
+        // round type, so neither eligible nor ineligible is claimed.
+        overrideAfter.put("studentEligible", coveredRound ? ineligibilityNote == null : null);
         audit.record(subject(actor), null, "THESIS_GROUP_ROSTER_OVERRIDE", "THESIS_GROUP", groupId.toString(),
                 "Member " + studentId + " added after registration closed; reason: " + cleanReason
                         + (underSize ? "; below-minimum size exception accepted" : "")
@@ -1976,10 +1980,11 @@ public class ThesisMutationService {
         if (roundId == null) {
             throw invalid("roundId is required");
         }
-        requireRoundStatus(roundId, RoundStatus.REGISTRATION_OPEN);
+        String thesisType = requireRoundStatus(roundId, RoundStatus.REGISTRATION_OPEN);
         String studentId = studentId(actor);
         requireActiveStudent(studentId);
-        requireEligibility(studentId, roundId);
+        // The caller is the evaluated student: the error may carry figures.
+        requireEligibility(studentId, roundId, thesisType, true);
         requireNotInAnotherActiveGroup(roundId, studentId);
         UUID groupId = UUID.randomUUID();
         jdbc.update("INSERT INTO thesis.thesis_group (id, round_id, leader_student_id, status, approval_status) VALUES (:id, :roundId, :studentId, 'DRAFT', 'PENDING')", params().addValue("id", groupId).addValue("roundId", roundId).addValue("studentId", studentId));
@@ -2003,7 +2008,7 @@ public class ThesisMutationService {
     public GroupResponse addMember(UUID groupId, MemberRequest request, Jwt actor) {
         GroupRow group = lockGroup(groupId);
         boolean supervisorPath = authorizeMemberManagement(group, actor);
-        requireRoundStatus(group.roundId(), RoundStatus.REGISTRATION_OPEN);
+        String thesisType = requireRoundStatus(group.roundId(), RoundStatus.REGISTRATION_OPEN);
         requireActiveRoster(group);
         if (!supervisorPath) {
             requireMutableMembership(group, actor);
@@ -2018,7 +2023,10 @@ public class ThesisMutationService {
             return groupView(groupId, actor);
         }
         requireActiveStudent(studentId);
-        requireEligibility(studentId, group.roundId());
+        // The figures belong to the invitee, not the calling leader/admin —
+        // the refusal discloses them only when caller and invitee coincide.
+        requireEligibility(studentId, group.roundId(), thesisType,
+                studentId.equals(studentId(actor)));
         requireNotInAnotherActiveGroup(group.roundId(), studentId);
         jdbc.update("INSERT INTO thesis.thesis_group_member (id, group_id, round_id, student_id, member_order, is_leader) VALUES (:id, :groupId, :roundId, :studentId, :memberOrder, FALSE)", params().addValue("id", UUID.randomUUID()).addValue("groupId", groupId).addValue("roundId", group.roundId()).addValue("studentId", studentId).addValue("memberOrder", nextMemberOrder(groupId)));
         jdbc.update("UPDATE thesis.thesis_group SET updated_at = CURRENT_TIMESTAMP, version = version + 1 WHERE id = :groupId", params().addValue("groupId", groupId));
@@ -2122,7 +2130,7 @@ public class ThesisMutationService {
     public GroupResponse assignTopic(UUID groupId, TopicAssignmentRequest request, Jwt actor) {
         GroupRow group = lockGroup(groupId);
         authorizeLeaderOrAdmin(group, actor);
-        requireRoundStatus(group.roundId(), RoundStatus.REGISTRATION_OPEN);
+        String thesisType = requireRoundStatus(group.roundId(), RoundStatus.REGISTRATION_OPEN);
         // Round-5 post-deploy sweep: the topic binding and approval trace of a
         // CANCELLED group are historical — the roster trigger cannot see this
         // path, so the guard is enforced here too (admin early-return in
@@ -2131,7 +2139,8 @@ public class ThesisMutationService {
         // The leader picks the topic, so the leader must satisfy the
         // accumulated-credit registration condition — an admin caller does not
         // bypass it (governance uses the audited roster override instead).
-        requireEligibility(group.leaderStudentId(), group.roundId());
+        requireEligibility(group.leaderStudentId(), group.roundId(), thesisType,
+                group.leaderStudentId().equals(studentId(actor)));
         UUID topicId = request == null ? null : request.topicId();
         if (topicId == null) {
             throw invalid("topicId is required");
@@ -2858,9 +2867,9 @@ public class ThesisMutationService {
                 + (accepted.length > 1 ? " or " + accepted[1].name() : ""));
     }
 
-    private void requireRoundStatus(UUID id, RoundStatus required) {
+    private String requireRoundStatus(UUID id, RoundStatus required) {
         Map<String, Object> round = one(
-                "SELECT status, registration_start, registration_end FROM thesis.thesis_registration_round WHERE id = :id FOR UPDATE",
+                "SELECT status, thesis_type, registration_start, registration_end FROM thesis.thesis_registration_round WHERE id = :id FOR UPDATE",
                 params().addValue("id", id), "ROUND_NOT_FOUND", "Thesis registration round not found");
         if (!required.name().equals(round.get("status"))) {
             throw conflict("ROUND_CLOSED", "Registration is not open for this round");
@@ -2875,6 +2884,7 @@ public class ThesisMutationService {
                 throw conflict("REGISTRATION_WINDOW_CLOSED", "The registration window is closed for this round");
             }
         }
+        return (String) round.get("thesis_type");
     }
 
     /** Membership is frozen once a supervisor approves the group; admins coordinate through re-review instead. */
@@ -2996,14 +3006,19 @@ public class ThesisMutationService {
     }
 
     /**
-     * Applies the accumulated-credit/CPA registration condition. Runs inside
-     * the transaction the caller already opened — one extra read, no new lock
-     * — and fails closed with THESIS_ELIGIBILITY_NOT_MET on missing academic
-     * data. Absent in manually-wired tests; never blocks in ADVISORY mode.
+     * Applies the accumulated-credit/CPA registration condition on the round
+     * types the policy covers (thesis.eligibility.round-types, default KLTN).
+     * Runs inside the transaction the caller already opened — one extra read,
+     * no new lock — and fails closed with THESIS_ELIGIBILITY_NOT_MET on
+     * missing academic data. Absent in manually-wired tests; never blocks in
+     * ADVISORY mode or on uncovered round types. {@code discloseFigures}
+     * decides whether the refusal may carry the evaluated student's numbers:
+     * only the student themself may see them.
      */
-    private void requireEligibility(String studentId, UUID roundId) {
+    private void requireEligibility(String studentId, UUID roundId, String thesisType,
+            boolean discloseFigures) {
         if (eligibility != null) {
-            eligibility.requireEligible(studentId, roundId);
+            eligibility.requireEligible(studentId, roundId, thesisType, discloseFigures);
         }
     }
 

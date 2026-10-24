@@ -10,5 +10,12 @@ public record EligibilityView(
         int requiredCredits,
         BigDecimal cpa,
         BigDecimal requiredCpa,
-        List<String> reasons) {
+        List<String> reasons,
+        /**
+         * Whether the backend currently refuses mutations on this standing —
+         * true only in ENFORCE mode on a covered round type. Clients show the
+         * warning card in ADVISORY but must never block on
+         * {@code eligible == false} alone.
+         */
+        boolean enforced) {
 }
