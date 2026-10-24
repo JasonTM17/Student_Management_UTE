@@ -351,6 +351,8 @@ jobs:
         run: node --test scripts/supabase/assistant-knowledge.test.mjs
       - name: Assistant RLS provisioning script tests
         run: node --test scripts/provision-assistant-runtime.test.mjs
+      - name: Postgres IT skip-check script tests
+        run: node --test scripts/check-postgres-its.test.mjs
       - name: Build and start fresh course stack
         run: docker compose up -d --build --wait
       - name: Verify database image boundary
