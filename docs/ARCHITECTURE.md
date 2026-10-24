@@ -326,7 +326,30 @@ Mọi quan tâm về exception nằm trong các package riêng theo vai trò:
 
 ---
 
-## 8. Ranh giới ngoài phạm vi (Non-goals)
+## 8. Truy cập dữ liệu (Data Access)
+
+**Chuẩn data-access của backend là JDBC** (`NamedParameterJdbcTemplate`, `JdbcTemplate`, `JdbcOperations`). Toàn bộ SQL và row mapping nằm trong package `repository/` của từng module; service sở hữu transaction (`@Transactional`) và thứ tự lời gọi; controller, service và job không chứa câu lệnh SQL. `ArchitectureGuardTest` bắt buộc quy tắc này: tham chiếu tới `org.springframework.jdbc.core` chỉ được phép trong `..repository..`, `..rls..`, `..config..`, ngoại trừ một allow-list chỉ-giảm (shrink-only) các lớp chưa được di chuyển.
+
+**JPA bị đóng băng trong các "đảo" hiện có** — không thêm entity hay repository JPA mới:
+- `engagement.entity` — `ArticleCategory`, `ArticleTag`, `ArticleAttachment`, `ArticleMediaGallery` + các Spring Data repository tương ứng; chỉ `ArticleTaxonomyController` sử dụng.
+- `thesis.entity` — `ThesisTopic`, `ThesisRegistrationRound` + `thesis.repository.ThesisTopicRepository`, `ThesisRegistrationRoundRepository`; được dùng bên trong các service chủ yếu là JDBC.
+- `thesis.assistant.config.AssistantDatabaseConfiguration` — hạ tầng: primary `JpaTransactionManager`, assistant DataSource + `DataSourceTransactionManager` riêng phục vụ RLS, và `NamedParameterJdbcTemplate` beans.
+
+Tham chiếu `jakarta.persistence` chỉ được phép trong các package entity của hai đảo trên và trong `AssistantDatabaseConfiguration` — guard test cũng chặn điều này.
+
+**Hợp đồng thứ tự khóa (lock order) sống trong SQL:**
+- Academic: `Student -> Section -> Round` (`RegistrationService`); auth dùng `User -> Session` và `User -> ResetToken`.
+- Thesis: `group -> round` (`ThesisMutationService`); council khóa `round -> topic` (`ThesisSupervisorService`).
+- Assistant: `conversation -> ledger` (`ThesisAssistantRepository`).
+- Phương thức khóa đặt tên `lock...ForUpdate` và chú thích `@Transactional(propagation = MANDATORY)` để không bao giờ chạy ngoài transaction của caller.
+
+**Thêm một câu query mới:** đặt SQL + `RowMapper` trong `repository/` của module; service gọi method đó và sở hữu `@Transactional` khi cần; query `FOR UPDATE`/`FOR SHARE` phải đi qua method `lock...ForUpdate` có `MANDATORY`; exception translation (`DuplicateKeyException`, `DataIntegrityViolationException`, …) ở lại đúng statement trong repository method.
+
+**Không bao giờ chuyển sang JPA:** mọi đường `FOR UPDATE`/`FOR SHARE` và chuỗi lock order; luồng giữ chỗ/idempotency của đăng ký học phần; roster/council/publication/round-restore của thesis; assistant RLS DataSource + turn ledger (`AssistantRlsTransactionRunner` gọi `set_config` per-transaction); các bảng có trigger bảo vệ (thesis group/member, V94/V113/V141); audit writes trong cùng transaction (`AdminAuditRecorder`, `MANDATORY`); read model analytics/dean-overview/report; upsert `ON CONFLICT`. Lý do: thứ tự khóa, ranh giới RLS, trigger bắn trong transaction và việc bắt lỗi theo-từng-statement đều nằm trong SQL — flush trì hoãn của ORM sẽ đổi ngữ nghĩa cả bốn. Boot JPA autoconfig bị exclude trong `application.yml`, `ddl-auto: none` (Flyway sở hữu schema).
+
+---
+
+## 9. Ranh giới ngoài phạm vi (Non-goals)
 
 Các thành phần sau đây được xác định rõ ràng là **nằm ngoài phạm vi của đồ án môn học** để giữ cho hệ thống tập trung vào bài toán cốt lõi:
 - **Tài chính & Cổng thanh toán trực tuyến** (Finance, Payment gateways).
