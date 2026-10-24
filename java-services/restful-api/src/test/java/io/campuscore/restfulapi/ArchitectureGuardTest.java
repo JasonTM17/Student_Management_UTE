@@ -84,17 +84,13 @@ class ArchitectureGuardTest {
             "thesis/assistant/service/AssistantPersonalContextAdvisor",
             "thesis/assistant/service/SqlKnowledgeReleasePromoter",
             "thesis/assistant/service/SupabaseKnowledgeSyncService",
-            "thesis/scope/ThesisDeanScope",
-            "thesis/scope/ThesisDepartmentScope",
             "thesis/service/ThesisCouncilService",
             "thesis/service/ThesisLecturerWorkloadService",
             "thesis/service/ThesisMutationService",
             "thesis/service/ThesisNotificationService",
             "thesis/service/ThesisProgressService",
             "thesis/service/ThesisReportService",
-            "thesis/service/ThesisReviewOutcome",
-            "thesis/service/ThesisSupervisorService",
-            "thesis/service/ThesisTopicService");
+            "thesis/service/ThesisSupervisorService");
 
     /**
      * The JPA islands: every class that may reference jakarta.persistence or

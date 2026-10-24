@@ -1,11 +1,10 @@
 package io.campuscore.restfulapi.thesis.scope;
 
 import io.campuscore.restfulapi.exception.DomainException;
+import io.campuscore.restfulapi.thesis.repository.ThesisScopeRepository;
 import java.util.List;
 import java.util.UUID;
 import org.springframework.http.HttpStatus;
-import org.springframework.jdbc.core.namedparam.MapSqlParameterSource;
-import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
 import org.springframework.security.oauth2.jwt.Jwt;
 
 /**
@@ -33,7 +32,7 @@ public final class ThesisDeanScope {
      * profile. Mirrors ThesisGroupReadRepository.findLecturerScope without a
      * repository dependency so every governance service can share it.
      */
-    public static String facultyId(NamedParameterJdbcTemplate jdbc, Jwt actor) {
+    public static String facultyId(ThesisScopeRepository scope, Jwt actor) {
         if (!isFacultyHead(actor) || actor.getSubject() == null) {
             return null;
         }
@@ -41,16 +40,7 @@ public final class ThesisDeanScope {
         if (lecturerId == null || lecturerId.isBlank()) {
             return null;
         }
-        List<String> rows = jdbc.queryForList(
-                "SELECT f.\"id\" FROM campuscore_auth.\"Lecturer\" l "
-                        + "JOIN campuscore_auth.\"User\" u ON u.\"id\" = l.\"userId\" "
-                        + "JOIN academic.\"Department\" d ON d.\"id\" = l.\"departmentId\" "
-                        + "JOIN academic.\"Faculty\" f ON f.\"id\" = d.\"facultyId\" "
-                        + "WHERE l.\"id\" = :lecturerId AND l.\"userId\" = :subject "
-                        + "AND l.\"isActive\" = TRUE AND u.\"status\" = 'ACTIVE' "
-                        + "AND d.\"isActive\" = TRUE AND f.\"isActive\" = TRUE",
-                new MapSqlParameterSource("lecturerId", lecturerId.trim())
-                        .addValue("subject", actor.getSubject()), String.class);
+        List<String> rows = scope.findDeanFacultyIds(lecturerId.trim(), actor.getSubject());
         return rows.stream().findFirst().orElse(null);
     }
 
@@ -59,34 +49,25 @@ public final class ThesisDeanScope {
      * whose department sits inside their faculty — unless they personally
      * supervise it — and gets the same 404 the unscoped read path would return.
      */
-    public static void requireTopicAccess(NamedParameterJdbcTemplate jdbc, Jwt actor, UUID topicId) {
+    public static void requireTopicAccess(ThesisScopeRepository scope, Jwt actor, UUID topicId) {
         if (isGlobalAdmin(actor) || !isFacultyHead(actor) || topicId == null) {
             return;
         }
-        String facultyId = facultyId(jdbc, actor);
+        String facultyId = facultyId(scope, actor);
         if (facultyId == null) {
             throw new DomainException(HttpStatus.FORBIDDEN, "FACULTY_PROFILE_REQUIRED",
                     "An active lecturer profile bound to the faculty head is required");
         }
-        Integer inFaculty = jdbc.queryForObject(
-                "SELECT COUNT(*) FROM thesis.thesis_topic t "
-                        + "JOIN academic.\"Department\" d ON d.\"id\" = t.department_id "
-                        + "WHERE t.id = :topicId AND d.\"facultyId\" = :facultyId",
-                new MapSqlParameterSource("topicId", topicId).addValue("facultyId", facultyId),
-                Integer.class);
+        Integer inFaculty = scope.countTopicInFaculty(topicId, facultyId);
         if (inFaculty != null && inFaculty > 0) {
             return;
         }
         String lecturerId = actor.getClaimAsString("lecturerId");
-        Integer supervised = lecturerId == null ? 0 : jdbc.queryForObject(
-                "SELECT COUNT(*) FROM thesis.thesis_topic_supervisor "
-                        + "WHERE topic_id = :topicId AND lecturer_id = :lecturerId",
-                new MapSqlParameterSource("topicId", topicId).addValue("lecturerId", lecturerId),
-                Integer.class);
+        Integer supervised = lecturerId == null ? 0 : scope.countTopicSupervisor(topicId, lecturerId);
         if (supervised != null && supervised > 0) {
             return;
         }
-        throw topicScopeFailure(jdbc, topicId);
+        throw topicScopeFailure(scope, topicId);
     }
 
     /**
@@ -97,23 +78,18 @@ public final class ThesisDeanScope {
      * the head of the faculty that owns the topic. Supervising it — even as
      * a dean — is never a waiver.
      */
-    public static void requireTopicGovernanceScope(NamedParameterJdbcTemplate jdbc, Jwt actor, UUID topicId) {
+    public static void requireTopicGovernanceScope(ThesisScopeRepository scope, Jwt actor, UUID topicId) {
         if (isGlobalAdmin(actor) || !isFacultyHead(actor) || topicId == null) {
             return;
         }
-        String facultyId = facultyId(jdbc, actor);
+        String facultyId = facultyId(scope, actor);
         if (facultyId == null) {
             throw new DomainException(HttpStatus.FORBIDDEN, "FACULTY_PROFILE_REQUIRED",
                     "An active lecturer profile bound to the faculty head is required");
         }
-        Integer inFaculty = jdbc.queryForObject(
-                "SELECT COUNT(*) FROM thesis.thesis_topic t "
-                        + "JOIN academic.\"Department\" d ON d.\"id\" = t.department_id "
-                        + "WHERE t.id = :topicId AND d.\"facultyId\" = :facultyId",
-                new MapSqlParameterSource("topicId", topicId).addValue("facultyId", facultyId),
-                Integer.class);
+        Integer inFaculty = scope.countTopicInFaculty(topicId, facultyId);
         if (inFaculty == null || inFaculty == 0) {
-            throw topicScopeFailure(jdbc, topicId);
+            throw topicScopeFailure(scope, topicId);
         }
     }
 
@@ -123,13 +99,8 @@ public final class ThesisDeanScope {
      * the failure must name the data problem — not pretend the row is gone
      * or merely out of scope. A global admin still reaches the row.
      */
-    private static DomainException topicScopeFailure(NamedParameterJdbcTemplate jdbc, UUID topicId) {
-        List<String> resolved = jdbc.queryForList(
-                "SELECT f.\"id\" FROM thesis.thesis_topic t "
-                        + "LEFT JOIN academic.\"Department\" d ON d.\"id\" = t.department_id "
-                        + "LEFT JOIN academic.\"Faculty\" f ON f.\"id\" = d.\"facultyId\" "
-                        + "WHERE t.id = :topicId",
-                new MapSqlParameterSource("topicId", topicId), String.class);
+    private static DomainException topicScopeFailure(ThesisScopeRepository scope, UUID topicId) {
+        List<String> resolved = scope.findTopicFacultyIds(topicId);
         if (!resolved.isEmpty() && resolved.get(0) == null) {
             return new DomainException(HttpStatus.CONFLICT, "TOPIC_SCOPE_UNRESOLVABLE",
                     "The topic's department resolves to no faculty; only a global admin can act on it");
@@ -141,19 +112,16 @@ public final class ThesisDeanScope {
      * Read-side counterpart to {@link #requireTopicAccess}: true when the topic
      * belongs to the dean's active faculty or the dean personally supervises it.
      */
-    public static boolean canAccessTopic(NamedParameterJdbcTemplate jdbc, Jwt actor, UUID topicId, String departmentId) {
+    public static boolean canAccessTopic(ThesisScopeRepository scope, Jwt actor, UUID topicId, String departmentId) {
         if (isGlobalAdmin(actor)) {
             return true;
         }
         if (!isFacultyHead(actor) || topicId == null) {
             return false;
         }
-        String facultyId = facultyId(jdbc, actor);
+        String facultyId = facultyId(scope, actor);
         if (facultyId != null && departmentId != null && !departmentId.isBlank()) {
-            Integer inFaculty = jdbc.queryForObject(
-                    "SELECT COUNT(*) FROM academic.\"Department\" WHERE \"id\" = :departmentId AND \"facultyId\" = :facultyId",
-                    new MapSqlParameterSource("departmentId", departmentId).addValue("facultyId", facultyId),
-                    Integer.class);
+            Integer inFaculty = scope.countDepartmentInFaculty(departmentId, facultyId);
             if (inFaculty != null && inFaculty > 0) {
                 return true;
             }
@@ -162,11 +130,7 @@ public final class ThesisDeanScope {
         if (lecturerId == null || lecturerId.isBlank()) {
             return false;
         }
-        Integer supervised = jdbc.queryForObject(
-                "SELECT COUNT(*) FROM thesis.thesis_topic_supervisor "
-                        + "WHERE topic_id = :topicId AND lecturer_id = :lecturerId",
-                new MapSqlParameterSource("topicId", topicId).addValue("lecturerId", lecturerId.trim()),
-                Integer.class);
+        Integer supervised = scope.countTopicSupervisor(topicId, lecturerId.trim());
         return supervised != null && supervised > 0;
     }
 }
