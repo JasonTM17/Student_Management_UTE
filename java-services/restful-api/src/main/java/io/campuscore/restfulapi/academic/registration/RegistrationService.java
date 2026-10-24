@@ -7,6 +7,7 @@ import io.campuscore.restfulapi.academic.registration.RegistrationDtos.RoundResp
 import io.campuscore.restfulapi.academic.registration.RegistrationDtos.SectionScheduleView;
 import io.campuscore.restfulapi.academic.registration.RegistrationDtos.SummaryResponse;
 import io.campuscore.restfulapi.academic.service.AcademicEnrollmentReadService;
+import io.campuscore.restfulapi.academic.service.SemesterStatuses;
 import io.campuscore.restfulapi.academic.web.AcademicEnrollmentReadDtos.EnrollmentResponse;
 import io.campuscore.restfulapi.web.DomainException;
 import java.nio.charset.StandardCharsets;
@@ -361,6 +362,13 @@ public class RegistrationService {
 
     @Transactional
     public SlipPayload slip(String studentId, String semesterId) {
+        // Lock order Student -> Section -> Round: a slip asserts the
+        // student's committed active set, and every path that changes it
+        // (enroll, drop, cancel/reopen purge) serializes on this row first.
+        // Share-lock it before reading anything — renders stay parallel but
+        // a reopen can neither commit past the render's active-set read nor
+        // leave a persisted slip missing the reopened course.
+        shareLockStudent(studentId);
         MapSqlParameterSource parameters = new MapSqlParameterSource("studentId", studentId);
         String sql = "SELECT \"sha256\", \"payload\" FROM " + SLIP + " WHERE \"studentId\" = :studentId";
         if (semesterId != null && !semesterId.isBlank()) {
@@ -395,57 +403,27 @@ public class RegistrationService {
         if (targetSemesterId != null && !targetSemesterId.isBlank()) {
             List<Map<String, Object>> active = activeEnrollments(studentId, targetSemesterId);
             if (!active.isEmpty()) {
+                // A section cancellation deletes persisted slips; a slip
+                // rendered from pre-cancel state could commit afterwards and
+                // keep listing the cancelled course. Share-lock the section
+                // rows so the render serializes with the cancel's UPDATE but
+                // not with other renders, then re-read the active set under
+                // the lock before persisting.
+                for (String sectionId : active.stream()
+                        .map(row -> String.valueOf(row.get("section_id"))).distinct().sorted().toList()) {
+                    jdbc.queryForList(
+                            "SELECT \"id\" FROM " + SECTION + " WHERE \"id\" = :id"
+                                    + (postgres ? " FOR SHARE" : " FOR UPDATE"),
+                            new MapSqlParameterSource("id", sectionId));
+                }
+                active = activeEnrollments(studentId, targetSemesterId);
+            }
+            if (!active.isEmpty()) {
                 Map<String, Object> first = active.get(0);
                 String enrollmentId = String.valueOf(first.get("id"));
                 String sectionId = String.valueOf(first.get("section_id"));
 
-                String studentCode = studentId;
-                String studentName = null;
-                try {
-                    Map<String, Object> stuInfo = jdbc.queryForMap(
-                            "SELECT s.\"studentId\" AS student_code, u.\"firstName\" AS first_name, u.\"lastName\" AS last_name"
-                                    + " FROM " + STUDENT + " s"
-                                    + " LEFT JOIN \"campuscore_auth\".\"User\" u ON u.\"id\" = s.\"userId\""
-                                    + " WHERE s.\"id\" = :studentId",
-                            new MapSqlParameterSource("studentId", studentId));
-                    if (stuInfo.get("student_code") != null) {
-                        studentCode = String.valueOf(stuInfo.get("student_code"));
-                    }
-                    studentName = displayName(
-                            (String) stuInfo.get("first_name"),
-                            (String) stuInfo.get("last_name"));
-                } catch (Exception ignored) {
-                }
-
-                String semesterName = targetSemesterId;
-                try {
-                    Map<String, Object> semInfo = jdbc.queryForMap(
-                            "SELECT \"name\" FROM " + SEMESTER + " WHERE \"id\" = :semesterId",
-                            new MapSqlParameterSource("semesterId", targetSemesterId));
-                    if (semInfo.get("name") != null) {
-                        semesterName = String.valueOf(semInfo.get("name"));
-                    }
-                } catch (Exception ignored) {
-                }
-
-                List<RegistrationPdfRenderer.CourseItem> courseItems = active.stream().map(row -> new RegistrationPdfRenderer.CourseItem(
-                        String.valueOf(row.get("course_code")),
-                        String.valueOf(row.get("course_name")),
-                        String.valueOf(row.get("section_number")),
-                        ((Number) row.get("credits")).intValue(),
-                        String.valueOf(row.get("id")),
-                        String.valueOf(row.get("section_id"))
-                )).toList();
-
-                byte[] pdf = pdfRenderer.renderEnriched(
-                        studentId,
-                        studentCode,
-                        studentName,
-                        targetSemesterId,
-                        semesterName,
-                        enrollmentId,
-                        sectionId,
-                        courseItems);
+                byte[] pdf = renderSlipPdf(studentId, targetSemesterId, enrollmentId, sectionId, active);
                 String digest = sha256(pdf);
 
                 String roundId = first.get("round_id") != null ? String.valueOf(first.get("round_id")) : null;
@@ -500,6 +478,64 @@ public class RegistrationService {
     public record SlipPayload(String sha256, byte[] payload) {
     }
 
+    /**
+     * Renders the slip from live registration data: every course row carries
+     * its code, name, section number and credits, plus the student code/name
+     * and semester name. Both the enroll-time persist and the on-demand
+     * fallback go through here so a stored slip never shows the placeholder
+     * row of internal ids the legacy {@code render} overload produced.
+     */
+    private byte[] renderSlipPdf(String studentId, String semesterId, String enrollmentId, String sectionId,
+            List<Map<String, Object>> active) {
+        String studentCode = studentId;
+        String studentName = null;
+        try {
+            Map<String, Object> stuInfo = jdbc.queryForMap(
+                    "SELECT s.\"studentId\" AS student_code, u.\"firstName\" AS first_name, u.\"lastName\" AS last_name"
+                            + " FROM " + STUDENT + " s"
+                            + " LEFT JOIN \"campuscore_auth\".\"User\" u ON u.\"id\" = s.\"userId\""
+                            + " WHERE s.\"id\" = :studentId",
+                    new MapSqlParameterSource("studentId", studentId));
+            if (stuInfo.get("student_code") != null) {
+                studentCode = String.valueOf(stuInfo.get("student_code"));
+            }
+            studentName = displayName(
+                    (String) stuInfo.get("first_name"),
+                    (String) stuInfo.get("last_name"));
+        } catch (Exception ignored) {
+        }
+
+        String semesterName = semesterId;
+        try {
+            Map<String, Object> semInfo = jdbc.queryForMap(
+                    "SELECT \"name\" FROM " + SEMESTER + " WHERE \"id\" = :semesterId",
+                    new MapSqlParameterSource("semesterId", semesterId));
+            if (semInfo.get("name") != null) {
+                semesterName = String.valueOf(semInfo.get("name"));
+            }
+        } catch (Exception ignored) {
+        }
+
+        List<RegistrationPdfRenderer.CourseItem> courseItems = active.stream().map(row -> new RegistrationPdfRenderer.CourseItem(
+                String.valueOf(row.get("course_code")),
+                String.valueOf(row.get("course_name")),
+                String.valueOf(row.get("section_number")),
+                ((Number) row.get("credits")).intValue(),
+                String.valueOf(row.get("id")),
+                String.valueOf(row.get("section_id"))
+        )).toList();
+
+        return pdfRenderer.renderEnriched(
+                studentId,
+                studentCode,
+                studentName,
+                semesterId,
+                semesterName,
+                enrollmentId,
+                sectionId,
+                courseItems);
+    }
+
     private EnrollmentResponse enrollLocked(
             String studentId,
             String sectionId,
@@ -518,6 +554,10 @@ public class RegistrationService {
         if (!"OPEN".equals(String.valueOf(section.get("status")))) {
             throw problem(HttpStatus.CONFLICT, "SECTION_CLOSED", "Section is not open for registration");
         }
+        // The semester lifecycle gates registration independently of the round
+        // rows: a CLOSED semester must refuse enroll even if a round is still
+        // flagged OPEN, and reopening the semester restores it unchanged.
+        requireOpenSemester(semesterId);
         Map<String, Object> round = openRoundReadOnly(semesterId, "REGISTRATION");
         assertEligible(student, round, Instant.now());
         List<Map<String, Object>> active = lockActiveEnrollments(studentId, semesterId);
@@ -527,6 +567,13 @@ public class RegistrationService {
         if (active.stream().anyMatch(row -> courseId.equals(String.valueOf(row.get("course_id"))))) {
             throw problem(HttpStatus.CONFLICT, "DUPLICATE_COURSE", "Student already has this course this term");
         }
+        // Cancelling a section preserves its enrollment rows as history, and
+        // the per-course uniqueness still counts them while their status stays
+        // active — the duplicate check above skips cancelled sections, so a
+        // same-course replacement would collide on the unique index at insert.
+        // Retire the preserved row as an automatic drop under this lock order;
+        // a later reopen does not resurrect it.
+        retireCancelledSectionEnrollment(studentId, semesterId, courseId, hash);
         int used = active.stream().mapToInt(row -> ((Number) row.get("credits")).intValue()).sum();
         int limit = creditLimitApplications.effectiveLimit(studentId, round);
         if (used + credits > limit) {
@@ -626,8 +673,14 @@ public class RegistrationService {
         Map<String, Object> section = lockSection(String.valueOf(enrollment.get("section_id")));
         String droppedCourseId = String.valueOf(section.get("course_id"));
         String semesterId = String.valueOf(enrollment.get("semester_id"));
-        assertNoActiveCorequisiteDependents(targetStudentId, droppedCourseId, semesterId, enrollmentId);
-        openRoundReadOnly(semesterId, "ADD_DROP");
+        // A cancelled section is already out of every active calculation: its
+        // enrollment cannot satisfy a corequisite, so keeping it would protect
+        // nothing while trapping the student. Its drop therefore bypasses the
+        // corequisite guard and the add/drop window entirely.
+        if (!"CANCELLED".equals(String.valueOf(section.get("status")))) {
+            assertNoActiveCorequisiteDependents(targetStudentId, droppedCourseId, semesterId, enrollmentId);
+            openRoundReadOnly(semesterId, "ADD_DROP");
+        }
         jdbc.update(
                 "UPDATE " + ENROLLMENT + " SET \"status\" = 'DROPPED', \"droppedAt\" = CURRENT_TIMESTAMP,"
                         + " \"updatedAt\" = CURRENT_TIMESTAMP WHERE \"id\" = :id",
@@ -658,11 +711,76 @@ public class RegistrationService {
         completeIdempotency(studentId == null ? enrollmentId : studentId, idempotencyKey, enrollmentId, hash);
     }
 
+    /**
+     * Cancelling a section preserves its enrollment rows as history, and the
+     * partial unique index on (student, course, semester) still counts them
+     * while their status stays active — the in-Java duplicate check skips
+     * cancelled sections, so inserting a replacement enroll for the same
+     * course would collide at the database boundary. Retire the preserved row
+     * as an automatic drop under the same student-first lock order the manual
+     * drop uses; a later section reopen does not resurrect it.
+     */
+    private void retireCancelledSectionEnrollment(
+            String studentId, String semesterId, String courseId, String hash) {
+        List<Map<String, Object>> preserved = jdbc.queryForList(
+                "SELECT enrollment.\"id\", enrollment.\"sectionId\" AS section_id FROM " + ENROLLMENT + " enrollment"
+                        + " JOIN " + SECTION + " section ON section.\"id\" = enrollment.\"sectionId\""
+                        + " WHERE enrollment.\"studentId\" = :studentId"
+                        + " AND enrollment.\"semesterId\" = :semesterId"
+                        + " AND enrollment.\"courseId\" = :courseId"
+                        + " AND enrollment.\"status\" IN ('ENROLLED', 'PENDING', 'CONFIRMED')"
+                        + " AND section.\"status\" = 'CANCELLED'"
+                        // Same join-shaping as lockActiveEnrollments: only the
+                        // Enrollment row is meant to lock.
+                        + (postgres ? " FOR UPDATE OF enrollment" : " FOR UPDATE"),
+                new MapSqlParameterSource()
+                        .addValue("studentId", studentId)
+                        .addValue("semesterId", semesterId)
+                        .addValue("courseId", courseId));
+        for (Map<String, Object> row : preserved) {
+            String enrollmentId = String.valueOf(row.get("id"));
+            String oldSectionId = String.valueOf(row.get("section_id"));
+            jdbc.update(
+                    "UPDATE " + ENROLLMENT + " SET \"status\" = 'DROPPED', \"droppedAt\" = CURRENT_TIMESTAMP,"
+                            + " \"updatedAt\" = CURRENT_TIMESTAMP WHERE \"id\" = :id",
+                    new MapSqlParameterSource("id", enrollmentId));
+            jdbc.update(
+                    "UPDATE " + SECTION + " SET \"enrolledCount\" = CASE WHEN \"enrolledCount\" > 0 THEN \"enrolledCount\" - 1 ELSE 0 END,"
+                            + " \"updatedAt\" = CURRENT_TIMESTAMP WHERE \"id\" = :sectionId",
+                    new MapSqlParameterSource("sectionId", oldSectionId));
+            // The action name carries the explanation: the seat was dropped
+            // because its section was cancelled and replaced by a new section.
+            jdbc.update(
+                    "INSERT INTO " + EVENT
+                            + " (\"id\", \"enrollmentId\", \"studentId\", \"sectionId\", \"action\", \"actorId\", \"requestHash\")"
+                            + " VALUES (:id, :enrollmentId, :studentId, :sectionId, 'REPLACED', :actorId, :hash)",
+                    new MapSqlParameterSource()
+                            .addValue("id", UUID.randomUUID().toString())
+                            .addValue("enrollmentId", enrollmentId)
+                            .addValue("studentId", studentId)
+                            .addValue("sectionId", oldSectionId)
+                            .addValue("actorId", studentId)
+                            .addValue("hash", hash));
+            // A persisted slip asserting the old seat is stale the moment the
+            // preserved row drops; the enroll-time persist re-issues it.
+            jdbc.update(
+                    "DELETE FROM " + SLIP + " WHERE \"studentId\" = :studentId AND \"semesterId\" = :semesterId",
+                    new MapSqlParameterSource()
+                            .addValue("studentId", studentId)
+                            .addValue("semesterId", semesterId));
+        }
+    }
+
     private void persistSlip(String studentId, EnrollmentResponse response) {
         if (response == null) {
             throw problem(HttpStatus.INTERNAL_SERVER_ERROR, "SLIP_PERSIST_FAILED", "Enrollment response missing after enroll");
         }
-        byte[] pdf = pdfRenderer.render(studentId, response.semesterId(), response.id(), response.sectionId());
+        byte[] pdf = renderSlipPdf(
+                studentId,
+                response.semesterId(),
+                response.id(),
+                response.sectionId(),
+                activeEnrollments(studentId, response.semesterId()));
         String digest = sha256(pdf);
         int inserted = jdbc.update(
                 "INSERT INTO " + SLIP
@@ -791,6 +909,19 @@ public class RegistrationService {
         }
     }
 
+    /**
+     * The read-side half of the student row lock: shares with other renders
+     * but conflicts with the FOR UPDATE every mutating path takes first, so
+     * a slip never serves or persists against a set a committed write has
+     * already changed.
+     */
+    private void shareLockStudent(String studentId) {
+        jdbc.queryForList(
+                "SELECT \"id\" FROM " + STUDENT + " WHERE \"id\" = :id"
+                        + (postgres ? " FOR SHARE" : " FOR UPDATE"),
+                new MapSqlParameterSource("id", studentId));
+    }
+
     private Map<String, Object> lockSection(String sectionId) {
         try {
             return jdbc.queryForMap(
@@ -806,6 +937,16 @@ public class RegistrationService {
 
     private Map<String, Object> openRound(String semesterId, String preferredKind) {
         return openRound(semesterId, preferredKind, true);
+    }
+
+    private void requireOpenSemester(String semesterId) {
+        Long count = jdbc.queryForObject(
+                "SELECT COUNT(*) FROM " + SEMESTER + " WHERE \"id\" = :id AND \"status\" IN (:openStatuses)",
+                new MapSqlParameterSource().addValue("id", semesterId).addValue("openStatuses", SemesterStatuses.OPEN),
+                Long.class);
+        if (count == null || count == 0) {
+            throw problem(HttpStatus.CONFLICT, "SEMESTER_CLOSED", "Semester is closed for registration");
+        }
     }
 
     /** Read paths must not hold exclusive round locks; only enroll/drop serialize on them. */
@@ -926,6 +1067,7 @@ public class RegistrationService {
                         + " JOIN " + COURSE + " course ON course.\"id\" = section.\"courseId\""
                         + " WHERE enrollment.\"studentId\" = :studentId AND enrollment.\"semesterId\" = :semesterId"
                         + " AND enrollment.\"status\" IN ('ENROLLED', 'PENDING', 'CONFIRMED')"
+                        + " AND section.\"status\" <> 'CANCELLED'"
                         + " ORDER BY course.\"code\", section.\"sectionNumber\"",
                 new MapSqlParameterSource().addValue("studentId", studentId).addValue("semesterId", semesterId));
     }
@@ -938,6 +1080,7 @@ public class RegistrationService {
                         + " JOIN " + COURSE + " course ON course.\"id\" = section.\"courseId\""
                         + " WHERE enrollment.\"studentId\" = :studentId AND enrollment.\"semesterId\" = :semesterId"
                         + " AND enrollment.\"status\" IN ('ENROLLED', 'PENDING', 'CONFIRMED')"
+                        + " AND section.\"status\" <> 'CANCELLED'"
                         // PostgreSQL otherwise locks the joined Section/Course rows too,
                         // inverting Section -> Round for a different student's drop.
                         + (postgres ? " FOR UPDATE OF enrollment" : " FOR UPDATE"),
@@ -956,7 +1099,8 @@ public class RegistrationService {
                         + " JOIN " + SECTION + " section ON section.\"id\" = enrollment.\"sectionId\""
                         + " JOIN " + COURSE + " course ON course.\"id\" = section.\"courseId\""
                         + " WHERE enrollment.\"studentId\" = :studentId AND enrollment.\"semesterId\" = :semesterId"
-                        + " AND enrollment.\"status\" IN ('ENROLLED', 'PENDING', 'CONFIRMED')",
+                        + " AND enrollment.\"status\" IN ('ENROLLED', 'PENDING', 'CONFIRMED')"
+                        + " AND section.\"status\" <> 'CANCELLED'",
                 new MapSqlParameterSource().addValue("studentId", studentId).addValue("semesterId", semesterId),
                 Integer.class);
         return used == null ? 0 : used;
@@ -1012,15 +1156,19 @@ public class RegistrationService {
             "F", 0, "D", 1, "D+", 2, "C", 3, "C+", 4, "B", 5, "B+", 6, "A", 7, "A+", 8);
 
     private boolean hasCompleted(String studentId, String courseId, String minLetter) {
+        // Same predicate as the transcript read: a COMPLETED enrollment whose
+        // grade is published (or under appeal) is completed history, and stays
+        // completed even if its section was later cancelled.
         List<String> letters = jdbc.queryForList(
-                "SELECT \"letterGrade\" FROM " + ENROLLMENT
-                        + " WHERE \"studentId\" = :studentId AND \"courseId\" = :courseId"
-                        + " AND \"gradeStatus\" IN ('COMPLETED', 'PUBLISHED')"
+                "SELECT enrollment.\"letterGrade\" FROM " + ENROLLMENT + " enrollment"
+                        + " WHERE enrollment.\"studentId\" = :studentId AND enrollment.\"courseId\" = :courseId"
+                        + " AND enrollment.\"status\" = 'COMPLETED'"
+                        + " AND enrollment.\"gradeStatus\" IN ('PUBLISHED', 'APPEALED')"
                         // A passing letter is required: a graded row without a
                         // letter (a producer bug) must never silently unlock a
                         // prerequisite, matching the knowledge-base copy.
-                        + " AND \"letterGrade\" IS NOT NULL"
-                        + " AND \"letterGrade\" NOT IN ('F', 'W')",
+                        + " AND enrollment.\"letterGrade\" IS NOT NULL"
+                        + " AND enrollment.\"letterGrade\" NOT IN ('F', 'W')",
                 new MapSqlParameterSource().addValue("studentId", studentId).addValue("courseId", courseId),
                 String.class);
         if (letters.isEmpty()) {
@@ -1039,9 +1187,12 @@ public class RegistrationService {
 
     private boolean hasActiveCourse(String studentId, String semesterId, String courseId) {
         Long count = jdbc.queryForObject(
-                "SELECT COUNT(*) FROM " + ENROLLMENT
-                        + " WHERE \"studentId\" = :studentId AND \"semesterId\" = :semesterId AND \"courseId\" = :courseId"
-                        + " AND \"status\" IN ('ENROLLED', 'PENDING', 'CONFIRMED')",
+                "SELECT COUNT(*) FROM " + ENROLLMENT + " enrollment"
+                        + " JOIN " + SECTION + " section ON section.\"id\" = enrollment.\"sectionId\""
+                        + " WHERE enrollment.\"studentId\" = :studentId AND enrollment.\"semesterId\" = :semesterId"
+                        + " AND enrollment.\"courseId\" = :courseId"
+                        + " AND enrollment.\"status\" IN ('ENROLLED', 'PENDING', 'CONFIRMED')"
+                        + " AND section.\"status\" <> 'CANCELLED'",
                 new MapSqlParameterSource()
                         .addValue("studentId", studentId)
                         .addValue("semesterId", semesterId)

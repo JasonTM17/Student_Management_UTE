@@ -52,7 +52,7 @@ public class ScheduledAnnouncementNotifyJob {
     }
 
     @Scheduled(
-            fixedDelayString = "${engagement.announcement-notify.delay-ms:300000}",
+            fixedDelayString = "${engagement.announcement-notify.delay-ms:900000}",
             initialDelayString = "${engagement.announcement-notify.initial-delay-ms:90000}")
     public void refireDueAnnouncements() {
         try {

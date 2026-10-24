@@ -89,13 +89,19 @@ public class AuthUserRepository {
                 new MapSqlParameterSource("id", userId), String.class);
     }
 
-    public Optional<AuthUserRecord> findByActiveRefreshSession(String refreshTokenHash, Instant now) {
-        List<AuthUserRecord> matches = jdbc.query(
+    /**
+     * The live session row behind a refresh-token hash, together with the
+     * account it belongs to. The row id rides along so the replacement
+     * token can carry the same "sid" binding.
+     */
+    public Optional<ActiveRefreshSession> findByActiveRefreshSession(String refreshTokenHash, Instant now) {
+        List<ActiveRefreshSession> matches = jdbc.query(
                 "SELECT u.\"id\", u.\"email\", u.\"password\", u.\"firstName\", u.\"lastName\","
                         + " u.\"phone\", u.\"gender\", u.\"dateOfBirth\", u.\"address\", u.\"avatar\","
                         + " u.\"status\", u.\"mustChangePassword\", u.\"credentialVersion\", u.\"failedLoginAttempts\", u.\"lockedUntil\", u.\"createdAt\","
                         + " st.\"id\" AS student_id, st.\"year\" AS student_year,"
-                        + " l.\"id\" AS lecturer_id"
+                        + " l.\"id\" AS lecturer_id,"
+                        + " se.\"id\" AS active_session_id"
                         + " FROM " + SESSION_TABLE + " se"
                         + " INNER JOIN " + USER_TABLE + " u ON u.\"id\" = se.\"userId\""
                         + " LEFT JOIN " + STUDENT_TABLE + " st ON st.\"userId\" = u.\"id\""
@@ -105,10 +111,84 @@ public class AuthUserRepository {
                 new MapSqlParameterSource()
                         .addValue("refreshToken", refreshTokenHash)
                         .addValue("now", localDateTime(now)),
-                USER_MAPPER);
-        return matches.stream().findFirst().map(user -> user.withAuthorities(
-                findRoles(user.id()),
-                findPermissions(user.id())));
+                (resultSet, rowNum) -> new ActiveRefreshSession(
+                        mapUser(resultSet, rowNum),
+                        resultSet.getString("active_session_id")));
+        return matches.stream().findFirst().map(session -> new ActiveRefreshSession(
+                session.user().withAuthorities(
+                        findRoles(session.user().id()),
+                        findPermissions(session.user().id())),
+                session.sessionId()));
+    }
+
+    public record ActiveRefreshSession(AuthUserRecord user, String sessionId) {
+    }
+
+    /**
+     * Re-checks a session pinned by stable row id under the account's User
+     * row lock. Returns the row's expiry instant; the caller decides
+     * whether the pinned session is still usable.
+     */
+    public Optional<Instant> findSessionExpiryForUpdate(String userId, String sessionId) {
+        return jdbc.query(
+                        "SELECT \"expiresAt\" FROM " + SESSION_TABLE
+                                + " WHERE \"userId\" = :userId AND \"id\" = :sessionId FOR UPDATE",
+                        new MapSqlParameterSource()
+                                .addValue("userId", userId)
+                                .addValue("sessionId", sessionId),
+                        (rs, rowNum) -> instant(rs.getTimestamp("expiresAt")))
+                .stream()
+                .findFirst();
+    }
+
+    /**
+     * Whether a live session row still exists — refresh reuse detection asks
+     * this to separate "the row was deleted or already expired" (quiet
+     * rejection) from "a live row stands behind a superseded token"
+     * (stolen-token signal). An expired-but-not-yet-deleted row must read as
+     * gone: a just-expired token is a dead-session refresh, not theft.
+     */
+    public boolean sessionExistsForUser(String userId, String sessionId, Instant now) {
+        Integer count = jdbc.queryForObject(
+                "SELECT COUNT(*) FROM " + SESSION_TABLE
+                        + " WHERE \"userId\" = :userId AND \"id\" = :sessionId"
+                        + " AND \"expiresAt\" > :now",
+                new MapSqlParameterSource()
+                        .addValue("userId", userId)
+                        .addValue("sessionId", sessionId)
+                        .addValue("now", localDateTime(now)),
+                Integer.class);
+        return count != null && count > 0;
+    }
+
+    /**
+     * Re-issues the kept session during a credential rotation: the row id
+     * survives but every token artifact is replaced — a fresh hash, no
+     * "previousRefreshToken" grace window, a fresh expiry. A credential
+     * change is exactly the moment no replay of the password-era token may
+     * recover. Callers must hold the account's User row lock.
+     */
+    public void reissueRefreshSession(
+            String userId,
+            String sessionId,
+            String refreshTokenHash,
+            Instant expiresAt) {
+        MapSqlParameterSource parameters = new MapSqlParameterSource()
+                .addValue("userId", userId)
+                .addValue("sessionId", sessionId)
+                .addValue("refreshToken", refreshTokenHash)
+                .addValue("expiresAt", localDateTime(expiresAt));
+        jdbc.update(
+                "UPDATE " + SESSION_TABLE
+                        + " SET \"refreshToken\" = :refreshToken,"
+                        + " \"previousRefreshToken\" = NULL, \"rotatedAt\" = NULL,"
+                        + " \"expiresAt\" = :expiresAt"
+                        + " WHERE \"userId\" = :userId AND \"id\" = :sessionId",
+                parameters);
+        jdbc.update(
+                "UPDATE " + USER_TABLE + " SET \"refreshToken\" = :refreshToken, \"updatedAt\" = CURRENT_TIMESTAMP"
+                        + " WHERE \"id\" = :userId",
+                parameters);
     }
 
     public void recordFailedLogin(String userId, int nextAttemptCount, Instant lockedUntil) {
@@ -305,12 +385,17 @@ public class AuthUserRepository {
 
     /**
      * Rotates exactly the session identified by its previous refresh-token hash.
-     * Other active sessions (other devices/tabs) stay valid.
+     * Other active sessions (other devices/tabs) stay valid. The replaced hash
+     * is kept on the row as "previousRefreshToken" with the rotation instant:
+     * a same-origin document that still presents the immediately-previous
+     * token inside the overlap window is recognized as a refresh race, not a
+     * stolen-token replay.
      */
     public int rotateRefreshSession(
             String userId,
             String previousRefreshTokenHash,
             String refreshTokenHash,
+            Instant rotatedAt,
             String ipAddress,
             String userAgent,
             Instant expiresAt) {
@@ -318,12 +403,16 @@ public class AuthUserRepository {
                 .addValue("userId", userId)
                 .addValue("previousRefreshToken", previousRefreshTokenHash)
                 .addValue("refreshToken", refreshTokenHash)
+                .addValue("rotatedAt", localDateTime(rotatedAt))
                 .addValue("ipAddress", ipAddress)
                 .addValue("userAgent", userAgent)
                 .addValue("expiresAt", localDateTime(expiresAt));
         int rotated = jdbc.update(
                 "UPDATE " + SESSION_TABLE
-                        + " SET \"refreshToken\" = :refreshToken, \"userAgent\" = :userAgent,"
+                        + " SET \"refreshToken\" = :refreshToken,"
+                        + " \"previousRefreshToken\" = :previousRefreshToken,"
+                        + " \"rotatedAt\" = :rotatedAt,"
+                        + " \"userAgent\" = :userAgent,"
                         + " \"ipAddress\" = :ipAddress, \"expiresAt\" = :expiresAt"
                         + " WHERE \"userId\" = :userId AND \"refreshToken\" = :previousRefreshToken",
                 parameters);
@@ -332,6 +421,77 @@ public class AuthUserRepository {
                         + " WHERE \"id\" = :userId",
                 parameters);
         return rotated;
+    }
+
+    /**
+     * Row state for a token that was rotated out exactly one generation ago.
+     * Joined under the same account lock and Session FOR UPDATE ordering as
+     * {@link #findByActiveRefreshSession}; the caller decides whether the
+     * {@code rotatedAt} instant is still inside the accepted overlap window.
+     */
+    public Optional<RacedRotation> findByPreviousRefreshSession(String refreshTokenHash, Instant now) {
+        List<RacedRotation> matches = jdbc.query(
+                "SELECT u.\"id\", u.\"email\", u.\"password\", u.\"firstName\", u.\"lastName\","
+                        + " u.\"phone\", u.\"gender\", u.\"dateOfBirth\", u.\"address\", u.\"avatar\","
+                        + " u.\"status\", u.\"mustChangePassword\", u.\"credentialVersion\", u.\"failedLoginAttempts\", u.\"lockedUntil\", u.\"createdAt\","
+                        + " st.\"id\" AS student_id, st.\"year\" AS student_year,"
+                        + " l.\"id\" AS lecturer_id,"
+                        + " se.\"id\" AS raced_session_id, se.\"rotatedAt\" AS raced_rotated_at"
+                        + " FROM " + SESSION_TABLE + " se"
+                        + " INNER JOIN " + USER_TABLE + " u ON u.\"id\" = se.\"userId\""
+                        + " LEFT JOIN " + STUDENT_TABLE + " st ON st.\"userId\" = u.\"id\""
+                        + " LEFT JOIN " + LECTURER_TABLE + " l ON l.\"userId\" = u.\"id\" AND l.\"isActive\" = TRUE"
+                        + " WHERE se.\"previousRefreshToken\" = :refreshToken"
+                        + " AND se.\"expiresAt\" > :now FOR UPDATE OF se",
+                new MapSqlParameterSource()
+                        .addValue("refreshToken", refreshTokenHash)
+                        .addValue("now", localDateTime(now)),
+                (resultSet, rowNum) -> new RacedRotation(
+                        mapUser(resultSet, rowNum),
+                        resultSet.getString("raced_session_id"),
+                        instant(resultSet.getTimestamp("raced_rotated_at"))));
+        return matches.stream().findFirst().map(candidate -> new RacedRotation(
+                candidate.user().withAuthorities(
+                        findRoles(candidate.user().id()),
+                        findPermissions(candidate.user().id())),
+                candidate.sessionId(),
+                candidate.rotatedAt()));
+    }
+
+    /**
+     * Answers a within-overlap replay of the previous generation: the row is
+     * rotated forward to a fresh hash exactly like a normal rotation, but
+     * "previousRefreshToken"/"rotatedAt" stay anchored to the original
+     * rotation, so the overlap window cannot be extended by repeated replays.
+     * Callers must hold the account's User row lock.
+     */
+    public void rotateRacedRefreshSession(
+            String userId,
+            String sessionId,
+            String refreshTokenHash,
+            String ipAddress,
+            String userAgent,
+            Instant expiresAt) {
+        MapSqlParameterSource parameters = new MapSqlParameterSource()
+                .addValue("userId", userId)
+                .addValue("sessionId", sessionId)
+                .addValue("refreshToken", refreshTokenHash)
+                .addValue("ipAddress", ipAddress)
+                .addValue("userAgent", userAgent)
+                .addValue("expiresAt", localDateTime(expiresAt));
+        jdbc.update(
+                "UPDATE " + SESSION_TABLE
+                        + " SET \"refreshToken\" = :refreshToken, \"userAgent\" = :userAgent,"
+                        + " \"ipAddress\" = :ipAddress, \"expiresAt\" = :expiresAt"
+                        + " WHERE \"id\" = :sessionId",
+                parameters);
+        jdbc.update(
+                "UPDATE " + USER_TABLE + " SET \"refreshToken\" = :refreshToken, \"updatedAt\" = CURRENT_TIMESTAMP"
+                        + " WHERE \"id\" = :userId",
+                parameters);
+    }
+
+    public record RacedRotation(AuthUserRecord user, String sessionId, Instant rotatedAt) {
     }
 
     public void deleteRefreshSession(String userId, String refreshTokenHash) {

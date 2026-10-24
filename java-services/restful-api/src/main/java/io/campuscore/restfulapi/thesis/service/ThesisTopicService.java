@@ -90,6 +90,17 @@ public class ThesisTopicService {
             String departmentId = ThesisDepartmentScope.departmentId(jdbc, actor);
             result = result.stream().filter(topic -> topic.getDepartmentId().equals(departmentId)).toList();
         }
+        // A withdrawn topic's outcome is masked for students, so listing it
+        // would offer a pick the assign path always refuses. Governance roles
+        // and lecturers keep full visibility (owners/supervisors/graders must
+        // still see it); students see only live topics.
+        if (!isAdmin(actor) && !ThesisDeanScope.isFacultyHead(actor)
+                && !ThesisDepartmentScope.isDepartmentHead(actor) && !isLecturer(actor)
+                && !result.isEmpty()) {
+            result = result.stream()
+                    .filter(topic -> !"WITHDRAWN".equals(topic.getResultStatus()))
+                    .toList();
+        }
         boolean published = isRoundResultsPublished(roundId);
         // One query for every topic the caller grades as a council member, so
         // the mask check below does not turn into per-topic round-trips.
@@ -160,7 +171,11 @@ public class ThesisTopicService {
         // unrelated lecturers must not learn who counter-reviews a topic.
         boolean reviewerMasked = topic.gvpbLecturerId() != null
                 && !internalGrader;
-        if (!scoreMasked && !reviewerMasked) {
+        // The waiver and outcome annotations are governance context: they ship
+        // with the same visibility as the outcome fields they describe.
+        boolean governanceMasked = (topic.gvpbWaivedReason() != null || topic.resultReason() != null)
+                && !internalGrader;
+        if (!scoreMasked && !reviewerMasked && !governanceMasked) {
             return topic;
         }
         return new TopicResponse(
@@ -168,7 +183,9 @@ public class ThesisTopicService {
                 topic.maxGroups(), topic.status(), topic.createdBy(),
                 scoreMasked ? null : topic.finalScore(),
                 scoreMasked ? null : topic.resultStatus(),
-                reviewerMasked ? null : topic.gvpbLecturerId());
+                reviewerMasked ? null : topic.gvpbLecturerId(),
+                governanceMasked ? null : topic.gvpbWaivedReason(),
+                governanceMasked ? null : topic.resultReason());
     }
 
     private boolean isCouncilGraderOf(UUID topicId, Jwt actor) {

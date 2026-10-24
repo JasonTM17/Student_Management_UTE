@@ -1,5 +1,6 @@
 package io.campuscore.restfulapi.academic.service;
 
+import io.campuscore.restfulapi.academic.registration.CreditLimitApplicationService;
 import io.campuscore.restfulapi.audit.AdminAuditRecorder;
 import io.campuscore.restfulapi.web.DomainException;
 import java.time.Instant;
@@ -32,6 +33,9 @@ public class AdminCatalogMutationService {
     private static final String CLASSROOM = "\"academic\".\"Classroom\"";
     private static final String SECTION = "\"academic\".\"Section\"";
     private static final String SECTION_SCHEDULE = "\"academic\".\"SectionSchedule\"";
+    private static final String ENROLLMENT = "\"academic\".\"Enrollment\"";
+    private static final String SLIP = "\"academic\".\"RegistrationSlip\"";
+    private static final String STUDENT = "\"academic\".\"Student\"";
     /** Section.lecturerId joins the academic profile table (the auth schema exposes it as a view). */
     private static final String LECTURER = "\"academic\".\"Lecturer\"";
     /** Statuses the academic services and the admin console understand. */
@@ -41,10 +45,13 @@ public class AdminCatalogMutationService {
 
     private final NamedParameterJdbcTemplate jdbc;
     private final AdminAuditRecorder audit;
+    private final CreditLimitApplicationService creditLimitApplications;
 
-    public AdminCatalogMutationService(NamedParameterJdbcTemplate jdbc) {
+    public AdminCatalogMutationService(NamedParameterJdbcTemplate jdbc,
+            CreditLimitApplicationService creditLimitApplications) {
         this.jdbc = jdbc;
         this.audit = new AdminAuditRecorder(jdbc);
+        this.creditLimitApplications = creditLimitApplications;
     }
 
     @Transactional
@@ -205,6 +212,7 @@ public class AdminCatalogMutationService {
         String classroomId = text(input, "classroomId", null);
         if (classroomId != null) {
             requireCatalogReference(CLASSROOM, "classroomId", classroomId);
+            requireActiveClassroom(classroomId);
             requireRoomFitsCapacity(classroomId, capacity);
         }
         jdbc.update(
@@ -257,6 +265,26 @@ public class AdminCatalogMutationService {
                 throw problem(HttpStatus.BAD_REQUEST, "INVALID_CAPACITY", "Classroom capacity must be at least 1");
             }
         }
+        // Reopening a cancelled section must serialize with concurrent
+        // enrolls: without these locks an enroll could commit between the
+        // conflict scan and this transaction's commit, leaving the student
+        // over the cap with no acknowledgement on the audit trail. Take the
+        // enroll path's Student FOR UPDATE first, in id order and BEFORE the
+        // section write — the global Student -> Section -> Round order.
+        // Taking them after the update would invert against
+        // retire-on-re-enroll, which holds the student and then updates this
+        // section's rows.
+        boolean reopening = SECTION.equals(table) && before != null
+                && "CANCELLED".equals(before.get("status"))
+                && input.containsKey("status") && !"CANCELLED".equals(input.get("status"));
+        if (reopening) {
+            // A reopen re-adds enrollment capacity, so it must not run inside
+            // a semester that already ended; every earlier lifecycle state
+            // allows it subject to the conflict checks. Cancelling stays
+            // allowed in any semester state because it only removes seats.
+            requireNonTerminalSemesterForReopen(before.get("semesterId"));
+            lockReopenAffectedStudents(id);
+        }
         MapSqlParameterSource parameters = new MapSqlParameterSource("id", id);
         StringBuilder sql = new StringBuilder("UPDATE ").append(table).append(" SET ");
         boolean replacesSchedules = SECTION.equals(table) && input.containsKey("schedules");
@@ -283,10 +311,29 @@ public class AdminCatalogMutationService {
             }
             requireExists(table, id);
         } else {
+            // The transition decision above read `before` without a lock, so
+            // a status write must verify that observed state: a transition
+            // committed in between (a cancel behind a queued edit, another
+            // admin's reopen) makes the guarded write match no row and the
+            // edit refuses instead of stamping stale status over the commit.
+            // IS NOT DISTINCT FROM keeps a null status comparable on both
+            // engines; the row itself is never locked before the student
+            // locks the reopen path takes first.
+            boolean statusGuarded = SECTION.equals(table) && before != null
+                    && input.containsKey("status");
             sql.append(", \"updatedAt\" = CURRENT_TIMESTAMP WHERE \"id\" = :id");
+            if (statusGuarded) {
+                sql.append(" AND \"status\" IS NOT DISTINCT FROM :beforeStatus");
+                parameters.addValue("beforeStatus", before.get("status"));
+            }
             int updated = jdbc.update(sql.toString(), parameters);
             if (updated == 0) {
-                throw problem(HttpStatus.NOT_FOUND, "RESOURCE_NOT_FOUND", "Resource not found");
+                if (!statusGuarded) {
+                    throw problem(HttpStatus.NOT_FOUND, "RESOURCE_NOT_FOUND", "Resource not found");
+                }
+                requireExists(table, id);
+                throw problem(HttpStatus.CONFLICT, "SECTION_STATUS_CHANGED",
+                        "The section changed while the edit was open; reload and try again");
             }
         }
         if (replacesSchedules) {
@@ -299,6 +346,60 @@ public class AdminCatalogMutationService {
             }
             if (input.containsKey("lecturerId") || input.containsKey("semesterId")) {
                 assertNoSectionConflicts(id);
+            }
+        }
+        if (SECTION.equals(table) && input.containsKey("status") && before != null) {
+            boolean cancelled = "CANCELLED".equals(before.get("status"));
+            boolean cancelling = !cancelled && "CANCELLED".equals(input.get("status"));
+            if (reopening) {
+                // The cancelled section released its room/lecturer slots, so a
+                // reopen must not silently restore a slot another section now
+                // holds — nor one whose room was deactivated in the meantime.
+                requireScheduledRoomsActive(id);
+                assertNoSectionConflicts(id);
+                // Students kept enrolled through the cancellation may have
+                // re-registered since: the reopened section must not push them
+                // over their credit cap or onto a timetable they already
+                // occupy. A conflict refuses the reopen unless the operator
+                // acknowledges it with a recorded reason. The per-student
+                // detail rides on the error envelope's admin-only `details`.
+                List<Map<String, Object>> conflicts = reopenConflicts(id);
+                if (!conflicts.isEmpty()) {
+                    boolean acknowledged = "true".equalsIgnoreCase(
+                            String.valueOf(input.getOrDefault("acknowledgeConflicts", "")));
+                    String reason = text(input, "reason", "");
+                    if (!acknowledged || reason.isBlank()) {
+                        throw new DomainException(HttpStatus.CONFLICT, "REOPEN_CONFLICTS",
+                                "Reopening creates " + conflicts.size() + " student conflict(s); "
+                                        + "pass acknowledgeConflicts with a reason to reopen anyway",
+                                Map.of("conflictCount", conflicts.size(), "conflicts", conflicts));
+                    }
+                    audit.record(actor(), null, "SECTION_REOPEN_CONFLICTS_ACKNOWLEDGED", "Section", id,
+                            "Reopen acknowledged " + conflicts.size() + " student conflict(s); reason: "
+                                    + reason + "; " + conflicts,
+                            Map.of(), Map.of("conflicts", conflicts));
+                }
+                // A persisted slip asserts registrations that no longer match
+                // the student's real set after the cancel window — seats may
+                // have been replaced or dropped — so every successful reopen
+                // re-issues them on the next download.
+                jdbc.update(
+                        "DELETE FROM " + SLIP + " WHERE (\"studentId\", \"semesterId\") IN"
+                                + " (SELECT e.\"studentId\", e.\"semesterId\" FROM " + ENROLLMENT + " e"
+                                + " WHERE e.\"sectionId\" = :sectionId"
+                                + " AND e.\"status\" IN ('ENROLLED', 'PENDING', 'CONFIRMED'))",
+                        new MapSqlParameterSource("sectionId", id));
+            }
+            if (cancelling) {
+                // Persisted slips assert active registrations; leaving them in
+                // place would keep offering the cancelled course on the
+                // downloaded slip.
+                jdbc.update(
+                        "DELETE FROM " + SLIP + " WHERE (\"studentId\", \"semesterId\") IN"
+                                + " (SELECT e.\"studentId\", e.\"semesterId\" FROM " + ENROLLMENT + " e"
+                                + " WHERE e.\"sectionId\" = :sectionId"
+                                + " AND e.\"status\" IN ('ENROLLED', 'PENDING', 'CONFIRMED'))",
+                        new MapSqlParameterSource("sectionId", id));
             }
         }
         Map<String, Object> after = get(table, id);
@@ -436,6 +537,7 @@ public class AdminCatalogMutationService {
                 throw problem(HttpStatus.BAD_REQUEST, "INVALID_SCHEDULE",
                         "startTime must be before endTime");
             }
+            requireActiveClassroom(requiredScheduleText(schedule, "classroomId"));
         }
         jdbc.update(
                 "DELETE FROM " + SECTION_SCHEDULE + " WHERE \"sectionId\" = :sectionId",
@@ -460,6 +562,154 @@ public class AdminCatalogMutationService {
         assertNoSectionConflicts(sectionId);
     }
 
+    /**
+     * Per-student conflicts a reopen would create: the preserved enrollments
+     * stayed active through the cancellation, but the students' other live
+     * registrations moved on — the reopened section's credits may now break
+     * their effective credit cap, and its timetable may overlap a section
+     * they took in the meantime. Returns one structured entry per conflicted
+     * student — student id, the reasons, and the peer section ids — for the
+     * admin-only conflict detail.
+     */
+    private List<Map<String, Object>> reopenConflicts(String sectionId) {
+        List<Map<String, Object>> affected = jdbc.queryForList(
+                "SELECT e.\"studentId\" AS student_id, e.\"semesterId\" AS semester_id,"
+                        + " e.\"roundId\" AS round_id, course.\"credits\" AS credits"
+                        + " FROM " + ENROLLMENT + " e"
+                        + " JOIN " + SECTION + " s ON s.\"id\" = e.\"sectionId\""
+                        + " JOIN " + COURSE + " course ON course.\"id\" = s.\"courseId\""
+                        + " WHERE e.\"sectionId\" = :sectionId"
+                        + " AND e.\"status\" IN ('ENROLLED', 'PENDING', 'CONFIRMED')",
+                new MapSqlParameterSource("sectionId", sectionId));
+        // The cap an enroll attempt would face NOW: the currently open,
+        // in-window round for the section's semester. Evaluating against the
+        // round each preserved enrollment came from misses credit-limit
+        // approvals granted on the later round — and applies a stale closed
+        // window's standard limit besides.
+        Map<String, Object> currentRound = affected.isEmpty() ? null
+                : currentRoundOrNull(String.valueOf(affected.get(0).get("semester_id")));
+        List<Map<String, Object>> conflicts = new java.util.ArrayList<>();
+        for (Map<String, Object> row : affected) {
+            String studentId = String.valueOf(row.get("student_id"));
+            String semesterId = String.valueOf(row.get("semester_id"));
+            int courseCredits = ((Number) row.get("credits")).intValue();
+            List<String> details = new java.util.ArrayList<>();
+            List<String> sectionIds = new java.util.ArrayList<>();
+            Integer otherCredits = jdbc.queryForObject(
+                    "SELECT COALESCE(SUM(course.\"credits\"), 0) FROM " + ENROLLMENT + " e"
+                            + " JOIN " + SECTION + " s ON s.\"id\" = e.\"sectionId\""
+                            + " JOIN " + COURSE + " course ON course.\"id\" = s.\"courseId\""
+                            + " WHERE e.\"studentId\" = :studentId AND e.\"semesterId\" = :semesterId"
+                            + " AND e.\"sectionId\" <> :sectionId"
+                            + " AND e.\"status\" IN ('ENROLLED', 'PENDING', 'CONFIRMED')"
+                            + " AND s.\"status\" <> 'CANCELLED'",
+                    new MapSqlParameterSource()
+                            .addValue("studentId", studentId)
+                            .addValue("semesterId", semesterId)
+                            .addValue("sectionId", sectionId),
+                    Integer.class);
+            int limit = currentRound == null
+                    ? effectiveLimit(studentId, row.get("round_id"))
+                    : creditLimitApplications.effectiveLimit(studentId, currentRound);
+            int other = otherCredits == null ? 0 : otherCredits;
+            if (other + courseCredits > limit) {
+                details.add("CREDIT_CAP");
+            }
+            List<String> overlappingSections = jdbc.queryForList(
+                    "SELECT DISTINCT e.\"sectionId\" FROM " + ENROLLMENT + " e"
+                            + " JOIN " + SECTION + " s ON s.\"id\" = e.\"sectionId\" AND s.\"status\" <> 'CANCELLED'"
+                            + " JOIN " + SECTION_SCHEDULE + " theirs ON theirs.\"sectionId\" = s.\"id\""
+                            + " JOIN " + SECTION_SCHEDULE + " mine ON mine.\"sectionId\" = :sectionId"
+                            + " AND theirs.\"dayOfWeek\" = mine.\"dayOfWeek\""
+                            + " AND theirs.\"startTime\" < mine.\"endTime\" AND theirs.\"endTime\" > mine.\"startTime\""
+                            + " WHERE e.\"studentId\" = :studentId AND e.\"semesterId\" = :semesterId"
+                            + " AND e.\"sectionId\" <> :sectionId"
+                            + " AND e.\"status\" IN ('ENROLLED', 'PENDING', 'CONFIRMED')",
+                    new MapSqlParameterSource()
+                            .addValue("sectionId", sectionId)
+                            .addValue("studentId", studentId)
+                            .addValue("semesterId", semesterId),
+                    String.class);
+            if (!overlappingSections.isEmpty()) {
+                details.add("SCHEDULE_OVERLAP");
+                sectionIds.addAll(overlappingSections);
+            }
+            if (!details.isEmpty()) {
+                Map<String, Object> conflict = new java.util.LinkedHashMap<>();
+                conflict.put("studentId", studentId);
+                conflict.put("reasons", details);
+                conflict.put("sections", sectionIds);
+                conflicts.add(conflict);
+            }
+        }
+        return conflicts;
+    }
+
+    /**
+     * Locks every student still registered on the cancelled section under the
+     * same FOR UPDATE the enroll path takes first, in ascending id order, so
+     * a concurrent enroll serializes fully before the conflict scan or fully
+     * after this transaction commits. The sorted order also keeps two
+     * reopens, or a reopen and a retire-on-re-enroll, from inverting on each
+     * other.
+     */
+    private void lockReopenAffectedStudents(String sectionId) {
+        List<String> studentIds = jdbc.queryForList(
+                "SELECT DISTINCT e.\"studentId\" FROM " + ENROLLMENT + " e"
+                        + " WHERE e.\"sectionId\" = :sectionId"
+                        + " AND e.\"status\" IN ('ENROLLED', 'PENDING', 'CONFIRMED')"
+                        + " ORDER BY e.\"studentId\"",
+                new MapSqlParameterSource("sectionId", sectionId), String.class);
+        if (studentIds.isEmpty()) {
+            return;
+        }
+        jdbc.queryForList(
+                "SELECT \"id\" FROM " + STUDENT + " WHERE \"id\" IN (:studentIds)"
+                        + " ORDER BY \"id\" FOR UPDATE",
+                new MapSqlParameterSource("studentIds", studentIds), String.class);
+    }
+
+    /**
+     * The round an enroll would be judged under right now — OPEN status and
+     * inside its window, REGISTRATION preferred with the same ADD_DROP
+     * fallback the enroll path uses — or null when no window is open.
+     */
+    private Map<String, Object> currentRoundOrNull(String semesterId) {
+        List<Map<String, Object>> rounds = jdbc.queryForList(
+                "SELECT \"id\", \"kind\", \"creditLimit\" AS credit_limit"
+                        + " FROM \"academic\".\"RegistrationRound\""
+                        + " WHERE \"semesterId\" = :semesterId AND \"status\" = 'OPEN'"
+                        + " AND \"windowStart\" <= CURRENT_TIMESTAMP AND \"windowEnd\" >= CURRENT_TIMESTAMP"
+                        + " ORDER BY \"windowStart\"",
+                new MapSqlParameterSource("semesterId", semesterId));
+        for (String kind : List.of("REGISTRATION", "ADD_DROP")) {
+            for (Map<String, Object> round : rounds) {
+                if (kind.equals(String.valueOf(round.get("kind")))) {
+                    return round;
+                }
+            }
+        }
+        return null;
+    }
+
+    /** Cap from the enrollment's original round — fallback when no round window is open at reopen. */
+    private int effectiveLimit(String studentId, Object roundId) {
+        Integer configured = null;
+        if (roundId != null) {
+            try {
+                configured = jdbc.queryForObject(
+                        "SELECT \"creditLimit\" FROM academic.\"RegistrationRound\" WHERE \"id\" = :id",
+                        new MapSqlParameterSource("id", String.valueOf(roundId)), Integer.class);
+            } catch (EmptyResultDataAccessException exception) {
+                configured = null;
+            }
+        }
+        Map<String, Object> round = new LinkedHashMap<>();
+        round.put("id", roundId == null ? null : String.valueOf(roundId));
+        round.put("credit_limit", configured);
+        return creditLimitApplications.effectiveLimit(studentId, round);
+    }
+
     private void requireScheduledRoomsFitCapacity(String sectionId) {
         MapSqlParameterSource parameters = new MapSqlParameterSource("sectionId", sectionId);
         int capacity = jdbc.queryForObject(
@@ -481,12 +731,16 @@ public class AdminCatalogMutationService {
     private void assertNoSectionConflicts(String sectionId) {
         // Compare individual slots: MIN(start)/MAX(end) would occupy the free
         // gap between two sessions and incorrectly reject another class there.
+        // Cancelled sections hold no rooms or lecturer time: neither the
+        // checked section nor its peers participate while CANCELLED, which is
+        // also what lets a slot be reclaimed and the cancellation be reversed.
         String overlappingSlots = " FROM " + SECTION_SCHEDULE + " ss"
                 + " JOIN " + SECTION + " me ON me.\"id\" = ss.\"sectionId\""
                 + " JOIN " + SECTION_SCHEDULE + " ss2 ON ss2.\"dayOfWeek\" = ss.\"dayOfWeek\""
                 + " AND ss2.\"startTime\" < ss.\"endTime\" AND ss2.\"endTime\" > ss.\"startTime\""
                 + " JOIN " + SECTION + " s2 ON s2.\"id\" = ss2.\"sectionId\""
                 + " WHERE ss.\"sectionId\" = :sectionId AND ss2.\"sectionId\" <> ss.\"sectionId\""
+                + " AND me.\"status\" <> 'CANCELLED' AND s2.\"status\" <> 'CANCELLED'"
                 + " AND s2.\"semesterId\" = me.\"semesterId\"";
         Long roomClash = jdbc.queryForObject(
                 "SELECT COUNT(*)" + overlappingSlots
@@ -635,6 +889,33 @@ public class AdminCatalogMutationService {
         }
     }
 
+    /** A section cannot be scheduled into a classroom that has been deactivated. */
+    private void requireActiveClassroom(String classroomId) {
+        Boolean active;
+        try {
+            active = jdbc.queryForObject(
+                    "SELECT \"isActive\" FROM " + CLASSROOM + " WHERE \"id\" = :id",
+                    new MapSqlParameterSource("id", classroomId), Boolean.class);
+        } catch (EmptyResultDataAccessException exception) {
+            throw problem(HttpStatus.NOT_FOUND, "REFERENCE_NOT_FOUND",
+                    "classroomId '" + classroomId + "' does not exist");
+        }
+        if (!Boolean.TRUE.equals(active)) {
+            throw problem(HttpStatus.CONFLICT, "CLASSROOM_INACTIVE",
+                    "Classroom '" + classroomId + "' is inactive");
+        }
+    }
+
+    /** Rooms assigned while the section was live must still be usable when it reopens. */
+    private void requireScheduledRoomsActive(String sectionId) {
+        List<String> classroomIds = jdbc.queryForList(
+                "SELECT DISTINCT \"classroomId\" FROM " + SECTION_SCHEDULE + " WHERE \"sectionId\" = :sectionId",
+                new MapSqlParameterSource("sectionId", sectionId), String.class);
+        for (String classroomId : classroomIds) {
+            requireActiveClassroom(classroomId);
+        }
+    }
+
     /** A section must not promise more seats than the room it meets in. */
     private void requireRoomFitsCapacity(String classroomId, int capacity) {
         Integer roomCapacity = jdbc.queryForObject(
@@ -674,6 +955,9 @@ public class AdminCatalogMutationService {
                     : (String) current.get("classroomId");
             if (classroomId != null) {
                 requireCatalogReference(CLASSROOM, "classroomId", classroomId);
+                if (touchesRoom) {
+                    requireActiveClassroom(classroomId);
+                }
                 requireRoomFitsCapacity(classroomId, capacity);
             }
         }
@@ -723,6 +1007,27 @@ public class AdminCatalogMutationService {
                 throw problem(HttpStatus.BAD_REQUEST, "INVALID_DATE_VALUE",
                         field + " '" + text + "' is not a valid ISO date");
             }
+        }
+    }
+
+    /**
+     * A reopen re-adds enrollment capacity to a semester, so it refuses only
+     * a semester that already reached a terminal state — DRAFT, IN_PROGRESS
+     * and every other non-terminal lifecycle state still allow it subject to
+     * the conflict checks. Cancel is not gated: it only removes seats and
+     * stays legal in any semester state.
+     */
+    private void requireNonTerminalSemesterForReopen(Object semesterId) {
+        // The comparison runs in Java so it is dialect-neutral: PostgreSQL
+        // TRIM strips only plain spaces, so a stored terminal value padded
+        // with a tab, a newline or a Unicode space must normalize before it
+        // is tested — a missing row refuses the same as before.
+        List<String> statuses = jdbc.queryForList(
+                "SELECT \"status\" FROM " + SEMESTER + " WHERE \"id\" = :id",
+                new MapSqlParameterSource("id", semesterId), String.class);
+        String status = statuses.isEmpty() ? null : statuses.get(0);
+        if (status == null || SemesterStatuses.TERMINAL.contains(SemesterStatuses.normalize(status))) {
+            throw problem(HttpStatus.CONFLICT, "SEMESTER_CLOSED", "Semester is closed for registration");
         }
     }
 

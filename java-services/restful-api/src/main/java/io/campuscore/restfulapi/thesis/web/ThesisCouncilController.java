@@ -9,6 +9,8 @@ import io.campuscore.restfulapi.thesis.web.ThesisCouncilRequestDtos.AddCouncilMe
 import io.campuscore.restfulapi.thesis.web.ThesisCouncilRequestDtos.AssignReviewerRequest;
 import io.campuscore.restfulapi.thesis.web.ThesisCouncilRequestDtos.AssignTopicRequest;
 import io.campuscore.restfulapi.thesis.web.ThesisCouncilRequestDtos.CreateCouncilRequest;
+import io.campuscore.restfulapi.thesis.web.ThesisCouncilRequestDtos.ReasonRequest;
+import io.campuscore.restfulapi.thesis.web.ThesisCouncilRequestDtos.ReplaceCouncilMemberRequest;
 import io.campuscore.restfulapi.thesis.web.ThesisCouncilRequestDtos.ReviewerScoreRequest;
 import io.campuscore.restfulapi.thesis.web.ThesisCouncilRequestDtos.SubmitScoreRequest;
 import jakarta.validation.Valid;
@@ -23,6 +25,7 @@ import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -103,6 +106,24 @@ public class ThesisCouncilController {
         return councils.removeMember(id, lecturerId, actor);
     }
 
+    @Operation(summary = "Thay thế thành viên hội đồng tại chỗ", description = "Đổi giảng viên ngồi một ghế hội đồng (giữ nguyên vai trò ghế) — dùng khi thành viên bị vô hiệu hóa hoặc không thể chấm điểm; ghi audit kèm lý do")
+    @ApiResponses({
+        @ApiResponse(responseCode = "200", description = "Thay thế thành viên thành công"),
+        @ApiResponse(responseCode = "400", description = "Dữ liệu không hợp lệ"),
+        @ApiResponse(responseCode = "401", description = "Chưa xác thực"),
+        @ApiResponse(responseCode = "403", description = "Không có quyền thực hiện"),
+        @ApiResponse(responseCode = "409", description = "Xung đột trạng thái hội đồng")
+    })
+    @PutMapping("/councils/{id}/members/{lecturerId}")
+    @PreAuthorize("hasAnyRole('ADMIN','TRUONG_KHOA','SUPER_ADMIN')")
+    public CouncilResponse replaceMember(
+            @Parameter(description = "Mã UUID của hội đồng", required = true) @PathVariable UUID id,
+            @Parameter(description = "Mã giảng viên rời ghế", required = true) @PathVariable String lecturerId,
+            @Valid @RequestBody ReplaceCouncilMemberRequest request,
+            @AuthenticationPrincipal Jwt actor) {
+        return councils.replaceMember(id, lecturerId, request.lecturerId(), request.reason(), actor);
+    }
+
     @Operation(summary = "Phân công đề tài cho hội đồng", description = "Chỉ định một đề tài khóa luận được bảo vệ/đánh giá trước hội đồng này")
     @ApiResponses({
         @ApiResponse(responseCode = "200", description = "Phân công đề tài thành công"),
@@ -117,6 +138,24 @@ public class ThesisCouncilController {
             @Valid @RequestBody AssignTopicRequest request,
             @AuthenticationPrincipal Jwt actor) {
         return councils.assignTopic(id, parseUuid(request.topicId(), "topicId"), actor);
+    }
+
+    @Operation(summary = "Gỡ đề tài khỏi hội đồng", description = "Hủy phân công đề tài khỏi hội đồng để phân công lại cho hội đồng khác — chỉ khi đề tài chưa có điểm bảo vệ; ghi audit kèm lý do")
+    @ApiResponses({
+        @ApiResponse(responseCode = "200", description = "Gỡ phân công thành công"),
+        @ApiResponse(responseCode = "400", description = "Dữ liệu không hợp lệ"),
+        @ApiResponse(responseCode = "401", description = "Chưa xác thực"),
+        @ApiResponse(responseCode = "403", description = "Không có quyền thực hiện"),
+        @ApiResponse(responseCode = "409", description = "Đề tài đã có điểm hoặc chưa được phân công")
+    })
+    @PostMapping("/councils/{id}/topics/{topicId}/unassign")
+    @PreAuthorize("hasAnyRole('ADMIN','TRUONG_KHOA','SUPER_ADMIN')")
+    public CouncilResponse unassignTopic(
+            @Parameter(description = "Mã UUID của hội đồng", required = true) @PathVariable UUID id,
+            @Parameter(description = "Mã UUID của đề tài", required = true) @PathVariable UUID topicId,
+            @Valid @RequestBody ReasonRequest request,
+            @AuthenticationPrincipal Jwt actor) {
+        return councils.unassignTopic(id, topicId, request == null ? null : request.reason(), actor);
     }
 
     @Operation(summary = "Nhập điểm thành phần hội đồng cho đề tài", description = "Ghi nhận điểm số thành phần (điểm chủ tịch, thư ký, phản biện) cho đề tài khóa luận")
@@ -198,6 +237,38 @@ public class ThesisCouncilController {
             @Valid @RequestBody ReviewerScoreRequest request,
             @AuthenticationPrincipal Jwt actor) {
         return councils.submitReviewerScore(id, parseScore(request.score()), request.comment(), actor);
+    }
+
+    @Operation(summary = "Miễn yêu cầu phản biện (GVPB) cho đề tài", description = "Bỏ qua yêu cầu điểm phản biện cho một đề tài (ví dụ khi hết hạn mà chưa có phản biện); ghi audit kèm lý do, có thể hoàn tác khi chưa chốt điểm")
+    @ApiResponses({
+        @ApiResponse(responseCode = "200", description = "Miễn phản biện thành công"),
+        @ApiResponse(responseCode = "400", description = "Dữ liệu không hợp lệ"),
+        @ApiResponse(responseCode = "403", description = "Không có quyền thực hiện"),
+        @ApiResponse(responseCode = "409", description = "Đề tài đã chốt điểm hoặc đã được miễn")
+    })
+    @PostMapping("/topics/{id}/gvpb-waiver")
+    @PreAuthorize("hasAnyRole('ADMIN','TRUONG_KHOA','SUPER_ADMIN')")
+    public java.util.Map<String, Object> waiveCounterReview(
+            @Parameter(description = "Mã UUID của đề tài", required = true) @PathVariable UUID id,
+            @Valid @RequestBody ReasonRequest request,
+            @AuthenticationPrincipal Jwt actor) {
+        return councils.waiveCounterReview(id, request == null ? null : request.reason(), actor);
+    }
+
+    @Operation(summary = "Khôi phục yêu cầu phản biện (GVPB)", description = "Hoàn tác miễn phản biện cho một đề tài chưa chốt điểm; ghi audit kèm lý do")
+    @ApiResponses({
+        @ApiResponse(responseCode = "200", description = "Khôi phục yêu cầu thành công"),
+        @ApiResponse(responseCode = "400", description = "Dữ liệu không hợp lệ"),
+        @ApiResponse(responseCode = "403", description = "Không có quyền thực hiện"),
+        @ApiResponse(responseCode = "409", description = "Đề tài đã chốt điểm hoặc chưa được miễn")
+    })
+    @PostMapping("/topics/{id}/gvpb-waiver/revoke")
+    @PreAuthorize("hasAnyRole('ADMIN','TRUONG_KHOA','SUPER_ADMIN')")
+    public java.util.Map<String, Object> revokeCounterReviewWaiver(
+            @Parameter(description = "Mã UUID của đề tài", required = true) @PathVariable UUID id,
+            @Valid @RequestBody ReasonRequest request,
+            @AuthenticationPrincipal Jwt actor) {
+        return councils.revokeCounterReviewWaiver(id, request == null ? null : request.reason(), actor);
     }
 
     @Operation(summary = "Điểm phản biện (GVPB) của chính giảng viên", description = "Giảng viên phản biện đọc lại điểm đã nộp cho đề tài; nhân sự quản trị đọc được điểm của phản biện hiện tại")

@@ -6,7 +6,7 @@ import { useI18n } from '@/i18n';
 import { enrollmentsApi, semestersApi } from '@/lib/api';
 import { STATIC_STALE_TIME_MS, useApiQuery } from '@/lib/query';
 import { getLocalizedName } from '@/lib/academic-content';
-import { isActiveEnrollment } from '@/lib/enrollment-status';
+import { isActiveEnrollment, isCancelledSection } from '@/lib/enrollment-status';
 import { pickPreferredSemesterId } from '@/lib/semesters';
 import { WeeklyGrid, dayLabel, ORDERED_DAYS, type WeeklyGridAgendaItem } from '@/components/schedule/weekly-grid';
 import { Button } from '@/components/ui/button';
@@ -54,7 +54,7 @@ export function RegisteredCoursesPanel({
   );
   const registered = useMemo(
     () => (enrollmentsQuery.data ?? []).filter(
-      (item) => item.semesterId === semesterId && isActiveEnrollment(item.status),
+      (item) => item.semesterId === semesterId && isActiveEnrollment(item.status) && !isCancelledSection(item),
     ),
     [enrollmentsQuery.data, semesterId],
   );

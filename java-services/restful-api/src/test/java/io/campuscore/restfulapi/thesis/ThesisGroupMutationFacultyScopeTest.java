@@ -101,13 +101,14 @@ class ThesisGroupMutationFacultyScopeTest {
     }
 
     @Test
-    void assignedDeanSupervisorRetainsCrossFacultyGroupAuthority() throws Exception {
+    void assignedDeanSupervisorKeepsRosterTopicAndReviewButNotTheLifecycle() throws Exception {
         UUID selected=topic("gw-foreign-dept"),id=group(selected,"gw-foreign-curr");
         jdbc.update("INSERT INTO thesis.thesis_topic_supervisor (id,topic_id,lecturer_id,supervisor_order) VALUES (?,?,'gw-dean',1)",UUID.randomUUID(),selected);
         mvc.perform(post("/api/v1/thesis/groups/{id}/members",id).with(dean()).contentType(MediaType.APPLICATION_JSON).content("{\"displayName\":\"Assigned external\"}")).andExpect(status().isOk());
         mvc.perform(post("/api/v1/thesis/groups/{id}/topic",id).with(dean()).contentType(MediaType.APPLICATION_JSON).content("{\"topicId\":\""+selected+"\"}")).andExpect(status().isOk());
-        mvc.perform(patch("/api/v1/thesis/groups/{id}/progress",id).with(dean()).contentType(MediaType.APPLICATION_JSON).content("{\"status\":\"SUBMITTED\"}")).andExpect(status().isOk());
+        mvc.perform(patch("/api/v1/thesis/groups/{id}/progress",id).with(dean()).contentType(MediaType.APPLICATION_JSON).content("{\"status\":\"SUBMITTED\"}")).andExpect(status().isNotFound());
         mvc.perform(post("/api/v1/thesis/groups/{id}/approve",id).with(dean())).andExpect(status().isOk());
+        assertThat(jdbc.queryForObject("SELECT approval_status FROM thesis.thesis_group WHERE id=?",String.class,id)).isEqualTo("APPROVED");
     }
 
     @ParameterizedTest

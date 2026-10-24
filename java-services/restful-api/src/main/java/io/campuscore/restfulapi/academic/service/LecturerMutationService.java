@@ -18,6 +18,7 @@ import org.springframework.transaction.annotation.Transactional;
 public class LecturerMutationService {
 
     private static final String LECTURER = "\"academic\".\"Lecturer\"";
+    private static final String SECTION = "\"academic\".\"Section\"";
 
     private final NamedParameterJdbcTemplate jdbc;
     private final AdminUserMutationService protectedAccounts;
@@ -88,7 +89,17 @@ public class LecturerMutationService {
         if (jdbc.update(sql.toString(), parameters) != 1) {
             throw problem(HttpStatus.NOT_FOUND, "LECTURER_NOT_FOUND", "Lecturer not found");
         }
-        return find(id);
+        Map<String, Object> result = find(id);
+        if (Boolean.FALSE.equals(input.get("isActive"))) {
+            // Deactivation keeps existing section assignments; surface how many
+            // sections still point at the lecturer so the admin can reassign.
+            Long assigned = jdbc.queryForObject(
+                    "SELECT COUNT(*) FROM " + SECTION
+                            + " WHERE \"lecturerId\" = :id AND \"status\" <> 'CANCELLED'",
+                    new MapSqlParameterSource("id", id), Long.class);
+            result.put("assignedSectionCount", assigned == null ? 0 : assigned);
+        }
+        return result;
     }
 
     @Transactional

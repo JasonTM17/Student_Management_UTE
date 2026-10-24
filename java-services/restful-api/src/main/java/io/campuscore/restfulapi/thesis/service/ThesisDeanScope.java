@@ -86,7 +86,55 @@ final class ThesisDeanScope {
         if (supervised != null && supervised > 0) {
             return;
         }
-        throw new DomainException(HttpStatus.NOT_FOUND, "TOPIC_NOT_FOUND", "Thesis topic not found");
+        throw topicScopeFailure(jdbc, topicId);
+    }
+
+    /**
+     * Governance outcomes are faculty-bound without the supervisor escape
+     * {@link #requireTopicAccess} keeps for ordinary topic work: waiving or
+     * restoring a counter-review, withdrawing or reinstating a topic, and
+     * approving under the faculty minimum must come from a global admin or
+     * the head of the faculty that owns the topic. Supervising it — even as
+     * a dean — is never a waiver.
+     */
+    static void requireTopicGovernanceScope(NamedParameterJdbcTemplate jdbc, Jwt actor, UUID topicId) {
+        if (isGlobalAdmin(actor) || !isFacultyHead(actor) || topicId == null) {
+            return;
+        }
+        String facultyId = facultyId(jdbc, actor);
+        if (facultyId == null) {
+            throw new DomainException(HttpStatus.FORBIDDEN, "FACULTY_PROFILE_REQUIRED",
+                    "An active lecturer profile bound to the faculty head is required");
+        }
+        Integer inFaculty = jdbc.queryForObject(
+                "SELECT COUNT(*) FROM thesis.thesis_topic t "
+                        + "JOIN academic.\"Department\" d ON d.\"id\" = t.department_id "
+                        + "WHERE t.id = :topicId AND d.\"facultyId\" = :facultyId",
+                new MapSqlParameterSource("topicId", topicId).addValue("facultyId", facultyId),
+                Integer.class);
+        if (inFaculty == null || inFaculty == 0) {
+            throw topicScopeFailure(jdbc, topicId);
+        }
+    }
+
+    /**
+     * Refusal classifier shared by both scope checks: a topic row whose
+     * department resolves to no faculty cannot be governed by any dean, so
+     * the failure must name the data problem — not pretend the row is gone
+     * or merely out of scope. A global admin still reaches the row.
+     */
+    private static DomainException topicScopeFailure(NamedParameterJdbcTemplate jdbc, UUID topicId) {
+        List<String> resolved = jdbc.queryForList(
+                "SELECT f.\"id\" FROM thesis.thesis_topic t "
+                        + "LEFT JOIN academic.\"Department\" d ON d.\"id\" = t.department_id "
+                        + "LEFT JOIN academic.\"Faculty\" f ON f.\"id\" = d.\"facultyId\" "
+                        + "WHERE t.id = :topicId",
+                new MapSqlParameterSource("topicId", topicId), String.class);
+        if (!resolved.isEmpty() && resolved.get(0) == null) {
+            return new DomainException(HttpStatus.CONFLICT, "TOPIC_SCOPE_UNRESOLVABLE",
+                    "The topic's department resolves to no faculty; only a global admin can act on it");
+        }
+        return new DomainException(HttpStatus.NOT_FOUND, "TOPIC_NOT_FOUND", "Thesis topic not found");
     }
 
     /**

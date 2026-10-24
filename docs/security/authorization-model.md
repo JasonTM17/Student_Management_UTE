@@ -74,6 +74,60 @@ bookkeeping (the five-strikes lock) still persists. See `TwoFactorService`
 and `TwoFactorLoginPersistenceTest` for the executable cases; the raced
 rotation schedules live in `CredentialSessionLockOrderPostgresIT`.
 
+Browser refresh sessions rotate on every exchange: the `Session` row carries
+the current refresh-token hash plus the hash it replaced
+(`previousRefreshToken`) and the rotation instant (`rotatedAt`, written from
+the application clock in UTC). A signed refresh token that matches no live
+row is the stolen-token signal and revokes the whole session family — with
+one bounded exception, scoped to exactly one ordering.
+
+The covered ordering is the lost-response case: a document's refresh commits
+a rotation but its response never reaches the shared cookie jar (navigation
+mid-flight, transport timeout, dropped network answer), so the jar — and any
+sibling document — still holds the immediately-previous token. Replaying
+that token inside the overlap window recovers: the same `Session.id`
+rotates forward again, the family survives, and the overlap anchor is not
+extended by repeated replays. The window is 30 seconds from `rotatedAt`,
+with a 2-second forward tolerance for cross-instance clock skew, so the
+real upper bound on acceptance is 32 seconds after the rotation commit; a
+`rotatedAt` further in the future fails closed.
+
+The delayed-duplicate ordering is NOT covered: two requests carrying the
+same token, where the second-processed one rotates and delivers its new
+token to the jar, then the delayed first request recovers inside the window
+and overwrites the row with a token whose response may itself be lost — the
+delivered token is then neither current nor previous, so the jar's next
+refresh still revokes the family. Stolen-token detection inside the window
+is likewise deferred, not removed: an in-window replay yields the replayer a
+fresh pair and evicts the legitimate holder, who is signed out at their next
+refresh. Accepted recoveries leave a `REFRESH_ROTATION_OVERLAP` warn line
+(session id, IP, user agent — never token material); every other mismatch
+still revokes every session and leaves a `REFRESH_TOKEN_REUSE` line. The
+executable contract lives in `AuthLoginPersistenceTest`; window and
+tolerance are code constants, not configuration.
+
+Session-bound refresh tokens additionally carry a `sid` claim naming their
+`Session` row, which lets a hash miss distinguish "the row is gone or has
+expired" — an administratively revoked, logged-out, or naturally elapsed
+session whose replay is a dead-session refresh and fails quietly — from
+"the row lives but the token is superseded", the stolen-token signal that
+still revokes the family. Refresh tokens minted before `sid` existed carry
+no claim and keep the legacy semantics: every signed token that matches no
+live row revokes the whole family. That legacy exposure is bounded by one
+refresh-token lifetime (`JWT_REFRESH_TOKEN_TTL_SECONDS`, 604800 seconds):
+rotation on every exchange means any pre-deploy token is either consumed
+or naturally expired within its own lifetime, and the oldest surviving
+sid-less token dies with the family it would otherwise have wiped.
+
+The same lost-response boundary applies to session-bound credential changes
+(mobile change-password): the rotation commits server-side and re-issues the
+kept row, but if the response never reaches the client the stored pair is now
+superseded. The client's next 401-triggered refresh presents that stale token,
+the reuse detector revokes the family, and the user lands at sign-in — where
+the new password works, because the credential write itself already committed.
+The mobile client narrows the window by pausing sibling refreshes until the
+rotated pair is adopted (`withPausedSessionRefresh`); it cannot remove it.
+
 Credential verification and replacement serialize on the account's User row
 lock, so login, refresh, reset issuance/redemption, and password writes for the
 same account queue rather than interleave. Row-lock contention is per account,
@@ -107,6 +161,15 @@ retroactively identify password changes made before the revision existed.
   [ThesisGroupReadController](../../java-services/restful-api/src/main/java/io/campuscore/restfulapi/thesis/web/ThesisGroupReadController.java),
   and [NotificationReadController](../../java-services/restful-api/src/main/java/io/campuscore/restfulapi/notification/web/NotificationReadController.java).
   A supplied record ID is a locator, never proof of access.
+- **Student directory data** is relationship-scoped, not role-scoped. Admins
+  keep the full directory; students still read only their own record.
+  Lecturers — including `TRUONG_BO_MON`/`TRUONG_KHOA` — see only students
+  enrolled in sections they teach or reach through the section-access
+  department/faculty rules, and students in thesis groups whose topics they
+  supervise, review, or sit on a council for. List totals and the status
+  filter apply to the scoped set, and an out-of-scope detail id answers the
+  same 404 as a missing id. The owner is
+  [PeopleReadRepository.LecturerDirectoryScope](../../java-services/restful-api/src/main/java/io/campuscore/restfulapi/people/repository/PeopleReadRepository.java).
 - **Announcement audiences** must protect detail access and inbox previews as
   well as feeds; a preview can disclose the same private content as the full row.
   The owners are [AnnouncementReadService](../../java-services/restful-api/src/main/java/io/campuscore/restfulapi/engagement/service/AnnouncementReadService.java)

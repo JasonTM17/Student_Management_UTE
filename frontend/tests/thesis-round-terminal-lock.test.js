@@ -214,7 +214,7 @@ function reviewProps(overrides) {
   };
 }
 
-test('a terminal round freezes the counter-review form behind the roundClosed copy', () => {
+test('a cancelled round freezes the counter-review form behind the cancelled copy', () => {
   const messages = loadMessages();
   const Panel = loadReviewPanel();
   let submitted = false;
@@ -222,8 +222,10 @@ test('a terminal round freezes the counter-review form behind the roundClosed co
     round: round('CANCELLED'),
     onSubmit: () => { submitted = true; },
   })));
-  assert.ok(html.includes(messages.thesis.review.roundClosed),
-    'the terminal-round locked message must render');
+  assert.ok(html.includes(messages.thesis.review.roundCancelled),
+    'a cancelled round must say it was cancelled, not merely ended');
+  assert.equal(html.includes(messages.thesis.review.roundClosed), false,
+    'the generic ended-round message must not mask the cancellation');
   assert.equal(html.includes(messages.thesis.review.deadlinePassed), false,
     'the lock reason is the ended round, not the deadline');
   assert.equal(html.includes('<input'), false, 'no score draft input may render');

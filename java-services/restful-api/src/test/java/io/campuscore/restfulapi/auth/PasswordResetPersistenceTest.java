@@ -186,6 +186,8 @@ class PasswordResetPersistenceTest {
                     "id" VARCHAR(120) PRIMARY KEY,
                     "userId" VARCHAR(120) NOT NULL,
                     "refreshToken" VARCHAR(200) NOT NULL,
+                    "previousRefreshToken" VARCHAR(200),
+                    "rotatedAt" TIMESTAMP,
                     "userAgent" VARCHAR(500),
                     "ipAddress" VARCHAR(80),
                     "expiresAt" TIMESTAMP NOT NULL,

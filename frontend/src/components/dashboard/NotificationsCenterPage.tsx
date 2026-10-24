@@ -25,6 +25,7 @@ import {
 import { statusToneClass } from '@/components/ui/status';
 import { StatusPill } from '@/components/ui/status-pill';
 import { cn, htmlToPlainText, stripNotificationTagPrefix } from '@/lib/utils';
+import { safeInternalPath } from '@/lib/safe-path';
 
 type NotificationItem = {
   id: string;
@@ -65,7 +66,7 @@ function resolveNotificationTarget(notification: {
   type?: string;
   link?: string;
 }): string {
-  const link = typeof notification.link === 'string' ? notification.link.trim() : '';
+  const link = safeInternalPath(notification.link);
   if (link) {
     return link;
   }

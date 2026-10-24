@@ -2,6 +2,7 @@ package io.campuscore.restfulapi.people.service;
 
 import io.campuscore.restfulapi.common.LikePattern;
 import io.campuscore.restfulapi.people.repository.PeopleReadRepository;
+import io.campuscore.restfulapi.people.repository.PeopleReadRepository.LecturerDirectoryScope;
 import io.campuscore.restfulapi.people.web.PeopleReadDtos.LecturerListResponse;
 import io.campuscore.restfulapi.people.web.PeopleReadDtos.LecturerResponse;
 import io.campuscore.restfulapi.people.web.PeopleReadDtos.PageMeta;
@@ -13,6 +14,7 @@ import org.springframework.context.annotation.Profile;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.GrantedAuthority;
+import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
@@ -31,11 +33,12 @@ public class PeopleReadService {
     }
 
     @Transactional(readOnly = true)
-    public StudentListResponse findStudents(int page, int limit, String status) {
+    public StudentListResponse findStudents(int page, int limit, String status, Authentication authentication) {
         requirePage(page, limit);
         String normalizedStatus = normalizeStatus(status);
-        long total = people.countStudents(normalizedStatus);
-        List<StudentResponse> data = people.findStudents(offset(page, limit), limit, normalizedStatus);
+        LecturerDirectoryScope scope = directoryScope(authentication);
+        long total = people.countStudents(normalizedStatus, scope);
+        List<StudentResponse> data = people.findStudents(offset(page, limit), limit, normalizedStatus, scope);
         return new StudentListResponse(data, meta(total, page, limit));
     }
 
@@ -71,8 +74,35 @@ public class PeopleReadService {
             return people.findStudentByIdAndUserId(id, ownerId)
                     .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Student not found"));
         }
-        return people.findStudentById(id)
+        return people.findStudentById(id, directoryScope(authentication))
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Student not found"));
+    }
+
+    /**
+     * Least-privilege directory scope: admins keep the global view; every
+     * other staff caller is reduced to the relationship slice resolved in the
+     * repository (own record, taught or governed sections, thesis groups).
+     */
+    private static LecturerDirectoryScope directoryScope(Authentication authentication) {
+        if (authentication == null) {
+            // Fail closed: an absent authentication must never widen access,
+            // even though the controller annotations currently guarantee one.
+            return new LecturerDirectoryScope(null, null, false, false);
+        }
+        Set<String> authorities = authentication.getAuthorities().stream()
+                .map(GrantedAuthority::getAuthority)
+                .collect(java.util.stream.Collectors.toSet());
+        if (authorities.contains("ROLE_ADMIN") || authorities.contains("ROLE_SUPER_ADMIN")) {
+            return null;
+        }
+        String lecturerId = authentication.getPrincipal() instanceof Jwt jwt
+                ? jwt.getClaimAsString("lecturerId")
+                : null;
+        return new LecturerDirectoryScope(
+                lecturerId,
+                authentication.getName(),
+                authorities.contains("ROLE_TRUONG_BO_MON"),
+                authorities.contains("ROLE_TRUONG_KHOA"));
     }
 
     private static boolean studentOnly(Authentication authentication) {

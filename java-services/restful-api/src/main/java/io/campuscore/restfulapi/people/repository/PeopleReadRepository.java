@@ -29,8 +29,12 @@ public class PeopleReadRepository {
     private static final String STUDENT_TABLE = "\"academic\".\"Student\"";
     private static final String LECTURER_TABLE = "\"academic\".\"Lecturer\"";
     private static final String USER_TABLE = "\"campuscore_auth\".\"User\"";
+    private static final String AUTH_LECTURER_TABLE = "\"campuscore_auth\".\"Lecturer\"";
     private static final String CURRICULUM_TABLE = "\"academic\".\"Curriculum\"";
     private static final String DEPARTMENT_TABLE = "\"academic\".\"Department\"";
+    private static final String ENROLLMENT_TABLE = "\"academic\".\"Enrollment\"";
+    private static final String SECTION_TABLE = "\"academic\".\"Section\"";
+    private static final String COURSE_TABLE = "\"academic\".\"Course\"";
     // The only status PeopleReadService.STUDENT_STATUSES admits; kept in sync
     // by that service's validation and referenced here for the fan-out roster.
     private static final String ACTIVE_STUDENT_STATUS = "ACTIVE";
@@ -43,9 +47,21 @@ public class PeopleReadRepository {
         this.jdbc = jdbc;
     }
 
-    public List<StudentResponse> findStudents(long offset, int limit, String status) {
+    /**
+     * The student slice a non-admin caller may see: their own record, students
+     * enrolled in sections they teach or reach through the
+     * AcademicEnrollmentReadRepository.hasSectionAccess department/faculty
+     * rules, and students in thesis groups whose topic they supervise, review,
+     * or sit on a council for. Thesis lecturer keys match either stored form
+     * (profile id or auth user id) the same way ThesisGroupReadRepository
+     * resolves them.
+     */
+    public record LecturerDirectoryScope(
+            String lecturerId, String userId, boolean departmentScoped, boolean facultyScoped) { }
+
+    public List<StudentResponse> findStudents(long offset, int limit, String status, LecturerDirectoryScope scope) {
         MapSqlParameterSource parameters = pageParameters(offset, limit);
-        String where = studentStatusFilter(parameters, status);
+        String where = studentWhere(parameters, status, scope);
         return jdbc.query(
                 studentSelect()
                         + where
@@ -54,9 +70,9 @@ public class PeopleReadRepository {
                 STUDENT_MAPPER);
     }
 
-    public long countStudents(String status) {
+    public long countStudents(String status, LecturerDirectoryScope scope) {
         MapSqlParameterSource parameters = new MapSqlParameterSource();
-        String where = studentStatusFilter(parameters, status);
+        String where = studentWhere(parameters, status, scope);
         Long count = jdbc.queryForObject(
                 "SELECT COUNT(*) FROM " + STUDENT_TABLE + " student"
                         + where,
@@ -137,10 +153,11 @@ public class PeopleReadRepository {
                         + filter + " ORDER BY 1", parameters, String.class);
     }
 
-    public Optional<StudentResponse> findStudentById(String id) {
+    public Optional<StudentResponse> findStudentById(String id, LecturerDirectoryScope scope) {
+        MapSqlParameterSource parameters = new MapSqlParameterSource("id", id);
         List<StudentResponse> matches = jdbc.query(
-                studentSelect() + " WHERE student.\"id\" = :id",
-                new MapSqlParameterSource("id", id),
+                studentSelect() + " WHERE student.\"id\" = :id" + studentScopePredicate(parameters, scope, true),
+                parameters,
                 STUDENT_MAPPER);
         return matches.stream().findFirst();
     }
@@ -237,6 +254,62 @@ public class PeopleReadRepository {
         }
         parameters.addValue("status", status);
         return " WHERE student.\"status\" = :status";
+    }
+
+    private static String studentWhere(MapSqlParameterSource parameters, String status, LecturerDirectoryScope scope) {
+        StringBuilder where = new StringBuilder();
+        if (status != null) {
+            parameters.addValue("status", status);
+            where.append("student.\"status\" = :status");
+        }
+        String scopePredicate = studentScopePredicate(parameters, scope, false);
+        if (!scopePredicate.isEmpty()) {
+            if (!where.isEmpty()) {
+                where.append(" AND ");
+            }
+            where.append(scopePredicate);
+        }
+        return where.isEmpty() ? "" : " WHERE " + where;
+    }
+
+    private static String studentScopePredicate(
+            MapSqlParameterSource parameters, LecturerDirectoryScope scope, boolean andPrefixed) {
+        if (scope == null) {
+            return "";
+        }
+        parameters.addValue("scopeLecturerId", scope.lecturerId())
+                .addValue("scopeUserId", scope.userId())
+                .addValue("scopeDepartment", scope.departmentScoped())
+                .addValue("scopeFaculty", scope.facultyScoped());
+        String predicate = "(student.\"userId\" = :scopeUserId"
+                + " OR EXISTS (SELECT 1 FROM " + ENROLLMENT_TABLE + " enrollment"
+                + " JOIN " + SECTION_TABLE + " section ON section.\"id\" = enrollment.\"sectionId\""
+                + " JOIN " + COURSE_TABLE + " course ON course.\"id\" = section.\"courseId\""
+                + " WHERE enrollment.\"studentId\" = student.\"id\""
+                + " AND (section.\"lecturerId\" = :scopeLecturerId"
+                + " OR EXISTS (SELECT 1 FROM " + LECTURER_TABLE + " lecturer"
+                + " LEFT JOIN " + DEPARTMENT_TABLE + " lecturer_dept ON lecturer_dept.\"id\" = lecturer.\"departmentId\""
+                + " LEFT JOIN " + DEPARTMENT_TABLE + " course_dept ON course_dept.\"id\" = course.\"departmentId\""
+                + " WHERE lecturer.\"id\" = :scopeLecturerId"
+                + " AND ((:scopeDepartment AND course.\"departmentId\" = lecturer.\"departmentId\")"
+                + " OR (:scopeFaculty AND course_dept.\"facultyId\" = lecturer_dept.\"facultyId\")))))"
+                + " OR EXISTS (SELECT 1 FROM thesis.thesis_group_member member"
+                + " JOIN thesis.thesis_group grp ON grp.id = member.group_id"
+                + " JOIN " + AUTH_LECTURER_TABLE + " scope_lecturer"
+                + " ON (scope_lecturer.\"id\" = :scopeLecturerId OR scope_lecturer.\"userId\" = :scopeUserId)"
+                + " AND scope_lecturer.\"isActive\" = TRUE"
+                + " WHERE member.student_id = student.\"id\""
+                + " AND (EXISTS (SELECT 1 FROM thesis.thesis_topic_supervisor supervisor"
+                + " WHERE supervisor.topic_id = grp.topic_id"
+                + " AND (supervisor.lecturer_id = scope_lecturer.\"id\" OR supervisor.lecturer_id = scope_lecturer.\"userId\"))"
+                + " OR EXISTS (SELECT 1 FROM thesis.thesis_topic topic"
+                + " WHERE topic.id = grp.topic_id AND topic.gvpb_lecturer_id = scope_lecturer.\"id\")"
+                + " OR EXISTS (SELECT 1 FROM thesis.thesis_council_topic council_topic"
+                + " JOIN thesis.thesis_council_member council_member ON council_member.council_id = council_topic.council_id"
+                + " WHERE council_topic.topic_id = grp.topic_id"
+                + " AND (council_member.lecturer_id = scope_lecturer.\"id\""
+                + " OR council_member.lecturer_id = scope_lecturer.\"userId\")))))";
+        return andPrefixed ? " AND " + predicate : predicate;
     }
 
     private static String studentSelect() {

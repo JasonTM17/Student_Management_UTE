@@ -85,6 +85,9 @@ export interface AuthUser {
   email: string;
   firstName?: string | null;
   lastName?: string | null;
+  phone?: string | null;
+  dateOfBirth?: string | null;
+  address?: string | null;
   roles?: string[];
   permissions?: string[];
   studentId?: string | null;
@@ -95,6 +98,37 @@ export interface LoginResponse {
   user: AuthUser;
   accessToken: string;
   refreshToken: string;
+}
+
+export interface TwoFactorChallengeResponse {
+  twoFactorRequired: boolean;
+  challengeId: string;
+  email: string | null;
+  user: null;
+  accessToken: null;
+  refreshToken: null;
+}
+
+export type SignInResponse = LoginResponse | TwoFactorChallengeResponse;
+
+export function isTwoFactorChallenge(
+  response: SignInResponse | null | undefined,
+): response is TwoFactorChallengeResponse {
+  const candidate = response as TwoFactorChallengeResponse | null | undefined;
+  return Boolean(
+    candidate
+      && candidate.twoFactorRequired === true
+      && typeof candidate.challengeId === 'string'
+      && candidate.challengeId.trim().length > 0,
+  );
+}
+
+export interface ChangePasswordResponse {
+  message: string;
+  sessionPreserved: boolean;
+  user: AuthUser | null;
+  accessToken: string | null;
+  refreshToken: string | null;
 }
 
 export interface MobileSection {
@@ -194,11 +228,31 @@ export interface MobileNotification {
   createdAt: string;
 }
 
+export interface MobileNotificationPage {
+  data: MobileNotification[];
+  meta?: {
+    total: number;
+    page: number;
+    limit: number;
+    totalPages: number;
+  };
+}
+
 export interface ApiClientOptions {
   baseUrl?: string;
   mode?: ApiMode;
   getAccessToken?: () => string | undefined;
   onSessionExpired?: () => void;
+}
+
+export interface SessionBoundRequestInit extends RequestInit {
+  /**
+   * When set, the CURRENT refresh token is (re)injected into the JSON body
+   * at every attempt — including the retry after a 401-triggered rotation.
+   * Without it, a request serialized before a concurrent rotation would
+   * present a superseded token and pin nothing server-side.
+   */
+  sessionBoundRefresh?: boolean;
 }
 
 export type ApiMode = 'preview' | 'live';
@@ -211,12 +265,20 @@ export interface ApiClient {
   getRefreshToken(): string | undefined;
   setOnSessionExpired(handler: (() => void) | undefined): void;
   clearAccessToken(): void;
-  request<TResponse>(path: string, init?: RequestInit): Promise<TResponse>;
-  requestWithMeta<TResponse>(path: string, init?: RequestInit): Promise<{ data: TResponse; headers: Headers; requestId: string }>;
-  get<TResponse>(path: string, init?: RequestInit): Promise<TResponse>;
-  post<TResponse>(path: string, body?: unknown, init?: RequestInit): Promise<TResponse>;
-  put<TResponse>(path: string, body?: unknown, init?: RequestInit): Promise<TResponse>;
-  patch<TResponse>(path: string, body?: unknown, init?: RequestInit): Promise<TResponse>;
+  /**
+   * Runs a session-bound mutation while 401-triggered refreshes from other
+   * requests wait: a refresh fired mid-rotation would present the
+   * pre-change token after the commit and read as token reuse server-side.
+   * The rotated pair must be adopted (or the attempt failed) before the
+   * task resolves; waiting refreshes then proceed on the current store.
+   */
+  withPausedSessionRefresh<T>(task: () => Promise<T>): Promise<T>;
+  request<TResponse>(path: string, init?: SessionBoundRequestInit): Promise<TResponse>;
+  requestWithMeta<TResponse>(path: string, init?: SessionBoundRequestInit): Promise<{ data: TResponse; headers: Headers; requestId: string }>;
+  get<TResponse>(path: string, init?: SessionBoundRequestInit): Promise<TResponse>;
+  post<TResponse>(path: string, body?: unknown, init?: SessionBoundRequestInit): Promise<TResponse>;
+  put<TResponse>(path: string, body?: unknown, init?: SessionBoundRequestInit): Promise<TResponse>;
+  patch<TResponse>(path: string, body?: unknown, init?: SessionBoundRequestInit): Promise<TResponse>;
   delete<TResponse>(path: string, init?: RequestInit): Promise<TResponse>;
 }
 
@@ -299,7 +361,8 @@ function shouldRefreshAfterUnauthorized(path: string, status: number) {
     status === 401 &&
     !normalizedPath.startsWith('/auth/login') &&
     !normalizedPath.startsWith('/auth/refresh') &&
-    !normalizedPath.startsWith('/auth/logout')
+    !normalizedPath.startsWith('/auth/logout') &&
+    !normalizedPath.startsWith('/auth/two-factor')
   );
 }
 
@@ -319,6 +382,40 @@ export function createApiClient(options: ApiClientOptions = {}): ApiClient {
   // Bumped whenever the app replaces or clears the session; an in-flight refresh
   // must not apply rotated tokens over a newer sign-in or sign-out.
   let sessionEpoch = 0;
+  // A credential rotation re-issues the kept session and clears the
+  // superseded-token overlap window. A 401-triggered refresh that fires
+  // while it is in flight would present the pre-change token after the
+  // commit and read as token reuse — revoking the family the rotation just
+  // kept. The pause holds such refreshes until the rotated pair is adopted
+  // (or the attempt fails); the session-bound request itself is exempt so
+  // it can still recover a stale access token mid-flight.
+  let sessionRefreshPause: Promise<void> | null = null;
+  let releaseSessionRefreshPause: (() => void) | null = null;
+
+  async function withPausedSessionRefresh<T>(task: () => Promise<T>): Promise<T> {
+    // A rotation committed but not yet adopted must land in the store first,
+    // and session mutations serialize among themselves too.
+    if (sessionRefreshPause) {
+      await sessionRefreshPause;
+    }
+    // Arm the pause before any further awaiting: a 401-triggered refresh that
+    // fires while we wait out an earlier in-flight refresh must still be
+    // captured instead of running ahead on the pre-change token.
+    sessionRefreshPause = new Promise<void>((resolve) => {
+      releaseSessionRefreshPause = resolve;
+    });
+    try {
+      if (sessionRefreshPromise) {
+        await sessionRefreshPromise.catch(() => false);
+      }
+      return await task();
+    } finally {
+      const release = releaseSessionRefreshPause;
+      sessionRefreshPause = null;
+      releaseSessionRefreshPause = null;
+      release?.();
+    }
+  }
 
   async function refreshMobileSession(requestId: string) {
     if (!refreshToken) {
@@ -409,7 +506,9 @@ export function createApiClient(options: ApiClientOptions = {}): ApiClient {
       refreshToken = undefined;
     },
 
-    async requestWithMeta<TResponse>(path: string, init: RequestInit = {}) {
+    withPausedSessionRefresh,
+
+    async requestWithMeta<TResponse>(path: string, init: SessionBoundRequestInit = {}) {
       const requestId = createRequestId();
       if (mode !== 'live') {
         throw new ApiClientError(
@@ -431,19 +530,42 @@ export function createApiClient(options: ApiClientOptions = {}): ApiClient {
         headers.set('Authorization', `Bearer ${token}`);
       }
 
+      // Session-bound requests name the session inside the JSON body. The
+      // body is re-serialized per attempt so a retry after an in-flight
+      // rotation presents the row's current token, not the superseded one
+      // captured when the caller built the request.
+      const attemptBody = () => {
+        if (!init.sessionBoundRefresh || typeof init.body !== 'string') {
+          return init.body;
+        }
+        const payload = JSON.parse(init.body) as JsonObject;
+        payload.refreshToken = refreshToken;
+        return JSON.stringify(payload);
+      };
+
       let response = await fetch(`${baseUrl}${normalizePath(path)}`, {
         ...init,
         headers,
+        body: attemptBody(),
       });
       let body = await readResponseBody(response);
 
       if (shouldRefreshAfterUnauthorized(path, response.status) && refreshToken) {
+        // A held pause means a session-bound mutation is mid-flight: refreshing
+        // now would carry the pre-change token into the reuse detector and
+        // wipe the just-rotated family. Wait for the rotated pair to land,
+        // then refresh on it — a revoked pair leaves the store empty and the
+        // refresh simply reports failure.
+        if (sessionRefreshPause && !init.sessionBoundRefresh) {
+          await sessionRefreshPause;
+        }
         const refreshed = await refreshSessionOnce(requestId);
         if (refreshed && accessToken) {
           headers.set('Authorization', `Bearer ${accessToken}`);
           response = await fetch(`${baseUrl}${normalizePath(path)}`, {
             ...init,
             headers,
+            body: attemptBody(),
           });
           body = await readResponseBody(response);
         }
@@ -462,16 +584,16 @@ export function createApiClient(options: ApiClientOptions = {}): ApiClient {
       return { data: body as TResponse, headers: response.headers, requestId };
     },
 
-    async request<TResponse>(path: string, init: RequestInit = {}) {
+    async request<TResponse>(path: string, init: SessionBoundRequestInit = {}) {
       const result = await client.requestWithMeta<TResponse>(path, init);
       return result.data;
     },
 
-    get<TResponse>(path: string, init: RequestInit = {}) {
+    get<TResponse>(path: string, init: SessionBoundRequestInit = {}) {
       return client.request<TResponse>(path, { ...init, method: 'GET' });
     },
 
-    post<TResponse>(path: string, body: unknown = undefined, init: RequestInit = {}) {
+    post<TResponse>(path: string, body: unknown = undefined, init: SessionBoundRequestInit = {}) {
       return client.request<TResponse>(path, {
         ...init,
         method: 'POST',
@@ -479,7 +601,7 @@ export function createApiClient(options: ApiClientOptions = {}): ApiClient {
       });
     },
 
-    put<TResponse>(path: string, body: unknown = undefined, init: RequestInit = {}) {
+    put<TResponse>(path: string, body: unknown = undefined, init: SessionBoundRequestInit = {}) {
       return client.request<TResponse>(path, {
         ...init,
         method: 'PUT',
@@ -487,7 +609,7 @@ export function createApiClient(options: ApiClientOptions = {}): ApiClient {
       });
     },
 
-    patch<TResponse>(path: string, body: unknown = undefined, init: RequestInit = {}) {
+    patch<TResponse>(path: string, body: unknown = undefined, init: SessionBoundRequestInit = {}) {
       return client.request<TResponse>(path, {
         ...init,
         method: 'PATCH',
@@ -511,6 +633,7 @@ export const apiRoutes = {
     refresh: '/auth/refresh',
     logout: '/auth/logout',
     me: '/auth/me',
+    twoFactorVerify: '/auth/two-factor/verify',
   },
   identity: '/me',
   health: '/health/liveness',
@@ -539,7 +662,15 @@ export const campusApi = {
   me: () => apiClient.get<JsonObject>(apiRoutes.identity),
   account: () => apiClient.get<AuthUser>(apiRoutes.auth.me),
   login: (email: string, password: string) =>
-    apiClient.post<LoginResponse>(apiRoutes.auth.login, { email, password }),
+    apiClient.post<SignInResponse>(apiRoutes.auth.login, { email, password }),
+  verifyTwoFactor: async (challengeId: string, code: string) => {
+    const response = await apiClient.post<LoginResponse>(
+      apiRoutes.auth.twoFactorVerify,
+      { challengeId, code },
+    );
+    apiClient.setSessionTokens(response.accessToken, response.refreshToken);
+    return response;
+  },
   refresh: async () => {
     const response = await apiClient.post<LoginResponse>(
       apiRoutes.auth.refresh,
@@ -577,8 +708,38 @@ export const campusApi = {
   transcript: () => apiClient.get<JsonObject>('/enrollments/my/transcript'),
   announcements: () => apiClient.get<{ data: JsonObject[] }>('/announcements/my'),
   updateProfile: (body: JsonObject) => apiClient.put<AuthUser>('/auth/profile', body),
-  changePassword: (oldPassword: string, newPassword: string) =>
-    apiClient.post<JsonObject>('/auth/change-password', { oldPassword, newPassword }),
+  changePassword: async (oldPassword: string, newPassword: string) => {
+    // Pause 401-triggered refreshes until the rotated pair is adopted: a
+    // sibling request's refresh landing after the server-side commit would
+    // present the pre-change token and read as token reuse.
+    return apiClient.withPausedSessionRefresh(async () => {
+      const response = await apiClient.post<ChangePasswordResponse>(
+        '/auth/change-password',
+        { oldPassword, newPassword },
+        // The session-bound flag keeps the body's refresh token current across
+        // the 401->refresh->retry transport path, so the server pin names this
+        // device's live session row.
+        { sessionBoundRefresh: true },
+      );
+      if (!response.sessionPreserved) {
+        // Nothing could be pinned server-side, so every session was revoked —
+        // the caller routes the user back to sign-in like an expired session.
+        return response;
+      }
+      if (!response.accessToken || !response.refreshToken) {
+        throw new ApiClientError(
+          'The Java auth change-password response did not include rotated tokens',
+          401,
+          createRequestId(),
+          'INVALID_CHANGE_PASSWORD_RESPONSE',
+        );
+      }
+      // The server re-issued this device's session inside the rotation: adopt
+      // the returned pair so the in-memory store matches the rotated row.
+      apiClient.setSessionTokens(response.accessToken, response.refreshToken);
+      return response;
+    });
+  },
   grades: (semesterId?: string) =>
     apiClient.get<MobileGrade[]>(
       apiRoutes.grades + (semesterId ? `?semesterId=${encodeURIComponent(semesterId)}` : ''),
@@ -587,7 +748,12 @@ export const campusApi = {
     apiClient.get<MobileAttendanceSummary[]>(
       apiRoutes.attendanceSummary + (semesterId ? `?semesterId=${encodeURIComponent(semesterId)}` : ''),
     ),
-  notifications: () => apiClient.get<{ data: MobileNotification[] }>(apiRoutes.notifications),
+  notifications: (page = 1, limit = 20) =>
+    apiClient.get<MobileNotificationPage>(
+      `${apiRoutes.notifications}?page=${page}&limit=${limit}`,
+    ),
+  notificationUnreadCount: () =>
+    apiClient.get<{ unreadCount: number }>(`${apiRoutes.notifications}/unread-count`),
   markNotificationRead: (id: string) =>
     apiClient.patch<JsonObject>(`/notifications/my/${id}/read`, {}),
   markAllNotificationsRead: () =>

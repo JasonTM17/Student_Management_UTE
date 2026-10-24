@@ -48,9 +48,10 @@ public class PeopleReadController {
             @Parameter(description = "Số trang") @RequestParam(defaultValue = "1") int page,
             @Parameter(description = "Số lượng bản ghi mỗi trang") @RequestParam(defaultValue = "20") int limit,
             @Parameter(description = "Trạng thái học vụ (ACTIVE) — giá trị khác trả về 400") @RequestParam(required = false) String status,
-            @RequestParam MultiValueMap<String, String> queryParameters) {
+            @RequestParam MultiValueMap<String, String> queryParameters,
+            Authentication authentication) {
         requireAllowedQuery(queryParameters, Set.of("page", "limit", "status"));
-        return people.findStudents(page, limit, status);
+        return people.findStudents(page, limit, status, authentication);
     }
 
     @Operation(summary = "Xem thông tin chi tiết hồ sơ sinh viên", description = "Lấy hồ sơ cá nhân của sinh viên theo ID (có bảo vệ quyền riêng tư)")

@@ -70,7 +70,7 @@ test('native API seam fails closed until live mode is explicitly enabled', () =>
   assert.match(client, /headers\.set\('Authorization', `Bearer \$\{accessToken\}`\)/);
   assert.match(client, /apiRoutes\.auth\.refresh,[\s\S]*?\{ refreshToken: apiClient\.getRefreshToken\(\) \}/);
   assert.match(client, /apiClient\.setSessionTokens\(response\.accessToken, response\.refreshToken\)/);
-  assert.match(client, /apiRoutes\.auth\.logout, \{ refreshToken: apiClient\.getRefreshToken\(\) \}/);
+  assert.match(client, /apiRoutes\.auth\.logout,[\s\S]*?\{ refreshToken: apiClient\.getRefreshToken\(\) \}/);
   assert.match(client, /export type AssistantLocale = 'en' \| 'vi'/);
   assert.match(client, /assistantChat: \(/);
   assert.match(client, /conversationId\?: string/);

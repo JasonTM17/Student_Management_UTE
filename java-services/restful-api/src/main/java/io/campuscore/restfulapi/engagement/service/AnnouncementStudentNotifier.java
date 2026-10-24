@@ -85,9 +85,15 @@ public class AnnouncementStudentNotifier {
         if (!announcement.isGlobal() && (targetRoles == null || !targetRoles.contains("STUDENT"))) {
             return 0;
         }
-        List<Integer> targetYears = announcement.targetYears();
-        List<String> userIds = people.findAnnouncementStudentUserIds(targetYears, announcement.sectionId(),
-                announcement.isGlobal() ? List.of() : announcement.targetRoles(), announcement.lecturerId());
+        List<String> userIds = audienceUserIds(announcement);
+        // A rescheduled announcement re-arms notifiedAt and fans out again at
+        // the new publishAt; students who already carry an inbox row for this
+        // announcement must not receive a second one.
+        List<String> alreadyNotified = notifications.findUserIdsByAnnouncementId(announcement.id());
+        if (!alreadyNotified.isEmpty()) {
+            java.util.Set<String> notified = new java.util.HashSet<>(alreadyNotified);
+            userIds = userIds.stream().filter(id -> !notified.contains(id)).toList();
+        }
         if (userIds.isEmpty()) {
             return 0;
         }
@@ -105,9 +111,59 @@ public class AnnouncementStudentNotifier {
                     message,
                     TYPE,
                     LINK,
-                    now));
+                    now,
+                    announcement.id()));
         }
         return notifications.createBatch(commands);
+    }
+
+    /**
+     * Reconciles delivered inbox rows with the announcement's current audience
+     * after an update: students who fell out of the audience lose their notice
+     * (the same recall mechanism archive uses, scoped per user), students newly
+     * included are notified, and students already notified are never written a
+     * second row. Runs after the update commits, REQUIRES_NEW like the fan-out.
+     *
+     * @return {retracted, added} row counts
+     */
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public int[] reconcileAudience(String announcementId) {
+        AnnouncementResponse announcement = announcements.findById(announcementId).orElse(null);
+        if (announcement == null || announcement.archivedAt() != null) {
+            return new int[] {0, 0};
+        }
+        List<String> notified = notifications.findUserIdsByAnnouncementId(announcementId);
+        List<String> audience = audienceUserIds(announcement);
+        java.util.Set<String> audienceSet = new java.util.HashSet<>(audience);
+        List<String> removed = notified.stream().filter(id -> !audienceSet.contains(id)).toList();
+        int retracted = notifications.deleteByAnnouncementIdAndUserIds(announcementId, removed);
+        int added = fanOutToActiveStudents(announcement);
+        return new int[] {retracted, added};
+    }
+
+    /**
+     * The announcement's current student audience — audience membership only;
+     * the schedule/visibility gates stay in fanOutToActiveStudents.
+     */
+    private List<String> audienceUserIds(AnnouncementResponse announcement) {
+        List<String> targetRoles = announcement.targetRoles();
+        if (!announcement.isGlobal() && (targetRoles == null || !targetRoles.contains("STUDENT"))) {
+            return List.of();
+        }
+        return people.findAnnouncementStudentUserIds(announcement.targetYears(), announcement.sectionId(),
+                announcement.isGlobal() ? List.of() : announcement.targetRoles(), announcement.lecturerId());
+    }
+
+    /**
+     * Recalls the fan-out of an archived or deleted announcement: removes every
+     * inbox row this announcement delivered. Rows written before the link
+     * column existed carry NULL and are deliberately left alone — nothing on
+     * them identifies their origin safely. Owns its own transaction like the
+     * fan-out so a recall failure can never poison the lifecycle write.
+     */
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public int recallForAnnouncement(String announcementId) {
+        return notifications.deleteByAnnouncementId(announcementId);
     }
 
     private static String nullToEmpty(String value) {

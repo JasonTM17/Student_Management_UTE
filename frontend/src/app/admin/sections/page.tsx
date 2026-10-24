@@ -35,7 +35,7 @@ import {
 } from '@/components/ui/state-block';
 import { useConfirmationDialog } from '@/components/ui/use-confirmation-dialog';
 import { useI18n } from '@/i18n';
-import { campusErrorMessage } from '@/lib/campus-error';
+import { campusCodeMessage, campusErrorCode, campusErrorMessage } from '@/lib/campus-error';
 import {
   getLocalizedCourseLabel,
   getLocalizedName,
@@ -113,11 +113,37 @@ interface ScheduleEntry {
   classroomId: string;
 }
 
+/** Per-student conflict rows the server attaches to a refused reopen (409). */
+interface ReopenConflict {
+  studentId: string;
+  reasons: string[];
+  sections: string[];
+}
+
 const sectionStatuses = ['OPEN', 'CLOSED', 'CANCELLED'] as const;
 type SectionStatus = (typeof sectionStatuses)[number];
 
 function isSectionStatus(value: string): value is SectionStatus {
   return sectionStatuses.includes(value as SectionStatus);
+}
+
+/** Reads the per-student conflict rows off a refused reopen's error envelope. */
+function extractReopenConflicts(error: unknown): ReopenConflict[] {
+  const data = (error as { response?: { data?: { details?: { conflicts?: unknown } } } })
+    ?.response?.data?.details?.conflicts;
+  if (!Array.isArray(data)) {
+    return [];
+  }
+  return data
+    .filter(
+      (row): row is { studentId: string; reasons?: unknown; sections?: unknown } =>
+        typeof row === 'object' && row !== null && typeof (row as { studentId?: unknown }).studentId === 'string',
+    )
+    .map((row) => ({
+      studentId: row.studentId,
+      reasons: Array.isArray(row.reasons) ? row.reasons.filter((r): r is string => typeof r === 'string') : [],
+      sections: Array.isArray(row.sections) ? row.sections.filter((s): s is string => typeof s === 'string') : [],
+    }));
 }
 
 export default function AdminSectionsPage() {
@@ -153,6 +179,10 @@ export default function AdminSectionsPage() {
   // flag keeps an outage distinguishable from a schedule-free section.
   const [schedulesError, setSchedulesError] = useState('');
   const [schedulesLoaded, setSchedulesLoaded] = useState(true);
+  // Reopen attempts the server refused hold their conflict list here until the
+  // operator acknowledges them with a recorded reason (or cancels).
+  const [reopenConflicts, setReopenConflicts] = useState<ReopenConflict[]>([]);
+  const [reopenReason, setReopenReason] = useState('');
   const nextScheduleId = useRef(0);
   const createScheduleRowId = () => `schedule-row-${++nextScheduleId.current}`;
   const canAccess = Boolean(user && (isAdmin || isSuperAdmin));
@@ -330,6 +360,16 @@ export default function AdminSectionsPage() {
           addSchedule: 'Thêm lịch',
           noSchedules: 'Chưa có lịch nào.',
           schedulesLoadFailed: 'Không tải được lịch học hiện có của lớp học phần này.',
+          reopenConflictsTitle: 'Xung đột khi mở lại',
+          reopenConflictsDescription:
+            'Mở lại lớp học phần này tạo xung đột cho sinh viên vẫn ghi danh.',
+          reopenReasonLabel: 'Lý do xác nhận',
+          reopenReasonRequired: 'Cần nhập lý do để xác nhận mở lại.',
+          reopenAnyway: 'Vẫn mở lại',
+          reopenReasons: {
+            CREDIT_CAP: 'Vượt giới hạn tín chỉ',
+            SCHEDULE_OVERLAP: 'Trùng lịch học',
+          } as Record<string, string>,
           dayFallback: (day: number) => `Thứ ${day}`,
           removeSchedule: (index: number) => `Xóa lịch ${index}`,
           saving: 'Đang lưu...',
@@ -403,6 +443,16 @@ export default function AdminSectionsPage() {
           addSchedule: 'Add schedule',
           noSchedules: 'No schedules added yet.',
           schedulesLoadFailed: 'The existing schedules for this section could not be loaded.',
+          reopenConflictsTitle: 'Reopen conflicts',
+          reopenConflictsDescription:
+            'Reopening this section creates conflicts for still-enrolled students.',
+          reopenReasonLabel: 'Acknowledgement reason',
+          reopenReasonRequired: 'A reason is required to confirm the reopen.',
+          reopenAnyway: 'Reopen anyway',
+          reopenReasons: {
+            CREDIT_CAP: 'Credit cap exceeded',
+            SCHEDULE_OVERLAP: 'Schedule overlap',
+          } as Record<string, string>,
           dayFallback: (day: number) => `Day ${day}`,
           removeSchedule: (index: number) => `Remove schedule ${index}`,
           saving: 'Saving...',
@@ -579,6 +629,78 @@ export default function AdminSectionsPage() {
     }
   };
 
+  const submitSection = async (acknowledgement?: { reason: string }) => {
+    setIsSaving(true);
+
+    try {
+      const payload: Record<string, unknown> = {
+        ...formData,
+        capacity: Number(formData.capacity),
+        // An empty known list means delete every meeting. An unavailable read
+        // omits the field so a metadata edit preserves the stored schedule.
+        schedules: schedulesLoaded
+          ? schedules.map(({ dayOfWeek, startTime, endTime, classroomId }) => ({ dayOfWeek, startTime, endTime, classroomId }))
+          : undefined,
+        ...(acknowledgement
+          ? { acknowledgeConflicts: true, reason: acknowledgement.reason }
+          : {}),
+      };
+      // An unchanged status is not a transition — resubmitting the loaded
+      // value would stamp stale state over a concurrent change.
+      if (editingSection && formData.status === editingSection.status) {
+        delete payload.status;
+      }
+
+      if (editingSection) {
+        await adminSectionsApi.update(editingSection.id, payload);
+        toast.success(copy.updated);
+      } else {
+        await adminSectionsApi.create(payload);
+        toast.success(copy.created);
+      }
+
+      setReopenConflicts([]);
+      setReopenReason('');
+      closeModal();
+      await fetchSections();
+    } catch (requestError: unknown) {
+      if (campusErrorCode(requestError) === 'REOPEN_CONFLICTS') {
+        // The server carries the refused students on the error envelope; hold
+        // the modal open behind an explicit acknowledge + reason. A missing
+        // or unparseable list still needs an error instead of a silent close.
+        const conflictRows = extractReopenConflicts(requestError);
+        if (conflictRows.length === 0) {
+          toast.error(
+            campusErrorMessage(requestError, messages.common.campusErrors, copy.saveFailed),
+          );
+        } else {
+          setReopenConflicts(conflictRows);
+          setReopenReason('');
+        }
+      } else if (campusErrorCode(requestError) === 'SECTION_STATUS_CHANGED') {
+        // The row moved under the open dialog: drop the stale copy, reload
+        // the list and let the admin retry from the committed state.
+        toast.error(
+          campusCodeMessage(requestError, messages.common.campusErrors, copy.saveFailed),
+        );
+        setReopenConflicts([]);
+        setReopenReason('');
+        closeModal();
+        await fetchSections();
+      } else {
+        toast.error(
+          campusErrorMessage(
+            requestError,
+            messages.common.campusErrors,
+            copy.saveFailed,
+          ),
+        );
+      }
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
 
@@ -591,40 +713,16 @@ export default function AdminSectionsPage() {
       return;
     }
 
-    setIsSaving(true);
+    await submitSection();
+  };
 
-    try {
-      const payload = {
-        ...formData,
-        capacity: Number(formData.capacity),
-        // An empty known list means delete every meeting. An unavailable read
-        // omits the field so a metadata edit preserves the stored schedule.
-        schedules: schedulesLoaded
-          ? schedules.map(({ dayOfWeek, startTime, endTime, classroomId }) => ({ dayOfWeek, startTime, endTime, classroomId }))
-          : undefined,
-      };
-
-      if (editingSection) {
-        await adminSectionsApi.update(editingSection.id, payload);
-        toast.success(copy.updated);
-      } else {
-        await adminSectionsApi.create(payload);
-        toast.success(copy.created);
-      }
-
-      closeModal();
-      await fetchSections();
-    } catch (requestError: unknown) {
-      toast.error(
-        campusErrorMessage(
-          requestError,
-          messages.common.campusErrors,
-          copy.saveFailed,
-        ),
-      );
-    } finally {
-      setIsSaving(false);
+  const confirmReopen = async () => {
+    const reason = reopenReason.trim();
+    if (!reason) {
+      toast.error(copy.reopenReasonRequired);
+      return;
     }
+    await submitSection({ reason });
   };
 
   const addSchedule = () => {
@@ -1188,6 +1286,65 @@ export default function AdminSectionsPage() {
             </Button>
           </AdminDialogFooter>
         </form>
+      </Modal>
+
+      <Modal
+        isOpen={reopenConflicts.length > 0}
+        onClose={() => {
+          setReopenConflicts([]);
+          setReopenReason('');
+        }}
+        title={copy.reopenConflictsTitle}
+      >
+        <div className="space-y-4">
+          <p className="text-sm text-muted-foreground">
+            {copy.reopenConflictsDescription}
+          </p>
+          <ul className="space-y-2">
+            {reopenConflicts.map((conflict) => (
+              <li
+                key={conflict.studentId}
+                className="rounded-md border px-3 py-2 text-sm"
+              >
+                <span className="font-medium">{conflict.studentId}</span>
+                <span className="text-muted-foreground">
+                  {' — '}
+                  {conflict.reasons
+                    .map((reason) => copy.reopenReasons[reason] ?? reason)
+                    .join(', ')}
+                </span>
+              </li>
+            ))}
+          </ul>
+          <AdminFormField label={copy.reopenReasonLabel}>
+            <Input
+              type="text"
+              value={reopenReason}
+              onChange={(event) => setReopenReason(event.target.value)}
+              required
+            />
+          </AdminFormField>
+          <AdminDialogFooter>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => {
+                setReopenConflicts([]);
+                setReopenReason('');
+              }}
+            >
+              {messages.common.actions.cancel}
+            </Button>
+            <Button
+              type="button"
+              variant="destructive"
+              onClick={() => void confirmReopen()}
+              disabled={isSaving}
+            >
+              {isSaving ? copy.saving : copy.reopenAnyway}
+            </Button>
+          </AdminDialogFooter>
+        </div>
       </Modal>
 
       {confirmationDialog}

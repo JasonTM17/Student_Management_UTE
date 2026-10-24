@@ -247,6 +247,68 @@ class CredentialSessionLockOrderPostgresIT {
         }
     }
 
+    /**
+     * Deterministic lost-response schedule: a rotation T0->T1 commits first;
+     * a second T0 refresh then queues on the User row lock — proving the
+     * overlap lookup still honours User-before-Session ordering — and on
+     * release recovers on the same stable Session.id instead of revoking the
+     * family. The superseded T1 (the delayed-duplicate victim) is then dead.
+     */
+    @Test
+    void queuedReplayOfThePreviousGenerationRecoversOnTheSameSessionRow() throws Exception {
+        Fixture f = fixture();
+        String refresh0 = auth.login(f.email(), f.before(), "127.0.0.1", "race-it").response().refreshToken();
+        String sessionId = jdbc.queryForObject(
+                "SELECT \"id\" FROM campuscore_auth.\"Session\" WHERE \"userId\"=?",
+                String.class, f.id());
+        String refresh1 = auth.refresh(refresh0, "127.0.0.1", "race-it").response().refreshToken();
+
+        var waiterAtUser = new CountDownLatch(1);
+        String waiterName = "replay-waiter-" + f.id();
+        doAnswer(invocation -> {
+            if (Thread.currentThread().getName().equals(waiterName)) waiterAtUser.countDown();
+            return invocation.callRealMethod();
+        }).when(users).lockUserRow(f.id());
+
+        var pool = Executors.newSingleThreadExecutor();
+        try (Connection holder = connection()) {
+            holder.setAutoCommit(false);
+            lockRow(holder, "User", "id", f.id());
+            Future<AuthLoginService.LoginResult> waiter;
+            try {
+                waiter = pool.submit(() -> {
+                    Thread.currentThread().setName(waiterName);
+                    return auth.refresh(refresh0, "127.0.0.1", "race-it");
+                });
+                await(waiterAtUser);
+                assertThat(waiter.isDone()).isFalse();
+                // Parked at the User lock, the queued replay cannot hold the
+                // Session row: a probe can still take it FOR UPDATE NOWAIT.
+                assertChildRowFree("Session", f.id());
+            } finally { holder.rollback(); }
+
+            AuthLoginService.LoginResult recovered = waiter.get(WAIT_SECONDS, TimeUnit.SECONDS);
+            assertThat(recovered.response().refreshToken()).isNotEqualTo(refresh0).isNotEqualTo(refresh1);
+            String keptId = jdbc.queryForObject(
+                    "SELECT \"id\" FROM campuscore_auth.\"Session\" WHERE \"userId\"=?",
+                    String.class, f.id());
+            assertThat(keptId).isEqualTo(sessionId);
+            assertThat(jdbc.queryForObject(
+                    "SELECT count(*) FROM campuscore_auth.\"Session\" WHERE \"userId\"=?",
+                    Integer.class, f.id())).isEqualTo(1);
+            // The delayed-duplicate casualty: the superseded T1 is neither
+            // current nor previous, so its replay revokes the whole family.
+            assertThatThrownBy(() -> auth.refresh(refresh1, "127.0.0.1", "race-it"))
+                    .isInstanceOf(BadCredentialsException.class);
+            assertThat(jdbc.queryForObject(
+                    "SELECT count(*) FROM campuscore_auth.\"Session\" WHERE \"userId\"=?",
+                    Integer.class, f.id())).isZero();
+        } finally {
+            pool.shutdownNow();
+            assertThat(pool.awaitTermination(WAIT_SECONDS, TimeUnit.SECONDS)).isTrue();
+        }
+    }
+
     @Test
     void loginChallengeWaitsOnUserBeforeChallengeAndCannotResurrectRevokedCredentials() throws Exception {
         queuedAuthentication(true);
@@ -280,7 +342,7 @@ class CredentialSessionLockOrderPostgresIT {
         }).when(users).lockUserRow(f.id());
         var pool = Executors.newFixedThreadPool(2);
         try {
-            Future<?> writer = pool.submit(() -> { Thread.currentThread().setName(writerName); auth.changePassword(f.id(), f.before(), f.after()); return null; });
+            Future<?> writer = pool.submit(() -> { Thread.currentThread().setName(writerName); auth.changePassword(f.id(), f.before(), f.after(), refresh); return null; });
             await(writerHoldsUser);
             Future<?> waiter = pool.submit(() -> {
                 Thread.currentThread().setName(waiterName);
@@ -294,12 +356,86 @@ class CredentialSessionLockOrderPostgresIT {
             writer.get(WAIT_SECONDS, TimeUnit.SECONDS);
             try { waiter.get(WAIT_SECONDS, TimeUnit.SECONDS); throw new AssertionError("Stale authentication must not mint a session"); }
             catch (ExecutionException expected) { assertThat(expected.getCause()).isInstanceOf(challenge ? AppException.class : BadCredentialsException.class); }
-            assertThat(jdbc.queryForObject("SELECT count(*) FROM campuscore_auth.\"Session\" WHERE \"userId\"=?", Integer.class, f.id())).isZero();
+            // The writer kept the caller's own session: its refresh token
+            // pinned a live row, so the rotation re-issued it instead of
+            // revoking the family. A queued stale login challenge then
+            // leaves that survivor in place; a queued replay of the
+            // superseded refresh meets the superseded-token path (its row
+            // still exists) and revokes the whole family.
+            assertThat(jdbc.queryForObject("SELECT count(*) FROM campuscore_auth.\"Session\" WHERE \"userId\"=?", Integer.class, f.id()))
+                    .isEqualTo(challenge ? 1 : 0);
             if (challenge) assertThat(jdbc.queryForObject("SELECT \"consumedAt\" IS NOT NULL FROM campuscore_auth.\"TwoFactorChallenge\" WHERE id=?", Boolean.class, challengeId)).isTrue();
             assertThat(auth.login(f.email(), f.after(), "127.0.0.1", "credential-lock-it").response().user().id()).isEqualTo(f.id());
             assertThat(users.findById(f.id()).orElseThrow().credentialVersion()).isEqualTo(1);
         } finally {
             releaseWriter.countDown(); pool.shutdownNow();
+            assertThat(pool.awaitTermination(WAIT_SECONDS, TimeUnit.SECONDS)).isTrue();
+        }
+    }
+
+    /**
+     * Documents the server-side hazard the clients must serialize around: a
+     * same-device refresh carrying the pre-rotation token, queued on the
+     * User lock while the password change commits, lands after the pinned
+     * row was re-issued (new hash, overlap cleared). It matches neither
+     * current nor previous while its row still exists — the
+     * superseded-token path reads it as theft and revokes the family,
+     * including the row the rotation just kept. The clients therefore run
+     * credential rotation inside the session transport so a pre-rotation
+     * refresh can never reach this schedule; the server keeps its
+     * fail-closed semantics for genuinely replayed tokens.
+     */
+    @Test
+    void queuedPreRotationRefreshRevokesTheFamilyIncludingTheKeptSession() throws Exception {
+        Fixture f = fixture();
+        String refresh0 = auth.login(f.email(), f.before(), "127.0.0.1", "race-it").response().refreshToken();
+        var writerHoldsUser = new CountDownLatch(1);
+        var releaseWriter = new CountDownLatch(1);
+        var waiterAtUser = new CountDownLatch(1);
+        String writerName = "rotation-writer-" + f.id(), waiterName = "rotation-waiter-" + f.id();
+        doAnswer(invocation -> {
+            String sql = invocation.getArgument(0, String.class);
+            Object result = invocation.callRealMethod();
+            if (Thread.currentThread().getName().equals(writerName)
+                    && sql.contains("SET \"password\"") && sql.contains("\"credentialVersion\" + 1")) {
+                writerHoldsUser.countDown();
+                await(releaseWriter);
+            }
+            return result;
+        }).when(namedJdbc).update(anyString(), any(SqlParameterSource.class));
+        doAnswer(invocation -> {
+            if (Thread.currentThread().getName().equals(waiterName)) waiterAtUser.countDown();
+            return invocation.callRealMethod();
+        }).when(users).lockUserRow(f.id());
+
+        var pool = Executors.newFixedThreadPool(2);
+        try {
+            Future<?> writer = pool.submit(() -> {
+                Thread.currentThread().setName(writerName);
+                auth.changePassword(f.id(), f.before(), f.after(), refresh0);
+                return null;
+            });
+            await(writerHoldsUser);
+            Future<AuthLoginService.LoginResult> waiter = pool.submit(() -> {
+                Thread.currentThread().setName(waiterName);
+                return auth.refresh(refresh0, "127.0.0.1", "race-it");
+            });
+            await(waiterAtUser);
+            assertThat(waiter.isDone()).isFalse();
+            releaseWriter.countDown();
+            writer.get(WAIT_SECONDS, TimeUnit.SECONDS);
+            try {
+                waiter.get(WAIT_SECONDS, TimeUnit.SECONDS);
+                throw new AssertionError("the queued pre-rotation refresh must not mint a session");
+            } catch (ExecutionException expected) {
+                assertThat(expected.getCause()).isInstanceOf(BadCredentialsException.class);
+            }
+            assertThat(jdbc.queryForObject(
+                    "SELECT count(*) FROM campuscore_auth.\"Session\" WHERE \"userId\"=?",
+                    Integer.class, f.id())).isZero();
+        } finally {
+            releaseWriter.countDown();
+            pool.shutdownNow();
             assertThat(pool.awaitTermination(WAIT_SECONDS, TimeUnit.SECONDS)).isTrue();
         }
     }
@@ -332,7 +468,15 @@ class CredentialSessionLockOrderPostgresIT {
     static boolean postgresTargetConfigured() {
         String url = System.getenv("CAMPUSCORE_COUNCIL_POSTGRES_URL");
         if (url == null || !url.startsWith("jdbc:postgresql:")) return false;
-        try { URI uri = URI.create(url.substring(5)); return "127.0.0.1".equals(uri.getHost()) && uri.getPort() == 5452 && "/campuscore_council_race_credential_20261016".equals(uri.getPath()); }
+        try {
+            URI uri = URI.create(url.substring(5));
+            String host = uri.getHost();
+            boolean loopback = "localhost".equalsIgnoreCase(host)
+                    || "127.0.0.1".equals(host) || "::1".equals(host) || "[::1]".equals(host);
+            String path = uri.getPath();
+            String database = path != null && path.startsWith("/") ? path.substring(1) : null;
+            return loopback && database != null && database.startsWith("campuscore_council_race_");
+        }
         catch (IllegalArgumentException invalid) { return false; }
     }
     private record Fixture(String id, String email, String before, String after) { }

@@ -28,6 +28,9 @@ export interface StudentGroupMemberRow extends ThesisGroupMember {
 interface StudentGroupCardProps {
   messages: I18nMessages;
   group: ThesisGroup | null;
+  /** The selected round was cancelled: the group row below is history, not a
+   * live seat — shown to the student instead of pretending it still runs. */
+  roundCancelled?: boolean;
   groupStatusLabel: string;
   roleLabel: string;
   topicTitle: string | null;
@@ -48,6 +51,7 @@ interface StudentGroupCardProps {
 export default function StudentGroupCard({
   messages,
   group,
+  roundCancelled,
   groupStatusLabel,
   roleLabel,
   topicTitle,
@@ -144,11 +148,11 @@ export default function StudentGroupCard({
             )}
 
             {/* Approval Status Guidance (Rule R4) */}
-            {isCancelled ? (
+            {isCancelled || roundCancelled ? (
               <div className="rounded-lg border border-muted-foreground/30 bg-muted/50 p-3 text-xs text-muted-foreground flex items-start gap-2">
                 <CircleDot className="h-4 w-4 shrink-0 mt-0.5" />
                 <div>
-                  <div>{messages.thesis.groupCancelledNotice}</div>
+                  <div>{isCancelled ? messages.thesis.groupCancelledNotice : messages.thesis.roundCancelledNotice}</div>
                   {canCreateGroup ? (
                     <Button type="button" size="sm" onClick={onCreateGroup} disabled={isActionPending} className="mt-2 gap-1.5">
                       {messages.thesis.createGroup}

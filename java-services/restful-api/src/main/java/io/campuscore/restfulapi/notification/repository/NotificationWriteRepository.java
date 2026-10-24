@@ -22,8 +22,18 @@ public class NotificationWriteRepository {
     private static final String TABLE = "notifications.notification";
 
     private static final String INSERT_SQL = "INSERT INTO " + TABLE
-            + " (id, user_id, title, message, type, link, is_read, read_at, created_at, updated_at)"
-            + " VALUES (:id, :userId, :title, :message, :type, :link, FALSE, NULL, :createdAt, :createdAt)";
+            + " (id, user_id, title, message, type, link, announcement_id, is_read, read_at, created_at, updated_at)"
+            + " VALUES (:id, :userId, :title, :message, :type, :link, :announcementId, FALSE, NULL, :createdAt, :createdAt)"
+            // Two fan-outs racing on the same (announcement_id, user_id) pair
+            // used to both insert; the unique index plus this clause makes
+            // delivery idempotent. H2 in PostgreSQL mode accepts the syntax.
+            + " ON CONFLICT DO NOTHING";
+
+    private static final String INSERT_SOURCE_SQL = "INSERT INTO " + TABLE
+            + " (id, user_id, title, message, type, link, announcement_id, source_key,"
+            + " is_read, read_at, created_at, updated_at)"
+            + " VALUES (:id, :userId, :title, :message, :type, :link, :announcementId, :sourceKey,"
+            + " FALSE, NULL, :createdAt, :createdAt) ON CONFLICT DO NOTHING";
 
     private static final String SELECT_COLUMNS = """
             id, user_id, title, message, type, link, is_read, read_at, created_at, updated_at
@@ -97,6 +107,32 @@ public class NotificationWriteRepository {
         return commands.size();
     }
 
+    /**
+     * Same batch fan-out but stamps every row with a producer key so a later
+     * lifecycle event (e.g. a retracted publication) can recall exactly these
+     * rows without touching unrelated notices.
+     */
+    public int createBatch(List<CreateNotificationCommand> commands, String sourceKey) {
+        if (sourceKey == null || sourceKey.isBlank()) {
+            return createBatch(commands);
+        }
+        if (commands == null || commands.isEmpty()) {
+            return 0;
+        }
+        SqlParameterSource[] batch = commands.stream()
+                .map(command -> insertParameters(command).addValue("sourceKey", sourceKey))
+                .toArray(SqlParameterSource[]::new);
+        jdbc.batchUpdate(INSERT_SOURCE_SQL, batch);
+        return commands.size();
+    }
+
+    /** Recall every inbox row a producer tagged with the given source key. */
+    public int deleteBySourceKey(String sourceKey) {
+        return jdbc.update(
+                "DELETE FROM " + TABLE + " WHERE source_key = :sourceKey",
+                new MapSqlParameterSource("sourceKey", sourceKey));
+    }
+
     private static MapSqlParameterSource insertParameters(CreateNotificationCommand command) {
         return new MapSqlParameterSource()
                 .addValue("id", command.id())
@@ -105,6 +141,7 @@ public class NotificationWriteRepository {
                 .addValue("message", command.message())
                 .addValue("type", command.type())
                 .addValue("link", command.link())
+                .addValue("announcementId", command.announcementId())
                 .addValue("createdAt", Timestamp.from(command.createdAt()));
     }
 
@@ -139,6 +176,40 @@ public class NotificationWriteRepository {
                 new MapSqlParameterSource()
                         .addValue("id", notificationId)
                         .addValue("userId", userId));
+    }
+
+    /**
+     * Recall path for the announcement fan-out: removes every inbox row a
+     * published announcement delivered. Rows predating the link column (or
+     * written by other producers) carry NULL and are deliberately untouched.
+     */
+    public int deleteByAnnouncementId(String announcementId) {
+        return jdbc.update(
+                "DELETE FROM " + TABLE + " WHERE announcement_id = :announcementId",
+                new MapSqlParameterSource("announcementId", announcementId));
+    }
+
+    /** The users this announcement already delivered an inbox row to. */
+    public List<String> findUserIdsByAnnouncementId(String announcementId) {
+        return jdbc.queryForList(
+                "SELECT user_id FROM " + TABLE + " WHERE announcement_id = :announcementId",
+                new MapSqlParameterSource("announcementId", announcementId), String.class);
+    }
+
+    /**
+     * Targeted recall: removes the announcement's inbox rows only for the
+     * listed users — the audience-shrink half of an audience update.
+     */
+    public int deleteByAnnouncementIdAndUserIds(String announcementId, List<String> userIds) {
+        if (userIds == null || userIds.isEmpty()) {
+            return 0;
+        }
+        return jdbc.update(
+                "DELETE FROM " + TABLE
+                        + " WHERE announcement_id = :announcementId AND user_id IN (:userIds)",
+                new MapSqlParameterSource()
+                        .addValue("announcementId", announcementId)
+                        .addValue("userIds", userIds));
     }
 
     /** Admin path: unscoped by design, guarded by the ADMIN-only route. */
@@ -204,7 +275,20 @@ public class NotificationWriteRepository {
             String message,
             String type,
             String link,
-            java.time.Instant createdAt) {
+            java.time.Instant createdAt,
+            String announcementId) {
+
+        /** Non-announcement notices carry no source link. */
+        public CreateNotificationCommand(
+                String id,
+                String userId,
+                String title,
+                String message,
+                String type,
+                String link,
+                java.time.Instant createdAt) {
+            this(id, userId, title, message, type, link, createdAt, null);
+        }
     }
 
     public record UpdateNotificationCommand(
