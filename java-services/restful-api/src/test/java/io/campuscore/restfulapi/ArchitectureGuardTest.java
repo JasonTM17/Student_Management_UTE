@@ -104,6 +104,27 @@ class ArchitectureGuardTest {
             "thesis/entity/ThesisTopic",
             "thesis/repository/ThesisTopicRepository");
 
+    /**
+     * {@code AssistantRlsContext.withInternalOwner} lets its caller assume a
+     * trusted RLS owner, so the constant-pool method-name reference may appear
+     * only in the assistant {@code rls} package that owns the context and in
+     * the internal controller entry point that fronts the trusted owner
+     * header today.
+     */
+    private static final byte[] WITH_INTERNAL_OWNER =
+            "withInternalOwner".getBytes();
+    private static final Set<String> INTERNAL_OWNER_ENTRY_POINTS = Set.of(
+            "thesis/assistant/controller/ThesisAssistantInternalController");
+
+    /**
+     * Dean/department scope helpers resolve faculty/department authorization
+     * for thesis flows; they are thesis-internal machinery and may not be
+     * referenced from other modules.
+     */
+    private static final List<String> THESIS_SCOPE_HELPERS = List.of(
+            "/thesis/scope/ThesisDeanScope",
+            "/thesis/scope/ThesisDepartmentScope");
+
     @Test
     void controllersLiveInControllerPackagesAndAreAnnotated() throws Exception {
         List<String> problems = scan().stream()
@@ -419,6 +440,30 @@ class ArchitectureGuardTest {
         }
         assertTrue(violations.isEmpty(),
                 () -> "security packages with a backwards dependency: " + violations);
+    }
+
+    @Test
+    void internalOwnerAssumptionStaysInsideAssistantBoundary() throws Exception {
+        List<String> violations = scan().stream()
+                .filter(c -> contains(c.bytes(), WITH_INTERNAL_OWNER))
+                .filter(c -> !inLayer(c, "rls"))
+                .filter(c -> !INTERNAL_OWNER_ENTRY_POINTS.contains(c.binaryName()))
+                .map(ScannedClass::binaryName)
+                .toList();
+        assertTrue(violations.isEmpty(),
+                () -> "withInternalOwner referenced outside the assistant rls boundary: "
+                        + violations);
+    }
+
+    @Test
+    void thesisScopeHelpersStayInsideThesisPackages() throws Exception {
+        List<String> violations = scan().stream()
+                .filter(c -> !c.binaryName().startsWith("thesis/"))
+                .filter(c -> THESIS_SCOPE_HELPERS.stream().anyMatch(helper -> references(c, helper)))
+                .map(ScannedClass::binaryName)
+                .toList();
+        assertTrue(violations.isEmpty(),
+                () -> "thesis scope helpers referenced outside thesis packages: " + violations);
     }
 
     private static java.util.Set<String> referencedTopSegments(ScannedClass c) {
