@@ -351,5 +351,4 @@ public class ThesisAssistantInternalController {
         if (event instanceof StreamError) return "error";
         return "done";
     }
-
 }

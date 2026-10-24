@@ -44,5 +44,4 @@ public class IdentityController {
         Object value = jwt.getClaims().get(name);
         return value == null ? null : value.toString();
     }
-
 }

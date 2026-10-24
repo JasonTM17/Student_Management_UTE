@@ -199,5 +199,4 @@ public class AuthTokenService {
                 .macAlgorithm(MacAlgorithm.HS256)
                 .build();
     }
-
 }

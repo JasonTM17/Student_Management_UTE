@@ -385,5 +385,4 @@ public class AcademicSectionReadRepository {
         // Vietnamese order: lastName carries the surname + title, firstName the given name.
         return ((lastName == null ? "" : lastName.trim()) + " " + (firstName == null ? "" : firstName.trim())).trim();
     }
-
 }

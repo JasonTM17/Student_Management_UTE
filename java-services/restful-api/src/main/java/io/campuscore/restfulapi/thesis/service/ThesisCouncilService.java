@@ -1814,5 +1814,4 @@ public class ThesisCouncilService {
     private static DomainException notFound(String code, String message) {
         return new DomainException(HttpStatus.NOT_FOUND, code, message);
     }
-
 }

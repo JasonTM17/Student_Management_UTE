@@ -41,7 +41,6 @@ public class ThesisAssistantKnowledgeRepository {
             ".", ",", ":", ";", "!", "?", "(", ")", "[", "]", "\"", "'",
             "*", "#", ">", "-"};
 
-
     /**
      * A column as a space-delimited token stream, padded so a first or last word
      * is still flanked by spaces. Only functions both PostgreSQL 15 and the H2
@@ -426,5 +425,4 @@ public class ThesisAssistantKnowledgeRepository {
                 resultSet.getObject("release_id", UUID.class),
                 resultSet.getInt("lexical_score"));
     }
-
 }

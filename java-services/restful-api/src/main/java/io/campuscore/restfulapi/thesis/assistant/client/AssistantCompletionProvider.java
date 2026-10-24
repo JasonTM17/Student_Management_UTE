@@ -24,5 +24,4 @@ public interface AssistantCompletionProvider {
         }
         return complete(request, segmentSink);
     }
-
 }

@@ -38,8 +38,6 @@ public class AdminAuditReadRepository {
         this.jdbc = jdbc;
     }
 
-
-
     /**
      * Newest first with an id tiebreaker: admin operations batch inside the
      * same transaction timestamp, and an OFFSET walk without one reshuffles

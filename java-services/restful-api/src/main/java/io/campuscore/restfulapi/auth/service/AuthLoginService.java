@@ -563,5 +563,4 @@ public class AuthLoginService {
             throw new IllegalStateException("SHA-256 is required", exception);
         }
     }
-
 }

@@ -420,5 +420,4 @@ public class AcademicEnrollmentReadRepository {
         }
         return timestamp.toLocalDateTime().toInstant(ZoneOffset.UTC);
     }
-
 }

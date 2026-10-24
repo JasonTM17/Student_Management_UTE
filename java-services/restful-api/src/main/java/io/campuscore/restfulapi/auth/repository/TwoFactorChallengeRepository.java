@@ -146,5 +146,4 @@ public class TwoFactorChallengeRepository {
     private static OffsetDateTime offsetDateTime(Instant instant) {
         return instant == null ? null : OffsetDateTime.ofInstant(instant, ZoneOffset.UTC);
     }
-
 }
