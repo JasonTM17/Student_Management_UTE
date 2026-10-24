@@ -54,6 +54,70 @@ class ArchitectureGuardTest {
             "thesis/assistant/repository/ThesisAssistantTurnRepository",
             List.of("reuses the assistant recovery-activity and timezone helpers"));
 
+    private static final byte[] SPRING_JDBC_CORE =
+            "org/springframework/jdbc/core".getBytes();
+    private static final byte[] JAKARTA_PERSISTENCE =
+            "jakarta/persistence".getBytes();
+    private static final byte[] SPRING_DATA_JPA =
+            "org/springframework/data/jpa".getBytes();
+    private static final byte[] SPRING_ORM_JPA =
+            "org/springframework/orm/jpa".getBytes();
+
+    /**
+     * Classes that still run JDBC statements outside repository/rls/config
+     * packages. Shrink-only: an entry must be deleted when its class stops
+     * referencing JDBC, and no entry may ever be added.
+     */
+    private static final Set<String> JDBC_OUTSIDE_DATA_LAYER_EXCEPTIONS = Set.of(
+            "academic/job/EnrolledCountReconcileJob",
+            "academic/registration/service/CreditLimitApplicationService",
+            "academic/registration/service/RegistrationService",
+            "academic/service/AcademicConductService",
+            "academic/service/AcademicMutationService",
+            "academic/service/AdminCatalogMutationService",
+            "academic/service/LecturerMutationService",
+            "audit/service/AdminAuditRecorder",
+            "auth/service/AdminUserMutationService",
+            "auth/service/DemoAccountGate",
+            "system/controller/HealthController",
+            "system/job/DatabaseKeepAliveScheduler",
+            "thesis/assistant/controller/ThesisAssistantKnowledgeAdminController",
+            "thesis/assistant/job/PrerequisiteMapSyncJob",
+            "thesis/assistant/service/AssistantFeedbackAdminService",
+            "thesis/assistant/service/AssistantPersonalContextAdvisor",
+            "thesis/assistant/service/SqlKnowledgeReleasePromoter",
+            "thesis/assistant/service/SupabaseKnowledgeSyncService",
+            "thesis/scope/ThesisDeanScope",
+            "thesis/scope/ThesisDepartmentScope",
+            "thesis/service/ThesisCouncilService",
+            "thesis/service/ThesisLecturerWorkloadService",
+            "thesis/service/ThesisMutationService",
+            "thesis/service/ThesisNotificationService",
+            "thesis/service/ThesisProgressService",
+            "thesis/service/ThesisReportService",
+            "thesis/service/ThesisReviewOutcome",
+            "thesis/service/ThesisSupervisorService",
+            "thesis/service/ThesisTopicService");
+
+    /**
+     * The JPA islands: every class that may reference jakarta.persistence or
+     * the Spring Data/ORM JPA machinery. The set is frozen; a new island
+     * member requires an explicit, reviewable entry here.
+     */
+    private static final Set<String> JPA_ISLAND_CLASSES = Set.of(
+            "engagement/entity/ArticleAttachment",
+            "engagement/entity/ArticleCategory",
+            "engagement/entity/ArticleMediaGallery",
+            "engagement/entity/ArticleTag",
+            "engagement/repository/ArticleAttachmentRepository",
+            "engagement/repository/ArticleCategoryRepository",
+            "engagement/repository/ArticleMediaGalleryRepository",
+            "engagement/repository/ArticleTagRepository",
+            "thesis/assistant/config/AssistantDatabaseConfiguration",
+            "thesis/entity/ThesisRegistrationRound",
+            "thesis/entity/ThesisTopic",
+            "thesis/repository/ThesisTopicRepository");
+
     @Test
     void controllersLiveInControllerPackagesAndAreAnnotated() throws Exception {
         List<String> problems = scan().stream()
@@ -92,6 +156,42 @@ class ArchitectureGuardTest {
                 .map(ScannedClass::binaryName)
                 .toList();
         assertTrue(violations.isEmpty(), () -> "new repository->controller/service dependencies: " + violations);
+    }
+
+    @Test
+    void jdbcCoreStaysInsideDataAccessPackages() throws Exception {
+        List<String> violators = scan().stream()
+                .filter(c -> contains(c.bytes(), SPRING_JDBC_CORE))
+                .filter(c -> !inLayer(c, "repository") && !inLayer(c, "rls")
+                        && !inLayer(c, "config"))
+                .map(ScannedClass::binaryName)
+                .toList();
+        List<String> newViolators = violators.stream()
+                .filter(v -> !JDBC_OUTSIDE_DATA_LAYER_EXCEPTIONS.contains(v))
+                .sorted()
+                .toList();
+        List<String> staleExemptions = JDBC_OUTSIDE_DATA_LAYER_EXCEPTIONS.stream()
+                .filter(v -> !violators.contains(v))
+                .sorted()
+                .toList();
+        assertTrue(newViolators.isEmpty() && staleExemptions.isEmpty(),
+                () -> "JDBC usage outside repository/rls/config: " + newViolators
+                        + "; exemptions to remove (class no longer touches JDBC): "
+                        + staleExemptions);
+    }
+
+    @Test
+    void jpaStaysInsideExistingIslands() throws Exception {
+        List<String> violations = scan().stream()
+                .filter(c -> contains(c.bytes(), JAKARTA_PERSISTENCE)
+                        || contains(c.bytes(), SPRING_DATA_JPA)
+                        || contains(c.bytes(), SPRING_ORM_JPA))
+                .filter(c -> !JPA_ISLAND_CLASSES.contains(c.binaryName()))
+                .map(ScannedClass::binaryName)
+                .sorted()
+                .toList();
+        assertTrue(violations.isEmpty(),
+                () -> "JPA usage outside the frozen islands: " + violations);
     }
 
     @Test
