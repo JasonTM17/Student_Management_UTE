@@ -71,6 +71,14 @@ public class ThesisMutationService {
     private final ThesisNotificationService notifier;
 
     /**
+     * Accumulated-credit/CPA registration condition (thesis.eligibility.*).
+     * Optional so hand-built service instances in narrow tests keep working;
+     * the full Spring context always wires it.
+     */
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private ThesisEligibilityService eligibility;
+
+    /**
      * Retract-publication grace window in days
      * (thesis.results.retract-grace-days, default 7).
      */
@@ -1108,6 +1116,9 @@ public class ThesisMutationService {
         }
         requireActiveStudent(studentId);
         requireNotInAnotherActiveGroup(group.roundId(), studentId);
+        // Governance override is never blocked by eligibility, but admitting
+        // an ineligible student must stay visible in the audit record.
+        String ineligibilityNote = eligibility == null ? null : eligibility.describeIneligibility(studentId);
         // The minimum only binds an APPROVED roster — the deferred membership
         // validator enforces it there and accepts a documented marker. A
         // pending roster has no minimum: growth toward it must always be
@@ -1134,11 +1145,16 @@ public class ThesisMutationService {
         }
         jdbc.update("UPDATE thesis.thesis_group SET updated_at = CURRENT_TIMESTAMP, version = version + 1 WHERE id = :groupId",
                 params().addValue("groupId", groupId));
+        Map<String, Object> overrideAfter = new LinkedHashMap<>();
+        overrideAfter.put("memberCount", memberCount + 1);
+        overrideAfter.put("sizeException", underSize);
+        overrideAfter.put("studentEligible", ineligibilityNote == null);
         audit.record(subject(actor), null, "THESIS_GROUP_ROSTER_OVERRIDE", "THESIS_GROUP", groupId.toString(),
                 "Member " + studentId + " added after registration closed; reason: " + cleanReason
-                        + (underSize ? "; below-minimum size exception accepted" : ""),
+                        + (underSize ? "; below-minimum size exception accepted" : "")
+                        + (ineligibilityNote == null ? "" : "; " + ineligibilityNote),
                 Map.of("memberCount", memberCount),
-                Map.of("memberCount", memberCount + 1, "sizeException", underSize));
+                overrideAfter);
         afterCommit(() -> {
             if (notifier != null) {
                 notifier.notifyGroupRosterChanged(groupId);
@@ -1845,6 +1861,7 @@ public class ThesisMutationService {
         requireRoundStatus(roundId, RoundStatus.REGISTRATION_OPEN);
         String studentId = studentId(actor);
         requireActiveStudent(studentId);
+        requireEligibility(studentId, roundId);
         requireNotInAnotherActiveGroup(roundId, studentId);
         UUID groupId = UUID.randomUUID();
         jdbc.update("INSERT INTO thesis.thesis_group (id, round_id, leader_student_id, status, approval_status) VALUES (:id, :roundId, :studentId, 'DRAFT', 'PENDING')", params().addValue("id", groupId).addValue("roundId", roundId).addValue("studentId", studentId));
@@ -1883,6 +1900,7 @@ public class ThesisMutationService {
             return groups.findById(groupId);
         }
         requireActiveStudent(studentId);
+        requireEligibility(studentId, group.roundId());
         requireNotInAnotherActiveGroup(group.roundId(), studentId);
         jdbc.update("INSERT INTO thesis.thesis_group_member (id, group_id, round_id, student_id, member_order, is_leader) VALUES (:id, :groupId, :roundId, :studentId, :memberOrder, FALSE)", params().addValue("id", UUID.randomUUID()).addValue("groupId", groupId).addValue("roundId", group.roundId()).addValue("studentId", studentId).addValue("memberOrder", nextMemberOrder(groupId)));
         jdbc.update("UPDATE thesis.thesis_group SET updated_at = CURRENT_TIMESTAMP, version = version + 1 WHERE id = :groupId", params().addValue("groupId", groupId));
@@ -1992,6 +2010,10 @@ public class ThesisMutationService {
         // path, so the guard is enforced here too (admin early-return in
         // authorizeLeaderOrAdmin used to let this through).
         requireActiveRoster(group);
+        // The leader picks the topic, so the leader must satisfy the
+        // accumulated-credit registration condition — an admin caller does not
+        // bypass it (governance uses the audited roster override instead).
+        requireEligibility(group.leaderStudentId(), group.roundId());
         UUID topicId = request == null ? null : request.topicId();
         if (topicId == null) {
             throw invalid("topicId is required");
@@ -2671,6 +2693,18 @@ public class ThesisMutationService {
      */
     private static java.sql.Timestamp tsOf(Instant value) {
         return value == null ? null : java.sql.Timestamp.from(value);
+    }
+
+    /**
+     * Applies the accumulated-credit/CPA registration condition. Runs inside
+     * the transaction the caller already opened — one extra read, no new lock
+     * — and fails closed with THESIS_ELIGIBILITY_NOT_MET on missing academic
+     * data. Absent in manually-wired tests; never blocks in ADVISORY mode.
+     */
+    private void requireEligibility(String studentId, UUID roundId) {
+        if (eligibility != null) {
+            eligibility.requireEligible(studentId, roundId);
+        }
     }
 
     private void requireActiveStudent(String studentId) {

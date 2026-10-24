@@ -2,6 +2,7 @@ package io.campuscore.restfulapi.thesis.repository;
 
 import io.campuscore.restfulapi.thesis.domain.ApprovalStatus;
 import io.campuscore.restfulapi.thesis.domain.GroupStatus;
+import io.campuscore.restfulapi.thesis.service.ThesisEligibilityService;
 import io.campuscore.restfulapi.thesis.web.ThesisGroupReadDtos.GroupMemberResponse;
 import io.campuscore.restfulapi.thesis.web.ThesisGroupReadDtos.GroupResponse;
 import java.sql.ResultSet;
@@ -22,6 +23,15 @@ import org.springframework.stereotype.Repository;
 @Profile("persistence")
 public class ThesisGroupReadRepository {
     private final NamedParameterJdbcTemplate jdbc;
+
+    /**
+     * Optional member-eligibility annotator: hydrated rosters carry the
+     * accumulated-credit flag when the full context wires the service, and
+     * stay {@code null} in manually-constructed repository tests.
+     */
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private ThesisEligibilityService eligibility;
+
     public ThesisGroupReadRepository(NamedParameterJdbcTemplate jdbc) { this.jdbc = jdbc; }
 
     public List<GroupResponse> findByRoundId(UUID roundId) {
@@ -257,8 +267,33 @@ public class ThesisGroupReadRepository {
                     external ? contact : rs.getString("email"),
                     external,
                     rs.getBoolean("is_leader"),
-                    rs.getInt("member_order")));
+                    rs.getInt("member_order"),
+                    null));
         });
+        Map<String, Boolean> eligibleByStudent = new LinkedHashMap<>();
+        if (eligibility != null) {
+            List<String> memberIds = memberDetails.values().stream()
+                    .flatMap(List::stream)
+                    .filter(member -> !member.isExternal())
+                    .map(GroupMemberResponse::studentId)
+                    .distinct()
+                    .toList();
+            if (!memberIds.isEmpty()) {
+                eligibility.evaluateAll(memberIds).forEach((id, view) -> eligibleByStudent.put(id, view.eligible()));
+            }
+        }
+        if (!eligibleByStudent.isEmpty()) {
+            for (Map.Entry<UUID, List<GroupMemberResponse>> entry : memberDetails.entrySet()) {
+                List<GroupMemberResponse> annotated = entry.getValue().stream()
+                        .map(member -> member.isExternal() ? member : new GroupMemberResponse(
+                                member.studentId(), member.studentNumber(), member.displayName(),
+                                member.contact(), member.isExternal(), member.isLeader(),
+                                member.memberOrder(),
+                                eligibleByStudent.getOrDefault(member.studentId(), Boolean.FALSE)))
+                        .toList();
+                entry.setValue(new ArrayList<>(annotated));
+            }
+        }
         return rows.stream().map(row -> new GroupResponse(row.id(), row.roundId(), row.leaderStudentId(), row.topicId(), row.status(), row.approvalStatus(), row.rejectionReason(), List.copyOf(members.get(row.id())), List.copyOf(memberDetails.get(row.id())))).toList();
     }
 
