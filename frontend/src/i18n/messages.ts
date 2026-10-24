@@ -344,6 +344,7 @@ export const en = {
         EMPLOYEE_ID_EXISTS: 'This employee ID already exists.',
         ROLE_ESCALATION:
           'Only a super administrator can grant this role or manage administrator, faculty-head and department-head accounts.',
+        LAST_SUPER_ADMIN_REQUIRED: 'At least one active super administrator must remain.',
         DEAN_ALREADY_ASSIGNED:
           'This faculty already has an active dean. Move the current dean back to lecturer before appointing another.',
         // Password policy & recovery
@@ -3570,6 +3571,7 @@ export const vi: I18nMessages = {
         EMPLOYEE_ID_EXISTS: 'Mã số giảng viên đã tồn tại.',
         ROLE_ESCALATION:
           'Chỉ quản trị viên cấp cao mới được cấp vai trò này hoặc quản lý tài khoản quản trị viên, Trưởng khoa và Trưởng bộ môn.',
+        LAST_SUPER_ADMIN_REQUIRED: 'Phải luôn còn ít nhất một quản trị viên cấp cao đang hoạt động.',
         DEAN_ALREADY_ASSIGNED:
           'Khoa này đã có Trưởng khoa đang hoạt động. Hãy chuyển Trưởng khoa hiện tại về Giảng viên trước khi bổ nhiệm người khác.',
         // Chính sách mật khẩu & khôi phục
