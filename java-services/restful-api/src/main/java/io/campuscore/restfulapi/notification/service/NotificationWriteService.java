@@ -1,6 +1,6 @@
 package io.campuscore.restfulapi.notification.service;
 
-import io.campuscore.restfulapi.audit.AdminAuditRecorder;
+import io.campuscore.restfulapi.audit.service.AdminAuditRecorder;
 import io.campuscore.restfulapi.notification.repository.NotificationWriteRepository;
 import io.campuscore.restfulapi.notification.repository.NotificationWriteRepository.CreateNotificationCommand;
 import io.campuscore.restfulapi.notification.repository.NotificationWriteRepository.PatchValue;

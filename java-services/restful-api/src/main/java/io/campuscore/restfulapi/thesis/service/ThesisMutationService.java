@@ -1,6 +1,6 @@
 package io.campuscore.restfulapi.thesis.service;
 
-import io.campuscore.restfulapi.audit.AdminAuditRecorder;
+import io.campuscore.restfulapi.audit.service.AdminAuditRecorder;
 import io.campuscore.restfulapi.thesis.domain.ApprovalStatus;
 import io.campuscore.restfulapi.thesis.domain.GroupStatus;
 import io.campuscore.restfulapi.thesis.domain.RoundStatus;

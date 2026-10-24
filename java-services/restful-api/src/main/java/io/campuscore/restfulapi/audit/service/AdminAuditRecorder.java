@@ -1,4 +1,4 @@
-package io.campuscore.restfulapi.audit;
+package io.campuscore.restfulapi.audit.service;
 
 import java.util.LinkedHashMap;
 import java.util.List;

@@ -1,4 +1,4 @@
-package io.campuscore.restfulapi.audit;
+package io.campuscore.restfulapi.audit.controller;
 
 import io.campuscore.restfulapi.web.DomainException;
 import java.util.List;
@@ -15,6 +15,7 @@ import org.springframework.web.bind.annotation.RestController;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import io.campuscore.restfulapi.audit.repository.AdminAuditReadRepository;
 
 /**
  * Round-3 contract ct-2: the governance read side for the admin audit trail.
