@@ -95,14 +95,18 @@ $env:BASE_URL="http://localhost:3100"; node scripts/prod-smoke.mjs   # stack loc
 > **Duyệt / Từ chối** để trình diễn trực tiếp bước xét duyệt nhóm.
 >
 > **Điều kiện đăng ký khóa luận (V143)**: quy chế yêu cầu ≥110 tín chỉ tích lũy
-> và CPA ≥2.0. `student2@`/`student3@`/`student4@` được seed đủ điều kiện
-> (~116–122 tín chỉ) để thao tác nhóm/đề tài bình thường. `student@` cố tình
-> để dưới ngưỡng (~38 tín chỉ) để trình diễn thẻ cảnh báo **"Chưa đủ điều
-> kiện"** — nhóm sẵn có không bị hủy (luật không áp dụng hồi tố); thử tạo nhóm
-> trong đợt mới sẽ nhận `THESIS_ELIGIBILITY_NOT_MET`. Trong DB cũng có các
-> hồ sơ `student-profile-105` (~38 tín chỉ), `-106` (~66), `-107` (~100) và
-> `-108` (~159 tín chỉ nhưng CPA ~1.85) cho trạng thái không đủ điều kiện;
-> `student-profile-021` không có điểm công bố.
+> và CPA ≥2.0, chỉ áp dụng cho đợt **KLTN** (cấu hình `THESIS_ELIGIBILITY_ROUND_TYPES`).
+> `student2@`/`student3@`/`student4@` được seed đủ điều kiện (lần lượt
+> 122/124/117 tín chỉ, CPA 3.14/3.13/2.78) để thao tác nhóm/đề tài bình thường.
+> `student@` cố tình để dưới ngưỡng (38 tín chỉ) — tài khoản đăng nhập được
+> duy nhất còn thiếu điều kiện — để trình diễn thẻ cảnh báo **"Chưa đủ điều
+> kiện"**; nhóm sẵn có không bị hủy (luật không áp dụng hồi tố). Khi
+> `THESIS_ELIGIBILITY_ENFORCEMENT=ENFORCE` thử tạo nhóm trong đợt mới sẽ nhận
+> `THESIS_ELIGIBILITY_NOT_MET`; mặc định release 2 là `ADVISORY` — vẫn hiện
+> thẻ cảnh báo nhưng không chặn. Trong DB cũng có các hồ sơ
+> `student-profile-105` (38 tín chỉ), `-106` (66), `-107` (99), `-108`
+> (160 tín chỉ nhưng CPA 1.77) và `-021` (chưa có điểm công bố) cho trạng
+> thái không đủ điều kiện — các hồ sơ này không có tài khoản đăng nhập.
 
 ---
 

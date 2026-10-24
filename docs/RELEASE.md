@@ -27,6 +27,11 @@ curl.exe http://127.0.0.1:3000/
 curl.exe http://127.0.0.1:8025/
 ```
 
+Deploy order for release 2: backend first, then frontend. Governance
+override approvals now require a documented reason — an older frontend that
+does not send one receives a clean `400 GROUP_APPROVAL_OVERRIDE_REASON_REQUIRED`,
+never a silent approval.
+
 Verify a fresh PostgreSQL database, Flyway versions, deterministic seed
 counts, login, role isolation, enrollment transaction rules, grade publishing,
 thesis group limits and assistant citations/locale fallback/outage behavior.

@@ -57,8 +57,9 @@ public class ThesisRoundReadService {
 
     /**
      * Same round list; a student caller additionally receives their own
-     * registration eligibility on every row so the thesis page renders the
-     * eligibility card without a second request.
+     * registration eligibility — but only on the round types the credit/CPA
+     * policy covers (default KLTN). On every other type the field stays null
+     * so no card or badge renders for a rule that does not apply there.
      */
     @Transactional(readOnly = true)
     public List<RoundResponse> list(RoundStatus status, Jwt actor) {
@@ -67,25 +68,28 @@ public class ThesisRoundReadService {
                 : rounds.findAllByStatusOrderByRegistrationStartDesc(status);
         Map<UUID, Map<String, Number>> counts = deletions.dependentCounts(
                 list.stream().map(ThesisRegistrationRound::getId).toList());
-        EligibilityView callerEligibility = callerEligibility(actor);
+        String callerStudentId = callerStudentId(actor);
+        // One transcript read per request, shared by every covered row —
+        // the standing is per student, only the coverage flag differs.
+        EligibilityView callerView = callerStudentId == null
+                || list.stream().noneMatch(r -> eligibility.covers(r.getThesisType()))
+                ? null : eligibility.evaluate(callerStudentId);
         return list.stream()
                 .map(round -> RoundResponse.from(round, deletionInfo(round, counts), closureInfo(round),
                         capabilities.counterReviewWaiverAllowed(round.getThesisType()),
                         ThesisMutationService.MIN_GROUP_MEMBERS, ThesisMutationService.MAX_GROUP_MEMBERS,
-                        callerEligibility))
+                        callerView == null || !eligibility.covers(round.getThesisType())
+                                ? null : callerView))
                 .toList();
     }
 
-    /** One evaluation per request; only a student principal gets a view. */
-    private EligibilityView callerEligibility(Jwt actor) {
+    /** Only a student principal carries a studentId claim worth evaluating. */
+    private String callerStudentId(Jwt actor) {
         if (eligibility == null || actor == null) {
             return null;
         }
         String studentId = actor.getClaimAsString("studentId");
-        if (studentId == null || studentId.isBlank()) {
-            return null;
-        }
-        return eligibility.evaluate(studentId);
+        return studentId == null || studentId.isBlank() ? null : studentId;
     }
 
     @Transactional(readOnly = true)

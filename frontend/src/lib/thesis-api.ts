@@ -41,6 +41,11 @@ export interface ThesisEligibility {
   cpa?: number | null;
   requiredCpa: number;
   reasons: string[];
+  /** True only while the backend refuses mutations on this standing
+   * (ENFORCE mode on a covered round type). ADVISORY still evaluates — the
+   * warning card shows — but never blocks, so clients may only gate an
+   * action on `eligible === false && enforced === true`. */
+  enforced?: boolean;
 }
 
 export interface ThesisRound {

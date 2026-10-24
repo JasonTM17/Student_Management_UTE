@@ -158,4 +158,27 @@ class ThesisEligibilityAdvisoryTest {
                         .with(ThesisAuthorityFixture.student(jdbc, "eli-advisory")))
                 .andExpect(status().isOk());
     }
+
+    @Test
+    void advisoryModeReportsEvaluationWithoutEnforcement() throws Exception {
+        UUID roundId = UUID.randomUUID();
+        Instant now = Instant.now();
+        jdbc.update("INSERT INTO thesis.thesis_registration_round "
+                        + "(id, name, thesis_type, lecturer_submit_start, lecturer_submit_end, "
+                        + "registration_start, registration_end, gvpb_deadline, status) "
+                        + "VALUES (?, 'Advisory read round', 'KLTN', ?, ?, ?, ?, ?, 'REGISTRATION_OPEN')",
+                roundId, Timestamp.from(now.minusSeconds(7_200)), Timestamp.from(now.minusSeconds(3_600)),
+                Timestamp.from(now.minusSeconds(3_600)), Timestamp.from(now.plusSeconds(3_600)),
+                Timestamp.from(now.plusSeconds(7_200)));
+
+        // The warning card still shows the caller's standing, but enforced
+        // tells the client nothing blocks on it.
+        mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders
+                        .get("/api/v1/thesis/rounds")
+                        .with(ThesisAuthorityFixture.student(jdbc, "eli-advisory")))
+                .andExpect(status().isOk())
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers
+                        .jsonPath("$[?(@.name == 'Advisory read round')].eligibility.enforced")
+                        .value(org.hamcrest.Matchers.hasItem(false)));
+    }
 }

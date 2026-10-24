@@ -3236,7 +3236,8 @@ export default function ThesisPage() {
                   supervisors={studentTopicSupervisors}
                   members={groupMemberRows}
                   canCreateGroup={isStudent && isRegistrationWindowOpen
-                    && selectedRound.eligibility?.eligible !== false}
+                    && !(selectedRound.eligibility?.eligible === false
+                      && selectedRound.eligibility?.enforced === true)}
                   canManageMembers={canManageMembers}
                   isActionPending={isActionPending}
                   onCreateGroup={() => void createGroup()}

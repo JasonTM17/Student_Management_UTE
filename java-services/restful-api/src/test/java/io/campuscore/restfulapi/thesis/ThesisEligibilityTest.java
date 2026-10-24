@@ -351,12 +351,137 @@ class ThesisEligibilityTest {
                         + "VALUES (?, ?, ?, ?, 2, FALSE)",
                 UUID.randomUUID(), group, round, INELIGIBLE);
 
-        mvc.perform(get("/api/v1/thesis/groups/{id}", group).with(studentJwt(ELIGIBLE)))
+        // Staff keep the full roster flag view: governance uses it to see
+        // which members miss the bar.
+        mvc.perform(get("/api/v1/thesis/groups/{id}", group).with(adminJwt()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.members[?(@.studentId == '" + ELIGIBLE + "')].eligible")
                         .value(org.hamcrest.Matchers.hasItem(true)))
                 .andExpect(jsonPath("$.members[?(@.studentId == '" + INELIGIBLE + "')].eligible")
                         .value(org.hamcrest.Matchers.hasItem(false)));
+    }
+
+    @Test
+    void tlcnRoundDoesNotEnforceTheKltnCreditRule() throws Exception {
+        // The 110-credit/CPA regulation covers KLTN rounds only
+        // (thesis.eligibility.round-types). A TLCN round must let the same
+        // no-data student register without even evaluating the transcript.
+        UUID round = insertRound("REGISTRATION_OPEN", "TLCN");
+        ensureStudent(INELIGIBLE);
+
+        createGroup(round, INELIGIBLE).andExpect(status().isOk());
+    }
+
+    @Test
+    void monHocRoundDoesNotEnforceTheKltnCreditRule() throws Exception {
+        UUID round = insertRound("REGISTRATION_OPEN", "MON_HOC");
+        ensureStudent(INELIGIBLE);
+
+        createGroup(round, INELIGIBLE).andExpect(status().isOk());
+    }
+
+    @Test
+    void nonCoveredRoundsCarryNoCallerEligibility() throws Exception {
+        insertRound("REGISTRATION_OPEN", "TLCN");
+        insertRound("REGISTRATION_OPEN", "KLTN");
+        ensureStudent(ELIGIBLE);
+        grantCredits(ELIGIBLE, 118, "A");
+
+        mvc.perform(get("/api/v1/thesis/rounds").with(studentJwt(ELIGIBLE)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[?(@.name == 'Eligibility round TLCN')].eligibility")
+                        .value(org.hamcrest.Matchers.hasItem(
+                                org.hamcrest.Matchers.nullValue())))
+                .andExpect(jsonPath("$[?(@.name == 'Eligibility round KLTN')].eligibility.enforced")
+                        .value(org.hamcrest.Matchers.hasItem(true)));
+    }
+
+    @Test
+    void studentReadsOnlyOwnMemberEligibilityFlag() throws Exception {
+        UUID round = insertLiveRound();
+        ensureStudent(ELIGIBLE);
+        ensureStudent(INELIGIBLE);
+        grantCredits(ELIGIBLE, 115, "B");
+        UUID group = insertDraftGroup(round, ELIGIBLE);
+        jdbc.update("INSERT INTO thesis.thesis_group_member (id, group_id, round_id, student_id, member_order, is_leader) "
+                        + "VALUES (?, ?, ?, ?, 2, FALSE)",
+                UUID.randomUUID(), group, round, INELIGIBLE);
+
+        // A student caller sees their own flag but never a peer's academic
+        // standing: other members' eligible field stays null (key omitted).
+        mvc.perform(get("/api/v1/thesis/groups/{id}", group).with(studentJwt(ELIGIBLE)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.members[?(@.studentId == '" + ELIGIBLE + "')].eligible")
+                        .value(org.hamcrest.Matchers.hasItem(true)))
+                .andExpect(jsonPath("$.members[?(@.studentId == '" + INELIGIBLE + "')].eligible")
+                        .value(org.hamcrest.Matchers.empty()));
+    }
+
+    @Test
+    void staffStillReadEveryMemberEligibilityFlag() throws Exception {
+        UUID round = insertLiveRound();
+        ensureStudent(ELIGIBLE);
+        ensureStudent(INELIGIBLE);
+        grantCredits(ELIGIBLE, 115, "B");
+        UUID group = insertDraftGroup(round, ELIGIBLE);
+        jdbc.update("INSERT INTO thesis.thesis_group_member (id, group_id, round_id, student_id, member_order, is_leader) "
+                        + "VALUES (?, ?, ?, ?, 2, FALSE)",
+                UUID.randomUUID(), group, round, INELIGIBLE);
+
+        mvc.perform(get("/api/v1/thesis/groups/{id}", group).with(adminJwt()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.members[?(@.studentId == '" + ELIGIBLE + "')].eligible")
+                        .value(org.hamcrest.Matchers.hasItem(true)))
+                .andExpect(jsonPath("$.members[?(@.studentId == '" + INELIGIBLE + "')].eligible")
+                        .value(org.hamcrest.Matchers.hasItem(false)));
+    }
+
+    @Test
+    void ineligibleInviteeErrorHidesTheirFiguresFromTheLeader() throws Exception {
+        UUID round = insertLiveRound();
+        ensureStudent(LEADER);
+        ensureStudent(INELIGIBLE);
+        grantCredits(LEADER, 115, "B");
+        grantCredits(INELIGIBLE, 66, "B");
+
+        createGroup(round, LEADER).andExpect(status().isOk());
+        UUID group = jdbc.queryForObject(
+                "SELECT id FROM thesis.thesis_group WHERE round_id = ?", UUID.class, round);
+
+        // One student's academic standing must not leak to another student:
+        // the 409 keeps the code and the reasons but drops every figure.
+        addMember(group, INELIGIBLE, studentJwt(LEADER))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("THESIS_ELIGIBILITY_NOT_MET"))
+                .andExpect(jsonPath("$.details.earnedCredits").doesNotExist())
+                .andExpect(jsonPath("$.details.cpa").doesNotExist())
+                .andExpect(jsonPath("$.details.reasons",
+                        org.hamcrest.Matchers.hasItem("INSUFFICIENT_CREDITS")))
+                .andExpect(jsonPath("$.message")
+                        .value(org.hamcrest.Matchers.not(
+                                org.hamcrest.Matchers.containsString("66"))));
+    }
+
+    @Test
+    void adminTopicPickErrorHidesLeaderFigures() throws Exception {
+        UUID round = insertLiveRound();
+        ensureStudent(INELIGIBLE);
+        grantCredits(INELIGIBLE, 66, "B");
+        UUID group = insertDraftGroup(round, INELIGIBLE);
+        UUID topic = insertPublishedTopic(round);
+
+        // The evaluated student is the leader, not the calling admin: the 409
+        // still reports the reasons but carries none of the leader's numbers.
+        mvc.perform(post("/api/v1/thesis/groups/{id}/topic", group)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"topicId\":\"" + topic + "\"}")
+                        .with(adminJwt()))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("THESIS_ELIGIBILITY_NOT_MET"))
+                .andExpect(jsonPath("$.details.earnedCredits").doesNotExist())
+                .andExpect(jsonPath("$.details.cpa").doesNotExist())
+                .andExpect(jsonPath("$.details.reasons",
+                        org.hamcrest.Matchers.hasItem("INSUFFICIENT_CREDITS")));
     }
 
     @Test
@@ -457,13 +582,18 @@ class ThesisEligibilityTest {
     }
 
     private UUID insertRound(String status) {
+        return insertRound(status, "KLTN");
+    }
+
+    private UUID insertRound(String status, String thesisType) {
         UUID roundId = UUID.randomUUID();
         Instant now = Instant.now();
         jdbc.update("INSERT INTO thesis.thesis_registration_round "
                         + "(id, name, thesis_type, lecturer_submit_start, lecturer_submit_end, "
                         + "registration_start, registration_end, gvpb_deadline, status) "
-                        + "VALUES (?, 'Eligibility round', 'KLTN', ?, ?, ?, ?, ?, ?)",
-                roundId, Timestamp.from(now.minusSeconds(7_200)), Timestamp.from(now.minusSeconds(3_600)),
+                        + "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                roundId, "Eligibility round " + thesisType, thesisType,
+                Timestamp.from(now.minusSeconds(7_200)), Timestamp.from(now.minusSeconds(3_600)),
                 Timestamp.from(now.minusSeconds(3_600)), Timestamp.from(now.plusSeconds(3_600)),
                 Timestamp.from(now.plusSeconds(7_200)), status);
         return roundId;

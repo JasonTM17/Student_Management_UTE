@@ -45,7 +45,7 @@ public class ThesisGroupReadService {
         rounds.requireExisting(roundId);
         if (isFacultyAdmin(roles)) {
             return withEligibility(withdrawalPolicy.attachAll(
-                    groups.findByRoundId(roundId), roles, lecturerId, subject));
+                    groups.findByRoundId(roundId), roles, lecturerId, subject), null);
         }
         // Governance readers are scoped like the dean overview: a faculty
         // head sees only their faculty, a department head only their
@@ -65,7 +65,8 @@ public class ThesisGroupReadService {
                     ? List.of()
                     : groups.findByRoundIdAndSupervisorId(roundId, lecturerId);
             return withEligibility(withdrawalPolicy.attachAll(
-                    mergeScopedWithSupervised(scoped, supervised, lecturerId), roles, lecturerId, subject));
+                    mergeScopedWithSupervised(scoped, supervised, lecturerId), roles, lecturerId, subject),
+                    null);
         }
         if (roles.contains("LECTURER")) {
             // External members declare an email/phone in `contact`, so a
@@ -73,10 +74,11 @@ public class ThesisGroupReadService {
             // same supervisor rule the report-read path applies.
             return withEligibility(withdrawalPolicy.attachAll(
                     groups.findByRoundIdAndSupervisorId(roundId, requireLecturerId(lecturerId)),
-                    roles, lecturerId, subject));
+                    roles, lecturerId, subject), null);
         }
         return withEligibility(
-                groups.findByRoundIdAndStudentId(roundId, requireStudentId(roles, studentId)));
+                groups.findByRoundIdAndStudentId(roundId, requireStudentId(roles, studentId)),
+                studentId);
     }
 
     /**
@@ -92,11 +94,13 @@ public class ThesisGroupReadService {
             String studentId,
             String lecturerId) {
         if (roles.contains("STUDENT")) {
-            return withEligibility(groups.findByStudentId(requireStudentId(roles, studentId)));
+            String caller = requireStudentId(roles, studentId);
+            return withEligibility(groups.findByStudentId(caller), caller);
         }
         if (roles.contains("LECTURER")) {
             return withEligibility(withdrawalPolicy.attachAll(
-                    groups.findBySupervisorId(requireLecturerId(lecturerId)), roles, lecturerId, null));
+                    groups.findBySupervisorId(requireLecturerId(lecturerId)), roles, lecturerId, null),
+                    null);
         }
         return List.of();
     }
@@ -109,6 +113,7 @@ public class ThesisGroupReadService {
             String lecturerId,
             String subject) {
         GroupResponse group;
+        String viewerStudentId = null;
         if (isFacultyAdmin(roles)) {
             group = groups.findById(id);
         } else if (roles.contains("TRUONG_KHOA") || roles.contains("TRUONG_BO_MON")) {
@@ -122,7 +127,8 @@ public class ThesisGroupReadService {
         } else if (roles.contains("LECTURER")) {
             group = supervisedGroup(id, requireLecturerId(lecturerId));
         } else {
-            group = groups.findByIdAndStudentId(id, requireStudentId(roles, studentId));
+            viewerStudentId = requireStudentId(roles, studentId);
+            group = groups.findByIdAndStudentId(id, viewerStudentId);
         }
         if (group == null) {
             throw new DomainException(
@@ -130,7 +136,8 @@ public class ThesisGroupReadService {
                     "THESIS_GROUP_NOT_FOUND",
                     "Thesis group not found");
         }
-        return withEligibility(withdrawalPolicy.attach(group, roles, lecturerId, subject));
+        return withEligibility(withdrawalPolicy.attach(group, roles, lecturerId, subject),
+                viewerStudentId);
     }
 
     /** Merge the governance-scoped groups with any group the caller supervises. */
@@ -187,18 +194,26 @@ public class ThesisGroupReadService {
     }
 
     /**
-     * Member eligibility annotation: every hydrated roster carries the
-     * accumulated-credit flag so the UI can mark ineligible members without a
-     * second request. External members stay {@code null}.
+     * Member eligibility annotation: staff callers get the accumulated-credit
+     * flag on every internal member of every covered round so the UI can mark
+     * ineligible members without a second request. A student caller gets the
+     * flag on their own member entry only — a peer's academic standing is not
+     * the caller's data. External members and members of round types the
+     * policy does not cover stay {@code null}.
      */
-    private List<GroupResponse> withEligibility(List<GroupResponse> found) {
+    private List<GroupResponse> withEligibility(List<GroupResponse> found,
+            String viewerStudentId) {
         if (found == null || found.isEmpty()) {
             return found;
         }
+        Map<UUID, String> roundTypes = groups.findRoundTypes(
+                found.stream().map(GroupResponse::roundId).distinct().toList());
         List<String> memberIds = found.stream()
+                .filter(group -> eligibility.covers(roundTypes.get(group.roundId())))
                 .flatMap(group -> group.members().stream())
                 .filter(member -> !member.isExternal())
                 .map(GroupMemberResponse::studentId)
+                .filter(id -> viewerStudentId == null || viewerStudentId.equals(id))
                 .distinct()
                 .toList();
         if (memberIds.isEmpty()) {
@@ -208,36 +223,35 @@ public class ThesisGroupReadService {
         eligibility.evaluateAll(memberIds)
                 .forEach((id, view) -> eligibleByStudent.put(id, view.eligible()));
         return found.stream()
-                .map(group -> annotate(group, eligibleByStudent))
+                .map(group -> annotate(group, eligibleByStudent,
+                        eligibility.covers(roundTypes.get(group.roundId())),
+                        viewerStudentId))
                 .toList();
     }
 
-    private GroupResponse withEligibility(GroupResponse group) {
+    private GroupResponse withEligibility(GroupResponse group, String viewerStudentId) {
         if (group == null) {
             return null;
         }
-        List<String> memberIds = group.members().stream()
-                .filter(member -> !member.isExternal())
-                .map(GroupMemberResponse::studentId)
-                .distinct()
-                .toList();
-        if (memberIds.isEmpty()) {
-            return group;
-        }
-        Map<String, Boolean> eligibleByStudent = new LinkedHashMap<>();
-        eligibility.evaluateAll(memberIds)
-                .forEach((id, view) -> eligibleByStudent.put(id, view.eligible()));
-        return annotate(group, eligibleByStudent);
+        return withEligibility(List.of(group), viewerStudentId).get(0);
     }
 
     private static GroupResponse annotate(
-            GroupResponse group, Map<String, Boolean> eligibleByStudent) {
+            GroupResponse group, Map<String, Boolean> eligibleByStudent,
+            boolean coveredRound, String viewerStudentId) {
         List<GroupMemberResponse> members = group.members().stream()
-                .map(member -> member.isExternal() ? member : new GroupMemberResponse(
-                        member.studentId(), member.studentNumber(), member.displayName(),
-                        member.contact(), member.isExternal(), member.isLeader(),
-                        member.memberOrder(),
-                        eligibleByStudent.getOrDefault(member.studentId(), Boolean.FALSE)))
+                .map(member -> {
+                    if (member.isExternal() || !coveredRound
+                            || (viewerStudentId != null
+                                    && !viewerStudentId.equals(member.studentId()))) {
+                        return member;
+                    }
+                    return new GroupMemberResponse(
+                            member.studentId(), member.studentNumber(), member.displayName(),
+                            member.contact(), member.isExternal(), member.isLeader(),
+                            member.memberOrder(),
+                            eligibleByStudent.getOrDefault(member.studentId(), Boolean.FALSE));
+                })
                 .toList();
         return new GroupResponse(
                 group.id(), group.roundId(), group.leaderStudentId(), group.topicId(),
