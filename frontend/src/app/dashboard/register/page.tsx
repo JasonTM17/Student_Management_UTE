@@ -28,6 +28,7 @@ import {
   type CreditLimitApplication,
   type RegistrationCurriculumRelevance,
   type RegistrationSection,
+  type WithdrawalApplication,
 } from '@/lib/api';
 import type { Enrollment } from '@/types/api';
 import { useApiQuery } from '@/lib/query';
@@ -51,6 +52,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
+import { Modal } from '@/components/ui/modal';
 import { Textarea } from '@/components/ui/textarea';
 import { Select } from '@/components/ui/select';
 import { PageHeader, SectionEyebrow } from '@/components/ui/page-header';
@@ -543,6 +545,83 @@ export default function RegisterPage() {
       }
     },
   });
+
+  const withdrawalWindowQuery = useApiQuery(
+    ['registration', 'withdrawal-window', semesterId ?? ''],
+    () => registrationApi.withdrawalWindow(semesterId as string),
+    { enabled: canLoad && Boolean(semesterId), staleTime: 60_000 },
+  );
+  const withdrawalApplicationsQuery = useApiQuery(
+    ['registration', 'withdrawal-applications'],
+    () => registrationApi.withdrawalApplications(),
+    { enabled: canLoad, staleTime: 60_000 },
+  );
+  const withdrawalByEnrollment = useMemo(() => {
+    const map = new Map<string, WithdrawalApplication>();
+    for (const application of withdrawalApplicationsQuery.data ?? []) {
+      if (!map.has(application.enrollmentId)) map.set(application.enrollmentId, application);
+    }
+    return map;
+  }, [withdrawalApplicationsQuery.data]);
+  const [withdrawTarget, setWithdrawTarget] = useState<Enrollment | null>(null);
+  const [withdrawReason, setWithdrawReason] = useState('');
+  const [withdrawError, setWithdrawError] = useState('');
+  const [withdrawBusy, setWithdrawBusy] = useState(false);
+  const [cancellingApplication, setCancellingApplication] = useState('');
+
+  const openWithdraw = (enrollment: Enrollment) => {
+    setWithdrawTarget(enrollment);
+    setWithdrawReason('');
+    setWithdrawError('');
+  };
+
+  const closeWithdraw = () => {
+    if (withdrawBusy) return;
+    setWithdrawTarget(null);
+    setWithdrawError('');
+  };
+
+  const submitWithdraw = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (!withdrawTarget) return;
+    const reason = withdrawReason.trim();
+    if (reason.length < 20) {
+      setWithdrawError(copy.applicationReasonInvalid);
+      return;
+    }
+    setWithdrawBusy(true);
+    setWithdrawError('');
+    try {
+      await registrationApi.submitWithdrawalApplication(withdrawTarget.id, reason);
+      setWithdrawTarget(null);
+      toast.success(copy.withdrawSubmitted);
+      await withdrawalApplicationsQuery.refetch();
+    } catch (cause) {
+      setWithdrawError(actionMessage(cause));
+    } finally {
+      setWithdrawBusy(false);
+    }
+  };
+
+  const cancelWithdraw = async (application: WithdrawalApplication) => {
+    const ok = await confirm({
+      title: copy.withdrawCancelTitle,
+      message: copy.withdrawCancelMessage,
+      confirmText: copy.withdrawCancel,
+      variant: 'destructive',
+    });
+    if (!ok) return;
+    setCancellingApplication(application.id);
+    try {
+      await registrationApi.cancelWithdrawalApplication(application.id);
+      toast.success(copy.withdrawCancelled);
+      await withdrawalApplicationsQuery.refetch();
+    } catch (cause) {
+      toast.error(actionMessage(cause));
+    } finally {
+      setCancellingApplication('');
+    }
+  };
 
   /** Human-readable section label so confirmation dialogs name the exact class. */
   const sectionLabel = (
@@ -1386,16 +1465,48 @@ export default function RegisterPage() {
                                       </span>
                                       <div className="flex flex-col items-start gap-1 sm:items-end">
                                         {enrollment ? (
-                                          <Button
-                                            type="button"
-                                            size="sm"
-                                            variant="outline"
-                                            onClick={() => void drop(enrollment)}
-                                            disabled={pending === enrollment.id || enrollment.id.startsWith('pending:') || !enrollmentDataReady}
-                                          >
-                                            <CheckCircle2 className="mr-2 h-4 w-4" aria-hidden="true" />
-                                            {pending === enrollment.id ? copy.working : copy.drop}
-                                          </Button>
+                                          <div className="flex flex-wrap items-center gap-2">
+                                            {(() => {
+                                              const application = withdrawalByEnrollment.get(enrollment.id);
+                                              if (application?.status === 'PENDING') {
+                                                return (
+                                                  <Button
+                                                    type="button"
+                                                    size="sm"
+                                                    variant="outline"
+                                                    onClick={() => void cancelWithdraw(application)}
+                                                    disabled={cancellingApplication === application.id}
+                                                  >
+                                                    {cancellingApplication === application.id ? copy.working : `${copy.withdrawPending} · ${copy.withdrawCancel}`}
+                                                  </Button>
+                                                );
+                                              }
+                                              if (withdrawalWindowQuery.data?.open && !enrollment.id.startsWith('pending:')) {
+                                                return (
+                                                  <Button
+                                                    type="button"
+                                                    size="sm"
+                                                    variant="outline"
+                                                    onClick={() => openWithdraw(enrollment)}
+                                                    disabled={!enrollmentDataReady}
+                                                  >
+                                                    {copy.withdraw}
+                                                  </Button>
+                                                );
+                                              }
+                                              return null;
+                                            })()}
+                                            <Button
+                                              type="button"
+                                              size="sm"
+                                              variant="outline"
+                                              onClick={() => void drop(enrollment)}
+                                              disabled={pending === enrollment.id || enrollment.id.startsWith('pending:') || !enrollmentDataReady}
+                                            >
+                                              <CheckCircle2 className="mr-2 h-4 w-4" aria-hidden="true" />
+                                              {pending === enrollment.id ? copy.working : copy.drop}
+                                            </Button>
+                                          </div>
                                         ) : (
                                           <Button
                                             type="button"
@@ -1715,6 +1826,39 @@ export default function RegisterPage() {
         </>
       )}
       </div>
+      <Modal
+        isOpen={Boolean(withdrawTarget)}
+        onClose={closeWithdraw}
+        title={copy.withdrawTitle}
+        description={withdrawTarget ? copy.withdrawMessage.replace('{section}', sectionLabel(withdrawTarget.section, withdrawTarget.sectionId)) : undefined}
+        closeLabel={messages.common.actions.cancel}
+      >
+        {withdrawTarget ? (
+          <form className="space-y-4" onSubmit={submitWithdraw}>
+            <div>
+              <label htmlFor="withdrawal-reason" className="mb-2 block text-sm font-medium text-foreground">
+                {copy.withdrawReason}
+              </label>
+              <Textarea
+                id="withdrawal-reason"
+                value={withdrawReason}
+                onChange={(event) => setWithdrawReason(event.target.value)}
+                maxLength={1000}
+                hint={`${copy.withdrawReasonHint} ${withdrawReason.trim().length}/1000`}
+                error={withdrawError || undefined}
+              />
+            </div>
+            <div className="flex justify-end gap-2 border-t border-border/70 pt-4">
+              <Button type="button" variant="outline" onClick={closeWithdraw} disabled={withdrawBusy}>
+                {messages.common.actions.cancel}
+              </Button>
+              <Button type="submit" disabled={withdrawBusy || withdrawReason.trim().length < 20}>
+                {withdrawBusy ? copy.withdrawSubmitting : copy.withdrawSubmit}
+              </Button>
+            </div>
+          </form>
+        ) : null}
+      </Modal>
       {confirmationDialog}
     </div>
   );

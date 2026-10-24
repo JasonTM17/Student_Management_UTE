@@ -177,6 +177,21 @@ retroactively identify password changes made before the revision existed.
 - **Internal AI calls** use a distinct service credential and owner boundary.
   See [ThesisAssistantInternalController](../../java-services/restful-api/src/main/java/io/campuscore/restfulapi/thesis/assistant/controller/ThesisAssistantInternalController.java)
   and [SupabaseKnowledgeInternalController](../../java-services/restful-api/src/main/java/io/campuscore/restfulapi/thesis/assistant/controller/SupabaseKnowledgeInternalController.java).
+- **Course-withdrawal applications (grade W)** follow the same ownership +
+  review split as credit-limit applications. The student routes
+  (`/me/registration/withdrawal-applications`, `/withdrawal-window`) require
+  `STUDENT` and the service binds every application to the caller's
+  `studentId` claim — a supplied enrollment/application id is a locator, never
+  proof of access (`403 ENROLLMENT_FORBIDDEN` /
+  `WITHDRAWAL_APPLICATION_FORBIDDEN`). Review
+  (`/admin/registration/withdrawal-applications`) is `ADMIN`/`SUPER_ADMIN`
+  only; lecturers have no approval capability. Owners:
+  [WithdrawalApplicationController](../../java-services/restful-api/src/main/java/io/campuscore/restfulapi/academic/registration/controller/WithdrawalApplicationController.java),
+  [WithdrawalApplicationService](../../java-services/restful-api/src/main/java/io/campuscore/restfulapi/academic/registration/service/WithdrawalApplicationService.java).
+  Unlike a self-service drop inside the add/drop window (which leaves no
+  transcript trace), an approved withdrawal is the later regulated path: it
+  records `WITHDRAWN` + grade `W` on the transcript, excluded from GPA,
+  attempted and earned credits.
 - **Thesis governance actions** run after the dean-scope check
   (`ThesisDeanScope`), so capability gates never leak topic existence or bypass
   faculty ownership. Group approval withdrawal
