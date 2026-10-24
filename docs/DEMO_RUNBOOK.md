@@ -117,6 +117,8 @@ $env:BASE_URL="http://localhost:3100"; node scripts/prod-smoke.mjs   # stack loc
 - Vào mục **"Đăng ký học phần"** (`/vi/dashboard/register`).
 - Tìm kiếm môn học theo khoa/ngành. Xem thanh trạng thái sức chứa của lớp.
 - Thử nghiệm đăng ký một lớp học phần và kiểm tra cập nhật tức thời vào "Môn học của tôi" (`/vi/dashboard/enrollments`).
+- Khi mở đợt đăng ký, Phòng Đào tạo vào **Quản trị → Đăng ký theo CTĐT** (`/admin/registration/curriculum-defaults`), chọn đợt/học kỳ, chạy **Xem trước** để kiểm tra số sinh viên/môn sẽ đăng ký và các lý do bỏ qua, rồi mới chọn **Áp dụng**. Hệ thống xử lý theo lô có con trỏ tiếp tục; lặp lại cùng một đợt là an toàn và ghi một dòng kiểm toán cho mỗi lần áp dụng.
+- Không có lịch tự chạy. Phòng Đào tạo chủ động chạy xem trước rồi áp dụng sau khi đợt mở; sinh viên có thể tự đăng ký các môn còn đủ điều kiện ở **Kế hoạch CTĐT** trên trang đăng ký. Môn do kế hoạch tạo có nhãn **Theo CTĐT** trong TKB và danh sách đăng ký; nếu sinh viên đã rút môn mặc định, lần áp dụng sau không tự thêm lại môn đó.
 - **Thuyết minh kỹ thuật**: Trình bày cơ chế chống race 4 lớp: Row lock `FOR UPDATE` -> Conditional update `"enrolledCount" < "capacity"` -> Partial unique index `academic_enrollment_active_student_section_uq` -> Idempotency key.
 
 ### Bước 5: Trợ lý Học vụ RAG & Kiểm thử Chặn Prompt Injection (60 giây)
