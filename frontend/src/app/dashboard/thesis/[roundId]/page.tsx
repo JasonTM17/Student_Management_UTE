@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import { useParams } from 'next/navigation';
+import { mergeThesisRounds } from '@/lib/thesis-round';
 import {
   ArrowLeft,
   CalendarDays,
@@ -46,13 +47,16 @@ export default function ThesisRoundDetailPage() {
     setIsLoading(true);
     setError('');
     try {
-      const [roundsData, topicsData, groupsData] = await Promise.all([
+      const [roundsData, closedData, topicsData, groupsData] = await Promise.all([
         thesisApi.listRounds(),
+        // Archived rounds keep their deep link working: closing makes a round
+        // read-only, it does not erase its topics/groups history.
+        thesisApi.listRounds('CLOSED').catch(() => [] as ThesisRound[]),
         thesisApi.listTopics(roundId),
         thesisApi.listGroups(roundId),
       ]);
       if (signal.cancelled) return;
-      setRound(roundsData.find((r) => r.id === roundId) ?? null);
+      setRound(mergeThesisRounds(roundsData, closedData).find((r) => r.id === roundId) ?? null);
       setTopics(topicsData);
       setGroups(groupsData);
     } catch {

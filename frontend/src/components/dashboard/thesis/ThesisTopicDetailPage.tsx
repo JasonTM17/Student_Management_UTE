@@ -47,8 +47,15 @@ export default function ThesisTopicDetailPage() {
   // replaced by an explanatory note instead of firing a doomed request.
   const roundAllowsChoice = workspace.selectedRound?.status === 'REGISTRATION_OPEN';
   const groupCancelled = myGroup?.status === 'CANCELLED';
+  // An ineligible student cannot pick a topic either (same policy as group
+  // creation) — but only while enforcement is on; in ADVISORY the card warns
+  // and the server still accepts. The thesis page carries the numbers.
+  const callerEligible = !(
+    workspace.selectedRound?.eligibility?.eligible === false
+    && workspace.selectedRound?.eligibility?.enforced === true);
   const canChoose =
-    isStudent && Boolean(myGroup) && !groupCancelled && !alreadyChosen && roundAllowsChoice;
+    isStudent && Boolean(myGroup) && !groupCancelled && !alreadyChosen
+    && roundAllowsChoice && callerEligible;
 
   const chooseThisTopic = async () => {
     if (!myGroup) return;

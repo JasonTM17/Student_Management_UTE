@@ -12,6 +12,7 @@ import { WorkspaceForbiddenState } from '@/components/ProtectedRoute';
 import { EmptyState, ErrorState, LoadingState } from '@/components/ui/state-block';
 import { cn } from '@/lib/utils';
 import { thesisApi, type ThesisProgressResponse } from '@/lib/thesis-api';
+import { roundsForPicker } from '@/lib/thesis-round';
 import { useThesisWorkspace } from './useThesisWorkspace';
 
 const PROGRESS_MILESTONES = [
@@ -153,7 +154,7 @@ export default function ThesisProgressPage() {
           value={workspace.selectedRoundId}
           onChange={(event) => workspace.setSelectedRoundId(event.target.value)}
           aria-label={messages.thesis.selectRound}
-          options={workspace.rounds.map((round) => ({ value: round.id, label: round.name }))}
+          options={roundsForPicker(workspace.rounds, workspace.selectedRoundId).map((round) => ({ value: round.id, label: round.name }))}
         />
         <div className="rounded-md bg-secondary px-3 py-1.5 text-sm font-medium text-foreground">
           {messages.thesis.progressCurrentStage}: {messages.thesis.progressSteps[Math.max(progressIndex, 0)]}

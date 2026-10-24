@@ -44,6 +44,21 @@ spring:
     cache: false
 
 thesis:
+  eligibility:
+    # The regulation's registration condition: accumulated credits earned and
+    # cumulative GPA on the 4.0 scale, both read from the canonical transcript
+    # summary (published grades, best attempt per course). ENFORCE blocks
+    # group create/member-add/topic-pick with 409 THESIS_ELIGIBILITY_NOT_MET;
+    # ADVISORY evaluates and reports in the read model but never blocks.
+    # Release 2 ships ADVISORY: flip THESIS_ELIGIBILITY_ENFORCEMENT to ENFORCE
+    # after observation. An unrecognized value logs a warning and behaves as
+    # ADVISORY — a config typo must never start refusing registrations.
+    # round-types limits the policy to the thesis types the regulation covers
+    # (default KLTN only); other round types neither block nor report.
+    min-credits: ${THESIS_ELIGIBILITY_MIN_CREDITS:110}
+    min-cpa: ${THESIS_ELIGIBILITY_MIN_CPA:2.0}
+    enforcement: ${THESIS_ELIGIBILITY_ENFORCEMENT:ADVISORY}
+    round-types: ${THESIS_ELIGIBILITY_ROUND_TYPES:KLTN}
   report:
     storage:
       # Local is the safe default for previews. Set provider=supabase only in

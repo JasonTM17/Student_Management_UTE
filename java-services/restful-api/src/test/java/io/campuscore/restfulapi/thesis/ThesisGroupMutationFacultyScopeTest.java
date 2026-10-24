@@ -89,7 +89,7 @@ class ThesisGroupMutationFacultyScopeTest {
         mvc.perform(post("/api/v1/thesis/groups/{id}/members",id).with(dean()).contentType(MediaType.APPLICATION_JSON).content("{\"displayName\":\"Own external\"}")).andExpect(status().isOk());
         mvc.perform(post("/api/v1/thesis/groups/{id}/topic",id).with(dean()).contentType(MediaType.APPLICATION_JSON).content("{\"topicId\":\""+selected+"\"}")).andExpect(status().isOk());
         mvc.perform(patch("/api/v1/thesis/groups/{id}/progress",id).with(dean()).contentType(MediaType.APPLICATION_JSON).content("{\"status\":\"SUBMITTED\"}")).andExpect(status().isOk());
-        mvc.perform(post("/api/v1/thesis/groups/{id}/approve",id).with(dean())).andExpect(status().isOk());
+        mvc.perform(post("/api/v1/thesis/groups/{id}/approve",id).with(dean()).contentType(MediaType.APPLICATION_JSON).content("{\"reason\":\"Faculty approval\"}")).andExpect(status().isOk());
         assertThat(jdbc.queryForObject("SELECT approval_status FROM thesis.thesis_group WHERE id=?",String.class,id)).isEqualTo("APPROVED");
     }
 

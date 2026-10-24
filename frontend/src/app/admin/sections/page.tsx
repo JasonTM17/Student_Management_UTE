@@ -27,6 +27,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Modal } from '@/components/ui/modal';
 import { Select } from '@/components/ui/select';
+import { Combobox } from '@/components/ui/combobox';
 import { statusToneClass, type StatusTone } from '@/components/ui/status';
 import {
   EmptyState,
@@ -510,16 +511,15 @@ export default function AdminSectionsPage() {
   );
 
   const lecturerOptions = useMemo(
-    () => [
-      { value: '', label: copy.noLecturerAssigned },
-      ...lecturers.map((lecturer) => ({
+    () =>
+      lecturers.map((lecturer) => ({
         value: lecturer.id,
         label: lecturer.user
           ? `${lecturer.user.lastName ?? ''} ${lecturer.user.firstName ?? ''}`.trim() + ` (${lecturer.employeeId})`
           : lecturer.employeeId,
+        keywords: lecturer.employeeId,
       })),
-    ],
-    [copy.noLecturerAssigned, lecturers],
+    [lecturers],
   );
 
   const classroomOptions = useMemo(
@@ -1181,15 +1181,17 @@ export default function AdminSectionsPage() {
             />
           </div>
 
-          <Select
+          <Combobox
             label={copy.fields.lecturer}
             value={formData.lecturerId}
-            onChange={(event) =>
+            onChange={(next) =>
               setFormData((current) => ({
                 ...current,
-                lecturerId: event.target.value,
+                lecturerId: next,
               }))
             }
+            allowClear
+            emptyLabel={copy.noLecturerAssigned}
             options={lecturerOptions}
           />
 

@@ -55,6 +55,10 @@ export const en = {
       loadingAnnouncements: 'Loading campus announcements',
       loadingThesisTopics: 'Loading thesis topics',
     },
+    combobox: {
+      noResults: 'No matching options',
+      clearSelection: 'Clear selection',
+    },
     statuses: {
       OPEN: 'Open',
       CLOSED: 'Closed',
@@ -132,6 +136,10 @@ export const en = {
           'You already have a pending credit limit exception application.',
         IDEMPOTENCY_IN_PROGRESS: 'Your previous request is still being processed. Try again in a moment.',
         GROUP_APPROVAL_STATE_CONFLICT: 'Only a submitted group with a topic can be reviewed.',
+        GROUP_WITHDRAWAL_BLOCKED:
+          'The group already has reports, scores, council or reviewer assignments — use the roster override instead.',
+        GROUP_APPROVAL_OVERRIDE_REASON_REQUIRED:
+          'A governance override approval requires a documented reason.',
         // Thesis group/member management
         STUDENT_ALREADY_IN_GROUP: 'This student is already a member of a group.',
         STUDENT_ACTIVE_IN_OTHER_GROUP:
@@ -142,6 +150,8 @@ export const en = {
         GROUP_MEMBER_REQUIRED: 'Only group members can perform this action.',
         GROUP_OWNER_REQUIRED: 'Only the group leader can perform this action.',
         REGISTRATION_WINDOW_CLOSED: 'The registration window for this round has already closed.',
+        THESIS_ELIGIBILITY_NOT_MET:
+          'Thesis registration requires enough accumulated credits and a minimum cumulative GPA. Check the eligibility card for your numbers.',
         // Thesis reports
         REPORT_NOT_FOUND: 'No report has been submitted for this group yet.',
         REPORT_DEADLINE_PASSED: 'The report submission deadline has passed.',
@@ -262,6 +272,10 @@ export const en = {
         RESULTS_ALL_EXCLUDED: 'Every approved topic is excluded from publication.',
         RETRACT_ADMIN_REQUIRED: 'Only an administrator can retract published results.',
         RETRACT_WINDOW_CLOSED: 'The retraction grace period has passed.',
+        RETRACT_WINDOW_OPEN:
+          'The retraction grace period is still open — wait for it to end before closing this round.',
+        CLOSE_ADMIN_REQUIRED: 'Only an administrator can close a round.',
+        REOPEN_ADMIN_REQUIRED: 'Only an administrator can reopen a closed round.',
         REVIEW_WINDOW_OPEN: 'The counter-review window is still open for some topics.',
         SECTION_STATUS_CHANGED:
           'This section changed while the edit was open. Review the latest version and try again.',
@@ -2371,6 +2385,18 @@ export const en = {
     sizeExceptionReasonPlaceholder:
       'Document why the under-size roster is approved (required)...',
     approveWithException: 'Approve with exception',
+    membersNeededShort: 'Needs {count} more to approve',
+    approveOverrideModalTitle: 'Approve as governance override',
+    approveOverrideModalDescription:
+      'You are not this topic’s supervisor. The approval is recorded as a governance override with your reason.',
+    withdrawApproval: 'Withdraw approval',
+    withdrawApprovalModalTitle: 'Withdraw group approval',
+    withdrawApprovalModalDescription:
+      'The group returns to pending review and keeps its members and topic.',
+    withdrawApprovalReason: 'Withdrawal reason',
+    withdrawApprovalReasonPlaceholder:
+      'Document why this approval is withdrawn (required)...',
+    withdrawApprovalSuccess: 'Approval withdrawn; the group is pending again.',
     groupTooSmall:
       'A thesis group needs 3 to 5 members, with exactly one group leader, before it can be approved. A draft with 1 or 2 members can be completed before approval.',
     groupStateConflict:
@@ -2384,6 +2410,14 @@ export const en = {
     noProposedTopics: 'You have not proposed any topics in this round yet.',
     memberCount: '{count}/5 members',
     membersNeededForApproval: 'A draft with 1 or 2 members can be completed before approval. Add {count} more member(s) to reach the minimum of 3; approval requires 3 to 5 members.',
+    eligibilityTitle: 'Thesis eligibility',
+    eligibilityEligible: 'Eligible',
+    eligibilityIneligible: 'Not eligible yet',
+    eligibilityCredits: '{earned}/{required} accumulated credits',
+    eligibilityCpa: 'CPA {cpa} (min {required})',
+    eligibilityCpaMissing: 'No published GPA yet',
+    eligibilityAction: 'Course registration',
+    memberIneligibleBadge: 'Not eligible',
     noGroup: 'You do not have a group in this round yet.',
     noGroupDescription: 'Create a group when registration opens.',
     groupCancelledNotice:
@@ -2434,6 +2468,7 @@ export const en = {
     supervisorPrimaryLabel: 'Primary supervisor',
     supervisorSecondaryLabel: 'Second supervisor (optional)',
     supervisorNoneOption: '— Not assigned —',
+    supervisorAlreadySelected: 'Already selected in the other seat',
     report: {
       title: 'Report',
       notSubmitted: 'No report submitted yet.',
@@ -2536,6 +2571,15 @@ export const en = {
       replaceMemberTitle: 'Replace council member',
       memberReplacedSuccess: 'Council member replaced.',
       topicUnassignedSuccess: 'Topic unassigned from council.',
+      conflicts: {
+        conflictSupervisorOfTopic: 'Supervises this topic',
+        conflictCouncilMemberOfTopic: 'Sits on the defense council',
+        conflictReviewsAssignedTopic: 'Counter-reviews an assigned topic',
+        conflictSupervisesAssignedTopic: 'Supervises an assigned topic',
+        conflictSupervisorOfficer: 'A supervisor is chair or secretary',
+        conflictReviewerOnCouncil: 'Its counter-reviewer sits on this council',
+        conflictTooFewGraders: 'Leaves fewer than 3 eligible members',
+      },
     },
     grading: {
       title: 'Defense council grading',
@@ -2748,6 +2792,16 @@ export const en = {
       retractResultsConfirmLabel: 'Type RETRACT to confirm',
       retractResultsSuccess: 'Publication retracted; students were notified.',
       retractResultsHint: 'Sent e-mails cannot be recalled.',
+      closeRound: 'Close round',
+      closeRoundTitle: 'Close this round?',
+      closeRoundHint: 'The round becomes read-only; results stay viewable and it can be reopened.',
+      closeRoundConfirmLabel: 'Type the round name to confirm',
+      closeBlockedRetractWindow: 'Closing unlocks once the retraction grace period ends.',
+      roundClosed: 'Round closed.',
+      reopenRound: 'Reopen',
+      reopenRoundTitle: 'Reopen this round?',
+      roundReopened: 'Round reopened.',
+      showClosedRounds: 'Show closed',
       publishReviewOpen: 'Counter-review still open: {titles}.',
       publishAllExcluded: 'Every approved group is excluded; publishing will show no results.',
     },
@@ -3133,6 +3187,10 @@ export const vi: I18nMessages = {
       loadingAnnouncements: 'Đang tải thông báo trường',
       loadingThesisTopics: 'Đang tải đề tài',
     },
+    combobox: {
+      noResults: 'Không có kết quả phù hợp',
+      clearSelection: 'Xóa lựa chọn',
+    },
     statuses: {
       OPEN: 'Đang mở',
       CLOSED: 'Đã đóng',
@@ -3210,6 +3268,10 @@ export const vi: I18nMessages = {
           'Sinh viên đã có đơn xin nâng hạn mức tín chỉ đang chờ xử lý.',
         IDEMPOTENCY_IN_PROGRESS: 'Yêu cầu trước của bạn đang được xử lý. Vui lòng thử lại sau chốc lát.',
         GROUP_APPROVAL_STATE_CONFLICT: 'Chỉ nhóm đã gửi kèm đề tài mới có thể được duyệt.',
+        GROUP_WITHDRAWAL_BLOCKED:
+          'Nhóm đã có tiến độ, điểm, hội đồng hoặc phản biện — hãy dùng thao tác ghi đè danh sách.',
+        GROUP_APPROVAL_OVERRIDE_REASON_REQUIRED:
+          'Quyết định duyệt theo thẩm quyền quản trị phải kèm lý do.',
         // Quản lý nhóm/thành viên khóa luận
         STUDENT_ALREADY_IN_GROUP: 'Sinh viên này đã là thành viên của một nhóm.',
         STUDENT_ACTIVE_IN_OTHER_GROUP:
@@ -3220,6 +3282,8 @@ export const vi: I18nMessages = {
         GROUP_MEMBER_REQUIRED: 'Chỉ thành viên trong nhóm mới thực hiện được thao tác này.',
         GROUP_OWNER_REQUIRED: 'Chỉ nhóm trưởng mới thực hiện được thao tác này.',
         REGISTRATION_WINDOW_CLOSED: 'Cửa sổ đăng ký của đợt này đã đóng.',
+        THESIS_ELIGIBILITY_NOT_MET:
+          'Đăng ký khóa luận yêu cầu đủ tín chỉ tích lũy và CPA tối thiểu. Xem thẻ điều kiện để biết số liệu của bạn.',
         // Nộp tài liệu khóa luận (Word/PDF) và hạn nộp
         REPORT_NOT_FOUND: 'Nhóm này chưa nộp tài liệu khóa luận.',
         REPORT_DEADLINE_PASSED: 'Đã quá hạn nộp tài liệu khóa luận.',
@@ -3340,6 +3404,10 @@ export const vi: I18nMessages = {
         RESULTS_ALL_EXCLUDED: 'Tất cả đề tài đã duyệt đều bị loại khỏi công bố.',
         RETRACT_ADMIN_REQUIRED: 'Chỉ quản trị viên mới có thể thu hồi kết quả đã công bố.',
         RETRACT_WINDOW_CLOSED: 'Đã hết thời hạn thu hồi kết quả.',
+        RETRACT_WINDOW_OPEN:
+          'Thời hạn thu hồi kết quả vẫn còn mở — hãy đợi hết hạn trước khi đóng đợt này.',
+        CLOSE_ADMIN_REQUIRED: 'Chỉ quản trị viên mới được đóng đợt.',
+        REOPEN_ADMIN_REQUIRED: 'Chỉ quản trị viên mới được mở lại đợt đã đóng.',
         REVIEW_WINDOW_OPEN: 'Cửa sổ phản biện vẫn đang mở cho một số đề tài.',
         SECTION_STATUS_CHANGED:
           'Lớp học phần đã thay đổi trong lúc chỉnh sửa. Hãy xem lại phiên bản mới nhất rồi thử lại.',
@@ -5443,6 +5511,18 @@ export const vi: I18nMessages = {
     sizeExceptionReasonPlaceholder:
       'Ghi rõ lý do duyệt nhóm dưới sĩ số tối thiểu (bắt buộc)...',
     approveWithException: 'Duyệt kèm ngoại lệ',
+    membersNeededShort: 'Cần thêm {count} thành viên để duyệt',
+    approveOverrideModalTitle: 'Duyệt theo thẩm quyền quản trị',
+    approveOverrideModalDescription:
+      'Bạn không phải giảng viên hướng dẫn của đề tài này. Quyết định duyệt được ghi nhận như ngoại lệ quản trị kèm lý do của bạn.',
+    withdrawApproval: 'Rút duyệt',
+    withdrawApprovalModalTitle: 'Rút duyệt nhóm đề tài',
+    withdrawApprovalModalDescription:
+      'Nhóm quay lại trạng thái chờ duyệt và giữ nguyên thành viên cùng đề tài đã chọn.',
+    withdrawApprovalReason: 'Lý do rút duyệt',
+    withdrawApprovalReasonPlaceholder:
+      'Ghi rõ lý do rút lại quyết định duyệt (bắt buộc)...',
+    withdrawApprovalSuccess: 'Đã rút duyệt; nhóm quay lại trạng thái chờ duyệt.',
     groupTooSmall:
       'Nhóm khóa luận cần từ 3 đến 5 thành viên, với đúng một nhóm trưởng, trước khi được xét duyệt. Nhóm nháp có 1 hoặc 2 thành viên có thể tiếp tục bổ sung trước khi duyệt.',
     groupStateConflict:
@@ -5456,6 +5536,14 @@ export const vi: I18nMessages = {
     noProposedTopics: 'Bạn chưa đề xuất đề tài nào trong đợt này.',
     memberCount: '{count}/5 thành viên',
     membersNeededForApproval: 'Nhóm nháp có 1 hoặc 2 thành viên có thể tiếp tục bổ sung trước khi duyệt. Cần thêm {count} thành viên để đủ mức tối thiểu 3; nhóm được duyệt phải có từ 3 đến 5 thành viên.',
+    eligibilityTitle: 'Điều kiện khóa luận',
+    eligibilityEligible: 'Đủ điều kiện',
+    eligibilityIneligible: 'Chưa đủ điều kiện',
+    eligibilityCredits: '{earned}/{required} tín chỉ tích lũy',
+    eligibilityCpa: 'CPA {cpa} (tối thiểu {required})',
+    eligibilityCpaMissing: 'Chưa có CPA công bố',
+    eligibilityAction: 'Đăng ký học phần',
+    memberIneligibleBadge: 'Chưa đủ điều kiện',
     noGroup: 'Bạn chưa có nhóm trong đợt này.',
     noGroupDescription: 'Tạo nhóm khi đợt đăng ký mở.',
     groupCancelledNotice:
@@ -5506,6 +5594,7 @@ export const vi: I18nMessages = {
     supervisorPrimaryLabel: 'Giảng viên hướng dẫn chính',
     supervisorSecondaryLabel: 'Giảng viên hướng dẫn thứ hai (không bắt buộc)',
     supervisorNoneOption: '— Không chọn —',
+    supervisorAlreadySelected: 'Đã chọn ở vị trí kia',
     report: {
       title: 'Báo cáo',
       notSubmitted: 'Chưa nộp báo cáo.',
@@ -5608,6 +5697,15 @@ export const vi: I18nMessages = {
       replaceMemberTitle: 'Thay thế thành viên hội đồng',
       memberReplacedSuccess: 'Đã thay thế thành viên hội đồng.',
       topicUnassignedSuccess: 'Đã gỡ đề tài khỏi hội đồng.',
+      conflicts: {
+        conflictSupervisorOfTopic: 'Giảng viên hướng dẫn đề tài này',
+        conflictCouncilMemberOfTopic: 'Nằm trong hội đồng bảo vệ',
+        conflictReviewsAssignedTopic: 'Phản biện một đề tài đã gán',
+        conflictSupervisesAssignedTopic: 'Hướng dẫn một đề tài đã gán',
+        conflictSupervisorOfficer: 'Người hướng dẫn là chủ tịch hoặc thư ký',
+        conflictReviewerOnCouncil: 'Người phản biện nằm trong hội đồng',
+        conflictTooFewGraders: 'Còn lại dưới 3 thành viên hợp lệ',
+      },
     },
     grading: {
       title: 'Chấm điểm bảo vệ hội đồng',
@@ -5820,6 +5918,16 @@ export const vi: I18nMessages = {
       retractResultsConfirmLabel: 'Nhập RETRACT để xác nhận',
       retractResultsSuccess: 'Đã thu hồi công bố và thông báo cho sinh viên.',
       retractResultsHint: 'Email đã gửi không thể thu hồi.',
+      closeRound: 'Đóng đợt',
+      closeRoundTitle: 'Đóng đợt này?',
+      closeRoundHint: 'Đợt sẽ chuyển sang chỉ đọc; kết quả vẫn xem được và có thể mở lại sau.',
+      closeRoundConfirmLabel: 'Nhập tên đợt để xác nhận',
+      closeBlockedRetractWindow: 'Có thể đóng sau khi hết thời hạn thu hồi kết quả.',
+      roundClosed: 'Đã đóng đợt.',
+      reopenRound: 'Mở lại',
+      reopenRoundTitle: 'Mở lại đợt này?',
+      roundReopened: 'Đã mở lại đợt.',
+      showClosedRounds: 'Hiện đợt đã đóng',
       publishReviewOpen: 'Phản biện còn mở: {titles}.',
       publishAllExcluded: 'Mọi nhóm đã duyệt đều bị loại; công bố sẽ không có kết quả.',
     },

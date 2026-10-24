@@ -17,6 +17,7 @@ import java.time.Duration;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Profile;
 import org.springframework.http.HttpStatus;
@@ -33,6 +34,7 @@ public class SupabaseKnowledgeAuthorityService {
     private final ObjectMapper mapper;
     private final HttpClient http;
 
+    @Autowired
     public SupabaseKnowledgeAuthorityService(SupabaseKnowledgeProperties properties, ObjectMapper mapper) {
         this(properties, mapper, HttpClient.newBuilder()
                 .connectTimeout(Duration.ofMillis(properties.connectTimeoutMs()))

@@ -156,6 +156,11 @@ export function SupervisedGroupMembers({ group, roundOpen = true, onChanged }: S
                       {messages.thesis.externalBadge}
                     </span>
                   ) : null}
+                  {member.eligible === false ? (
+                    <span className="ml-1.5 rounded bg-amber-500/15 px-1.5 py-0.5 text-[11px] font-semibold text-amber-700 dark:text-amber-300">
+                      {messages.thesis.memberIneligibleBadge}
+                    </span>
+                  ) : null}
                 </span>
                 {member.isLeader ? null : (
                   <Button

@@ -17,5 +17,12 @@ public interface ThesisRegistrationRoundRepository extends Repository<ThesisRegi
 
     List<ThesisRegistrationRound> findAllByStatusOrderByRegistrationStartDesc(RoundStatus status);
 
+    /**
+     * The unfiltered "active" list: archived (CLOSED) rounds stay out of
+     * default pickers while remaining reachable through the explicit status
+     * query above.
+     */
+    List<ThesisRegistrationRound> findAllByStatusNotOrderByRegistrationStartDesc(RoundStatus status);
+
     Optional<ThesisRegistrationRound> findById(UUID id);
 }
