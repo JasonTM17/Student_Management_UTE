@@ -1,5 +1,6 @@
 package io.campuscore.restfulapi.audit.controller;
 
+import io.campuscore.restfulapi.audit.model.AuditPage;
 import io.campuscore.restfulapi.exception.DomainException;
 import java.util.List;
 import java.util.Map;
@@ -57,7 +58,7 @@ public class AdminAuditReadController {
             throw new DomainException(HttpStatus.BAD_REQUEST, "INVALID_REQUEST",
                     "limit must be between 1 and " + AdminAuditReadRepository.MAX_PAGE_SIZE);
         }
-        AdminAuditReadRepository.AuditPage result =
+        AuditPage result =
                 audits.page(page, limit, action, entityType, entityId, actorId, search);
         Map<String, Object> meta = Map.of(
                 "total", result.total(),
