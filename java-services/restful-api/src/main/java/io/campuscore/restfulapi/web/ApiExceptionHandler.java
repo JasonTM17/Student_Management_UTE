@@ -6,7 +6,7 @@ import java.util.Map;
 
 /**
  * Legacy exception DTO container preserved for backward compatibility.
- * Active exception handling is managed by {@link io.campuscore.restfulapi.web.GlobalExceptionHandler}.
+ * Active exception handling is managed by {@link io.campuscore.restfulapi.exception.handler.GlobalExceptionHandler}.
  */
 public final class ApiExceptionHandler {
 
