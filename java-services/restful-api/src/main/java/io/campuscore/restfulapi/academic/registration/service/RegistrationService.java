@@ -1026,6 +1026,7 @@ public class RegistrationService {
         if (!"OPEN".equals(String.valueOf(round.get("status"))) || !inWindow(round, now)) {
             throw problem(HttpStatus.CONFLICT, "WINDOW_CLOSED", "Registration window is closed");
         }
+        requireOpenSemester(String.valueOf(round.get("semester_id")));
         // One query answers both "does this round restrict cohorts" and "does
         // the student match one": counting the two populations in a single
         // round trip keeps the catalog query budget contract at a constant.
