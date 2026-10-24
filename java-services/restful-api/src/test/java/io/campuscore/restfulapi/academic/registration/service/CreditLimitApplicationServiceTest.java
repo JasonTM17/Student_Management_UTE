@@ -12,6 +12,7 @@ import java.util.Map;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.http.HttpStatus;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.web.server.ResponseStatusException;
@@ -91,6 +92,24 @@ class CreditLimitApplicationServiceTest {
         assertThat(approved.status()).isEqualTo("APPROVED");
     }
 
+    @Test
+    void inactiveStudentCannotSubmitCreditLimitApplication() {
+        seedStudent();
+        seedOpenRound("cl-round-inactive", 28);
+        jdbc.update("UPDATE academic.\"Student\" SET \"status\" = 'INACTIVE' WHERE \"id\" = ?", STUDENT);
+
+        assertThatThrownBy(() -> service.submit(
+                        STUDENT,
+                        "cl-round-inactive",
+                        "Tôi cần đăng ký vượt hạn mức để học môn thay thế học phần bị hoãn."))
+                .isInstanceOf(DomainException.class)
+                .satisfies(failure -> {
+                    DomainException domain = (DomainException) failure;
+                    assertThat(domain.status()).isEqualTo(HttpStatus.FORBIDDEN);
+                    assertThat(domain.code()).isEqualTo("STUDENT_PROFILE_REQUIRED");
+                });
+    }
+
     private void seedStudent() {
         // The service resolves the student in academic."Student" and joins the
         // campuscore_auth."User" account for display fields; the H2 harness
@@ -98,7 +117,7 @@ class CreditLimitApplicationServiceTest {
         // provides exactly the columns the SQL reads.
         jdbc.execute("CREATE TABLE IF NOT EXISTS academic.\"Student\""
                 + " (\"id\" VARCHAR(120) PRIMARY KEY, \"userId\" VARCHAR(120) NOT NULL,"
-                + " \"studentId\" VARCHAR(120))");
+                + " \"studentId\" VARCHAR(120), \"status\" VARCHAR(40) NOT NULL DEFAULT 'ACTIVE')");
         jdbc.update("DELETE FROM academic.\"Student\" WHERE \"id\" = ?", STUDENT);
         jdbc.update("DELETE FROM campuscore_auth.\"User\" WHERE \"id\" = ?", STUDENT);
         jdbc.update(
