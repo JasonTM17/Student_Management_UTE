@@ -27,21 +27,21 @@ class DemoAccountGateFailClosedTest {
 
     @Test
     void disabledModePropagatesDataAccessException() {
-        DemoAccountGate gate = new DemoAccountGate(failingJdbc(), false, "STUDENT");
+        DemoAccountGate gate = new DemoAccountGate(new io.campuscore.restfulapi.auth.repository.DemoAccountRepository(failingJdbc()), false, "STUDENT");
 
         assertThrows(DataAccessException.class, () -> gate.run(null));
     }
 
     @Test
     void enabledUnscopedModePropagatesDataAccessException() {
-        DemoAccountGate gate = new DemoAccountGate(failingJdbc(), true, "");
+        DemoAccountGate gate = new DemoAccountGate(new io.campuscore.restfulapi.auth.repository.DemoAccountRepository(failingJdbc()), true, "");
 
         assertThrows(DataAccessException.class, () -> gate.run(null));
     }
 
     @Test
     void enabledScopedModePropagatesDataAccessException() {
-        DemoAccountGate gate = new DemoAccountGate(failingJdbc(), true, "STUDENT");
+        DemoAccountGate gate = new DemoAccountGate(new io.campuscore.restfulapi.auth.repository.DemoAccountRepository(failingJdbc()), true, "STUDENT");
 
         assertThrows(DataAccessException.class, () -> gate.run(null));
     }
