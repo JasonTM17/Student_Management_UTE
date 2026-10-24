@@ -149,8 +149,9 @@ export default function AdminThesisPage() {
   // reinstate a topic. Each call is audited server-side with the reason.
   const [reasonAction, setReasonAction] = useState<{
     kind: 'unassignTopic' | 'replaceMember' | 'waiveGvpb' | 'revokeGvpbWaiver' | 'withdrawTopic' | 'reinstateTopic'
-        | 'lateTopic' | 'rosterOverride' | 'topicReassign' | 'retractResults';
+        | 'lateTopic' | 'rosterOverride' | 'topicReassign' | 'retractResults' | 'deleteRound';
     roundId: string;
+    roundName?: string;
     councilId?: string;
     topicId?: string;
     lecturerId?: string;
@@ -834,17 +835,43 @@ export default function AdminThesisPage() {
         }
         await thesisApi.retractResults(action.roundId, reason, 'RETRACT');
         setSuccess(messages.thesis.admin.retractResultsSuccess);
+      } else if (action.kind === 'deleteRound') {
+        if (retractConfirmation.trim() !== action.roundName) {
+          setReasonActionError(messages.thesis.admin.deleteRoundConfirmLabel);
+          return;
+        }
+        await thesisApi.deleteRound(action.roundId, reason);
+        setSuccess(messages.thesis.admin.roundDeleted);
       } else {
         return;
       }
       setReasonAction(null);
+      if (action.kind === 'deleteRound' && expandedRoundRef.current === action.roundId) {
+        expandedRoundRef.current = null;
+        setExpandedRoundId(null);
+      }
       await loadData();
-      await loadRoundDetail(action.roundId);
+      if (action.kind !== 'deleteRound') {
+        await loadRoundDetail(action.roundId);
+      }
     } catch (err: unknown) {
       setReasonActionError(transitionErrorMessage(err));
     } finally {
       setIsSaving(false);
     }
+  };
+
+  const deleteBlockerSummary = (round: ThesisRound): string => {
+    const info = round.deletion;
+    if (!info) return '';
+    const copy = messages.thesis.admin;
+    const parts: string[] = [];
+    if (info.topics > 0) parts.push(copy.deleteBlockerTopics.replace('{count}', String(info.topics)));
+    if (info.groups > 0) parts.push(copy.deleteBlockerGroups.replace('{count}', String(info.groups)));
+    if (info.members > 0) parts.push(copy.deleteBlockerMembers.replace('{count}', String(info.members)));
+    if (info.reports > 0) parts.push(copy.deleteBlockerReports.replace('{count}', String(info.reports)));
+    if (info.councils > 0) parts.push(copy.deleteBlockerCouncils.replace('{count}', String(info.councils)));
+    return parts.join(' · ');
   };
 
   const reasonActionTitle = reasonAction
@@ -859,6 +886,7 @@ export default function AdminThesisPage() {
         rosterOverride: messages.thesis.admin.rosterOverrideTitle,
         topicReassign: messages.thesis.admin.topicReassignTitle,
         retractResults: messages.thesis.admin.retractResultsTitle,
+        deleteRound: messages.thesis.admin.deleteRoundTitle,
       }[reasonAction.kind]
     : '';
 
@@ -1173,6 +1201,27 @@ export default function AdminThesisPage() {
                             >
                               {messages.thesis.admin.cancelRound}
                             </Button>
+                          ) : null}
+                          {round.deletion?.deletable ? (
+                            <Button
+                              type="button"
+                              size="sm"
+                              variant="ghost"
+                              className="text-destructive hover:text-destructive"
+                              onClick={() => openReasonAction({
+                                kind: 'deleteRound', roundId: round.id, roundName: round.name,
+                              })}
+                              disabled={isSaving}
+                            >
+                              <Trash2 className="h-3.5 w-3.5" />
+                              {messages.thesis.admin.deleteRound}
+                            </Button>
+                          ) : null}
+                          {round.status === 'CANCELLED' && deleteBlockerSummary(round) ? (
+                            <span className="text-xs text-muted-foreground">
+                              {messages.thesis.admin.deleteBlockersLabel
+                                .replace('{counts}', deleteBlockerSummary(round))}
+                            </span>
                           ) : null}
                         </div>
 
@@ -2171,6 +2220,21 @@ export default function AdminThesisPage() {
                 <Input
                   value={reassignForm.topicId}
                   onChange={(e) => setReassignForm({ ...reassignForm, topicId: e.target.value })}
+                  required
+                />
+              </label>
+            </>
+          ) : null}
+          {reasonAction?.kind === 'deleteRound' ? (
+            <>
+              <p className="text-sm text-muted-foreground">
+                {messages.thesis.admin.deleteRoundHint}
+              </p>
+              <label className="flex flex-col gap-2 text-sm font-medium text-foreground">
+                {messages.thesis.admin.deleteRoundConfirmLabel}
+                <Input
+                  value={retractConfirmation}
+                  onChange={(e) => setRetractConfirmation(e.target.value)}
                   required
                 />
               </label>
