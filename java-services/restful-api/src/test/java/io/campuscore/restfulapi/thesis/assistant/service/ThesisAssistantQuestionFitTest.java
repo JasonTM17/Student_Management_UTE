@@ -14,6 +14,8 @@ import org.junit.jupiter.params.provider.ValueSource;
 import org.junit.jupiter.api.Test;
 import io.campuscore.restfulapi.thesis.assistant.client.AssistantCompletionProvider;
 import io.campuscore.restfulapi.thesis.assistant.client.DeepSeekClient;
+import io.campuscore.restfulapi.thesis.assistant.exception.ProviderCancelledException;
+import io.campuscore.restfulapi.thesis.assistant.exception.ProviderUnavailableException;
 import io.campuscore.restfulapi.thesis.assistant.properties.AssistantProperties;
 import io.campuscore.restfulapi.thesis.assistant.properties.DeepSeekProperties;
 import io.campuscore.restfulapi.thesis.assistant.repository.ThesisAssistantKnowledgeRepository;
@@ -123,7 +125,7 @@ class ThesisAssistantQuestionFitTest {
             var request = invocation.getArgument(0, AssistantCompletionProvider.CompletionRequest.class);
             assertTrue(request.context().contains(content), "provider context remains the approved retrieval");
             assertEquals(List.of(sourceId), request.sourceIds());
-            if ("unavailable".equals(branch)) throw new DeepSeekClient.ProviderUnavailableException("fixture");
+            if ("unavailable".equals(branch)) throw new ProviderUnavailableException("fixture");
             @SuppressWarnings("unchecked")
             var sink = (java.util.function.Consumer<AssistantCompletionProvider.ProviderSegment>) invocation.getArgument(1);
             String text = "unsafe".equals(branch) ? "Contact student@example.com" : "Synthesized answer";

@@ -5,6 +5,8 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import io.campuscore.restfulapi.thesis.assistant.client.AssistantCompletionProvider.CompletionRequest;
 import io.campuscore.restfulapi.thesis.assistant.client.AssistantCompletionProvider.CompletionResult;
 import io.campuscore.restfulapi.thesis.assistant.client.AssistantCompletionProvider.ProviderSegment;
+import io.campuscore.restfulapi.thesis.assistant.exception.ProviderCancelledException;
+import io.campuscore.restfulapi.thesis.assistant.exception.ProviderUnavailableException;
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStream;
@@ -491,23 +493,4 @@ public class DeepSeekClient implements AssistantCompletionProvider {
     }
 
     private record ParsedFrame(boolean done, String text, String finishReason, List<String> sourceIds, long rawBytes) { }
-
-    public static final class ProviderCancelledException extends RuntimeException {
-        public ProviderCancelledException() { super("assistant request cancelled"); }
-    }
-
-    public static class ProviderUnavailableException extends RuntimeException {
-        private final boolean retryableBeforeContent;
-        private final boolean malformed;
-
-        public ProviderUnavailableException(String message) { this(message, false, null, false); }
-        public ProviderUnavailableException(String message, Throwable cause) { this(message, false, cause, false); }
-        ProviderUnavailableException(String message, boolean retryableBeforeContent, Throwable cause, boolean malformed) {
-            super(message, cause);
-            this.retryableBeforeContent = retryableBeforeContent;
-            this.malformed = malformed;
-        }
-        public boolean retryableBeforeContent() { return retryableBeforeContent; }
-        public boolean malformed() { return malformed; }
-    }
 }
