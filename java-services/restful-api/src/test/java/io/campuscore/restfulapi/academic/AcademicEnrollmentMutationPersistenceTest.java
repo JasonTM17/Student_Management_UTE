@@ -150,6 +150,17 @@ class AcademicEnrollmentMutationPersistenceTest {
     }
 
     @Test
+    void eligibilityRejectsArchivedSemesterEvenWhenRegistrationRoundIsOpen() throws Exception {
+        jdbc.update("UPDATE \"academic\".\"Semester\" SET \"status\" = 'ARCHIVED' WHERE \"id\" = 'semester-1'");
+
+        mvc.perform(get("/api/v1/me/registration/eligibility")
+                        .with(studentJwt("student-user-1", "student-1"))
+                        .param("roundId", "round-open"))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("SEMESTER_CLOSED"));
+    }
+
+    @Test
     void enrollPersistsRegistrationSlipWithSha256Header() throws Exception {
         mvc.perform(post("/api/v1/me/enrollments")
                         .with(studentJwt("student-user-1", "student-1"))
