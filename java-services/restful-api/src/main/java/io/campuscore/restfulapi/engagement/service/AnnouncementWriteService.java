@@ -2,13 +2,14 @@ package io.campuscore.restfulapi.engagement.service;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import io.campuscore.restfulapi.engagement.domain.SanitizationResult;
 import io.campuscore.restfulapi.engagement.repository.AnnouncementAuditRepository;
-import io.campuscore.restfulapi.engagement.repository.AnnouncementAuditRepository.AuditCommand;
+import io.campuscore.restfulapi.engagement.domain.AuditCommand;
 import io.campuscore.restfulapi.engagement.repository.AnnouncementWriteRepository;
-import io.campuscore.restfulapi.engagement.repository.AnnouncementWriteRepository.CreateAnnouncementCommand;
-import io.campuscore.restfulapi.engagement.repository.AnnouncementWriteRepository.PatchValue;
-import io.campuscore.restfulapi.engagement.repository.AnnouncementWriteRepository.TransitionCommand;
-import io.campuscore.restfulapi.engagement.repository.AnnouncementWriteRepository.UpdateAnnouncementCommand;
+import io.campuscore.restfulapi.engagement.domain.CreateAnnouncementCommand;
+import io.campuscore.restfulapi.engagement.domain.PatchValue;
+import io.campuscore.restfulapi.engagement.domain.TransitionCommand;
+import io.campuscore.restfulapi.engagement.domain.UpdateAnnouncementCommand;
 import io.campuscore.restfulapi.engagement.dto.AnnouncementReadDtos.AnnouncementHistoryListResponse;
 import io.campuscore.restfulapi.engagement.dto.AnnouncementReadDtos.AnnouncementHistoryResponse;
 import io.campuscore.restfulapi.engagement.dto.AnnouncementReadDtos.AnnouncementResponse;
@@ -661,7 +662,7 @@ public class AnnouncementWriteService {
             throw new DomainException(HttpStatus.BAD_REQUEST, "UNSAFE_ANNOUNCEMENT_CONTENT",
                     "Announcement content must not contain scripts, embedded frames, or event handlers");
         }
-        AnnouncementHtmlSanitizer.SanitizationResult sanitized =
+        SanitizationResult sanitized =
                 AnnouncementHtmlSanitizer.sanitize(content);
         return new SanitizedContent(sanitized.html(), sanitized.removedElements());
     }

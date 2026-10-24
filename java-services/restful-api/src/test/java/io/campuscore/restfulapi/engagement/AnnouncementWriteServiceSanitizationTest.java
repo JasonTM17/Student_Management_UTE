@@ -11,10 +11,10 @@ import static org.mockito.Mockito.when;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.campuscore.restfulapi.engagement.repository.AnnouncementAuditRepository;
-import io.campuscore.restfulapi.engagement.repository.AnnouncementAuditRepository.AuditCommand;
+import io.campuscore.restfulapi.engagement.domain.AuditCommand;
 import io.campuscore.restfulapi.engagement.repository.AnnouncementWriteRepository;
-import io.campuscore.restfulapi.engagement.repository.AnnouncementWriteRepository.CreateAnnouncementCommand;
-import io.campuscore.restfulapi.engagement.repository.AnnouncementWriteRepository.UpdateAnnouncementCommand;
+import io.campuscore.restfulapi.engagement.domain.CreateAnnouncementCommand;
+import io.campuscore.restfulapi.engagement.domain.UpdateAnnouncementCommand;
 import io.campuscore.restfulapi.engagement.service.AnnouncementStudentNotifier;
 import io.campuscore.restfulapi.engagement.service.AnnouncementWriteService;
 import io.campuscore.restfulapi.engagement.dto.AnnouncementReadDtos.AnnouncementResponse;
