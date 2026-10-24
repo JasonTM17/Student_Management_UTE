@@ -686,6 +686,34 @@ class AdminCatalogMutationPersistenceTest {
     }
 
     @Test
+    void courseCreditsCannotChangeAfterPublishedGradesExist() throws Exception {
+        jdbc.update("INSERT INTO \"academic\".\"Enrollment\""
+                        + " (\"id\", \"studentId\", \"sectionId\", \"courseId\", \"gradeStatus\")"
+                        + " VALUES (?, ?, ?, ?, ?)",
+                "enrollment-published-credit-lock", "student-1", "section-existing", "course-old", "PUBLISHED");
+
+        mvc.perform(put("/api/v1/courses/course-old")
+                        .with(adminJwt())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"credits\":4}"))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("COURSE_CREDITS_LOCKED_BY_GRADES"));
+
+        jdbc.update("UPDATE \"academic\".\"Enrollment\" SET \"gradeStatus\" = 'APPEALED'"
+                + " WHERE \"id\" = 'enrollment-published-credit-lock'");
+        mvc.perform(put("/api/v1/courses/course-old")
+                        .with(adminJwt())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"credits\":4}"))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("COURSE_CREDITS_LOCKED_BY_GRADES"));
+
+        assertThat(jdbc.queryForObject(
+                "SELECT \"credits\" FROM \"academic\".\"Course\" WHERE \"id\" = ?", Integer.class, "course-old"))
+                .isEqualTo(3);
+    }
+
+    @Test
     void semesterUpdateRejectsUnknownStatus() throws Exception {
         mvc.perform(put("/api/v1/semesters/semester-old")
                         .with(adminJwt())
@@ -930,10 +958,20 @@ class AdminCatalogMutationPersistenceTest {
                     "endTime" VARCHAR(10) NOT NULL
                 )
                 """);
+        jdbc.execute("""
+                CREATE TABLE IF NOT EXISTS "academic"."Enrollment" (
+                    "id" VARCHAR(120) PRIMARY KEY,
+                    "studentId" VARCHAR(120) NOT NULL,
+                    "sectionId" VARCHAR(120) NOT NULL REFERENCES "academic"."Section" ("id"),
+                    "courseId" VARCHAR(120) NOT NULL REFERENCES "academic"."Course" ("id"),
+                    "gradeStatus" VARCHAR(40) NOT NULL
+                )
+                """);
     }
 
     private void clearTables() {
         jdbc.update("DELETE FROM \"campuscore_audit\".\"AdminAudit\"");
+        jdbc.update("DELETE FROM \"academic\".\"Enrollment\"");
         jdbc.update("DELETE FROM \"academic\".\"SectionSchedule\"");
         jdbc.update("DELETE FROM \"academic\".\"Section\"");
         jdbc.update("DELETE FROM \"academic\".\"Lecturer\"");
