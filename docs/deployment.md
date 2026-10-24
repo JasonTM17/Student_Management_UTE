@@ -69,6 +69,7 @@ Hệ thống trợ lý học vụ AI (`ThesisAssistantService`) áp dụng kiế
 ### 3.2. Hạn mức tín chỉ đăng ký
 
 - `REGISTRATION_SUMMER_MAX_CREDITS` (property `registration.summer-max-credits`, mặc định `10`) cấu hình giới hạn tín chỉ thông thường trong học kỳ hè. Máy chủ nhận diện học kỳ hè bằng `Semester.type = SUMMER`; hạn mức của đợt đăng ký vẫn có thể đặt thấp hơn. Mức `8` trong quy chế không được áp làm trần mặc định.
+- `REGISTRATION_WITHDRAWAL_WINDOW_DAYS` (property `registration.withdrawal.window.days`, mặc định `14`) cấu hình số ngày đầu học kỳ chính (`FIRST`/`SECOND`, trạng thái `OPEN`) mà sinh viên được nộp đơn rút học phần có phê duyệt — điểm `W` trên bảng điểm, không tính GPA/tín chỉ. Tính từ `Semester.startDate` theo giờ Asia/Bangkok, ngày cuối của cửa sổ được tính trọn ngày; đơn đang chờ vẫn được xét duyệt sau khi cửa sổ đóng.
 - Đơn nâng hạn mức đã được duyệt tiếp tục theo hành vi hiện có, kể cả ở học kỳ hè. Giới hạn tối thiểu `14` chỉ là thông tin tư vấn trên trang đăng ký và không chặn việc thêm từng học phần. Dữ liệu hiện không xác định chắc chắn học kỳ cuối, vì vậy Phòng Đào tạo phải áp dụng ngoại lệ học kỳ cuối thủ công khi cần.
 
 ---
