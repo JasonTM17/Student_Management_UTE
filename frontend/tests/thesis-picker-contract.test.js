@@ -53,6 +53,34 @@ test('clearing the GVPB picker still posts the empty unassigned draft', () => {
   assert.match(row, /\[tid\]: next/, 'the same reviewerDrafts setter receives the value');
 });
 
+test('the add-member picker is a searchable Combobox gated by assigned-topic conflicts', () => {
+  const modal = slice(page, 'Add Council Member Modal', 'lecturerLoadFailed');
+  assert.match(modal, /<Combobox/, 'add-member uses the searchable combobox');
+  assert.doesNotMatch(modal, /<Select/, 'the long lecturer list no longer uses a native select');
+  assert.match(modal, /councilMemberConflict\(\{/);
+  assert.match(modal, /assignedTopics: councilTopics/, 'the council\u2019s topics gate the option');
+  assert.match(modal, /disabledReason: conflict[\s\S]{0,140}conflicts\[conflict\]/);
+});
+
+test('the replace-member picker keeps the seat filter and adds conflict reasons', () => {
+  const modal = slice(page, "reasonAction?.kind === 'replaceMember'", "reasonAction?.kind === 'lateTopic'");
+  assert.match(modal, /<Combobox/, 'replace-member uses the searchable combobox');
+  assert.doesNotMatch(modal, /<Select/, 'the replacement list no longer uses a native select');
+  assert.match(modal, /l\.id !== reasonAction\.lecturerId/, 'the outgoing member is still excluded');
+  assert.match(modal, /councilMemberConflict\(\{/);
+  assert.match(modal, /assignedTopics: replaceCouncilTopics/);
+});
+
+test('the assign-topic picker is a searchable Combobox gated by council-seat conflicts', () => {
+  const modal = slice(page, 'Assign Topic Modal', 'handleAssignTopic');
+  assert.match(modal, /<Combobox/, 'assign-topic uses the searchable combobox');
+  assert.doesNotMatch(modal, /<Select/, 'the topic list no longer uses a native select');
+  assert.match(modal, /assignTopicConflict\(\{/);
+  assert.match(modal, /memberIds: targetMemberIds/);
+  assert.match(modal, /officerIds: targetOfficerIds/);
+  assert.match(modal, /topicSupervisorIds: topicSupervisors\[t\.id\]/);
+});
+
 test('supervisor ids come from the real thesis API, keyed per topic', () => {
   assert.match(page, /thesisApi\s*\.\s*listSupervisors\(/);
   assert.match(
