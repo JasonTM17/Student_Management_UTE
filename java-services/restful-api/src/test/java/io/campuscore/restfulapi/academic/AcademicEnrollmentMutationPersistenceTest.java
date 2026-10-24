@@ -798,11 +798,20 @@ class AcademicEnrollmentMutationPersistenceTest {
                 .andExpect(jsonPath("$.creditsUsed").value(0))
                 .andExpect(jsonPath("$.belowMinimum").value(true));
 
-        jdbc.update("UPDATE \"academic\".\"Course\" SET \"credits\" = 14 WHERE \"id\" = 'course-open'");
-        seedActiveEnrollment("enrollment-minimum-exact", "section-open", "course-open");
+        jdbc.update("UPDATE \"academic\".\"Course\" SET \"credits\" = 13 WHERE \"id\" = 'course-open'");
+        seedActiveEnrollment("enrollment-minimum-below", "section-open", "course-open");
         mvc.perform(get("/api/v1/me/registration/summary")
                         .with(studentJwt("student-user-1", "student-1")))
                 .andExpect(status().isOk())
+                .andExpect(jsonPath("$.minCredits").value(14))
+                .andExpect(jsonPath("$.creditsUsed").value(13))
+                .andExpect(jsonPath("$.belowMinimum").value(true));
+
+        jdbc.update("UPDATE \"academic\".\"Course\" SET \"credits\" = 14 WHERE \"id\" = 'course-open'");
+        mvc.perform(get("/api/v1/me/registration/summary")
+                        .with(studentJwt("student-user-1", "student-1")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.minCredits").value(14))
                 .andExpect(jsonPath("$.creditsUsed").value(14))
                 .andExpect(jsonPath("$.belowMinimum").value(false));
 
@@ -811,6 +820,32 @@ class AcademicEnrollmentMutationPersistenceTest {
                         .with(studentJwt("student-user-1", "student-1")))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.creditsUsed").value(15))
+                .andExpect(jsonPath("$.belowMinimum").value(false));
+    }
+
+    @Test
+    void summerSummaryOmitsTheRegularSemesterMinimumAndFirstRegistrationStillSucceeds() throws Exception {
+        jdbc.update("UPDATE \"academic\".\"Semester\" SET \"type\" = 'SUMMER' WHERE \"id\" = 'semester-1'");
+
+        mvc.perform(get("/api/v1/me/registration/summary")
+                        .with(studentJwt("student-user-1", "student-1")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.minCredits").value(0))
+                .andExpect(jsonPath("$.creditsUsed").value(0))
+                .andExpect(jsonPath("$.belowMinimum").value(false));
+
+        mvc.perform(post("/api/v1/me/enrollments")
+                        .with(studentJwt("student-user-1", "student-1"))
+                        .header("Idempotency-Key", "summer-first-registration-under-minimum")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"sectionId\":\"section-open\"}"))
+                .andExpect(status().isOk());
+
+        mvc.perform(get("/api/v1/me/registration/summary")
+                        .with(studentJwt("student-user-1", "student-1")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.minCredits").value(0))
+                .andExpect(jsonPath("$.creditsUsed").value(3))
                 .andExpect(jsonPath("$.belowMinimum").value(false));
     }
 

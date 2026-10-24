@@ -1,10 +1,11 @@
 type MinimumCreditsNoticeProps = {
   belowMinimum: boolean;
+  minCredits: number;
   message: string;
 };
 
-export function MinimumCreditsNotice({ belowMinimum, message }: MinimumCreditsNoticeProps) {
-  if (!belowMinimum) return null;
+export function MinimumCreditsNotice({ belowMinimum, minCredits, message }: MinimumCreditsNoticeProps) {
+  if (!belowMinimum || minCredits <= 0) return null;
 
   return (
     <p
