@@ -11,6 +11,8 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import java.util.List;
 import org.springframework.context.annotation.Profile;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -36,7 +38,8 @@ public class ThesisRoundReadController {
     @PreAuthorize("hasAnyRole('STUDENT','LECTURER','ADMIN','SUPER_ADMIN','TRUONG_KHOA','TRUONG_BO_MON')")
     public List<RoundResponse> list(
             @Parameter(description = "Lọc theo trạng thái đợt (PROPOSAL_OPEN, REGISTRATION_OPEN, RESULTS_PUBLISHED, v.v.)")
-            @RequestParam(required = false) RoundStatus status) {
-        return rounds.list(status);
+            @RequestParam(required = false) RoundStatus status,
+            @AuthenticationPrincipal Jwt actor) {
+        return rounds.list(status, actor);
     }
 }

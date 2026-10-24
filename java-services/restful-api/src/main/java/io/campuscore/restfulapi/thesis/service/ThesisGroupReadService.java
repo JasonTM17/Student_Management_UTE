@@ -166,7 +166,7 @@ public class ThesisGroupReadService {
                 group.members().stream()
                         .map(m -> new io.campuscore.restfulapi.thesis.web.ThesisGroupReadDtos.GroupMemberResponse(
                                 m.studentId(), m.studentNumber(), m.displayName(), null,
-                                m.isExternal(), m.isLeader(), m.memberOrder()))
+                                m.isExternal(), m.isLeader(), m.memberOrder(), m.eligible()))
                         .toList());
     }
 

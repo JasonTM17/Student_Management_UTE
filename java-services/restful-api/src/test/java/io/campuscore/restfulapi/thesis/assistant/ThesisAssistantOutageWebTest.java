@@ -37,6 +37,9 @@ class ThesisAssistantOutageWebTest {
     @MockitoBean
     private io.campuscore.restfulapi.academic.service.AcademicConductService conduct;
 
+    @org.springframework.test.context.bean.override.mockito.MockitoSpyBean
+    private io.campuscore.restfulapi.academic.service.AcademicEnrollmentReadService enrollments;
+
     @Test
     void databaseOutageKeepsThePublicDegradedContractThroughTheWebLayer() throws Exception {
         when(knowledge.search(anyString(), anyList(), anyInt()))
@@ -66,9 +69,13 @@ class ThesisAssistantOutageWebTest {
                 .thenThrow(new DataAccessResourceFailureException("database unavailable"));
         // Knowledge failure does not fail the independent conduct database.
         // Inject the personal-data fault explicitly instead of relying on a
-        // missing schema left over from another test class.
+        // missing schema left over from another test class. The H2 chain now
+        // mirrors the academic read tables (V144), so the grades path faults
+        // on its service seam the same way the conduct path does.
         when(conduct.studentSummary(anyString()))
                 .thenThrow(new DataAccessResourceFailureException("conduct database unavailable"));
+        org.mockito.Mockito.doThrow(new DataAccessResourceFailureException("enrollment database unavailable"))
+                .when(enrollments).findStudentGrades(anyString(), org.mockito.ArgumentMatchers.isNull());
 
         String[][] handedOverQuestions = {
                 {"00000000-0000-4000-8000-000000000021", "điểm của tôi hiện tại thế nào?"},

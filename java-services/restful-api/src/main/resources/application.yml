@@ -44,6 +44,15 @@ spring:
     cache: false
 
 thesis:
+  eligibility:
+    # The regulation's registration condition: accumulated credits earned and
+    # cumulative GPA on the 4.0 scale, both read from the canonical transcript
+    # summary (published grades, best attempt per course). ENFORCE blocks
+    # group create/member-add/topic-pick with 409 THESIS_ELIGIBILITY_NOT_MET;
+    # ADVISORY evaluates and reports in the read model but never blocks.
+    min-credits: ${THESIS_ELIGIBILITY_MIN_CREDITS:110}
+    min-cpa: ${THESIS_ELIGIBILITY_MIN_CPA:2.0}
+    enforcement: ${THESIS_ELIGIBILITY_ENFORCEMENT:ENFORCE}
   report:
     storage:
       # Local is the safe default for previews. Set provider=supabase only in

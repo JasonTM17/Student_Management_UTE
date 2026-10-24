@@ -2,6 +2,7 @@ package io.campuscore.restfulapi.thesis.web;
 
 import io.campuscore.restfulapi.thesis.domain.RoundStatus;
 import io.campuscore.restfulapi.thesis.domain.ThesisRegistrationRound;
+import io.campuscore.restfulapi.thesis.service.ThesisEligibilityService.EligibilityView;
 import java.time.Instant;
 import java.util.UUID;
 
@@ -61,21 +62,32 @@ public final class ThesisRoundDtos {
              * shipped undergraduate round type; the UI hides the waive action
              * and must not keep its own round-type list.
              */
-            boolean counterReviewWaiverAllowed) {
+            boolean counterReviewWaiverAllowed,
+            /**
+             * Caller-scoped registration eligibility: populated only for
+             * student callers so the thesis page can render the eligibility
+             * card without a second request. Null for staff/governance callers.
+             */
+            EligibilityView eligibility) {
 
         public static RoundResponse from(ThesisRegistrationRound round) {
-            return from(round, null, false);
+            return from(round, null, false, null);
         }
 
         public static RoundResponse from(ThesisRegistrationRound round, RoundDeletionInfo deletion,
                 boolean counterReviewWaiverAllowed) {
+            return from(round, deletion, counterReviewWaiverAllowed, null);
+        }
+
+        public static RoundResponse from(ThesisRegistrationRound round, RoundDeletionInfo deletion,
+                boolean counterReviewWaiverAllowed, EligibilityView eligibility) {
             return new RoundResponse(
                     round.getId(), round.getName(), round.getThesisType(),
                     round.getLecturerSubmitStart(), round.getLecturerSubmitEnd(),
                     round.getRegistrationStart(), round.getRegistrationEnd(),
                     round.getGvpbDeadline(), round.getReportDeadline(), round.getProposalPublishAt(),
                     round.getReportDate(), round.getDefenseDate(), round.getStatus(),
-                    round.getCancelledFromStatus(), deletion, counterReviewWaiverAllowed);
+                    round.getCancelledFromStatus(), deletion, counterReviewWaiverAllowed, eligibility);
         }
     }
 }

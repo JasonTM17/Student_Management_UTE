@@ -29,5 +29,11 @@ public final class ThesisGroupReadDtos {
             String contact,
             boolean isExternal,
             boolean isLeader,
-            int memberOrder) { }
+            int memberOrder,
+            /**
+             * Accumulated-credit/CPA eligibility flag: false renders the
+             * "chưa đủ điều kiện" chip on rosters. Null for external members
+             * and on backends without the eligibility service.
+             */
+            Boolean eligible) { }
 }

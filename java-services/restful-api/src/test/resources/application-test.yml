@@ -53,3 +53,11 @@ engagement:
 academic:
   enrolled-count:
     enabled: false
+
+thesis:
+  eligibility:
+    # Legacy thesis fixtures carry no published academic records, so the
+    # fail-closed ENFORCE default would refuse every fixture mutation. Tests
+    # that exercise the blocking behaviour pin ENFORCE explicitly
+    # (ThesisEligibilityTest); ADVISORY still evaluates and reports.
+    enforcement: ADVISORY
