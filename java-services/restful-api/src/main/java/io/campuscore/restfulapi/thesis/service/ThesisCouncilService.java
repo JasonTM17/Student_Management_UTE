@@ -61,6 +61,7 @@ public class ThesisCouncilService {
     private final ThesisScopeRepository scope;
     private final AdminAuditRecorder audit;
     private final ThesisNotificationService notifier;
+    private final ThesisGovernanceCapabilities capabilities;
 
     /**
      * Creates the service over the shared named-parameter JDBC template.
@@ -70,16 +71,18 @@ public class ThesisCouncilService {
      *              caller's transaction so the grade and its trace commit together
      */
     public ThesisCouncilService(NamedParameterJdbcTemplate jdbc, AdminAuditRecorder audit) {
-        this(jdbc, audit, null, new ThesisScopeRepository(jdbc));
+        this(jdbc, audit, null, new ThesisScopeRepository(jdbc), new ThesisGovernanceCapabilities(false));
     }
 
     @org.springframework.beans.factory.annotation.Autowired
     public ThesisCouncilService(NamedParameterJdbcTemplate jdbc, AdminAuditRecorder audit,
-            ThesisNotificationService notifier, ThesisScopeRepository scope) {
+            ThesisNotificationService notifier, ThesisScopeRepository scope,
+            ThesisGovernanceCapabilities capabilities) {
         this.jdbc = jdbc;
         this.scope = scope;
         this.audit = audit;
         this.notifier = notifier;
+        this.capabilities = capabilities;
     }
 
     // ---------- councils ----------
@@ -1271,6 +1274,13 @@ public class ThesisCouncilService {
         // A waiver is a governance outcome: supervising the topic — even as
         // a dean from another faculty — must not grant it.
         ThesisDeanScope.requireTopicGovernanceScope(scope, actor, topicId);
+        // Every shipped round level is undergraduate: the counter-reviewer is
+        // always required, so the waiver is refused before any state check or
+        // write. A stored waiver stays revocable (see revokeCounterReviewWaiver).
+        if (!capabilities.counterReviewWaiverAllowed((String) topic.get("thesis_type"))) {
+            throw conflict("COUNTER_REVIEW_WAIVER_NOT_SUPPORTED",
+                    "This round type always requires a counter-reviewer");
+        }
         if (!TopicStatus.PUBLISHED.name().equals(topic.get("status"))
                 && !TopicStatus.APPROVED.name().equals(topic.get("status"))) {
             throw conflict("TOPIC_NOT_PUBLISHED", "Only published topics can waive a counter-review");

@@ -23,6 +23,7 @@ import io.campuscore.restfulapi.thesis.dto.ThesisMutationDtos.PublishResultsPrev
 import io.campuscore.restfulapi.thesis.dto.ThesisMutationDtos.ReportDeadlineUpdateRequest;
 import io.campuscore.restfulapi.thesis.dto.ThesisMutationDtos.ReportUpdateRequest;
 import io.campuscore.restfulapi.thesis.dto.ThesisMutationDtos.RoundCreateRequest;
+import io.campuscore.restfulapi.thesis.dto.ThesisMutationDtos.RoundDeleteRequest;
 import io.campuscore.restfulapi.thesis.dto.ThesisMutationDtos.RoundRestoreRequest;
 import io.campuscore.restfulapi.thesis.dto.ThesisMutationDtos.StudentSearchResponse;
 import io.campuscore.restfulapi.thesis.dto.ThesisMutationDtos.TopicAssignmentRequest;
@@ -126,6 +127,27 @@ public class ThesisMutationController {
             @RequestBody(required = false) RoundRestoreRequest request,
             @AuthenticationPrincipal Jwt actor) {
         return mutations.restoreRound(id, request == null ? null : request.targetStatus(), actor);
+    }
+
+    /**
+     * Removes a round that was created by mistake. Only an empty DRAFT or
+     * CANCELLED round is deletable; a round holding any thesis data is refused
+     * with ROUND_HAS_DATA so cancel stays the safe archive path.
+     */
+    @Operation(summary = "Xóa đợt tạo nhầm", description = "Xóa hẳn một đợt rỗng còn DRAFT hoặc đã CANCELLED (xóa đợt tạo nhầm); đợt đã có đề tài/nhóm/hội đồng bị từ chối với mã ROUND_HAS_DATA; yêu cầu lý do, ghi audit")
+    @ApiResponses({
+        @ApiResponse(responseCode = "204", description = "Xóa thành công"),
+        @ApiResponse(responseCode = "404", description = "Không tìm thấy đợt (ROUND_NOT_FOUND)"),
+        @ApiResponse(responseCode = "409", description = "Đợt không đủ điều kiện xóa (ROUND_NOT_DELETABLE hoặc ROUND_HAS_DATA kèm số lượng dữ liệu chặn)")
+    })
+    @DeleteMapping("/rounds/{id}")
+    @PreAuthorize("hasAnyRole('ADMIN','TRUONG_KHOA','SUPER_ADMIN')")
+    public org.springframework.http.ResponseEntity<Void> deleteRound(
+            @Parameter(description = "Mã UUID của đợt", required = true) @PathVariable UUID id,
+            @RequestBody RoundDeleteRequest request,
+            @AuthenticationPrincipal Jwt actor) {
+        mutations.deleteRound(id, request == null ? null : request.reason(), actor);
+        return org.springframework.http.ResponseEntity.noContent().build();
     }
 
     /** Brief phase one: the faculty head opens the lecturer topic-submission window. */
