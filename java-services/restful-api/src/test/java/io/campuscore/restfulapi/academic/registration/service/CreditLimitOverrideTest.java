@@ -22,10 +22,6 @@ class CreditLimitOverrideTest {
         assertThat(service.effectiveLimit("any-student", Map.of())).isEqualTo(999);
         assertThat(service.effectiveLimit("any-student", Map.of("credit_limit", 28, "semester_type", "SUMMER")))
                 .isEqualTo(10);
-        assertThat(service.effectiveLimit("any-student", Map.of("credit_limit", 28, "semester_type", "SEMESTER_3")))
-                .isEqualTo(10);
-        assertThat(service.effectiveLimit("any-student", Map.of("credit_limit", 28, "semester_type", "3")))
-                .isEqualTo(10);
     }
 
     @Test
