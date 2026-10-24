@@ -69,7 +69,6 @@ class ArchitectureGuardTest {
      * referencing JDBC, and no entry may ever be added.
      */
     private static final Set<String> JDBC_OUTSIDE_DATA_LAYER_EXCEPTIONS = Set.of(
-            "academic/job/EnrolledCountReconcileJob",
             "academic/registration/service/CreditLimitApplicationService",
             "academic/registration/service/RegistrationService",
             "academic/service/AcademicConductService",
