@@ -1,9 +1,9 @@
 package io.campuscore.restfulapi.academic.service;
 
 import io.campuscore.restfulapi.academic.repository.AcademicAttendanceReadRepository;
-import io.campuscore.restfulapi.academic.repository.AcademicAttendanceReadRepository.AttendanceRow;
-import io.campuscore.restfulapi.academic.repository.AcademicAttendanceReadRepository.SectionSummaryRow;
-import io.campuscore.restfulapi.academic.repository.AcademicAttendanceReadRepository.StudentSummaryRow;
+import io.campuscore.restfulapi.academic.model.AttendanceRow;
+import io.campuscore.restfulapi.academic.model.SectionSummaryRow;
+import io.campuscore.restfulapi.academic.model.StudentSummaryRow;
 import io.campuscore.restfulapi.academic.dto.AcademicAttendanceReadDtos.AttendanceListResponse;
 import io.campuscore.restfulapi.academic.dto.AcademicAttendanceReadDtos.AttendanceResponse;
 import io.campuscore.restfulapi.academic.dto.AcademicAttendanceReadDtos.AttendanceRosterEntry;
