@@ -2,11 +2,12 @@ package io.campuscore.restfulapi.thesis.assistant.client;
 
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import io.campuscore.restfulapi.thesis.assistant.controller.ThesisAssistantKnowledgeAdminController.KnowledgeDocumentView;
-import io.campuscore.restfulapi.thesis.assistant.controller.ThesisAssistantKnowledgeAdminController.KnowledgeRequest;
-import io.campuscore.restfulapi.thesis.assistant.controller.ThesisAssistantKnowledgeAdminController.KnowledgeRevision;
+import io.campuscore.restfulapi.thesis.assistant.dto.KnowledgeDocumentView;
+import io.campuscore.restfulapi.thesis.assistant.dto.KnowledgeRequest;
+import io.campuscore.restfulapi.thesis.assistant.dto.KnowledgeRevision;
 import io.campuscore.restfulapi.exception.response.ApiError;
 import io.campuscore.restfulapi.exception.DomainException;
+import io.campuscore.restfulapi.thesis.assistant.dto.SyncResult;
 import java.io.IOException;
 import java.net.URI;
 import java.net.URLEncoder;
@@ -87,19 +88,19 @@ public class AssistantKnowledgeAuthorityGateway {
                 new TypeReference<KnowledgeRevision>() { });
     }
 
-    public SupabaseKnowledgeSyncService.SyncResult archive(UUID id, String actor) {
+    public SyncResult archive(UUID id, String actor) {
         return exchange("DELETE", "/knowledge/" + id, Map.of(), null, actor,
-                new TypeReference<SupabaseKnowledgeSyncService.SyncResult>() { });
+                new TypeReference<SyncResult>() { });
     }
 
-    public SupabaseKnowledgeSyncService.SyncResult sync(String actor) {
+    public SyncResult sync(String actor) {
         return exchange("POST", "/knowledge/sync", Map.of(), null, actor,
-                new TypeReference<SupabaseKnowledgeSyncService.SyncResult>() { });
+                new TypeReference<SyncResult>() { });
     }
 
-    public SupabaseKnowledgeSyncService.SyncResult status(String actor) {
+    public SyncResult status(String actor) {
         return exchange("GET", "/knowledge/sync-status", Map.of(), null, actor,
-                new TypeReference<SupabaseKnowledgeSyncService.SyncResult>() { });
+                new TypeReference<SyncResult>() { });
     }
 
     private <T> T exchange(String method, String path, Map<String, String> query,

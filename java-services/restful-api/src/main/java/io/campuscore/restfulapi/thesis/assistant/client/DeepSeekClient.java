@@ -2,9 +2,9 @@ package io.campuscore.restfulapi.thesis.assistant.client;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import io.campuscore.restfulapi.thesis.assistant.client.AssistantCompletionProvider.CompletionRequest;
-import io.campuscore.restfulapi.thesis.assistant.client.AssistantCompletionProvider.CompletionResult;
-import io.campuscore.restfulapi.thesis.assistant.client.AssistantCompletionProvider.ProviderSegment;
+import io.campuscore.restfulapi.thesis.assistant.model.CompletionRequest;
+import io.campuscore.restfulapi.thesis.assistant.model.CompletionResult;
+import io.campuscore.restfulapi.thesis.assistant.model.ProviderSegment;
 import io.campuscore.restfulapi.thesis.assistant.exception.ProviderCancelledException;
 import io.campuscore.restfulapi.thesis.assistant.exception.ProviderUnavailableException;
 import java.io.BufferedReader;

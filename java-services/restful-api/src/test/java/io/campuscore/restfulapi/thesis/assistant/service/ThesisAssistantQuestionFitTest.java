@@ -4,6 +4,18 @@ import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
+import io.campuscore.restfulapi.thesis.assistant.dto.StreamCitation;
+import io.campuscore.restfulapi.thesis.assistant.dto.StreamDelta;
+import io.campuscore.restfulapi.thesis.assistant.dto.StreamEvent;
+import io.campuscore.restfulapi.thesis.assistant.dto.StreamReplace;
+import io.campuscore.restfulapi.thesis.assistant.model.CompletionRequest;
+import io.campuscore.restfulapi.thesis.assistant.model.CompletionResult;
+import io.campuscore.restfulapi.thesis.assistant.model.DispatchDecision;
+import io.campuscore.restfulapi.thesis.assistant.model.KnowledgeDocument;
+import io.campuscore.restfulapi.thesis.assistant.model.ProviderSegment;
+import io.campuscore.restfulapi.thesis.assistant.model.Reservation;
+import io.campuscore.restfulapi.thesis.assistant.model.ReservationStatus;
+import io.campuscore.restfulapi.thesis.assistant.model.TerminalResult;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
@@ -27,7 +39,7 @@ class ThesisAssistantQuestionFitTest {
     private static ThesisAssistantService service(String content, String title) {
         var repository = mock(ThesisAssistantKnowledgeRepository.class);
         when(repository.search(anyString(), anyList(), anyInt(), eq("specialized"))).thenReturn(List.of(
-                new ThesisAssistantKnowledgeRepository.KnowledgeDocument("11111111-1111-1111-1111-111111111111",
+                new KnowledgeDocument("11111111-1111-1111-1111-111111111111",
                         "focus-test", "vi", title, content, "curated", "SPECIALIZED",
                         null, null, null, null, null, null, null, null, 50)));
         return new ThesisAssistantService(repository, null, null, null, null, null, null,
@@ -104,41 +116,41 @@ class ThesisAssistantQuestionFitTest {
                 : "Explain Dependency Injection in Spring Boot with a constructor injection example.";
         var knowledge = mock(ThesisAssistantKnowledgeRepository.class);
         when(knowledge.search(anyString(), anyList(), anyInt(), eq("specialized"))).thenReturn(List.of(
-                new ThesisAssistantKnowledgeRepository.KnowledgeDocument(sourceId,
+                new KnowledgeDocument(sourceId,
                         "focus-test", locale, matching ? "Dependency Injection / constructor injection in Spring Boot" : "Spring Boot architecture", content, "curated", "SPECIALIZED",
                         null, null, null, null, null, null, null, null, 50)));
         var turns = mock(ThesisAssistantTurnRepository.class);
         UUID turn = UUID.randomUUID(), conversation = UUID.randomUUID(), message = UUID.randomUUID();
         when(turns.reserve(anyString(), any(), anyString(), isNull(), anyString(), anyString(), anyInt()))
-                .thenReturn(new ThesisAssistantTurnRepository.Reservation(
-                        ThesisAssistantTurnRepository.ReservationStatus.NEW, turn, conversation, 1L, true, null, null, false));
+                .thenReturn(new Reservation(
+                        ReservationStatus.NEW, turn, conversation, 1L, true, null, null, false));
         when(turns.markSnapshotReady(any(), anyString(), anyLong(), anyString())).thenReturn(true);
         when(turns.dispatch(any(), anyString(), anyLong(), anyInt(), anyInt()))
-                .thenReturn(new ThesisAssistantTurnRepository.DispatchDecision(!"quota".equals(branch),
+                .thenReturn(new DispatchDecision(!"quota".equals(branch),
                         !"quota".equals(branch), "quota".equals(branch) ? "QUOTA_EXCEEDED" : "DISPATCHED"));
         when(turns.complete(any(), anyString(), anyLong(), anyString(), anyString(), anyString(), anyBoolean(), anyString(), anyList()))
-                .thenAnswer(invocation -> new ThesisAssistantTurnRepository.TerminalResult(conversation, message,
+                .thenAnswer(invocation -> new TerminalResult(conversation, message,
                         invocation.getArgument(5), invocation.getArgument(4), invocation.getArgument(6),
                         invocation.getArgument(7), invocation.getArgument(8), false, "COMPLETED"));
         var provider = mock(DeepSeekClient.class);
         doAnswer(invocation -> {
-            var request = invocation.getArgument(0, AssistantCompletionProvider.CompletionRequest.class);
+            var request = invocation.getArgument(0, CompletionRequest.class);
             assertTrue(request.context().contains(content), "provider context remains the approved retrieval");
             assertEquals(List.of(sourceId), request.sourceIds());
             if ("unavailable".equals(branch)) throw new ProviderUnavailableException("fixture");
             @SuppressWarnings("unchecked")
-            var sink = (java.util.function.Consumer<AssistantCompletionProvider.ProviderSegment>) invocation.getArgument(1);
+            var sink = (java.util.function.Consumer<ProviderSegment>) invocation.getArgument(1);
             String text = "unsafe".equals(branch) ? "Contact student@example.com" : "Synthesized answer";
-            sink.accept(new AssistantCompletionProvider.ProviderSegment(0, text,
+            sink.accept(new ProviderSegment(0, text,
                     List.of("invalid".equals(branch) ? "unapproved-source" : sourceId)));
-            return new AssistantCompletionProvider.CompletionResult(text, List.of(),
+            return new CompletionResult(text, List.of(),
                     "truncated".equals(branch) ? "length" : "stop");
-        }).when(provider).complete(any(AssistantCompletionProvider.CompletionRequest.class),
+        }).when(provider).complete(any(CompletionRequest.class),
                 any(java.util.function.Consumer.class), any(java.util.function.BooleanSupplier.class));
         var assistant = new ThesisAssistantService(knowledge, provider, null, turns, null, null,
                 new DeepSeekProperties(!"disabled".equals(branch), "fixture", "https://api.deepseek.com", "deepseek-v4-flash", 8000, 800),
                 new AssistantProperties(6000, 2000, 20, 200, 90, true));
-        var events = new java.util.ArrayList<ThesisAssistantService.StreamEvent>();
+        var events = new java.util.ArrayList<StreamEvent>();
         var response = assistant.stream(question, locale, null, "owner-focus", UUID.randomUUID(), events::add, "specialized");
         String reason = switch (branch) {
             case "disabled" -> "PROVIDER_DISABLED";
@@ -154,14 +166,14 @@ class ThesisAssistantQuestionFitTest {
         assertEquals("quota".equals(branch), response.resetAt() != null);
         verify(turns).complete(eq(turn), eq("owner-focus"), eq(1L), eq(question), anyString(),
                 eq(response.answer()), eq(response.degraded()), eq(reason), eq(response.citations()));
-        var visible = events.stream().filter(event -> event instanceof ThesisAssistantService.StreamDelta
-                        || event instanceof ThesisAssistantService.StreamReplace).toList();
+        var visible = events.stream().filter(event -> event instanceof StreamDelta
+                        || event instanceof StreamReplace).toList();
         assertFalse(visible.isEmpty());
         var last = visible.getLast();
-        String finalText = last instanceof ThesisAssistantService.StreamReplace replace ? replace.text()
-                : ((ThesisAssistantService.StreamDelta) last).text();
-        List<String> finalSources = last instanceof ThesisAssistantService.StreamReplace replace ? replace.sourceIds()
-                : ((ThesisAssistantService.StreamDelta) last).sourceIds();
+        String finalText = last instanceof StreamReplace replace ? replace.text()
+                : ((StreamDelta) last).text();
+        List<String> finalSources = last instanceof StreamReplace replace ? replace.sourceIds()
+                : ((StreamDelta) last).sourceIds();
         assertEquals(response.answer(), finalText);
         if ("answered".equals(branch)) {
             assertEquals("Synthesized answer", response.answer());
@@ -180,7 +192,7 @@ class ThesisAssistantQuestionFitTest {
                     : "I could not find content matching this question"));
             assertTrue(finalSources.isEmpty());
             assertTrue(response.citations().isEmpty());
-            assertTrue(events.stream().noneMatch(event -> event instanceof ThesisAssistantService.StreamCitation));
+            assertTrue(events.stream().noneMatch(event -> event instanceof StreamCitation));
         }
     }
 

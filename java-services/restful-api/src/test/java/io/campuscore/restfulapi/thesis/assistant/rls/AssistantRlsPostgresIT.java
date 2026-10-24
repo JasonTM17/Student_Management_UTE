@@ -6,6 +6,7 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import io.campuscore.restfulapi.thesis.assistant.model.Conversation;
 import io.campuscore.restfulapi.thesis.assistant.rls.AssistantRlsBoundary.Access;
 import io.campuscore.restfulapi.exception.DomainException;
 import java.time.Instant;
@@ -208,8 +209,8 @@ class AssistantRlsPostgresIT {
                 "invalid-token", ownerA, null, null, null, new MockHttpServletResponse()));
         var aRows = internalController.conversations(INTERNAL_TOKEN, ownerA, null, null, null, new MockHttpServletResponse());
         var bRows = internalController.conversations(INTERNAL_TOKEN, ownerB, null, null, null, new MockHttpServletResponse());
-        assertEquals(List.of(conversationA), aRows.stream().map(ThesisAssistantRepository.Conversation::id).toList());
-        assertEquals(List.of(conversationB), bRows.stream().map(ThesisAssistantRepository.Conversation::id).toList());
+        assertEquals(List.of(conversationA), aRows.stream().map(Conversation::id).toList());
+        assertEquals(List.of(conversationB), bRows.stream().map(Conversation::id).toList());
         assertThrows(DomainException.class, () -> internalController.conversations(
                 INTERNAL_TOKEN, " ", null, null, null, new MockHttpServletResponse()));
         assertEquals(0, count("SELECT COUNT(*) FROM assistant.chat_conversation"));

@@ -14,14 +14,16 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import io.campuscore.restfulapi.thesis.assistant.dto.StreamCitation;
 import io.campuscore.restfulapi.thesis.assistant.dto.ThesisAssistantDtos.ChatRequest;
 import io.campuscore.restfulapi.thesis.assistant.dto.ThesisAssistantDtos.ChatResponse;
 import io.campuscore.restfulapi.thesis.assistant.dto.ThesisAssistantDtos.Citation;
+import io.campuscore.restfulapi.thesis.assistant.model.KnowledgeDocument;
 import io.campuscore.restfulapi.thesis.assistant.service.ThesisAssistantService;
-import io.campuscore.restfulapi.thesis.assistant.service.ThesisAssistantService.StreamDelta;
-import io.campuscore.restfulapi.thesis.assistant.service.ThesisAssistantService.StreamDone;
-import io.campuscore.restfulapi.thesis.assistant.service.ThesisAssistantService.StreamEvent;
-import io.campuscore.restfulapi.thesis.assistant.service.ThesisAssistantService.StreamMeta;
+import io.campuscore.restfulapi.thesis.assistant.dto.StreamDelta;
+import io.campuscore.restfulapi.thesis.assistant.dto.StreamDone;
+import io.campuscore.restfulapi.thesis.assistant.dto.StreamEvent;
+import io.campuscore.restfulapi.thesis.assistant.dto.StreamMeta;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
@@ -47,9 +49,9 @@ class ThesisAssistantLexicalFastPathTest {
     private static final AssistantProperties DEFAULTS =
             new AssistantProperties(6000, 2000, 20, 200, 90, true);
 
-    private static ThesisAssistantKnowledgeRepository.KnowledgeDocument document(
+    private static KnowledgeDocument document(
             String slug, String title, String content, String domain, int lexicalScore) {
-        return new ThesisAssistantKnowledgeRepository.KnowledgeDocument(
+        return new KnowledgeDocument(
                 "11111111-1111-1111-1111-111111111111", slug, "vi", title, content, "curated",
                 domain, null, null, null, null, null, null, null, null, lexicalScore);
     }
@@ -324,7 +326,7 @@ class ThesisAssistantLexicalFastPathTest {
                 && ThesisAssistantService.FAST_PATH_MODEL.equals(meta.model()));
         assertTrue(events.get(1) instanceof StreamDelta delta
                 && delta.text().contains("Các bước đăng ký học phần"));
-        assertTrue(events.get(2) instanceof ThesisAssistantService.StreamCitation);
+        assertTrue(events.get(2) instanceof StreamCitation);
         assertTrue(events.get(3) instanceof StreamDone done
                 && !done.degraded() && "ANSWERED".equals(done.reasonCode()));
         verify(ragGateway, never()).stream(any(), anyString(), any());
@@ -339,16 +341,16 @@ class ThesisAssistantLexicalFastPathTest {
         when(assistant.lexicalFastPath(anyString(), anyString(), any()))
                 .thenThrow(new IllegalStateException("probe failed"));
         org.mockito.Mockito.doAnswer(invocation -> {
-            Consumer<ThesisAssistantService.StreamEvent> sink = invocation.getArgument(2);
-            sink.accept(new ThesisAssistantService.StreamDelta(0, "Trả lời từ RAG.", List.of()));
-            sink.accept(new ThesisAssistantService.StreamDone(null, "ANSWERED", false, "COMPLETED"));
+            Consumer<StreamEvent> sink = invocation.getArgument(2);
+            sink.accept(new StreamDelta(0, "Trả lời từ RAG.", List.of()));
+            sink.accept(new StreamDone(null, "ANSWERED", false, "COMPLETED"));
             return null;
         }).when(ragGateway).stream(any(), anyString(), any());
 
         List<StreamEvent> events = new ArrayList<>();
         controller.streamRemoteWithFallback(request("Quy trình xin nghỉ học thế nào?"), "owner-miss", events::add, new MockHttpServletRequest());
 
-        assertTrue(events.stream().anyMatch(event -> event instanceof ThesisAssistantService.StreamDelta delta
+        assertTrue(events.stream().anyMatch(event -> event instanceof StreamDelta delta
                 && delta.text().contains("Trả lời từ RAG.")));
         verify(ragGateway).stream(any(), anyString(), any());
     }

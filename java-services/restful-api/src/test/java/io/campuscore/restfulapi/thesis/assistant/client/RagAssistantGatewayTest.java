@@ -6,6 +6,11 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.sun.net.httpserver.HttpServer;
+import io.campuscore.restfulapi.thesis.assistant.dto.StreamCitation;
+import io.campuscore.restfulapi.thesis.assistant.dto.StreamDelta;
+import io.campuscore.restfulapi.thesis.assistant.dto.StreamDone;
+import io.campuscore.restfulapi.thesis.assistant.dto.StreamEvent;
+import io.campuscore.restfulapi.thesis.assistant.dto.StreamReplace;
 import io.campuscore.restfulapi.thesis.assistant.dto.ThesisAssistantDtos.ChatRequest;
 import java.io.IOException;
 import java.net.InetAddress;
@@ -112,7 +117,7 @@ class RagAssistantGatewayTest {
             }
         }, "/chat/stream");
         var reader = Executors.newSingleThreadExecutor();
-        List<ThesisAssistantService.StreamEvent> events = new ArrayList<>();
+        List<StreamEvent> events = new ArrayList<>();
         try {
             var result = reader.submit(() -> {
                 try {
@@ -126,10 +131,10 @@ class RagAssistantGatewayTest {
             if (malformed) {
                 assertInstanceOf(DomainException.class, failure);
                 assertEquals("RAG_SERVICE_UNAVAILABLE", failure.code());
-                assertTrue(events.stream().noneMatch(ThesisAssistantService.StreamDone.class::isInstance));
+                assertTrue(events.stream().noneMatch(StreamDone.class::isInstance));
             } else {
                 assertEquals(null, failure);
-                assertEquals(1, events.stream().filter(ThesisAssistantService.StreamDone.class::isInstance).count());
+                assertEquals(1, events.stream().filter(StreamDone.class::isInstance).count());
             }
         } finally {
             releaseBody.countDown();
@@ -243,12 +248,12 @@ class RagAssistantGatewayTest {
             exchange.close();
         }, "/chat/stream");
 
-        List<ThesisAssistantService.StreamEvent> events = new ArrayList<>();
+        List<StreamEvent> events = new ArrayList<>();
         gateway().stream(new ChatRequest("Stream?", "vi", UUID.randomUUID(), null), "owner-a", events::add);
 
         assertEquals(2, events.size());
-        ThesisAssistantService.StreamDelta delta = assertInstanceOf(ThesisAssistantService.StreamDelta.class, events.get(0));
-        ThesisAssistantService.StreamDone done = assertInstanceOf(ThesisAssistantService.StreamDone.class, events.get(1));
+        StreamDelta delta = assertInstanceOf(StreamDelta.class, events.get(0));
+        StreamDone done = assertInstanceOf(StreamDone.class, events.get(1));
         assertEquals("xin chào", delta.text());
         assertEquals(messageId, done.messageId());
     }
@@ -274,18 +279,18 @@ class RagAssistantGatewayTest {
             exchange.close();
         }, "/chat/stream");
 
-        List<ThesisAssistantService.StreamEvent> events = new ArrayList<>();
+        List<StreamEvent> events = new ArrayList<>();
         gateway().stream(new ChatRequest("Stream?", "vi", UUID.randomUUID(), null), "owner-a", events::add);
 
-        assertTrue(events.stream().noneMatch(event -> event instanceof ThesisAssistantService.StreamDelta delta
+        assertTrue(events.stream().noneMatch(event -> event instanceof StreamDelta delta
                 && (delta.text().contains("curl") || delta.text().contains("/api/v1"))));
-        ThesisAssistantService.StreamReplace replace = assertInstanceOf(
-                ThesisAssistantService.StreamReplace.class,
-                events.stream().filter(ThesisAssistantService.StreamReplace.class::isInstance).findFirst().orElseThrow());
+        StreamReplace replace = assertInstanceOf(
+                StreamReplace.class,
+                events.stream().filter(StreamReplace.class::isInstance).findFirst().orElseThrow());
         assertEquals(ThesisAssistantService.technicalOutputMessage("vi"), replace.text());
-        ThesisAssistantService.StreamDone done = assertInstanceOf(
-                ThesisAssistantService.StreamDone.class,
-                events.stream().filter(ThesisAssistantService.StreamDone.class::isInstance).findFirst().orElseThrow());
+        StreamDone done = assertInstanceOf(
+                StreamDone.class,
+                events.stream().filter(StreamDone.class::isInstance).findFirst().orElseThrow());
         assertEquals("PROVIDER_UNSAFE_OUTPUT", done.reasonCode());
         assertTrue(done.degraded());
     }
@@ -311,20 +316,20 @@ class RagAssistantGatewayTest {
             exchange.close();
         }, "/chat/stream");
 
-        List<ThesisAssistantService.StreamEvent> events = new ArrayList<>();
+        List<StreamEvent> events = new ArrayList<>();
         gateway().stream(new ChatRequest("Thời tiết", "vi", UUID.randomUUID(), null), "owner-a", events::add);
 
         // The provider delta reaches the client live and exactly once: the
         // done frame no longer re-emits the whole answer, or the client would
         // render the response twice.
-        List<ThesisAssistantService.StreamDelta> deltas = events.stream()
-                .filter(ThesisAssistantService.StreamDelta.class::isInstance)
-                .map(ThesisAssistantService.StreamDelta.class::cast)
+        List<StreamDelta> deltas = events.stream()
+                .filter(StreamDelta.class::isInstance)
+                .map(StreamDelta.class::cast)
                 .toList();
         assertEquals(1, deltas.size());
         assertEquals("1. Đăng ký lớp Mở Cổng sinh viên tương đương4.0", deltas.get(0).text());
-        assertTrue(events.stream().noneMatch(ThesisAssistantService.StreamCitation.class::isInstance));
-        assertEquals(1, events.stream().filter(ThesisAssistantService.StreamDone.class::isInstance).count());
+        assertTrue(events.stream().noneMatch(StreamCitation.class::isInstance));
+        assertEquals(1, events.stream().filter(StreamDone.class::isInstance).count());
     }
 
     @Test
@@ -347,17 +352,17 @@ class RagAssistantGatewayTest {
             exchange.close();
         }, "/chat/stream");
 
-        List<ThesisAssistantService.StreamEvent> events = new ArrayList<>();
+        List<StreamEvent> events = new ArrayList<>();
         gateway().stream(new ChatRequest("Quy chế", "vi", UUID.randomUUID(), null), "owner-a", events::add);
 
-        List<ThesisAssistantService.StreamDelta> deltas = events.stream()
-                .filter(ThesisAssistantService.StreamDelta.class::isInstance)
-                .map(ThesisAssistantService.StreamDelta.class::cast)
+        List<StreamDelta> deltas = events.stream()
+                .filter(StreamDelta.class::isInstance)
+                .map(StreamDelta.class::cast)
                 .toList();
         assertEquals(2, deltas.size());
         assertEquals("Phần một. Phần hai.",
                 deltas.get(0).text() + deltas.get(1).text());
-        assertEquals(1, events.stream().filter(ThesisAssistantService.StreamDone.class::isInstance).count());
+        assertEquals(1, events.stream().filter(StreamDone.class::isInstance).count());
     }
 
     @Test
@@ -380,19 +385,19 @@ class RagAssistantGatewayTest {
             exchange.close();
         }, "/chat/stream");
 
-        List<ThesisAssistantService.StreamEvent> events = new ArrayList<>();
+        List<StreamEvent> events = new ArrayList<>();
         gateway().stream(new ChatRequest("Tín chỉ tối đa?", "vi", UUID.randomUUID(), null), "owner-a", events::add);
 
         // The replace must cross the wire: without it the bubble keeps the
         // stale "24" while history replays the corrected "20" answer.
-        ThesisAssistantService.StreamReplace replace = assertInstanceOf(
-                ThesisAssistantService.StreamReplace.class,
-                events.stream().filter(ThesisAssistantService.StreamReplace.class::isInstance)
+        StreamReplace replace = assertInstanceOf(
+                StreamReplace.class,
+                events.stream().filter(StreamReplace.class::isInstance)
                         .findFirst().orElseThrow());
         assertEquals("Tín chỉ tối đa là 20 theo quy chế 2024", replace.text());
         // The corrected text was already forwarded, so done must not re-emit
         // the pre-replace buffer as a second delta.
-        assertTrue(events.stream().noneMatch(event -> event instanceof ThesisAssistantService.StreamDelta delta
+        assertTrue(events.stream().noneMatch(event -> event instanceof StreamDelta delta
                 && delta.text().contains("20")));
     }
 

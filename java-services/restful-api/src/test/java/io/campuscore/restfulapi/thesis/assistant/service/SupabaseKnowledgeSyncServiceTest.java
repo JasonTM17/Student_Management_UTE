@@ -10,6 +10,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import io.campuscore.restfulapi.thesis.assistant.dto.SyncResult;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
@@ -70,7 +71,7 @@ class SupabaseKnowledgeSyncServiceTest {
         responses.add(response(200, "[{\"id\":\"" + release + "\",\"corpus_version\":\"campus-1\",\"corpus_hash\":\"" + hash + "\",\"row_count\":1,\"status\":\"PUBLISHED\",\"manifest\":{\"schemaVersion\":1}}]"));
         responses.add(response(200, "[{\"source_id\":\"" + source + "\",\"revision_id\":null,\"version\":1,\"domain\":\"REGISTRATION\",\"slug\":\"registration-window\",\"locale\":\"en\",\"title\":\"Registration window\",\"content\":\"" + content + "\",\"source\":\"registrar\",\"priority\":10,\"active\":true,\"visibility\":\"PUBLIC\",\"published_at\":\"2026-09-01T00:00:00Z\"}]"));
 
-        SupabaseKnowledgeSyncService.SyncResult result = service(responses).syncNow();
+        SyncResult result = service(responses).syncNow();
 
         assertEquals("ACTIVATED", result.status(), result.message());
         assertEquals(release.toString(), result.releaseId());
@@ -93,7 +94,7 @@ class SupabaseKnowledgeSyncServiceTest {
                 + "\",\"revision_id\":null,\"version\":1,\"domain\":\"SPECIALIZED\",\"slug\":\"software-design\",\"locale\":\"en\",\"title\":\"Software design\",\"content\":\""
                 + content + "\",\"source\":\"faculty\",\"priority\":10,\"active\":true,\"visibility\":\"PUBLIC\",\"published_at\":\"2026-09-01T00:00:00Z\"}]"));
 
-        SupabaseKnowledgeSyncService.SyncResult result = service(responses).syncNow();
+        SyncResult result = service(responses).syncNow();
 
         assertEquals("ACTIVATED", result.status(), result.message());
         assertEquals("SPECIALIZED", raw.queryForObject(
@@ -141,10 +142,10 @@ class SupabaseKnowledgeSyncServiceTest {
         try {
             SupabaseKnowledgeSyncService olderSync = service(olderHttp);
             SupabaseKnowledgeSyncService newerSync = service(newerHttp);
-            Future<SupabaseKnowledgeSyncService.SyncResult> olderResult = executor.submit(olderSync::syncNow);
+            Future<SyncResult> olderResult = executor.submit(olderSync::syncNow);
             assertTrue(olderDocumentsRequested.await(2, TimeUnit.SECONDS), "older snapshot did not reach its document fetch");
             CountDownLatch newerSyncStarted = new CountDownLatch(1);
-            Future<SupabaseKnowledgeSyncService.SyncResult> newerResult = executor.submit(() -> {
+            Future<SyncResult> newerResult = executor.submit(() -> {
                 newerSyncStarted.countDown();
                 return newerSync.syncNow();
             });
@@ -191,7 +192,7 @@ class SupabaseKnowledgeSyncServiceTest {
         raw.update("DELETE FROM assistant.knowledge_runtime_state WHERE singleton=TRUE");
         HttpClient http = mock(HttpClient.class);
 
-        SupabaseKnowledgeSyncService.SyncResult result = service(http).syncNow();
+        SyncResult result = service(http).syncNow();
 
         assertEquals("FAILED", result.status());
         assertEquals("Runtime projection state is unavailable", result.message());
@@ -200,7 +201,7 @@ class SupabaseKnowledgeSyncServiceTest {
     }
 
     private void assertRuntimePointerRejected(HttpClient http) {
-        SupabaseKnowledgeSyncService.SyncResult result = service(http).syncNow();
+        SyncResult result = service(http).syncNow();
 
         assertEquals("FAILED", result.status());
         assertEquals("Runtime projection pointer is inconsistent", result.message());
@@ -213,7 +214,7 @@ class SupabaseKnowledgeSyncServiceTest {
         responses.add(response(200, "[{\"id\":\"" + release + "\",\"corpus_version\":\"campus-bad\",\"corpus_hash\":\"" + "b".repeat(64) + "\",\"row_count\":2,\"status\":\"PUBLISHED\",\"manifest\":{}}]"));
         responses.add(response(200, "[]"));
 
-        SupabaseKnowledgeSyncService.SyncResult result = service(responses).syncNow();
+        SyncResult result = service(responses).syncNow();
 
         assertEquals("FAILED", result.status());
         assertTrue(result.degraded());
@@ -232,7 +233,7 @@ class SupabaseKnowledgeSyncServiceTest {
         SupabaseKnowledgeSyncService sync = new SupabaseKnowledgeSyncService(properties, jdbc,
                 new ObjectMapper(), runner(), http);
 
-        SupabaseKnowledgeSyncService.SyncResult result = sync.syncNow();
+        SyncResult result = sync.syncNow();
 
         assertEquals("FAILED", result.status());
         assertEquals(legacyRelease, raw.queryForObject("SELECT active_release_id FROM assistant.knowledge_runtime_state WHERE singleton=TRUE", UUID.class));
@@ -248,7 +249,7 @@ class SupabaseKnowledgeSyncServiceTest {
         responses.add(response(200, "[{\"id\":\"" + release + "\",\"corpus_version\":\"campus-stage-failure\",\"corpus_hash\":\"" + hash + "\",\"row_count\":1,\"status\":\"PUBLISHED\",\"manifest\":{}}]"));
         responses.add(response(200, "[{\"source_id\":\"" + source + "\",\"version\":1,\"domain\":\"POLICY\",\"slug\":\"policy\",\"locale\":\"en\",\"title\":\"Policy\",\"content\":\"" + content + "\",\"source\":\"office\",\"priority\":10,\"active\":true,\"visibility\":\"PUBLIC\",\"published_at\":\"2026-09-01T00:00:00Z\"}]"));
 
-        SupabaseKnowledgeSyncService.SyncResult result = service(responses).syncNow();
+        SyncResult result = service(responses).syncNow();
 
         assertEquals("FAILED", result.status());
         assertEquals(legacyRelease, raw.queryForObject("SELECT active_release_id FROM assistant.knowledge_runtime_state WHERE singleton=TRUE", UUID.class));
@@ -267,7 +268,7 @@ class SupabaseKnowledgeSyncServiceTest {
         responses.add(response(200, "[{\"id\":\"" + release + "\",\"corpus_version\":\"campus-pointer-failure\",\"corpus_hash\":\"" + hash + "\",\"row_count\":1,\"status\":\"PUBLISHED\",\"manifest\":{}}]"));
         responses.add(response(200, "[{\"source_id\":\"" + source + "\",\"version\":1,\"domain\":\"POLICY\",\"slug\":\"policy-pointer\",\"locale\":\"en\",\"title\":\"Policy\",\"content\":\"" + content + "\",\"source\":\"office\",\"priority\":10,\"active\":true,\"visibility\":\"PUBLIC\",\"published_at\":\"2026-09-01T00:00:00Z\"}]"));
 
-        SupabaseKnowledgeSyncService.SyncResult result = service(responses).syncNow();
+        SyncResult result = service(responses).syncNow();
 
         assertEquals("FAILED", result.status());
         assertEquals(legacyRelease, raw.queryForObject("SELECT active_release_id FROM assistant.knowledge_runtime_state WHERE singleton=TRUE", UUID.class));

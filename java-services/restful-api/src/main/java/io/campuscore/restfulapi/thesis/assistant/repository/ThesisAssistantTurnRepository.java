@@ -2,6 +2,17 @@ package io.campuscore.restfulapi.thesis.assistant.repository;
 
 import io.campuscore.restfulapi.thesis.assistant.dto.ThesisAssistantDtos.Citation;
 import io.campuscore.restfulapi.exception.DomainException;
+import io.campuscore.restfulapi.thesis.assistant.model.CancelResult;
+import io.campuscore.restfulapi.thesis.assistant.model.DispatchDecision;
+import io.campuscore.restfulapi.thesis.assistant.model.DispatchHandle;
+import io.campuscore.restfulapi.thesis.assistant.model.ExpiredConversation;
+import io.campuscore.restfulapi.thesis.assistant.model.ExpiredLease;
+import io.campuscore.restfulapi.thesis.assistant.model.PurgedConversation;
+import io.campuscore.restfulapi.thesis.assistant.model.ReplayResult;
+import io.campuscore.restfulapi.thesis.assistant.model.Reservation;
+import io.campuscore.restfulapi.thesis.assistant.model.ReservationStatus;
+import io.campuscore.restfulapi.thesis.assistant.model.TerminalResult;
+import io.campuscore.restfulapi.thesis.assistant.model.TurnRow;
 import java.sql.ResultSet;
 import java.sql.Timestamp;
 import java.time.Instant;
@@ -804,16 +815,5 @@ public class ThesisAssistantTurnRepository {
     private static MapSqlParameterSource p() { return new MapSqlParameterSource(); }
     private static DomainException problem(int status, String code, String message) { return new DomainException(org.springframework.http.HttpStatus.valueOf(status), code, message); }
 
-    public enum ReservationStatus { NEW, REPLAY, ACTIVE, RETRYABLE, AMBIGUOUS }
-    public record Reservation(ReservationStatus status, UUID turnId, UUID conversationId, long leaseGeneration, boolean createdConversation, UUID resultMessageId, String terminalState, boolean replayed) { }
-    public record DispatchDecision(boolean dispatched, boolean quotaReserved, String reasonCode) { }
-    public record CancelResult(boolean cancelled, String status) { }
-    public record DispatchHandle(UUID clientRequestId, long leaseGeneration) { }
-    public record ExpiredLease(String ownerId, UUID clientRequestId, UUID turnId, long leaseGeneration, String terminalState) { }
-    public record ExpiredConversation(UUID id, String ownerId) { }
-    public record PurgedConversation(UUID id, String ownerId, List<DispatchHandle> handles) { }
-    public record TerminalResult(UUID conversationId, UUID messageId, String answer, String model, boolean degraded, String reasonCode, List<Citation> citations, boolean replayed, String terminalStatus) { }
-    public record ReplayResult(UUID conversationId, UUID messageId, String answer, String model, boolean degraded, String reasonCode, List<Citation> citations, boolean replayed, String terminalStatus) { }
-    public record TurnRow(UUID turnId, String ownerId, UUID clientRequestId, String requestHash, UUID conversationId, boolean createdConversation, String state, long leaseGeneration, boolean quotaReserved, UUID resultMessageId) { }
     private record LeaseRow(String ownerId, UUID clientRequestId, UUID turnId, long generation, String state) { }
 }

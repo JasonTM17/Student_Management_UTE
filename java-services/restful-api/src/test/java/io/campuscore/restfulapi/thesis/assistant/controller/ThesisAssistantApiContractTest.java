@@ -6,6 +6,9 @@ import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import io.campuscore.restfulapi.thesis.assistant.dto.StreamDelta;
+import io.campuscore.restfulapi.thesis.assistant.dto.StreamDone;
+import io.campuscore.restfulapi.thesis.assistant.dto.StreamMeta;
 import java.text.Normalizer;
 import java.util.List;
 import java.util.UUID;
@@ -70,10 +73,10 @@ class ThesisAssistantApiContractTest {
     void streamEventsCarryDiscriminatorsAndStableTerminalShape() throws Exception {
         ObjectMapper mapper = new ObjectMapper();
         UUID client = UUID.randomUUID();
-        String meta = mapper.writeValueAsString(new ThesisAssistantService.StreamMeta(UUID.randomUUID(), client,
+        String meta = mapper.writeValueAsString(new StreamMeta(UUID.randomUUID(), client,
                 UUID.randomUUID(), UUID.randomUUID(), "model", "en"));
-        String delta = mapper.writeValueAsString(new ThesisAssistantService.StreamDelta(0, "answer", List.of("CURATED:1")));
-        String done = mapper.writeValueAsString(new ThesisAssistantService.StreamDone(UUID.randomUUID(), "ANSWERED", false, "COMPLETED"));
+        String delta = mapper.writeValueAsString(new StreamDelta(0, "answer", List.of("CURATED:1")));
+        String done = mapper.writeValueAsString(new StreamDone(UUID.randomUUID(), "ANSWERED", false, "COMPLETED"));
         assertTrue(meta.contains("\"type\":\"meta\""));
         assertTrue(delta.contains("\"type\":\"delta\""));
         assertTrue(done.contains("\"type\":\"done\""));

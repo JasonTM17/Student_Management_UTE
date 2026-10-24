@@ -1,5 +1,6 @@
 package io.campuscore.restfulapi.thesis.assistant.service;
 
+import io.campuscore.restfulapi.thesis.assistant.model.KnowledgeDocument;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
@@ -39,7 +40,7 @@ class ThesisAssistantDegradedAnswerFormatTest {
     @Test
     @DisplayName("formatDocumentAnswer shapes numbered content into heading plus bullets")
     void formatDocumentAnswerShapesMarkdown() {
-        var document = new ThesisAssistantKnowledgeRepository.KnowledgeDocument(
+        var document = new KnowledgeDocument(
                 "id-1", "specialized-devops-cicd-docker-kubernetes-vi", "vi",
                 "DevOps cho sinh viên", "1. Container hoá: Dockerfile đa giai đoạn. 2. CI/CD: pipeline tối thiểu.",
                 "campuscore-specialized-corpus");
@@ -53,12 +54,12 @@ class ThesisAssistantDegradedAnswerFormatTest {
     @Test
     @DisplayName("formatDocumentAnswer passes through markdown or unsegmented content")
     void formatDocumentAnswerPassesThroughOtherContent() {
-        var document = new ThesisAssistantKnowledgeRepository.KnowledgeDocument(
+        var document = new KnowledgeDocument(
                 "id-2", "slug-2", "vi", "Tiêu đề", "## Đã có cấu trúc\n\n- điểm một",
                 "campuscore-specialized-corpus");
         assertTrue(ThesisAssistantService.formatDocumentAnswer(document, document.content())
                 .startsWith("## Đã có cấu trúc"));
-        var plain = new ThesisAssistantKnowledgeRepository.KnowledgeDocument(
+        var plain = new KnowledgeDocument(
                 "id-3", "slug-3", "vi", "Tiêu đề", "Một đoạn văn không đánh số.",
                 "campuscore-specialized-corpus");
         assertTrue(ThesisAssistantService.formatDocumentAnswer(plain, plain.content())

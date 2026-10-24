@@ -1,5 +1,9 @@
 package io.campuscore.restfulapi.thesis.assistant.service;
 
+import io.campuscore.restfulapi.thesis.assistant.dto.FeedbackSummary;
+import io.campuscore.restfulapi.thesis.assistant.dto.ReasonCount;
+import io.campuscore.restfulapi.thesis.assistant.dto.RecentItem;
+import io.campuscore.restfulapi.thesis.assistant.dto.Totals;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
@@ -100,20 +104,4 @@ public class AssistantFeedbackAdminService {
         return value.substring(0, value.offsetByCodePoints(0, MAX_PREVIEW_CODE_POINTS));
     }
 
-    public record Totals(long up, long down, long total) { }
-
-    public record ReasonCount(String reason, long count) { }
-
-    public record RecentItem(
-            UUID messageId,
-            String rating,
-            String reason,
-            Instant updatedAt,
-            String questionPreview,
-            String answerPreview,
-            String model,
-            boolean degraded,
-            String reasonCode) { }
-
-    public record FeedbackSummary(Totals totals, List<ReasonCount> byReason, List<RecentItem> recent) { }
 }

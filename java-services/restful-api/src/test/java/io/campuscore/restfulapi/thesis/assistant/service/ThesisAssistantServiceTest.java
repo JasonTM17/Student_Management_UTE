@@ -22,13 +22,20 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
-import io.campuscore.restfulapi.thesis.assistant.client.AssistantCompletionProvider.CompletionResult;
-import io.campuscore.restfulapi.thesis.assistant.client.AssistantCompletionProvider.ProviderSegment;
+import io.campuscore.restfulapi.thesis.assistant.dto.StreamCitation;
+import io.campuscore.restfulapi.thesis.assistant.model.CompletionResult;
+import io.campuscore.restfulapi.thesis.assistant.model.ProviderSegment;
 import io.campuscore.restfulapi.thesis.assistant.dto.ThesisAssistantDtos.ChatResponse;
 import io.campuscore.restfulapi.thesis.assistant.dto.ThesisAssistantDtos.Citation;
-import io.campuscore.restfulapi.thesis.assistant.service.ThesisAssistantService.StreamDelta;
-import io.campuscore.restfulapi.thesis.assistant.service.ThesisAssistantService.StreamEvent;
-import io.campuscore.restfulapi.thesis.assistant.service.ThesisAssistantService.StreamReplace;
+import io.campuscore.restfulapi.thesis.assistant.model.CompletionRequest;
+import io.campuscore.restfulapi.thesis.assistant.model.DispatchDecision;
+import io.campuscore.restfulapi.thesis.assistant.model.KnowledgeDocument;
+import io.campuscore.restfulapi.thesis.assistant.model.Reservation;
+import io.campuscore.restfulapi.thesis.assistant.model.ReservationStatus;
+import io.campuscore.restfulapi.thesis.assistant.model.TerminalResult;
+import io.campuscore.restfulapi.thesis.assistant.dto.StreamDelta;
+import io.campuscore.restfulapi.thesis.assistant.dto.StreamEvent;
+import io.campuscore.restfulapi.thesis.assistant.dto.StreamReplace;
 import io.campuscore.restfulapi.exception.DomainException;
 import java.util.ArrayList;
 import java.util.List;
@@ -55,7 +62,7 @@ class ThesisAssistantServiceTest {
         ThesisAssistantRepository history = mock(ThesisAssistantRepository.class);
         ThesisAssistantTurnRepository turns = mock(ThesisAssistantTurnRepository.class);
         ThesisAssistantCatalogRepository catalog = mock(ThesisAssistantCatalogRepository.class);
-        var document = new ThesisAssistantKnowledgeRepository.KnowledgeDocument(
+        var document = new KnowledgeDocument(
                 "11111111-1111-1111-1111-111111111111", "topic", "en", "Topic", "topic details", "office");
         when(knowledge.search(anyString(), anyList(), anyInt())).thenReturn(List.of(document));
         when(catalog.search(anyString(), anyList(), anyInt())).thenReturn(List.of());
@@ -66,14 +73,14 @@ class ThesisAssistantServiceTest {
         UUID message = UUID.randomUUID();
         when(turns.reserve(anyString(), eq(request), anyString(), isNull(), eq("en"), anyString(), anyInt(),
                 any(java.util.function.Consumer.class)))
-                .thenReturn(new ThesisAssistantTurnRepository.Reservation(
-                        ThesisAssistantTurnRepository.ReservationStatus.NEW, turn, conversation, 1L, true, null, null, false));
+                .thenReturn(new Reservation(
+                        ReservationStatus.NEW, turn, conversation, 1L, true, null, null, false));
         when(turns.markSnapshotReady(eq(turn), anyString(), eq(1L), anyString(),
                 any(java.util.function.Consumer.class))).thenReturn(true);
         when(turns.complete(eq(turn), anyString(), eq(1L), anyString(), eq("curated-lexical-rag"),
                 eq("topic details"), eq(false), eq("RAG_GROUNDED"), anyList(),
                 any(java.util.function.Consumer.class)))
-                .thenReturn(new ThesisAssistantTurnRepository.TerminalResult(
+                .thenReturn(new TerminalResult(
                         conversation, message, "topic details", "curated-lexical-rag", false,
                         "RAG_GROUNDED", List.of(), false, "COMPLETED"));
 
@@ -99,7 +106,7 @@ class ThesisAssistantServiceTest {
         ThesisAssistantTurnRepository turns = mock(ThesisAssistantTurnRepository.class);
         ThesisAssistantCatalogRepository catalog = mock(ThesisAssistantCatalogRepository.class);
         String sourceId = "44444444-4444-4444-4444-444444444444";
-        var document = new ThesisAssistantKnowledgeRepository.KnowledgeDocument(
+        var document = new KnowledgeDocument(
                 sourceId, "topic", "en", "Topic", "Grounded answer", "office");
         when(knowledge.search(anyString(), anyList(), anyInt())).thenReturn(List.of(document));
         when(catalog.search(anyString(), anyList(), anyInt())).thenReturn(List.of());
@@ -111,17 +118,17 @@ class ThesisAssistantServiceTest {
         UUID message = UUID.randomUUID();
         when(turns.reserve(anyString(), eq(request), anyString(), isNull(), eq("en"), anyString(), anyInt(),
                 any(java.util.function.Consumer.class)))
-                .thenReturn(new ThesisAssistantTurnRepository.Reservation(
-                        ThesisAssistantTurnRepository.ReservationStatus.NEW, turn, conversation, 1L, true, null, null, false));
+                .thenReturn(new Reservation(
+                        ReservationStatus.NEW, turn, conversation, 1L, true, null, null, false));
         when(turns.markSnapshotReady(eq(turn), anyString(), eq(1L), anyString(),
                 any(java.util.function.Consumer.class))).thenReturn(true);
         when(turns.dispatch(eq(turn), anyString(), eq(1L), anyInt(), anyInt(),
                 any(java.util.function.Consumer.class)))
-                .thenReturn(new ThesisAssistantTurnRepository.DispatchDecision(true, true, "DISPATCHED"));
+                .thenReturn(new DispatchDecision(true, true, "DISPATCHED"));
         when(turns.complete(eq(turn), anyString(), eq(1L), anyString(), eq("curated-lexical-rag"),
                 eq("Grounded answer"), eq(true), eq("PROVIDER_TRUNCATED"), anyList(),
                 any(java.util.function.Consumer.class)))
-                .thenReturn(new ThesisAssistantTurnRepository.TerminalResult(
+                .thenReturn(new TerminalResult(
                         conversation, message, "Grounded answer", "curated-lexical-rag", true,
                         "PROVIDER_TRUNCATED", List.of(), false, "COMPLETED"));
         doAnswer(invocation -> {
@@ -129,7 +136,7 @@ class ThesisAssistantServiceTest {
             java.util.function.Consumer<ProviderSegment> sink = invocation.getArgument(1);
             sink.accept(new ProviderSegment(0, "Partial answer", List.of(sourceId)));
             return new CompletionResult("Partial answer", List.of(), "length");
-        }).when(provider).complete(any(AssistantCompletionProvider.CompletionRequest.class),
+        }).when(provider).complete(any(CompletionRequest.class),
                 any(java.util.function.Consumer.class), any(java.util.function.BooleanSupplier.class));
 
         List<StreamEvent> events = new ArrayList<>();
@@ -255,7 +262,7 @@ class ThesisAssistantServiceTest {
 
         // The per-course answer extracts the named course's section from the
         // generated map and refuses a course the map does not list honestly.
-        var map = new ThesisAssistantKnowledgeRepository.KnowledgeDocument(
+        var map = new KnowledgeDocument(
                 "map-doc", "catalog-prerequisite-map-vi", "vi",
                 "Bản đồ học phần tiên quyết toàn trường",
                 "## Danh sách chi tiết\n\n- **SE421** — Kiến trúc phần mềm nâng cao\n  - Học phần tiên quyết: SE405 — Kiến trúc phần mềm\n- **AI401** — Học sâu\n  - Học phần tiên quyết: SE411 — Nhập môn trí tuệ nhân tạo\n\n## Lưu ý\n\n- Ngưỡng áp dụng mức Đạt (D).",
@@ -267,7 +274,7 @@ class ThesisAssistantServiceTest {
         String headAnswer = ThesisAssistantService.prerequisiteAnswer("Tiên quyết của SE401 là gì?", map);
         assertTrue(headAnswer.contains("không có học phần tiên quyết"));
         assertTrue(ThesisAssistantService.isPrerequisiteMapDocument(map));
-        var policyDoc = new ThesisAssistantKnowledgeRepository.KnowledgeDocument(
+        var policyDoc = new KnowledgeDocument(
                 "policy-doc", "prerequisite-prior-corequisite-vi", "vi",
                 "Học phần tiên quyết, học phần học trước và học phần song hành",
                 "Quy định chung về học phần điều kiện.",
@@ -283,22 +290,22 @@ class ThesisAssistantServiceTest {
         assertTrue(ThesisAssistantService.retrievalTerms("Quy dinh tin chi toi da").contains("tối đa"));
 
         ThesisAssistantKnowledgeRepository knowledge = mock(ThesisAssistantKnowledgeRepository.class);
-        var unrelated = new ThesisAssistantKnowledgeRepository.KnowledgeDocument(
+        var unrelated = new KnowledgeDocument(
                 "policy", "policy-deadline", "en", "General policy", "General classes and enrollment deadline information.",
                 "registrar", "POLICY", UUID.randomUUID(), 1);
         // Real retrieval orders by lexical score per locale; the mocks below
         // mirror that shape so the corroboration gate sees the same top
         // document production would.
-        var registration = new ThesisAssistantKnowledgeRepository.KnowledgeDocument(
+        var registration = new KnowledgeDocument(
                 "registration", "registration-window-en", "en", "Course registration window",
                 "Check the active registration window, enroll in a course or section, "
                         + "and use the add drop period for changes.",
                 "registrar", "REGISTRATION", null, null, null, UUID.randomUUID(), 1, null, null, null, 40);
-        var registrationVietnamese = new ThesisAssistantKnowledgeRepository.KnowledgeDocument(
+        var registrationVietnamese = new KnowledgeDocument(
                 "registration-vi", "registration-window-vi", "vi", "Đăng ký học phần",
                 "Kiểm tra thời hạn đăng ký học phần trước khi chọn lớp.",
                 "registrar", "REGISTRATION", null, null, null, UUID.randomUUID(), 1, null, null, null, 40);
-        var creditLimitVietnamese = new ThesisAssistantKnowledgeRepository.KnowledgeDocument(
+        var creditLimitVietnamese = new KnowledgeDocument(
                 "credit-limit-vi", "credit-limit-vi", "vi", "Giới hạn tín chỉ",
                 "Quy chế về rút môn học và giới hạn khối lượng học tập: 1. Rút học phần: "
                         + "Sinh viên được nộp đơn rút môn học trong vòng 2 tuần đầu của học kỳ chính. "
@@ -306,7 +313,7 @@ class ThesisAssistantServiceTest {
                         + "và tối đa 24 tín chỉ (sinh viên có điểm GPA loại Khá, Giỏi có thể làm đơn xin đăng ký "
                         + "tối đa 28 tín chỉ). Học kỳ phụ được đăng ký tối đa 8 đến 10 tín chỉ.",
                 "registrar", "REGISTRATION", null, null, null, UUID.randomUUID(), 1, null, null, null, 35);
-        var incidentalCreditPolicy = new ThesisAssistantKnowledgeRepository.KnowledgeDocument(
+        var incidentalCreditPolicy = new KnowledgeDocument(
                 "incidental-credit", "incidental-credit", "vi", "Điều kiện bảo vệ khóa luận",
                 "Sinh viên phải tích lũy tối thiểu 75% số tín chỉ của chương trình.",
                 "registrar", "POLICY", null, null, null, UUID.randomUUID(), 1, null, null, null, 8);
@@ -533,11 +540,11 @@ class ThesisAssistantServiceTest {
         assertTrue(!ThesisAssistantService.isCertificateQuery("Where do I get a certificate for my lost student card?"));
         assertTrue(!ThesisAssistantService.isCertificateQuery("Lịch thi học kỳ này thế nào?"));
 
-        var card = new ThesisAssistantKnowledgeRepository.KnowledgeDocument(
+        var card = new KnowledgeDocument(
                 "card", "faq-student-card-vi", "vi", "Thẻ sinh viên: xác nhận thủ tục cấp lại",
                 "Mất hoặc hỏng thẻ sinh viên: nộp đơn cấp lại kèm giấy xác nhận tại Phòng CTSV.",
                 "registrar", "GENERAL_FAQ", null, null, null, UUID.randomUUID(), 1, null, null, null, 18);
-        var certificate = new ThesisAssistantKnowledgeRepository.KnowledgeDocument(
+        var certificate = new KnowledgeDocument(
                 "certificate", "faq-student-certificates-vi", "vi",
                 "Giấy xác nhận sinh viên: bản in trên cổng và bản có dấu của trường",
                 "Sinh viên tải giấy xác nhận bản nháp trên cổng; bản có dấu xin tại Phòng Đào tạo.",
@@ -601,7 +608,7 @@ class ThesisAssistantServiceTest {
     void legacyUnsafeKnowledgeIsFilteredBeforeLexicalFallback() {
         ThesisAssistantKnowledgeRepository knowledge = mock(ThesisAssistantKnowledgeRepository.class);
         when(knowledge.search(anyString(), anyList(), anyInt())).thenReturn(List.of(
-                new ThesisAssistantKnowledgeRepository.KnowledgeDocument(
+                new KnowledgeDocument(
                         "unsafe", "unsafe", "vi", "Registration contact", "Student email student@example.edu", "curated")));
 
         ChatResponse response = new ThesisAssistantService(knowledge)
@@ -619,7 +626,7 @@ class ThesisAssistantServiceTest {
         ThesisAssistantRepository history = mock(ThesisAssistantRepository.class);
         ThesisAssistantTurnRepository turns = mock(ThesisAssistantTurnRepository.class);
         ThesisAssistantCatalogRepository catalog = mock(ThesisAssistantCatalogRepository.class);
-        var document = new ThesisAssistantKnowledgeRepository.KnowledgeDocument(
+        var document = new KnowledgeDocument(
                 "11111111-1111-1111-1111-111111111111", "topic", "en", "Topic", "Grounded answer", "office");
         when(knowledge.search(anyString(), anyList(), anyInt())).thenReturn(List.of(document));
         when(catalog.search(anyString(), anyList(), anyInt())).thenReturn(List.of());
@@ -631,20 +638,20 @@ class ThesisAssistantServiceTest {
         UUID message = UUID.randomUUID();
         when(turns.reserve(anyString(), eq(request), anyString(), isNull(), eq("en"), anyString(), anyInt(),
                 any(java.util.function.Consumer.class)))
-                .thenReturn(new ThesisAssistantTurnRepository.Reservation(
-                        ThesisAssistantTurnRepository.ReservationStatus.NEW, turn, conversation, 1L, true, null, null, false));
+                .thenReturn(new Reservation(
+                        ReservationStatus.NEW, turn, conversation, 1L, true, null, null, false));
         when(turns.markSnapshotReady(eq(turn), anyString(), eq(1L), anyString(),
                 any(java.util.function.Consumer.class))).thenReturn(true);
         when(turns.dispatch(eq(turn), anyString(), eq(1L), anyInt(), anyInt(),
                 any(java.util.function.Consumer.class)))
-                .thenReturn(new ThesisAssistantTurnRepository.DispatchDecision(true, true, "DISPATCHED"));
+                .thenReturn(new DispatchDecision(true, true, "DISPATCHED"));
         Citation citation = new Citation("doc", "topic", "Topic", "office", "en", "Grounded answer",
                 "THESIS", "CURATED", "11111111-1111-1111-1111-111111111111", null, null, "hash", null, null, null);
         String hardQuestion = "topic compare multiple conditions";
         when(turns.complete(eq(turn), anyString(), eq(1L), anyString(), eq("curated-lexical-rag"),
                 eq("Grounded answer"), eq(true), eq("PROVIDER_UNSAFE_OUTPUT"), anyList(),
                 any(java.util.function.Consumer.class)))
-                .thenReturn(new ThesisAssistantTurnRepository.TerminalResult(
+                .thenReturn(new TerminalResult(
                         conversation, message, "Grounded answer", "curated-lexical-rag", true,
                         "PROVIDER_UNSAFE_OUTPUT", List.of(citation), false, "COMPLETED"));
         doAnswer(invocation -> {
@@ -656,7 +663,7 @@ class ThesisAssistantServiceTest {
             sink.accept(new ProviderSegment(1, "example.edu", List.of("11111111-1111-1111-1111-111111111111")));
             return new CompletionResult("Contact student@example.edu", List.of(), "stop");
         }).when(provider).complete(
-                any(AssistantCompletionProvider.CompletionRequest.class),
+                any(CompletionRequest.class),
                 any(java.util.function.Consumer.class),
                 any(java.util.function.BooleanSupplier.class));
 
@@ -686,7 +693,7 @@ class ThesisAssistantServiceTest {
         ThesisAssistantRepository history = mock(ThesisAssistantRepository.class);
         ThesisAssistantTurnRepository turns = mock(ThesisAssistantTurnRepository.class);
         ThesisAssistantCatalogRepository catalog = mock(ThesisAssistantCatalogRepository.class);
-        var document = new ThesisAssistantKnowledgeRepository.KnowledgeDocument(
+        var document = new KnowledgeDocument(
                 "33333333-3333-3333-3333-333333333333", "topic", "en", "Topic", "Grounded answer", "office");
         when(knowledge.search(anyString(), anyList(), anyInt())).thenReturn(List.of(document));
         when(catalog.search(anyString(), anyList(), anyInt())).thenReturn(List.of());
@@ -698,19 +705,19 @@ class ThesisAssistantServiceTest {
         UUID message = UUID.randomUUID();
         when(turns.reserve(anyString(), eq(request), anyString(), isNull(), eq("en"), anyString(), anyInt(),
                 any(java.util.function.Consumer.class)))
-                .thenReturn(new ThesisAssistantTurnRepository.Reservation(
-                        ThesisAssistantTurnRepository.ReservationStatus.NEW, turn, conversation, 1L, true, null, null, false));
+                .thenReturn(new Reservation(
+                        ReservationStatus.NEW, turn, conversation, 1L, true, null, null, false));
         when(turns.markSnapshotReady(eq(turn), anyString(), eq(1L), anyString(),
                 any(java.util.function.Consumer.class))).thenReturn(true);
         when(turns.dispatch(eq(turn), anyString(), eq(1L), anyInt(), anyInt(),
                 any(java.util.function.Consumer.class)))
-                .thenReturn(new ThesisAssistantTurnRepository.DispatchDecision(true, true, "DISPATCHED"));
+                .thenReturn(new DispatchDecision(true, true, "DISPATCHED"));
         Citation citation = new Citation("doc", "topic", "Topic", "office", "en", "Grounded answer",
                 "THESIS", "CURATED", "33333333-3333-3333-3333-333333333333", null, null, "hash", null, null, null);
         when(turns.complete(eq(turn), anyString(), eq(1L), anyString(), eq("curated-lexical-rag"),
                 eq("Grounded answer"), eq(true), eq("PROVIDER_UNSAFE_OUTPUT"), anyList(),
                 any(java.util.function.Consumer.class)))
-                .thenReturn(new ThesisAssistantTurnRepository.TerminalResult(
+                .thenReturn(new TerminalResult(
                         conversation, message, "Grounded answer", "curated-lexical-rag", true,
                         "PROVIDER_UNSAFE_OUTPUT", List.of(citation), false, "COMPLETED"));
         doAnswer(invocation -> {
@@ -720,7 +727,7 @@ class ThesisAssistantServiceTest {
             sink.accept(new ProviderSegment(0, "Here is a command: cur", List.of("33333333-3333-3333-3333-333333333333")));
             sink.accept(new ProviderSegment(1, "l https://campuscore.local/api/v1/assistant", List.of("33333333-3333-3333-3333-333333333333")));
             return new CompletionResult("Here is a command: curl https://campuscore.local/api/v1/assistant", List.of(), "stop");
-        }).when(provider).complete(any(AssistantCompletionProvider.CompletionRequest.class),
+        }).when(provider).complete(any(CompletionRequest.class),
                 any(java.util.function.Consumer.class), any(java.util.function.BooleanSupplier.class));
 
         List<StreamEvent> events = new ArrayList<>();
@@ -748,7 +755,7 @@ class ThesisAssistantServiceTest {
         ThesisAssistantRepository history = mock(ThesisAssistantRepository.class);
         ThesisAssistantTurnRepository turns = mock(ThesisAssistantTurnRepository.class);
         ThesisAssistantCatalogRepository catalog = mock(ThesisAssistantCatalogRepository.class);
-        var document = new ThesisAssistantKnowledgeRepository.KnowledgeDocument(
+        var document = new KnowledgeDocument(
                 "22222222-2222-2222-2222-222222222222", "topic", "en", "Topic", "Grounded answer", "office");
         when(knowledge.search(anyString(), anyList(), anyInt())).thenReturn(List.of(document));
         when(catalog.search(anyString(), anyList(), anyInt())).thenReturn(List.of());
@@ -759,13 +766,13 @@ class ThesisAssistantServiceTest {
         UUID conversation = UUID.randomUUID();
         when(turns.reserve(anyString(), eq(request), anyString(), isNull(), eq("en"), anyString(), anyInt(),
                 any(java.util.function.Consumer.class)))
-                .thenReturn(new ThesisAssistantTurnRepository.Reservation(
-                        ThesisAssistantTurnRepository.ReservationStatus.NEW, turn, conversation, 1L, true, null, null, false));
+                .thenReturn(new Reservation(
+                        ReservationStatus.NEW, turn, conversation, 1L, true, null, null, false));
         when(turns.markSnapshotReady(eq(turn), anyString(), eq(1L), anyString(),
                 any(java.util.function.Consumer.class))).thenReturn(true);
         when(turns.dispatch(eq(turn), anyString(), eq(1L), anyInt(), anyInt(),
                 any(java.util.function.Consumer.class)))
-                .thenReturn(new ThesisAssistantTurnRepository.DispatchDecision(true, true, "DISPATCHED"));
+                .thenReturn(new DispatchDecision(true, true, "DISPATCHED"));
         String hardQuestion = "topic compare multiple conditions";
         when(turns.complete(eq(turn), anyString(), eq(1L), anyString(), eq("deepseek-v4-flash"),
                 eq("grounded answer"), eq(false), eq("ANSWERED"), anyList(),
@@ -776,7 +783,7 @@ class ThesisAssistantServiceTest {
             java.util.function.Consumer<ProviderSegment> sink = invocation.getArgument(1);
             sink.accept(new ProviderSegment(0, "grounded answer", List.of("22222222-2222-2222-2222-222222222222")));
             return new CompletionResult("grounded answer", List.of(), "stop");
-        }).when(provider).complete(any(AssistantCompletionProvider.CompletionRequest.class),
+        }).when(provider).complete(any(CompletionRequest.class),
                 any(java.util.function.Consumer.class), any(java.util.function.BooleanSupplier.class));
 
         List<StreamEvent> events = new ArrayList<>();
@@ -800,7 +807,7 @@ class ThesisAssistantServiceTest {
         ThesisAssistantTurnRepository turns = mock(ThesisAssistantTurnRepository.class);
         ThesisAssistantCatalogRepository catalog = mock(ThesisAssistantCatalogRepository.class);
         String sourceId = "66666666-6666-6666-6666-666666666666";
-        var document = new ThesisAssistantKnowledgeRepository.KnowledgeDocument(
+        var document = new KnowledgeDocument(
                 sourceId, "topic", "en", "Topic", "Grounded context", "office");
         when(knowledge.search(anyString(), anyList(), anyInt())).thenReturn(List.of(document));
         when(catalog.search(anyString(), anyList(), anyInt())).thenReturn(List.of());
@@ -812,16 +819,16 @@ class ThesisAssistantServiceTest {
         UUID message = UUID.randomUUID();
         when(turns.reserve(anyString(), eq(request), anyString(), isNull(), eq("en"), anyString(), anyInt(),
                 any(java.util.function.Consumer.class)))
-                .thenReturn(new ThesisAssistantTurnRepository.Reservation(
-                        ThesisAssistantTurnRepository.ReservationStatus.NEW, turn, conversation, 1L, true, null, null, false));
+                .thenReturn(new Reservation(
+                        ReservationStatus.NEW, turn, conversation, 1L, true, null, null, false));
         when(turns.markSnapshotReady(eq(turn), anyString(), eq(1L), anyString(),
                 any(java.util.function.Consumer.class))).thenReturn(true);
         when(turns.dispatch(eq(turn), anyString(), eq(1L), anyInt(), anyInt(),
                 any(java.util.function.Consumer.class)))
-                .thenReturn(new ThesisAssistantTurnRepository.DispatchDecision(true, true, "DISPATCHED"));
+                .thenReturn(new DispatchDecision(true, true, "DISPATCHED"));
         when(turns.complete(eq(turn), anyString(), eq(1L), anyString(), anyString(), anyString(), eq(false),
                 eq("ANSWERED"), anyList(), any(java.util.function.Consumer.class)))
-                .thenAnswer(invocation -> new ThesisAssistantTurnRepository.TerminalResult(
+                .thenAnswer(invocation -> new TerminalResult(
                         conversation, message, invocation.getArgument(5), invocation.getArgument(4), false,
                         "ANSWERED", invocation.getArgument(8), false, "COMPLETED"));
         doAnswer(invocation -> {
@@ -842,7 +849,7 @@ class ThesisAssistantServiceTest {
             return new CompletionResult(
                     "Cổng học vụ chưa công bố lịch thi. Xin lỗi vì bất tiện nhưng học phí đã niêm yết.",
                     List.of(), "stop");
-        }).when(provider).complete(any(AssistantCompletionProvider.CompletionRequest.class),
+        }).when(provider).complete(any(CompletionRequest.class),
                 any(java.util.function.Consumer.class), any(java.util.function.BooleanSupplier.class));
 
         ThesisAssistantService service = new ThesisAssistantService(knowledge, provider, history, turns, catalog,
@@ -855,14 +862,14 @@ class ThesisAssistantServiceTest {
         assertEquals("ANSWERED", denial.reasonCode());
         assertTrue(denial.citations().isEmpty(),
                 "a pure denial streams no citations: " + denial.citations());
-        assertTrue(denialEvents.stream().noneMatch(ThesisAssistantService.StreamCitation.class::isInstance));
+        assertTrue(denialEvents.stream().noneMatch(StreamCitation.class::isInstance));
 
         List<StreamEvent> mixedEvents = new ArrayList<>();
         ChatResponse mixed = service.answer("topic compare multiple conditions", "en", null, "owner-mixed", request, mixedEvents::add);
         assertEquals("ANSWERED", mixed.reasonCode());
         assertTrue(mixed.citations().stream().anyMatch(citation -> sourceId.equals(citation.sourceId())),
                 "a grounded contrast tail keeps the retrieved source: " + mixed.citations());
-        assertTrue(mixedEvents.stream().anyMatch(ThesisAssistantService.StreamCitation.class::isInstance));
+        assertTrue(mixedEvents.stream().anyMatch(StreamCitation.class::isInstance));
     }
 
     @Test
@@ -1042,7 +1049,7 @@ class ThesisAssistantServiceTest {
         ThesisAssistantRepository history = mock(ThesisAssistantRepository.class);
         ThesisAssistantTurnRepository turns = mock(ThesisAssistantTurnRepository.class);
         ThesisAssistantCatalogRepository catalog = mock(ThesisAssistantCatalogRepository.class);
-        var document = new ThesisAssistantKnowledgeRepository.KnowledgeDocument(
+        var document = new KnowledgeDocument(
                 "55555555-5555-5555-5555-555555555555", "topic", "en", "Topic", "Grounded answer", "office");
         when(knowledge.search(anyString(), anyList(), anyInt())).thenReturn(List.of(document));
         when(catalog.search(anyString(), anyList(), anyInt())).thenReturn(List.of());
@@ -1054,17 +1061,17 @@ class ThesisAssistantServiceTest {
         UUID message = UUID.randomUUID();
         when(turns.reserve(anyString(), eq(request), anyString(), isNull(), eq("en"), anyString(), anyInt(),
                 any(java.util.function.Consumer.class)))
-                .thenReturn(new ThesisAssistantTurnRepository.Reservation(
-                        ThesisAssistantTurnRepository.ReservationStatus.NEW, turn, conversation, 1L, true, null, null, false));
+                .thenReturn(new Reservation(
+                        ReservationStatus.NEW, turn, conversation, 1L, true, null, null, false));
         when(turns.markSnapshotReady(eq(turn), anyString(), eq(1L), anyString(),
                 any(java.util.function.Consumer.class))).thenReturn(true);
         when(turns.dispatch(eq(turn), anyString(), eq(1L), anyInt(), anyInt(),
                 any(java.util.function.Consumer.class)))
-                .thenReturn(new ThesisAssistantTurnRepository.DispatchDecision(false, false, "QUOTA_EXCEEDED"));
+                .thenReturn(new DispatchDecision(false, false, "QUOTA_EXCEEDED"));
         when(turns.complete(eq(turn), anyString(), eq(1L), anyString(), eq("curated-lexical-rag"),
                 eq("Grounded answer"), eq(true), eq("QUOTA_EXCEEDED"), anyList(),
                 any(java.util.function.Consumer.class)))
-                .thenReturn(new ThesisAssistantTurnRepository.TerminalResult(
+                .thenReturn(new TerminalResult(
                         conversation, message, "Grounded answer", "curated-lexical-rag", true,
                         "QUOTA_EXCEEDED", List.of(), false, "COMPLETED"));
 
@@ -1089,7 +1096,7 @@ class ThesisAssistantServiceTest {
     @Test
     void groundedFallbackAnswersFromLocalKnowledgeWithCitationsWhenGatewayIsDown() {
         ThesisAssistantKnowledgeRepository knowledge = mock(ThesisAssistantKnowledgeRepository.class);
-        var document = new ThesisAssistantKnowledgeRepository.KnowledgeDocument(
+        var document = new KnowledgeDocument(
                 "66666666-6666-6666-6666-666666666666", "dang-ky-de-tai", "vi",
                 "Điều kiện đăng ký đề tài khóa luận", "Tích lũy tối thiểu 110 tín chỉ để đăng ký đề tài.",
                 "handbook", "THESIS", null, null, null, null, null, null, null, null, 60);
@@ -1156,7 +1163,7 @@ class ThesisAssistantServiceTest {
     @Test
     void groundedFallbackDegradesToCuratedTextWhenTheLocalBudgetIsExceeded() {
         ThesisAssistantKnowledgeRepository knowledge = mock(ThesisAssistantKnowledgeRepository.class);
-        var document = new ThesisAssistantKnowledgeRepository.KnowledgeDocument(
+        var document = new KnowledgeDocument(
                 "77777777-7777-7777-7777-777777777777", "topic", "vi", "Đề tài", "Nội dung đề tài", "handbook");
         when(knowledge.search(anyString(), anyList(), anyInt())).thenAnswer(invocation -> {
             Thread.sleep(ThesisAssistantService.LOCAL_FALLBACK_BUDGET_MS + 1_000L); // exceed the raised fallback ceiling
@@ -1178,9 +1185,9 @@ class ThesisAssistantServiceTest {
         ThesisAssistantRepository history = mock(ThesisAssistantRepository.class);
         ThesisAssistantTurnRepository turns = mock(ThesisAssistantTurnRepository.class);
         ThesisAssistantCatalogRepository catalog = mock(ThesisAssistantCatalogRepository.class);
-        List<ThesisAssistantKnowledgeRepository.KnowledgeDocument> documents = new ArrayList<>();
+        List<KnowledgeDocument> documents = new ArrayList<>();
         for (int index = 1; index <= 5; index++) {
-            documents.add(new ThesisAssistantKnowledgeRepository.KnowledgeDocument(
+            documents.add(new KnowledgeDocument(
                     "00000000-0000-0000-0000-00000000000" + index, "topic-" + index, "en",
                     "Topic " + index, "compare multiple conditions details " + index, "office"));
         }
@@ -1194,19 +1201,19 @@ class ThesisAssistantServiceTest {
         UUID message = UUID.randomUUID();
         when(turns.reserve(anyString(), eq(request), anyString(), isNull(), eq("en"), anyString(), anyInt(),
                 any(java.util.function.Consumer.class)))
-                .thenReturn(new ThesisAssistantTurnRepository.Reservation(
-                        ThesisAssistantTurnRepository.ReservationStatus.NEW, turn, conversation, 1L, true, null, null, false));
+                .thenReturn(new Reservation(
+                        ReservationStatus.NEW, turn, conversation, 1L, true, null, null, false));
         when(turns.markSnapshotReady(eq(turn), anyString(), eq(1L), anyString(),
                 any(java.util.function.Consumer.class))).thenReturn(true);
         when(turns.dispatch(eq(turn), anyString(), eq(1L), anyInt(), anyInt(),
                 any(java.util.function.Consumer.class)))
-                .thenReturn(new ThesisAssistantTurnRepository.DispatchDecision(true, true, "DISPATCHED"));
+                .thenReturn(new DispatchDecision(true, true, "DISPATCHED"));
         when(turns.complete(eq(turn), anyString(), eq(1L), anyString(), eq("deepseek-v4-flash"),
                 anyString(), eq(false), eq("ANSWERED"), anyList(), any(java.util.function.Consumer.class)))
-                .thenAnswer(invocation -> new ThesisAssistantTurnRepository.TerminalResult(
+                .thenAnswer(invocation -> new TerminalResult(
                         conversation, message, invocation.getArgument(5, String.class), "deepseek-v4-flash", false,
                         "ANSWERED", invocation.getArgument(8, List.class), false, "COMPLETED"));
-        List<AssistantCompletionProvider.CompletionRequest> captured = new ArrayList<>();
+        List<CompletionRequest> captured = new ArrayList<>();
         String firstAllowedId = "00000000-0000-0000-0000-000000000001";
         doAnswer(invocation -> {
             captured.add(invocation.getArgument(0));
@@ -1214,7 +1221,7 @@ class ThesisAssistantServiceTest {
             java.util.function.Consumer<ProviderSegment> sink = invocation.getArgument(1);
             sink.accept(new ProviderSegment(0, "Synthesized answer", List.of(firstAllowedId)));
             return new CompletionResult("Synthesized answer", List.of(), "stop");
-        }).when(provider).complete(any(AssistantCompletionProvider.CompletionRequest.class),
+        }).when(provider).complete(any(CompletionRequest.class),
                 any(java.util.function.Consumer.class), any(java.util.function.BooleanSupplier.class));
 
         ThesisAssistantService service = new ThesisAssistantService(knowledge, provider, history, turns, catalog,
@@ -1245,19 +1252,19 @@ class ThesisAssistantServiceTest {
         ThesisAssistantRepository history = mock(ThesisAssistantRepository.class);
         ThesisAssistantTurnRepository turns = mock(ThesisAssistantTurnRepository.class);
         ThesisAssistantCatalogRepository catalog = mock(ThesisAssistantCatalogRepository.class);
-        List<ThesisAssistantKnowledgeRepository.KnowledgeDocument> documents = new ArrayList<>();
+        List<KnowledgeDocument> documents = new ArrayList<>();
         // Three generic decoys outrank both family docs — without per-family
         // representation the prompt window carries decoys only.
         for (int index = 1; index <= 3; index++) {
-            documents.add(new ThesisAssistantKnowledgeRepository.KnowledgeDocument(
+            documents.add(new KnowledgeDocument(
                     "00000000-0000-0000-0000-00000000001" + index, "portal-guide-" + index, "vi",
                     "Hướng dẫn cổng " + index, "Phúc khảo điểm lịch thi hướng dẫn " + index, "office"));
         }
-        var appeals = new ThesisAssistantKnowledgeRepository.KnowledgeDocument(
+        var appeals = new KnowledgeDocument(
                 "00000000-0000-0000-0000-000000000021", "academic-appeals-and-re-evaluation-vi", "vi",
                 "Quy trình khiếu nại và phúc khảo điểm thi học phần",
                 "Quy trình phúc khảo điểm thi chi tiết", "office");
-        var examSchedule = new ThesisAssistantKnowledgeRepository.KnowledgeDocument(
+        var examSchedule = new KnowledgeDocument(
                 "00000000-0000-0000-0000-000000000022", "campus-exam-schedule-vi", "vi",
                 "Lịch thi cuối kỳ", "Lịch thi kết thúc học phần được công bố", "office");
         documents.add(appeals);
@@ -1272,27 +1279,27 @@ class ThesisAssistantServiceTest {
         UUID message = UUID.randomUUID();
         when(turns.reserve(anyString(), eq(request), anyString(), isNull(), eq("vi"), anyString(), anyInt(),
                 any(java.util.function.Consumer.class)))
-                .thenReturn(new ThesisAssistantTurnRepository.Reservation(
-                        ThesisAssistantTurnRepository.ReservationStatus.NEW, turn, conversation, 1L, true, null, null, false));
+                .thenReturn(new Reservation(
+                        ReservationStatus.NEW, turn, conversation, 1L, true, null, null, false));
         when(turns.markSnapshotReady(eq(turn), anyString(), eq(1L), anyString(),
                 any(java.util.function.Consumer.class))).thenReturn(true);
         when(turns.dispatch(eq(turn), anyString(), eq(1L), anyInt(), anyInt(),
                 any(java.util.function.Consumer.class)))
-                .thenReturn(new ThesisAssistantTurnRepository.DispatchDecision(true, true, "DISPATCHED"));
+                .thenReturn(new DispatchDecision(true, true, "DISPATCHED"));
         when(turns.complete(eq(turn), anyString(), eq(1L), anyString(), anyString(),
                 anyString(), anyBoolean(), anyString(), anyList(), any(java.util.function.Consumer.class)))
-                .thenAnswer(invocation -> new ThesisAssistantTurnRepository.TerminalResult(
+                .thenAnswer(invocation -> new TerminalResult(
                         conversation, message, invocation.getArgument(5, String.class), "deepseek-v4-flash", false,
                         invocation.getArgument(7, String.class), invocation.getArgument(8, List.class),
                         false, "COMPLETED"));
-        List<AssistantCompletionProvider.CompletionRequest> captured = new ArrayList<>();
+        List<CompletionRequest> captured = new ArrayList<>();
         doAnswer(invocation -> {
             captured.add(invocation.getArgument(0));
             @SuppressWarnings("unchecked")
             java.util.function.Consumer<ProviderSegment> sink = invocation.getArgument(1);
             sink.accept(new ProviderSegment(0, "Both parts answered", List.of()));
             return new CompletionResult("Both parts answered", List.of(), "stop");
-        }).when(provider).complete(any(AssistantCompletionProvider.CompletionRequest.class),
+        }).when(provider).complete(any(CompletionRequest.class),
                 any(java.util.function.Consumer.class), any(java.util.function.BooleanSupplier.class));
 
         ThesisAssistantService service = new ThesisAssistantService(knowledge, provider, history, turns, catalog,
@@ -1362,9 +1369,9 @@ class ThesisAssistantServiceTest {
     void generalAnswerIfOffTopicAnswersGeneralQuestionsViaProvider() {
         ThesisAssistantKnowledgeRepository knowledge = mock(ThesisAssistantKnowledgeRepository.class);
         DeepSeekClient provider = mock(DeepSeekClient.class);
-        when(provider.complete(org.mockito.ArgumentMatchers.<DeepSeekClient.CompletionRequest>any(),
-                org.mockito.ArgumentMatchers.<java.util.function.Consumer<DeepSeekClient.ProviderSegment>>any()))
-                .thenReturn(new DeepSeekClient.CompletionResult(
+        when(provider.complete(org.mockito.ArgumentMatchers.<CompletionRequest>any(),
+                org.mockito.ArgumentMatchers.<java.util.function.Consumer<ProviderSegment>>any()))
+                .thenReturn(new CompletionResult(
                         "Con gà có 2 chân.", List.of(), "stop"));
         ThesisAssistantService service = new ThesisAssistantService(knowledge, provider,
                 mock(ThesisAssistantRepository.class),
@@ -1412,14 +1419,14 @@ class ThesisAssistantServiceTest {
         when(history.conversationScope(eq(conversation), anyString())).thenReturn("specialized");
         when(turns.reserve(anyString(), eq(request), anyString(), eq(conversation), eq("en"), anyString(), anyInt(),
                 any(java.util.function.Consumer.class)))
-                .thenReturn(new ThesisAssistantTurnRepository.Reservation(
-                        ThesisAssistantTurnRepository.ReservationStatus.NEW, turn, conversation, 1L, false, null, null, false));
+                .thenReturn(new Reservation(
+                        ReservationStatus.NEW, turn, conversation, 1L, false, null, null, false));
         when(turns.markSnapshotReady(eq(turn), anyString(), eq(1L), anyString(),
                 any(java.util.function.Consumer.class))).thenReturn(true);
         when(turns.complete(eq(turn), anyString(), eq(1L), anyString(), anyString(),
                 anyString(), anyBoolean(), anyString(), anyList(),
                 any(java.util.function.Consumer.class)))
-                .thenReturn(new ThesisAssistantTurnRepository.TerminalResult(
+                .thenReturn(new TerminalResult(
                         conversation, UUID.randomUUID(), "answer", "curated-lexical-rag", false,
                         "NO_MATCH", List.of(), false, "COMPLETED"));
 
@@ -1482,14 +1489,14 @@ class ThesisAssistantServiceTest {
         UUID conversation = UUID.randomUUID();
         when(turns.reserve(anyString(), eq(request), anyString(), isNull(), eq("en"), anyString(), anyInt(),
                 any(java.util.function.Consumer.class)))
-                .thenReturn(new ThesisAssistantTurnRepository.Reservation(
-                        ThesisAssistantTurnRepository.ReservationStatus.NEW, turn, conversation, 1L, true, null, null, false));
+                .thenReturn(new Reservation(
+                        ReservationStatus.NEW, turn, conversation, 1L, true, null, null, false));
         when(turns.markSnapshotReady(eq(turn), anyString(), eq(1L), anyString(),
                 any(java.util.function.Consumer.class))).thenReturn(true);
         when(turns.complete(eq(turn), anyString(), eq(1L), anyString(), anyString(),
                 anyString(), anyBoolean(), anyString(), anyList(),
                 any(java.util.function.Consumer.class)))
-                .thenReturn(new ThesisAssistantTurnRepository.TerminalResult(
+                .thenReturn(new TerminalResult(
                         conversation, UUID.randomUUID(), "answer", "curated-lexical-rag", false,
                         "NO_MATCH", List.of(), false, "COMPLETED"));
 
@@ -1507,7 +1514,7 @@ class ThesisAssistantServiceTest {
     void documentNumberedSegmentsDoNotKeepTheNextMarkerDigit() {
         String content = "1. Tiên quyết: Đạt từ 4.0/10. 2. Học trước: Có điểm thành phần. "
                 + "3. Song hành: Học cùng học kỳ.";
-        var document = new ThesisAssistantKnowledgeRepository.KnowledgeDocument(
+        var document = new KnowledgeDocument(
                 "dddddddd-dddd-dddd-dddd-dddddddddddd", "dieu-kien", "vi", "Học phần điều kiện", content, "office");
         String expected = "# Học phần điều kiện\n\n- **Tiên quyết**: Đạt từ 4.0/10.\n"
                 + "- **Học trước**: Có điểm thành phần.\n- **Song hành**: Học cùng học kỳ.";
@@ -1520,7 +1527,7 @@ class ThesisAssistantServiceTest {
     @Test
     void legacyAnswerPathEchoesTheCallerClientRequestId() {
         ThesisAssistantKnowledgeRepository knowledge = mock(ThesisAssistantKnowledgeRepository.class);
-        var document = new ThesisAssistantKnowledgeRepository.KnowledgeDocument(
+        var document = new KnowledgeDocument(
                 "fixture-id", "fixture-slug", "vi", "Tiên quyết", "Tiên quyết phải đạt trước.", "office");
         when(knowledge.search(anyString(), anyList(), anyInt())).thenReturn(List.of(document));
 
@@ -1544,13 +1551,13 @@ class ThesisAssistantServiceTest {
     @Test
     void documentNumberedSegmentsPreserveLiteralNumbers() {
         String content = "1. GPA: 2.00/4.0. 2. Điểm đạt: 4.0/10 và 3 đến 5 tín chỉ.";
-        var document = new ThesisAssistantKnowledgeRepository.KnowledgeDocument(
+        var document = new KnowledgeDocument(
                 "eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee", "diem", "vi", "Điểm", content, "office");
         assertEquals("# Điểm\n\n- **GPA**: 2.00/4.0.\n- **Điểm đạt**: 4.0/10 và 3 đến 5 tín chỉ.",
                 ThesisAssistantService.formatDocumentAnswer(document, content));
 
         String markdown = "# Heading\n\n1. Keep 2.00 unchanged.";
-        var shaped = new ThesisAssistantKnowledgeRepository.KnowledgeDocument(
+        var shaped = new KnowledgeDocument(
                 "ffffffff-ffff-ffff-ffff-ffffffffffff", "heading", "vi", "Heading", markdown, "office");
         assertEquals(markdown, ThesisAssistantService.formatDocumentAnswer(shaped, markdown));
     }

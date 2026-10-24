@@ -1,9 +1,10 @@
 package io.campuscore.restfulapi.thesis.assistant.controller;
 
-import io.campuscore.restfulapi.thesis.assistant.controller.ThesisAssistantKnowledgeAdminController.KnowledgeDocumentView;
-import io.campuscore.restfulapi.thesis.assistant.controller.ThesisAssistantKnowledgeAdminController.KnowledgeRequest;
-import io.campuscore.restfulapi.thesis.assistant.controller.ThesisAssistantKnowledgeAdminController.KnowledgeRevision;
+import io.campuscore.restfulapi.thesis.assistant.dto.KnowledgeDocumentView;
+import io.campuscore.restfulapi.thesis.assistant.dto.KnowledgeRequest;
+import io.campuscore.restfulapi.thesis.assistant.dto.KnowledgeRevision;
 import io.campuscore.restfulapi.exception.DomainException;
+import io.campuscore.restfulapi.thesis.assistant.dto.SyncResult;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.util.List;
@@ -106,13 +107,13 @@ public class SupabaseKnowledgeInternalController {
         verify(token);
         String owner = owner(actor);
         KnowledgeRevision published = authority.publish(id, owner);
-        SupabaseKnowledgeSyncService.SyncResult projection = sync.syncNow();
+        SyncResult projection = sync.syncNow();
         return new KnowledgeRevision(published.documentId(), published.revisionId(), published.version(), published.state(),
                 published.releaseId(), published.corpusVersion(), published.corpusHash(), published.rowCount(), projection);
     }
 
     @DeleteMapping("/{id}")
-    public SupabaseKnowledgeSyncService.SyncResult archive(@PathVariable UUID id,
+    public SyncResult archive(@PathVariable UUID id,
             @RequestHeader(name = TOKEN_HEADER, required = false) String token,
             @RequestHeader(name = "X-Assistant-Owner", required = false) String actor) {
         verify(token);
@@ -123,7 +124,7 @@ public class SupabaseKnowledgeInternalController {
     }
 
     @PostMapping("/sync")
-    public SupabaseKnowledgeSyncService.SyncResult sync(
+    public SyncResult sync(
             @RequestHeader(name = TOKEN_HEADER, required = false) String token,
             @RequestHeader(name = "X-Assistant-Owner", required = false) String actor) {
         verify(token);
@@ -132,7 +133,7 @@ public class SupabaseKnowledgeInternalController {
     }
 
     @GetMapping("/sync-status")
-    public SupabaseKnowledgeSyncService.SyncResult status(
+    public SyncResult status(
             @RequestHeader(name = TOKEN_HEADER, required = false) String token,
             @RequestHeader(name = "X-Assistant-Owner", required = false) String actor) {
         verify(token);

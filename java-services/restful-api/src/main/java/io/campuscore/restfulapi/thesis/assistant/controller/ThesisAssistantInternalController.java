@@ -1,9 +1,25 @@
 package io.campuscore.restfulapi.thesis.assistant.controller;
 
+import io.campuscore.restfulapi.thesis.assistant.dto.StreamCitation;
+import io.campuscore.restfulapi.thesis.assistant.dto.StreamDelta;
+import io.campuscore.restfulapi.thesis.assistant.dto.StreamDone;
+import io.campuscore.restfulapi.thesis.assistant.dto.StreamError;
+import io.campuscore.restfulapi.thesis.assistant.dto.StreamEvent;
+import io.campuscore.restfulapi.thesis.assistant.dto.StreamMeta;
+import io.campuscore.restfulapi.thesis.assistant.dto.StreamReplace;
 import io.campuscore.restfulapi.thesis.assistant.dto.ThesisAssistantDtos.ChatRequest;
 import io.campuscore.restfulapi.thesis.assistant.dto.ThesisAssistantDtos.ChatResponse;
 import io.campuscore.restfulapi.thesis.assistant.dto.ThesisAssistantDtos.FeedbackRequest;
 import io.campuscore.restfulapi.exception.DomainException;
+import io.campuscore.restfulapi.thesis.assistant.dto.ThesisAssistantInternalCancelResponse;
+import io.campuscore.restfulapi.thesis.assistant.dto.ThesisAssistantInternalConversationCreated;
+import io.campuscore.restfulapi.thesis.assistant.dto.ThesisAssistantInternalCreateConversationRequest;
+import io.campuscore.restfulapi.thesis.assistant.dto.ThesisAssistantInternalFeedbackResponse;
+import io.campuscore.restfulapi.thesis.assistant.dto.ThesisAssistantInternalStreamError;
+import io.campuscore.restfulapi.thesis.assistant.model.Conversation;
+import io.campuscore.restfulapi.thesis.assistant.model.ConversationPage;
+import io.campuscore.restfulapi.thesis.assistant.model.Message;
+import io.campuscore.restfulapi.thesis.assistant.model.MessagePage;
 import jakarta.validation.Valid;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
@@ -125,8 +141,8 @@ public class ThesisAssistantInternalController {
             AssistantRlsContext.withInternalOwner(ownerId, () -> {
                 assistant.stream(request.message(), request.locale(), request.conversationId(), ownerId,
                         request.clientRequestId(), event -> {
-                            if (event instanceof ThesisAssistantService.StreamDone
-                                    || event instanceof ThesisAssistantService.StreamError) {
+                            if (event instanceof StreamDone
+                                    || event instanceof StreamError) {
                                 terminal.set(true);
                             }
                             if (!transportClosed.get()) send(emitter, event);
@@ -168,7 +184,7 @@ public class ThesisAssistantInternalController {
     }
 
     @PostMapping("/requests/{clientRequestId}/cancel")
-    public CancelResponse cancel(@PathVariable UUID clientRequestId,
+    public ThesisAssistantInternalCancelResponse cancel(@PathVariable UUID clientRequestId,
             @RequestHeader(name = "X-Rag-Service-Token", required = false) String token,
             @RequestHeader(name = "X-Assistant-Owner", required = false) String owner) {
         verify(token);
@@ -184,11 +200,11 @@ public class ThesisAssistantInternalController {
         if (!result.cancelled() && ("FAILED_AMBIGUOUS".equals(result.status()) || "TERMINAL_RACE".equals(result.status()))) {
             throw new DomainException(HttpStatus.CONFLICT, "FAILED_AMBIGUOUS", "The provider outcome is ambiguous; automatic redispatch is disabled");
         }
-        return new CancelResponse(clientRequestId, result.status());
+        return new ThesisAssistantInternalCancelResponse(clientRequestId, result.status());
     }
 
     @PutMapping("/messages/{messageId}/feedback")
-    public FeedbackResponse feedback(@PathVariable UUID messageId, @Valid @RequestBody FeedbackRequest request,
+    public ThesisAssistantInternalFeedbackResponse feedback(@PathVariable UUID messageId, @Valid @RequestBody FeedbackRequest request,
             @RequestHeader(name = "X-Rag-Service-Token", required = false) String token,
             @RequestHeader(name = "X-Assistant-Owner", required = false) String owner) {
         verify(token);
@@ -197,7 +213,7 @@ public class ThesisAssistantInternalController {
             assistant.setFeedback(messageId, ownerId, request.rating(), request.reason());
             return null;
         });
-        return new FeedbackResponse(messageId, request.rating(), request.reason(), false);
+        return new ThesisAssistantInternalFeedbackResponse(messageId, request.rating(), request.reason(), false);
     }
 
     @DeleteMapping("/messages/{messageId}/feedback")
@@ -214,7 +230,7 @@ public class ThesisAssistantInternalController {
     }
 
     @GetMapping("/conversations")
-    public List<ThesisAssistantRepository.Conversation> conversations(
+    public List<Conversation> conversations(
             @RequestHeader(name = "X-Rag-Service-Token", required = false) String token,
             @RequestHeader(name = "X-Assistant-Owner", required = false) String owner,
             @RequestParam(required = false) Integer limit,
@@ -223,14 +239,14 @@ public class ThesisAssistantInternalController {
             jakarta.servlet.http.HttpServletResponse response) {
         verify(token);
         String ownerId = owner(owner);
-        ThesisAssistantRepository.ConversationPage page = AssistantRlsContext.withInternalOwner(ownerId,
+        ConversationPage page = AssistantRlsContext.withInternalOwner(ownerId,
                 () -> assistant.conversationPage(ownerId, limit, cursor, scope));
         if (page.nextCursor() != null) response.setHeader("X-Next-Cursor", page.nextCursor());
         return page.data();
     }
 
     @PostMapping("/conversations")
-    public ConversationCreated createConversation(@RequestBody(required = false) CreateConversationRequest request,
+    public ThesisAssistantInternalConversationCreated createConversation(@RequestBody(required = false) ThesisAssistantInternalCreateConversationRequest request,
             @RequestHeader(name = "X-Rag-Service-Token", required = false) String token,
             @RequestHeader(name = "X-Assistant-Owner", required = false) String owner) {
         verify(token);
@@ -239,7 +255,7 @@ public class ThesisAssistantInternalController {
             throw new DomainException(HttpStatus.BAD_REQUEST, "INVALID_LOCALE", "locale must be en or vi");
         }
         // Mirror the public controller's INVALID_SCOPE gate: the gateway
-        // forwards CreateConversationRequest{locale, scope} and a specialized
+        // forwards ThesisAssistantInternalCreateConversationRequest{locale, scope} and a specialized
         // conversation pinned 'academic' here would poison every resumed turn.
         String scope = request == null ? null : request.scope();
         if (scope != null && !scope.isBlank() && !"academic".equalsIgnoreCase(scope)
@@ -250,11 +266,11 @@ public class ThesisAssistantInternalController {
         String ownerId = owner(owner);
         String id = AssistantRlsContext.withInternalOwner(ownerId,
                 () -> assistant.createConversation(ownerId, locale, scope));
-        return new ConversationCreated(id, locale == null || locale.isBlank() ? "vi" : locale);
+        return new ThesisAssistantInternalConversationCreated(id, locale == null || locale.isBlank() ? "vi" : locale);
     }
 
     @GetMapping("/conversations/{id}/messages")
-    public List<ThesisAssistantRepository.Message> messages(@PathVariable UUID id,
+    public List<Message> messages(@PathVariable UUID id,
             @RequestHeader(name = "X-Rag-Service-Token", required = false) String token,
             @RequestHeader(name = "X-Assistant-Owner", required = false) String owner,
             @RequestParam(required = false) Integer limit,
@@ -262,7 +278,7 @@ public class ThesisAssistantInternalController {
             jakarta.servlet.http.HttpServletResponse response) {
         verify(token);
         String ownerId = owner(owner);
-        ThesisAssistantRepository.MessagePage page = AssistantRlsContext.withInternalOwner(ownerId,
+        MessagePage page = AssistantRlsContext.withInternalOwner(ownerId,
                 () -> assistant.messagePage(id, ownerId, limit, cursor));
         if (page.nextCursor() != null) response.setHeader("X-Next-Cursor", page.nextCursor());
         return page.data();
@@ -313,7 +329,7 @@ public class ThesisAssistantInternalController {
         return value;
     }
 
-    private static void send(SseEmitter emitter, ThesisAssistantService.StreamEvent event) {
+    private static void send(SseEmitter emitter, StreamEvent event) {
         try {
             String name = eventName(event);
             emitter.send(SseEmitter.event().name(name).data(event));
@@ -323,25 +339,17 @@ public class ThesisAssistantInternalController {
     }
 
     private static void sendError(SseEmitter emitter, String code, boolean retryable) {
-        try { emitter.send(SseEmitter.event().name("error").data(new StreamError(code, retryable))); }
+        try { emitter.send(SseEmitter.event().name("error").data(new ThesisAssistantInternalStreamError(code, retryable))); }
         catch (Exception ignored) { emitter.completeWithError(ignored); }
     }
 
-    private static String eventName(ThesisAssistantService.StreamEvent event) {
-        if (event instanceof ThesisAssistantService.StreamMeta) return "meta";
-        if (event instanceof ThesisAssistantService.StreamDelta) return "delta";
-        if (event instanceof ThesisAssistantService.StreamReplace) return "replace";
-        if (event instanceof ThesisAssistantService.StreamCitation) return "citation";
-        if (event instanceof ThesisAssistantService.StreamError) return "error";
+    private static String eventName(StreamEvent event) {
+        if (event instanceof StreamMeta) return "meta";
+        if (event instanceof StreamDelta) return "delta";
+        if (event instanceof StreamReplace) return "replace";
+        if (event instanceof StreamCitation) return "citation";
+        if (event instanceof StreamError) return "error";
         return "done";
     }
 
-    public record StreamError(String code, boolean retryable) {
-        @com.fasterxml.jackson.annotation.JsonProperty("type")
-        public String type() { return "error"; }
-    }
-    public record CancelResponse(UUID clientRequestId, String status) { }
-    public record FeedbackResponse(UUID messageId, String rating, String reason, boolean removed) { }
-    public record CreateConversationRequest(String locale, String scope) { }
-    public record ConversationCreated(String id, String locale) { }
 }

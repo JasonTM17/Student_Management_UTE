@@ -1,9 +1,27 @@
 package io.campuscore.restfulapi.thesis.assistant.controller;
 
+import io.campuscore.restfulapi.thesis.assistant.dto.CancelResponse;
+import io.campuscore.restfulapi.thesis.assistant.dto.ConversationCreated;
+import io.campuscore.restfulapi.thesis.assistant.dto.CreateConversationRequest;
+import io.campuscore.restfulapi.thesis.assistant.dto.FeedbackResponse;
+import io.campuscore.restfulapi.thesis.assistant.dto.StreamCitation;
+import io.campuscore.restfulapi.thesis.assistant.dto.StreamDelta;
+import io.campuscore.restfulapi.thesis.assistant.dto.StreamDone;
+import io.campuscore.restfulapi.thesis.assistant.dto.StreamError;
+import io.campuscore.restfulapi.thesis.assistant.dto.StreamEvent;
+import io.campuscore.restfulapi.thesis.assistant.dto.StreamMeta;
+import io.campuscore.restfulapi.thesis.assistant.dto.StreamReplace;
 import io.campuscore.restfulapi.thesis.assistant.dto.ThesisAssistantDtos.ChatRequest;
 import io.campuscore.restfulapi.thesis.assistant.dto.ThesisAssistantDtos.ChatResponse;
 import io.campuscore.restfulapi.thesis.assistant.dto.ThesisAssistantDtos.FeedbackRequest;
 import io.campuscore.restfulapi.exception.DomainException;
+import io.campuscore.restfulapi.thesis.assistant.dto.ThesisAssistantStreamError;
+import io.campuscore.restfulapi.thesis.assistant.model.Conversation;
+import io.campuscore.restfulapi.thesis.assistant.model.ConversationPage;
+import io.campuscore.restfulapi.thesis.assistant.model.Message;
+import io.campuscore.restfulapi.thesis.assistant.model.MessagePage;
+import io.campuscore.restfulapi.thesis.assistant.model.PersonalTurn;
+import io.campuscore.restfulapi.thesis.assistant.model.RemotePage;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import io.campuscore.restfulapi.security.DatabaseAvailabilityTracker;
@@ -180,7 +198,7 @@ public class ThesisAssistantController {
             if (targetConversation == null || targetConversation.isBlank()) {
                 targetConversation = assistant.createConversation(owner, personal.locale(), request.scope());
             }
-            ThesisAssistantService.PersonalTurn recorded = assistant.recordPersonalTurn(owner,
+            PersonalTurn recorded = assistant.recordPersonalTurn(owner,
                     targetConversation,
                     request.message(), personal.answer(), personal.locale(), personal.reasonCode());
             assistant.recordPersonalTurnKey(owner, request.clientRequestId(),
@@ -505,7 +523,7 @@ public class ThesisAssistantController {
                 HEARTBEAT_INTERVAL_MS, HEARTBEAT_INTERVAL_MS,
                 java.util.concurrent.TimeUnit.MILLISECONDS);
         Runnable stopHeartbeat = () -> heartbeat.cancel(false);
-        Consumer<ThesisAssistantService.StreamEvent> sink = event -> {
+        Consumer<StreamEvent> sink = event -> {
             if (!transportClosed.get()) send(emitter, event);
         };
         var securityContext = SecurityContextHolder.createEmptyContext();
@@ -685,7 +703,7 @@ public class ThesisAssistantController {
     })
     @GetMapping("/conversations")
     @PreAuthorize("hasAnyRole('STUDENT','LECTURER','ADMIN','SUPER_ADMIN','TRUONG_KHOA')")
-    public List<ThesisAssistantRepository.Conversation> conversations(
+    public List<Conversation> conversations(
             @AuthenticationPrincipal Jwt actor,
             @Parameter(description = "Giới hạn số bản ghi") @RequestParam(required = false) Integer limit,
             @Parameter(description = "Con trỏ phân trang cursor") @RequestParam(required = false) String cursor,
@@ -693,12 +711,12 @@ public class ThesisAssistantController {
             HttpServletResponse response) {
         String owner = subject(actor);
         if (remoteRag()) {
-            RagAssistantGateway.RemotePage<List<ThesisAssistantRepository.Conversation>> page =
+            RemotePage<List<Conversation>> page =
                     ragGateway.conversations(owner, limit, cursor, scope);
             if (page.nextCursor() != null) response.setHeader("X-Next-Cursor", page.nextCursor());
             return page.data();
         }
-        ThesisAssistantRepository.ConversationPage page = assistant.conversationPage(owner, limit, cursor, scope);
+        ConversationPage page = assistant.conversationPage(owner, limit, cursor, scope);
         if (page.nextCursor() != null) response.setHeader("X-Next-Cursor", page.nextCursor());
         return page.data();
     }
@@ -733,7 +751,7 @@ public class ThesisAssistantController {
     })
     @GetMapping("/conversations/{id}/messages")
     @PreAuthorize("hasAnyRole('STUDENT','LECTURER','ADMIN','SUPER_ADMIN','TRUONG_KHOA')")
-    public List<ThesisAssistantRepository.Message> messages(
+    public List<Message> messages(
             @Parameter(description = "Mã định danh phiên hội thoại (UUID)", required = true) @PathVariable UUID id,
             @AuthenticationPrincipal Jwt actor,
             @Parameter(description = "Giới hạn số tin nhắn") @RequestParam(required = false) Integer limit,
@@ -741,12 +759,12 @@ public class ThesisAssistantController {
             HttpServletResponse response) {
         String owner = subject(actor);
         if (remoteRag()) {
-            RagAssistantGateway.RemotePage<List<ThesisAssistantRepository.Message>> page =
+            RemotePage<List<Message>> page =
                     ragGateway.messages(id, owner, limit, cursor);
             if (page.nextCursor() != null) response.setHeader("X-Next-Cursor", page.nextCursor());
             return page.data();
         }
-        ThesisAssistantRepository.MessagePage page = assistant.messagePage(id, owner, limit, cursor);
+        MessagePage page = assistant.messagePage(id, owner, limit, cursor);
         if (page.nextCursor() != null) response.setHeader("X-Next-Cursor", page.nextCursor());
         return page.data();
     }
@@ -781,19 +799,19 @@ public class ThesisAssistantController {
      * the gateway entirely with a complete meta/delta/citation/done sequence.
      */
     void streamRemoteWithFallback(ChatRequest request, String owner,
-            Consumer<ThesisAssistantService.StreamEvent> sink, HttpServletRequest httpRequest) {
+            Consumer<StreamEvent> sink, HttpServletRequest httpRequest) {
         streamRemoteWithFallback(request, owner, sink, httpRequest != null && Boolean.TRUE.equals(
                 httpRequest.getAttribute(DatabaseAvailabilityTracker.REQUEST_ATTRIBUTE)));
     }
 
     private void streamRemoteWithFallback(ChatRequest request, String owner,
-            Consumer<ThesisAssistantService.StreamEvent> sink, boolean dbDownAtRequestStart) {
+            Consumer<StreamEvent> sink, boolean dbDownAtRequestStart) {
         String locale = AssistantInputGuard.normalizeLocale(request.locale());
         // The caller ran the lexical fast path before choosing this branch —
         // a second retrieval here would only add a DB round-trip.
         boolean[] forwarded = { false };
-        Consumer<ThesisAssistantService.StreamEvent> intercept = event -> {
-            if (event instanceof ThesisAssistantService.StreamDone done && "NO_MATCH".equals(done.reasonCode())) {
+        Consumer<StreamEvent> intercept = event -> {
+            if (event instanceof StreamDone done && "NO_MATCH".equals(done.reasonCode())) {
                 emitStreamFallback(request, locale, sink, forwarded[0], dbDownAtRequestStart, false);
                 return;
             }
@@ -818,47 +836,47 @@ public class ThesisAssistantController {
      * existing local-grounded fallback contract the clients already render.
      */
     void emitLexicalFastPath(ChatResponse fastPath, ChatRequest request, String locale,
-            Consumer<ThesisAssistantService.StreamEvent> sink) {
-        sink.accept(new ThesisAssistantService.StreamMeta(
+            Consumer<StreamEvent> sink) {
+        sink.accept(new StreamMeta(
                 UUID.randomUUID(), request.clientRequestId(), null, null,
                 ThesisAssistantService.FAST_PATH_MODEL, locale));
-        sink.accept(new ThesisAssistantService.StreamDelta(0, fastPath.answer(),
+        sink.accept(new StreamDelta(0, fastPath.answer(),
                 fastPath.citations().stream().map(ThesisAssistantDtos.Citation::sourceId)
                         .filter(java.util.Objects::nonNull).toList()));
         fastPath.citations().forEach(citation -> sink.accept(
-                new ThesisAssistantService.StreamCitation(citation)));
-        sink.accept(new ThesisAssistantService.StreamDone(null, fastPath.reasonCode(),
+                new StreamCitation(citation)));
+        sink.accept(new StreamDone(null, fastPath.reasonCode(),
                 fastPath.degraded(), "COMPLETED"));
     }
 
     private void emitStreamFallback(ChatRequest request, String locale,
-            Consumer<ThesisAssistantService.StreamEvent> sink, boolean alreadyForwarded,
+            Consumer<StreamEvent> sink, boolean alreadyForwarded,
             boolean dbDownAtRequestStart, boolean remoteFailed) {
         ChatResponse fallback = localGroundedFallback(request, dbDownAtRequestStart, remoteFailed);
         if (!alreadyForwarded) {
             // Nothing crossed the wire yet, so the fallback is a complete stream.
-            sink.accept(new ThesisAssistantService.StreamMeta(
+            sink.accept(new StreamMeta(
                     UUID.randomUUID(), request.clientRequestId(), null, null,
                     ThesisAssistantService.MODEL, locale));
-            sink.accept(new ThesisAssistantService.StreamDelta(0, fallback.answer(),
+            sink.accept(new StreamDelta(0, fallback.answer(),
                     fallback.citations().stream().map(ThesisAssistantDtos.Citation::sourceId)
                             .filter(java.util.Objects::nonNull).toList()));
             fallback.citations().forEach(citation -> sink.accept(
-                    new ThesisAssistantService.StreamCitation(citation)));
+                    new StreamCitation(citation)));
         } else {
             // Remote frames already streamed: replace them, never append. The
             // replace carries the fallback's own reasonCode — an uncited curated
             // answer must mark the bubble degraded (NO_MATCH), not ANSWERED.
             // Citations still follow: a bare remote meta frame must not strip
             // the fallback's sources the way the JSON path keeps them.
-            sink.accept(new ThesisAssistantService.StreamReplace(fallback.answer(),
+            sink.accept(new StreamReplace(fallback.answer(),
                     fallback.citations().stream().map(ThesisAssistantDtos.Citation::sourceId)
                             .filter(java.util.Objects::nonNull).toList(),
                     fallback.reasonCode()));
             fallback.citations().forEach(citation -> sink.accept(
-                    new ThesisAssistantService.StreamCitation(citation)));
+                    new StreamCitation(citation)));
         }
-        sink.accept(new ThesisAssistantService.StreamDone(parseMessageId(fallback.messageId()),
+        sink.accept(new StreamDone(parseMessageId(fallback.messageId()),
                 fallback.reasonCode(), fallback.degraded(), "COMPLETED"));
     }
 
@@ -867,7 +885,7 @@ public class ThesisAssistantController {
         try { return UUID.fromString(messageId); } catch (IllegalArgumentException ignored) { return null; }
     }
 
-    private static void send(SseEmitter emitter, ThesisAssistantService.StreamEvent event) {
+    private static void send(SseEmitter emitter, StreamEvent event) {
         try {
             String name = eventName(event);
             synchronized (emitter) {
@@ -895,16 +913,16 @@ public class ThesisAssistantController {
     }
 
     private static void sendError(SseEmitter emitter, String code, boolean retryable) {
-        try { emitter.send(SseEmitter.event().name("error").data(new StreamError(code, retryable))); }
+        try { emitter.send(SseEmitter.event().name("error").data(new ThesisAssistantStreamError(code, retryable))); }
         catch (Exception ignored) { emitter.completeWithError(ignored); }
     }
 
-    private static String eventName(ThesisAssistantService.StreamEvent event) {
-        if (event instanceof ThesisAssistantService.StreamMeta) return "meta";
-        if (event instanceof ThesisAssistantService.StreamDelta) return "delta";
-        if (event instanceof ThesisAssistantService.StreamReplace) return "replace";
-        if (event instanceof ThesisAssistantService.StreamCitation) return "citation";
-        if (event instanceof ThesisAssistantService.StreamError) return "error";
+    private static String eventName(StreamEvent event) {
+        if (event instanceof StreamMeta) return "meta";
+        if (event instanceof StreamDelta) return "delta";
+        if (event instanceof StreamReplace) return "replace";
+        if (event instanceof StreamCitation) return "citation";
+        if (event instanceof StreamError) return "error";
         return "done";
     }
 
@@ -914,12 +932,4 @@ public class ThesisAssistantController {
         return subject;
     }
 
-    public record StreamError(String code, boolean retryable) {
-        @com.fasterxml.jackson.annotation.JsonProperty("type")
-        public String type() { return "error"; }
-    }
-    public record CancelResponse(UUID clientRequestId, String status) { }
-    public record FeedbackResponse(UUID messageId, String rating, String reason, boolean removed) { }
-    public record CreateConversationRequest(String locale, String scope) { }
-    public record ConversationCreated(String id, String locale) { }
 }

@@ -14,6 +14,13 @@ import static org.mockito.Mockito.verify;
 
 import com.zaxxer.hikari.HikariDataSource;
 import io.campuscore.restfulapi.thesis.assistant.dto.ThesisAssistantDtos.Citation;
+import io.campuscore.restfulapi.thesis.assistant.model.CancelResult;
+import io.campuscore.restfulapi.thesis.assistant.model.DispatchDecision;
+import io.campuscore.restfulapi.thesis.assistant.model.ExpiredLease;
+import io.campuscore.restfulapi.thesis.assistant.model.PurgedConversation;
+import io.campuscore.restfulapi.thesis.assistant.model.Reservation;
+import io.campuscore.restfulapi.thesis.assistant.model.ReservationStatus;
+import io.campuscore.restfulapi.thesis.assistant.model.TerminalResult;
 import java.util.List;
 import java.util.UUID;
 import java.sql.Timestamp;
@@ -65,13 +72,13 @@ class ThesisAssistantTurnLedgerH2Test {
     void reserveSnapshotDispatchAndCompleteCommitOneUserAndAssistant() {
         String owner = "ledger-owner-" + UUID.randomUUID();
         UUID key = UUID.randomUUID();
-        ThesisAssistantTurnRepository.Reservation reservation = turns.reserve(owner, key,
+        Reservation reservation = turns.reserve(owner, key,
                 AssistantInputGuard.canonicalHash("topic", "en", null), null, "en", "test-lease", 90);
-        assertEquals(ThesisAssistantTurnRepository.ReservationStatus.NEW, reservation.status());
+        assertEquals(ReservationStatus.NEW, reservation.status());
         assertTrue(turns.markSnapshotReady(reservation.turnId(), owner, reservation.leaseGeneration(), "a".repeat(64)));
-        ThesisAssistantTurnRepository.DispatchDecision dispatch = turns.dispatch(reservation.turnId(), owner, reservation.leaseGeneration(), 20, 200);
+        DispatchDecision dispatch = turns.dispatch(reservation.turnId(), owner, reservation.leaseGeneration(), 20, 200);
         assertTrue(dispatch.dispatched());
-        ThesisAssistantTurnRepository.TerminalResult result = turns.complete(reservation.turnId(), owner, reservation.leaseGeneration(),
+        TerminalResult result = turns.complete(reservation.turnId(), owner, reservation.leaseGeneration(),
                 "topic", "curated-lexical-rag", "grounded answer", true, "PROVIDER_DISABLED", List.of());
         assertEquals("COMPLETED", result.terminalStatus());
         Integer users = jdbc.queryForObject("SELECT COUNT(*) FROM assistant.chat_message WHERE turn_id=:turn AND role='USER'", p("turn", reservation.turnId()), Integer.class);
@@ -84,12 +91,12 @@ class ThesisAssistantTurnLedgerH2Test {
     void anAlreadyDispatchedGenerationCannotDispatchProviderTwice() {
         String owner = "duplicate-dispatch-" + UUID.randomUUID();
         UUID key = UUID.randomUUID();
-        ThesisAssistantTurnRepository.Reservation reservation = turns.reserve(owner, key,
+        Reservation reservation = turns.reserve(owner, key,
                 reservationHash("duplicate", "en"), null, "en", "lease", 90);
         assertTrue(turns.markSnapshotReady(reservation.turnId(), owner, reservation.leaseGeneration(), "a".repeat(64)));
         assertTrue(turns.dispatch(reservation.turnId(), owner, reservation.leaseGeneration(), 20, 200).dispatched());
 
-        ThesisAssistantTurnRepository.DispatchDecision duplicate = turns.dispatch(
+        DispatchDecision duplicate = turns.dispatch(
                 reservation.turnId(), owner, reservation.leaseGeneration(), 20, 200);
         assertTrue(!duplicate.dispatched());
         assertEquals("ALREADY_DISPATCHED", duplicate.reasonCode());
@@ -102,14 +109,14 @@ class ThesisAssistantTurnLedgerH2Test {
     void quotaExhaustedTurnStaysCompletableWithDegradedAnswer() {
         String owner = "quota-owner-" + UUID.randomUUID();
         UUID key = UUID.randomUUID();
-        ThesisAssistantTurnRepository.Reservation reservation = turns.reserve(owner, key, AssistantInputGuard.canonicalHash("topic", "en", null), null, "en", "lease-a", 90);
+        Reservation reservation = turns.reserve(owner, key, AssistantInputGuard.canonicalHash("topic", "en", null), null, "en", "lease-a", 90);
         turns.markSnapshotReady(reservation.turnId(), owner, reservation.leaseGeneration(), "b".repeat(64));
         assertEquals("QUOTA_EXCEEDED", turns.dispatch(reservation.turnId(), owner, reservation.leaseGeneration(), 1, 1).reasonCode());
         // CB-P2-5: a quota block no longer downgrades the turn to
         // FAILED_PRE_DISPATCH. The row stays SNAPSHOT_READY so the service can
         // complete the grounded lexical answer with the QUOTA_EXCEEDED reason,
         // and the quota buckets stay uncharged.
-        ThesisAssistantTurnRepository.TerminalResult result = turns.complete(reservation.turnId(), owner,
+        TerminalResult result = turns.complete(reservation.turnId(), owner,
                 reservation.leaseGeneration(), "topic", "curated-lexical-rag",
                 "grounded answer", true, "QUOTA_EXCEEDED", List.of());
         assertEquals("COMPLETED", result.terminalStatus());
@@ -119,9 +126,9 @@ class ThesisAssistantTurnLedgerH2Test {
                 "SELECT request_count FROM assistant.usage_bucket WHERE owner_id=:owner AND scope='USER'",
                 p("owner", owner), Integer.class));
         // The completed turn is replayable under the same idempotency key.
-        ThesisAssistantTurnRepository.Reservation replay = turns.reserve(owner, key,
+        Reservation replay = turns.reserve(owner, key,
                 AssistantInputGuard.canonicalHash("topic", "en", null), null, "en", "lease-b", 90);
-        assertEquals(ThesisAssistantTurnRepository.ReservationStatus.REPLAY, replay.status());
+        assertEquals(ReservationStatus.REPLAY, replay.status());
     }
 
     @Test
@@ -214,9 +221,9 @@ class ThesisAssistantTurnLedgerH2Test {
     void cancellationWinsAndLeavesNoMessagesOrCitations() {
         String owner = "cancel-owner-" + UUID.randomUUID();
         UUID key = UUID.randomUUID();
-        ThesisAssistantTurnRepository.Reservation reservation = turns.reserve(owner, key, reservationHash("cancel", "vi"), null, "vi", "lease", 90);
+        Reservation reservation = turns.reserve(owner, key, reservationHash("cancel", "vi"), null, "vi", "lease", 90);
         assertTrue(turns.markSnapshotReady(reservation.turnId(), owner, reservation.leaseGeneration(), "d".repeat(64)));
-        ThesisAssistantTurnRepository.CancelResult cancelled = turns.cancel(reservation.turnId(), owner, key);
+        CancelResult cancelled = turns.cancel(reservation.turnId(), owner, key);
         assertTrue(cancelled.cancelled());
         assertEquals(0, count("SELECT COUNT(*) FROM assistant.chat_message WHERE turn_id=:turn", p("turn", reservation.turnId())));
         assertEquals(0, count("SELECT COUNT(*) FROM assistant.chat_citation c JOIN assistant.chat_message m ON m.id=c.message_id WHERE m.turn_id=:turn", p("turn", reservation.turnId())));
@@ -228,7 +235,7 @@ class ThesisAssistantTurnLedgerH2Test {
         String other = "owner-b-" + UUID.randomUUID();
         UUID key = UUID.randomUUID();
         String hash = reservationHash("same", "en");
-        ThesisAssistantTurnRepository.Reservation first = turns.reserve(owner, key, hash, null, "en", "lease", 90);
+        Reservation first = turns.reserve(owner, key, hash, null, "en", "lease", 90);
         assertThrows(RuntimeException.class, () -> turns.reserve(owner, key, reservationHash("different", "en"), null, "en", "lease", 90));
         assertEquals(null, turns.findByRequest(other, key));
         assertNotEquals(first.turnId(), UUID.randomUUID());
@@ -238,7 +245,7 @@ class ThesisAssistantTurnLedgerH2Test {
     void citationFailureRollsBackTerminalClaimAndMessages() {
         String owner = "rollback-owner-" + UUID.randomUUID();
         UUID key = UUID.randomUUID();
-        ThesisAssistantTurnRepository.Reservation reservation = turns.reserve(owner, key, reservationHash("rollback", "en"), null, "en", "lease", 90);
+        Reservation reservation = turns.reserve(owner, key, reservationHash("rollback", "en"), null, "en", "lease", 90);
         turns.markSnapshotReady(reservation.turnId(), owner, reservation.leaseGeneration(), "e".repeat(64));
         assertThrows(NullPointerException.class, () -> turns.complete(reservation.turnId(), owner, reservation.leaseGeneration(), "rollback", "model", "answer", false, "ANSWERED", java.util.Arrays.asList((Citation) null)));
         assertEquals("SNAPSHOT_READY", jdbc.queryForObject("SELECT state FROM assistant.chat_turn_ledger WHERE turn_id=:turn", p("turn", reservation.turnId()), String.class));
@@ -249,14 +256,14 @@ class ThesisAssistantTurnLedgerH2Test {
     void expiredPreDispatchLeaseIsReacquiredWithANewGeneration() {
         String owner = "expiry-pre-" + UUID.randomUUID();
         UUID key = UUID.randomUUID();
-        ThesisAssistantTurnRepository.Reservation reservation = turns.reserve(owner, key,
+        Reservation reservation = turns.reserve(owner, key,
                 reservationHash("expiry", "en"), null, "en", "lease-old", 90);
         jdbc.update("UPDATE assistant.chat_turn_ledger SET lease_expires_at=:expired WHERE turn_id=:turn",
                 p("turn", reservation.turnId()).addValue("expired", Timestamp.from(Instant.now().minusSeconds(1))));
 
-        ThesisAssistantTurnRepository.Reservation retry = turns.reserve(owner, key,
+        Reservation retry = turns.reserve(owner, key,
                 reservationHash("expiry", "en"), null, "en", "lease-new", 90);
-        assertEquals(ThesisAssistantTurnRepository.ReservationStatus.RETRYABLE, retry.status());
+        assertEquals(ReservationStatus.RETRYABLE, retry.status());
         assertEquals(reservation.leaseGeneration() + 1, retry.leaseGeneration());
         assertTrue(!turns.markSnapshotReady(retry.turnId(), owner, reservation.leaseGeneration(), "0".repeat(64)));
         assertTrue(turns.markSnapshotReady(retry.turnId(), owner, retry.leaseGeneration(), "f".repeat(64)));
@@ -268,29 +275,29 @@ class ThesisAssistantTurnLedgerH2Test {
     void expiredDispatchedLeaseBecomesAmbiguousAndCannotRedispatch() {
         String owner = "expiry-dispatch-" + UUID.randomUUID();
         UUID key = UUID.randomUUID();
-        ThesisAssistantTurnRepository.Reservation reservation = turns.reserve(owner, key,
+        Reservation reservation = turns.reserve(owner, key,
                 reservationHash("dispatch expiry", "en"), null, "en", "lease", 90);
         assertTrue(turns.markSnapshotReady(reservation.turnId(), owner, reservation.leaseGeneration(), "1".repeat(64)));
         assertTrue(turns.dispatch(reservation.turnId(), owner, reservation.leaseGeneration(), 20, 200).dispatched());
         jdbc.update("UPDATE assistant.chat_turn_ledger SET lease_expires_at=:expired WHERE turn_id=:turn",
                 p("turn", reservation.turnId()).addValue("expired", Timestamp.from(Instant.now().minusSeconds(1))));
 
-        List<ThesisAssistantTurnRepository.ExpiredLease> recovered = turns.recoverExpiredLeases();
+        List<ExpiredLease> recovered = turns.recoverExpiredLeases();
         assertTrue(recovered.stream().anyMatch(lease -> lease.turnId().equals(reservation.turnId())
                 && "FAILED_AMBIGUOUS".equals(lease.terminalState())));
         assertEquals("FAILED_AMBIGUOUS", jdbc.queryForObject(
                 "SELECT state FROM assistant.chat_turn_ledger WHERE turn_id=:turn", p("turn", reservation.turnId()), String.class));
         assertEquals(1, count("SELECT request_count FROM assistant.usage_bucket WHERE owner_id=:owner AND scope='USER'", p("owner", owner)));
-        ThesisAssistantTurnRepository.Reservation replay = turns.reserve(owner, key,
+        Reservation replay = turns.reserve(owner, key,
                 reservationHash("dispatch expiry", "en"), null, "en", "retry", 90);
-        assertEquals(ThesisAssistantTurnRepository.ReservationStatus.AMBIGUOUS, replay.status());
+        assertEquals(ReservationStatus.AMBIGUOUS, replay.status());
     }
 
     @Test
     void cancelAfterDispatchedExpiryRecoversAmbiguousAndFencesOldGeneration() {
         String owner = "cancel-expiry-" + UUID.randomUUID();
         UUID key = UUID.randomUUID();
-        ThesisAssistantTurnRepository.Reservation reservation = turns.reserve(owner, key,
+        Reservation reservation = turns.reserve(owner, key,
                 reservationHash("cancel expiry", "en"), null, "en", "lease", 90);
         assertTrue(turns.markSnapshotReady(reservation.turnId(), owner, reservation.leaseGeneration(), "a".repeat(64)));
         assertTrue(turns.dispatch(reservation.turnId(), owner, reservation.leaseGeneration(), 20, 200).dispatched());
@@ -300,7 +307,7 @@ class ThesisAssistantTurnLedgerH2Test {
         jdbc.update("UPDATE assistant.chat_turn_ledger SET lease_expires_at=:expired WHERE turn_id=:turn",
                 p("turn", reservation.turnId()).addValue("expired", Timestamp.from(Instant.now().minusSeconds(1))));
 
-        ThesisAssistantTurnRepository.CancelResult cancelled = turns.cancel(reservation.turnId(), owner, key,
+        CancelResult cancelled = turns.cancel(reservation.turnId(), owner, key,
                 handle -> registry.fence(owner, handle.clientRequestId(), handle.leaseGeneration()));
         assertFalse(cancelled.cancelled());
         assertEquals("FAILED_AMBIGUOUS", cancelled.status());
@@ -311,7 +318,7 @@ class ThesisAssistantTurnLedgerH2Test {
         assertEquals(1, count("SELECT request_count FROM assistant.usage_bucket WHERE owner_id=:owner AND scope='USER'", p("owner", owner)));
         assertFalse(registry.emitIfActive(owner, key, reservation.leaseGeneration(),
                 () -> { throw new AssertionError("expired dispatched generation emitted after cancel recovery"); }));
-        assertEquals(ThesisAssistantTurnRepository.ReservationStatus.AMBIGUOUS,
+        assertEquals(ReservationStatus.AMBIGUOUS,
                 turns.reserve(owner, key, reservationHash("cancel expiry", "en"), null, "en", "retry", 90).status());
     }
 
@@ -319,14 +326,14 @@ class ThesisAssistantTurnLedgerH2Test {
     void directDispatchRetryAfterExpiryCannotRedispatchBeforeTheSweep() {
         String owner = "expiry-direct-" + UUID.randomUUID();
         UUID key = UUID.randomUUID();
-        ThesisAssistantTurnRepository.Reservation reservation = turns.reserve(owner, key,
+        Reservation reservation = turns.reserve(owner, key,
                 reservationHash("direct expiry", "en"), null, "en", "lease", 90);
         assertTrue(turns.markSnapshotReady(reservation.turnId(), owner, reservation.leaseGeneration(), "9".repeat(64)));
         assertTrue(turns.dispatch(reservation.turnId(), owner, reservation.leaseGeneration(), 20, 200).dispatched());
         jdbc.update("UPDATE assistant.chat_turn_ledger SET lease_expires_at=:expired WHERE turn_id=:turn",
                 p("turn", reservation.turnId()).addValue("expired", Timestamp.from(Instant.now().minusSeconds(1))));
 
-        ThesisAssistantTurnRepository.DispatchDecision staleRetry = turns.dispatch(
+        DispatchDecision staleRetry = turns.dispatch(
                 reservation.turnId(), owner, reservation.leaseGeneration(), 20, 200);
         assertTrue(!staleRetry.dispatched());
         assertEquals("FAILED_AMBIGUOUS", staleRetry.reasonCode());
@@ -338,7 +345,7 @@ class ThesisAssistantTurnLedgerH2Test {
     void inlineRetryRecoveryFencesTheExpiredProviderGenerationBeforeReturning() {
         String owner = "expiry-inline-fence-" + UUID.randomUUID();
         UUID key = UUID.randomUUID();
-        ThesisAssistantTurnRepository.Reservation reservation = turns.reserve(owner, key,
+        Reservation reservation = turns.reserve(owner, key,
                 reservationHash("inline fence", "en"), null, "en", "lease-old", 90);
         assertTrue(turns.markSnapshotReady(reservation.turnId(), owner, reservation.leaseGeneration(), "a".repeat(64)));
         assertTrue(turns.dispatch(reservation.turnId(), owner, reservation.leaseGeneration(), 20, 200).dispatched());
@@ -348,15 +355,15 @@ class ThesisAssistantTurnLedgerH2Test {
         jdbc.update("UPDATE assistant.chat_turn_ledger SET lease_expires_at=:expired WHERE turn_id=:turn",
                 p("turn", reservation.turnId()).addValue("expired", Timestamp.from(Instant.now().minusSeconds(1))));
 
-        List<ThesisAssistantTurnRepository.ExpiredLease> fenced = new java.util.ArrayList<>();
-        ThesisAssistantTurnRepository.Reservation retry = turns.reserve(owner, key,
+        List<ExpiredLease> fenced = new java.util.ArrayList<>();
+        Reservation retry = turns.reserve(owner, key,
                 reservationHash("inline fence", "en"), null, "en", "lease-new", 90,
                 lease -> {
                     fenced.add(lease);
                     registry.fence(lease.ownerId(), lease.clientRequestId(), lease.leaseGeneration());
                 });
 
-        assertEquals(ThesisAssistantTurnRepository.ReservationStatus.AMBIGUOUS, retry.status());
+        assertEquals(ReservationStatus.AMBIGUOUS, retry.status());
         assertEquals(1, fenced.size());
         assertFalse(registry.emitIfActive(owner, key, reservation.leaseGeneration(),
                 () -> { throw new AssertionError("expired provider generation emitted after inline recovery"); }));
@@ -366,7 +373,7 @@ class ThesisAssistantTurnLedgerH2Test {
     void physicalConversationDeleteKeepsLedgerTombstoneAndRemovesMessagesAtomically() {
         String owner = "purge-owner-" + UUID.randomUUID();
         UUID key = UUID.randomUUID();
-        ThesisAssistantTurnRepository.Reservation reservation = turns.reserve(owner, key,
+        Reservation reservation = turns.reserve(owner, key,
                 reservationHash("purge", "vi"), null, "vi", "lease", 90);
         assertTrue(turns.markSnapshotReady(reservation.turnId(), owner, reservation.leaseGeneration(), "2".repeat(64)));
         assertTrue(turns.dispatch(reservation.turnId(), owner, reservation.leaseGeneration(), 20, 200).dispatched());
@@ -385,12 +392,12 @@ class ThesisAssistantTurnLedgerH2Test {
     void retentionPurgesExpiredConversationThroughTurnBoundary() {
         String owner = "retention-owner-" + UUID.randomUUID();
         UUID key = UUID.randomUUID();
-        ThesisAssistantTurnRepository.Reservation reservation = turns.reserve(owner, key,
+        Reservation reservation = turns.reserve(owner, key,
                 reservationHash("retention", "vi"), null, "vi", "lease", 90);
         jdbc.update("UPDATE assistant.chat_conversation SET expires_at=:expired WHERE id=:conversation",
                 p("conversation", reservation.conversationId()).addValue("expired", Timestamp.from(Instant.now().minusSeconds(1))));
 
-        List<ThesisAssistantTurnRepository.PurgedConversation> purged = turns.purgeExpiredConversations();
+        List<PurgedConversation> purged = turns.purgeExpiredConversations();
         assertTrue(purged.stream().anyMatch(item -> item.id().equals(reservation.conversationId())));
         assertEquals(0, count("SELECT COUNT(*) FROM assistant.chat_conversation WHERE id=:conversation", p("conversation", reservation.conversationId())));
         assertEquals("PURGED", jdbc.queryForObject("SELECT state FROM assistant.chat_turn_ledger WHERE turn_id=:turn",
@@ -401,7 +408,7 @@ class ThesisAssistantTurnLedgerH2Test {
     void legacyRetentionCannotDeleteAnExpiredConversationWithAnActiveTurn() {
         String owner = "legacy-retention-active-" + UUID.randomUUID();
         UUID key = UUID.randomUUID();
-        ThesisAssistantTurnRepository.Reservation reservation = turns.reserve(owner, key,
+        Reservation reservation = turns.reserve(owner, key,
                 reservationHash("legacy active", "vi"), null, "vi", "lease", 90);
         assertTrue(turns.markSnapshotReady(reservation.turnId(), owner, reservation.leaseGeneration(), "b".repeat(64)));
         assertTrue(turns.dispatch(reservation.turnId(), owner, reservation.leaseGeneration(), 20, 200).dispatched());

@@ -6,6 +6,11 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
+import io.campuscore.restfulapi.thesis.assistant.dto.StreamDelta;
+import io.campuscore.restfulapi.thesis.assistant.dto.StreamDone;
+import io.campuscore.restfulapi.thesis.assistant.dto.StreamEvent;
+import io.campuscore.restfulapi.thesis.assistant.dto.StreamMeta;
+import io.campuscore.restfulapi.thesis.assistant.dto.StreamReplace;
 import org.springframework.mock.web.MockHttpServletRequest;
 import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.anyString;
@@ -203,15 +208,15 @@ class ThesisAssistantControllerTest {
         CountDownLatch workFinished = new CountDownLatch(1);
         AtomicReference<Boolean> interrupted = new AtomicReference<>(false);
         org.mockito.Mockito.doAnswer(invocation -> {
-            Consumer<ThesisAssistantService.StreamEvent> sink = invocation.getArgument(5);
-            sink.accept(new ThesisAssistantService.StreamMeta(UUID.randomUUID(), invocation.getArgument(4),
+            Consumer<StreamEvent> sink = invocation.getArgument(5);
+            sink.accept(new StreamMeta(UUID.randomUUID(), invocation.getArgument(4),
                     null, null, "test-provider", "vi"));
-            sink.accept(new ThesisAssistantService.StreamDelta(0, "first grounded answer", List.of()));
+            sink.accept(new StreamDelta(0, "first grounded answer", List.of()));
             firstDeltaSent.countDown();
             try { release.await(5, TimeUnit.SECONDS); }
             catch (InterruptedException transportClosed) { interrupted.set(true); }
             try {
-                sink.accept(new ThesisAssistantService.StreamDelta(1, "late answer must stay hidden", List.of()));
+                sink.accept(new StreamDelta(1, "late answer must stay hidden", List.of()));
                 return null;
             } finally {
                 workFinished.countDown();
@@ -252,15 +257,15 @@ class ThesisAssistantControllerTest {
         CountDownLatch generationFinished = new CountDownLatch(1);
         AtomicReference<String> workerOwner = new AtomicReference<>();
         org.mockito.Mockito.doAnswer(invocation -> {
-            Consumer<ThesisAssistantService.StreamEvent> sink = invocation.getArgument(5);
+            Consumer<StreamEvent> sink = invocation.getArgument(5);
             workerOwner.set(AssistantRlsContext.forAccess(AssistantRlsBoundary.Access.AUTO).ownerId());
-            sink.accept(new ThesisAssistantService.StreamMeta(UUID.randomUUID(), invocation.getArgument(4),
+            sink.accept(new StreamMeta(UUID.randomUUID(), invocation.getArgument(4),
                     null, null, "test-provider", "vi"));
-            sink.accept(new ThesisAssistantService.StreamDelta(0, "first grounded answer", List.of()));
+            sink.accept(new StreamDelta(0, "first grounded answer", List.of()));
             firstDeltaSent.countDown();
             try {
                 assertTrue(releaseGeneration.await(5, TimeUnit.SECONDS), "generation gate was not released");
-                sink.accept(new ThesisAssistantService.StreamDone(null, "ANSWERED", false, "COMPLETED"));
+                sink.accept(new StreamDone(null, "ANSWERED", false, "COMPLETED"));
                 return null;
             } finally {
                 generationFinished.countDown();
@@ -597,17 +602,17 @@ class ThesisAssistantControllerTest {
         when(assistant.groundedFallback(anyString(), anyString(), anyBoolean(), any(), anyBoolean()))
                 .thenThrow(new IllegalStateException("knowledge unavailable"));
 
-        List<ThesisAssistantService.StreamEvent> events = new ArrayList<>();
+        List<StreamEvent> events = new ArrayList<>();
         controller.streamRemoteWithFallback(request("Quy trình xin nghỉ học?"), "owner-stream", events::add, new MockHttpServletRequest());
 
         assertEquals(3, events.size());
-        assertTrue(events.get(0) instanceof ThesisAssistantService.StreamMeta);
-        assertTrue(events.get(1) instanceof ThesisAssistantService.StreamDelta delta
+        assertTrue(events.get(0) instanceof StreamMeta);
+        assertTrue(events.get(1) instanceof StreamDelta delta
                 && delta.text().contains("Cẩm nang sinh viên")
                 && delta.text().contains("Phòng Đào tạo"));
         // The curated fallback is uncited: it must stream as NO_MATCH so the UI
         // never labels it as answered from approved guidance.
-        assertTrue(events.get(2) instanceof ThesisAssistantService.StreamDone done
+        assertTrue(events.get(2) instanceof StreamDone done
                 && done.degraded() && "NO_MATCH".equals(done.reasonCode()));
     }
 
@@ -618,9 +623,9 @@ class ThesisAssistantControllerTest {
         ThesisAssistantController controller = new ThesisAssistantController(assistant, ragGateway);
         when(ragGateway.enabled()).thenReturn(true);
         org.mockito.Mockito.doAnswer(invocation -> {
-            Consumer<ThesisAssistantService.StreamEvent> sink = invocation.getArgument(2);
-            sink.accept(new ThesisAssistantService.StreamDelta(0, "Mình chưa tìm thấy hướng dẫn phù hợp.", List.of()));
-            sink.accept(new ThesisAssistantService.StreamDone(null, "NO_MATCH", false, "COMPLETED"));
+            Consumer<StreamEvent> sink = invocation.getArgument(2);
+            sink.accept(new StreamDelta(0, "Mình chưa tìm thấy hướng dẫn phù hợp.", List.of()));
+            sink.accept(new StreamDone(null, "NO_MATCH", false, "COMPLETED"));
             return null;
         }).when(ragGateway).stream(any(), anyString(), any());
         ThesisAssistantDtos.Citation citation = new ThesisAssistantDtos.Citation(
@@ -629,15 +634,15 @@ class ThesisAssistantControllerTest {
                 "Các bước đăng ký học phần...", ThesisAssistantService.MODEL, true, "ANSWERED",
                 "vi", List.of(citation)));
 
-        List<ThesisAssistantService.StreamEvent> events = new ArrayList<>();
+        List<StreamEvent> events = new ArrayList<>();
         controller.streamRemoteWithFallback(request("Đăng ký học phần thế nào?"), "owner-stream", events::add, new MockHttpServletRequest());
 
-        assertTrue(events.stream().anyMatch(event -> event instanceof ThesisAssistantService.StreamReplace replace
+        assertTrue(events.stream().anyMatch(event -> event instanceof StreamReplace replace
                 && replace.text().contains("Các bước đăng ký học phần")
                 && "ANSWERED".equals(replace.reasonCode())));
-        assertTrue(events.stream().anyMatch(event -> event instanceof ThesisAssistantService.StreamDone done
+        assertTrue(events.stream().anyMatch(event -> event instanceof StreamDone done
                 && done.degraded() && "ANSWERED".equals(done.reasonCode())));
-        assertTrue(events.stream().noneMatch(event -> event instanceof ThesisAssistantService.StreamDone done
+        assertTrue(events.stream().noneMatch(event -> event instanceof StreamDone done
                 && "NO_MATCH".equals(done.reasonCode())));
     }
 

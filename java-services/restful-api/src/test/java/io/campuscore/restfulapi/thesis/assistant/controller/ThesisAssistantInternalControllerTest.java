@@ -9,6 +9,10 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
+import io.campuscore.restfulapi.thesis.assistant.dto.StreamDelta;
+import io.campuscore.restfulapi.thesis.assistant.dto.StreamDone;
+import io.campuscore.restfulapi.thesis.assistant.dto.StreamEvent;
+import io.campuscore.restfulapi.thesis.assistant.dto.StreamMeta;
 import io.campuscore.restfulapi.thesis.assistant.dto.ThesisAssistantDtos.ChatRequest;
 import io.campuscore.restfulapi.thesis.assistant.dto.ThesisAssistantDtos.ChatResponse;
 import io.campuscore.restfulapi.exception.DomainException;
@@ -91,14 +95,14 @@ class ThesisAssistantInternalControllerTest {
         CountDownLatch releaseGeneration = new CountDownLatch(1);
         AtomicReference<AssistantRlsContext.Identity> identity = new AtomicReference<>();
         Mockito.doAnswer(invocation -> {
-            Consumer<ThesisAssistantService.StreamEvent> sink = invocation.getArgument(5);
+            Consumer<StreamEvent> sink = invocation.getArgument(5);
             identity.set(AssistantRlsContext.current());
-            sink.accept(new ThesisAssistantService.StreamMeta(UUID.randomUUID(), invocation.getArgument(4),
+            sink.accept(new StreamMeta(UUID.randomUUID(), invocation.getArgument(4),
                     null, null, "test-provider", "vi"));
-            sink.accept(new ThesisAssistantService.StreamDelta(0, "first grounded answer", List.of()));
+            sink.accept(new StreamDelta(0, "first grounded answer", List.of()));
             firstDeltaSent.countDown();
             assertTrue(releaseGeneration.await(5, TimeUnit.SECONDS));
-            sink.accept(new ThesisAssistantService.StreamDone(null, "ANSWERED", false, "COMPLETED"));
+            sink.accept(new StreamDone(null, "ANSWERED", false, "COMPLETED"));
             return null;
         }).when(service).stream(anyString(), anyString(), any(), anyString(), any(), any(), any());
         var requests = Executors.newSingleThreadExecutor();

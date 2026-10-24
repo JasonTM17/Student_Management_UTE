@@ -1,5 +1,6 @@
 package io.campuscore.restfulapi.thesis.assistant.service;
 
+import io.campuscore.restfulapi.thesis.assistant.model.KnowledgeDocument;
 import java.text.Normalizer;
 import java.util.List;
 import java.util.Locale;
@@ -32,7 +33,7 @@ final class AssistantDifficultyRouter {
      * direct fact lookup. No network or model call occurs in this decision.
      */
     static boolean requiresSynthesis(String message,
-            List<ThesisAssistantKnowledgeRepository.KnowledgeDocument> documents) {
+            List<KnowledgeDocument> documents) {
         if (documents == null || documents.isEmpty() || message == null) return false;
         String normalized = Normalizer.normalize(message, Normalizer.Form.NFD)
                 .replaceAll("\\p{M}", "")
@@ -46,7 +47,7 @@ final class AssistantDifficultyRouter {
                 || normalized.split("\\s+").length >= MANY_TERMS) return true;
         if (containsComplexMarker(normalized)) return true;
         return documents.size() >= 3
-                || documents.stream().map(ThesisAssistantKnowledgeRepository.KnowledgeDocument::domain)
+                || documents.stream().map(KnowledgeDocument::domain)
                         .filter(domain -> domain != null && !domain.isBlank()).distinct().count() >= 2;
     }
 

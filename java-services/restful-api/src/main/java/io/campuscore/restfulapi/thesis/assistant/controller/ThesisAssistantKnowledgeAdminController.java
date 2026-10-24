@@ -1,6 +1,9 @@
 package io.campuscore.restfulapi.thesis.assistant.controller;
 
 import io.campuscore.restfulapi.exception.DomainException;
+import io.campuscore.restfulapi.thesis.assistant.dto.KnowledgeDocumentView;
+import io.campuscore.restfulapi.thesis.assistant.dto.KnowledgeRequest;
+import io.campuscore.restfulapi.thesis.assistant.dto.KnowledgeRevision;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.time.Instant;
@@ -324,20 +327,4 @@ public class ThesisAssistantKnowledgeAdminController {
             this(slug, locale, title, content, source, priority, "THESIS");
         }
     }
-    public record KnowledgeRequest(String slug, String locale, String title, String content, String source, Integer priority, String domain) {
-        public KnowledgeRequest {
-            domain = domain == null || domain.isBlank() ? "THESIS" : domain.trim().toUpperCase(java.util.Locale.ROOT);
-        }
-        public KnowledgeRequest(String slug, String locale, String title, String content, String source, Integer priority) {
-            this(slug, locale, title, content, source, priority, "THESIS");
-        }
-    }
-    public record KnowledgeRevision(UUID documentId, UUID revisionId, int version, String state,
-            UUID releaseId, String corpusVersion, String corpusHash, Integer rowCount,
-            SupabaseKnowledgeSyncService.SyncResult sync) {
-        public KnowledgeRevision(UUID documentId, UUID revisionId, int version, String state) {
-            this(documentId, revisionId, version, state, null, null, null, null, null);
-        }
-    }
-    public record KnowledgeDocumentView(UUID documentId, UUID revisionId, int version, String state, String domain, String locale, String slug, String title, String content, String source, int priority, String createdBy, String reviewedBy, Instant createdAt, Instant publishedAt) { }
 }

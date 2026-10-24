@@ -3,8 +3,8 @@ package io.campuscore.restfulapi.thesis.assistant.repository;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-import io.campuscore.restfulapi.thesis.assistant.repository.ThesisAssistantKnowledgeRepository.KnowledgeDocument;
-import io.campuscore.restfulapi.thesis.assistant.repository.ThesisAssistantKnowledgeRepository.SnapshotRow;
+import io.campuscore.restfulapi.thesis.assistant.model.KnowledgeDocument;
+import io.campuscore.restfulapi.thesis.assistant.model.SnapshotRow;
 import java.time.Instant;
 import java.util.List;
 import java.util.UUID;

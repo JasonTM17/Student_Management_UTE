@@ -1,6 +1,6 @@
 package io.campuscore.restfulapi.thesis.assistant.controller;
 
-import io.campuscore.restfulapi.thesis.assistant.service.AssistantFeedbackAdminService.FeedbackSummary;
+import io.campuscore.restfulapi.thesis.assistant.dto.FeedbackSummary;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
