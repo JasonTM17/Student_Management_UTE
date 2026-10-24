@@ -11,6 +11,7 @@ import io.campuscore.restfulapi.thesis.service.ThesisCouncilService;
 import io.campuscore.restfulapi.thesis.service.ThesisMutationService;
 import io.campuscore.restfulapi.thesis.service.ThesisSupervisorService;
 import io.campuscore.restfulapi.thesis.web.ThesisMutationDtos.GroupApprovalRequest;
+import io.campuscore.restfulapi.thesis.web.ThesisMutationDtos.GroupRejectionRequest;
 import io.campuscore.restfulapi.thesis.web.ThesisMutationDtos.ProgressRequest;
 import io.campuscore.restfulapi.thesis.web.ThesisMutationDtos.RosterOverrideRequest;
 import io.campuscore.restfulapi.thesis.web.ThesisMutationDtos.TopicReassignRequest;
@@ -716,15 +717,17 @@ class ThesisRosterLockOrderPostgresIT {
     }
 
     /**
-     * Cancelling or completing a group after registration closed is
-     * governance: it frees the members' seats or seals their outcome. A dean
-     * who merely supervises the topic from another faculty used to reach
-     * both transitions through the reviewer escape a plain supervisor never
-     * had — the same {@code GROUP_OWNER_REQUIRED} refusal now answers them,
-     * while the owning faculty head and a global admin keep the write.
+     * Driving a group's lifecycle after registration closed is governance:
+     * every status a dean writes — DRAFT and SUBMITTED included — frees the
+     * members' seats or seals their outcome through the roster the leader
+     * owns. A dean who merely supervises the topic from another faculty
+     * used to reach the lifecycle transitions through the reviewer escape a
+     * plain supervisor never had — the same concealed refusal now answers
+     * them all, while the group's leader, the owning faculty head and a
+     * global admin keep their writes.
      */
     @Test
-    void postCloseGroupCancellationAndCompletionNeedTheOwningFaculty() {
+    void postCloseGroupLifecycleNeedsTheLeaderOrOwningFacultyNotTheSupervisor() {
         UUID topicId = insertTopic("Rlo Progress Scope Topic");
         Jwt foreignDean = dean("rlo-dean-foreign", "rlo-dept-foreign", "rlo-fac-foreign");
         Jwt ownDean = dean("rlo-dean-own", "department-demo", "faculty-demo");
@@ -760,14 +763,34 @@ class ThesisRosterLockOrderPostgresIT {
                 "SELECT status FROM thesis.thesis_group WHERE id = ?",
                 String.class, approved)).isEqualTo("SUBMITTED");
 
-        // Ordinary progress writes on a supervised group stay ordinary: the
-        // foreign dean still moves it between DRAFT and SUBMITTED.
+        // DRAFT and SUBMITTED are lifecycle targets too: the foreign dean
+        // is refused them exactly like cancel and complete — only the
+        // review verbs stay ordinary for a dean who merely supervises.
         UUID ordinary = insertGroup(topicId, "rlo-og", 3);
-        mutations.updateProgress(ordinary, new ProgressRequest(GroupStatus.DRAFT), foreignDean);
-        mutations.updateProgress(ordinary, new ProgressRequest(GroupStatus.SUBMITTED), foreignDean);
-        assertThat(jdbc.queryForObject(
-                "SELECT status FROM thesis.thesis_group WHERE id = ?",
-                String.class, ordinary)).isEqualTo("SUBMITTED");
+        assertThatThrownBy(() -> mutations.updateProgress(ordinary,
+                new ProgressRequest(GroupStatus.DRAFT), foreignDean))
+                .isInstanceOf(DomainException.class)
+                .satisfies(failure -> assertThat(((DomainException) failure).code())
+                        .isEqualTo("THESIS_GROUP_NOT_FOUND"));
+        assertThatThrownBy(() -> mutations.updateProgress(ordinary,
+                new ProgressRequest(GroupStatus.SUBMITTED), foreignDean))
+                .isInstanceOf(DomainException.class)
+                .satisfies(failure -> assertThat(((DomainException) failure).code())
+                        .isEqualTo("THESIS_GROUP_NOT_FOUND"));
+        assertThat(groupStatusPair(ordinary)).isEqualTo("SUBMITTED/PENDING");
+
+        // The leader's own transitions are untouched — including when the
+        // leader identity arrives stacked on a dean-role token: the guard
+        // only binds a dean who is not the group's leader.
+        Jwt leaderDean = Jwt.withTokenValue("roster-lock-fixture").header("alg", "none")
+                .subject("rlo-user-rlo-dean-foreign")
+                .claim("roles", List.of("TRUONG_KHOA", "LECTURER", "STUDENT"))
+                .claim("lecturerId", "rlo-dean-foreign")
+                .claim("studentId", "rlo-og-leader").build();
+        mutations.updateProgress(ordinary, new ProgressRequest(GroupStatus.DRAFT), leaderDean);
+        mutations.updateProgress(ordinary, new ProgressRequest(GroupStatus.SUBMITTED),
+                student("rlo-og-leader"));
+        assertThat(groupStatusPair(ordinary)).isEqualTo("SUBMITTED/PENDING");
 
         // The owning faculty head cancels and completes both groups, and a
         // global admin still performs the same transitions on fresh rows.
@@ -791,6 +814,127 @@ class ThesisRosterLockOrderPostgresIT {
         assertThat(jdbc.queryForObject(
                 "SELECT status FROM thesis.thesis_group WHERE id = ?",
                 String.class, adminApproved)).isEqualTo("COMPLETED");
+    }
+
+    /**
+     * A dean who only supervises the topic from another faculty once drove
+     * the leader's lifecycle through the reviewer escape: resubmitting a
+     * group the leader had withdrawn, then approving it — freezing the
+     * roster after close with no leader consent. Every progress target a
+     * dean writes now requires the owning faculty unless the dean is the
+     * group's own leader or a global admin; supervising the topic keeps
+     * only the ordinary review verbs (approve and reject).
+     */
+    @Test
+    void foreignSupervisorDeanCannotResubmitButKeepsApproveAndReject() {
+        ensureLecturer("rlo-home-sup");
+        Jwt foreignDean = dean("rlo-dean-foreign", "rlo-dept-foreign", "rlo-fac-foreign");
+        UUID topicId = insertTopic("Rlo Resubmit Scope Topic");
+        supervise(topicId, "rlo-home-sup", 1);
+        supervise(topicId, "rlo-dean-foreign", 2);
+        UUID group = insertGroup(topicId, "rlo-rw", 3);
+
+        // The leader withdraws their own pending group back to DRAFT.
+        mutations.updateProgress(group, new ProgressRequest(GroupStatus.DRAFT),
+                student("rlo-rw-leader"));
+        assertThat(groupStatusPair(group)).isEqualTo("DRAFT/PENDING");
+
+        // A plain supervisor was never allowed; the foreign dean now
+        // shares that refusal instead of the reviewer escape's OK.
+        assertThatThrownBy(() -> mutations.updateProgress(group,
+                new ProgressRequest(GroupStatus.SUBMITTED), lecturer("rlo-home-sup")))
+                .isInstanceOf(DomainException.class)
+                .satisfies(failure -> assertThat(((DomainException) failure).code())
+                        .isEqualTo("GROUP_OWNER_REQUIRED"));
+        assertThatThrownBy(() -> mutations.updateProgress(group,
+                new ProgressRequest(GroupStatus.SUBMITTED), foreignDean))
+                .isInstanceOf(DomainException.class)
+                .satisfies(failure -> assertThat(((DomainException) failure).code())
+                        .isEqualTo("THESIS_GROUP_NOT_FOUND"));
+        assertThatThrownBy(() -> mutations.updateProgress(group,
+                new ProgressRequest(GroupStatus.DRAFT), foreignDean))
+                .isInstanceOf(DomainException.class)
+                .satisfies(failure -> assertThat(((DomainException) failure).code())
+                        .isEqualTo("THESIS_GROUP_NOT_FOUND"));
+
+        // The leader resubmits their own group; the foreign dean then
+        // approves it — review stays an ordinary path for them.
+        mutations.updateProgress(group, new ProgressRequest(GroupStatus.SUBMITTED),
+                student("rlo-rw-leader"));
+        mutations.approveGroup(group, foreignDean);
+        assertThat(groupStatusPair(group)).isEqualTo("SUBMITTED/APPROVED");
+
+        // Rejection is the same ordinary review right on a fresh group.
+        UUID rejected = insertGroup(topicId, "rlo-rr", 3);
+        mutations.rejectGroup(rejected, new GroupRejectionRequest("returned for fixes"), foreignDean);
+        assertThat(groupStatusPair(rejected)).isEqualTo("SUBMITTED/REJECTED");
+    }
+
+    /**
+     * The symmetric lifecycle escape: the same foreign dean could
+     * un-submit a pending group ahead of the home supervisor's approval,
+     * delaying it until the leader resubmitted. Un-submitting is refused
+     * the same way, so the ordinary approval lands on the first try.
+     */
+    @Test
+    void foreignSupervisorDeanCannotUnsubmitAheadOfHomeApproval() {
+        ensureLecturer("rlo-home-sup");
+        Jwt foreignDean = dean("rlo-dean-foreign", "rlo-dept-foreign", "rlo-fac-foreign");
+        UUID topicId = insertTopic("Rlo Unsubmit Scope Topic");
+        supervise(topicId, "rlo-home-sup", 1);
+        supervise(topicId, "rlo-dean-foreign", 2);
+        UUID group = insertGroup(topicId, "rlo-ub", 3);
+
+        assertThatThrownBy(() -> mutations.updateProgress(group,
+                new ProgressRequest(GroupStatus.DRAFT), foreignDean))
+                .isInstanceOf(DomainException.class)
+                .satisfies(failure -> assertThat(((DomainException) failure).code())
+                        .isEqualTo("THESIS_GROUP_NOT_FOUND"));
+        assertThat(groupStatusPair(group)).isEqualTo("SUBMITTED/PENDING");
+
+        // The group stayed submitted, so the home supervisor's approval
+        // is no longer delayable by the foreign dean's lifecycle writes.
+        mutations.approveGroup(group, lecturer("rlo-home-sup"));
+        assertThat(groupStatusPair(group)).isEqualTo("SUBMITTED/APPROVED");
+    }
+
+    /**
+     * Owning a topic is an ordinary owner right, not a governance grant:
+     * a dean whose identity created the topic keeps the supervisor roster
+     * even after the topic leaves their faculty (a department transfer or
+     * an admin edit) — the same account as a plain lecturer would pass,
+     * so the dean role must not strip the right. A foreign dean who only
+     * co-supervises the topic stays refused.
+     */
+    @Test
+    void deanKeepsOwnerRightsOnATopicOutsideTheirFaculty() {
+        ensureLecturer("rlo-owner-co");
+        // The topic lives in faculty-demo while the dean who created it now
+        // belongs to rlo-fac-foreign — the post-transfer shape.
+        Jwt ownerDean = dean("rlo-dean-foreign", "rlo-dept-foreign", "rlo-fac-foreign");
+        Jwt coSupervisingDean = dean("rlo-dean-foreign-2", "rlo-dept-foreign-2", "rlo-fac-foreign-2");
+        UUID topicId = insertTopic("Rlo Dean Owned Foreign Topic", "department-demo");
+        jdbc.update("UPDATE thesis.thesis_topic SET created_by = ? WHERE id = ?",
+                "rlo-dean-foreign", topicId);
+        supervise(topicId, "rlo-owner-co", 1);
+        supervise(topicId, "rlo-dean-foreign-2", 2);
+
+        supervisors.setSupervisors(topicId, List.of("rlo-dean-foreign", "rlo-owner-co"), ownerDean);
+        assertThat(supervisorIds(topicId)).containsExactly("rlo-dean-foreign", "rlo-owner-co");
+
+        // The same identity as a plain lecturer passes too — the dean role
+        // only removed the right, it never granted it.
+        supervisors.setSupervisors(topicId, List.of("rlo-dean-foreign", "rlo-owner-co"),
+                lecturer("rlo-dean-foreign"));
+
+        // The foreign co-supervisor who is not the owner is still refused
+        // — ownership, not supervision, carried the right across faculties.
+        assertThatThrownBy(() -> supervisors.setSupervisors(topicId,
+                List.of("rlo-owner-co"), coSupervisingDean))
+                .isInstanceOf(DomainException.class)
+                .satisfies(failure -> assertThat(((DomainException) failure).code())
+                        .isEqualTo("TOPIC_NOT_FOUND"));
+        assertThat(supervisorIds(topicId)).containsExactly("rlo-dean-foreign", "rlo-owner-co");
     }
 
     /**
@@ -946,6 +1090,19 @@ class ThesisRosterLockOrderPostgresIT {
                 .subject("rlo-user-" + lecturerId)
                 .claim("roles", List.of("LECTURER"))
                 .claim("lecturerId", lecturerId).build();
+    }
+
+    private Jwt student(String studentId) {
+        return Jwt.withTokenValue("roster-lock-fixture").header("alg", "none")
+                .subject("rlo-user-" + studentId)
+                .claim("roles", List.of("STUDENT"))
+                .claim("studentId", studentId).build();
+    }
+
+    private String groupStatusPair(UUID groupId) {
+        return jdbc.queryForObject(
+                "SELECT status || '/' || approval_status FROM thesis.thesis_group WHERE id = ?",
+                String.class, groupId);
     }
 
     private void ensureStudent(String studentId) {
