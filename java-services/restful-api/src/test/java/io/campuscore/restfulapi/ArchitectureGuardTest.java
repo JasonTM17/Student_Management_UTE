@@ -76,7 +76,6 @@ class ArchitectureGuardTest {
             "academic/service/AdminCatalogMutationService",
             "academic/service/LecturerMutationService",
             "auth/service/AdminUserMutationService",
-            "auth/service/DemoAccountGate",
             "system/controller/HealthController",
             "system/job/DatabaseKeepAliveScheduler",
             "thesis/assistant/service/AssistantPersonalContextAdvisor",

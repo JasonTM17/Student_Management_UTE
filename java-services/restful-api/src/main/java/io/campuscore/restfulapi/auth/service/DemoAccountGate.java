@@ -13,9 +13,8 @@ import org.springframework.boot.ApplicationArguments;
 import org.springframework.boot.ApplicationRunner;
 import org.springframework.context.annotation.Profile;
 import org.springframework.dao.DataAccessException;
-import org.springframework.jdbc.core.namedparam.MapSqlParameterSource;
-import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
 import org.springframework.stereotype.Component;
+import io.campuscore.restfulapi.auth.repository.DemoAccountRepository;
 
 /**
  * Keeps the seeded showcase accounts in the state the deployment asked for.
@@ -96,16 +95,16 @@ public class DemoAccountGate implements ApplicationRunner {
      */
     private static final String LOCKED = "LOCKED";
 
-    private final NamedParameterJdbcTemplate jdbc;
+    private final DemoAccountRepository repository;
     private final boolean enabled;
     /** Uppercased role names from {@code app.demo.roles}; empty means every demo role. */
     private final Set<String> roleScope;
 
     public DemoAccountGate(
-            NamedParameterJdbcTemplate jdbc,
+            DemoAccountRepository repository,
             @Value("${app.demo.accounts-enabled:false}") boolean enabled,
             @Value("${app.demo.roles:}") String roles) {
-        this.jdbc = jdbc;
+        this.repository = repository;
         this.enabled = enabled;
         this.roleScope = parseRoles(roles);
     }
@@ -151,28 +150,8 @@ public class DemoAccountGate implements ApplicationRunner {
             // the safe side for an account nobody can authenticate into anyway.
             // Columns are referenced through the full table name (no alias) so
             // the same statement runs unchanged on PostgreSQL and H2.
-            int activated = jdbc.update(
-                    "UPDATE campuscore_auth.\"User\" SET \"status\" = :active, \"failedLoginAttempts\" = 0,"
-                            + " \"lockedUntil\" = NULL, \"updatedAt\" = CURRENT_TIMESTAMP"
-                            + " WHERE \"email\" IN (:emails) AND \"status\" <> :active"
-                            + " AND EXISTS (SELECT 1 FROM campuscore_auth.\"UserRole\" ur"
-                            + " JOIN campuscore_auth.\"Role\" r ON r.\"id\" = ur.\"roleId\""
-                            + " WHERE ur.\"userId\" = campuscore_auth.\"User\".\"id\" AND r.\"name\" IN (:roles))",
-                    new MapSqlParameterSource()
-                            .addValue("active", ACTIVE)
-                            .addValue("emails", DEMO_EMAILS)
-                            .addValue("roles", roleScope));
-            int locked = jdbc.update(
-                    "UPDATE campuscore_auth.\"User\" SET \"status\" = :locked, \"failedLoginAttempts\" = 0,"
-                            + " \"lockedUntil\" = NULL, \"updatedAt\" = CURRENT_TIMESTAMP"
-                            + " WHERE \"email\" IN (:emails) AND \"status\" <> :locked"
-                            + " AND NOT EXISTS (SELECT 1 FROM campuscore_auth.\"UserRole\" ur"
-                            + " JOIN campuscore_auth.\"Role\" r ON r.\"id\" = ur.\"roleId\""
-                            + " WHERE ur.\"userId\" = campuscore_auth.\"User\".\"id\" AND r.\"name\" IN (:roles))",
-                    new MapSqlParameterSource()
-                            .addValue("locked", LOCKED)
-                            .addValue("emails", DEMO_EMAILS)
-                            .addValue("roles", roleScope));
+            int activated = repository.activateScoped(DEMO_EMAILS, ACTIVE, roleScope);
+            int locked = repository.lockUnscoped(DEMO_EMAILS, LOCKED, roleScope);
             if (activated + locked > 0) {
                 // Counts only: the account state is operational information, the
                 // credentials are not.
@@ -189,14 +168,7 @@ public class DemoAccountGate implements ApplicationRunner {
         }
     }
 
-    /** One bulk update applying a single status to every demo email that is not already in it. */
     private int setStatus(List<String> emails, String status) {
-        return jdbc.update(
-                "UPDATE campuscore_auth.\"User\" SET \"status\" = :status, \"failedLoginAttempts\" = 0,"
-                        + " \"lockedUntil\" = NULL, \"updatedAt\" = CURRENT_TIMESTAMP"
-                        + " WHERE \"email\" IN (:emails) AND \"status\" <> :status",
-                new MapSqlParameterSource()
-                        .addValue("status", status)
-                        .addValue("emails", emails));
+        return repository.setStatus(emails, status);
     }
 }
