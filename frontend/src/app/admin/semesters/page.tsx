@@ -29,7 +29,7 @@ import {
 } from '@/components/ui/state-block';
 import { useConfirmationDialog } from '@/components/ui/use-confirmation-dialog';
 import { useI18n } from '@/i18n';
-import { campusErrorMessage } from '@/lib/campus-error';
+import { campusCodeMessage } from '@/lib/campus-error';
 import { getLocalizedName } from '@/lib/academic-content';
 import { ACADEMIC_REFERENCE_LIMIT } from '@/lib/reference-data';
 
@@ -417,7 +417,7 @@ export default function AdminSemestersPage() {
       await fetchSemesters();
     } catch (requestError: unknown) {
       toast.error(
-        campusErrorMessage(
+        campusCodeMessage(
           requestError,
           messages.common.campusErrors,
           copy.saveFailed,

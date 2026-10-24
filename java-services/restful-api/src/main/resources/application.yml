@@ -1,3 +1,7 @@
+registration:
+  # Maximum effective limit for ordinary summer-term registration.
+  summer-max-credits: ${REGISTRATION_SUMMER_MAX_CREDITS:10}
+
 spring:
   application:
     name: campuscore-restful-api

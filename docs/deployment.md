@@ -66,6 +66,11 @@ Hệ thống trợ lý học vụ AI (`ThesisAssistantService`) áp dụng kiế
      - `DEEPSEEK_BASE_URL`: `https://api.deepseek.com` *(Đã đặt mặc định chuẩn)*
    - **Bước 5**: Nhấn **Save Changes**. Render sẽ tự động redeploy phiên bản mới có kích hoạt kết nối DeepSeek.
 
+### 3.2. Hạn mức tín chỉ đăng ký
+
+- `REGISTRATION_SUMMER_MAX_CREDITS` (property `registration.summer-max-credits`, mặc định `10`) cấu hình giới hạn tín chỉ thông thường trong học kỳ hè. Máy chủ nhận diện học kỳ hè bằng `Semester.type = SUMMER`; hạn mức của đợt đăng ký vẫn có thể đặt thấp hơn. Mức `8` trong quy chế không được áp làm trần mặc định.
+- Đơn nâng hạn mức đã được duyệt tiếp tục theo hành vi hiện có, kể cả ở học kỳ hè. Giới hạn tối thiểu `14` chỉ là thông tin tư vấn trên trang đăng ký và không chặn việc thêm từng học phần. Dữ liệu hiện không xác định chắc chắn học kỳ cuối, vì vậy Phòng Đào tạo phải áp dụng ngoại lệ học kỳ cuối thủ công khi cần.
+
 ---
 
 ## 4. Tối Ưu Hóa Nhận Diện Thương Hiệu & SEO
