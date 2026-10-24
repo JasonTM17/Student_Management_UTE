@@ -2,7 +2,7 @@ package io.campuscore.restfulapi.notification;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import io.campuscore.restfulapi.audit.AdminAuditRecorder;
+import io.campuscore.restfulapi.audit.service.AdminAuditRecorder;
 import io.campuscore.restfulapi.notification.repository.NotificationWriteRepository;
 import io.campuscore.restfulapi.notification.service.NotificationWriteService;
 import io.campuscore.restfulapi.notification.web.NotificationWriteDtos.UpdateNotificationRequest;

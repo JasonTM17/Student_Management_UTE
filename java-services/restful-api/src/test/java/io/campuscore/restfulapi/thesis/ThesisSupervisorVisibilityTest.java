@@ -48,7 +48,7 @@ class ThesisSupervisorVisibilityTest {
     void setUp() throws Exception {
         jdbc = mock(NamedParameterJdbcTemplate.class);
         repository = mock(ThesisTopicRepository.class);
-        service = new ThesisSupervisorService(jdbc, repository, mock(io.campuscore.restfulapi.audit.AdminAuditRecorder.class));
+        service = new ThesisSupervisorService(jdbc, repository, mock(io.campuscore.restfulapi.audit.service.AdminAuditRecorder.class));
 
         ResultSet rows = mock(ResultSet.class);
         when(rows.getString("lecturer_id")).thenReturn(LECTURER_DIRECTORY_ID);

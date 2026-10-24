@@ -8,7 +8,7 @@ import io.campuscore.restfulapi.academic.registration.service.RegistrationServic
 import io.campuscore.restfulapi.academic.service.AcademicEnrollmentReadService;
 import io.campuscore.restfulapi.academic.service.AcademicMutationService;
 import io.campuscore.restfulapi.academic.dto.AcademicMutationDtos.GradeUpdate;
-import io.campuscore.restfulapi.audit.AdminAuditRecorder;
+import io.campuscore.restfulapi.audit.service.AdminAuditRecorder;
 import io.campuscore.restfulapi.engagement.service.GradePublishNotifier;
 import io.campuscore.restfulapi.notification.repository.NotificationWriteRepository;
 import javax.sql.DataSource;

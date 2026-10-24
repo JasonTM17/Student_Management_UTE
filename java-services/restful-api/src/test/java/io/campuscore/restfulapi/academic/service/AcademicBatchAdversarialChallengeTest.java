@@ -174,7 +174,7 @@ class AcademicBatchAdversarialChallengeTest {
                 namedJdbc,
                 mock(AcademicEnrollmentReadService.class),
                 mock(RegistrationService.class),
-                mock(io.campuscore.restfulapi.audit.AdminAuditRecorder.class));
+                mock(io.campuscore.restfulapi.audit.service.AdminAuditRecorder.class));
 
         // Wrap targetMutationService with Spring's TransactionInterceptor for real transaction boundary testing
         DataSourceTransactionManager txManager = new DataSourceTransactionManager(dataSource);

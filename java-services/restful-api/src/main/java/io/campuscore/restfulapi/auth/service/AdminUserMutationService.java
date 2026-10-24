@@ -1,6 +1,6 @@
 package io.campuscore.restfulapi.auth.service;
 
-import io.campuscore.restfulapi.audit.AdminAuditRecorder;
+import io.campuscore.restfulapi.audit.service.AdminAuditRecorder;
 import io.campuscore.restfulapi.auth.repository.AuthUserRepository;
 import io.campuscore.restfulapi.common.LikePattern;
 import io.campuscore.restfulapi.web.DomainException;

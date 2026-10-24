@@ -1,4 +1,4 @@
-package io.campuscore.restfulapi.audit;
+package io.campuscore.restfulapi.audit.repository;
 
 import io.campuscore.restfulapi.common.LikePattern;
 import java.sql.Timestamp;
@@ -10,6 +10,7 @@ import org.springframework.context.annotation.Profile;
 import org.springframework.jdbc.core.namedparam.MapSqlParameterSource;
 import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
 import org.springframework.stereotype.Repository;
+import io.campuscore.restfulapi.audit.service.AdminAuditRecorder;
 
 /**
  * Read side of the admin audit trail (round-3 contract ct-2). The trail was
@@ -27,7 +28,7 @@ public class AdminAuditReadRepository {
     private static final String ACTOR_LABEL = "COALESCE(NULLIF(TRIM(\"actorLabel\"), ''),"
             + " (SELECT TRIM(COALESCE(u.\"lastName\", '') || ' ' || COALESCE(u.\"firstName\", '')) || ' (' || u.\"email\" || ')'"
             + " FROM campuscore_auth.\"User\" u WHERE u.\"id\" = \"actorId\"), \"actorId\")";
-    static final int MAX_PAGE_SIZE = 100;
+    public static final int MAX_PAGE_SIZE = 100;
 
     private final NamedParameterJdbcTemplate jdbc;
 

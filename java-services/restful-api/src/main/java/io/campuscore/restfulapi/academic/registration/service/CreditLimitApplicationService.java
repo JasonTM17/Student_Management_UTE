@@ -1,7 +1,7 @@
 package io.campuscore.restfulapi.academic.registration.service;
 
 import io.campuscore.restfulapi.academic.registration.dto.CreditLimitApplicationDtos.Response;
-import io.campuscore.restfulapi.audit.AdminAuditRecorder;
+import io.campuscore.restfulapi.audit.service.AdminAuditRecorder;
 import io.campuscore.restfulapi.web.DomainException;
 import java.sql.Timestamp;
 import java.time.Instant;

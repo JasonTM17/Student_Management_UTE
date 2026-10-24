@@ -1,4 +1,4 @@
-package io.campuscore.restfulapi.audit;
+package io.campuscore.restfulapi.audit.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertThrows;
