@@ -6,11 +6,11 @@ class-level annotations, the filter chain, and service/repository scope all matt
 
 ## Executable owners
 
-- [SecurityConfig](../../java-services/restful-api/src/main/java/io/campuscore/restfulapi/security/SecurityConfig.java)
+- [SecurityConfig](../../java-services/restful-api/src/main/java/io/campuscore/restfulapi/security/config/SecurityConfig.java)
   owns the public route and HTTP-method allowlist, authenticated fallback, token
   validation, and role conversion. Use it instead of maintaining a second route
   list here. Accounts are office-issued; there is no public self-registration.
-- [AccountStateFilter](../../java-services/restful-api/src/main/java/io/campuscore/restfulapi/security/AccountStateFilter.java)
+- [AccountStateFilter](../../java-services/restful-api/src/main/java/io/campuscore/restfulapi/security/filter/AccountStateFilter.java)
   and [AuthUserRepository.findAccountAuthorization](../../java-services/restful-api/src/main/java/io/campuscore/restfulapi/auth/repository/AuthUserRepository.java)
   own the current-account gate. A valid signature proves who issued a token; it
   does not make an earlier role or academic profile authoritative forever.
@@ -182,6 +182,6 @@ retroactively identify password changes made before the revision existed.
 
 Published development secrets are unsuitable for deployment, and access and
 refresh credentials must remain separate token families. The startup policy is
-owned by [JwtSecretPolicy](../../java-services/restful-api/src/main/java/io/campuscore/restfulapi/security/JwtSecretPolicy.java)
+owned by [JwtSecretPolicy](../../java-services/restful-api/src/main/java/io/campuscore/restfulapi/security/token/JwtSecretPolicy.java)
 and `SecurityConfig`; deployment configuration is in
 [docker-compose.prod.yml](../../docker-compose.prod.yml).
