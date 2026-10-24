@@ -1,5 +1,6 @@
 package io.campuscore.restfulapi.people.repository;
 
+import io.campuscore.restfulapi.academic.model.EnrollmentStatuses;
 import io.campuscore.restfulapi.common.util.LikePattern;
 import io.campuscore.restfulapi.people.dto.PeopleReadDtos.CurriculumSummary;
 import io.campuscore.restfulapi.people.dto.PeopleReadDtos.DepartmentSummary;
@@ -133,7 +134,8 @@ public class PeopleReadRepository {
             filter += " AND EXISTS (SELECT 1 FROM academic.\"Enrollment\" enrollment"
                     + " WHERE enrollment.\"studentId\" = student.\"id\""
                     + " AND enrollment.\"sectionId\" = :sectionId"
-                    + " AND enrollment.\"status\" NOT IN ('DROPPED', 'CANCELLED'))";
+                    + " AND enrollment.\"status\" IN "
+                    + EnrollmentStatuses.ACTIVE_STATUS_PREDICATE + ")";
             parameters.addValue("sectionId", sectionId);
         }
         return jdbc.queryForList("SELECT DISTINCT student.\"userId\" FROM " + STUDENT_TABLE + " student"

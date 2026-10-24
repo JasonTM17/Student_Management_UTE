@@ -3,7 +3,7 @@ import net from 'node:net';
 import { spawn } from 'node:child_process';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { seedCourseE2e, seedReportE2e } from './course-e2e-fixture.mjs';
+import { seedCourseE2e, seedReportE2e, seedWithdrawalE2e } from './course-e2e-fixture.mjs';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -31,6 +31,7 @@ async function main() {
     await waitForResponse(`${apiBaseURL}/health/liveness`, (_, response) => response.ok);
     await seedCourseE2e(projectName, compose);
     await seedReportE2e(projectName, compose);
+    await seedWithdrawalE2e(projectName, compose);
     await waitForResponse(frontendBaseURL, (_, response) => response.ok, {
       parseJson: false,
     });

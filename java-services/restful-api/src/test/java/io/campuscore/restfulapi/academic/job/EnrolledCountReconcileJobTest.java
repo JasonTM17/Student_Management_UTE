@@ -160,6 +160,27 @@ class EnrolledCountReconcileJobTest {
         assertThat(counterOf("section-completed")).isEqualTo(1);
     }
 
+    @Test
+    void withdrawnEnrollmentsDoNotHoldASeat() {
+        // Approve-withdraw releases the seat (enrolledCount--), so a section
+        // whose only enrollment is WITHDRAWN has true count 0 like a dropped
+        // row and must not be flagged as drift.
+        jdbc.update("INSERT INTO \"academic\".\"Section\" (\"id\", \"enrolledCount\") VALUES ('section-withdrawn', 0)");
+        insertEnrollment("e-withdrawn-1", "section-withdrawn", "WITHDRAWN");
+
+        io.campuscore.restfulapi.academic.job.EnrolledCountReconcileJob job =
+                new io.campuscore.restfulapi.academic.job.EnrolledCountReconcileJob(
+                        new io.campuscore.restfulapi.academic.repository.EnrolledCountReconcileRepository(
+                                new NamedParameterJdbcTemplate(jdbc)), false);
+
+        job.reconcile();
+
+        List<ILoggingEvent> warnings = warnEvents();
+        assertThat(warnings).isNotEmpty();
+        assertThat(warnings.get(0).getFormattedMessage()).doesNotContain("section-withdrawn");
+        assertThat(counterOf("section-withdrawn")).isEqualTo(0);
+    }
+
     private int counterOf(String sectionId) {
         Integer count = jdbc.queryForObject(
                 "SELECT \"enrolledCount\" FROM \"academic\".\"Section\" WHERE \"id\" = ?",

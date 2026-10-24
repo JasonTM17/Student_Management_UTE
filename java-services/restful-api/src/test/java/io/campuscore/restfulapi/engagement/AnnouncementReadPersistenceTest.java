@@ -219,6 +219,36 @@ class AnnouncementReadPersistenceTest {
     }
 
     @Test
+    void withdrawnEnrollmentDoesNotGrantSectionNoticeVisibility() throws Exception {
+        insert(fixture("withdrawn-section", false, new String[]{"STUDENT"}, new Integer[0], "2026-08-20T10:00:00Z")
+                .withAcademicContext("semester-1", "Semester 1", "section-withdrawn", "05", "CS105", "Security"));
+        insert(fixture("still-enrolled", false, new String[]{"STUDENT"}, new Integer[0], "2026-08-20T11:00:00Z")
+                .withAcademicContext("semester-1", "Semester 1", "section-active", "04", "CS104", "Databases"));
+        jdbc.update("INSERT INTO academic.\"Enrollment\""
+                        + " (\"id\", \"studentId\", \"sectionId\", \"semesterId\", \"status\")"
+                        + " VALUES (?, ?, ?, ?, ?)",
+                "enrollment-withdrawn", "student-profile", "section-withdrawn", "semester-1", "WITHDRAWN");
+        jdbc.update("INSERT INTO academic.\"Enrollment\""
+                        + " (\"id\", \"studentId\", \"sectionId\", \"semesterId\", \"status\")"
+                        + " VALUES (?, ?, ?, ?, ?)",
+                "enrollment-active", "student-profile", "section-active", "semester-1", "ENROLLED");
+
+        // A withdrawn enrollment is transcript history, not a live seat: only
+        // the active section's notice may reach the student inbox.
+        mvc.perform(get("/api/v1/announcements/my")
+                        .with(fixtureJwt(jdbc, "student-user", token -> token
+                                .subject("student-user")
+                                .claim("email", "student@campuscore.edu")
+                                .claim("roles", List.of("STUDENT"))
+                                .claim("studentId", "student-profile")
+                                .claim("student", Map.of("year", 2)), "STUDENT")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.length()").value(1))
+                .andExpect(jsonPath("$.data[0].id").value("still-enrolled"))
+                .andExpect(jsonPath("$.meta.total").value(1));
+    }
+
+    @Test
     void sectionScopedNoticeOnlyReachesEnrolledStudents() throws Exception {
         insert(fixture("own-section", false, new String[]{"STUDENT"}, new Integer[0], "2026-08-20T10:00:00Z")
                 .withAcademicContext("semester-1", "Semester 1", "section-owned", "01", "CS101", "Web Programming"));

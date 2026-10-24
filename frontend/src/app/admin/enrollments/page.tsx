@@ -44,7 +44,7 @@ interface Enrollment {
   studentId: string;
   sectionId: string;
   semesterId: string;
-  status: 'ENROLLED' | 'PENDING' | 'CONFIRMED' | 'COMPLETED' | 'DROPPED' | 'CANCELLED';
+  status: 'ENROLLED' | 'PENDING' | 'CONFIRMED' | 'COMPLETED' | 'DROPPED' | 'CANCELLED' | 'WITHDRAWN';
   enrolledAt: string;
   droppedAt?: string;
   finalGrade?: number;
@@ -301,6 +301,7 @@ export default function AdminEnrollmentsPage() {
             COMPLETED: 'Hoàn tất',
             DROPPED: 'Đã rút',
             CANCELLED: 'Đã hủy',
+            WITHDRAWN: 'Đã rút học phần',
           },
           clearFilters: 'Xóa bộ lọc',
           enrollmentsCount: (count: number) => `${formatNumber(count)} đăng ký`,
@@ -385,6 +386,7 @@ export default function AdminEnrollmentsPage() {
             COMPLETED: 'Completed',
             DROPPED: 'Dropped',
             CANCELLED: 'Cancelled',
+            WITHDRAWN: 'Withdrawn',
           },
           clearFilters: 'Clear filters',
           enrollmentsCount: (count: number) => `${formatNumber(count)} enrollments`,
@@ -513,6 +515,7 @@ export default function AdminEnrollmentsPage() {
       { value: 'COMPLETED', label: copy.statusOptions.COMPLETED },
       { value: 'DROPPED', label: copy.statusOptions.DROPPED },
       { value: 'CANCELLED', label: copy.statusOptions.CANCELLED },
+      { value: 'WITHDRAWN', label: copy.statusOptions.WITHDRAWN },
     ],
     [copy.allStatuses, copy.statusOptions],
   );

@@ -431,7 +431,7 @@ public class AcademicMutationService {
         if (incomplete != null && incomplete > 0) {
             Long blockers = jdbc.queryForObject(
                     "SELECT COUNT(*) FROM " + ENROLLMENT + " e WHERE e.\"sectionId\" = :sectionId"
-                            + " AND e.\"status\" NOT IN ('ENROLLED', 'CONFIRMED', 'COMPLETED', 'DROPPED', 'CANCELLED')",
+                            + " AND e.\"status\" NOT IN ('ENROLLED', 'CONFIRMED', 'COMPLETED', 'DROPPED', 'CANCELLED', 'WITHDRAWN')",
                     new MapSqlParameterSource("sectionId", sectionId), Long.class);
             String detail = blockers != null && blockers > 0
                     ? "All gradeable students require process and final exam scores before publishing"
@@ -449,9 +449,10 @@ public class AcademicMutationService {
                         + " \"updatedAt\" = CURRENT_TIMESTAMP WHERE \"sectionId\" = :sectionId"
                         + " AND \"status\" IN (:gradeableStatuses)"
                         // A repeat publish must not re-touch or re-notify rows
-                        // already published; IS DISTINCT FROM keeps NULL-gradeStatus
-                        // pre-publish rows eligible.
+                        // already published or appealed; IS DISTINCT FROM keeps
+                        // NULL-gradeStatus pre-publish rows eligible.
                         + " AND \"gradeStatus\" IS DISTINCT FROM 'PUBLISHED'"
+                        + " AND \"gradeStatus\" IS DISTINCT FROM 'APPEALED'"
                         + " AND \"finalGrade\" IS NOT NULL AND \"letterGrade\" IS NOT NULL",
                 new MapSqlParameterSource("sectionId", sectionId)
                         .addValue("gradeableStatuses", GRADEABLE_STATUSES));

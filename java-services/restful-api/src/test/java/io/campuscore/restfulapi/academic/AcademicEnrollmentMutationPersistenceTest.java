@@ -12,8 +12,10 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import java.sql.Timestamp;
 import java.time.Instant;
 import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.List;
@@ -25,6 +27,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import io.campuscore.restfulapi.academic.registration.renderer.RegistrationPdfRenderer;
+import io.campuscore.restfulapi.academic.registration.service.RegistrationService;
 import io.campuscore.restfulapi.testsupport.AccountAuthorityFixture;
 import io.campuscore.restfulapi.testsupport.CurrentAccountJwt;
 import org.hamcrest.Matchers;
@@ -35,9 +38,11 @@ import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMock
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.core.env.Environment;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.TestPropertySource;
+import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
@@ -64,6 +69,12 @@ class AcademicEnrollmentMutationPersistenceTest {
 
     @Autowired
     private ObjectMapper objectMapper;
+
+    @Autowired
+    private Environment environment;
+
+    @Autowired
+    private RegistrationService registrationService;
 
     @MockitoSpyBean
     private RegistrationPdfRenderer pdfRenderer;
@@ -121,6 +132,12 @@ class AcademicEnrollmentMutationPersistenceTest {
                         Integer.class,
                         "section-open"))
                 .isEqualTo(1);
+        mvc.perform(get("/api/v1/me/registration/summary")
+                        .with(studentJwt("student-user-1", "student-1")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.creditsUsed").value(3))
+                .andExpect(jsonPath("$.minCredits").value(14))
+                .andExpect(jsonPath("$.belowMinimum").value(true));
 
         mvc.perform(get("/api/v1/enrollments/my").with(studentJwt("student-user-1", "student-1")))
                 .andExpect(status().isOk())
@@ -147,6 +164,29 @@ class AcademicEnrollmentMutationPersistenceTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$[0].id").value(enrollmentId))
                 .andExpect(jsonPath("$[0].status").value("DROPPED"));
+        assertThat(jdbc.queryForObject(
+                "SELECT \"gradeStatus\" FROM \"academic\".\"Enrollment\" WHERE \"id\" = ?",
+                String.class,
+                enrollmentId)).isEqualTo("NOT_GRADED");
+        assertThat(jdbc.queryForObject(
+                "SELECT \"letterGrade\" FROM \"academic\".\"Enrollment\" WHERE \"id\" = ?",
+                String.class,
+                enrollmentId)).isNull();
+        mvc.perform(get("/api/v1/me/registration/summary")
+                        .with(studentJwt("student-user-1", "student-1")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.creditsUsed").value(0));
+    }
+
+    @Test
+    void eligibilityRejectsArchivedSemesterEvenWhenRegistrationRoundIsOpen() throws Exception {
+        jdbc.update("UPDATE \"academic\".\"Semester\" SET \"status\" = 'ARCHIVED' WHERE \"id\" = 'semester-1'");
+
+        mvc.perform(get("/api/v1/me/registration/eligibility")
+                        .with(studentJwt("student-user-1", "student-1"))
+                        .param("roundId", "round-open"))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("SEMESTER_CLOSED"));
     }
 
     @Test
@@ -514,6 +554,12 @@ class AcademicEnrollmentMutationPersistenceTest {
 
     /** Seeds one completed, passing enrollment used to satisfy a PREREQ check. */
     private void seedCompletedEnrollment(String id, String sectionId, String courseId, String letterGrade) {
+        seedCompletedEnrollment(id, sectionId, courseId, "PUBLISHED", letterGrade);
+    }
+
+    /** Seeds a completed enrollment with a chosen grade release state for prerequisite checks. */
+    private void seedCompletedEnrollment(
+            String id, String sectionId, String courseId, String gradeStatus, String letterGrade) {
         LocalDateTime now = localDateTime(BASE_TIME);
         jdbc.update(
                 "INSERT INTO \"academic\".\"Enrollment\""
@@ -521,7 +567,7 @@ class AcademicEnrollmentMutationPersistenceTest {
                         + " \"gradeStatus\", \"courseId\", \"letterGrade\", \"creditsSnapshot\", \"version\")"
                         + " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
                 id, "student-1", sectionId, "semester-0", "COMPLETED", now,
-                "PUBLISHED", courseId, letterGrade, 3, 0);
+                gradeStatus, courseId, letterGrade, 3, 0);
     }
 
     /** Seeds one active enrollment used to satisfy a COREQ check. */
@@ -561,6 +607,283 @@ class AcademicEnrollmentMutationPersistenceTest {
                         .content("{\"sectionId\":\"section-open\"}"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.sectionId").value("section-open"))
+                .andExpect(jsonPath("$.status").value("ENROLLED"));
+    }
+
+    @Test
+    void inactiveCourseIsHiddenFromRegistrationCatalog() throws Exception {
+        jdbc.update("UPDATE \"academic\".\"Course\" SET \"isActive\" = FALSE WHERE \"id\" = 'course-open'");
+
+        MvcResult catalog = mvc.perform(get("/api/v1/me/registration/sections")
+                        .with(studentJwt("student-user-1", "student-1")))
+                .andExpect(status().isOk())
+                .andReturn();
+
+        JsonNode sections = objectMapper.readTree(catalog.getResponse().getContentAsString());
+        for (JsonNode section : sections) {
+            assertThat(section.get("id").asText()).isNotEqualTo("section-open");
+        }
+    }
+
+    @Test
+    void inactiveCourseBlocksNewEnrollmentInAnOpenSection() throws Exception {
+        jdbc.update("UPDATE \"academic\".\"Course\" SET \"isActive\" = FALSE WHERE \"id\" = 'course-open'");
+
+        mvc.perform(post("/api/v1/enrollments/enroll")
+                        .with(studentJwt("student-user-1", "student-1"))
+                        .header("Idempotency-Key", "inactive-course-enroll")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"sectionId\":\"section-open\"}"))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("COURSE_INACTIVE"));
+    }
+
+    @Test
+    void inactiveCourseDoesNotHideOrTrapAnExistingEnrollment() throws Exception {
+        MvcResult enrolled = mvc.perform(post("/api/v1/enrollments/enroll")
+                        .with(studentJwt("student-user-1", "student-1"))
+                        .header("Idempotency-Key", "enroll-before-course-inactive")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"sectionId\":\"section-open\"}"))
+                .andExpect(status().isOk())
+                .andReturn();
+        String enrollmentId = objectMapper.readTree(enrolled.getResponse().getContentAsString()).get("id").asText();
+
+        jdbc.update("UPDATE \"academic\".\"Course\" SET \"isActive\" = FALSE WHERE \"id\" = 'course-open'");
+
+        mvc.perform(get("/api/v1/enrollments/my").with(studentJwt("student-user-1", "student-1")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].id").value(enrollmentId))
+                .andExpect(jsonPath("$[0].status").value("ENROLLED"));
+
+        mvc.perform(post("/api/v1/enrollments/" + enrollmentId + "/drop")
+                        .with(studentJwt("student-user-1", "student-1"))
+                        .header("Idempotency-Key", "drop-after-course-inactive"))
+                .andExpect(status().isOk());
+
+        mvc.perform(get("/api/v1/enrollments/my").with(studentJwt("student-user-1", "student-1")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].id").value(enrollmentId))
+                .andExpect(jsonPath("$[0].status").value("DROPPED"));
+    }
+
+    @Test
+    void registrationWindowIncludesBothEndpointsAcrossBangkokAndUtcMidnight() {
+        Instant bangkokMidnight = LocalDateTime.of(2026, 1, 1, 0, 0)
+                .atZone(ZoneId.of("Asia/Bangkok"))
+                .toInstant();
+        Instant utcMidnight = Instant.parse("2026-01-01T00:00:00Z");
+        assertThat(bangkokMidnight).isEqualTo(Instant.parse("2025-12-31T17:00:00Z"));
+
+        Map<String, Object> round = Map.of(
+                "window_start", Timestamp.from(bangkokMidnight),
+                "window_end", Timestamp.from(utcMidnight));
+
+        assertThat(Boolean.TRUE.equals(
+                ReflectionTestUtils.invokeMethod(registrationService, "inWindow", round, bangkokMidnight))).isTrue();
+        assertThat(Boolean.TRUE.equals(
+                ReflectionTestUtils.invokeMethod(registrationService, "inWindow", round, utcMidnight))).isTrue();
+        assertThat(Boolean.FALSE.equals(ReflectionTestUtils.invokeMethod(
+                registrationService, "inWindow", round, bangkokMidnight.minusNanos(1)))).isTrue();
+        assertThat(Boolean.FALSE.equals(ReflectionTestUtils.invokeMethod(
+                registrationService, "inWindow", round, utcMidnight.plusNanos(1)))).isTrue();
+    }
+
+    @Test
+    void adjacentRegistrationSchedulePeriodsDoNotConflictWhenEndEqualsStart() throws Exception {
+        jdbc.update("UPDATE \"academic\".\"SectionSchedule\" SET \"startTime\" = '07:00', \"endTime\" = '09:00' WHERE \"id\" = 'sched-overlap'");
+        jdbc.update("UPDATE \"academic\".\"SectionSchedule\" SET \"startTime\" = '09:00', \"endTime\" = '11:00' WHERE \"id\" = 'sched-open'");
+        seedActiveEnrollment("enrollment-abutting", "section-overlap", "course-overlap");
+
+        mvc.perform(post("/api/v1/enrollments/enroll")
+                        .with(studentJwt("student-user-1", "student-1"))
+                        .header("Idempotency-Key", "enroll-abutting-period")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"sectionId\":\"section-open\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.sectionId").value("section-open"));
+    }
+
+    @Test
+    void summerCreditCapFollowsTheConfiguredRegistrationRound() throws Exception {
+        jdbc.update("UPDATE \"academic\".\"Semester\" SET \"type\" = 'SUMMER' WHERE \"id\" = 'semester-1'");
+        jdbc.update("UPDATE \"academic\".\"RegistrationRound\" SET \"creditLimit\" = 8 WHERE \"id\" = 'round-open'");
+
+        mvc.perform(get("/api/v1/me/registration/eligibility")
+                        .with(studentJwt("student-user-1", "student-1"))
+                        .param("roundId", "round-open"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.creditLimit").value(8));
+
+        jdbc.update("UPDATE \"academic\".\"RegistrationRound\" SET \"creditLimit\" = 10 WHERE \"id\" = 'round-open'");
+        mvc.perform(get("/api/v1/me/registration/eligibility")
+                        .with(studentJwt("student-user-1", "student-1"))
+                        .param("roundId", "round-open"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.creditLimit").value(10));
+    }
+
+    @Test
+    void summerConfiguredCapAllowsTenCreditsAndRefusesEleven() throws Exception {
+        jdbc.update("UPDATE \"academic\".\"Semester\" SET \"type\" = 'SUMMER' WHERE \"id\" = 'semester-1'");
+        jdbc.update("UPDATE \"academic\".\"RegistrationRound\" SET \"creditLimit\" = 28 WHERE \"id\" = 'round-open'");
+        jdbc.update("UPDATE \"academic\".\"Course\" SET \"credits\" = 10 WHERE \"id\" = 'course-open'");
+        jdbc.update("UPDATE \"academic\".\"Course\" SET \"credits\" = 1 WHERE \"id\" = 'course-two'");
+
+        mvc.perform(post("/api/v1/me/enrollments")
+                        .with(studentJwt("student-user-1", "student-1"))
+                        .header("Idempotency-Key", "summer-ten-credits")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"sectionId\":\"section-open\"}"))
+                .andExpect(status().isOk());
+
+        mvc.perform(get("/api/v1/me/registration/summary")
+                        .with(studentJwt("student-user-1", "student-1")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.creditLimit").value(10))
+                .andExpect(jsonPath("$.creditsUsed").value(10));
+
+        mvc.perform(post("/api/v1/me/enrollments")
+                        .with(studentJwt("student-user-1", "student-1"))
+                        .header("Idempotency-Key", "summer-eleven-credits")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"sectionId\":\"section-two\"}"))
+                .andExpect(status().isUnprocessableEntity())
+                .andExpect(jsonPath("$.code").value("CREDIT_CAP_EXCEEDED"));
+    }
+
+    @Test
+    void summerCapUsesRegistrationSummerMaxCreditsProperty() throws Exception {
+        jdbc.update("UPDATE \"academic\".\"Semester\" SET \"type\" = 'SUMMER' WHERE \"id\" = 'semester-1'");
+        jdbc.update("UPDATE \"academic\".\"RegistrationRound\" SET \"creditLimit\" = 28 WHERE \"id\" = 'round-open'");
+        int configuredMaximum = environment.getProperty("registration.summer-max-credits", Integer.class, 10);
+
+        mvc.perform(get("/api/v1/me/registration/eligibility")
+                        .with(studentJwt("student-user-1", "student-1"))
+                        .param("roundId", "round-open"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.creditLimit").value(configuredMaximum));
+    }
+
+    @Test
+    void approvedCreditLimitExceptionRetainsItsExistingSummerBehavior() throws Exception {
+        jdbc.update("UPDATE \"academic\".\"Semester\" SET \"type\" = 'SUMMER' WHERE \"id\" = 'semester-1'");
+        jdbc.update(
+                "INSERT INTO \"academic\".\"CreditLimitApplication\""
+                        + " (\"id\", \"studentId\", \"semesterId\", \"roundId\", \"requestedLimit\","
+                        + " \"reason\", \"status\", \"reviewedBy\", \"reviewedAt\")"
+                        + " VALUES (?, ?, ?, ?, ?, ?, 'APPROVED', ?, ?)",
+                "summer-approved-limit",
+                "student-1",
+                "semester-1",
+                "round-open",
+                30,
+                "Approved exception retained for summer behavior",
+                "admin-user",
+                localDateTime(BASE_TIME));
+
+        mvc.perform(get("/api/v1/me/registration/eligibility")
+                        .with(studentJwt("student-user-1", "student-1"))
+                        .param("roundId", "round-open"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.creditLimit").value(30));
+    }
+
+    @Test
+    void registrationSummaryAdvisesBelowMinimumOnlyBelowFourteenCredits() throws Exception {
+        mvc.perform(get("/api/v1/me/registration/summary")
+                        .with(studentJwt("student-user-1", "student-1")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.minCredits").value(14))
+                .andExpect(jsonPath("$.creditsUsed").value(0))
+                .andExpect(jsonPath("$.belowMinimum").value(true));
+
+        jdbc.update("UPDATE \"academic\".\"Course\" SET \"credits\" = 13 WHERE \"id\" = 'course-open'");
+        seedActiveEnrollment("enrollment-minimum-below", "section-open", "course-open");
+        mvc.perform(get("/api/v1/me/registration/summary")
+                        .with(studentJwt("student-user-1", "student-1")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.minCredits").value(14))
+                .andExpect(jsonPath("$.creditsUsed").value(13))
+                .andExpect(jsonPath("$.belowMinimum").value(true));
+
+        jdbc.update("UPDATE \"academic\".\"Course\" SET \"credits\" = 14 WHERE \"id\" = 'course-open'");
+        mvc.perform(get("/api/v1/me/registration/summary")
+                        .with(studentJwt("student-user-1", "student-1")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.minCredits").value(14))
+                .andExpect(jsonPath("$.creditsUsed").value(14))
+                .andExpect(jsonPath("$.belowMinimum").value(false));
+
+        jdbc.update("UPDATE \"academic\".\"Course\" SET \"credits\" = 15 WHERE \"id\" = 'course-open'");
+        mvc.perform(get("/api/v1/me/registration/summary")
+                        .with(studentJwt("student-user-1", "student-1")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.creditsUsed").value(15))
+                .andExpect(jsonPath("$.belowMinimum").value(false));
+    }
+
+    @Test
+    void summerSummaryOmitsTheRegularSemesterMinimumAndFirstRegistrationStillSucceeds() throws Exception {
+        jdbc.update("UPDATE \"academic\".\"Semester\" SET \"type\" = 'SUMMER' WHERE \"id\" = 'semester-1'");
+
+        mvc.perform(get("/api/v1/me/registration/summary")
+                        .with(studentJwt("student-user-1", "student-1")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.minCredits").value(0))
+                .andExpect(jsonPath("$.creditsUsed").value(0))
+                .andExpect(jsonPath("$.belowMinimum").value(false));
+
+        mvc.perform(post("/api/v1/me/enrollments")
+                        .with(studentJwt("student-user-1", "student-1"))
+                        .header("Idempotency-Key", "summer-first-registration-under-minimum")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"sectionId\":\"section-open\"}"))
+                .andExpect(status().isOk());
+
+        mvc.perform(get("/api/v1/me/registration/summary")
+                        .with(studentJwt("student-user-1", "student-1")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.minCredits").value(0))
+                .andExpect(jsonPath("$.creditsUsed").value(3))
+                .andExpect(jsonPath("$.belowMinimum").value(false));
+    }
+
+    @Test
+    void prerequisiteRequiresOfficialPassingGradeAndAcceptsAppealedGradeAtTheFloor() throws Exception {
+        jdbc.update(
+                "INSERT INTO \"academic\".\"CourseRequirement\""
+                        + " (\"id\", \"courseId\", \"requiredCourseId\", \"kind\", \"minLetterGrade\")"
+                        + " VALUES ('req-test-official-floor', 'course-open', 'course-overlap', 'PREREQ', 'B')");
+        seedCompletedEnrollment(
+                "enrollment-prereq-failed", "section-overlap", "course-overlap", "PUBLISHED", "F");
+
+        mvc.perform(post("/api/v1/enrollments/enroll")
+                        .with(studentJwt("student-user-1", "student-1"))
+                        .header("Idempotency-Key", "prereq-failed-grade")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"sectionId\":\"section-open\"}"))
+                .andExpect(status().isUnprocessableEntity())
+                .andExpect(jsonPath("$.code").value("PREREQUISITE_UNMET"));
+
+        jdbc.update("UPDATE \"academic\".\"Enrollment\" SET \"gradeStatus\" = 'DRAFT', \"letterGrade\" = 'B'"
+                + " WHERE \"id\" = 'enrollment-prereq-failed'");
+        mvc.perform(post("/api/v1/enrollments/enroll")
+                        .with(studentJwt("student-user-1", "student-1"))
+                        .header("Idempotency-Key", "prereq-draft-grade")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"sectionId\":\"section-open\"}"))
+                .andExpect(status().isUnprocessableEntity())
+                .andExpect(jsonPath("$.code").value("PREREQUISITE_UNMET"));
+
+        jdbc.update("UPDATE \"academic\".\"Enrollment\" SET \"gradeStatus\" = 'APPEALED'"
+                + " WHERE \"id\" = 'enrollment-prereq-failed'");
+        mvc.perform(post("/api/v1/enrollments/enroll")
+                        .with(studentJwt("student-user-1", "student-1"))
+                        .header("Idempotency-Key", "prereq-appealed-at-floor")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"sectionId\":\"section-open\"}"))
+                .andExpect(status().isOk())
                 .andExpect(jsonPath("$.status").value("ENROLLED"));
     }
 
