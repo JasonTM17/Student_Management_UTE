@@ -1,4 +1,4 @@
-package io.campuscore.restfulapi.job;
+package io.campuscore.restfulapi.system.job;
 
 import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.mockito.ArgumentMatchers.any;

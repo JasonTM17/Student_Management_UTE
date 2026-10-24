@@ -1,4 +1,4 @@
-package io.campuscore.restfulapi.dto;
+package io.campuscore.restfulapi.system.dto;
 
 import jakarta.validation.constraints.NotBlank;
 
