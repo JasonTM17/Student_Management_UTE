@@ -93,18 +93,22 @@ public final class RegistrationDtos {
             int creditsUsed,
             int creditsRemaining,
             List<String> enrollmentIds,
-            @Schema(description = "Mức tín chỉ tối thiểu mang tính tư vấn trong học kỳ chính", example = "14")
+            @Schema(description = "Mức tín chỉ tối thiểu mang tính tư vấn trong học kỳ chính; bằng 0 trong học kỳ hè", example = "14")
             int minCredits,
-            @Schema(description = "True khi số tín chỉ đang hoạt động thấp hơn minCredits; không chặn đăng ký", example = "true")
+            @Schema(description = "True khi số tín chỉ đang hoạt động thấp hơn minCredits; không chặn đăng ký và luôn false khi minCredits bằng 0", example = "true")
             boolean belowMinimum) {
 
+        /**
+         * Compatibility constructor for callers without semester context.
+         * No semester-specific minimum can be inferred safely in that case.
+         */
         public SummaryResponse(
                 String roundId,
                 int creditLimit,
                 int creditsUsed,
                 int creditsRemaining,
                 List<String> enrollmentIds) {
-            this(roundId, creditLimit, creditsUsed, creditsRemaining, enrollmentIds, 14, creditsUsed < 14);
+            this(roundId, creditLimit, creditsUsed, creditsRemaining, enrollmentIds, 0, false);
         }
     }
 

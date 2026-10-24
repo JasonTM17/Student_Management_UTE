@@ -360,7 +360,8 @@ export default function RegisterPage() {
       : summaryQuery.data && typeof summaryQuery.data.creditLimit === 'number' && summaryQuery.data.creditLimit > 0
         ? summaryQuery.data.creditLimit
         : null;
-  const belowMinimum = summaryQuery.data?.belowMinimum === true;
+  const belowMinimum =
+    summaryQuery.data?.belowMinimum === true && (summaryQuery.data?.minCredits ?? 0) > 0;
 
   // ---- filters (all client-side, live counts) ----
   const searchedSections = useMemo(
@@ -1510,6 +1511,7 @@ export default function RegisterPage() {
                 {belowMinimum && summaryQuery.data ? (
                   <MinimumCreditsNotice
                     belowMinimum={belowMinimum}
+                    minCredits={summaryQuery.data.minCredits}
                     message={copy.minimumCreditsNotice.replace(
                       '{count}',
                       formatNumber(summaryQuery.data.minCredits),

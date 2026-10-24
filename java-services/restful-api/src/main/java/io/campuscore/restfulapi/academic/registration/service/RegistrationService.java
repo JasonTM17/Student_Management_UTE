@@ -315,14 +315,17 @@ public class RegistrationService {
         List<String> ids = activeEnrollments(studentId, String.valueOf(round.get("semester_id"))).stream()
                 .map(row -> String.valueOf(row.get("id")))
                 .toList();
+        int minCredits = "SUMMER".equalsIgnoreCase(String.valueOf(round.get("semester_type")))
+                ? 0
+                : MINIMUM_CREDITS;
         return new SummaryResponse(
                 String.valueOf(round.get("id")),
                 limit,
                 used,
                 Math.max(0, limit - used),
                 ids,
-                MINIMUM_CREDITS,
-                used < MINIMUM_CREDITS);
+                minCredits,
+                minCredits > 0 && used < minCredits);
     }
 
     public EnrollmentResponse enroll(

@@ -29,7 +29,8 @@ test('registration summary contract and page consume the advisory fields', () =>
 
   assert.match(apiSource, /minCredits:\s*number/);
   assert.match(apiSource, /belowMinimum:\s*boolean/);
-  assert.match(pageSource, /summaryQuery\.data\?\.belowMinimum/);
+  assert.match(pageSource, /summaryQuery\.data\?\.belowMinimum === true && \(summaryQuery\.data\?\.minCredits \?\? 0\) > 0/);
+  assert.match(pageSource, /minCredits=\{summaryQuery\.data\.minCredits\}/);
   assert.match(pageSource, /summaryQuery\.data\.minCredits/);
   assert.match(pageSource, /<MinimumCreditsNotice/);
   assert.equal((messagesSource.match(/minimumCreditsNotice:/g) || []).length, 2);
@@ -45,6 +46,7 @@ test('below-minimum notice renders as a calm accessible status in English and Vi
   for (const message of messages) {
     const markup = renderToStaticMarkup(React.createElement(MinimumCreditsNotice, {
       belowMinimum: true,
+      minCredits: 14,
       message,
     }));
     assert.match(markup, /role="status"/);
@@ -59,8 +61,22 @@ test('notice stays hidden when the summary is at or above its minimum', () => {
 
   const markup = renderToStaticMarkup(React.createElement(MinimumCreditsNotice, {
     belowMinimum: false,
+    minCredits: 14,
     message: 'This advisory notice is hidden.',
   }));
 
   assert.equal(markup, '');
+});
+
+test('summer summary with no minimum never renders the advisory notice', () => {
+  const MinimumCreditsNotice = loadNotice();
+
+  for (const belowMinimum of [false, true]) {
+    const markup = renderToStaticMarkup(React.createElement(MinimumCreditsNotice, {
+      belowMinimum,
+      minCredits: 0,
+      message: 'This summer advisory must stay hidden.',
+    }));
+    assert.equal(markup, '');
+  }
 });
