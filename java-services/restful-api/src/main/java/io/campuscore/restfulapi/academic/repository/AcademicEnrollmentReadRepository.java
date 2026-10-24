@@ -260,6 +260,7 @@ public class AcademicEnrollmentReadRepository {
     private static String enrollmentSelect() {
         return "SELECT e.\"id\", e.\"studentId\", e.\"sectionId\", e.\"semesterId\", e.\"status\","
                 + " e.\"enrolledAt\", e.\"droppedAt\", e.\"gradeStatus\", e.\"finalGrade\", e.\"letterGrade\","
+                + " e.\"registrationSource\","
                 + " e.\"createdAt\", e.\"updatedAt\", student.\"studentId\" AS student_number,"
                 + " student_user.\"id\" AS student_user_id, student_user.\"email\" AS student_email,"
                 + " student_user.\"firstName\" AS student_first_name, student_user.\"lastName\" AS student_last_name,"
@@ -369,7 +370,8 @@ public class AcademicEnrollmentReadRepository {
                 rs.getInt("credits"), rs.getString("sem_id"), rs.getString("sem_name"), rs.getString("sem_name_en"),
                 rs.getString("sem_name_vi"), instant(rs.getTimestamp("sem_start_date")), rs.getString("lecturer_id"),
                 rs.getString("employeeId"), rs.getString("lecturer_user_id"), rs.getString("lecturer_email"),
-                rs.getString("lecturer_first_name"), rs.getString("lecturer_last_name"));
+                rs.getString("lecturer_first_name"), rs.getString("lecturer_last_name"),
+                rs.getString("registrationSource"));
     }
 
     private static ScheduleRow mapSchedule(ResultSet rs, int ignored) throws SQLException {

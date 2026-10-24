@@ -33,6 +33,7 @@ public class CreditLimitApplicationService {
 
     public static final int STANDARD_LIMIT = 28;
     public static final int APPROVED_LIMIT = 30;
+    public static final int SUMMER_LIMIT = 10;
     /** Upper bound for the admin console listing; the feed is newest-first. */
     static final int MAX_LIST_RESULTS = 500;
 
@@ -212,10 +213,16 @@ public class CreditLimitApplicationService {
     /** Returns the standard round limit, raised only by a matching approved row. */
     @Transactional(readOnly = true)
     public int effectiveLimit(String studentId, Map<String, Object> round) {
+        int standard = standardLimit(round);
+        if (isSummerRound(round)) {
+            // The configured round limit carries the selected 8–10 policy
+            // value; a stale value can never exceed the published 10-credit
+            // ceiling, and a 30-credit exception does not apply in summer.
+            return Math.min(standard, SUMMER_LIMIT);
+        }
         if (limitOverride > 0) {
             return limitOverride;
         }
-        int standard = standardLimit(round);
         Integer requested;
         try {
             requested = jdbc.queryForObject(
@@ -230,6 +237,19 @@ public class CreditLimitApplicationService {
             requested = null;
         }
         return requested == null ? standard : Math.min(APPROVED_LIMIT, Math.max(standard, requested));
+    }
+
+    private boolean isSummerRound(Map<String, Object> round) {
+        Object value = round.get("semester_type");
+        if (value == null) {
+            value = round.get("semesterType");
+        }
+        if (value == null) {
+            return false;
+        }
+        String type = String.valueOf(value).trim().toUpperCase(Locale.ROOT);
+        return "SUMMER".equals(type) || "THIRD".equals(type)
+                || "SEMESTER_3".equals(type) || "3".equals(type);
     }
 
     public int standardLimit(Map<String, Object> round) {
