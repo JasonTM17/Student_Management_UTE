@@ -54,12 +54,12 @@ public class CreditLimitApplicationService {
     private final AdminAuditRecorder audit;
 
     public CreditLimitApplicationService(NamedParameterJdbcTemplate jdbc) {
-        this(jdbc, 0, new AdminAuditRecorder(jdbc));
+        this(jdbc, 0, new AdminAuditRecorder(new io.campuscore.restfulapi.audit.repository.AdminAuditWriteRepository(jdbc)));
     }
 
     /** Compatibility constructor for callers that only exercise limit math; review() still audits through a recorder over the same template. */
     public CreditLimitApplicationService(NamedParameterJdbcTemplate jdbc, int limitOverride) {
-        this(jdbc, limitOverride, new AdminAuditRecorder(jdbc));
+        this(jdbc, limitOverride, new AdminAuditRecorder(new io.campuscore.restfulapi.audit.repository.AdminAuditWriteRepository(jdbc)));
     }
 
     @org.springframework.beans.factory.annotation.Autowired

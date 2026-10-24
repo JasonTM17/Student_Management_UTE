@@ -159,7 +159,7 @@ class AcademicAdminAuditPersistenceTest {
                 namedJdbc,
                 mock(io.campuscore.restfulapi.academic.service.AcademicEnrollmentReadService.class),
                 mock(RegistrationService.class),
-                new AdminAuditRecorder(namedJdbc),
+                new AdminAuditRecorder(new io.campuscore.restfulapi.audit.repository.AdminAuditWriteRepository(namedJdbc)),
                 new io.campuscore.restfulapi.engagement.service.GradePublishNotifier(
                         new io.campuscore.restfulapi.notification.repository.NotificationWriteRepository(namedJdbc)));
     }

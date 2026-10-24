@@ -4,13 +4,12 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
-import java.util.UUID;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.context.annotation.Profile;
-import org.springframework.jdbc.core.namedparam.MapSqlParameterSource;
-import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
+
 import org.springframework.stereotype.Service;
+import io.campuscore.restfulapi.audit.repository.AdminAuditWriteRepository;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -39,8 +38,6 @@ public class AdminAuditRecorder {
 
     private static final Logger log = LoggerFactory.getLogger(AdminAuditRecorder.class);
 
-    private static final String AUDIT = "campuscore_audit.\"AdminAudit\"";
-
     /**
      * Keys whose values are removed before serialization. Matched case-insensitively
      * and by substring, so `password`, `passwordHash`, `temporaryPassword` and
@@ -50,10 +47,10 @@ public class AdminAuditRecorder {
 
     private static final String REDACTED = "[redacted]";
 
-    private final NamedParameterJdbcTemplate jdbc;
+    private final AdminAuditWriteRepository repository;
 
-    public AdminAuditRecorder(NamedParameterJdbcTemplate jdbc) {
-        this.jdbc = jdbc;
+    public AdminAuditRecorder(AdminAuditWriteRepository repository) {
+        this.repository = repository;
     }
 
     @Transactional(propagation = Propagation.MANDATORY)
@@ -77,22 +74,8 @@ public class AdminAuditRecorder {
             String summary,
             Object beforeState,
             Object afterState) {
-        jdbc.update(
-                "INSERT INTO " + AUDIT
-                        + " (\"id\", \"actorId\", \"actorLabel\", \"action\", \"entityType\", \"entityId\","
-                        + " \"summary\", \"beforeState\", \"afterState\")"
-                        + " VALUES (:id, :actorId, :actorLabel, :action, :entityType, :entityId,"
-                        + " :summary, :beforeState, :afterState)",
-                new MapSqlParameterSource()
-                        .addValue("id", UUID.randomUUID().toString())
-                        .addValue("actorId", actorId)
-                        .addValue("actorLabel", truncate(actorLabel, 240))
-                        .addValue("action", action)
-                        .addValue("entityType", entityType)
-                        .addValue("entityId", entityId)
-                        .addValue("summary", truncate(summary, 500))
-                        .addValue("beforeState", serialize(beforeState))
-                        .addValue("afterState", serialize(afterState)));
+        repository.insert(actorId, truncate(actorLabel, 240), action, entityType, entityId,
+                truncate(summary, 500), serialize(beforeState), serialize(afterState));
     }
 
     /** Convenience for the common "delete this record" case. */

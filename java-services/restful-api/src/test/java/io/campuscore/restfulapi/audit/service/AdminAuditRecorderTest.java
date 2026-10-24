@@ -34,7 +34,7 @@ class AdminAuditRecorderTest {
     @org.junit.jupiter.api.BeforeEach
     void setUp() {
         jdbc = mock(NamedParameterJdbcTemplate.class);
-        recorder = new AdminAuditRecorder(jdbc);
+        recorder = new AdminAuditRecorder(new io.campuscore.restfulapi.audit.repository.AdminAuditWriteRepository(jdbc));
     }
 
     @Test

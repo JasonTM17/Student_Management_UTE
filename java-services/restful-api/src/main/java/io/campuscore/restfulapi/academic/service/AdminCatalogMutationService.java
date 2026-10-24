@@ -50,7 +50,7 @@ public class AdminCatalogMutationService {
     public AdminCatalogMutationService(NamedParameterJdbcTemplate jdbc,
             CreditLimitApplicationService creditLimitApplications) {
         this.jdbc = jdbc;
-        this.audit = new AdminAuditRecorder(jdbc);
+        this.audit = new AdminAuditRecorder(new io.campuscore.restfulapi.audit.repository.AdminAuditWriteRepository(jdbc));
         this.creditLimitApplications = creditLimitApplications;
     }
 
