@@ -144,6 +144,11 @@ export default function AdminThesisPage() {
   const [extendDeadlineValue, setExtendDeadlineValue] = useState('');
   const [extendDeadlineError, setExtendDeadlineError] = useState('');
 
+  // Failure inside a modal must be readable inside that modal: the page-level
+  // `error` banner renders behind the modal overlay, so a refused submit used
+  // to look like nothing happened. Cleared on each open and each retry.
+  const [modalError, setModalError] = useState('');
+
   // Reason-bearing governance actions share one modal: unassign a topic,
   // replace a council seat, waive/restore a counter-review, withdraw or
   // reinstate a topic. Each call is audited server-side with the reason.
@@ -266,6 +271,7 @@ export default function AdminThesisPage() {
     setIsSaving(true);
     setError('');
     setSuccess('');
+    setModalError('');
     try {
       await thesisApi.createCouncil(roundId, councilNameInput.trim());
       setSuccess(messages.thesis.councils.councilCreatedSuccess);
@@ -274,7 +280,7 @@ export default function AdminThesisPage() {
       const c = await thesisApi.listCouncils(roundId);
       if (expandedRoundRef.current === roundId) setCouncils(c);
     } catch (err: unknown) {
-      setError(transitionErrorMessage(err));
+      setModalError(transitionErrorMessage(err));
     } finally {
       setIsSaving(false);
     }
@@ -293,6 +299,7 @@ export default function AdminThesisPage() {
     setIsSaving(true);
     setError('');
     setSuccess('');
+    setModalError('');
     try {
       await thesisApi.addCouncilMember(councilId, selectedLecturerId, nextRole);
       setSuccess(messages.thesis.councils.memberAddedSuccess);
@@ -301,7 +308,7 @@ export default function AdminThesisPage() {
       const c = await thesisApi.listCouncils(roundId);
       if (expandedRoundRef.current === roundId) setCouncils(c);
     } catch (err: unknown) {
-      setError(transitionErrorMessage(err));
+      setModalError(transitionErrorMessage(err));
     } finally {
       setIsSaving(false);
     }
@@ -336,6 +343,7 @@ export default function AdminThesisPage() {
     setIsSaving(true);
     setError('');
     setSuccess('');
+    setModalError('');
     try {
       await thesisApi.assignTopicToCouncil(councilId, selectedTopicIdToAssign);
       setSuccess(messages.thesis.councils.assignSuccess);
@@ -344,7 +352,7 @@ export default function AdminThesisPage() {
       const c = await thesisApi.listCouncils(roundId);
       if (expandedRoundRef.current === roundId) setCouncils(c);
     } catch (assignErr) {
-      setError(campusCodeMessage(assignErr, messages.common.campusErrors, messages.thesis.actionFailed));
+      setModalError(campusCodeMessage(assignErr, messages.common.campusErrors, messages.thesis.actionFailed));
     } finally {
       setIsSaving(false);
     }
@@ -375,12 +383,13 @@ export default function AdminThesisPage() {
     if (!formName || !formStart || !formEnd || !formLecturerStart || !formLecturerEnd
         || (needsGvpb && (!formGvpb || !formReportDate))
         || (needsDefense && !formDefenseDate)) {
-      setError(messages.thesis.admin.createIncomplete);
+      setModalError(messages.thesis.admin.createIncomplete);
       return;
     }
     setIsSaving(true);
     setError('');
     setSuccess('');
+    setModalError('');
     try {
       await thesisApi.createRound({
         name: formName,
@@ -413,7 +422,7 @@ export default function AdminThesisPage() {
       setFormDefenseDate('');
       await loadData();
     } catch {
-      setError(messages.thesis.actionFailed);
+      setModalError(messages.thesis.actionFailed);
     } finally {
       setIsSaving(false);
     }
@@ -603,6 +612,7 @@ export default function AdminThesisPage() {
     setFormGvpb(toLocalInput(round.gvpbDeadline));
     setFormReportDate(toLocalInput(round.reportDate));
     setFormDefenseDate(toLocalInput(round.defenseDate));
+    setModalError('');
     setShowEditRoundModal(true);
   };
 
@@ -611,12 +621,13 @@ export default function AdminThesisPage() {
     if (!formName || !formStart || !formEnd || !formLecturerStart || !formLecturerEnd
         || (needsGvpb && (!formGvpb || !formReportDate))
         || (needsDefense && !formDefenseDate)) {
-      setError(messages.thesis.admin.createIncomplete);
+      setModalError(messages.thesis.admin.createIncomplete);
       return;
     }
     setIsSaving(true);
     setError('');
     setSuccess('');
+    setModalError('');
     try {
       await thesisApi.updateRound(editingRoundId, {
         name: formName,
@@ -638,7 +649,7 @@ export default function AdminThesisPage() {
         await loadRoundDetail(editingRoundId);
       }
     } catch (err: unknown) {
-      setError(transitionErrorMessage(err));
+      setModalError(transitionErrorMessage(err));
     } finally {
       setIsSaving(false);
     }
@@ -671,6 +682,7 @@ export default function AdminThesisPage() {
     setIsSaving(true);
     setError('');
     setSuccess('');
+    setModalError('');
     try {
       await thesisApi.restoreRound(roundId, targetStatus);
       setSuccess(messages.thesis.admin.roundRestored);
@@ -680,7 +692,10 @@ export default function AdminThesisPage() {
         await loadRoundDetail(roundId);
       }
     } catch (err: unknown) {
+      // Restore runs both from the target-picker modal and the plain confirm
+      // flow — write both sinks so the failure is visible on either path.
       setError(transitionErrorMessage(err));
+      setModalError(transitionErrorMessage(err));
     } finally {
       setIsSaving(false);
     }
@@ -699,6 +714,7 @@ export default function AdminThesisPage() {
     }
     const plan = planThesisRoundRestore(round, hasLiveGroups);
     if (plan.requiresChoice) {
+      setModalError('');
       setRestoreTargetRound(round);
       setRestoreTargets(plan.explicitTargets);
       setRestoreStatusDraft(plan.explicitTargets[0]);
@@ -953,7 +969,7 @@ export default function AdminThesisPage() {
       title={messages.thesis.admin.title}
       description={messages.thesis.admin.description}
       actions={
-        <Button type="button" onClick={() => setShowCreateModal(true)} disabled={!canAccess}>
+        <Button type="button" onClick={() => { setModalError(''); setShowCreateModal(true); }} disabled={!canAccess}>
           <Plus className="mr-2 h-4 w-4" />
           {messages.thesis.admin.createRound}
         </Button>
@@ -1260,6 +1276,7 @@ export default function AdminThesisPage() {
                             size="sm"
                             variant="outline"
                             onClick={() => {
+                              setModalError('');
                               setTargetRoundIdForCouncil(round.id);
                               setShowCreateCouncilModal(true);
                             }}
@@ -1322,6 +1339,7 @@ export default function AdminThesisPage() {
                                           size="sm"
                                           className="h-7 text-xs px-2 text-primary"
                                           onClick={() => {
+                                            setModalError('');
                                             setTargetCouncilIdForMember(council.id);
                                             setTargetRoundIdForCouncil(round.id);
                                             setShowAddMemberModal(true);
@@ -1423,6 +1441,7 @@ export default function AdminThesisPage() {
                                           size="sm"
                                           className="h-7 text-xs px-2 text-primary"
                                           onClick={() => {
+                                            setModalError('');
                                             setTargetCouncilIdForTopic(council.id);
                                             setTargetRoundIdForCouncil(round.id);
                                             setShowAssignTopicModal(true);
@@ -1651,6 +1670,11 @@ export default function AdminThesisPage() {
         title={messages.thesis.admin.createRound}
       >
         <div className="space-y-4">
+          {modalError ? (
+            <div className="rounded-md border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive">
+              {modalError}
+            </div>
+          ) : null}
           <label className="flex flex-col gap-2 text-sm font-medium text-foreground">
             {messages.thesis.admin.roundName}
             <Input placeholder={messages.thesis.admin.roundNamePlaceholder} value={formName} onChange={(e) => setFormName(e.target.value)} />
@@ -1742,6 +1766,11 @@ export default function AdminThesisPage() {
         title={messages.thesis.councils.createCouncil}
       >
         <div className="space-y-4">
+          {modalError ? (
+            <div className="rounded-md border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive">
+              {modalError}
+            </div>
+          ) : null}
           <label className="flex flex-col gap-2 text-sm font-medium text-foreground">
             {messages.thesis.councils.councilName}
             <Input
@@ -1772,6 +1801,11 @@ export default function AdminThesisPage() {
         title={messages.thesis.councils.addMember}
       >
         <div className="space-y-4">
+          {modalError ? (
+            <div className="rounded-md border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive">
+              {modalError}
+            </div>
+          ) : null}
           <p className="text-xs text-muted-foreground">
             {messages.thesis.councils.councilSeatOrderHint}
           </p>
@@ -1854,6 +1888,11 @@ export default function AdminThesisPage() {
         title={messages.thesis.admin.editRoundTitle}
       >
         <div className="space-y-4">
+          {modalError ? (
+            <div className="rounded-md border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive">
+              {modalError}
+            </div>
+          ) : null}
           <label className="flex flex-col gap-2 text-sm font-medium text-foreground">
             {messages.thesis.admin.roundName}
             <Input placeholder={messages.thesis.admin.roundNamePlaceholder} value={formName} onChange={(e) => setFormName(e.target.value)} />
@@ -1945,6 +1984,11 @@ export default function AdminThesisPage() {
         title={messages.thesis.councils.assignTopic}
       >
         <div className="space-y-4">
+          {modalError ? (
+            <div className="rounded-md border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive">
+              {modalError}
+            </div>
+          ) : null}
           {(() => {
             const allAssigned = new Set<string>();
             for (const c of councils) {
@@ -2291,6 +2335,11 @@ export default function AdminThesisPage() {
         title={messages.thesis.admin.restoreRoundTitle}
       >
         <div className="space-y-4">
+          {modalError ? (
+            <div className="rounded-md border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive">
+              {modalError}
+            </div>
+          ) : null}
           <p className="text-sm text-muted-foreground">
             {restoreTargetRound?.cancelledFromStatus
               ? messages.thesis.admin.restoreRoundWindowPassed
