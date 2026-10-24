@@ -20,6 +20,7 @@ import io.campuscore.restfulapi.thesis.web.ThesisMutationDtos.MemberRequest;
 import io.campuscore.restfulapi.thesis.web.ThesisMutationDtos.ProgressRequest;
 import io.campuscore.restfulapi.thesis.web.ThesisMutationDtos.PublishResultsExcludedTopic;
 import io.campuscore.restfulapi.thesis.web.ThesisMutationDtos.PublishResultsPreviewResponse;
+import io.campuscore.restfulapi.thesis.web.ThesisMutationDtos.RoundClosureRequest;
 import io.campuscore.restfulapi.thesis.web.ThesisMutationDtos.RoundCreateRequest;
 import io.campuscore.restfulapi.thesis.web.ThesisMutationDtos.StudentSearchResponse;
 import io.campuscore.restfulapi.thesis.web.ThesisMutationDtos.TopicAssignmentRequest;
@@ -1399,6 +1400,98 @@ public class ThesisMutationService {
                 }
             }
         });
+        return roundReads.get(id);
+    }
+
+    /**
+     * Archives a published round: RESULTS_PUBLISHED -> CLOSED. Closing is the
+     * audited end of the lifecycle — the round and everything in it becomes
+     * read-only for every mutation path while the published results stay
+     * readable. While the retraction grace window is still open the close is
+     * refused so a mistaken publication keeps its documented undo path, and
+     * {@code results_published_at} is deliberately left untouched so a
+     * reopened round is the same publication, not a new one. No notifications
+     * are sent: students were already told results are out and an archive is
+     * not a result change.
+     */
+    @Transactional
+    public RoundResponse closeRound(UUID id, RoundClosureRequest request, Jwt actor) {
+        if (!ThesisDeanScope.isGlobalAdmin(actor)) {
+            throw new DomainException(HttpStatus.FORBIDDEN, "CLOSE_ADMIN_REQUIRED",
+                    "Only a global admin can close a published round");
+        }
+        String cleanReason = requireReason(request == null ? null : request.reason());
+        Map<String, Object> round = one(
+                "SELECT status, name, results_published_at FROM thesis.thesis_registration_round "
+                        + "WHERE id = :id FOR UPDATE",
+                params().addValue("id", id), "ROUND_NOT_FOUND", "Thesis registration round not found");
+        if (!RoundStatus.RESULTS_PUBLISHED.name().equals(round.get("status"))) {
+            throw conflict("ROUND_STATE_CONFLICT", "Only a published round can be closed");
+        }
+        Instant publishedAt = instantOf(round.get("results_published_at"));
+        if (publishedAt != null) {
+            Instant windowEnds = publishedAt.plus(java.time.Duration.ofDays(retractGraceDays));
+            if (Instant.now().isBefore(windowEnds)) {
+                throw new DomainException(HttpStatus.CONFLICT, "RETRACT_WINDOW_OPEN",
+                        "The retraction grace period is still open for " + windowEnds
+                                + "; closing now would silently remove that undo path",
+                        Map.of("retractWindowEndsAt", windowEnds.toString(),
+                                "remainingHours", java.time.Duration.between(Instant.now(), windowEnds).toHours() + 1));
+            }
+        }
+        int moved = jdbc.update(
+                "UPDATE thesis.thesis_registration_round SET status = 'CLOSED', updated_at = CURRENT_TIMESTAMP, "
+                        + "version = version + 1 WHERE id = :id AND status = 'RESULTS_PUBLISHED'",
+                params().addValue("id", id));
+        if (moved != 1) {
+            throw conflict("ROUND_STATE_CONFLICT", "Only a published round can be closed");
+        }
+        Integer topics = jdbc.queryForObject(
+                "SELECT COUNT(*) FROM thesis.thesis_topic WHERE round_id = :id",
+                params().addValue("id", id), Integer.class);
+        Integer groups = jdbc.queryForObject(
+                "SELECT COUNT(*) FROM thesis.thesis_group WHERE round_id = :id",
+                params().addValue("id", id), Integer.class);
+        audit.record(subject(actor), null, "THESIS_ROUND_CLOSED", "THESIS_ROUND", id.toString(),
+                "Round closed (archived); reason: " + cleanReason,
+                Map.of("status", RoundStatus.RESULTS_PUBLISHED.name(), "name", round.get("name"),
+                        "topics", topics == null ? 0 : topics, "groups", groups == null ? 0 : groups),
+                Map.of("status", RoundStatus.CLOSED.name(), "reason", cleanReason));
+        return roundReads.get(id);
+    }
+
+    /**
+     * Reopens an archived round: CLOSED -> RESULTS_PUBLISHED. Only the status
+     * moves back — {@code results_published_at} was preserved at close so the
+     * round returns to exactly the published state it left, and the retract
+     * grace window is already past (close was refused while it was open). No
+     * notifications are sent.
+     */
+    @Transactional
+    public RoundResponse reopenRound(UUID id, RoundClosureRequest request, Jwt actor) {
+        if (!ThesisDeanScope.isGlobalAdmin(actor)) {
+            throw new DomainException(HttpStatus.FORBIDDEN, "REOPEN_ADMIN_REQUIRED",
+                    "Only a global admin can reopen a closed round");
+        }
+        String cleanReason = requireReason(request == null ? null : request.reason());
+        Map<String, Object> round = one(
+                "SELECT status, name FROM thesis.thesis_registration_round WHERE id = :id FOR UPDATE",
+                params().addValue("id", id), "ROUND_NOT_FOUND", "Thesis registration round not found");
+        if (!RoundStatus.CLOSED.name().equals(round.get("status"))) {
+            throw conflict("ROUND_STATE_CONFLICT", "Only a closed round can be reopened");
+        }
+        int moved = jdbc.update(
+                "UPDATE thesis.thesis_registration_round SET status = 'RESULTS_PUBLISHED', "
+                        + "updated_at = CURRENT_TIMESTAMP, version = version + 1 "
+                        + "WHERE id = :id AND status = 'CLOSED'",
+                params().addValue("id", id));
+        if (moved != 1) {
+            throw conflict("ROUND_STATE_CONFLICT", "Only a closed round can be reopened");
+        }
+        audit.record(subject(actor), null, "THESIS_ROUND_REOPENED", "THESIS_ROUND", id.toString(),
+                "Round reopened to results published; reason: " + cleanReason,
+                Map.of("status", RoundStatus.CLOSED.name(), "name", round.get("name")),
+                Map.of("status", RoundStatus.RESULTS_PUBLISHED.name(), "reason", cleanReason));
         return roundReads.get(id);
     }
 

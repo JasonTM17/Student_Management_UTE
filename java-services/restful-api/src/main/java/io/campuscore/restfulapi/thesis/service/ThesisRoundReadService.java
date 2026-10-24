@@ -3,6 +3,7 @@ package io.campuscore.restfulapi.thesis.service;
 import io.campuscore.restfulapi.thesis.domain.RoundStatus;
 import io.campuscore.restfulapi.thesis.domain.ThesisRegistrationRound;
 import io.campuscore.restfulapi.thesis.repository.ThesisRegistrationRoundRepository;
+import io.campuscore.restfulapi.thesis.web.ThesisRoundDtos.RoundClosureInfo;
 import io.campuscore.restfulapi.thesis.web.ThesisRoundDtos.RoundDeletionInfo;
 import io.campuscore.restfulapi.thesis.web.ThesisRoundDtos.RoundResponse;
 import java.util.Collection;
@@ -47,6 +48,14 @@ public class ThesisRoundReadService {
             GROUP BY round_id
             """;
 
+    /**
+     * Retract-publication grace window in days — the same property the
+     * mutation service enforces, needed here so {@code closeAllowed} agrees
+     * with what the close endpoint would answer.
+     */
+    @org.springframework.beans.factory.annotation.Value("${thesis.results.retract-grace-days:7}")
+    private int retractGraceDays;
+
     private final ThesisRegistrationRoundRepository rounds;
     private final NamedParameterJdbcTemplate jdbc;
     private final ThesisGovernanceCapabilities capabilities;
@@ -60,15 +69,20 @@ public class ThesisRoundReadService {
         this.capabilities = capabilities;
     }
 
+    /**
+     * The unfiltered call is the "active" list: archived CLOSED rounds stay
+     * out of every role's default picker while remaining reachable through
+     * the explicit {@code status=CLOSED} query the admin filter uses.
+     */
     @Transactional(readOnly = true)
     public List<RoundResponse> list(RoundStatus status) {
         List<ThesisRegistrationRound> list = status == null
-                ? rounds.findAllByOrderByRegistrationStartDesc()
+                ? rounds.findAllByStatusNotOrderByRegistrationStartDesc(RoundStatus.CLOSED)
                 : rounds.findAllByStatusOrderByRegistrationStartDesc(status);
         Map<UUID, Map<String, Number>> counts = dependentCounts(
                 list.stream().map(ThesisRegistrationRound::getId).toList());
         return list.stream()
-                .map(round -> RoundResponse.from(round, deletionInfo(round, counts),
+                .map(round -> RoundResponse.from(round, deletionInfo(round, counts), closureInfo(round),
                         capabilities.counterReviewWaiverAllowed(round.getThesisType()),
                         ThesisMutationService.MIN_GROUP_MEMBERS, ThesisMutationService.MAX_GROUP_MEMBERS))
                 .toList();
@@ -81,7 +95,7 @@ public class ThesisRoundReadService {
                         org.springframework.http.HttpStatus.NOT_FOUND,
                         "ROUND_NOT_FOUND",
                         "Thesis registration round not found"));
-        return RoundResponse.from(round, deletionInfo(round, dependentCounts(List.of(id))),
+        return RoundResponse.from(round, deletionInfo(round, dependentCounts(List.of(id))), closureInfo(round),
                 capabilities.counterReviewWaiverAllowed(round.getThesisType()),
                 ThesisMutationService.MIN_GROUP_MEMBERS, ThesisMutationService.MAX_GROUP_MEMBERS);
     }
@@ -103,6 +117,11 @@ public class ThesisRoundReadService {
                 counts.get("members").longValue(),
                 counts.get("reports").longValue(),
                 counts.get("councils").longValue());
+    }
+
+    private RoundClosureInfo closureInfo(ThesisRegistrationRound round) {
+        return RoundClosureInfo.of(round.getStatus(), round.getResultsPublishedAt(),
+                retractGraceDays, java.time.Instant.now());
     }
 
     private RoundDeletionInfo deletionInfo(

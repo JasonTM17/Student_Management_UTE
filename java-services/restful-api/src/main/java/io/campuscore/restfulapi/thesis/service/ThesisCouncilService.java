@@ -679,7 +679,8 @@ public class ThesisCouncilService {
         // own the topic's faculty, not merely supervise it.
         ThesisDeanScope.requireTopicGovernanceScope(jdbc, actor, topicId);
         if (RoundStatus.CANCELLED.name().equals(topic.get("round_status"))
-                || RoundStatus.RESULTS_PUBLISHED.name().equals(topic.get("round_status"))) {
+                || RoundStatus.RESULTS_PUBLISHED.name().equals(topic.get("round_status"))
+                || RoundStatus.CLOSED.name().equals(topic.get("round_status"))) {
             throw conflict("ROUND_STATE_CONFLICT", "The round no longer accepts a counter-reviewer assignment");
         }
         if (!TopicStatus.PUBLISHED.name().equals(topic.get("status"))
@@ -776,7 +777,8 @@ public class ThesisCouncilService {
                         + "WHERE t.id = :topicId FOR UPDATE OF t",
                 params().addValue("topicId", topicId), "TOPIC_NOT_FOUND", "Thesis topic not found");
         if (RoundStatus.CANCELLED.name().equals(topic.get("round_status"))
-                || RoundStatus.RESULTS_PUBLISHED.name().equals(topic.get("round_status"))) {
+                || RoundStatus.RESULTS_PUBLISHED.name().equals(topic.get("round_status"))
+                || RoundStatus.CLOSED.name().equals(topic.get("round_status"))) {
             throw conflict("ROUND_STATE_CONFLICT", "The round no longer accepts counter-review scores");
         }
         if (!lecturerId.equals(topic.get("gvpb_lecturer_id"))) {
@@ -1376,7 +1378,8 @@ public class ThesisCouncilService {
     /**
      * Reads the published defense result of one student's approved groups in a round.
      *
-     * @param roundId round whose results are read; it must be in the {@code RESULTS_PUBLISHED} status
+     * @param roundId round whose results are read; it must be in the {@code RESULTS_PUBLISHED}
+     *        or {@code CLOSED} status (closing archives the round, it does not unpublish)
      * @param studentId id of the student whose memberships are selected
      * @return one row per approved group the student belongs to, with title, final score,
      *         council name, and group leader
@@ -1390,7 +1393,9 @@ public class ThesisCouncilService {
             throw invalid("roundId is required");
         }
         String status = roundStatus(roundId);
-        if (!"RESULTS_PUBLISHED".equals(status)) {
+        // CLOSED still serves the published result set: archiving a round
+        // makes it read-only, it does not unpublish anything.
+        if (!"RESULTS_PUBLISHED".equals(status) && !"CLOSED".equals(status)) {
             throw conflict("RESULTS_NOT_PUBLISHED", "Results for this round have not been published yet");
         }
         return jdbc.query(

@@ -51,6 +51,11 @@ export interface ThesisRound {
   /** Read-only deletability view: `deletable` only when the round is an empty
    * DRAFT/CANCELLED; the per-kind counts explain every blocker. */
   deletion?: ThesisRoundDeletionInfo | null;
+  /** End-of-life view: `closeAllowed` once the retract grace window has ended
+   * (`closeBlocker`/`retractWindowEndsAt` explain why not until then);
+   * `reopenAllowed` on a CLOSED round. Absent on older backends — the UI then
+   * falls back to the status check alone. */
+  closure?: ThesisRoundClosureInfo | null;
   /** Server-decided waiver capability: only round types that permit a
    * counter-review waiver return true (none of the shipped undergraduate
    * types do). Absent on older backends — treat as not allowed. */
@@ -69,6 +74,15 @@ export interface ThesisRoundDeletionInfo {
   members: number;
   reports: number;
   councils: number;
+}
+
+export interface ThesisRoundClosureInfo {
+  closeAllowed: boolean;
+  reopenAllowed: boolean;
+  /** Stable refusal code while close is blocked — currently
+   * RETRACT_WINDOW_OPEN — or null when nothing blocks it. */
+  closeBlocker?: string | null;
+  retractWindowEndsAt?: string | null;
 }
 
 export interface ThesisTopicSupervisor {
@@ -654,8 +668,12 @@ export function createAssistantRequestId(): string {
 
 /** Parse one or more SSE frames. Kept pure so the stream contract can be tested without a browser. */
 export const thesisApi = {
-  listRounds: async (): Promise<ThesisRound[]> => {
-    const response = await api.get<ThesisRound[]>('/thesis/rounds');
+  listRounds: async (status?: ThesisRoundStatus): Promise<ThesisRound[]> => {
+    // No status is the "active" list: archived CLOSED rounds stay out of
+    // default pickers; status=CLOSED is the admin's explicit archive view.
+    const response = await api.get<ThesisRound[]>('/thesis/rounds', {
+      params: status ? { status } : {},
+    });
     return response.data;
   },
 
@@ -893,6 +911,27 @@ export const thesisApi = {
    * the round, so cancel stays the archive path. */
   deleteRound: async (roundId: string, reason: string): Promise<void> => {
     await api.delete('/thesis/rounds/' + roundId, { data: { reason } });
+  },
+
+  /** Archives a published round: RESULTS_PUBLISHED -> CLOSED (read-only,
+   * results stay viewable). Refused with RETRACT_WINDOW_OPEN while the
+   * retraction grace window is still open. Reason required; audited. */
+  closeRound: async (roundId: string, reason: string): Promise<ThesisRound> => {
+    const response = await api.post<ThesisRound>(
+      '/thesis/rounds/' + roundId + '/close',
+      { reason },
+    );
+    return response.data;
+  },
+
+  /** Reverses the archive: CLOSED -> RESULTS_PUBLISHED restores exactly the
+   * published state the round left. Reason required; audited. */
+  reopenRound: async (roundId: string, reason: string): Promise<ThesisRound> => {
+    const response = await api.post<ThesisRound>(
+      '/thesis/rounds/' + roundId + '/reopen',
+      { reason },
+    );
+    return response.data;
   },
 
   /** Assigns the GVPB counter-reviewer of a topic (governance only). */

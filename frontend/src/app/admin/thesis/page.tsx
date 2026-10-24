@@ -154,7 +154,8 @@ export default function AdminThesisPage() {
   // reinstate a topic. Each call is audited server-side with the reason.
   const [reasonAction, setReasonAction] = useState<{
     kind: 'unassignTopic' | 'replaceMember' | 'waiveGvpb' | 'revokeGvpbWaiver' | 'withdrawTopic' | 'reinstateTopic'
-        | 'lateTopic' | 'rosterOverride' | 'topicReassign' | 'retractResults' | 'deleteRound';
+        | 'lateTopic' | 'rosterOverride' | 'topicReassign' | 'retractResults' | 'deleteRound'
+        | 'closeRound' | 'reopenRound';
     roundId: string;
     roundName?: string;
     councilId?: string;
@@ -174,6 +175,11 @@ export default function AdminThesisPage() {
   const [reassignForm, setReassignForm] = useState({ groupId: '', topicId: '' });
   const [retractConfirmation, setRetractConfirmation] = useState('');
 
+  // Archived rounds stay out of the default list (the server filters them);
+  // this toggle merges the explicit status=CLOSED query back in so the
+  // archive is one click away without cluttering the active view.
+  const [showClosed, setShowClosed] = useState(false);
+
   // Restore-with-target modal: shown only when no implicit restore exists —
   // a legacy cancellation that still holds groups, or a REGISTRATION_OPEN
   // marker whose window already passed.
@@ -191,14 +197,17 @@ export default function AdminThesisPage() {
     setIsLoading(true);
     setError('');
     try {
-      const data = await thesisApi.listRounds();
-      setRounds(sortThesisRoundsForOverview(data));
+      const [data, closed] = await Promise.all([
+        thesisApi.listRounds(),
+        showClosed ? thesisApi.listRounds('CLOSED') : Promise.resolve([]),
+      ]);
+      setRounds(sortThesisRoundsForOverview([...data, ...closed]));
     } catch {
       setError(messages.thesis.loadFailed);
     } finally {
       setIsLoading(false);
     }
-  }, [messages.thesis.loadFailed]);
+  }, [messages.thesis.loadFailed, showClosed]);
 
   useEffect(() => {
     if (canAccess) void loadData();
@@ -858,6 +867,16 @@ export default function AdminThesisPage() {
         }
         await thesisApi.deleteRound(action.roundId, reason);
         setSuccess(messages.thesis.admin.roundDeleted);
+      } else if (action.kind === 'closeRound') {
+        if (retractConfirmation.trim() !== action.roundName) {
+          setReasonActionError(messages.thesis.admin.closeRoundConfirmLabel);
+          return;
+        }
+        await thesisApi.closeRound(action.roundId, reason);
+        setSuccess(messages.thesis.admin.roundClosed);
+      } else if (action.kind === 'reopenRound') {
+        await thesisApi.reopenRound(action.roundId, reason);
+        setSuccess(messages.thesis.admin.roundReopened);
       } else {
         return;
       }
@@ -903,6 +922,8 @@ export default function AdminThesisPage() {
         topicReassign: messages.thesis.admin.topicReassignTitle,
         retractResults: messages.thesis.admin.retractResultsTitle,
         deleteRound: messages.thesis.admin.deleteRoundTitle,
+        closeRound: messages.thesis.admin.closeRoundTitle,
+        reopenRound: messages.thesis.admin.reopenRoundTitle,
       }[reasonAction.kind]
     : '';
 
@@ -969,10 +990,21 @@ export default function AdminThesisPage() {
       title={messages.thesis.admin.title}
       description={messages.thesis.admin.description}
       actions={
-        <Button type="button" onClick={() => { setModalError(''); setShowCreateModal(true); }} disabled={!canAccess}>
-          <Plus className="mr-2 h-4 w-4" />
-          {messages.thesis.admin.createRound}
-        </Button>
+        <div className="flex items-center gap-4">
+          <label className="flex items-center gap-2 text-sm font-medium text-foreground">
+            <input
+              type="checkbox"
+              checked={showClosed}
+              onChange={(e) => setShowClosed(e.target.checked)}
+              className="h-4 w-4 rounded border-input accent-primary"
+            />
+            {messages.thesis.admin.showClosedRounds}
+          </label>
+          <Button type="button" onClick={() => { setModalError(''); setShowCreateModal(true); }} disabled={!canAccess}>
+            <Plus className="mr-2 h-4 w-4" />
+            {messages.thesis.admin.createRound}
+          </Button>
+        </div>
       }
     >
       {error ? (
@@ -1187,6 +1219,35 @@ export default function AdminThesisPage() {
                               disabled={isSaving}
                             >
                               {messages.thesis.admin.retractResults}
+                            </Button>
+                          ) : null}
+                          {round.status === 'RESULTS_PUBLISHED' && round.closure?.closeAllowed !== false ? (
+                            <Button
+                              type="button"
+                              size="sm"
+                              variant="outline"
+                              onClick={() => openReasonAction({
+                                kind: 'closeRound', roundId: round.id, roundName: round.name,
+                              })}
+                              disabled={isSaving}
+                            >
+                              {messages.thesis.admin.closeRound}
+                            </Button>
+                          ) : null}
+                          {round.status === 'RESULTS_PUBLISHED' && round.closure?.closeBlocker ? (
+                            <span className="text-xs text-muted-foreground">
+                              {messages.thesis.admin.closeBlockedRetractWindow}
+                            </span>
+                          ) : null}
+                          {round.status === 'CLOSED' && round.closure?.reopenAllowed !== false ? (
+                            <Button
+                              type="button"
+                              size="sm"
+                              variant="outline"
+                              onClick={() => openReasonAction({ kind: 'reopenRound', roundId: round.id })}
+                              disabled={isSaving}
+                            >
+                              {messages.thesis.admin.reopenRound}
                             </Button>
                           ) : null}
                           {(round.status === 'DRAFT' || round.status === 'PROPOSAL_OPEN' || round.status === 'PROPOSALS_PUBLISHED') ? (
@@ -2304,6 +2365,21 @@ export default function AdminThesisPage() {
               </p>
               <label className="flex flex-col gap-2 text-sm font-medium text-foreground">
                 {messages.thesis.admin.retractResultsConfirmLabel}
+                <Input
+                  value={retractConfirmation}
+                  onChange={(e) => setRetractConfirmation(e.target.value)}
+                  required
+                />
+              </label>
+            </>
+          ) : null}
+          {reasonAction?.kind === 'closeRound' ? (
+            <>
+              <p className="text-sm text-muted-foreground">
+                {messages.thesis.admin.closeRoundHint}
+              </p>
+              <label className="flex flex-col gap-2 text-sm font-medium text-foreground">
+                {messages.thesis.admin.closeRoundConfirmLabel}
                 <Input
                   value={retractConfirmation}
                   onChange={(e) => setRetractConfirmation(e.target.value)}

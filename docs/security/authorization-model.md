@@ -193,6 +193,14 @@ retroactively identify password changes made before the revision existed.
   (`RoundType.allowsCounterReviewWaiver()` plus the
   `thesis.governance.counter-review-waiver.enabled` override, default `false`);
   revoke stays ungated so stored waivers can always be cleared.
+  Round end-of-life (`POST /api/v1/thesis/rounds/{id}/close` and `/reopen`)
+  is narrower still: rounds carry no faculty column, so only
+  `ADMIN`/`SUPER_ADMIN` may archive a published round or reopen it — dean and
+  department-head scope plays no part. Both demand a documented reason and
+  write `THESIS_ROUND_CLOSED`/`THESIS_ROUND_REOPENED` audit rows under the
+  round row lock; closing while the results-retract grace window is still
+  open is refused (`409 RETRACT_WINDOW_OPEN`) so a lawful retract is never
+  silently blocked.
 
 ## Signing configuration
 

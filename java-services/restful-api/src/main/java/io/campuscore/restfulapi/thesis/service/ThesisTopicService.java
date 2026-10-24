@@ -208,8 +208,10 @@ public class ThesisTopicService {
     }
 
     private boolean isRoundResultsPublished(UUID roundId) {
+        // CLOSED counts as published: the archive state still serves scores.
         Integer published = jdbc.queryForObject(
-                "SELECT COUNT(*) FROM thesis.thesis_registration_round WHERE id = :roundId AND status = 'RESULTS_PUBLISHED'",
+                "SELECT COUNT(*) FROM thesis.thesis_registration_round WHERE id = :roundId "
+                        + "AND status IN ('RESULTS_PUBLISHED', 'CLOSED')",
                 new org.springframework.jdbc.core.namedparam.MapSqlParameterSource().addValue("roundId", roundId),
                 Integer.class);
         return published != null && published > 0;
