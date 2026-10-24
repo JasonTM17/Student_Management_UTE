@@ -1,12 +1,12 @@
-package io.campuscore.restfulapi.notification.web;
+package io.campuscore.restfulapi.notification.controller;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import io.campuscore.restfulapi.notification.service.NotificationWriteService;
-import io.campuscore.restfulapi.notification.web.NotificationReadDtos.NotificationResponse;
-import io.campuscore.restfulapi.notification.web.NotificationWriteDtos.CreateNotificationRequest;
-import io.campuscore.restfulapi.notification.web.NotificationWriteDtos.DeleteNotificationResponse;
-import io.campuscore.restfulapi.notification.web.NotificationWriteDtos.MarkAllReadResponse;
-import io.campuscore.restfulapi.notification.web.NotificationWriteDtos.UpdateNotificationRequest;
+import io.campuscore.restfulapi.notification.dto.NotificationReadDtos.NotificationResponse;
+import io.campuscore.restfulapi.notification.dto.NotificationWriteDtos.CreateNotificationRequest;
+import io.campuscore.restfulapi.notification.dto.NotificationWriteDtos.DeleteNotificationResponse;
+import io.campuscore.restfulapi.notification.dto.NotificationWriteDtos.MarkAllReadResponse;
+import io.campuscore.restfulapi.notification.dto.NotificationWriteDtos.UpdateNotificationRequest;
 import org.springframework.context.annotation.Profile;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -27,6 +27,8 @@ import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import io.campuscore.restfulapi.notification.dto.NotificationReadDtos;
+import io.campuscore.restfulapi.notification.dto.NotificationWriteDtos;
 
 /** Notification inbox mutation routes owned by the Java API. */
 @Tag(name = "Notifications & Alerts", description = "Hộp thư thông báo cá nhân, đếm tin chưa đọc và quản trị phát thông báo hệ thống")

@@ -1,9 +1,9 @@
-package io.campuscore.restfulapi.notification.web;
+package io.campuscore.restfulapi.notification.controller;
 
 import io.campuscore.restfulapi.notification.service.NotificationReadService;
-import io.campuscore.restfulapi.notification.web.NotificationReadDtos.NotificationListResponse;
-import io.campuscore.restfulapi.notification.web.NotificationReadDtos.NotificationResponse;
-import io.campuscore.restfulapi.notification.web.NotificationReadDtos.UnreadCountResponse;
+import io.campuscore.restfulapi.notification.dto.NotificationReadDtos.NotificationListResponse;
+import io.campuscore.restfulapi.notification.dto.NotificationReadDtos.NotificationResponse;
+import io.campuscore.restfulapi.notification.dto.NotificationReadDtos.UnreadCountResponse;
 import org.springframework.context.annotation.Profile;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -19,6 +19,7 @@ import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import io.campuscore.restfulapi.notification.dto.NotificationReadDtos;
 
 /** Notification inbox query routes owned by the Java API. */
 @Tag(name = "Notifications & Alerts", description = "Hộp thư thông báo cá nhân, đếm tin chưa đọc và quản trị phát thông báo hệ thống")
