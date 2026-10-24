@@ -907,6 +907,32 @@ export const registrationApi = {
     }>('/me/registration/summary', { params: { semesterId } });
     return response.data;
   },
+  withdrawalWindow: async (semesterId: string): Promise<WithdrawalWindow> => {
+    const response = await api.get<WithdrawalWindow>('/me/registration/withdrawal-window', {
+      params: { semesterId },
+    });
+    return response.data;
+  },
+  withdrawalApplications: async (): Promise<WithdrawalApplication[]> => {
+    const response = await api.get<WithdrawalApplication[]>('/me/registration/withdrawal-applications');
+    return response.data;
+  },
+  submitWithdrawalApplication: async (
+    enrollmentId: string,
+    reason: string,
+  ): Promise<WithdrawalApplication> => {
+    const response = await api.post<WithdrawalApplication>('/me/registration/withdrawal-applications', {
+      enrollmentId,
+      reason,
+    });
+    return response.data;
+  },
+  cancelWithdrawalApplication: async (id: string): Promise<WithdrawalApplication> => {
+    const response = await api.post<WithdrawalApplication>(
+      `/me/registration/withdrawal-applications/${id}/cancel`,
+    );
+    return response.data;
+  },
   creditLimitApplication: async (roundId: string): Promise<CreditLimitApplication | null> => {
     const response = await api.get<CreditLimitApplication>(
       '/me/registration/credit-limit-application',
@@ -978,7 +1004,58 @@ export const adminRegistrationApi = {
     );
     return response.data;
   },
+  withdrawalApplications: async (
+    status: 'PENDING' | 'APPROVED' | 'REJECTED' | 'CANCELLED' | 'ALL' = 'PENDING',
+  ): Promise<WithdrawalApplication[]> => {
+    const response = await api.get<WithdrawalApplication[]>(
+      '/admin/registration/withdrawal-applications',
+      { params: { status } },
+    );
+    return response.data;
+  },
+  reviewWithdrawalApplication: async (
+    id: string,
+    decision: 'APPROVED' | 'REJECTED',
+    note?: string,
+  ): Promise<WithdrawalApplication> => {
+    const response = await api.post<WithdrawalApplication>(
+      `/admin/registration/withdrawal-applications/${id}/review`,
+      { decision, note },
+    );
+    return response.data;
+  },
 };
+
+export interface WithdrawalWindow {
+  semesterId: string;
+  semesterName: string;
+  regularSemester: boolean;
+  semesterOpen: boolean;
+  windowStart: string | null;
+  windowEnd: string | null;
+  open: boolean;
+}
+
+export interface WithdrawalApplication {
+  id: string;
+  studentId: string;
+  studentCode: string;
+  studentName: string;
+  studentEmail: string;
+  enrollmentId: string;
+  semesterId: string;
+  semesterName: string;
+  courseCode: string;
+  courseName: string;
+  sectionNumber: string;
+  reason: string;
+  status: 'PENDING' | 'APPROVED' | 'REJECTED' | 'CANCELLED';
+  reviewedBy: string | null;
+  reviewedAt: string | null;
+  reviewerNote: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
 
 export const enrollmentsApi = {
   enroll: async (
