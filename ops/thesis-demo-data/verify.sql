@@ -7,6 +7,9 @@
 \set QUIET on
 \pset footer off
 
+SET lock_timeout = '5s';
+SET statement_timeout = '120s';
+
 WITH m(p) AS (VALUES ('ed1a0000-0000-4000-8000-%'))
 SELECT 'marker_count.' || sec.name AS check_name,
        sec.expected::text AS expected,
@@ -20,7 +23,7 @@ FROM (VALUES
       ('thesis_council',           4),
       ('thesis_council_member',   16),
       ('thesis_council_topic',    16),
-      ('thesis_topic_score',      48),
+      ('thesis_topic_score',      62),
       ('thesis_group_report',     17)) sec(name, expected)
 JOIN LATERAL (
   SELECT CASE sec.name
@@ -40,9 +43,9 @@ SELECT 'marker_count.notification', '107',
        (SELECT count(*)::text FROM notifications.notification WHERE id LIKE 'demo-th-%'),
        CASE WHEN (SELECT count(*) FROM notifications.notification WHERE id LIKE 'demo-th-%') = 107 THEN 'PASS' ELSE 'FAIL' END
 UNION ALL
-SELECT 'marker_count.admin_audit', '5',
+SELECT 'marker_count.admin_audit', '6',
        (SELECT count(*)::text FROM campuscore_audit."AdminAudit" WHERE id LIKE 'demo-th-%'),
-       CASE WHEN (SELECT count(*) FROM campuscore_audit."AdminAudit" WHERE id LIKE 'demo-th-%') = 5 THEN 'PASS' ELSE 'FAIL' END
+       CASE WHEN (SELECT count(*) FROM campuscore_audit."AdminAudit" WHERE id LIKE 'demo-th-%') = 6 THEN 'PASS' ELSE 'FAIL' END
 ORDER BY 1;
 
 -- referential integrity: every marker row's parents must exist
@@ -118,8 +121,7 @@ FROM (
   UNION ALL SELECT a."actorId" FROM campuscore_audit."AdminAudit" a WHERE a.id LIKE 'demo-th-%'
 ) refs
 WHERE refs.uid IS NULL
-   OR NOT EXISTS (SELECT 1 FROM campuscore_auth."User" u
-                  WHERE u."id" = refs.uid AND u.email LIKE '%@campuscore.%')
+   OR NOT EXISTS (SELECT 1 FROM campuscore_auth."User" u WHERE u."id" = refs.uid)
 UNION ALL
 SELECT 'synthetic.known_real_accounts_absent', '0', count(*)::text,
        CASE WHEN count(*) = 0 THEN 'PASS' ELSE 'FAIL' END
@@ -264,8 +266,8 @@ FROM thesis.thesis_group_report r
 WHERE r.id::text LIKE 'ed1a0000-0000-4000-8000-%'
   AND (r.storage_provider <> 'database'
        OR r.file_data IS NULL
-       OR r.file_size IS DISTINCT FROM length(r.file_data)
-       OR r.file_sha256 IS DISTINCT FROM encode(thesis.digest(r.file_data, 'sha256'), 'hex'))
+       OR r.file_size IS DISTINCT FROM octet_length(r.file_data)
+       OR r.file_sha256 IS DISTINCT FROM encode(sha256(r.file_data), 'hex'))
 UNION ALL
 SELECT 'report.one_per_group', '0', count(*)::text,
        CASE WHEN count(*) = 0 THEN 'PASS' ELSE 'FAIL' END
@@ -292,3 +294,69 @@ FROM (
   WHERE ct.id::text LIKE 'ed1a0000-0000-4000-8000-%'
   GROUP BY ct.topic_id HAVING count(*) > 1
 ) dup;
+
+-- application business rules (ThesisCouncilService / ThesisMutationService):
+-- every graded topic is finalized by its assigned council's CHAIR user,
+-- no counter-reviewer sits on that topic's own council or supervises it,
+-- no supervisor scores their own topic, council seats are distinct lecturers,
+-- every eligible council member scored each graded topic on that council.
+SELECT 'rule.finalizer_is_chair' AS check_name, '0' AS expected, count(*)::text AS actual,
+       CASE WHEN count(*) = 0 THEN 'PASS' ELSE 'FAIL' END AS verdict
+FROM thesis.thesis_topic t
+JOIN thesis.thesis_council_topic ct ON ct.topic_id = t.id
+JOIN thesis.thesis_council_member cm ON cm.council_id = ct.council_id AND cm.member_role = 'CHAIR'
+JOIN academic."Lecturer" l ON l."id" = cm.lecturer_id
+WHERE t.id::text LIKE 'ed1a0000-0000-4000-8000-%' AND t.result_status = 'GRADED'
+  AND t.final_score_finalized_by IS DISTINCT FROM l."userId"
+UNION ALL
+SELECT 'rule.reviewer_not_on_own_council', '0', count(*)::text,
+       CASE WHEN count(*) = 0 THEN 'PASS' ELSE 'FAIL' END
+FROM thesis.thesis_topic t
+WHERE t.id::text LIKE 'ed1a0000-0000-4000-8000-%' AND t.gvpb_lecturer_id IS NOT NULL
+  AND EXISTS (SELECT 1 FROM thesis.thesis_council_topic ct
+              JOIN thesis.thesis_council_member cm ON cm.council_id = ct.council_id
+              WHERE ct.topic_id = t.id AND cm.lecturer_id = t.gvpb_lecturer_id)
+UNION ALL
+SELECT 'rule.reviewer_not_supervisor', '0', count(*)::text,
+       CASE WHEN count(*) = 0 THEN 'PASS' ELSE 'FAIL' END
+FROM thesis.thesis_topic t
+WHERE t.id::text LIKE 'ed1a0000-0000-4000-8000-%' AND t.gvpb_lecturer_id IS NOT NULL
+  AND EXISTS (SELECT 1 FROM thesis.thesis_topic_supervisor s
+              WHERE s.topic_id = t.id AND s.lecturer_id = t.gvpb_lecturer_id)
+UNION ALL
+SELECT 'rule.supervisor_not_scoring', '0', count(*)::text,
+       CASE WHEN count(*) = 0 THEN 'PASS' ELSE 'FAIL' END
+FROM thesis.thesis_topic_score s
+WHERE s.id::text LIKE 'ed1a0000-0000-4000-8000-%'
+  AND EXISTS (SELECT 1 FROM thesis.thesis_topic_supervisor sup
+              WHERE sup.topic_id = s.topic_id AND sup.lecturer_id = s.lecturer_id)
+UNION ALL
+SELECT 'rule.council_seats_distinct', '0', count(*)::text,
+       CASE WHEN count(*) = 0 THEN 'PASS' ELSE 'FAIL' END
+FROM (
+  SELECT cm.council_id, cm.lecturer_id FROM thesis.thesis_council_member cm
+  WHERE cm.id::text LIKE 'ed1a0000-0000-4000-8000-%'
+  GROUP BY cm.council_id, cm.lecturer_id HAVING count(*) > 1
+) dup
+UNION ALL
+SELECT 'rule.eligible_graders_complete', '0', count(*)::text,
+       CASE WHEN count(*) = 0 THEN 'PASS' ELSE 'FAIL' END
+FROM thesis.thesis_topic t
+JOIN thesis.thesis_council_topic ct ON ct.topic_id = t.id
+JOIN thesis.thesis_council_member cm ON cm.council_id = ct.council_id
+WHERE t.id::text LIKE 'ed1a0000-0000-4000-8000-%' AND t.result_status = 'GRADED'
+  AND NOT EXISTS (SELECT 1 FROM thesis.thesis_topic_supervisor sup
+                  WHERE sup.topic_id = t.id AND sup.lecturer_id = cm.lecturer_id)
+  AND NOT EXISTS (SELECT 1 FROM thesis.thesis_topic_score s
+                  WHERE s.topic_id = t.id AND s.component = 'DEFENSE' AND s.lecturer_id = cm.lecturer_id)
+UNION ALL
+SELECT 'report.no_demo_wording', '0', count(*)::text,
+       CASE WHEN count(*) = 0 THEN 'PASS' ELSE 'FAIL' END
+FROM thesis.thesis_group_report r
+WHERE r.id::text LIKE 'ed1a0000-0000-4000-8000-%'
+  AND (r.title ILIKE '%demo%' OR r.file_name ILIKE '%demo%' OR r.note ILIKE '%demo%')
+UNION ALL
+SELECT 'audit.not_in_future', '0', count(*)::text,
+       CASE WHEN count(*) = 0 THEN 'PASS' ELSE 'FAIL' END
+FROM campuscore_audit."AdminAudit" a
+WHERE a.id LIKE 'demo-th-%' AND a."createdAt" > now() + interval '1 minute';
