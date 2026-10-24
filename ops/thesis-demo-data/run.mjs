@@ -10,17 +10,20 @@
 // Prints row counts only; no credentials or personal data are ever echoed.
 //
 // Every psql invocation uses -X + --no-psqlrc so a user startup file can
-// never change session settings underneath the scripts' pinned SET LOCAL.
+// never change session settings underneath the scripts' pinned SET LOCAL,
+// and runs with PGCLIENTENCODING=UTF8 so a shell with a different client
+// encoding cannot silently transcode the UTF-8 payload into mojibake (the
+// scripts additionally pin and verify the session encoding themselves).
 //
-// Locking policy: the mutating scripts (apply/dry-run/rollback/recover) run
-// under lock_timeout=300ms — deliberately below the default deadlock_timeout
-// (1s) — so the package is ALWAYS the victim of any lock-ordering conflict
-// and aborts cleanly instead of letting an application transaction lose a
-// deadlock. When a run dies that way (55P03 lock_not_available, or a
-// lock_timeout error), this runner retries the whole script up to
-// THESIS_DEMO_MAX_ATTEMPTS times (default 8) with jitter between attempts.
-// Each retry is a FRESH transaction — psql is a new process — so no lock is
-// ever held while the runner waits.
+// Locking policy: the mutating scripts (apply/dry-run/rollback/recover)
+// acquire every table lock with NOWAIT — the package never queues on a lock,
+// so it can never be one edge of a wait-for cycle: no deadlock can form and
+// the application transaction is never the victim. When a run fails that
+// way (55P03 lock_not_available or a lock_timeout error), this runner
+// retries the whole script up to THESIS_DEMO_MAX_ATTEMPTS times (default 8)
+// with jitter between attempts, reporting whether the blocker looked like
+// autovacuum/ANALYZE. Each retry is a FRESH transaction — psql is a new
+// process — so no lock is ever held while the runner waits.
 
 import { spawnSync } from 'node:child_process';
 import { dirname, join } from 'node:path';
@@ -30,6 +33,8 @@ const here = dirname(fileURLToPath(import.meta.url));
 const action = process.argv[2];
 const psql = process.env.PSQL_BIN || 'psql';
 const MAX_ATTEMPTS = Math.max(1, parseInt(process.env.THESIS_DEMO_MAX_ATTEMPTS || '8', 10) || 8);
+// the package data is UTF-8; every psql child is pinned, never inherited.
+const PSQL_ENV = { ...process.env, PGCLIENTENCODING: 'UTF8' };
 
 const FILES = {
   'dry-run': { file: 'apply.sql', vars: { dry_run: '1' }, retryable: true },
@@ -41,7 +46,7 @@ const FILES = {
 };
 
 // lock-window failures the runner may retry; anything else fails once.
-const RETRYABLE = /could not lock|lock_not_available|55P03|deadlock detected|40P01|canceling statement due to lock timeout/i;
+const RETRYABLE = /could not lock|lock_not_available|55P03|deadlock detected|40P01|canceling statement due to lock timeout|table is locked/i;
 
 function connectionArgs() {
   if (process.env.THESIS_DEMO_DB_URL) return [process.env.THESIS_DEMO_DB_URL];
@@ -62,13 +67,39 @@ function sleepMs(ms) {
   Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms);
 }
 
+// counts-only diagnosis of who is holding the conflicting side of a failed
+// lock attempt: autovacuum/ANALYZE workers vs other lock holders on the
+// eleven package tables. Never prints query text, usernames or row data.
+function lockBlockerCounts() {
+  const sql = `SELECT
+  coalesce((SELECT count(*) FROM pg_stat_activity a
+     WHERE a.backend_type LIKE 'autovacuum%'
+        OR (a.query ~* '^\\s*(vacuum|analyze)\\b' AND a.pid <> pg_backend_pid())), 0)
+  || '|' ||
+  coalesce((SELECT count(DISTINCT l.pid) FROM pg_locks l
+     JOIN pg_class c ON c.oid = l.relation
+     JOIN pg_namespace n ON n.oid = c.relnamespace
+     WHERE l.granted AND l.pid <> pg_backend_pid()
+       AND l.mode IN ('ShareUpdateExclusiveLock','ShareLock','ShareRowExclusiveLock',
+                      'ExclusiveLock','AccessExclusiveLock')
+       AND n.nspname || '.' || c.relname IN
+         ('thesis.thesis_council','thesis.thesis_council_member','thesis.thesis_council_topic',
+          'thesis.thesis_group','thesis.thesis_group_member','thesis.thesis_group_report',
+          'thesis.thesis_registration_round','thesis.thesis_topic','thesis.thesis_topic_score',
+          'thesis.thesis_topic_supervisor','notifications.notification','campuscore_audit.AdminAudit')), 0)`;
+  const res = spawnSync(psql, [...connectionArgs(), '-X', '--no-psqlrc', '-A', '-t', '-c', sql],
+    { encoding: 'utf8', env: PSQL_ENV, windowsHide: true });
+  const m = (res.stdout || '').trim().match(/^(\d+)\|(\d+)$/);
+  return m ? { av: parseInt(m[1], 10), holders: parseInt(m[2], 10) } : null;
+}
+
 function runPsql(file, vars, retryable) {
   const base = [...connectionArgs(), '-X', '--no-psqlrc', '-v', 'ON_ERROR_STOP=1', '-P', 'pager=off'];
   for (const [k, v] of Object.entries(vars)) base.push('-v', `${k}=${v}`);
   base.push('-f', join(here, file));
   const attempts = retryable ? MAX_ATTEMPTS : 1;
   for (let attempt = 1; attempt <= attempts; attempt++) {
-    const res = spawnSync(psql, base, { encoding: 'utf8', windowsHide: true });
+    const res = spawnSync(psql, base, { encoding: 'utf8', env: PSQL_ENV, windowsHide: true });
     if (res.stdout) process.stdout.write(res.stdout);
     if (res.stderr) process.stderr.write(res.stderr);
     if (res.error) {
@@ -76,11 +107,20 @@ function runPsql(file, vars, retryable) {
       process.exit(2);
     }
     const status = res.status ?? 1;
-    const retry = retryable && status !== 0 && attempt < attempts
-      && RETRYABLE.test(`${res.stdout || ''}\n${res.stderr || ''}`);
-    if (!retry) return status;
+    const out = `${res.stdout || ''}\n${res.stderr || ''}`;
+    const retry = retryable && status !== 0 && attempt < attempts && RETRYABLE.test(out);
+    if (!retry) {
+      if (retryable && status !== 0 && attempt >= attempts && RETRYABLE.test(out)) {
+        console.error(`run.mjs: all ${attempts} attempts lost the lock window — before retrying, check pg_stat_activity for autovacuum/ANALYZE workers (or other lock holders) on the package tables`);
+      }
+      return status;
+    }
     const wait = 250 + Math.floor(Math.random() * 500);
-    console.error(`run.mjs: attempt ${attempt}/${attempts} lost the lock window — retrying in ${wait}ms (fresh transaction, no locks held)`);
+    let reason = 'lost the lock window';
+    const b = lockBlockerCounts();
+    if (b && b.av > 0) reason = `blocked by autovacuum/analyze`;
+    else if (b && b.holders > 0) reason = `blocked by ${b.holders} lock holder(s) on the package tables`;
+    console.error(`run.mjs: attempt ${attempt}/${attempts} ${reason}, retrying in ${wait}ms (fresh transaction, no locks held)`);
     sleepMs(wait);
   }
   return 1;
@@ -96,7 +136,7 @@ UNION ALL SELECT 'reports', count(*) FROM thesis.thesis_group_report WHERE id::t
 UNION ALL SELECT 'notifications', count(*) FROM notifications.notification WHERE id LIKE 'demo-th-%'
 UNION ALL SELECT 'audit_rows', count(*) FROM campuscore_audit."AdminAudit" WHERE id LIKE 'demo-th-%'
 ORDER BY 1;`;
-  const res = spawnSync(psql, [...connectionArgs(), '-X', '--no-psqlrc', '-P', 'pager=off', '-c', sql], { stdio: 'inherit', windowsHide: true });
+  const res = spawnSync(psql, [...connectionArgs(), '-X', '--no-psqlrc', '-P', 'pager=off', '-c', sql], { stdio: 'inherit', env: PSQL_ENV, windowsHide: true });
   process.exit(res.status ?? 1);
 }
 

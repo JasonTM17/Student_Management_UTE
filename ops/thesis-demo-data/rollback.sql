@@ -13,25 +13,27 @@
 --      first (the app writes them first), then any FK-referencing tables the
 --      preflight discovers, and only then — LAST — the hot app-wide tables
 --      notifications.notification and campuscore_audit."AdminAudit" (the app
---      writes its notification/audit rows last). Because the package can only
---      ever WAIT on a thesis table while holding no audit/notification lock,
---      no wait-for cycle back to the app is possible; and lock_timeout =
---      300 ms, deliberately below the default deadlock_timeout (1 s), makes
---      the package abort before deadlock detection would even run — the
---      package is always the victim, the application transaction never loses.
---      run.mjs retries the whole script a bounded number of times with
---      jitter; each retry is a fresh transaction and no lock is held while
---      the runner waits. The locks are held only until COMMIT — sub-second
---      on a local connection, a few seconds worst-case over a remote one.
+--      writes its notification/audit rows last). Every lock is requested
+--      with NOWAIT: the package never queues on a lock, so it can never be
+--      half of a wait-for cycle — no deadlock can form, the package is always
+--      the transaction that loses (instantly), and the application
+--      transaction is never killed. run.mjs retries the whole script a
+--      bounded number of times with jitter; each retry is a fresh transaction
+--      and no lock is held while the runner waits. The locks are held only
+--      until COMMIT — sub-second on a local connection, a few seconds
+--      worst-case over a remote one.
 --   2) PREFLIGHT (re-checked only after the locks are held, so a committed
 --      write is always seen and an in-flight write can never slip under us):
---      enumerate every foreign key into the three marker parent tables
---      (thesis_topic, thesis_group, thesis_council) straight from
---      pg_constraint, lock any referencing table not already covered, then
---      count every non-marker row that references a marker row — plus
---      non-marker counter-review scores on the guarded baseline topics. If
---      any exist the script ABORTS with per-table counts and deletes nothing:
---      app-written references are never removed by rollback.
+--      enumerate every foreign key into ALL eleven package tables straight
+--      from pg_constraint, recursively following ON DELETE CASCADE edges so
+--      a future grandchild table is covered too, and compare the result with
+--      the reviewed inventory — the known nine-key set printed below; any
+--      drift aborts the run. Then lock any referencing table not already
+--      covered and count the rows the delete would cascade through plus the
+--      rows that pin a doomed parent (matched by ctid, never by an assumed
+--      id column) — plus non-marker counter-review scores on the guarded
+--      baseline topics. If any exist the script ABORTS with per-table counts
+--      and deletes nothing: app-written references are never removed.
 --   3) BEFORE-IMAGE: marker rows exist → the image stored by apply.sql is
 --      REQUIRED. It is read from audit row 'demo-th-audit-000' first; a
 --      checksum-protected copy in the thesis.thesis_topic table comment is the
@@ -71,38 +73,135 @@ SET LOCAL bytea_output = 'hex';
 SET LOCAL extra_float_digits = 0;
 SET LOCAL IntervalStyle = 'iso_8601';
 SET LOCAL standard_conforming_strings = 'on';
+-- the marker data and the before-image are UTF-8: pin the client encoding so
+-- a session started with a different PGCLIENTENCODING cannot read or compare
+-- the Vietnamese text as mojibake.
+SET LOCAL client_encoding = 'UTF8';
+
+-- fail closed if either end of the session is not UTF-8.
+DO $$
+BEGIN
+  IF current_setting('client_encoding') <> 'UTF8'
+     OR current_setting('server_encoding') <> 'UTF8' THEN
+    RAISE EXCEPTION 'rollback aborted: client_encoding=% server_encoding=% — UTF8 is required end-to-end; nothing was changed',
+      current_setting('client_encoding'), current_setting('server_encoding')
+      USING ERRCODE = '22000', CONSTRAINT = 'thesis_demo_rollback_encoding';
+  END IF;
+END $$;
+
+-- the eleven marker tables and their marker-row predicates (same list as
+-- apply.sql; the audit image row demo-th-audit-000 is excluded — it carries
+-- the image and is deleted unconditionally below). Kept literal on purpose:
+-- the preflight below materializes its doomed-row set from these predicates.
+CREATE TEMP TABLE _tables (tbl text, pred text) ON COMMIT DROP;
+INSERT INTO _tables VALUES
+  ('thesis.thesis_topic','id::text LIKE ''ed1a0000-0000-4000-8000-%'''),
+  ('thesis.thesis_topic_supervisor','id::text LIKE ''ed1a0000-0000-4000-8000-%'''),
+  ('thesis.thesis_group','id::text LIKE ''ed1a0000-0000-4000-8000-%'''),
+  ('thesis.thesis_group_member','id::text LIKE ''ed1a0000-0000-4000-8000-%'''),
+  ('thesis.thesis_council','id::text LIKE ''ed1a0000-0000-4000-8000-%'''),
+  ('thesis.thesis_council_member','id::text LIKE ''ed1a0000-0000-4000-8000-%'''),
+  ('thesis.thesis_council_topic','id::text LIKE ''ed1a0000-0000-4000-8000-%'''),
+  ('thesis.thesis_topic_score','id::text LIKE ''ed1a0000-0000-4000-8000-%'''),
+  ('thesis.thesis_group_report','id::text LIKE ''ed1a0000-0000-4000-8000-%'''),
+  ('notifications.notification','id LIKE ''demo-th-%'''),
+  ('campuscore_audit."AdminAudit"','id LIKE ''demo-th-%'' AND id <> ''demo-th-audit-000''');
 
 -- 1) locks in the application's write order, phase 1: the thesis business
---    tables. A lock wait that exceeds lock_timeout aborts the whole run with
---    a clear reason — the package gives up, the app is never the victim.
+--    tables. NOWAIT: the package never waits, so it can never be one edge of
+--    a deadlock cycle — it is always the transaction that loses, instantly.
 DO $$
 BEGIN
   BEGIN
     EXECUTE 'LOCK TABLE thesis.thesis_council, thesis.thesis_council_member, thesis.thesis_council_topic,'
          || ' thesis.thesis_group, thesis.thesis_group_member, thesis.thesis_group_report,'
          || ' thesis.thesis_registration_round, thesis.thesis_topic, thesis.thesis_topic_score,'
-         || ' thesis.thesis_topic_supervisor IN SHARE ROW EXCLUSIVE MODE';
+         || ' thesis.thesis_topic_supervisor IN SHARE ROW EXCLUSIVE MODE NOWAIT';
   EXCEPTION WHEN lock_not_available THEN
-    RAISE EXCEPTION 'rollback aborted: could not lock the package tables within lock_timeout — an application write is in progress; nothing was changed, retry when the app is idle'
+    RAISE EXCEPTION 'rollback aborted: a package table is locked (an application write or an autovacuum/analyze worker holds it) — nothing was changed, retry when the database is idle'
       USING ERRCODE = '55P03', CONSTRAINT = 'thesis_demo_rollback_lock';
   END;
 END $$;
 
--- 2a) discover every FK into the three marker parent tables from pg_constraint
---     (any child schema, so a future cross-schema FK is still covered), then
---     lock each referencing table not already in the static set, same mode.
+-- 2a) foreign-key inventory: every FK that references ANY of the eleven
+--     package tables, straight from pg_constraint — any schema — then
+--     recursively every ON DELETE CASCADE edge whose parent is itself a
+--     discovered referencing table, so a future grandchild two cascade hops
+--     away is covered too.
 CREATE TEMP TABLE _fk_refs ON COMMIT DROP AS
-SELECT con.conname, n2.nspname AS sch, cls.relname AS tbl, att.attname AS col, pcl.relname AS parent
-FROM pg_constraint con
-JOIN pg_class cls ON cls.oid = con.conrelid
-JOIN pg_namespace n2 ON n2.oid = cls.relnamespace
-JOIN pg_class pcl ON pcl.oid = con.confrelid
-JOIN pg_attribute att ON att.attrelid = con.conrelid AND att.attnum = con.conkey[1]
-WHERE con.contype = 'f'
-  AND con.confrelid IN ('thesis.thesis_topic'::regclass,
-                        'thesis.thesis_group'::regclass,
-                        'thesis.thesis_council'::regclass);
+WITH RECURSIVE reach AS (
+  SELECT con.oid AS conoid, con.conrelid AS child_relid, 1 AS depth
+    FROM pg_constraint con
+   WHERE con.contype = 'f'
+     AND con.confrelid IN ('thesis.thesis_topic'::regclass,
+                           'thesis.thesis_topic_supervisor'::regclass,
+                           'thesis.thesis_group'::regclass,
+                           'thesis.thesis_group_member'::regclass,
+                           'thesis.thesis_council'::regclass,
+                           'thesis.thesis_council_member'::regclass,
+                           'thesis.thesis_council_topic'::regclass,
+                           'thesis.thesis_topic_score'::regclass,
+                           'thesis.thesis_group_report'::regclass,
+                           'notifications.notification'::regclass,
+                           'campuscore_audit."AdminAudit"'::regclass)
+   UNION
+  SELECT con.oid, con.conrelid, r.depth + 1
+    FROM reach r
+    JOIN pg_constraint con ON con.confrelid = r.child_relid
+   WHERE con.contype = 'f' AND con.confdeltype = 'c' AND r.depth < 8
+),
+uniq AS (SELECT conoid, min(depth) AS depth FROM reach GROUP BY conoid)
+SELECT con.conname, cn.nspname AS sch, cls.relname AS tbl,
+       att.attname AS col, pn.nspname AS psch, pcl.relname AS ptbl,
+       patt.attname AS pcol, con.confdeltype AS del, uniq.depth,
+       cn.nspname || '.' || cls.relname || '.' || att.attname || '>'
+       || pn.nspname || '.' || pcl.relname || '(' || con.confdeltype::text || ')' AS key
+  FROM uniq
+  JOIN pg_constraint con ON con.oid = uniq.conoid
+  JOIN pg_class cls ON cls.oid = con.conrelid
+  JOIN pg_namespace cn ON cn.oid = cls.relnamespace
+  JOIN pg_class pcl ON pcl.oid = con.confrelid
+  JOIN pg_namespace pn ON pn.oid = pcl.relnamespace
+  JOIN pg_attribute att ON att.attrelid = con.conrelid AND att.attnum = con.conkey[1]
+  JOIN pg_attribute patt ON patt.attrelid = con.confrelid AND patt.attnum = con.confkey[1];
 
+-- the reviewed inventory (flyway-142 fixture): exactly these nine
+-- single-column foreign keys reference the package tables. Any drift — a new
+-- referencing table, a composite key, a changed delete action — means the
+-- schema moved since this script was reviewed; refuse rather than count.
+CREATE TEMP TABLE _fk_expected (key text) ON COMMIT DROP;
+INSERT INTO _fk_expected VALUES
+  ('thesis.thesis_council_member.council_id>thesis.thesis_council(c)'),
+  ('thesis.thesis_council_topic.council_id>thesis.thesis_council(c)'),
+  ('thesis.thesis_council_topic.topic_id>thesis.thesis_topic(c)'),
+  ('thesis.thesis_group_member.group_id>thesis.thesis_group(c)'),
+  ('thesis.thesis_group_report.group_id>thesis.thesis_group(r)'),
+  ('thesis.thesis_group.topic_id>thesis.thesis_topic(a)'),
+  ('thesis.thesis_topic_score.council_id>thesis.thesis_council(c)'),
+  ('thesis.thesis_topic_score.topic_id>thesis.thesis_topic(c)'),
+  ('thesis.thesis_topic_supervisor.topic_id>thesis.thesis_topic(c)');
+
+DO $$
+DECLARE
+  v_missing text;
+  v_extra text;
+BEGIN
+  RAISE NOTICE 'fk inventory into the package tables: %',
+    coalesce((SELECT string_agg(key, ', ' ORDER BY key) FROM _fk_refs), '-');
+  SELECT string_agg(key, ', ' ORDER BY key) INTO v_missing
+    FROM (SELECT key FROM _fk_expected EXCEPT SELECT key FROM _fk_refs) d(key);
+  SELECT string_agg(key, ', ' ORDER BY key) INTO v_extra
+    FROM (SELECT key FROM _fk_refs EXCEPT SELECT key FROM _fk_expected) d(key);
+  IF v_missing IS NOT NULL OR v_extra IS NOT NULL THEN
+    RAISE EXCEPTION 'rollback aborted: the foreign-key inventory into the package tables changed since this script was reviewed (expected % keys; missing: %; unexpected: %) — re-run the FK inventory preflight from the README and re-review the package before rolling back; nothing was changed',
+      (SELECT count(*) FROM _fk_expected), coalesce(v_missing, '-'), coalesce(v_extra, '-')
+      USING ERRCODE = '23503', CONSTRAINT = 'thesis_demo_rollback_preflight';
+  END IF;
+END $$;
+
+-- lock each referencing table not already in the static set, same mode — a
+-- referencing table with a matching inventory is still locked so no row can
+-- be inserted between the preflight count and the delete.
 DO $$
 DECLARE r record;
 BEGIN
@@ -118,9 +217,9 @@ BEGIN
     ORDER BY sch, tbl
   LOOP
     BEGIN
-      EXECUTE format('LOCK TABLE %I.%I IN SHARE ROW EXCLUSIVE MODE', r.sch, r.tbl);
+      EXECUTE format('LOCK TABLE %I.%I IN SHARE ROW EXCLUSIVE MODE NOWAIT', r.sch, r.tbl);
     EXCEPTION WHEN lock_not_available THEN
-      RAISE EXCEPTION 'rollback aborted: could not lock referencing table %.% within lock_timeout — an application write is in progress; nothing was changed',
+      RAISE EXCEPTION 'rollback aborted: referencing table %.% is locked (an application write or an autovacuum/analyze worker holds it) — nothing was changed',
         r.sch, r.tbl USING ERRCODE = '55P03', CONSTRAINT = 'thesis_demo_rollback_lock';
     END;
   END LOOP;
@@ -128,18 +227,97 @@ END $$;
 
 -- 2b) preflight, now that every relevant table is locked: no committed write
 --     can appear mid-check and no in-flight write can slip under us.
+--     Materialize the doomed-row set — the marker rows the script deletes,
+--     propagated along every discovered ON DELETE CASCADE edge until fixed
+--     point — then count the rows the application owns that the delete would
+--     cascade through, plus the rows whose non-cascade references pin a
+--     doomed parent. Rows are matched by ctid, so a referencing table
+--     without an id column (or with a different marker shape) is covered.
+CREATE TEMP TABLE _doomed (sch text, tbl text, row_ctid tid) ON COMMIT DROP;
 CREATE TEMP TABLE _blocking (tbl text, refs bigint) ON COMMIT DROP;
 
 DO $$
-DECLARE r record;
+DECLARE
+  r record;
+  n bigint := 1;
+  m bigint;
+  v_pred text;
 BEGIN
-  FOR r IN SELECT sch, tbl, col FROM _fk_refs LOOP
+  -- seeds: the marker rows the script itself deletes
+  FOR r IN SELECT tbl, pred FROM _tables LOOP
     EXECUTE format(
-      'INSERT INTO _blocking SELECT %L, count(*) FROM %I.%I c
-        WHERE c.%I::text LIKE ''ed1a0000-0000-4000-8000-%%''
-          AND c.id::text NOT LIKE ''ed1a0000-0000-4000-8000-%%''',
-      r.tbl || '.' || r.col, r.sch, r.tbl, r.col);
+      'INSERT INTO _doomed (sch, tbl, row_ctid)
+         SELECT n.nspname, c.relname, t.ctid
+           FROM %s t
+           JOIN pg_class c ON c.oid = t.tableoid
+           JOIN pg_namespace n ON n.oid = c.relnamespace
+          WHERE %s',
+      r.tbl, r.pred);
   END LOOP;
+
+  -- propagate along every discovered cascade edge until fixed point: a
+  -- referencing row of a doomed row is doomed too.
+  WHILE n > 0 LOOP
+    n := 0;
+    FOR r IN SELECT sch, tbl, col, psch, ptbl, pcol FROM _fk_refs WHERE del = 'c' LOOP
+      EXECUTE format(
+        'INSERT INTO _doomed (sch, tbl, row_ctid)
+           SELECT %L, %L, c.ctid
+             FROM %I.%I c
+            WHERE EXISTS (SELECT 1 FROM _doomed d
+                            JOIN %I.%I p ON p.ctid = d.row_ctid
+                           WHERE d.sch = %L AND d.tbl = %L
+                             AND p.%I = c.%I)
+              AND NOT EXISTS (SELECT 1 FROM _doomed d2
+                               WHERE d2.sch = %L AND d2.tbl = %L
+                                 AND d2.row_ctid = c.ctid)',
+        r.sch, r.tbl, r.sch, r.tbl,
+        r.psch, r.ptbl, r.psch, r.ptbl, r.pcol, r.col,
+        r.sch, r.tbl);
+      GET DIAGNOSTICS m = ROW_COUNT;
+      n := n + m;
+    END LOOP;
+  END LOOP;
+
+  -- rows that pin a doomed parent through a non-cascade edge: the child row
+  -- is not deleted, but the delete fails (NO ACTION / RESTRICT) or the
+  -- reference is rewritten (SET NULL / SET DEFAULT) — either way the app
+  -- loses data integrity, so they count as blockers. Rows already doomed
+  -- (marker rows of a package table) are expected deletions, not blockers.
+  FOR r IN SELECT sch, tbl, col, psch, ptbl, pcol FROM _fk_refs WHERE del <> 'c' LOOP
+    EXECUTE format(
+      'INSERT INTO _blocking
+         SELECT %L, count(*) FROM %I.%I c
+          WHERE EXISTS (SELECT 1 FROM _doomed d
+                          JOIN %I.%I p ON p.ctid = d.row_ctid
+                         WHERE d.sch = %L AND d.tbl = %L
+                           AND p.%I = c.%I)
+            AND NOT EXISTS (SELECT 1 FROM _doomed d2
+                             WHERE d2.sch = %L AND d2.tbl = %L
+                               AND d2.row_ctid = c.ctid)',
+      r.tbl || '.' || r.col, r.sch, r.tbl,
+      r.psch, r.ptbl, r.psch, r.ptbl, r.pcol, r.col,
+      r.sch, r.tbl);
+  END LOOP;
+
+  -- cascade victims the application owns: every doomed row in a table
+  -- outside the package, and non-marker doomed rows inside it.
+  FOR r IN SELECT sch, tbl FROM _doomed GROUP BY sch, tbl LOOP
+    SELECT pt.pred INTO v_pred FROM _tables pt
+     WHERE regexp_replace(pt.tbl, '"', '', 'g') = r.sch || '.' || r.tbl;
+    IF v_pred IS NULL THEN
+      EXECUTE format(
+        'INSERT INTO _blocking SELECT %L, count(*) FROM _doomed d WHERE d.sch = %L AND d.tbl = %L',
+        r.sch || '.' || r.tbl || '(cascade)', r.sch, r.tbl);
+    ELSE
+      EXECUTE format(
+        'INSERT INTO _blocking SELECT %L, count(*) FROM %I.%I c
+           JOIN _doomed d ON d.row_ctid = c.ctid AND d.sch = %L AND d.tbl = %L
+          WHERE NOT (%s)',
+        r.sch || '.' || r.tbl || '(cascade)', r.sch, r.tbl, r.sch, r.tbl, v_pred);
+    END IF;
+  END LOOP;
+
   -- non-marker counter-review scores on the three baseline topics whose
   -- gvpb_lecturer_id this script resets: deleting nothing, but restoring NULL
   -- would leave an application score orphaned from its reviewer.
@@ -152,7 +330,7 @@ BEGIN
                        'f580eadf-fffb-4db2-a7d8-423e83934dc2')
     AND s.id::text NOT LIKE 'ed1a0000-0000-4000-8000-%';
   IF EXISTS (SELECT 1 FROM _blocking WHERE refs > 0) THEN
-    RAISE EXCEPTION 'rollback aborted: % non-marker row(s) reference marker rows (%). Remove those references first; rollback never deletes application-owned rows.',
+    RAISE EXCEPTION 'rollback aborted: % application-owned row(s) reference marker rows or would be cascade-deleted (%). Remove those references first; rollback never deletes application-owned rows.',
       (SELECT sum(refs) FROM _blocking),
       (SELECT string_agg(tbl || '=' || refs, ', ' ORDER BY tbl) FROM _blocking WHERE refs > 0)
       USING ERRCODE = '23503', CONSTRAINT = 'thesis_demo_rollback_preflight';
@@ -160,15 +338,13 @@ BEGIN
 END $$;
 
 -- locks, phase 2 (LAST, matching the app which writes audit/notification
--- last): the two hot app-wide tables. Taken only after every thesis lock is
--- held, so the package never holds an audit/notification lock while waiting
--- on a thesis table — no wait-for cycle back to the app can form.
+-- last): the two hot app-wide tables. NOWAIT like every other lock.
 DO $$
 BEGIN
   BEGIN
-    EXECUTE 'LOCK TABLE notifications.notification, campuscore_audit."AdminAudit" IN SHARE ROW EXCLUSIVE MODE';
+    EXECUTE 'LOCK TABLE notifications.notification, campuscore_audit."AdminAudit" IN SHARE ROW EXCLUSIVE MODE NOWAIT';
   EXCEPTION WHEN lock_not_available THEN
-    RAISE EXCEPTION 'rollback aborted: could not lock the audit/notification tables within lock_timeout — an application write is in progress; nothing was changed, retry when the app is idle'
+    RAISE EXCEPTION 'rollback aborted: an audit/notification table is locked (an application write or an autovacuum/analyze worker holds it) — nothing was changed, retry when the database is idle'
       USING ERRCODE = '55P03', CONSTRAINT = 'thesis_demo_rollback_lock';
   END;
 END $$;
@@ -186,23 +362,6 @@ UNION ALL SELECT 'thesis_topic_score', count(*) FROM thesis.thesis_topic_score W
 UNION ALL SELECT 'thesis_group_report', count(*) FROM thesis.thesis_group_report WHERE id::text LIKE 'ed1a0000-0000-4000-8000-%'
 UNION ALL SELECT 'notification', count(*) FROM notifications.notification WHERE id LIKE 'demo-th-%'
 UNION ALL SELECT 'admin_audit', count(*) FROM campuscore_audit."AdminAudit" WHERE id LIKE 'demo-th-%';
-
--- the eleven marker tables and their marker-row predicates (same list as
--- apply.sql; the audit image row demo-th-audit-000 is excluded — it carries
--- the image and is deleted unconditionally below).
-CREATE TEMP TABLE _tables (tbl text, pred text) ON COMMIT DROP;
-INSERT INTO _tables VALUES
-  ('thesis.thesis_topic','id::text LIKE ''ed1a0000-0000-4000-8000-%'''),
-  ('thesis.thesis_topic_supervisor','id::text LIKE ''ed1a0000-0000-4000-8000-%'''),
-  ('thesis.thesis_group','id::text LIKE ''ed1a0000-0000-4000-8000-%'''),
-  ('thesis.thesis_group_member','id::text LIKE ''ed1a0000-0000-4000-8000-%'''),
-  ('thesis.thesis_council','id::text LIKE ''ed1a0000-0000-4000-8000-%'''),
-  ('thesis.thesis_council_member','id::text LIKE ''ed1a0000-0000-4000-8000-%'''),
-  ('thesis.thesis_council_topic','id::text LIKE ''ed1a0000-0000-4000-8000-%'''),
-  ('thesis.thesis_topic_score','id::text LIKE ''ed1a0000-0000-4000-8000-%'''),
-  ('thesis.thesis_group_report','id::text LIKE ''ed1a0000-0000-4000-8000-%'''),
-  ('notifications.notification','id LIKE ''demo-th-%'''),
-  ('campuscore_audit."AdminAudit"','id LIKE ''demo-th-%'' AND id <> ''demo-th-audit-000''');
 
 -- explicit, versioned per-table column lists the row hashes cover — the same
 -- literal list as apply.sql (every column apply writes EXCEPT version,

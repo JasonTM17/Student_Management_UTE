@@ -16,6 +16,21 @@ SET bytea_output = 'hex';
 SET extra_float_digits = 0;
 SET IntervalStyle = 'iso_8601';
 SET standard_conforming_strings = 'on';
+-- the demo text is UTF-8: pin the client encoding for this session too, so a
+-- non-UTF-8 client cannot make the byte-level checks below read mojibake.
+SET client_encoding = 'UTF8';
+
+-- fail closed if either end of the session is not UTF-8: under a different
+-- encoding the mojibake check cannot tell 'correct' from 'already garbled'.
+DO $$
+BEGIN
+  IF current_setting('client_encoding') <> 'UTF8'
+     OR current_setting('server_encoding') <> 'UTF8' THEN
+    RAISE EXCEPTION 'verify aborted: client_encoding=% server_encoding=% — UTF8 is required end-to-end',
+      current_setting('client_encoding'), current_setting('server_encoding')
+      USING ERRCODE = '22000', CONSTRAINT = 'thesis_demo_verify_encoding';
+  END IF;
+END $$;
 
 WITH m(p) AS (VALUES ('ed1a0000-0000-4000-8000-%'))
 SELECT 'marker_count.' || sec.name AS check_name,
@@ -547,3 +562,22 @@ SELECT 'image.guarded_cols_at_applied' AS check_name, '0' AS expected, count(*):
 FROM exp
 JOIN act ON act.tbl = exp.tbl AND act.rid = exp.rid AND act.col = exp.col
 WHERE act.val IS DISTINCT FROM exp.app;
+
+-- encoding: three seeded Vietnamese strings must still be valid UTF-8 bytes
+-- exactly as apply.sql wrote them. Any LATIN1/other-encoding write or a
+-- double-encoded value fails byte-for-byte, no collation involved.
+SELECT 'encoding.vietnamese_utf8_bytes' AS check_name, '3' AS expected,
+       count(*)::text AS actual,
+       CASE WHEN count(*) = 3 THEN 'PASS' ELSE 'FAIL' END AS verdict
+FROM (VALUES
+  ((SELECT encode(convert_to(n.title, 'UTF8'), 'hex')
+      FROM notifications.notification n WHERE n.id = 'demo-th-notif-0001'),
+   '4be1babf74207175e1baa3206b68c3b361206c75e1baad6e20c491c3a32063c3b46e672062e1bb91'),
+  ((SELECT encode(convert_to(t.title, 'UTF8'), 'hex')
+      FROM thesis.thesis_topic t WHERE t.id = 'ed1a0000-0000-4000-8000-000100000001'),
+   '48e1bb87207468e1bb916e67206b686169207068c3a12064e1bbaf206c69e1bb8775206e68e1baad74206bc3bd2068e1bb8d632074e1baad70207068e1bba5632076e1bba52063e1baa36e682062c3a16f2068e1bb8d632076e1bba52073e1bb9b6d'),
+  ((SELECT encode(convert_to(t.gvpb_waived_reason, 'UTF8'), 'hex')
+      FROM thesis.thesis_topic t WHERE t.id = '67c74df5-5c7f-4e74-aa02-d51af7207fe9'),
+   '4d69e1bb856e207068e1baa36e206269e1bb876e207468656f20517579e1babf7420c491e1bb8b6e68203231342f51c4902d4b434e54543a20c491e1bb812074c3a06920746875e1bb9963206e68c3b36d2063687579c3aa6e206e67c3a06e682068e1bab9702c20c491c3a320717561206861692076c3b26e672078c3a97420647579e1bb87742063e1bba7612042e1bb99206dc3b46e')
+) p(actual_hex, expected_hex)
+WHERE p.actual_hex IS NOT DISTINCT FROM p.expected_hex;

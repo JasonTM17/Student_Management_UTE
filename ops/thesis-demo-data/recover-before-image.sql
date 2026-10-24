@@ -11,7 +11,9 @@
 --
 -- What it does, in one transaction:
 --   1) takes SHARE ROW EXCLUSIVE locks in the application's write order
---      (thesis tables first, notification + audit last), lock_timeout 300 ms;
+--      (thesis tables first, notification + audit last), every lock NOWAIT —
+--      the package never queues on a lock, so it can never be one edge of a
+--      deadlock cycle;
 --   2) REFUSES when no marker rows exist (nothing to recover) and when a
 --      usable image copy still exists (fix the bad copy deliberately first);
 --   3) rebuilds the v3 image FROM RECORDED FACTS ONLY — never from live
@@ -44,24 +46,38 @@ SET LOCAL bytea_output = 'hex';
 SET LOCAL extra_float_digits = 0;
 SET LOCAL IntervalStyle = 'iso_8601';
 SET LOCAL standard_conforming_strings = 'on';
+-- the rebuilt image contains UTF-8 text: pin the client encoding so a
+-- non-UTF-8 client session cannot transcode it into mojibake.
+SET LOCAL client_encoding = 'UTF8';
+
+-- fail closed if either end of the session is not UTF-8.
+DO $$
+BEGIN
+  IF current_setting('client_encoding') <> 'UTF8'
+     OR current_setting('server_encoding') <> 'UTF8' THEN
+    RAISE EXCEPTION 'recovery aborted: client_encoding=% server_encoding=% — UTF8 is required end-to-end; nothing was changed',
+      current_setting('client_encoding'), current_setting('server_encoding')
+      USING ERRCODE = '22000', CONSTRAINT = 'thesis_demo_recover_encoding';
+  END IF;
+END $$;
 
 -- locks in the application's write order: thesis tables first, then the hot
--- app-wide tables last. Same 300 ms fail-fast rule as rollback.
+-- app-wide tables last. NOWAIT like apply/rollback: the package never waits.
 DO $$
 BEGIN
   BEGIN
     EXECUTE 'LOCK TABLE thesis.thesis_council, thesis.thesis_council_member, thesis.thesis_council_topic,'
          || ' thesis.thesis_group, thesis.thesis_group_member, thesis.thesis_group_report,'
          || ' thesis.thesis_registration_round, thesis.thesis_topic, thesis.thesis_topic_score,'
-         || ' thesis.thesis_topic_supervisor IN SHARE ROW EXCLUSIVE MODE';
+         || ' thesis.thesis_topic_supervisor IN SHARE ROW EXCLUSIVE MODE NOWAIT';
   EXCEPTION WHEN lock_not_available THEN
-    RAISE EXCEPTION 'recovery aborted: could not lock the package tables within lock_timeout — an application write is in progress; nothing was changed'
+    RAISE EXCEPTION 'recovery aborted: a package table is locked (an application write or an autovacuum/analyze worker holds it) — nothing was changed'
       USING ERRCODE = '55P03', CONSTRAINT = 'thesis_demo_recover_lock';
   END;
   BEGIN
-    EXECUTE 'LOCK TABLE notifications.notification, campuscore_audit."AdminAudit" IN SHARE ROW EXCLUSIVE MODE';
+    EXECUTE 'LOCK TABLE notifications.notification, campuscore_audit."AdminAudit" IN SHARE ROW EXCLUSIVE MODE NOWAIT';
   EXCEPTION WHEN lock_not_available THEN
-    RAISE EXCEPTION 'recovery aborted: could not lock the audit/notification tables within lock_timeout — an application write is in progress; nothing was changed'
+    RAISE EXCEPTION 'recovery aborted: an audit/notification table is locked (an application write or an autovacuum/analyze worker holds it) — nothing was changed'
       USING ERRCODE = '55P03', CONSTRAINT = 'thesis_demo_recover_lock';
   END;
 END $$;
