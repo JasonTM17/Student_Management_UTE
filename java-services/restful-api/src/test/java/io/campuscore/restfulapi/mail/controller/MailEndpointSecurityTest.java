@@ -1,4 +1,4 @@
-package io.campuscore.restfulapi.mail;
+package io.campuscore.restfulapi.mail.controller;
 
 import static io.campuscore.restfulapi.testsupport.CurrentAccountJwt.fixtureJwt;
 

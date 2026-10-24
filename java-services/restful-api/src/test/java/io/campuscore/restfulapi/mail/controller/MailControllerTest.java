@@ -1,4 +1,4 @@
-package io.campuscore.restfulapi.mail;
+package io.campuscore.restfulapi.mail.controller;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -14,14 +14,14 @@ import static org.mockito.Mockito.when;
 import io.campuscore.restfulapi.mail.repository.MailRecipientScopeRepository;
 import io.campuscore.restfulapi.mail.repository.MailRecipientScopeRepository.ScopedRecipient;
 import io.campuscore.restfulapi.mail.service.EmailService;
-import io.campuscore.restfulapi.mail.web.MailController;
-import io.campuscore.restfulapi.mail.web.MailDtos.AcademicNoticeRequest;
-import io.campuscore.restfulapi.mail.web.MailDtos.CourseItem;
-import io.campuscore.restfulapi.mail.web.MailDtos.CourseRegistrationRequest;
-import io.campuscore.restfulapi.mail.web.MailDtos.GradeAlertRequest;
-import io.campuscore.restfulapi.mail.web.MailDtos.GradeItem;
-import io.campuscore.restfulapi.mail.web.MailDtos.MailDispatchResponse;
-import io.campuscore.restfulapi.mail.web.MailDtos.TestEmailRequest;
+import io.campuscore.restfulapi.mail.controller.MailController;
+import io.campuscore.restfulapi.mail.dto.MailDtos.AcademicNoticeRequest;
+import io.campuscore.restfulapi.mail.dto.MailDtos.CourseItem;
+import io.campuscore.restfulapi.mail.dto.MailDtos.CourseRegistrationRequest;
+import io.campuscore.restfulapi.mail.dto.MailDtos.GradeAlertRequest;
+import io.campuscore.restfulapi.mail.dto.MailDtos.GradeItem;
+import io.campuscore.restfulapi.mail.dto.MailDtos.MailDispatchResponse;
+import io.campuscore.restfulapi.mail.dto.MailDtos.TestEmailRequest;
 import io.campuscore.restfulapi.web.DomainException;
 import java.util.List;
 import org.junit.jupiter.api.BeforeEach;

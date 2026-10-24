@@ -1,4 +1,4 @@
-package io.campuscore.restfulapi.mail.web;
+package io.campuscore.restfulapi.mail.dto;
 
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;

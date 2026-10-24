@@ -1,8 +1,8 @@
 package io.campuscore.restfulapi.mail.service;
 
-import io.campuscore.restfulapi.mail.web.MailDtos.AcademicNoticeRequest;
-import io.campuscore.restfulapi.mail.web.MailDtos.CourseRegistrationRequest;
-import io.campuscore.restfulapi.mail.web.MailDtos.GradeAlertRequest;
+import io.campuscore.restfulapi.mail.dto.MailDtos.AcademicNoticeRequest;
+import io.campuscore.restfulapi.mail.dto.MailDtos.CourseRegistrationRequest;
+import io.campuscore.restfulapi.mail.dto.MailDtos.GradeAlertRequest;
 import java.util.Map;
 
 public interface EmailService {

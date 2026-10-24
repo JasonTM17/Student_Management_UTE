@@ -1,15 +1,15 @@
-package io.campuscore.restfulapi.mail.web;
+package io.campuscore.restfulapi.mail.controller;
 
 import io.campuscore.restfulapi.mail.repository.MailRecipientScopeRepository;
 import io.campuscore.restfulapi.mail.repository.MailRecipientScopeRepository.ScopedRecipient;
 import io.campuscore.restfulapi.mail.service.EmailService;
-import io.campuscore.restfulapi.mail.web.MailDtos.AcademicNoticeRequest;
-import io.campuscore.restfulapi.mail.web.MailDtos.CourseItem;
-import io.campuscore.restfulapi.mail.web.MailDtos.CourseRegistrationRequest;
-import io.campuscore.restfulapi.mail.web.MailDtos.GradeAlertRequest;
-import io.campuscore.restfulapi.mail.web.MailDtos.GradeItem;
-import io.campuscore.restfulapi.mail.web.MailDtos.MailDispatchResponse;
-import io.campuscore.restfulapi.mail.web.MailDtos.TestEmailRequest;
+import io.campuscore.restfulapi.mail.dto.MailDtos.AcademicNoticeRequest;
+import io.campuscore.restfulapi.mail.dto.MailDtos.CourseItem;
+import io.campuscore.restfulapi.mail.dto.MailDtos.CourseRegistrationRequest;
+import io.campuscore.restfulapi.mail.dto.MailDtos.GradeAlertRequest;
+import io.campuscore.restfulapi.mail.dto.MailDtos.GradeItem;
+import io.campuscore.restfulapi.mail.dto.MailDtos.MailDispatchResponse;
+import io.campuscore.restfulapi.mail.dto.MailDtos.TestEmailRequest;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
@@ -33,6 +33,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+import io.campuscore.restfulapi.mail.dto.MailDtos;
 
 @RestController
 @RequestMapping("/api/v1/mail")
