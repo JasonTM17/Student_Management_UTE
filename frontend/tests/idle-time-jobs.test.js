@@ -2,6 +2,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
+const { readJavaSource } = require('./helpers/java-source');
 
 const root = path.resolve(__dirname, '..', '..');
 
@@ -11,12 +12,8 @@ function readSource(rel) {
 
 const applicationYml = readSource('java-services/restful-api/src/main/resources/application.yml');
 const renderYaml = readSource('render.yaml');
-const keepAliveScheduler = readSource(
-  'java-services/restful-api/src/main/java/io/campuscore/restfulapi/config/DatabaseKeepAliveScheduler.java',
-);
-const announcementJob = readSource(
-  'java-services/restful-api/src/main/java/io/campuscore/restfulapi/engagement/service/ScheduledAnnouncementNotifyJob.java',
-);
+const keepAliveScheduler = readJavaSource('DatabaseKeepAliveScheduler');
+const announcementJob = readJavaSource('ScheduledAnnouncementNotifyJob');
 
 // Every scheduled tick that issues SQL while the app is otherwise idle
 // counts as query activity on the hosted free-tier Postgres and delays or
