@@ -691,11 +691,16 @@ public class AdminCatalogMutationService {
      */
     private Map<String, Object> currentRoundOrNull(String semesterId) {
         List<Map<String, Object>> rounds = jdbc.queryForList(
-                "SELECT \"id\", \"kind\", \"creditLimit\" AS credit_limit"
-                        + " FROM \"academic\".\"RegistrationRound\""
-                        + " WHERE \"semesterId\" = :semesterId AND \"status\" = 'OPEN'"
-                        + " AND \"windowStart\" <= CURRENT_TIMESTAMP AND \"windowEnd\" >= CURRENT_TIMESTAMP"
-                        + " ORDER BY \"windowStart\"",
+                "SELECT registration_round.\"id\", registration_round.\"kind\","
+                        + " registration_round.\"creditLimit\" AS credit_limit,"
+                        + " (SELECT semester.\"type\" FROM " + SEMESTER
+                        + " semester WHERE semester.\"id\" = registration_round.\"semesterId\") AS semester_type"
+                        + " FROM \"academic\".\"RegistrationRound\" registration_round"
+                        + " WHERE registration_round.\"semesterId\" = :semesterId"
+                        + " AND registration_round.\"status\" = 'OPEN'"
+                        + " AND registration_round.\"windowStart\" <= CURRENT_TIMESTAMP"
+                        + " AND registration_round.\"windowEnd\" >= CURRENT_TIMESTAMP"
+                        + " ORDER BY registration_round.\"windowStart\"",
                 new MapSqlParameterSource("semesterId", semesterId));
         for (String kind : List.of("REGISTRATION", "ADD_DROP")) {
             for (Map<String, Object> round : rounds) {
@@ -709,19 +714,26 @@ public class AdminCatalogMutationService {
 
     /** Cap from the enrollment's original round — fallback when no round window is open at reopen. */
     private int effectiveLimit(String studentId, Object roundId) {
-        Integer configured = null;
+        Map<String, Object> storedRound = null;
         if (roundId != null) {
             try {
-                configured = jdbc.queryForObject(
-                        "SELECT \"creditLimit\" FROM academic.\"RegistrationRound\" WHERE \"id\" = :id",
-                        new MapSqlParameterSource("id", String.valueOf(roundId)), Integer.class);
+                storedRound = jdbc.queryForMap(
+                        "SELECT registration_round.\"creditLimit\" AS credit_limit,"
+                                + " (SELECT semester.\"type\" FROM " + SEMESTER
+                                + " semester WHERE semester.\"id\" = registration_round.\"semesterId\") AS semester_type"
+                                + " FROM academic.\"RegistrationRound\" registration_round"
+                                + " WHERE registration_round.\"id\" = :id",
+                        new MapSqlParameterSource("id", String.valueOf(roundId)));
             } catch (EmptyResultDataAccessException exception) {
-                configured = null;
+                storedRound = null;
             }
         }
         Map<String, Object> round = new LinkedHashMap<>();
         round.put("id", roundId == null ? null : String.valueOf(roundId));
-        round.put("credit_limit", configured);
+        if (storedRound != null) {
+            round.put("credit_limit", storedRound.get("credit_limit"));
+            round.put("semester_type", storedRound.get("semester_type"));
+        }
         return creditLimitApplications.effectiveLimit(studentId, round);
     }
 

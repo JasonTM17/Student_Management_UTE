@@ -847,6 +847,8 @@ export const en = {
     creditLimitExceeded: 'This registration would exceed the {limit}-credit term limit.',
     creditLimitReached: 'You have reached the {limit}-credit term limit.',
     creditLimitRemaining: '{count} credits remain available this term.',
+    minimumCreditsNotice:
+      'You are below the {count}-credit advisory minimum. Registration is still available; Academic Affairs must apply the final-semester exception manually when it applies.',
     headerCreditsRemaining: '{count} credits left',
     searchPlaceholder: 'Search by course code or name',
     searchByCode: 'Course code or class',
@@ -3952,6 +3954,8 @@ export const vi: I18nMessages = {
     creditLimitExceeded: 'Đăng ký này sẽ vượt hạn mức {limit} tín chỉ của học kỳ.',
     creditLimitReached: 'Bạn đã đạt hạn mức {limit} tín chỉ của học kỳ.',
     creditLimitRemaining: 'Học kỳ này còn {count} tín chỉ có thể đăng ký.',
+    minimumCreditsNotice:
+      'Bạn đang dưới mức khuyến nghị tối thiểu {count} tín chỉ. Bạn vẫn có thể đăng ký; Phòng Đào tạo cần áp dụng ngoại lệ học kỳ cuối thủ công nếu phù hợp.',
     headerCreditsRemaining: 'Còn {count} tín chỉ',
     searchPlaceholder: 'Tìm theo mã hoặc tên môn học',
     searchByCode: 'Mã học phần hoặc lớp',

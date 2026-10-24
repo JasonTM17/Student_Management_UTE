@@ -62,6 +62,7 @@ public class RegistrationService {
     private static final String AUTH_USER = "campuscore_auth.\"User\"";
     private static final String CURRICULUM_COURSE = "academic.\"CurriculumCourse\"";
     private static final int STANDARD_CREDIT_LIMIT = CreditLimitApplicationService.STANDARD_LIMIT;
+    private static final int MINIMUM_CREDITS = 14;
 
     private final NamedParameterJdbcTemplate jdbc;
     private final AcademicEnrollmentReadService reads;
@@ -314,7 +315,14 @@ public class RegistrationService {
         List<String> ids = activeEnrollments(studentId, String.valueOf(round.get("semester_id"))).stream()
                 .map(row -> String.valueOf(row.get("id")))
                 .toList();
-        return new SummaryResponse(String.valueOf(round.get("id")), limit, used, Math.max(0, limit - used), ids);
+        return new SummaryResponse(
+                String.valueOf(round.get("id")),
+                limit,
+                used,
+                Math.max(0, limit - used),
+                ids,
+                MINIMUM_CREDITS,
+                used < MINIMUM_CREDITS);
     }
 
     public EnrollmentResponse enroll(
@@ -978,14 +986,20 @@ public class RegistrationService {
 
     private Map<String, Object> openRound(String semesterId, String preferredKind, boolean forUpdate) {
         MapSqlParameterSource parameters = new MapSqlParameterSource();
-        String sql = "SELECT \"id\", \"semesterId\" AS semester_id, \"kind\", \"status\", \"windowStart\" AS window_start,"
-                + " \"windowEnd\" AS window_end, \"creditLimit\" AS credit_limit FROM " + ROUND
-                + " WHERE \"status\" = 'OPEN'";
+        String sql = "SELECT registration_round.\"id\", registration_round.\"semesterId\" AS semester_id,"
+                + " registration_round.\"kind\", registration_round.\"status\","
+                + " registration_round.\"windowStart\" AS window_start,"
+                + " registration_round.\"windowEnd\" AS window_end,"
+                + " registration_round.\"creditLimit\" AS credit_limit,"
+                + " (SELECT semester.\"type\" FROM " + SEMESTER
+                + " semester WHERE semester.\"id\" = registration_round.\"semesterId\") AS semester_type"
+                + " FROM " + ROUND + " registration_round"
+                + " WHERE registration_round.\"status\" = 'OPEN'";
         if (semesterId != null && !semesterId.isBlank()) {
-            sql += " AND \"semesterId\" = :semesterId";
+            sql += " AND registration_round.\"semesterId\" = :semesterId";
             parameters.addValue("semesterId", semesterId);
         }
-        sql += " ORDER BY \"windowStart\"" + (forUpdate ? " FOR UPDATE" : "");
+        sql += " ORDER BY registration_round.\"windowStart\"" + (forUpdate ? " FOR UPDATE" : "");
         List<Map<String, Object>> rounds = jdbc.queryForList(sql, parameters);
         Instant now = Instant.now();
         Map<String, Object> preferred = rounds.stream()
@@ -1018,9 +1032,15 @@ public class RegistrationService {
     private Map<String, Object> round(String roundId) {
         try {
             return jdbc.queryForMap(
-                    "SELECT \"id\", \"semesterId\" AS semester_id, \"kind\", \"status\", \"windowStart\" AS window_start,"
-                            + " \"windowEnd\" AS window_end, \"creditLimit\" AS credit_limit FROM " + ROUND
-                            + " WHERE \"id\" = :id",
+                    "SELECT registration_round.\"id\", registration_round.\"semesterId\" AS semester_id,"
+                            + " registration_round.\"kind\", registration_round.\"status\","
+                            + " registration_round.\"windowStart\" AS window_start,"
+                            + " registration_round.\"windowEnd\" AS window_end,"
+                            + " registration_round.\"creditLimit\" AS credit_limit,"
+                            + " (SELECT semester.\"type\" FROM " + SEMESTER
+                            + " semester WHERE semester.\"id\" = registration_round.\"semesterId\") AS semester_type"
+                            + " FROM " + ROUND + " registration_round"
+                            + " WHERE registration_round.\"id\" = :id",
                     new MapSqlParameterSource("id", roundId));
         } catch (EmptyResultDataAccessException exception) {
             throw problem(HttpStatus.NOT_FOUND, "ROUND_NOT_FOUND", "Registration round not found");
