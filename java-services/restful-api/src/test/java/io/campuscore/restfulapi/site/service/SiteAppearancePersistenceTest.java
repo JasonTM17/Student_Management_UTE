@@ -2,6 +2,8 @@ package io.campuscore.restfulapi.site.service;
 
 import static io.campuscore.restfulapi.testsupport.CurrentAccountJwt.fixtureJwt;
 
+import io.campuscore.restfulapi.site.repository.SiteAppearanceRepository;
+
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
@@ -140,7 +142,7 @@ class SiteAppearancePersistenceTest {
 
         var rows = jdbc.queryForList(
                 "SELECT \"id\" FROM \"site\".\"Appearance\"", String.class);
-        Assertions.assertEquals(List.of(SiteAppearanceStore.ROW_ID), rows);
+        Assertions.assertEquals(List.of(SiteAppearanceRepository.ROW_ID), rows);
     }
 
     @Test
@@ -174,7 +176,7 @@ class SiteAppearancePersistenceTest {
                 JSON.readTree(jdbc.queryForObject(
                         "SELECT \"payload\" FROM \"site\".\"Appearance\" WHERE \"id\" = ?",
                         String.class,
-                        SiteAppearanceStore.ROW_ID)).path("version").asLong());
+                        SiteAppearanceRepository.ROW_ID)).path("version").asLong());
     }
 
     @Test
@@ -228,8 +230,8 @@ class SiteAppearancePersistenceTest {
         String storedActor = jdbc.queryForObject(
                 "SELECT \"updatedBy\" FROM \"site\".\"Appearance\" WHERE \"id\" = ?",
                 String.class,
-                SiteAppearanceStore.ROW_ID);
-        Assertions.assertEquals(SiteAppearanceStore.MAX_UPDATED_BY_CHARS, storedActor.length());
+                SiteAppearanceRepository.ROW_ID);
+        Assertions.assertEquals(SiteAppearanceRepository.MAX_UPDATED_BY_CHARS, storedActor.length());
         Assertions.assertTrue(storedActor.length() < subject.length());
     }
 
