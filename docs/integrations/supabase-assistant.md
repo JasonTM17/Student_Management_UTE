@@ -2,9 +2,10 @@
 
 The assistant answers from the active published release in the Java application's PostgreSQL `assistant` schema. `knowledge_runtime_state.active_release_id` selects an immutable snapshot. The authoring table alone is not served. Public chatbot requests never query Supabase directly.
 
-`assistant.knowledge.authority-mode` selects who may change that active release:
+`assistant.knowledge.authority-mode` selects how governed admin operations reach the active release authority:
 
 - `sql`: the Java two-admin review flow publishes or archives a document and promotes the matching local snapshot in the same database transaction.
+- `remote`: the Java API forwards governed admin operations to the private RAG service through its service-token gateway.
 - `supabase`: the two-admin authority flow publishes or archives a release in Supabase. Java then synchronizes that release to the local runtime. A failed projection is reported as pending or degraded; an authoring acknowledgement is not proof that the chatbot serves the change.
 
 Do not edit `assistant.knowledge_document` directly with a service key. Direct upsert bypasses the two-admin review and release pointer. The import utility rejects that governed table. Use the admin workflow for changes to live knowledge.
