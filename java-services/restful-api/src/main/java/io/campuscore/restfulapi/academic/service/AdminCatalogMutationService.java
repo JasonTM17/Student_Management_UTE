@@ -1018,12 +1018,15 @@ public class AdminCatalogMutationService {
      * stays legal in any semester state.
      */
     private void requireNonTerminalSemesterForReopen(Object semesterId) {
-        Long count = jdbc.queryForObject(
-                "SELECT COUNT(*) FROM " + SEMESTER + " WHERE \"id\" = :id AND UPPER(TRIM(\"status\")) NOT IN (:terminalStatuses)",
-                new MapSqlParameterSource().addValue("id", semesterId)
-                        .addValue("terminalStatuses", SemesterStatuses.TERMINAL),
-                Long.class);
-        if (count == null || count == 0) {
+        // The comparison runs in Java so it is dialect-neutral: PostgreSQL
+        // TRIM strips only plain spaces, so a stored terminal value padded
+        // with a tab, a newline or a Unicode space must normalize before it
+        // is tested — a missing row refuses the same as before.
+        List<String> statuses = jdbc.queryForList(
+                "SELECT \"status\" FROM " + SEMESTER + " WHERE \"id\" = :id",
+                new MapSqlParameterSource("id", semesterId), String.class);
+        String status = statuses.isEmpty() ? null : statuses.get(0);
+        if (status == null || SemesterStatuses.TERMINAL.contains(SemesterStatuses.normalize(status))) {
             throw problem(HttpStatus.CONFLICT, "SEMESTER_CLOSED", "Semester is closed for registration");
         }
     }
