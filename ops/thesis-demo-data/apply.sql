@@ -10,41 +10,66 @@
 --
 -- SAFETY: the guard block aborts unless the database is exactly the expected
 -- production baseline (flyway >= 142, the seven known rounds present with their
--- recon statuses and baseline row counts) or already fully enriched. On the
+-- recon statuses and baseline row counts), is already fully enriched, or is
+-- fully enriched minus marker rows the application deleted afterwards. On the
 -- baseline path it also aborts when a guarded column already carries a value
 -- (pre-existing reviewer, waiver or council assignment), so apply can never
--- insert a counter-review score that mismatches an existing reviewer. When the
--- full marker set is already present the script is a strict no-op: it prints
--- 'already applied' plus the marker census and writes nothing, so it can never
--- overwrite application changes made since the first apply (retracted rounds,
--- removed waivers). Partial marker states are refused.
+-- insert a counter-review score that mismatches an existing reviewer.
 --
--- LOCKING: before anything is checked or written the script takes fixed-order
--- SHARE ROW EXCLUSIVE locks on every table it touches — the weakest level that
+-- STATE CLASSIFICATION (exact, id-set based — see _class below):
+--   absent              zero marker rows                     -> apply
+--   full                live marker ids == image ids         -> 'already applied'
+--   app_deleted_subset  live ids are a strict subset of the  -> 'already applied'
+--                       image ids (the app deleted some of   no-op; re-adding
+--                       them, e.g. a results retract)        what the app
+--                                                            removed is wrong
+--   foreign_partial     any marker rows exist but the image  -> REFUSE with the
+--                       is missing/unreadable, or live       recovery steps
+--                       contains ids the image does not
+--
+-- LOCKING: before anything is checked or written the script takes SHARE ROW
+-- EXCLUSIVE locks on every table it touches, IN THE APPLICATION'S WRITE ORDER
+-- — the thesis business tables first (the app writes them first), then
+-- notifications.notification and campuscore_audit."AdminAudit" last (the app
+-- writes its audit row last). SHARE ROW EXCLUSIVE is the weakest level that
 -- blocks application INSERT/UPDATE/DELETE (ROW EXCLUSIVE) and serializes two
--- concurrent package runs, while plain reads stay untouched. That removes every
--- check-then-act window between the guard and the writes. The locks are held
--- until COMMIT; the script is short (sub-second on a local connection, a few
--- seconds over a remote one), so that is also the longest an application write
--- can ever wait behind it. lock_timeout = 5 s makes apply abort cleanly
--- instead of queueing behind an in-flight app transaction. Run it in a quiet
--- maintenance window, exactly like rollback.
+-- concurrent package runs, while plain reads stay untouched. That removes
+-- every check-then-act window between the guard and the writes. The locks are
+-- held until COMMIT; the script is short (sub-second on a local connection, a
+-- few seconds over a remote one), so that is also the longest an application
+-- write can ever wait behind it. lock_timeout = 300 ms — deliberately below
+-- the default deadlock_timeout (1 s) — makes the package ALWAYS the victim of
+-- any lock-ordering conflict: it aborts cleanly instead of queueing, and the
+-- application transaction is never killed. run.mjs retries the whole script a
+-- bounded number of times with jitter, each attempt a fresh transaction, so no
+-- lock is ever held while the runner waits. Run it in a quiet maintenance
+-- window, exactly like rollback.
 
 BEGIN;
 
-SET LOCAL lock_timeout = '5s';
+-- every session setting that can change text/bytea/timestamp rendering is
+-- pinned for the transaction: the image hashes must round-trip identically
+-- under any client session settings (the runner also uses psql -X so no
+-- startup file can pre-set different values).
+SET LOCAL lock_timeout = '300ms';
 SET LOCAL statement_timeout = '120s';
 SET LOCAL TimeZone = 'UTC';
 SET LOCAL DateStyle = 'ISO, MDY';
+SET LOCAL bytea_output = 'hex';
+SET LOCAL extra_float_digits = 0;
+SET LOCAL IntervalStyle = 'iso_8601';
+SET LOCAL standard_conforming_strings = 'on';
 
+-- locks in the application's own write order: thesis business tables first,
+-- the hot app-wide notification and audit tables last.
 DO $$
 BEGIN
   BEGIN
-    EXECUTE 'LOCK TABLE campuscore_audit."AdminAudit", notifications.notification,'
-         || ' thesis.thesis_council, thesis.thesis_council_member, thesis.thesis_council_topic,'
+    EXECUTE 'LOCK TABLE thesis.thesis_council, thesis.thesis_council_member, thesis.thesis_council_topic,'
          || ' thesis.thesis_group, thesis.thesis_group_member, thesis.thesis_group_report,'
          || ' thesis.thesis_registration_round, thesis.thesis_topic, thesis.thesis_topic_score,'
-         || ' thesis.thesis_topic_supervisor IN SHARE ROW EXCLUSIVE MODE';
+         || ' thesis.thesis_topic_supervisor, notifications.notification,'
+         || ' campuscore_audit."AdminAudit" IN SHARE ROW EXCLUSIVE MODE';
   EXCEPTION WHEN lock_not_available THEN
     RAISE EXCEPTION 'apply aborted: could not lock the package tables within lock_timeout — an application write is in progress; nothing was changed, retry when the app is idle'
       USING ERRCODE = '55P03', CONSTRAINT = 'thesis_demo_apply_lock';
@@ -73,11 +98,120 @@ FROM (VALUES ('thesis_topic',17),('thesis_topic_supervisor',18),('thesis_group',
              ('thesis_council_topic',16),('thesis_topic_score',62),('thesis_group_report',17),
              ('notification',107),('admin_audit',6)) s(name, expected);
 
+-- the eleven marker tables and their marker-row predicates, reused by the
+-- state classification and the hash capture.
+CREATE TEMP TABLE _tables (tbl text, pred text) ON COMMIT DROP;
+INSERT INTO _tables VALUES
+  ('thesis.thesis_topic','id::text LIKE ''ed1a0000-0000-4000-8000-%'''),
+  ('thesis.thesis_topic_supervisor','id::text LIKE ''ed1a0000-0000-4000-8000-%'''),
+  ('thesis.thesis_group','id::text LIKE ''ed1a0000-0000-4000-8000-%'''),
+  ('thesis.thesis_group_member','id::text LIKE ''ed1a0000-0000-4000-8000-%'''),
+  ('thesis.thesis_council','id::text LIKE ''ed1a0000-0000-4000-8000-%'''),
+  ('thesis.thesis_council_member','id::text LIKE ''ed1a0000-0000-4000-8000-%'''),
+  ('thesis.thesis_council_topic','id::text LIKE ''ed1a0000-0000-4000-8000-%'''),
+  ('thesis.thesis_topic_score','id::text LIKE ''ed1a0000-0000-4000-8000-%'''),
+  ('thesis.thesis_group_report','id::text LIKE ''ed1a0000-0000-4000-8000-%'''),
+  ('notifications.notification','id LIKE ''demo-th-%'''),
+  ('campuscore_audit."AdminAudit"','id LIKE ''demo-th-%'' AND id <> ''demo-th-audit-000''');
+
+-- explicit, versioned per-table column lists the row hashes cover: every
+-- column the package writes EXCEPT volatile bookkeeping columns the
+-- application legitimately bumps on its own (version, updated_at everywhere;
+-- is_read/read_at on notifications — markAllRead touches those). A future
+-- migration that ADDS a column therefore changes no hash; a migration that
+-- drops a hashed column simply removes it from the comparison (the remaining
+-- columns are still verified). The same literal list lives in rollback.sql
+-- and must stay identical.
+CREATE TEMP TABLE _hashcols (tbl text, col text, ord int) ON COMMIT DROP;
+INSERT INTO _hashcols
+SELECT j.tbl, c.col, c.ord::int
+FROM (VALUES
+  ('thesis.thesis_topic', '["id","round_id","department_id","title","description","max_groups","status","created_by","created_at","final_score","final_score_finalized_by","final_score_finalized_at","result_status","gvpb_lecturer_id","gvpb_waived_reason","gvpb_waived_by","gvpb_waived_at","result_reason","result_by","result_at"]'),
+  ('thesis.thesis_topic_supervisor', '["id","topic_id","lecturer_id","supervisor_order","created_at"]'),
+  ('thesis.thesis_group', '["id","round_id","leader_student_id","topic_id","status","approval_status","approved_by","approved_at","rejection_reason","created_at","legacy_group_size_exception","size_exception_reason","size_exception_by","size_exception_at"]'),
+  ('thesis.thesis_group_member', '["id","group_id","round_id","student_id","member_order","is_leader","created_at","display_name","contact","is_external","active_participation"]'),
+  ('thesis.thesis_council', '["id","round_id","name","status","created_by","created_at"]'),
+  ('thesis.thesis_council_member', '["id","council_id","lecturer_id","member_role","created_at"]'),
+  ('thesis.thesis_council_topic', '["id","council_id","topic_id","assigned_by","created_at"]'),
+  ('thesis.thesis_topic_score', '["id","topic_id","council_id","lecturer_id","component","score","graded_at","created_at","comment"]'),
+  ('thesis.thesis_group_report', '["id","group_id","round_id","submitted_by","title","url","note","submitted_at","file_name","file_type","file_size","file_data","storage_provider","storage_bucket","storage_key","file_sha256"]'),
+  ('notifications.notification', '["id","user_id","title","message","type","link","created_at","announcement_id","source_key"]'),
+  ('campuscore_audit."AdminAudit"', '["id","actorId","actorLabel","action","entityType","entityId","summary","beforeState","afterState"]')
+) j(tbl, cols)
+CROSS JOIN LATERAL jsonb_array_elements_text(j.cols::jsonb) WITH ORDINALITY c(col, ord);
+
+-- state classification: compare the live marker-id set with the ids recorded
+-- in the before-image (audit row first, checksum-verified comment copy as
+-- fallback). Outcome decides whether this script applies, no-ops, or refuses.
+CREATE TEMP TABLE _class (state text, missing_rows bigint, extra_rows bigint, detail text) ON COMMIT DROP;
+
+DO $$
+DECLARE
+  v_live bigint;
+  v_img jsonb;
+  v_copy jsonb;
+  v_raw text;
+  v_comment text;
+  v_decl text;
+  v_payload text;
+  v_missing bigint := 0;
+  v_extra bigint := 0;
+  v_m bigint;
+  v_x bigint;
+  v_detail text := '';
+  r record;
+BEGIN
+  SELECT coalesce(sum(cnt), 0) INTO v_live FROM _marker_counts;
+  IF v_live = 0 THEN
+    INSERT INTO _class VALUES ('absent', 0, 0, '');
+    RETURN;
+  END IF;
+
+  -- locate a usable before-image: audit-row copy first, then the
+  -- checksum-protected comment copy (md5 verified before trusting it).
+  SELECT "beforeState" INTO v_raw FROM campuscore_audit."AdminAudit" WHERE id = 'demo-th-audit-000';
+  IF v_raw IS NOT NULL AND v_raw ~ '^\s*\{' THEN
+    BEGIN v_img := v_raw::jsonb; EXCEPTION WHEN OTHERS THEN v_img := NULL; END;
+  END IF;
+  v_comment := obj_description('thesis.thesis_topic'::regclass);
+  IF v_comment LIKE 'thesis-demo-data v3 md5:%' THEN
+    v_decl := substring(v_comment from 'md5:([0-9a-f]{32})');
+    v_payload := substr(v_comment, position(E'\n' in v_comment) + 1);
+    IF v_decl IS NOT NULL AND coalesce(v_payload, '') <> '' AND md5(v_payload) = v_decl THEN
+      BEGIN v_copy := v_payload::jsonb; EXCEPTION WHEN OTHERS THEN v_copy := NULL; END;
+    END IF;
+  END IF;
+  v_img := coalesce(v_img, v_copy);
+  IF v_img IS NULL
+     OR coalesce(v_img->>'format', '') <> '3'
+     OR jsonb_typeof(v_img->'rows') IS DISTINCT FROM 'object' THEN
+    INSERT INTO _class VALUES ('foreign_partial', 0, 0, 'before-image missing or unreadable');
+    RETURN;
+  END IF;
+
+  FOR r IN SELECT tbl, pred FROM _tables LOOP
+    EXECUTE format(
+      'WITH exp AS (SELECT e.key AS id FROM jsonb_each(coalesce($1, ''{}''::jsonb)) e),
+            act AS (SELECT id::text AS id FROM %s t WHERE %s)
+       SELECT (SELECT count(*) FROM exp e WHERE NOT EXISTS (SELECT 1 FROM act a WHERE a.id = e.id)),
+              (SELECT count(*) FROM act a WHERE NOT EXISTS (SELECT 1 FROM exp e WHERE e.id = a.id))',
+      r.tbl, r.pred)
+      INTO v_m, v_x USING (v_img->'rows'->r.tbl);
+    v_missing := v_missing + v_m;
+    v_extra := v_extra + v_x;
+    IF v_m > 0 THEN v_detail := v_detail || r.tbl || '=' || v_m || ' '; END IF;
+  END LOOP;
+  INSERT INTO _class VALUES (
+    CASE WHEN v_extra > 0 THEN 'foreign_partial'
+         WHEN v_missing > 0 THEN 'app_deleted_subset'
+         ELSE 'full' END,
+    v_missing, v_extra, trim(v_detail));
+END $$;
+
 DO $$
 DECLARE
   v_max int;
-  v_all_zero boolean;
-  v_all_full boolean;
+  v_state text;
 BEGIN
   SELECT max(version::int) INTO v_max FROM thesis.flyway_schema_history WHERE success;
   IF v_max IS NULL OR v_max < 142 THEN
@@ -104,15 +238,18 @@ BEGIN
       USING ERRCODE = '23514', CONSTRAINT = 'thesis_demo_data_guard';
   END IF;
 
-  -- baseline or fully-enriched state required, per marker table (nothing in
-  -- between in either direction)
-  SELECT bool_and(cnt = 0), bool_and(cnt = expected)
-    INTO v_all_zero, v_all_full FROM _marker_counts;
-  IF NOT (v_all_zero OR v_all_full) THEN
-    RAISE EXCEPTION 'demo-data guard: partial marker state detected — run rollback.sql first, then re-apply'
+  -- refuse a foreign partial state: marker rows exist but the before-image is
+  -- missing/unreadable, or live marker ids exist that the image never wrote.
+  -- The exact way back is recovery (it rebuilds the image from the manifest,
+  -- not from live content) followed by rollback, or a deliberate marker
+  -- cleanup — never a blind re-apply.
+  SELECT state INTO v_state FROM _class;
+  IF v_state = 'foreign_partial' THEN
+    RAISE EXCEPTION 'demo-data guard: foreign partial marker state (%) — marker rows exist but the before-image cannot vouch for them. Run recover-before-image.sql to rebuild the image from the recorded baseline, then rollback.sql; or remove the marker rows deliberately. Re-apply is refused.',
+      (SELECT detail FROM _class)
       USING ERRCODE = '23514', CONSTRAINT = 'thesis_demo_data_guard';
   END IF;
-  IF v_all_zero THEN
+  IF v_state = 'absent' THEN
     -- pristine baseline: the five touched rounds must still look like recon.
     -- Counts are upper bounds so both the production baseline and the verified
     -- pre-deploy snapshot (which predates some prod drift) are accepted.
@@ -204,21 +341,27 @@ BEGIN
     -- the redundant before-image copy lives in this table's comment; refuse to
     -- overwrite a foreign one rather than destroy operator metadata
     IF obj_description('thesis.thesis_topic'::regclass) IS NOT NULL
-       AND obj_description('thesis.thesis_topic'::regclass) NOT LIKE 'thesis-demo-data v2 %' THEN
+       AND obj_description('thesis.thesis_topic'::regclass) NOT LIKE 'thesis-demo-data v3 %' THEN
       RAISE EXCEPTION 'demo-data guard: thesis.thesis_topic carries a non-package comment — refusing to overwrite metadata'
         USING ERRCODE = '23514', CONSTRAINT = 'thesis_demo_data_guard';
     END IF;
   END IF;
 END $$;
 
--- full marker set already present: a re-apply must change NOTHING. It prints
--- 'already applied' plus the census and skips every guarded update, so it can
--- never overwrite application changes made since the first apply.
-SELECT bool_and(cnt = expected) AS already_applied FROM _marker_counts \gset
+-- full marker set (or a strict subset left by application deletes) already
+-- present: a re-apply must change NOTHING. It prints 'already applied' plus
+-- the census and skips every guarded update, so it can never overwrite
+-- application changes made since the first apply — including not re-adding
+-- rows the application deliberately removed.
+SELECT (state IN ('full','app_deleted_subset')) AS already_applied,
+       state, missing_rows, detail FROM _class \gset
 
 \if :already_applied
 
-SELECT 'thesis demo-data already applied — no-op, 0 rows written' AS result;
+SELECT CASE WHEN :'state' = 'app_deleted_subset'
+  THEN 'thesis demo-data already applied — the application removed ' || :missing_rows
+       || ' marker row(s) since apply (' || :'detail' || '); no-op, 0 rows written'
+  ELSE 'thesis demo-data already applied — no-op, 0 rows written' END AS result;
 
 -- report drift on the guarded columns against the recorded applied values so
 -- post-apply application changes stay visible without being touched
@@ -227,11 +370,24 @@ DECLARE
   r record;
   n int;
   v_img jsonb;
+  v_comment text;
+  v_decl text;
+  v_payload text;
   v_drift int := 0;
   v_names text := '';
 BEGIN
   SELECT "beforeState"::jsonb INTO v_img FROM campuscore_audit."AdminAudit"
    WHERE id = 'demo-th-audit-000' AND "beforeState" ~ '^\s*\{';
+  IF v_img IS NULL THEN
+    v_comment := obj_description('thesis.thesis_topic'::regclass);
+    IF v_comment LIKE 'thesis-demo-data v3 md5:%' THEN
+      v_decl := substring(v_comment from 'md5:([0-9a-f]{32})');
+      v_payload := substr(v_comment, position(E'\n' in v_comment) + 1);
+      IF v_decl IS NOT NULL AND md5(v_payload) = v_decl THEN
+        BEGIN v_img := v_payload::jsonb; EXCEPTION WHEN OTHERS THEN v_img := NULL; END;
+      END IF;
+    END IF;
+  END IF;
   IF v_img IS NULL OR jsonb_typeof(v_img->'cols') IS DISTINCT FROM 'array' THEN
     RAISE WARNING 'demo-data already applied, but the before-image is missing — rollback will refuse; rebuild it with recover-before-image.sql';
     RETURN;
@@ -839,49 +995,73 @@ FROM (VALUES
 ON CONFLICT (id) DO NOTHING;
 
 -- persist the apply-time state into the durable before-image (same transaction):
---   cols: the guarded-column before/applied values (ISO 8601 with offset for
---         timestamps — session-format independent)
---   rows: the whole-row md5 hash of every marker row, per table. rollback.sql
---         re-hashes and ABORTS on any difference, so an application edit or a
---         delete of a marker row can never be silently cascaded away.
+--   format:   3
+--   cols:     the guarded-column before/applied values (ISO 8601 with offset
+--             for timestamps — session-format independent)
+--   hashcols: the explicit per-table column lists the row hashes cover
+--   rows:     per marker row, per HASHED column, md5 of its canonical render
+--             (to_jsonb(... )#>>'{}' under the pinned session settings;
+--             encode(...,'hex') for bytea). rollback.sql re-hashes the same
+--             columns: a marker row that still exists but DIFFERS on a hashed
+--             column blocks rollback, while a marker row the application
+--             deleted is simply reported and skipped. Columns a migration
+--             later adds are invisible to the hash, and volatile bookkeeping
+--             columns (version, updated_at, notification is_read/read_at) are
+--             never hashed.
 -- demo-th-audit-000 itself is excluded from the hash set: it carries the image.
-CREATE TEMP TABLE _row_hashes (tbl text, id text, h text) ON COMMIT DROP;
-INSERT INTO _row_hashes SELECT 'thesis.thesis_topic', id::text, md5(t::text) FROM thesis.thesis_topic t WHERE id::text LIKE 'ed1a0000-0000-4000-8000-%';
-INSERT INTO _row_hashes SELECT 'thesis.thesis_topic_supervisor', id::text, md5(t::text) FROM thesis.thesis_topic_supervisor t WHERE id::text LIKE 'ed1a0000-0000-4000-8000-%';
-INSERT INTO _row_hashes SELECT 'thesis.thesis_group', id::text, md5(t::text) FROM thesis.thesis_group t WHERE id::text LIKE 'ed1a0000-0000-4000-8000-%';
-INSERT INTO _row_hashes SELECT 'thesis.thesis_group_member', id::text, md5(t::text) FROM thesis.thesis_group_member t WHERE id::text LIKE 'ed1a0000-0000-4000-8000-%';
-INSERT INTO _row_hashes SELECT 'thesis.thesis_council', id::text, md5(t::text) FROM thesis.thesis_council t WHERE id::text LIKE 'ed1a0000-0000-4000-8000-%';
-INSERT INTO _row_hashes SELECT 'thesis.thesis_council_member', id::text, md5(t::text) FROM thesis.thesis_council_member t WHERE id::text LIKE 'ed1a0000-0000-4000-8000-%';
-INSERT INTO _row_hashes SELECT 'thesis.thesis_council_topic', id::text, md5(t::text) FROM thesis.thesis_council_topic t WHERE id::text LIKE 'ed1a0000-0000-4000-8000-%';
-INSERT INTO _row_hashes SELECT 'thesis.thesis_topic_score', id::text, md5(t::text) FROM thesis.thesis_topic_score t WHERE id::text LIKE 'ed1a0000-0000-4000-8000-%';
-INSERT INTO _row_hashes SELECT 'thesis.thesis_group_report', id::text, md5(t::text) FROM thesis.thesis_group_report t WHERE id::text LIKE 'ed1a0000-0000-4000-8000-%';
-INSERT INTO _row_hashes SELECT 'notifications.notification', id::text, md5(t::text) FROM notifications.notification t WHERE id LIKE 'demo-th-%';
-INSERT INTO _row_hashes SELECT 'campuscore_audit."AdminAudit"', id::text, md5(t::text) FROM campuscore_audit."AdminAudit" t WHERE id LIKE 'demo-th-%' AND id <> 'demo-th-audit-000';
+CREATE TEMP TABLE _row_hashes (tbl text, id text, hashes jsonb) ON COMMIT DROP;
+
+DO $$
+DECLARE
+  r record;
+BEGIN
+  FOR r IN
+    SELECT hc.tbl,
+           string_agg(format('%L, md5(CASE WHEN t.%I IS NULL THEN chr(1) ELSE %s END)',
+                             hc.col, hc.col,
+                             CASE WHEN a.atttypid = 'bytea'::regtype
+                                  THEN format('encode(t.%I, ''hex'')', hc.col)
+                                  ELSE format('to_jsonb(t.%I) #>> ''{}''', hc.col) END),
+                             ', ' ORDER BY hc.ord) AS pairs,
+           count(*) AS ncol
+      FROM _hashcols hc
+      JOIN pg_attribute a ON a.attrelid = hc.tbl::regclass AND a.attname = hc.col
+                         AND a.attnum > 0 AND NOT a.attisdropped
+      JOIN _tables pt ON pt.tbl = hc.tbl
+      GROUP BY hc.tbl
+  LOOP
+    IF r.ncol = 0 THEN
+      RAISE EXCEPTION 'demo apply impossible: every hashed column of % was dropped by a schema change', r.tbl;
+    END IF;
+    EXECUTE format('INSERT INTO _row_hashes SELECT %L, id::text, jsonb_build_object(%s) FROM %s t WHERE %s',
+                   r.tbl, r.pairs, r.tbl,
+                   (SELECT pred FROM _tables WHERE tbl = r.tbl));
+  END LOOP;
+END $$;
 
 CREATE TEMP TABLE _image (img jsonb) ON COMMIT DROP;
 INSERT INTO _image
 SELECT jsonb_build_object(
-  'format', 2,
-  'cols', (SELECT jsonb_agg(jsonb_build_object('tbl', b.tbl, 'id', b.id, 'col', b.col, 'before', b.before_val, 'applied', b.applied_val))
+  'format', 3,
+  'cols', (SELECT coalesce(jsonb_agg(jsonb_build_object('tbl', b.tbl, 'id', b.id, 'col', b.col, 'before', b.before_val, 'applied', b.applied_val)), '[]'::jsonb)
              FROM _demo_before b),
+  'hashcols', (SELECT jsonb_object_agg(tbl, cols)
+                 FROM (SELECT tbl, jsonb_agg(col ORDER BY ord) AS cols FROM _hashcols GROUP BY tbl) s),
   'rows', (SELECT jsonb_object_agg(tbl, ids)
-             FROM (SELECT tbl, jsonb_object_agg(id, h) AS ids FROM _row_hashes GROUP BY tbl) s));
+             FROM (SELECT tbl, jsonb_object_agg(id, hashes) AS ids FROM _row_hashes GROUP BY tbl) s));
 
--- only written when the guarded updates actually ran and no image exists yet,
--- so a re-apply never erases the original baseline
+-- written on every fresh apply (the image describes THIS apply's marker rows
+-- and guarded values; a stale image must never survive a new apply)
 UPDATE campuscore_audit."AdminAudit"
 SET "beforeState" = (SELECT img::text FROM _image)
-WHERE id = 'demo-th-audit-000'
-  AND EXISTS (SELECT 1 FROM _demo_before)
-  AND coalesce("beforeState", '') IN ('', '[]', 'null');
+WHERE id = 'demo-th-audit-000';
 
 -- checksum-protected redundant copy in the table comment: it survives a single
 -- audit-row deletion (and any AdminAudit pruning), and rollback verifies the
 -- md5 before trusting it. The comment is cleared by rollback.
 SELECT format('COMMENT ON TABLE thesis.thesis_topic IS %L',
-              'thesis-demo-data v2 md5:' || md5(img::text) || E'\n' || img::text)
-FROM _image
-WHERE EXISTS (SELECT 1 FROM _demo_before) \gexec
+              'thesis-demo-data v3 md5:' || md5(img::text) || E'\n' || img::text)
+FROM _image \gexec
 
 -- post-write assertion: abort the whole transaction if the marker set is incomplete
 -- or any report blob disagrees with its recorded size/sha256 metadata.
@@ -900,7 +1080,7 @@ BEGIN
   SELECT count(*) INTO n FROM campuscore_audit."AdminAudit"
    WHERE id = 'demo-th-audit-000' AND "beforeState" ~ '^\s*\{';
   IF n <> 1 THEN RAISE EXCEPTION 'demo apply incomplete: audit-row before-image missing'; END IF;
-  IF obj_description('thesis.thesis_topic'::regclass) NOT LIKE 'thesis-demo-data v2 md5:%' THEN
+  IF obj_description('thesis.thesis_topic'::regclass) NOT LIKE 'thesis-demo-data v3 md5:%' THEN
     RAISE EXCEPTION 'demo apply incomplete: checksum-protected comment copy missing';
   END IF;
   SELECT count(*) INTO n FROM thesis.thesis_group_report

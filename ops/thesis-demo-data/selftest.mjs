@@ -40,21 +40,34 @@ function sql(script, env = {}) {
   for (const s of stmts) args.push('-c', s);
   const r = spawnSync(psql, args,
     { encoding: 'utf8', env: { ...process.env, ...env }, windowsHide: true });
-  return { status: r.status ?? 1, out: r.stdout || '', err: r.stderr || '' };
+  const res = { status: r.status ?? 1, out: r.stdout || '', err: r.stderr || '' };
+  if (res.err.trim()) {
+    lastErr = res.err.split('\n').filter(l => /ERROR|FATAL|EXCEPTION/i.test(l)).slice(-2).join(' ~ ');
+    if (res.status !== 0) console.log(`  !! sql exit=${res.status} :: ${lastErr}`);
+  }
+  return res;
 }
+let lastErr = '';
 function runFile(file, vars = {}, env = {}) {
   const args = [...connArgs(), '-X', '-v', 'ON_ERROR_STOP=1', '-P', 'pager=off'];
   for (const [k, v] of Object.entries(vars)) args.push('-v', `${k}=${v}`);
   args.push('-f', join(here, file));
   const r = spawnSync(psql, args, { encoding: 'utf8', env: { ...process.env, ...env }, windowsHide: true });
-  return { status: r.status ?? 1, out: r.stdout || '', err: r.stderr || '' };
+  const res = { status: r.status ?? 1, out: r.stdout || '', err: r.stderr || '' };
+  lastErr = (res.err + '\n' + res.out).split('\n').filter(l => /ERROR|EXCEPTION|guard|refus|warn/i.test(l)).slice(-2).join(' ~ ');
+  if (res.status !== 0) console.log(`  !! ${file} exit=${res.status} :: ${lastErr || res.err.trim().split('\n')[0] || 'no-error-text'}`);
+  return res;
 }
 function record(name, ok, detail = '') {
   results.push([name, ok]);
-  console.log(`${ok ? 'PASS' : 'FAIL'} ${name}${detail ? ' — ' + detail : ''}`);
+  console.log(`${ok ? 'PASS' : 'FAIL'} ${name}${detail ? ' — ' + detail : ''}${!ok && lastErr ? '  <<' + lastErr + '>>' : ''}`);
+  if (!ok && process.env.SELFTEST_STOP_ON_FAIL) {
+    console.log('---'); console.log('stopped at first FAIL (SELFTEST_STOP_ON_FAIL)');
+    process.exit(1);
+  }
 }
 
-const HASH_SQL = [`SET TimeZone='UTC'`, `SET DateStyle='ISO,MDY'`,
+const HASH_SQL = [`SET TimeZone='UTC'`, `SET DateStyle='ISO,MDY'`, `SET bytea_output='hex'`, `SET extra_float_digits=0`,
 `SELECT 'audit', md5(coalesce(string_agg(t.h, '' ORDER BY t.h), '')) FROM (SELECT md5(t::text) h FROM campuscore_audit."AdminAudit" t) t
 UNION ALL SELECT 'notification', md5(coalesce(string_agg(t.h,'' ORDER BY t.h),'')) FROM (SELECT md5(t::text) h FROM notifications.notification t) t
 UNION ALL SELECT 'thesis_council', md5(coalesce(string_agg(t.h,'' ORDER BY t.h),'')) FROM (SELECT md5(t::text) h FROM thesis.thesis_council t) t
@@ -172,11 +185,12 @@ async function main() {
     SELECT pg_sleep(3); COMMIT;`;
   const app = spawn(psql, [...connArgs(), '-X', '-v', 'ON_ERROR_STOP=1', '-P', 'pager=off', '-c', appSql],
     { env: process.env, windowsHide: true });
+  const appDone = once(app, 'exit'); // register before any await — 'exit' is not replayed
   await delay(1000);
   const t0 = Date.now();
   r = runFile('rollback.sql');
   const raceMs = Date.now() - t0;
-  const [appCode] = await once(app, 'exit');
+  const [appCode] = await appDone;
   const appRow = sql(`SELECT count(*) FROM thesis.thesis_topic_score WHERE council_id='ed1a0000-0000-4000-8000-000500000004'
                       AND id::text NOT LIKE 'ed1a0000-%'`).out.trim();
   record('race.rollback_aborted_or_refused', r.status !== 0 && /reference marker rows|aborted/.test(r.out + r.err),
@@ -189,12 +203,13 @@ async function main() {
   // ---- N1b: rollback first, app write arrives during the lock window ----
   const rb = spawn(psql, [...connArgs(), '-X', '-v', 'ON_ERROR_STOP=1', '-P', 'pager=off', '-f', join(here, 'rollback.sql')],
     { env: process.env, windowsHide: true });
+  const rbDone = once(rb, 'exit');
   await delay(400);
   const app2Sql = `INSERT INTO thesis.thesis_topic_score (id, topic_id, council_id, lecturer_id, component, score, graded_at, created_at)
     VALUES (gen_random_uuid(), '6f64670b-cd6b-4e1b-ae9d-0b497f2472a8', 'ed1a0000-0000-4000-8000-000500000004',
             'lecturer-profile-002', 'DEFENSE', 9.00, now(), now())`;
   const r2 = sql(app2Sql);
-  const [rbCode] = await once(rb, 'exit');
+  const [rbCode] = await rbDone;
   const appRow2 = sql(`SELECT count(*) FROM thesis.thesis_topic_score WHERE council_id='ed1a0000-0000-4000-8000-000500000004'`).out.trim();
   record('race2.app_insert_rejected', r2.status !== 0 && appRow2 === '0',
          `app_exit=${r2.status} rollback_exit=${rbCode} leftover=${appRow2}`);
@@ -204,14 +219,24 @@ async function main() {
   r = runFile('apply.sql', { dry_run: '0' });
   record('reapply_for_phase2.exit0', r.status === 0 && markerTotal() === MARKER_EXPECTED, `exit=${r.status}`);
 
-  // ---- N4: in-place edit of a marker row must abort rollback ----
+  // ---- N4a: volatile bookkeeping edit (updated_at) must NOT block rollback (E1) ----
   const editId = sql(`SELECT id::text FROM thesis.thesis_group_report WHERE id::text LIKE 'ed1a0000-%' ORDER BY id LIMIT 1`).out.trim();
-  const origUpd = sql(`SELECT to_jsonb(updated_at)#>>'{}' FROM thesis.thesis_group_report WHERE id::text='${editId}'`).out.trim();
-  sql(`UPDATE thesis.thesis_group_report SET updated_at = now() + interval '1 hour' WHERE id::text='${editId}'`);
+  const topicId = sql(`SELECT id::text FROM thesis.thesis_topic WHERE id::text LIKE 'ed1a0000-%' ORDER BY id LIMIT 1`).out.trim();
+  const v = sql(`UPDATE thesis.thesis_group_report SET updated_at = now() + interval '1 hour' WHERE id::text='${editId}';
+       UPDATE thesis.thesis_topic SET version = version + 7, updated_at = now() + interval '1 hour' WHERE id::text='${topicId}'`);
+  record('n4.volatile_update_executed', v.status === 0, `exit=${v.status}`);
   r = runFile('rollback.sql');
-  record('n4.report_edit_aborts', r.status !== 0 && /content hash|differ/.test(r.out + r.err) && markerTotal() === MARKER_EXPECTED,
+  record('n4.volatile_edit_tolerated', r.status === 0 && markerTotal() === 0,
          `exit=${r.status}`);
-  sql(`UPDATE thesis.thesis_group_report SET updated_at='${origUpd}'::timestamptz WHERE id::text='${editId}'`);
+
+  // ---- N4b: content edit of a hashed column must still abort (fail-closed) ----
+  r = runFile('apply.sql', { dry_run: '0' });
+  const origName = sql(`SELECT file_name FROM thesis.thesis_group_report WHERE id::text='${editId}'`).out.trim();
+  sql(`UPDATE thesis.thesis_group_report SET file_name='tampered-by-app.pdf' WHERE id::text='${editId}'`);
+  r = runFile('rollback.sql');
+  record('n4.content_edit_aborts', r.status !== 0 && /differ/.test(r.out + r.err) && markerTotal() === MARKER_EXPECTED,
+         `exit=${r.status}`);
+  sql(`UPDATE thesis.thesis_group_report SET file_name=$X$${origName}$X$ WHERE id::text='${editId}'`);
   r = runFile('rollback.sql');
   record('n4.reverted_edit_allows_rollback', r.status === 0 && markerTotal() === 0, `exit=${r.status}`);
 
@@ -270,10 +295,238 @@ async function main() {
   record('f.preexisting_reviewer_aborts_apply', r.status !== 0 && markerTotal() === 0, `exit=${r.status} markers=${markerTotal()}`);
   sql(`UPDATE thesis.thesis_topic SET gvpb_lecturer_id=NULL WHERE id='6f64670b-cd6b-4e1b-ae9d-0b497f2472a8'`);
 
+  // waiver / council-assignment / foreign-comment preflights on the same
+  // guarded baseline topics (each maps to a dedicated mutant in mutants.mjs)
+  sql(`UPDATE thesis.thesis_topic SET gvpb_waived_reason='probe' WHERE id='67c74df5-5c7f-4e74-aa02-d51af7207fe9'`);
+  r = runFile('apply.sql', { dry_run: '0' });
+  record('f.preexisting_waiver_aborts_apply', r.status !== 0 && /waiver/.test(r.out + r.err) && markerTotal() === 0, `exit=${r.status}`);
+  sql(`UPDATE thesis.thesis_topic SET gvpb_waived_reason=NULL WHERE id='67c74df5-5c7f-4e74-aa02-d51af7207fe9'`);
+  sql(`INSERT INTO thesis.thesis_council_topic (id, council_id, topic_id, assigned_by, created_at)
+       VALUES (gen_random_uuid(),'7ea8f499-949e-42c2-b11e-02be39b8ec52','018f4a7c-3b12-4d90-a5e1-7c82b9045001','admin-user',now())`);
+  r = runFile('apply.sql', { dry_run: '0' });
+  record('f.existing_council_assignment_aborts', r.status !== 0 && /council assignment/.test(r.out + r.err) && markerTotal() === 0, `exit=${r.status}`);
+  sql(`DELETE FROM thesis.thesis_council_topic WHERE council_id='7ea8f499-949e-42c2-b11e-02be39b8ec52' AND topic_id='018f4a7c-3b12-4d90-a5e1-7c82b9045001'`);
+  sql(`COMMENT ON TABLE thesis.thesis_topic IS 'operator note - not the package'`);
+  r = runFile('apply.sql', { dry_run: '0' });
+  record('f.foreign_comment_aborts_apply', r.status !== 0 && /non-package comment/.test(r.out + r.err) && markerTotal() === 0, `exit=${r.status}`);
+  sql(`COMMENT ON TABLE thesis.thesis_topic IS NULL`);
+
+  // ---- P1 dean-retract (ENR3 E1): the app retracts round be1aa853 and the
+  // notification recall deletes the round's 16 marker notifications. The old
+  // package stuck BOTH ways ('partial state' on apply, '16 differ' on
+  // rollback). Now: re-apply is a no-op 'already applied' and rollback
+  // tolerates the app-deleted rows while still restoring what remains. ----
+  r = runFile('apply.sql', { dry_run: '0' });
+  record('p1.apply', r.status === 0 && markerTotal() === MARKER_EXPECTED, `exit=${r.status}`);
+  const beSnap = sql(`SELECT version||'|'||(to_jsonb(updated_at)#>>'{}')||'|'||coalesce(to_jsonb(results_published_at)#>>'{}','~')||'|'||status
+                      FROM thesis.thesis_registration_round WHERE id='be1aa853-f153-4f2e-a5cb-ed1b6c3c1bf1'`).out.trim();
+  const nSkey = sql(`SELECT count(*) FROM notifications.notification WHERE id LIKE 'demo-th-%' AND source_key='THESIS_RESULTS:be1aa853-f153-4f2e-a5cb-ed1b6c3c1bf1'`).out.trim();
+  const sim = sql(`UPDATE thesis.thesis_registration_round SET status='REGISTRATION_CLOSED', results_published_at=NULL,
+       updated_at=now(), version=version+1 WHERE id='be1aa853-f153-4f2e-a5cb-ed1b6c3c1bf1';
+       DELETE FROM notifications.notification WHERE id LIKE 'demo-th-%' AND source_key='THESIS_RESULTS:be1aa853-f153-4f2e-a5cb-ed1b6c3c1bf1';`);
+  record('p1.retract_simulated', sim.status === 0 && nSkey === '16' && markerTotal() === MARKER_EXPECTED - 16,
+         `exit=${sim.status} skey_notifications=${nSkey} markers=${markerTotal()}`);
+  r = runFile('apply.sql', { dry_run: '0' });
+  record('p1.reapply_is_noop_not_partial', r.status === 0 && /already applied/.test(r.out) && /removed/.test(r.out) && markerTotal() === MARKER_EXPECTED - 16,
+         `exit=${r.status}`);
+  r = runFile('rollback.sql');
+  record('p1.rollback_tolerates_app_deleted', r.status === 0 && /already removed by the application/.test(r.out + r.err) && markerTotal() === 0,
+         `exit=${r.status}`);
+  // restore the retracted round to its pre-test state (the app-owned change
+  // rollback correctly left alone: skipped_drift on the guarded columns)
+  const [bv, bu, bp, bs] = beSnap.split('|');
+  sql(`UPDATE thesis.thesis_registration_round SET version=${bv}, updated_at='${bu}'::timestamptz,
+       results_published_at=${bp === '~' ? 'NULL' : `'${bp}'::timestamptz`}, status='${bs}'
+       WHERE id='be1aa853-f153-4f2e-a5cb-ed1b6c3c1bf1'`);
+
+  // ---- E1b: markAllRead touches only is_read/read_at/updated_at — excluded
+  // bookkeeping columns — so a full sweep of the demo notifications must not
+  // block rollback either. ----
+  r = runFile('apply.sql', { dry_run: '0' });
+  sql(`UPDATE notifications.notification SET is_read=TRUE, read_at=now(), updated_at=now() WHERE id LIKE 'demo-th-%'`);
+  r = runFile('rollback.sql');
+  record('e1.markallread_tolerated', r.status === 0 && markerTotal() === 0, `exit=${r.status}`);
+
+  // ---- E1c: a later migration ADDs a column — hashed column list is
+  // explicit, so whole-row shape changes no longer change any hash (ENR3 P2). ----
+  r = runFile('apply.sql', { dry_run: '0' });
+  const alt = sql(`ALTER TABLE thesis.thesis_group_member ADD COLUMN enr4_probe_col text`);
+  r = runFile('rollback.sql');
+  const unalt = sql(`ALTER TABLE thesis.thesis_group_member DROP COLUMN enr4_probe_col`);
+  record('e1.add_column_migration_tolerated', alt.status === 0 && r.status === 0 && markerTotal() === 0 && unalt.status === 0,
+         `alter=${alt.status} rollback=${r.status} unalter=${unalt.status}`);
+
+  // ---- E3: bytea_output=escape session must not produce false drift (P3). ----
+  r = runFile('apply.sql', { dry_run: '0' });
+  r = runFile('rollback.sql', {}, { PGOPTIONS: '-c bytea_output=escape' });
+  record('e3.bytea_escape_rollback', r.status === 0 && markerTotal() === 0, `exit=${r.status}`);
+
+  // ---- P11 (ENR3 E1): image lost, app re-uploads a marker report, recovery
+  // rebuilds the image from recorded expected content — NOT live rows — so
+  // rollback REFUSES on the edited row and the re-uploaded file survives. ----
+  r = runFile('apply.sql', { dry_run: '0' });
+  const repId = sql(`SELECT id::text FROM thesis.thesis_group_report WHERE id::text LIKE 'ed1a0000-%' ORDER BY id LIMIT 1`).out.trim();
+  const repSnap = sql(`SELECT encode(file_data,'hex')||'|'||file_name||'|'||file_size||'|'||file_sha256
+                       FROM thesis.thesis_group_report WHERE id::text='${repId}'`).out.trim();
+  sql(`UPDATE thesis.thesis_group_report SET file_data='\\x6170702d75706c6f6164'::bytea,
+         file_name='app-reupload.pdf', file_size=9,
+         file_sha256=encode(sha256('\\x6170702d75706c6f6164'::bytea),'hex'), updated_at=now()
+       WHERE id::text='${repId}';
+       DELETE FROM campuscore_audit."AdminAudit" WHERE id='demo-th-audit-000';
+       COMMENT ON TABLE thesis.thesis_topic IS NULL;`);
+  r = runFile('recover-before-image.sql');
+  record('p11.recover_from_recorded_facts', r.status === 0 && /differ/.test(r.out + r.err), `exit=${r.status}`);
+  r = runFile('rollback.sql');
+  const fileLeft = sql(`SELECT count(*) FROM thesis.thesis_group_report WHERE id::text='${repId}' AND file_name='app-reupload.pdf'`).out.trim();
+  record('p11.rollback_refuses_keeps_reupload', r.status !== 0 && /differ/.test(r.out + r.err) && fileLeft === '1',
+         `exit=${r.status} reuploaded_file_present=${fileLeft}`);
+  const [rfd, rfn, rfs, rfsum] = repSnap.split('|');
+  sql(`UPDATE thesis.thesis_group_report SET file_data='\\x${rfd}'::bytea, file_name='${rfn}',
+         file_size=${rfs}, file_sha256='${rfsum}' WHERE id::text='${repId}'`);
+  r = runFile('rollback.sql');
+  record('p11.clean_rollback_after_revert', r.status === 0 && markerTotal() === 0, `exit=${r.status}`);
+
+  // ---- M4: the two image copies disagree -> rollback MUST abort (mutant:
+  // removing the disagree check lets a tampered copy through). ----
+  r = runFile('apply.sql', { dry_run: '0' });
+  sql(`DO $$ DECLARE img text; BEGIN
+         SELECT "beforeState" INTO img FROM campuscore_audit."AdminAudit" WHERE id='demo-th-audit-000';
+         img := (img::jsonb || '{"tampered":1}'::jsonb)::text;
+         EXECUTE format('COMMENT ON TABLE thesis.thesis_topic IS %L',
+           'thesis-demo-data v3 md5:' || md5(img) || E'\\n' || img);
+       END $$;`);
+  r = runFile('rollback.sql');
+  record('m4.disagreeing_copies_abort', r.status !== 0 && /disagree/.test(r.out + r.err) && markerTotal() === MARKER_EXPECTED,
+         `exit=${r.status}`);
+  sql(`DO $$ DECLARE img text; BEGIN
+         SELECT "beforeState" INTO img FROM campuscore_audit."AdminAudit" WHERE id='demo-th-audit-000';
+         EXECUTE format('COMMENT ON TABLE thesis.thesis_topic IS %L',
+           'thesis-demo-data v3 md5:' || md5(img) || E'\\n' || img);
+       END $$;`);
+  r = runFile('rollback.sql');
+  record('m4.rollback_after_comment_restored', r.status === 0 && markerTotal() === 0, `exit=${r.status}`);
+
+  // ---- M5: comment copy with a bad checksum must be ignored even when it is
+  // the only copy left (mutant: removing the checksum verification lets a
+  // tampered comment be trusted). ----
+  r = runFile('apply.sql', { dry_run: '0' });
+  sql(`DO $$ DECLARE img text; BEGIN
+         SELECT "beforeState" INTO img FROM campuscore_audit."AdminAudit" WHERE id='demo-th-audit-000';
+         DELETE FROM campuscore_audit."AdminAudit" WHERE id='demo-th-audit-000';
+         EXECUTE format('COMMENT ON TABLE thesis.thesis_topic IS %L',
+           'thesis-demo-data v3 md5:00000000000000000000000000000000' || E'\\n' || img);
+       END $$;`);
+  r = runFile('rollback.sql');
+  record('m5.bad_checksum_comment_rejected', r.status !== 0 && /before-image/.test(r.out + r.err) && markerTotal() === MARKER_EXPECTED - 1,
+         `exit=${r.status} markers=${markerTotal()}`);
+  sql(`COMMENT ON TABLE thesis.thesis_topic IS NULL;`);
+  r = runFile('recover-before-image.sql');
+  record('m5.recover_after_fake_comment_cleared', r.status === 0, `exit=${r.status}`);
+  r = runFile('rollback.sql');
+  record('m5.rollback_after_recovery', r.status === 0 && markerTotal() === 0, `exit=${r.status}`);
+
+  // ---- M9: a non-marker reviewer (GVPB) score on a guarded baseline topic
+  // must abort rollback (mutant: removing the guarded_gvpb preflight lets the
+  // app's score be orphaned by the gvpb_lecturer_id restore). ----
+  r = runFile('apply.sql', { dry_run: '0' });
+  sql(`INSERT INTO thesis.thesis_topic_score (id, topic_id, council_id, lecturer_id, component, score, graded_at, created_at)
+       VALUES (gen_random_uuid(),'018f4a7c-3b12-4d90-a5e1-7c82b9045001',NULL,'lecturer-profile-002','GVPB',9.00,now(),now())`);
+  r = runFile('rollback.sql');
+  record('m9.reviewer_score_preflight_aborts', r.status !== 0 && /guarded_gvpb/.test(r.out + r.err) && markerTotal() === MARKER_EXPECTED,
+         `exit=${r.status}`);
+  sql(`DELETE FROM thesis.thesis_topic_score WHERE id::text NOT LIKE 'ed1a0000-%'
+       AND component='GVPB' AND topic_id='018f4a7c-3b12-4d90-a5e1-7c82b9045001'`);
+  r = runFile('rollback.sql');
+  record('m9.rollback_after_score_removed', r.status === 0 && markerTotal() === 0, `exit=${r.status}`);
+
+  // ---- foreign partial: a marker-id row the image never wrote makes apply
+  // refuse with the exact recovery instruction (never a blind re-apply). ----
+  r = runFile('apply.sql', { dry_run: '0' });
+  sql(`INSERT INTO thesis.thesis_council_member (id, council_id, lecturer_id, member_role, created_at)
+       VALUES ('ed1a0000-0000-4000-8000-deadbeef0001'::uuid,'ed1a0000-0000-4000-8000-000500000001','lecturer-profile-002','MEMBER',now())`);
+  r = runFile('apply.sql', { dry_run: '0' });
+  record('e1.foreign_partial_refused', r.status !== 0 && /foreign partial/.test(r.out + r.err), `exit=${r.status}`);
+  sql(`DELETE FROM thesis.thesis_council_member WHERE id='ed1a0000-0000-4000-8000-deadbeef0001'`);
+  r = runFile('rollback.sql');
+  record('e1.rollback_after_foreign_row_removed', r.status === 0 && markerTotal() === 0, `exit=${r.status}`);
+
+  // ---- baseline drift: a touched baseline round makes apply refuse (guard
+  // removal must not let it through). Runs at baseline — zero markers. ----
+  sql(`UPDATE thesis.thesis_registration_round SET status='REGISTRATION_CLOSED' WHERE id='b35e9ff1-1eb8-4e73-812e-04e1a66041f1'`);
+  r = runFile('apply.sql', { dry_run: '0' });
+  record('e1.baseline_drift_refused', r.status !== 0 && /recon baseline/.test(r.out + r.err) && markerTotal() === 0, `exit=${r.status}`);
+  sql(`UPDATE thesis.thesis_registration_round SET status='RESULTS_PUBLISHED' WHERE id='b35e9ff1-1eb8-4e73-812e-04e1a66041f1'`);
+
+  // ---- flyway floor: schema below the required baseline must refuse. ----
+  sql(`CREATE TABLE _fw_bak_enr4 AS SELECT * FROM thesis.flyway_schema_history WHERE version::int >= 140;
+       DELETE FROM thesis.flyway_schema_history WHERE version::int >= 140;`);
+  r = runFile('apply.sql', { dry_run: '0' });
+  record('e1.flyway_below_142_refused', r.status !== 0 && /flyway/.test(r.out + r.err) && markerTotal() === 0, `exit=${r.status}`);
+  sql(`INSERT INTO thesis.flyway_schema_history SELECT * FROM _fw_bak_enr4; DROP TABLE _fw_bak_enr4;`);
+
+  // ---- real-account reference: a marker row pointing at a known real account
+  // id aborts apply immediately (unconditional guard, runs before the state
+  // machine). ----
+  r = runFile('apply.sql', { dry_run: '0' });
+  sql(`INSERT INTO notifications.notification (id, user_id, title, message, type, link, is_read, created_at, updated_at, source_key)
+       VALUES ('demo-th-foreign-0001','16a1b2be-6556-4d47-83d9-e9a07daf109d','probe','probe','INFO','/',FALSE,now(),now(),NULL)`);
+  r = runFile('apply.sql', { dry_run: '0' });
+  record('e1.real_account_ref_aborts', r.status !== 0 && /real account/.test(r.out + r.err), `exit=${r.status}`);
+  sql(`DELETE FROM notifications.notification WHERE id='demo-th-foreign-0001'`);
+  r = runFile('rollback.sql');
+  record('e1.rollback_after_real_ref_removed', r.status === 0 && markerTotal() === 0, `exit=${r.status}`);
+
+  // ---- recover refuses while a usable copy exists and on a bare baseline. ----
+  r = runFile('apply.sql', { dry_run: '0' });
+  r = runFile('recover-before-image.sql');
+  record('rv.refuses_with_copy_present', r.status !== 0 && /still exists/.test(r.out + r.err), `exit=${r.status}`);
+  r = runFile('rollback.sql');
+  record('rv.rollback_still_clean', r.status === 0 && markerTotal() === 0, `exit=${r.status}`);
+  r = runFile('recover-before-image.sql');
+  record('rv.refuses_without_markers', r.status !== 0 && /no marker rows/.test(r.out + r.err), `exit=${r.status}`);
+
+  // ---- E2/P4 deadlock schedule (ENR3): app tx writes thesis -> sleeps ->
+  // writes audit last; the package must be the lock victim, never the app.
+  // Part 1: a bare rollback.sql (no runner retry) must fail cleanly while the
+  // app transaction completes. ----
+  const p4AppSql = (tag) => `BEGIN;
+    UPDATE thesis.thesis_registration_round SET updated_at=now() WHERE id='b35e9ff1-1eb8-4e73-812e-04e1a66041f1';
+    SELECT pg_sleep(1.6);
+    INSERT INTO campuscore_audit."AdminAudit"(id,"actorId","actorLabel",action,"entityType","entityId",summary,"beforeState","afterState","createdAt")
+    VALUES ('enr4-p4-app-audit-${tag}','admin-user',NULL,'THESIS_ROUND_UPDATE','THESIS_ROUND','b35e9ff1-1eb8-4e73-812e-04e1a66041f1','p4 probe',NULL,NULL,now());
+    COMMIT;`;
+  const p4Snap = sql(`SELECT version||'|'||(to_jsonb(updated_at)#>>'{}')||'|'||status
+                      FROM thesis.thesis_registration_round WHERE id='b35e9ff1-1eb8-4e73-812e-04e1a66041f1'`).out.trim();
+  r = runFile('apply.sql', { dry_run: '0' });
+  const p4app = spawn(psql, [...connArgs(), '-X', '-v', 'ON_ERROR_STOP=1', '-P', 'pager=off', '-c', p4AppSql('a')],
+    { env: process.env, windowsHide: true });
+  const p4done = once(p4app, 'exit');
+  await delay(300);
+  r = runFile('rollback.sql');
+  const [p4code] = await p4done;
+  record('e2.package_is_lock_victim_not_app', r.status !== 0 && p4code === 0 && markerTotal() === MARKER_EXPECTED,
+         `rollback_exit=${r.status} app_exit=${p4code}`);
+
+  // Part 2: same schedule again, this time through run.mjs — the runner's
+  // bounded retry (fresh transaction per attempt) must ride out the app's
+  // lock window and complete the rollback.
+  const p4app2 = spawn(psql, [...connArgs(), '-X', '-v', 'ON_ERROR_STOP=1', '-P', 'pager=off', '-c', p4AppSql('b')],
+    { env: process.env, windowsHide: true });
+  const p4done2 = once(p4app2, 'exit');
+  await delay(300);
+  const rm = spawnSync('node', [join(here, 'run.mjs'), 'rollback'], { encoding: 'utf8', env: process.env, windowsHide: true });
+  const [p4code2] = await p4done2;
+  record('e2.runner_retries_completes', rm.status === 0 && p4code2 === 0 && markerTotal() === 0,
+         `runner_exit=${rm.status} app_exit=${p4code2}`);
+  sql(`DELETE FROM campuscore_audit."AdminAudit" WHERE id LIKE 'enr4-p4-%'`);
+  const [pv, pu, ps] = p4Snap.split('|');
+  sql(`UPDATE thesis.thesis_registration_round SET version=${pv}, updated_at='${pu}'::timestamptz, status='${ps}'
+       WHERE id='b35e9ff1-1eb8-4e73-812e-04e1a66041f1'`);
+
   // ---- final clean cycle under default session + end state ----
   r = runFile('apply.sql', { dry_run: '0' });
-  const v = runFile('verify.sql');
-  record('final.verify_no_fail', (v.out.match(/FAIL/g) || []).length === 0, `PASS=${(v.out.match(/PASS/g) || []).length}`);
+  const vf = runFile('verify.sql');
+  record('final.verify_no_fail', (vf.out.match(/FAIL/g) || []).length === 0, `PASS=${(vf.out.match(/PASS/g) || []).length}`);
   r = runFile('rollback.sql');
   record('final.rollback_committed', r.status === 0 && markerTotal() === 0, `exit=${r.status}`);
   record('final.baseline_hashes_identical', sameHashes(tableHashes(), base));
