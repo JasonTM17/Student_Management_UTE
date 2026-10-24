@@ -1,6 +1,8 @@
 package io.campuscore.restfulapi.engagement.repository;
 
 import io.campuscore.restfulapi.common.LikePattern;
+import io.campuscore.restfulapi.engagement.domain.AnnouncementFilter;
+import io.campuscore.restfulapi.engagement.domain.UserVisibility;
 import io.campuscore.restfulapi.engagement.dto.AnnouncementReadDtos.AnnouncementResponse;
 import io.campuscore.restfulapi.engagement.dto.AnnouncementReadDtos.CourseSummary;
 import io.campuscore.restfulapi.engagement.dto.AnnouncementReadDtos.LecturerSummary;
@@ -394,17 +396,6 @@ public class AnnouncementReadRepository {
 
     private static boolean present(String value) {
         return value != null && !value.isEmpty();
-    }
-
-    public record AnnouncementFilter(String semesterId, String sectionId, String priority, String status, String search) {
-    }
-
-    public record UserVisibility(
-            List<String> roles,
-            String studentId,
-            Integer studentYear,
-            String lecturerId,
-            Instant now) {
     }
 
     private record SqlWhere(String sql, MapSqlParameterSource parameters) {

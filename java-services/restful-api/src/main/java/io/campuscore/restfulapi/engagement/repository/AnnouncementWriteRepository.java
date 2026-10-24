@@ -1,5 +1,9 @@
 package io.campuscore.restfulapi.engagement.repository;
 
+import io.campuscore.restfulapi.engagement.domain.CreateAnnouncementCommand;
+import io.campuscore.restfulapi.engagement.domain.PatchValue;
+import io.campuscore.restfulapi.engagement.domain.TransitionCommand;
+import io.campuscore.restfulapi.engagement.domain.UpdateAnnouncementCommand;
 import io.campuscore.restfulapi.engagement.dto.AnnouncementReadDtos.AnnouncementResponse;
 import io.campuscore.restfulapi.engagement.dto.AnnouncementReadDtos.CourseSummary;
 import io.campuscore.restfulapi.engagement.dto.AnnouncementReadDtos.LecturerSummary;
@@ -460,59 +464,6 @@ public class AnnouncementWriteRepository {
 
     private static boolean present(String value) {
         return value != null && !value.isEmpty();
-    }
-
-    public record CreateAnnouncementCommand(
-            String id,
-            String title,
-            String content,
-            String priority,
-            List<String> targetRoles,
-            List<Integer> targetYears,
-            boolean isGlobal,
-            Instant publishAt,
-            Instant expiresAt,
-            String publishedBy,
-            String semesterId,
-            String sectionId,
-            String lecturerId,
-            Instant createdAt) {
-    }
-
-    public record UpdateAnnouncementCommand(
-            String id,
-            PatchValue<String> title,
-            PatchValue<String> content,
-            PatchValue<String> priority,
-            PatchValue<List<String>> targetRoles,
-            PatchValue<List<Integer>> targetYears,
-            PatchValue<Boolean> isGlobal,
-            PatchValue<Instant> publishAt,
-            PatchValue<Instant> expiresAt,
-            PatchValue<String> semesterId,
-            PatchValue<String> sectionId,
-            PatchValue<String> lecturerId,
-            Instant updatedAt,
-            int expectedVersion) {
-    }
-
-    public record TransitionCommand(
-            String id,
-            int expectedVersion,
-            String archivedBy,
-            Instant archivedAt,
-            Instant updatedAt) {
-    }
-
-    public record PatchValue<T>(boolean present, T value) {
-
-        public static <T> PatchValue<T> present(T value) {
-            return new PatchValue<>(true, value);
-        }
-
-        public static <T> PatchValue<T> omitted() {
-            return new PatchValue<>(false, null);
-        }
     }
 
     @FunctionalInterface

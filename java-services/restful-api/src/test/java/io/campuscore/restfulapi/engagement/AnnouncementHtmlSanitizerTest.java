@@ -7,6 +7,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import io.campuscore.restfulapi.engagement.domain.SanitizationResult;
 import io.campuscore.restfulapi.engagement.service.AnnouncementHtmlSanitizer;
 import java.io.IOException;
 import java.nio.file.Files;
@@ -75,7 +76,7 @@ class AnnouncementHtmlSanitizerTest {
                 new Attack("<p id=\"9bad id\">x</p>", "id=\"9bad id\""));
 
         for (Attack attack : attacks) {
-            AnnouncementHtmlSanitizer.SanitizationResult result =
+            SanitizationResult result =
                     AnnouncementHtmlSanitizer.sanitize(attack.payload());
             assertFalse(
                     Pattern.compile(attack.forbidden()).matcher(result.html()).find(),
@@ -87,19 +88,19 @@ class AnnouncementHtmlSanitizerTest {
     void pluginsKeptByTheEditorRoundTripThroughTheSanitizer() {
         // RT-P2-2: accordion and anchor are the plugins the editor keeps, so
         // their output must survive the write-time policy.
-        AnnouncementHtmlSanitizer.SanitizationResult accordion = AnnouncementHtmlSanitizer.sanitize(
+        SanitizationResult accordion = AnnouncementHtmlSanitizer.sanitize(
                 "<details><summary>Tiêu đề mục</summary><p>nội dung bên trong</p></details>");
         assertTrue(accordion.html().contains("<details>"), accordion.html());
         assertTrue(accordion.html().contains("<summary>"), accordion.html());
         assertTrue(accordion.html().contains("nội dung bên trong"), accordion.html());
 
-        AnnouncementHtmlSanitizer.SanitizationResult anchor = AnnouncementHtmlSanitizer.sanitize(
+        SanitizationResult anchor = AnnouncementHtmlSanitizer.sanitize(
                 "<h2 id=\"muc-1\">Mục 1</h2><p><a href=\"#muc-1\">lên đầu mục</a></p>");
         assertTrue(anchor.html().contains("id=\"muc-1\""), anchor.html());
         assertTrue(anchor.html().contains("href=\"#muc-1\""), anchor.html());
 
         // RT-P2-2: the media plugin was removed — its iframe output must not survive.
-        AnnouncementHtmlSanitizer.SanitizationResult media = AnnouncementHtmlSanitizer.sanitize(
+        SanitizationResult media = AnnouncementHtmlSanitizer.sanitize(
                 "<iframe src=\"https://youtu.be/x\"></iframe>");
         assertFalse(media.html().toLowerCase(Locale.ROOT).contains("iframe"), media.html());
     }
@@ -148,7 +149,7 @@ class AnnouncementHtmlSanitizerTest {
 
     @Test
     void sanitizedOutputDiffersFromRawInputAndReportsRemovedElements() {
-        AnnouncementHtmlSanitizer.SanitizationResult result = AnnouncementHtmlSanitizer.sanitize(
+        SanitizationResult result = AnnouncementHtmlSanitizer.sanitize(
                 "<p>nội dung</p><xss>độc</xss><iframe src=\"https://evil.example\"></iframe>");
         assertNotEquals("<p>nội dung</p><xss>độc</xss><iframe src=\"https://evil.example\"></iframe>", result.html());
         assertTrue(result.html().contains("nội dung"), result.html());
@@ -162,18 +163,18 @@ class AnnouncementHtmlSanitizerTest {
         // strips its src at publish. The bare <img> must not survive as a
         // dead frame — the whole element goes, and the removal is counted so
         // the write-time mutation stays observable.
-        AnnouncementHtmlSanitizer.SanitizationResult strippedSrc = AnnouncementHtmlSanitizer.sanitize(
+        SanitizationResult strippedSrc = AnnouncementHtmlSanitizer.sanitize(
                 "<p>Thông báo</p><img src=\"data:image/avif;base64,AAAA\" alt=\"x\"><p>cuối</p>");
         assertFalse(strippedSrc.html().contains("<img"), strippedSrc.html());
         assertTrue(strippedSrc.html().contains("Thông báo"), strippedSrc.html());
         assertEquals(1, strippedSrc.removedElements());
 
-        AnnouncementHtmlSanitizer.SanitizationResult protocolRelative =
+        SanitizationResult protocolRelative =
                 AnnouncementHtmlSanitizer.sanitize("<img src=\"//evil.example/x.png\">");
         assertFalse(protocolRelative.html().contains("<img"), protocolRelative.html());
 
         // A legal image keeps its tag and src untouched.
-        AnnouncementHtmlSanitizer.SanitizationResult kept = AnnouncementHtmlSanitizer.sanitize(
+        SanitizationResult kept = AnnouncementHtmlSanitizer.sanitize(
                 "<img src=\"data:image/png;base64,iVBORw0KGgo=\" alt=\"ok\">");
         assertTrue(kept.html().contains("<img"), kept.html());
         assertTrue(kept.html().contains("data:image/png;base64,"), kept.html());
