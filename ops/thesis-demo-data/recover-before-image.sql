@@ -61,6 +61,20 @@ BEGIN
   END IF;
 END $$;
 
+-- verify the lock_timeout pin actually held: every lock below is NOWAIT, so
+-- the lock phase waits 0 ms — strictly below the application's 1 s
+-- deadlock_timeout; this 300 ms setting is the backstop for any implicit
+-- wait elsewhere. If a startup setting (psqlrc, PGOPTIONS, ALTER ROLE or
+-- ALTER DATABASE) overrode it, refuse rather than run with a longer wait.
+DO $$
+BEGIN
+  IF current_setting('lock_timeout') <> '300ms' THEN
+    RAISE EXCEPTION 'recovery aborted: lock_timeout is %, expected 300ms — the script pins it strictly below the application deadlock_timeout; nothing was changed',
+      current_setting('lock_timeout')
+      USING ERRCODE = '22000', CONSTRAINT = 'thesis_demo_recover_lock_timeout';
+  END IF;
+END $$;
+
 -- locks in the application's write order: thesis tables first, then the hot
 -- app-wide tables last. NOWAIT like apply/rollback: the package never waits.
 DO $$
