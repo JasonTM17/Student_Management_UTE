@@ -1,11 +1,11 @@
 package io.campuscore.restfulapi.people.repository;
 
 import io.campuscore.restfulapi.common.LikePattern;
-import io.campuscore.restfulapi.people.web.PeopleReadDtos.CurriculumSummary;
-import io.campuscore.restfulapi.people.web.PeopleReadDtos.DepartmentSummary;
-import io.campuscore.restfulapi.people.web.PeopleReadDtos.LecturerResponse;
-import io.campuscore.restfulapi.people.web.PeopleReadDtos.StudentResponse;
-import io.campuscore.restfulapi.people.web.PeopleReadDtos.UserSummary;
+import io.campuscore.restfulapi.people.dto.PeopleReadDtos.CurriculumSummary;
+import io.campuscore.restfulapi.people.dto.PeopleReadDtos.DepartmentSummary;
+import io.campuscore.restfulapi.people.dto.PeopleReadDtos.LecturerResponse;
+import io.campuscore.restfulapi.people.dto.PeopleReadDtos.StudentResponse;
+import io.campuscore.restfulapi.people.dto.PeopleReadDtos.UserSummary;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Timestamp;

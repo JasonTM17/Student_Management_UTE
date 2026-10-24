@@ -1,10 +1,10 @@
-package io.campuscore.restfulapi.people.web;
+package io.campuscore.restfulapi.people.controller;
 
 import io.campuscore.restfulapi.people.service.PeopleReadService;
-import io.campuscore.restfulapi.people.web.PeopleReadDtos.LecturerListResponse;
-import io.campuscore.restfulapi.people.web.PeopleReadDtos.LecturerResponse;
-import io.campuscore.restfulapi.people.web.PeopleReadDtos.StudentListResponse;
-import io.campuscore.restfulapi.people.web.PeopleReadDtos.StudentResponse;
+import io.campuscore.restfulapi.people.dto.PeopleReadDtos.LecturerListResponse;
+import io.campuscore.restfulapi.people.dto.PeopleReadDtos.LecturerResponse;
+import io.campuscore.restfulapi.people.dto.PeopleReadDtos.StudentListResponse;
+import io.campuscore.restfulapi.people.dto.PeopleReadDtos.StudentResponse;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -23,6 +23,7 @@ import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import io.campuscore.restfulapi.people.dto.PeopleReadDtos;
 
 /** Student and lecturer directory routes owned by the Java API. */
 @Tag(name = "People & Profiles", description = "Danh bạ hồ sơ sinh viên, cán bộ giảng viên trường HCM-UTE")
