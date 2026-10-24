@@ -74,6 +74,7 @@ type DayAgendaItem = {
   credits?: number;
   lecturerName?: string;
   status?: string;
+  curriculumDefault?: boolean;
 };
 
 // Day labels, week ordering, and the unified block accent now live in the
@@ -231,6 +232,7 @@ export default function SchedulePage() {
             credits: section.course?.credits,
             lecturerName,
             status: enrollment.status,
+            curriculumDefault: enrollment.registrationSource === 'CURRICULUM_DEFAULT',
           });
         });
       });
@@ -327,6 +329,7 @@ export default function SchedulePage() {
           browseSections: 'Xem lớp học phần',
           weeklyAgenda: 'Lịch học theo tuần',
           weeklyGrid: 'Lưới thời khóa biểu',
+          curriculumDefault: 'Theo CTĐT',
           upcomingClassList: 'Danh sách lớp học phần',
           noMeetings: 'Chưa có buổi học nào.',
           noMeetingsHint: 'Các buổi học của ngày đã chọn sẽ xuất hiện tại đây.',
@@ -373,6 +376,7 @@ export default function SchedulePage() {
           browseSections: 'Browse sections',
           weeklyAgenda: 'Weekly agenda',
           weeklyGrid: 'Weekly timetable grid',
+          curriculumDefault: 'Curriculum',
           upcomingClassList: 'Class section list',
           noMeetings: 'No scheduled meetings.',
           noMeetingsHint: 'Classes for the selected day will appear here.',
@@ -647,6 +651,7 @@ export default function SchedulePage() {
                       blockHint: copy.clickToViewDetails,
                       item: copy.item,
                       items: copy.items,
+                      curriculumDefault: copy.curriculumDefault,
                     }}
                   />
                 </CardContent>
@@ -746,6 +751,11 @@ export default function SchedulePage() {
                               item.courseName,
                             )}
                           </h4>
+                          {item.curriculumDefault ? (
+                            <span className="mt-2 inline-flex min-h-6 items-center rounded-md border border-primary/25 bg-primary/10 px-2 py-0.5 text-[11px] font-semibold text-primary">
+                              {copy.curriculumDefault}
+                            </span>
+                          ) : null}
                           <div className="mt-3 space-y-1.5 border-t border-current/10 pt-2.5 text-xs text-muted-foreground">
                             <div className="flex items-center gap-2">
                               <Clock className="h-3.5 w-3.5 text-primary" />
@@ -856,6 +866,11 @@ export default function SchedulePage() {
                             item.courseName,
                           )}
                         </div>
+                        {item.curriculumDefault ? (
+                          <span className="mt-1.5 inline-flex min-h-6 items-center rounded-md border border-primary/25 bg-primary/10 px-2 py-0.5 text-[11px] font-semibold text-primary">
+                            {copy.curriculumDefault}
+                          </span>
+                        ) : null}
                         <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-muted-foreground">
                           {item.roomNumber ? (
                             <span className="inline-flex items-center gap-1 font-medium text-foreground">
@@ -918,6 +933,11 @@ export default function SchedulePage() {
                                 },
                                 item.courseName,
                               )}
+                              {item.curriculumDefault ? (
+                                <span className="mt-1 inline-flex min-h-6 items-center rounded-md border border-primary/25 bg-primary/10 px-2 py-0.5 text-[11px] font-semibold text-primary">
+                                  {copy.curriculumDefault}
+                                </span>
+                              ) : null}
                             </td>
                             <td className="py-3 px-4 text-center font-bold text-foreground">{item.credits ?? '—'}</td>
                             <td className="py-3 px-4 text-center">

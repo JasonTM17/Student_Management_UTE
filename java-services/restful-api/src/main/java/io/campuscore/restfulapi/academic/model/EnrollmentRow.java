@@ -10,5 +10,5 @@ public record EnrollmentRow(String id, String studentId, String sectionId, Strin
         String sectionStatus, String courseId, String courseCode, String courseName, String courseNameEn,
         String courseNameVi, int credits, String semesterIdValue, String semesterName, String semesterNameEn,
         String semesterNameVi, Instant semesterStartDate, String lecturerId, String employeeId, String lecturerUserId,
-        String lecturerEmail, String lecturerFirstName, String lecturerLastName) {
+        String lecturerEmail, String lecturerFirstName, String lecturerLastName, String registrationSource) {
 }

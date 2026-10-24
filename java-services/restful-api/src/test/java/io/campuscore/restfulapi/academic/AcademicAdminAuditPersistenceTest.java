@@ -89,6 +89,7 @@ class AcademicAdminAuditPersistenceTest {
                 "sectionId" VARCHAR(64) NOT NULL,
                 "semesterId" VARCHAR(64),
                 "status" VARCHAR(32) NOT NULL,
+                "registrationSource" VARCHAR(40),
                 "gradeStatus" VARCHAR(32) NOT NULL DEFAULT 'DRAFT',
                 "enrolledAt" TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 "finalGrade" NUMERIC(5,2),

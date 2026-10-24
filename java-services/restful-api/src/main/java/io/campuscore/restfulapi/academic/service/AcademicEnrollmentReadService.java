@@ -424,7 +424,8 @@ public class AcademicEnrollmentReadService {
                 new StudentSummary(row.studentId(), row.studentNumber(),
                         new UserSummary(row.studentUserId(), row.studentEmail(), row.studentFirstName(), row.studentLastName())),
                 section(row, schedules.getOrDefault(row.sectionId(), List.of())),
-                semester(row.semesterIdValue(), row.semesterName(), row.semesterNameEn(), row.semesterNameVi(), row.semesterStartDate()));
+                semester(row.semesterIdValue(), row.semesterName(), row.semesterNameEn(), row.semesterNameVi(), row.semesterStartDate()),
+                row.registrationSource());
     }
 
     /** Draft results are lecturer working data: only PUBLISHED/APPEALED rows are student-visible. */
@@ -457,7 +458,8 @@ public class AcademicEnrollmentReadService {
                 response.updatedAt(),
                 response.student(),
                 response.section(),
-                response.semester());
+                response.semester(),
+                response.registrationSource());
     }
 
     private static SectionSummary section(EnrollmentRow row, List<ScheduleRow> schedules) {

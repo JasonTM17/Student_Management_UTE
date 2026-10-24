@@ -127,6 +127,7 @@ class AdminAnalyticsOverviewTest {
                     "sectionId" VARCHAR(120) NOT NULL,
                     "semesterId" VARCHAR(120) NOT NULL,
                     "status" VARCHAR(40) NOT NULL,
+                    "registrationSource" VARCHAR(40),
                     "gradeStatus" VARCHAR(40) NOT NULL,
                     "letterGrade" VARCHAR(16)
                 )
