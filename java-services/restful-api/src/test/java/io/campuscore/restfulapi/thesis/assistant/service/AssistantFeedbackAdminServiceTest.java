@@ -25,7 +25,7 @@ class AssistantFeedbackAdminServiceTest {
         dataSource.setUsername("sa");
         dataSource.setPassword("");
         jdbc = new JdbcTemplate(dataSource);
-        service = new AssistantFeedbackAdminService(new NamedParameterJdbcTemplate(dataSource));
+        service = new AssistantFeedbackAdminService(new io.campuscore.restfulapi.thesis.assistant.repository.AssistantFeedbackReadRepository(new NamedParameterJdbcTemplate(dataSource)));
 
         jdbc.execute("CREATE SCHEMA assistant");
         jdbc.execute("""
