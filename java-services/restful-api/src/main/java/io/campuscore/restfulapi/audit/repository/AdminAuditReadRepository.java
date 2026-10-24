@@ -1,5 +1,7 @@
 package io.campuscore.restfulapi.audit.repository;
 
+import io.campuscore.restfulapi.audit.model.AuditEntry;
+import io.campuscore.restfulapi.audit.model.AuditPage;
 import io.campuscore.restfulapi.common.LikePattern;
 import java.sql.Timestamp;
 import java.time.Instant;
@@ -36,21 +38,7 @@ public class AdminAuditReadRepository {
         this.jdbc = jdbc;
     }
 
-    public record AuditEntry(
-            String id,
-            String actorId,
-            String actorLabel,
-            String action,
-            String entityType,
-            String entityId,
-            String summary,
-            String beforeState,
-            String afterState,
-            Instant createdAt) {
-    }
 
-    public record AuditPage(List<AuditEntry> data, long total, int page, int limit, long totalPages) {
-    }
 
     /**
      * Newest first with an id tiebreaker: admin operations batch inside the
