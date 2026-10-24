@@ -20,6 +20,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.StringJoiner;
 import java.util.UUID;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Profile;
 import org.springframework.http.HttpStatus;
@@ -46,6 +47,7 @@ public class AssistantKnowledgeAuthorityGateway {
     private final ObjectMapper mapper;
     private final HttpClient http;
 
+    @Autowired
     public AssistantKnowledgeAuthorityGateway(AssistantRagProperties properties, ObjectMapper mapper) {
         this(properties, mapper, HttpClient.newBuilder()
                 .connectTimeout(Duration.ofMillis(properties.connectTimeoutMs()))
