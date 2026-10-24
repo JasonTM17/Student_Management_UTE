@@ -3,7 +3,7 @@ package io.campuscore.restfulapi.engagement.repository;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.NullNode;
-import io.campuscore.restfulapi.engagement.domain.AuditCommand;
+import io.campuscore.restfulapi.engagement.model.AuditCommand;
 import io.campuscore.restfulapi.engagement.dto.AnnouncementReadDtos.AnnouncementHistoryResponse;
 import java.sql.ResultSet;
 import java.sql.SQLException;

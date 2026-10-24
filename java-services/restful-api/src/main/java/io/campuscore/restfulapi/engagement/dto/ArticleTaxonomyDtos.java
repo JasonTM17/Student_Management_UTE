@@ -1,9 +1,9 @@
 package io.campuscore.restfulapi.engagement.dto;
 
-import io.campuscore.restfulapi.engagement.domain.ArticleAttachment;
-import io.campuscore.restfulapi.engagement.domain.ArticleCategory;
-import io.campuscore.restfulapi.engagement.domain.ArticleMediaGallery;
-import io.campuscore.restfulapi.engagement.domain.ArticleTag;
+import io.campuscore.restfulapi.engagement.entity.ArticleAttachment;
+import io.campuscore.restfulapi.engagement.entity.ArticleCategory;
+import io.campuscore.restfulapi.engagement.entity.ArticleMediaGallery;
+import io.campuscore.restfulapi.engagement.entity.ArticleTag;
 import java.util.List;
 
 /**

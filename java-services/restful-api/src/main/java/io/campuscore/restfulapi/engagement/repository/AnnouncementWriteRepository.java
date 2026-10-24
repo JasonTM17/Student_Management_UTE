@@ -1,9 +1,9 @@
 package io.campuscore.restfulapi.engagement.repository;
 
-import io.campuscore.restfulapi.engagement.domain.CreateAnnouncementCommand;
-import io.campuscore.restfulapi.engagement.domain.PatchValue;
-import io.campuscore.restfulapi.engagement.domain.TransitionCommand;
-import io.campuscore.restfulapi.engagement.domain.UpdateAnnouncementCommand;
+import io.campuscore.restfulapi.engagement.model.CreateAnnouncementCommand;
+import io.campuscore.restfulapi.engagement.model.PatchValue;
+import io.campuscore.restfulapi.engagement.model.TransitionCommand;
+import io.campuscore.restfulapi.engagement.model.UpdateAnnouncementCommand;
 import io.campuscore.restfulapi.engagement.dto.AnnouncementReadDtos.AnnouncementResponse;
 import io.campuscore.restfulapi.engagement.dto.AnnouncementReadDtos.CourseSummary;
 import io.campuscore.restfulapi.engagement.dto.AnnouncementReadDtos.LecturerSummary;

@@ -8,10 +8,10 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-import io.campuscore.restfulapi.engagement.domain.ArticleAttachment;
-import io.campuscore.restfulapi.engagement.domain.ArticleCategory;
-import io.campuscore.restfulapi.engagement.domain.ArticleMediaGallery;
-import io.campuscore.restfulapi.engagement.domain.ArticleTag;
+import io.campuscore.restfulapi.engagement.entity.ArticleAttachment;
+import io.campuscore.restfulapi.engagement.entity.ArticleCategory;
+import io.campuscore.restfulapi.engagement.entity.ArticleMediaGallery;
+import io.campuscore.restfulapi.engagement.entity.ArticleTag;
 import io.campuscore.restfulapi.engagement.repository.ArticleAttachmentRepository;
 import io.campuscore.restfulapi.engagement.repository.ArticleCategoryRepository;
 import io.campuscore.restfulapi.engagement.repository.ArticleMediaGalleryRepository;
