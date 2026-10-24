@@ -2437,6 +2437,7 @@ export const en = {
     supervisorPrimaryLabel: 'Primary supervisor',
     supervisorSecondaryLabel: 'Second supervisor (optional)',
     supervisorNoneOption: '— Not assigned —',
+    supervisorAlreadySelected: 'Already selected in the other seat',
     report: {
       title: 'Report',
       notSubmitted: 'No report submitted yet.',
@@ -5521,6 +5522,7 @@ export const vi: I18nMessages = {
     supervisorPrimaryLabel: 'Giảng viên hướng dẫn chính',
     supervisorSecondaryLabel: 'Giảng viên hướng dẫn thứ hai (không bắt buộc)',
     supervisorNoneOption: '— Không chọn —',
+    supervisorAlreadySelected: 'Đã chọn ở vị trí kia',
     report: {
       title: 'Báo cáo',
       notSubmitted: 'Chưa nộp báo cáo.',
