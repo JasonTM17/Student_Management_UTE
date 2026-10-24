@@ -118,6 +118,11 @@ class CreditLimitApplicationServiceTest {
         jdbc.execute("CREATE TABLE IF NOT EXISTS academic.\"Student\""
                 + " (\"id\" VARCHAR(120) PRIMARY KEY, \"userId\" VARCHAR(120) NOT NULL,"
                 + " \"studentId\" VARCHAR(120), \"status\" VARCHAR(40) NOT NULL DEFAULT 'ACTIVE')");
+        // The shared H2 catalog may already provide academic."Student" (the
+        // V144 eligibility mirror creates it with a deliberately nullable
+        // status); always set the ACTIVE status this fixture requires rather
+        // than relying on a column default that may not exist.
+        jdbc.execute("ALTER TABLE academic.\"Student\" ADD COLUMN IF NOT EXISTS \"status\" VARCHAR(40)");
         jdbc.update("DELETE FROM academic.\"Student\" WHERE \"id\" = ?", STUDENT);
         jdbc.update("DELETE FROM campuscore_auth.\"User\" WHERE \"id\" = ?", STUDENT);
         jdbc.update(
@@ -126,7 +131,8 @@ class CreditLimitApplicationServiceTest {
                         + "  \"emailVerified\", \"isSuperAdmin\", \"failedLoginAttempts\", \"createdAt\", \"updatedAt\")"
                         + " VALUES (?, ?, 'x', 'Credit', 'Limit', 'ACTIVE', TRUE, FALSE, 0, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)",
                 STUDENT, STUDENT + "@example.test");
-        jdbc.update("INSERT INTO academic.\"Student\" (\"id\", \"userId\", \"studentId\") VALUES (?, ?, 'CL001')",
+        jdbc.update("INSERT INTO academic.\"Student\" (\"id\", \"userId\", \"studentId\", \"status\")"
+                        + " VALUES (?, ?, 'CL001', 'ACTIVE')",
                 STUDENT, STUDENT);
     }
 
