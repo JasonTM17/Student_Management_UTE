@@ -2,12 +2,14 @@ package io.campuscore.restfulapi.thesis.repository;
 
 import io.campuscore.restfulapi.thesis.model.ApprovalStatus;
 import io.campuscore.restfulapi.thesis.model.GroupStatus;
+import io.campuscore.restfulapi.thesis.model.GroupWithdrawalFacts;
 import io.campuscore.restfulapi.thesis.model.LecturerScope;
 import io.campuscore.restfulapi.thesis.dto.ThesisGroupReadDtos.GroupMemberResponse;
 import io.campuscore.restfulapi.thesis.dto.ThesisGroupReadDtos.GroupResponse;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -23,6 +25,7 @@ import org.springframework.stereotype.Repository;
 @Profile("persistence")
 public class ThesisGroupReadRepository {
     private final NamedParameterJdbcTemplate jdbc;
+
     public ThesisGroupReadRepository(NamedParameterJdbcTemplate jdbc) { this.jdbc = jdbc; }
 
     public List<GroupResponse> findByRoundId(UUID roundId) {
@@ -197,6 +200,21 @@ public class ThesisGroupReadRepository {
         return count != null && count > 0;
     }
 
+    /**
+     * thesis_type per round id — the group read paths need the round type to
+     * decide whether the credit/CPA eligibility policy covers a roster.
+     */
+    public Map<UUID, String> findRoundTypes(Collection<UUID> roundIds) {
+        if (roundIds == null || roundIds.isEmpty()) {
+            return Map.of();
+        }
+        Map<UUID, String> types = new LinkedHashMap<>();
+        jdbc.query("SELECT id, thesis_type FROM thesis.thesis_registration_round WHERE id IN (:ids)",
+                new MapSqlParameterSource("ids", roundIds), (RowCallbackHandler) rs ->
+                types.put(rs.getObject("id", UUID.class), rs.getString("thesis_type")));
+        return types;
+    }
+
     public boolean isTopicSupervisedBy(UUID topicId, String lecturerId) {
         Integer count = jdbc.queryForObject(
                 "SELECT COUNT(*) FROM thesis.thesis_topic_supervisor ts "
@@ -208,6 +226,43 @@ public class ThesisGroupReadRepository {
                 new MapSqlParameterSource("topicId", topicId).addValue("lecturerId", lecturerId),
                 Integer.class);
         return count != null && count > 0;
+    }
+
+    /**
+     * Batched withdrawal-gate facts for a set of groups: the owning round's
+     * status plus the downstream-work counts that block
+     * {@code withdraw-approval}. Groups with no facts simply have no entry.
+     */
+    public Map<UUID, GroupWithdrawalFacts> findWithdrawalFacts(Collection<UUID> groupIds) {
+        if (groupIds.isEmpty()) {
+            return Map.of();
+        }
+        Map<UUID, GroupWithdrawalFacts> byId = new LinkedHashMap<>();
+        jdbc.query(
+                "SELECT g.id, r.status AS round_status, "
+                        + "(SELECT COUNT(*) FROM thesis.thesis_group_report rep "
+                        + "  WHERE rep.group_id = g.id) AS reports, "
+                        + "(SELECT COUNT(*) FROM thesis.thesis_topic_score s "
+                        + "  WHERE s.topic_id = g.topic_id) AS scores, "
+                        + "(SELECT COUNT(*) FROM thesis.thesis_council_topic ct "
+                        + "  WHERE ct.topic_id = g.topic_id) AS council_topics, "
+                        + "CASE WHEN t.gvpb_lecturer_id IS NOT NULL THEN 1 ELSE 0 END AS reviewers, "
+                        + "CASE WHEN t.result_status IS NOT NULL OR t.final_score IS NOT NULL "
+                        + "  THEN 1 ELSE 0 END AS results "
+                        + "FROM thesis.thesis_group g "
+                        + "JOIN thesis.thesis_registration_round r ON r.id = g.round_id "
+                        + "LEFT JOIN thesis.thesis_topic t ON t.id = g.topic_id "
+                        + "WHERE g.id IN (:ids)",
+                new MapSqlParameterSource("ids", groupIds),
+                (RowCallbackHandler) rs -> byId.put(
+                        rs.getObject("id", UUID.class), new GroupWithdrawalFacts(
+                        rs.getString("round_status"),
+                        rs.getLong("reports"),
+                        rs.getLong("scores"),
+                        rs.getLong("council_topics"),
+                        rs.getLong("reviewers"),
+                        rs.getLong("results"))));
+        return byId;
     }
 
     public GroupResponse findById(UUID id) {
@@ -255,9 +310,10 @@ public class ThesisGroupReadRepository {
                     external ? contact : rs.getString("email"),
                     external,
                     rs.getBoolean("is_leader"),
-                    rs.getInt("member_order")));
+                    rs.getInt("member_order"),
+                    null));
         });
-        return rows.stream().map(row -> new GroupResponse(row.id(), row.roundId(), row.leaderStudentId(), row.topicId(), row.status(), row.approvalStatus(), row.rejectionReason(), List.copyOf(members.get(row.id())), List.copyOf(memberDetails.get(row.id())))).toList();
+        return rows.stream().map(row -> new GroupResponse(row.id(), row.roundId(), row.leaderStudentId(), row.topicId(), row.status(), row.approvalStatus(), row.rejectionReason(), List.copyOf(members.get(row.id())), List.copyOf(memberDetails.get(row.id())), null)).toList();
     }
 
     private static String joinName(String firstName, String lastName) {

@@ -73,6 +73,37 @@ export function planThesisRoundRestore(
   return { implicitTarget: null, explicitTargets: targets, requiresChoice: true };
 }
 
+/**
+ * The unfiltered round list and the CLOSED-only fetch overlap whenever the
+ * backend already ships archived rounds in the default response, so merging
+ * keeps the first occurrence of each id — otherwise the same round renders
+ * twice and React keys collide in pickers and dashboards.
+ */
+export function mergeThesisRounds(
+  ...lists: ReadonlyArray<ReadonlyArray<ThesisRound>>
+): ThesisRound[] {
+  const byId = new Map<string, ThesisRound>();
+  for (const list of lists) {
+    for (const round of list) {
+      if (!byId.has(round.id)) byId.set(round.id, round);
+    }
+  }
+  return [...byId.values()];
+}
+
+/**
+ * Interactive round pickers stay on live rounds: a CLOSED (archived) round is
+ * resolvable data — results and history still render for it — but it is not
+ * something a user picks to work in. The already-selected id is kept so the
+ * picker still names the archived round being viewed instead of going blank.
+ */
+export function roundsForPicker(
+  rounds: ReadonlyArray<ThesisRound>,
+  selectedId?: string,
+): ThesisRound[] {
+  return rounds.filter((round) => round.status !== 'CLOSED' || round.id === selectedId);
+}
+
 const ROUND_STATUS_PRIORITY: Readonly<Record<string, number>> = {
   REGISTRATION_OPEN: 0,
   REGISTRATION_CLOSED: 1,

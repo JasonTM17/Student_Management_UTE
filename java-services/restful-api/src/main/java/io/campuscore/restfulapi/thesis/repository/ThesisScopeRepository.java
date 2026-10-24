@@ -133,8 +133,10 @@ public class ThesisScopeRepository {
     }
 
     public Integer countPublishedResultsRounds(UUID roundId) {
+        // CLOSED counts as published: the archive state still serves scores.
         return jdbc.queryForObject(
-                "SELECT COUNT(*) FROM thesis.thesis_registration_round WHERE id = :roundId AND status = 'RESULTS_PUBLISHED'",
+                "SELECT COUNT(*) FROM thesis.thesis_registration_round WHERE id = :roundId "
+                        + "AND status IN ('RESULTS_PUBLISHED', 'CLOSED')",
                 new MapSqlParameterSource().addValue("roundId", roundId),
                 Integer.class);
     }

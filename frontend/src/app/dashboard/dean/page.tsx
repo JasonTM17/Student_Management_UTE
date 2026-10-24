@@ -6,7 +6,7 @@ import { Building2, ChevronDown, Crown, Users } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import { useI18n } from '@/i18n';
 import { thesisApi, type DeanGroup, type DeanOverview, type ThesisRound } from '@/lib/thesis-api';
-import { sortThesisRoundsForOverview } from '@/lib/thesis-round';
+import { mergeThesisRounds, sortThesisRoundsForOverview } from '@/lib/thesis-round';
 import { cn } from '@/lib/utils';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { PageHeader } from '@/components/ui/page-header';
@@ -190,11 +190,15 @@ export default function DeanOverviewPage() {
     setError(false);
     setIsLoading(true);
     let cancelled = false;
-    thesisApi
-      .listRounds()
-      .then((list) => {
+    Promise.all([
+      thesisApi.listRounds(),
+      // The faculty overview must stay reachable for archived rounds too —
+      // closing does not change the numbers, it only ends the lifecycle.
+      thesisApi.listRounds('CLOSED').catch(() => [] as ThesisRound[]),
+    ])
+      .then(([list, closed]) => {
         if (cancelled) return;
-        const sorted = sortThesisRoundsForOverview(list);
+        const sorted = sortThesisRoundsForOverview(mergeThesisRounds(list, closed));
         setRounds(sorted);
         const preferred = explicitRoundId && sorted.some((r) => r.id === explicitRoundId)
           ? explicitRoundId

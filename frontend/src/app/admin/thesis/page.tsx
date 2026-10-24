@@ -25,13 +25,19 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Input } from '@/components/ui/input';
 import { Modal } from '@/components/ui/modal';
 import { Select } from '@/components/ui/select';
+import { Combobox } from '@/components/ui/combobox';
 import { AdminFrame } from '@/components/admin/AdminFrame';
 import { AdminMetricCard } from '@/components/admin/AdminSurface';
 import { useConfirmationDialog } from '@/components/ui/use-confirmation-dialog';
 import { metricToneClass, statusToneClass } from '@/components/ui/status';
 import { cn } from '@/lib/utils';
 import { toThesisLocalInput as toLocalInput } from '@/lib/thesis-datetime';
-import { planThesisRoundRestore, sortThesisRoundsForOverview } from '@/lib/thesis-round';
+import { mergeThesisRounds, planThesisRoundRestore, sortThesisRoundsForOverview } from '@/lib/thesis-round';
+import {
+  assignTopicConflict,
+  councilMemberConflict,
+  reviewerConflict,
+} from '@/lib/thesis-picker-rules';
 import {
   EmptyState,
   ForbiddenState,
@@ -154,7 +160,8 @@ export default function AdminThesisPage() {
   // reinstate a topic. Each call is audited server-side with the reason.
   const [reasonAction, setReasonAction] = useState<{
     kind: 'unassignTopic' | 'replaceMember' | 'waiveGvpb' | 'revokeGvpbWaiver' | 'withdrawTopic' | 'reinstateTopic'
-        | 'lateTopic' | 'rosterOverride' | 'topicReassign' | 'retractResults' | 'deleteRound';
+        | 'lateTopic' | 'rosterOverride' | 'topicReassign' | 'retractResults' | 'deleteRound'
+        | 'closeRound' | 'reopenRound';
     roundId: string;
     roundName?: string;
     councilId?: string;
@@ -174,6 +181,11 @@ export default function AdminThesisPage() {
   const [reassignForm, setReassignForm] = useState({ groupId: '', topicId: '' });
   const [retractConfirmation, setRetractConfirmation] = useState('');
 
+  // Archived rounds stay out of the default list (the server filters them);
+  // this toggle merges the explicit status=CLOSED query back in so the
+  // archive is one click away without cluttering the active view.
+  const [showClosed, setShowClosed] = useState(false);
+
   // Restore-with-target modal: shown only when no implicit restore exists —
   // a legacy cancellation that still holds groups, or a REGISTRATION_OPEN
   // marker whose window already passed.
@@ -183,6 +195,10 @@ export default function AdminThesisPage() {
 
   // GVPB counter-reviewer assignment drafts, keyed by topic id
   const [reviewerDrafts, setReviewerDrafts] = useState<Record<string, string>>({});
+  // topicId -> supervisor lecturer ids (either stored key form), lazily fetched
+  // so the person pickers can explain disabled options; empty while loading.
+  const [topicSupervisors, setTopicSupervisors] = useState<Record<string, string[]>>({});
+  const topicSupervisorRequestsRef = useRef(new Set<string>());
 
   const thesisAdminAccess = Boolean(isAdmin || isSuperAdmin || isFacultyHead);
   const canAccess = Boolean(user && thesisAdminAccess);
@@ -191,14 +207,17 @@ export default function AdminThesisPage() {
     setIsLoading(true);
     setError('');
     try {
-      const data = await thesisApi.listRounds();
-      setRounds(sortThesisRoundsForOverview(data));
+      const [data, closed] = await Promise.all([
+        thesisApi.listRounds(),
+        showClosed ? thesisApi.listRounds('CLOSED') : Promise.resolve([]),
+      ]);
+      setRounds(sortThesisRoundsForOverview(mergeThesisRounds(data, closed)));
     } catch {
       setError(messages.thesis.loadFailed);
     } finally {
       setIsLoading(false);
     }
-  }, [messages.thesis.loadFailed]);
+  }, [messages.thesis.loadFailed, showClosed]);
 
   useEffect(() => {
     if (canAccess) void loadData();
@@ -215,6 +234,30 @@ export default function AdminThesisPage() {
       setLecturerLoadError(true);
     }
   };
+
+  /**
+   * Warms the per-topic supervisor cache the pickers read for disabled-with-
+   * reason hints. Fire-and-forget: the backend remains the authority, so a
+   * topic whose rows have not landed yet simply shows no disabled hint.
+   */
+  const ensureTopicSupervisors = useCallback((topicIds: string[]) => {
+    for (const topicId of topicIds) {
+      if (topicSupervisorRequestsRef.current.has(topicId)) continue;
+      topicSupervisorRequestsRef.current.add(topicId);
+      void thesisApi
+        .listSupervisors(topicId)
+        .then((sups) => {
+          setTopicSupervisors((prev) => ({
+            ...prev,
+            [topicId]: sups.map((s) => s.lecturerId),
+          }));
+        })
+        .catch(() => {
+          // Drop the in-flight mark so the next picker open can retry.
+          topicSupervisorRequestsRef.current.delete(topicId);
+        });
+    }
+  }, []);
 
   const loadRoundDetail = async (roundId: string) => {
     if (expandedRoundRef.current !== roundId) return;
@@ -241,6 +284,7 @@ export default function AdminThesisPage() {
       setTopics(Array.from(byId.values()));
       setGroups(g);
       if (expandedRoundRef.current === roundId) setCouncils(c);
+      ensureTopicSupervisors(c.flatMap((council) => council.topicIds ?? []));
       if (lecturers.length === 0) {
         await loadLecturers();
       }
@@ -858,6 +902,16 @@ export default function AdminThesisPage() {
         }
         await thesisApi.deleteRound(action.roundId, reason);
         setSuccess(messages.thesis.admin.roundDeleted);
+      } else if (action.kind === 'closeRound') {
+        if (retractConfirmation.trim() !== action.roundName) {
+          setReasonActionError(messages.thesis.admin.closeRoundConfirmLabel);
+          return;
+        }
+        await thesisApi.closeRound(action.roundId, reason);
+        setSuccess(messages.thesis.admin.roundClosed);
+      } else if (action.kind === 'reopenRound') {
+        await thesisApi.reopenRound(action.roundId, reason);
+        setSuccess(messages.thesis.admin.roundReopened);
       } else {
         return;
       }
@@ -903,6 +957,8 @@ export default function AdminThesisPage() {
         topicReassign: messages.thesis.admin.topicReassignTitle,
         retractResults: messages.thesis.admin.retractResultsTitle,
         deleteRound: messages.thesis.admin.deleteRoundTitle,
+        closeRound: messages.thesis.admin.closeRoundTitle,
+        reopenRound: messages.thesis.admin.reopenRoundTitle,
       }[reasonAction.kind]
     : '';
 
@@ -969,10 +1025,21 @@ export default function AdminThesisPage() {
       title={messages.thesis.admin.title}
       description={messages.thesis.admin.description}
       actions={
-        <Button type="button" onClick={() => { setModalError(''); setShowCreateModal(true); }} disabled={!canAccess}>
-          <Plus className="mr-2 h-4 w-4" />
-          {messages.thesis.admin.createRound}
-        </Button>
+        <div className="flex items-center gap-4">
+          <label className="flex items-center gap-2 text-sm font-medium text-foreground">
+            <input
+              type="checkbox"
+              checked={showClosed}
+              onChange={(e) => setShowClosed(e.target.checked)}
+              className="h-4 w-4 rounded border-input accent-primary"
+            />
+            {messages.thesis.admin.showClosedRounds}
+          </label>
+          <Button type="button" onClick={() => { setModalError(''); setShowCreateModal(true); }} disabled={!canAccess}>
+            <Plus className="mr-2 h-4 w-4" />
+            {messages.thesis.admin.createRound}
+          </Button>
+        </div>
       }
     >
       {error ? (
@@ -1187,6 +1254,35 @@ export default function AdminThesisPage() {
                               disabled={isSaving}
                             >
                               {messages.thesis.admin.retractResults}
+                            </Button>
+                          ) : null}
+                          {round.status === 'RESULTS_PUBLISHED' && round.closure?.closeAllowed !== false ? (
+                            <Button
+                              type="button"
+                              size="sm"
+                              variant="outline"
+                              onClick={() => openReasonAction({
+                                kind: 'closeRound', roundId: round.id, roundName: round.name,
+                              })}
+                              disabled={isSaving}
+                            >
+                              {messages.thesis.admin.closeRound}
+                            </Button>
+                          ) : null}
+                          {round.status === 'RESULTS_PUBLISHED' && round.closure?.closeBlocker ? (
+                            <span className="text-xs text-muted-foreground">
+                              {messages.thesis.admin.closeBlockedRetractWindow}
+                            </span>
+                          ) : null}
+                          {round.status === 'CLOSED' && round.closure?.reopenAllowed !== false ? (
+                            <Button
+                              type="button"
+                              size="sm"
+                              variant="outline"
+                              onClick={() => openReasonAction({ kind: 'reopenRound', roundId: round.id })}
+                              disabled={isSaving}
+                            >
+                              {messages.thesis.admin.reopenRound}
                             </Button>
                           ) : null}
                           {(round.status === 'DRAFT' || round.status === 'PROPOSAL_OPEN' || round.status === 'PROPOSALS_PUBLISHED') ? (
@@ -1455,6 +1551,23 @@ export default function AdminThesisPage() {
                                             setModalError('');
                                             setTargetCouncilIdForTopic(council.id);
                                             setTargetRoundIdForCouncil(round.id);
+                                            // Warm supervisor rows for every
+                                            // topic the modal may offer so the
+                                            // disabled reasons land together.
+                                            const assigned = new Set(
+                                              councils.flatMap((c) => c.topicIds ?? []),
+                                            );
+                                            ensureTopicSupervisors(
+                                              topics
+                                                .filter(
+                                                  (t) =>
+                                                    !assigned.has(t.id) &&
+                                                    t.finalScore == null &&
+                                                    (t.status === 'PUBLISHED' ||
+                                                      t.status === 'APPROVED'),
+                                                )
+                                                .map((t) => t.id),
+                                            );
                                             setShowAssignTopicModal(true);
                                           }}
                                         >
@@ -1497,28 +1610,42 @@ export default function AdminThesisPage() {
                                               {/* GVPB counter-reviewer (spec: one reviewer per defended topic) */}
                                               {!councilLocked ? (
                                               <div className="flex items-center gap-1.5">
-                                                <Select
+                                                <Combobox
                                                   aria-label={messages.thesis.admin.assignReviewer}
-                                                  className="h-7 flex-1 text-xs"
+                                                  className="h-7 text-xs"
+                                                  wrapperClassName="flex-1"
                                                   value={reviewerDrafts[tid] ?? reviewerId}
-                                                  onChange={(e) =>
+                                                  onChange={(next) =>
                                                     setReviewerDrafts((prev) => ({
                                                       ...prev,
-                                                      [tid]: e.target.value,
+                                                      [tid]: next,
                                                     }))
                                                   }
-                                                  options={[
-                                                    {
-                                                      value: '',
-                                                      label: `-- ${messages.thesis.admin.assignReviewer} --`,
-                                                    },
-                                                    ...lecturers.map((l) => ({
+                                                  allowClear
+                                                  placeholder={`-- ${messages.thesis.admin.assignReviewer} --`}
+                                                  options={lecturers.map((l) => {
+                                                    const conflict = reviewerConflict({
+                                                      lecturer: l,
+                                                      supervisorIds: topicSupervisors[tid] ?? [],
+                                                      councilMemberIds: (council.members ?? []).map(
+                                                        (m) => m.lecturerId,
+                                                      ),
+                                                    });
+                                                    return {
                                                       value: l.id,
                                                       label: l.user
                                                         ? `${l.user.lastName} ${l.user.firstName}`
                                                         : l.id,
-                                                    })),
-                                                  ]}
+                                                      description: l.department?.name,
+                                                      keywords: [l.employeeId, l.user?.email]
+                                                        .filter(Boolean)
+                                                        .join(' '),
+                                                      disabled: conflict != null,
+                                                      disabledReason: conflict
+                                                        ? messages.thesis.councils.conflicts[conflict]
+                                                        : undefined,
+                                                    };
+                                                  })}
                                                 />
                                                 <Button
                                                   type="button"
@@ -1839,6 +1966,9 @@ export default function AdminThesisPage() {
 
             const existingLecturerIds = new Set(members.map((m) => m.lecturerId));
             const availableLecturers = lecturers.filter((l) => !existingLecturerIds.has(l.id));
+            const councilTopics = (activeCouncil?.topicIds ?? [])
+              .map((tid) => topics.find((t) => t.id === tid))
+              .filter((t): t is ThesisTopic => Boolean(t));
 
             return (
               <>
@@ -1846,19 +1976,32 @@ export default function AdminThesisPage() {
                   <span className="text-muted-foreground">{messages.thesis.councils.nextSeatRequired}</span>
                   <span className="font-semibold text-primary">{nextRoleLabel}</span>
                 </div>
-                <Select
+                <Combobox
                   label={messages.thesis.councils.selectLecturer}
                   value={selectedLecturerId}
-                  onChange={(e) => setSelectedLecturerId(e.target.value)}
-                  options={[
-                    { value: '', label: `-- ${messages.thesis.councils.selectLecturer} --` },
-                    ...availableLecturers.map((l) => ({
+                  onChange={(next) => setSelectedLecturerId(next)}
+                  placeholder={`-- ${messages.thesis.councils.selectLecturer} --`}
+                  allowClear
+                  emptyLabel={`-- ${messages.thesis.councils.selectLecturer} --`}
+                  options={availableLecturers.map((l) => {
+                    const conflict = councilMemberConflict({
+                      lecturer: l,
+                      assignedTopics: councilTopics,
+                      topicSupervisors,
+                    });
+                    return {
                       value: l.id,
-                      label: l.user
-                        ? `${l.user.lastName} ${l.user.firstName} (${l.employeeId || l.user.email})`
-                        : l.id,
-                    })),
-                  ]}
+                      label: l.user ? `${l.user.lastName} ${l.user.firstName}` : l.id,
+                      description: [l.department?.name, l.employeeId || l.user?.email]
+                        .filter(Boolean)
+                        .join(' · '),
+                      keywords: [l.employeeId, l.user?.email].filter(Boolean).join(' '),
+                      disabled: conflict != null,
+                      disabledReason: conflict
+                        ? messages.thesis.councils.conflicts[conflict]
+                        : undefined,
+                    };
+                  })}
                 />
                 {lecturerLoadError ? (
                   <div className="flex items-center justify-between gap-3 rounded-md border border-status-warning/30 bg-status-warning/10 px-3 py-2 text-xs text-status-warning-foreground">
@@ -2018,6 +2161,11 @@ export default function AdminThesisPage() {
                 t.finalScore == null &&
                 (t.status === 'PUBLISHED' || t.status === 'APPROVED')
             );
+            const targetCouncil = councils.find((c) => c.id === targetCouncilIdForTopic);
+            const targetMemberIds = (targetCouncil?.members ?? []).map((m) => m.lecturerId);
+            const targetOfficerIds = (targetCouncil?.members ?? [])
+              .filter((m) => m.memberRole === 'CHAIR' || m.memberRole === 'SECRETARY')
+              .map((m) => m.lecturerId);
 
             return (
               <>
@@ -2028,14 +2176,30 @@ export default function AdminThesisPage() {
                       {messages.thesis.councils.noAssignedTopics}
                     </p>
                   ) : (
-                    <Select
+                    <Combobox
                       aria-label={messages.thesis.councils.selectTopic}
                       value={selectedTopicIdToAssign}
-                      onChange={(e) => setSelectedTopicIdToAssign(e.target.value)}
-                      options={[
-                        { value: '', label: `-- ${messages.thesis.councils.selectTopic} --` },
-                        ...assignableTopics.map((t) => ({ value: t.id, label: t.title })),
-                      ]}
+                      onChange={(next) => setSelectedTopicIdToAssign(next)}
+                      placeholder={`-- ${messages.thesis.councils.selectTopic} --`}
+                      allowClear
+                      emptyLabel={`-- ${messages.thesis.councils.selectTopic} --`}
+                      options={assignableTopics.map((t) => {
+                        const conflict = assignTopicConflict({
+                          topicSupervisorIds: topicSupervisors[t.id] ?? [],
+                          reviewerId: t.gvpbLecturerId,
+                          memberIds: targetMemberIds,
+                          officerIds: targetOfficerIds,
+                          lecturers,
+                        });
+                        return {
+                          value: t.id,
+                          label: t.title,
+                          disabled: conflict != null,
+                          disabledReason: conflict
+                            ? messages.thesis.councils.conflicts[conflict]
+                            : undefined,
+                        };
+                      })}
                     />
                   )}
                 </label>
@@ -2143,26 +2307,47 @@ export default function AdminThesisPage() {
             </div>
           ) : null}
           {reasonAction?.kind === 'replaceMember' ? (
-            <Select
-              label={messages.thesis.councils.selectLecturer}
-              value={replacementLecturerId}
-              onChange={(e) => setReplacementLecturerId(e.target.value)}
-              options={[
-                { value: '', label: `-- ${messages.thesis.councils.selectLecturer} --` },
-                ...lecturers
-                  .filter(
-                    (l) =>
-                      l.id !== reasonAction.lecturerId &&
-                      !(councils.find((c) => c.id === reasonAction.councilId)?.members ?? []).some(
-                        (m) => m.lecturerId === l.id,
-                      ),
-                  )
-                  .map((l) => ({
-                    value: l.id,
-                    label: l.user ? `${l.user.lastName} ${l.user.firstName}` : l.id,
-                  })),
-              ]}
-            />
+            (() => {
+              const replaceCouncil = councils.find((c) => c.id === reasonAction.councilId);
+              const replaceCouncilTopics = (replaceCouncil?.topicIds ?? [])
+                .map((tid) => topics.find((t) => t.id === tid))
+                .filter((t): t is ThesisTopic => Boolean(t));
+              return (
+                <Combobox
+                  label={messages.thesis.councils.selectLecturer}
+                  value={replacementLecturerId}
+                  onChange={(next) => setReplacementLecturerId(next)}
+                  placeholder={`-- ${messages.thesis.councils.selectLecturer} --`}
+                  allowClear
+                  emptyLabel={`-- ${messages.thesis.councils.selectLecturer} --`}
+                  options={lecturers
+                    .filter(
+                      (l) =>
+                        l.id !== reasonAction.lecturerId &&
+                        !(replaceCouncil?.members ?? []).some((m) => m.lecturerId === l.id),
+                    )
+                    .map((l) => {
+                      const conflict = councilMemberConflict({
+                        lecturer: l,
+                        assignedTopics: replaceCouncilTopics,
+                        topicSupervisors,
+                      });
+                      return {
+                        value: l.id,
+                        label: l.user ? `${l.user.lastName} ${l.user.firstName}` : l.id,
+                        description: [l.department?.name, l.employeeId]
+                          .filter(Boolean)
+                          .join(' · '),
+                        keywords: [l.employeeId, l.user?.email].filter(Boolean).join(' '),
+                        disabled: conflict != null,
+                        disabledReason: conflict
+                          ? messages.thesis.councils.conflicts[conflict]
+                          : undefined,
+                      };
+                    })}
+                />
+              );
+            })()
           ) : null}
           {reasonAction?.kind === 'lateTopic' ? (
             <>
@@ -2304,6 +2489,21 @@ export default function AdminThesisPage() {
               </p>
               <label className="flex flex-col gap-2 text-sm font-medium text-foreground">
                 {messages.thesis.admin.retractResultsConfirmLabel}
+                <Input
+                  value={retractConfirmation}
+                  onChange={(e) => setRetractConfirmation(e.target.value)}
+                  required
+                />
+              </label>
+            </>
+          ) : null}
+          {reasonAction?.kind === 'closeRound' ? (
+            <>
+              <p className="text-sm text-muted-foreground">
+                {messages.thesis.admin.closeRoundHint}
+              </p>
+              <label className="flex flex-col gap-2 text-sm font-medium text-foreground">
+                {messages.thesis.admin.closeRoundConfirmLabel}
                 <Input
                   value={retractConfirmation}
                   onChange={(e) => setRetractConfirmation(e.target.value)}

@@ -3110,8 +3110,10 @@ public class AssistantPersonalContextAdvisor {
             String leaderStudentId = text(row, "leader_student_id");
             Object finalScore = row.get("final_score");
             // Scores are only visible after the faculty publishes results; the
-            // chatbot must mirror the portal's pre-publish masking.
-            boolean resultsPublished = "RESULTS_PUBLISHED".equals(text(row, "round_status"));
+            // chatbot must mirror the portal's pre-publish masking. CLOSED
+            // keeps the published set readable (the portal agrees).
+            boolean resultsPublished = "RESULTS_PUBLISHED".equals(text(row, "round_status"))
+                    || "CLOSED".equals(text(row, "round_status"));
 
             answer.append("\n• ").append(StringUtils.hasText(roundName) ? roundName : (vi ? "Đợt khóa luận" : "Thesis Round"));
             if (StringUtils.hasText(topicTitle)) {

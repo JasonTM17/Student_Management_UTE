@@ -1,3 +1,4 @@
+import { execFileSync } from 'node:child_process';
 import { expect, test, type Page } from '@playwright/test';
 import { submitLiveLogin } from './fixtures/live-login';
 
@@ -408,6 +409,23 @@ test('stages 2-9: proposal through published results and reporting', async ({ pa
     expect(approve.status(), 'supervisor approves').toBe(200);
   }
 
+  // GV1: a mistaken approval in an open round is withdrawn back to PENDING,
+  // then approved again — the release path that used to be missing entirely.
+  const withdrawal = await apiAs(page, lecturer, 'POST', `/thesis/groups/${group.id}/withdraw-approval`, {
+    reason: 'mistaken approval — withdraw for lifecycle coverage',
+  });
+  expect(withdrawal.status(), 'withdraw approval succeeds in an open round').toBe(200);
+  expect((await withdrawal.json()).approvalStatus, 'group returns to pending').toBe('PENDING');
+  const reApprove = await apiAs(page, lecturer, 'POST', `/thesis/groups/${group.id}/approve`, {});
+  if (reApprove.status() === 409) {
+    const sizedAgain = await apiAs(page, admin, 'POST', `/thesis/groups/${group.id}/approve`, {
+      allowSizeException: true, reason: 'undersized demo roster',
+    });
+    expect(sizedAgain.status(), 're-approve via size exception').toBe(200);
+  } else {
+    expect(reApprove.status(), 're-approve after withdrawal').toBe(200);
+  }
+
   // Registration mutations freeze once the round closes.
   const close = await apiAs(page, admin, 'POST', `/thesis/rounds/${round.id}/close-registration`);
   expect(close.status(), 'close registration').toBe(200);
@@ -563,4 +581,136 @@ test('stages 2-9: proposal through published results and reporting', async ({ pa
   for (const expected of ['THESIS_ROUND_TRANSITION', 'THESIS_RESULTS_RETRACTED']) {
     expect(actions, `audit contains ${expected}`).toContain(expected);
   }
+
+  // Stage 10: end-of-life governance. While the retract grace window is open
+  // the close must refuse with its stable blocker, the read model must say so,
+  // and non-governance roles are refused. When the disposable stack exposes
+  // its fixture postgres (E2E_THESIS_PG_CONTAINER/E2E_THESIS_PG_DATABASE) the
+  // round is aged past the window — the only way to age a live round — and
+  // the full close -> read-only -> reopen cycle runs against the real API.
+  const publishedList = await apiAs(page, admin, 'GET', '/thesis/rounds?status=RESULTS_PUBLISHED');
+  expect(publishedList.status(), 'published rounds list').toBe(200);
+  const liveRound = ((await publishedList.json()) as Array<{
+    id: string;
+    closure?: { closeAllowed?: boolean; reopenAllowed?: boolean; closeBlocker?: string | null } | null;
+  }>).find((row) => row.id === round.id);
+  expect(liveRound?.closure?.closeAllowed, 'read model blocks close in-window').toBe(false);
+  expect(liveRound?.closure?.closeBlocker).toBe('RETRACT_WINDOW_OPEN');
+  const studentClose = await apiAs(page, memberToken, 'POST', `/thesis/rounds/${round.id}/close`, { reason: 'probe' });
+  expect(studentClose.status(), 'student cannot close').toBe(403);
+  const noCloseReason = await apiAs(page, admin, 'POST', `/thesis/rounds/${round.id}/close`, {});
+  expect(noCloseReason.status(), 'close needs a reason').toBe(400);
+  const earlyClose = await apiAs(page, admin, 'POST', `/thesis/rounds/${round.id}/close`, { reason: 'too early' });
+  expect(earlyClose.status(), 'close inside the retract window refuses').toBe(409);
+  expect((await earlyClose.json()).code).toBe('RETRACT_WINDOW_OPEN');
+
+  const pgContainer = process.env.E2E_THESIS_PG_CONTAINER;
+  const pgDatabase = process.env.E2E_THESIS_PG_DATABASE;
+  if (!pgContainer || !pgDatabase) {
+    test.info().annotations.push({
+      type: 'note',
+      description: 'E2E_THESIS_PG_* unset: close -> read-only -> reopen positive cycle skipped.',
+    });
+    return;
+  }
+  execFileSync('docker', ['exec', '-i', pgContainer, 'psql', '-U', 'campuscore', '-d', pgDatabase,
+    '-v', 'ON_ERROR_STOP=1', '-c',
+    `UPDATE thesis.thesis_registration_round SET results_published_at = CURRENT_TIMESTAMP - interval '30 days' WHERE id = '${round.id}'`]);
+
+  const closeRes = await apiAs(page, admin, 'POST', `/thesis/rounds/${round.id}/close`, { reason: 'lifecycle e2e archive' });
+  expect(closeRes.status(), 'admin closes the round').toBe(200);
+  expect((await closeRes.json()).status).toBe('CLOSED');
+  const closedCouncil = await apiAs(page, admin, 'POST', '/thesis/councils', { roundId: round.id, name: 'late' });
+  expect(closedCouncil.status(), 'council refused on a closed round').toBe(409);
+  const closedResult = await apiAs(page, leaderToken, 'GET', `/thesis/me/results?roundId=${round.id}`);
+  expect(closedResult.status(), 'student still reads results on a closed round').toBe(200);
+  const activeList = await apiAs(page, admin, 'GET', '/thesis/rounds');
+  expect((((await activeList.json()) as Array<{ id: string }>).map((row) => row.id)),
+    'closed round leaves the default active list').not.toContain(round.id);
+  const closedList = await apiAs(page, admin, 'GET', '/thesis/rounds?status=CLOSED');
+  expect((((await closedList.json()) as Array<{ id: string }>).map((row) => row.id)),
+    'closed round appears under the explicit CLOSED filter').toContain(round.id);
+  const doubleClose = await apiAs(page, admin, 'POST', `/thesis/rounds/${round.id}/close`, { reason: 'again' });
+  expect(doubleClose.status(), 'double close refuses').toBe(409);
+
+  const studentReopen = await apiAs(page, memberToken, 'POST', `/thesis/rounds/${round.id}/reopen`, { reason: 'probe' });
+  expect(studentReopen.status(), 'student cannot reopen').toBe(403);
+  const reopen = await apiAs(page, admin, 'POST', `/thesis/rounds/${round.id}/reopen`, { reason: 'lifecycle e2e reopen' });
+  expect(reopen.status(), 'admin reopens the round').toBe(200);
+  const reopened = await reopen.json();
+  expect(reopened.status).toBe('RESULTS_PUBLISHED');
+  expect(reopened.closure?.reopenAllowed ?? false, 'reopened round is published again').toBe(false);
+  const auditTrail2 = await apiAs(page, admin, 'GET', `/admin/audit?entityId=${round.id}&entityType=THESIS_ROUND&limit=50`);
+  const actions2 = (((await auditTrail2.json()).data ?? []) as Array<{ action?: string }>)
+    .map((row) => row.action);
+  for (const expected of ['THESIS_ROUND_CLOSED', 'THESIS_ROUND_REOPENED']) {
+    expect(actions2, `audit contains ${expected}`).toContain(expected);
+  }
+});
+
+test('credit ineligibility shows the warning card; blocking follows enforced flag', async ({ page }) => {
+  const stamp = Date.now().toString(36);
+  const name = `Eligibility ${stamp}`;
+
+  // A live REGISTRATION_OPEN round for the probes below.
+  await login(page, ADMIN.email, ADMIN.password);
+  const createRes = await api(page, 'POST', '/thesis/rounds', roundPayload(name, 14));
+  expect(createRes.status(), 'round creation').toBe(200);
+  const round = await createRes.json();
+  for (const step of ['open-proposals', 'publish-proposals']) {
+    const res = await api(page, 'POST', `/thesis/rounds/${round.id}/${step}`);
+    expect(res.status(), `transition ${step}`).toBe(200);
+  }
+  const amendRes = await api(page, 'PUT', `/thesis/rounds/${round.id}`,
+    compressWindows(roundPayload(name, 14), 'registration'));
+  expect(amendRes.status(), 'schedule amendment').toBe(200);
+  const openRes = await api(page, 'POST', `/thesis/rounds/${round.id}/open-registration`);
+  expect(openRes.status(), 'open registration').toBe(200);
+
+  // V143 leaves student-profile below the accumulated-credit bar; the seeded
+  // trio (058/059/team-004) is eligible, so the refusal is credit-driven.
+  // The API refuses login-while-authenticated, so the admin session leaves
+  // first — the same clear-cookie dance tokenFor does for bearer mints.
+  await page.context().clearCookies();
+  await login(page, STUDENT.email, STUDENT.password);
+  const roundsRes = await api(page, 'GET', '/thesis/rounds');
+  expect(roundsRes.status(), 'student reads rounds').toBe(200);
+  const rounds = await roundsRes.json() as Array<{ id: string; eligibility?: { eligible: boolean; earnedCredits: number; requiredCredits: number; enforced: boolean } }>;
+  const mine = rounds.find((r) => r.id === round.id);
+  expect(mine?.eligibility, 'round carries the caller eligibility').toBeTruthy();
+  expect(mine?.eligibility?.eligible, 'seeded student is ineligible').toBe(false);
+  expect(mine?.eligibility?.earnedCredits).toBeLessThan(mine?.eligibility?.requiredCredits ?? 0);
+  expect(typeof mine?.eligibility?.enforced, 'round reports enforcement mode').toBe('boolean');
+  const enforced = mine?.eligibility?.enforced === true;
+
+  const createAttempt = await api(page, 'POST', '/thesis/groups', { roundId: round.id });
+  if (enforced) {
+    expect(createAttempt.status(), 'ineligible create refused').toBe(409);
+    const refusedBody = await createAttempt.json();
+    expect(refusedBody.code).toBe('THESIS_ELIGIBILITY_NOT_MET');
+    expect(refusedBody.details?.reasons).toContain('INSUFFICIENT_CREDITS');
+  } else {
+    // ADVISORY: the warning is displayed but the action is never blocked.
+    expect(createAttempt.status(), 'advisory mode does not block').toBe(200);
+  }
+
+  // The page surfaces the same state as a warning card for the round; the
+  // create affordance is hidden only under ENFORCE (and only while the caller
+  // has no group — under ADVISORY the POST above already created one).
+  await page.goto(`/en/dashboard/thesis?roundId=${round.id}`);
+  await expect(
+    page.getByText(/not eligible yet|chưa đủ điều kiện/i).first(),
+  ).toBeVisible({ timeout: 30_000 });
+  if (enforced) {
+    await expect(
+      page.getByRole('button', { name: /create a thesis group|tạo nhóm đề tài/i }),
+    ).toHaveCount(0);
+  }
+
+  // An eligible demo student still registers (the seeded trio carries 110+).
+  const leaderToken = await tokenFor(page, LEADER.email, LEADER.password);
+  const leaderRounds = await apiAs(page, leaderToken, 'GET', '/thesis/rounds');
+  const leaderView = ((await leaderRounds.json()) as typeof rounds)
+    .find((r) => r.id === round.id);
+  expect(leaderView?.eligibility?.eligible, 'seeded trio stays eligible').toBe(true);
 });

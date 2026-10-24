@@ -17,7 +17,7 @@ const js = ts.transpileModule(source, {
 }).outputText;
 const mod = { exports: {} };
 new Function('module', 'exports', 'require', js)(mod, mod.exports, require);
-const { pickPreferredThesisRound, sortThesisRoundsForOverview } = mod.exports;
+const { pickPreferredThesisRound, sortThesisRoundsForOverview, mergeThesisRounds } = mod.exports;
 
 const round = (id, status = 'REGISTRATION_CLOSED', start = '2026-09-01', thesisType = 'KLTN') => ({
   id,
@@ -119,7 +119,56 @@ test('advisor directory and admin round list share the overview ordering', () =>
   assert.match(advisors, /sortThesisRoundsForOverview\(roundsList\)/);
   assert.doesNotMatch(advisors, /roundsList\[0\]/);
   const admin = fs.readFileSync(path.join(root, 'src/app/admin/thesis/page.tsx'), 'utf8');
-  assert.match(admin, /setRounds\(sortThesisRoundsForOverview\(data\)\)/);
+  assert.match(admin, /setRounds\(sortThesisRoundsForOverview\(mergeThesisRounds\(data, closed\)\)\)/);
+});
+
+test('live and archived lists merge to one entry per round id', () => {
+  // The unfiltered listRounds() response can already include CLOSED rounds
+  // (the e2e fixture returns the same payload for both calls), so a naive
+  // concat renders the same round twice and React keys collide downstream.
+  const live = [
+    round('r-open', 'REGISTRATION_OPEN'),
+    round('thesis-round-demo', 'REGISTRATION_CLOSED'),
+  ];
+  const archived = [
+    round('thesis-round-demo', 'CLOSED'),
+    round('r-archived', 'CLOSED'),
+  ];
+  assert.deepEqual(
+    mergeThesisRounds(live, archived).map((r) => r.id),
+    ['r-open', 'thesis-round-demo', 'r-archived'],
+  );
+});
+
+test('the live copy wins when both lists describe the same round', () => {
+  const liveCopy = round('r1', 'REGISTRATION_OPEN', '2026-09-01');
+  const archivedEcho = round('r1', 'CLOSED', '2026-09-01');
+  const merged = mergeThesisRounds([liveCopy], [archivedEcho]);
+  assert.equal(merged.length, 1);
+  assert.equal(merged[0].status, 'REGISTRATION_OPEN');
+});
+
+test('an empty archived list keeps the live order untouched', () => {
+  const live = [round('a'), round('b')];
+  assert.deepEqual(mergeThesisRounds(live, []), live);
+});
+
+test('every live+archived merge site dedupes instead of concatenating', () => {
+  const sites = [
+    'src/app/dashboard/thesis/page.tsx',
+    'src/app/dashboard/thesis/[roundId]/page.tsx',
+    'src/app/dashboard/dean/page.tsx',
+    'src/app/admin/thesis/page.tsx',
+    'src/components/dashboard/thesis/useThesisWorkspace.ts',
+  ];
+  for (const site of sites) {
+    const source = fs.readFileSync(path.join(root, site), 'utf8');
+    assert.doesNotMatch(
+      source,
+      /\[\.\.\.(liveRounds|roundsData|data|list), \.\.\.(closedRounds|closedData|closed)\]/,
+      `${site} must merge round lists by id`,
+    );
+  }
 });
 
 test('advisor directory action buttons say they open the topic proposal form', () => {

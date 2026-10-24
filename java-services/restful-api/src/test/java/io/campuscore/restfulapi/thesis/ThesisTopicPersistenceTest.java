@@ -827,6 +827,8 @@ class ThesisTopicPersistenceTest {
         ensureStudent("student-review-6c", "user-student-6c", "student6c@campuscore.edu");
         addMember(groupId, "student-review-6c").andExpect(status().isOk());
         mvc.perform(post("/api/v1/thesis/groups/{id}/approve", groupId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"reason\":\"Administrative approval\"}")
                         .with(adminJwt()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.approvalStatus").value("APPROVED"));

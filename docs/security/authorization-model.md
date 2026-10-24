@@ -179,13 +179,35 @@ retroactively identify password changes made before the revision existed.
   and [SupabaseKnowledgeInternalController](../../java-services/restful-api/src/main/java/io/campuscore/restfulapi/thesis/assistant/controller/SupabaseKnowledgeInternalController.java).
 - **Thesis governance actions** run after the dean-scope check
   (`ThesisDeanScope`), so capability gates never leak topic existence or bypass
-  faculty ownership. The counter-review waiver is one such action: it stays
+  faculty ownership. Group approval withdrawal
+  (`ThesisMutationService.withdrawGroupApproval`) applies the same discipline:
+  `TRUONG_KHOA`/`TRUONG_BO_MON` act only inside their faculty/department scope
+  with no supervisor escape, while the topic's own supervisors and global
+  admins retain the direct path. Approval by anyone who is not the topic's
+  supervisor is a governance override and requires a documented reason
+  (`GROUP_APPROVAL_OVERRIDE_REASON_REQUIRED`), recorded on the audit row;
+  supervisor self-approval is unchanged. The counter-review waiver is one such action: it stays
   implemented but is off for every shipped undergraduate round type
   (`409 COUNTER_REVIEW_WAIVER_NOT_SUPPORTED`), because those rounds always
   require a counter-reviewer. `ThesisGovernanceCapabilities` owns the decision
   (`RoundType.allowsCounterReviewWaiver()` plus the
   `thesis.governance.counter-review-waiver.enabled` override, default `false`);
   revoke stays ungated so stored waivers can always be cleared.
+  Round end-of-life (`POST /api/v1/thesis/rounds/{id}/close` and `/reopen`)
+  is narrower still: rounds carry no faculty column, so only
+  `ADMIN`/`SUPER_ADMIN` may archive a published round or reopen it — dean and
+  department-head scope plays no part. Both demand a documented reason and
+  write `THESIS_ROUND_CLOSED`/`THESIS_ROUND_REOPENED` audit rows under the
+  round row lock; closing while the results-retract grace window is still
+  open is refused (`409 RETRACT_WINDOW_OPEN`) so a lawful retract is never
+  silently blocked.
+- **Thesis registration eligibility** is an academic precondition, not an
+  authorization rule: any authenticated student caller may register only when
+  their published transcript meets `thesis.eligibility.min-credits` (110) and
+  `thesis.eligibility.min-cpa` (2.0). Refusals answer
+  `409 THESIS_ELIGIBILITY_NOT_MET` with numeric `details`; governance roster
+  overrides stay reachable to the same privileged roles and audit the
+  ineligibility. `ADVISORY` mode reports without blocking.
 
 ## Signing configuration
 

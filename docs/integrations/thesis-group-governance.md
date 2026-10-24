@@ -26,6 +26,40 @@ council lifecycle authority remains a separate contract. Report submission
 and upload remain group-leader-only; report read authority is documented in
 [report storage and recovery](thesis-report-storage.md#artifact-integrity-and-concurrent-changes).
 
+## Approval decisions
+
+A group approval is reviewable again through two paths. Rejection decides a
+`PENDING` group; **withdraw approval**
+(`POST /api/v1/thesis/groups/{id}/withdraw-approval`) releases a *mistaken*
+`APPROVED` decision back to `PENDING` while the round still reviews
+registrations (`PROPOSALS_PUBLISHED`, `REGISTRATION_OPEN`, `REGISTRATION_CLOSED`
+— the same window in which approve is legal). The roster and topic pick are
+kept; the approval columns, including any size-exception marker, are cleared.
+Withdrawal authority is narrower than review authority: the topic's own
+supervisors, `ADMIN`/`SUPER_ADMIN`, and `TRUONG_KHOA`/`TRUONG_BO_MON` strictly
+inside their governance scope — a dean or department head who supervises a
+foreign-scope topic gets no supervisor escape. A mandatory reason (1–500
+characters) and an audit row (`THESIS_GROUP_APPROVAL_WITHDRAWN`) accompany the
+transition, and group members are notified. Downstream work locks the decision
+in: any group report, topic score, council-topic assignment, assigned
+counter-reviewer, or topic result refuses the withdrawal with
+`409 GROUP_WITHDRAWAL_BLOCKED` carrying per-kind counts, so governance reaches
+for the roster override instead of silently orphaning graded work. The UI
+surfaces the actor-scoped `approvalWithdrawal.withdrawable` flag plus the same
+counts on the group read model, so no extra round trip is needed.
+
+Approvals stay accountable: an approver who is not the topic's supervisor acts
+as a governance override and must supply a reason
+(`400 GROUP_APPROVAL_OVERRIDE_REASON_REQUIRED` when missing), which is recorded
+on the `THESIS_GROUP_APPROVED` audit row. A supervisor approving their own
+topic needs no reason — unchanged.
+
+Roster size stays advisory while joining and enforced on approval: a group
+below the round minimum (3) cannot be approved (`409 GROUP_TOO_SMALL`) except
+through the audited governance size exception, which requires a documented
+reason. The round read model exposes `minGroupSize`/`maxGroupSize` so the UI
+can show the missing-member state instead of a dead-end error.
+
 The counter-review waiver ("Miễn phản biện") remains implemented but is
 disabled for every shipped round type: undergraduate rounds always require a
 counter-reviewer, so the waive endpoint answers
@@ -38,11 +72,40 @@ before. A future postgraduate round type opts in by returning `true` from
 single owner is `ThesisGovernanceCapabilities`, which feeds both the write
 path and the round read model (`counterReviewWaiverAllowed`).
 
+## Registration eligibility (accumulated credits + CPA)
+
+A student may register (create a group, be added as a member, or pick the
+group's topic) only when their published transcript meets the regulation's
+condition: at least `thesis.eligibility.min-credits` accumulated credits
+(default `110`) and a cumulative GPA of at least `thesis.eligibility.min-cpa`
+(default `2.0`, 4.0 scale). Both numbers come from the canonical transcript
+summary — published grades only, best attempt per course, letter `F` earns
+nothing. A student with no published academic data fails closed
+(`ACADEMIC_DATA_UNAVAILABLE`).
+
+- `thesis.eligibility.enforcement` = `ENFORCE` (default) refuses the mutation
+  with `409 THESIS_ELIGIBILITY_NOT_MET` plus `details` carrying
+  `earnedCredits`, `requiredCredits`, `cpa`, `requiredCpa` and a `reasons`
+  list. `ADVISORY` still evaluates and reports in the read model but never
+  blocks.
+- The round read model carries `eligibility` for student callers; group
+  members carry an `eligible` flag for roster chips. No extra round trip.
+- Governance escape hatches are deliberately not blocked: the audited roster
+  override admits an ineligible student, and the audit row records the
+  ineligibility note (`student does not meet thesis eligibility (...)` +
+  `studentEligible=false`). A reason remains required, as before.
+- The regulation's academic-warning and disciplinary-sanction prerequisites
+  have no data model in this schema, so they are not evaluated.
+
 ## Executable owners
 
 - [Group mutations](../../java-services/restful-api/src/main/java/io/campuscore/restfulapi/thesis/service/ThesisMutationService.java):
   `isGroupAdmin`, `requireDeanScope` and `requireDeanTopicAccess` own the group
   authorization boundary; the separate `isAdmin` owner governs other lifecycle operations.
+- [Eligibility policy](../../java-services/restful-api/src/main/java/io/campuscore/restfulapi/thesis/service/ThesisEligibilityService.java)
+  owns the credit/CPA rule; the batch transcript summary lives in
+  `AcademicEnrollmentReadService.findTranscriptSummaries`, reusing the
+  single-source grade reduction.
 - [Faculty identity and ownership](../../java-services/restful-api/src/main/java/io/campuscore/restfulapi/thesis/repository/ThesisGroupReadRepository.java):
   `findLecturerScope` and `groupInFaculty`.
 - [Group mutation faculty-scope regressions](../../java-services/restful-api/src/test/java/io/campuscore/restfulapi/thesis/ThesisGroupMutationFacultyScopeTest.java)

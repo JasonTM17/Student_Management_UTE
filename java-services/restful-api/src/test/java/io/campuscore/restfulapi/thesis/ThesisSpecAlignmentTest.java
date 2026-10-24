@@ -264,6 +264,8 @@ class ThesisSpecAlignmentTest {
                 .andExpect(status().isOk());
         ensureLecturer("sa-dean-group-approval");
         mvc.perform(post("/api/v1/thesis/groups/{id}/approve", groupId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"reason\":\"Faculty approval\"}")
                         .with(ThesisAuthorityFixture.role(jdbc, "sa-user-sa-dean-group-approval", "TRUONG_KHOA")))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.approvalStatus").value("APPROVED"));

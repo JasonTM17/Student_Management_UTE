@@ -150,3 +150,12 @@ Hai PR squash-merge kế tiếp chốt đợt audit toàn diện (cross-role the
 - `THESIS_RESULTS_RETRACTGRACEDAYS` (property `thesis.results.retract-grace-days`, mặc định `7`): số ngày sau `RESULTS_PUBLISHED` mà admin toàn cục được phép thu hồi công bố qua `POST /api/v1/thesis/rounds/{id}/retract-results`.
 - Thu hồi đòi lý do + xác nhận gõ `RETRACT`; không bao giờ sửa điểm; inbox "kết quả đã công bố" bị thu hồi và sinh viên nhận thông báo chỉnh chính; email đã gửi **không** thu hồi được (ghi rõ trong audit). Vòng quay về `REGISTRATION_CLOSED` để chạy lại luồng preview → publish bình thường.
 - Sai sót phát hiện sau khi hết hạn ân hạn đi qua đường khiếu nại từng đề tài (chưa xây dựng — follow-up sản phẩm).
+
+### Cấu hình điều kiện đăng ký khóa luận (thesis eligibility)
+
+- `THESIS_ELIGIBILITY_MIN_CREDITS` (`thesis.eligibility.min-credits`, mặc định `110`): số tín chỉ tích lũy tối thiểu theo quy chế trước khi sinh viên được đăng ký khóa luận.
+- `THESIS_ELIGIBILITY_MIN_CPA` (`thesis.eligibility.min-cpa`, mặc định `2.0`): CPA tối thiểu trên thang 4.0. Cả hai số đọc từ bảng điểm chuẩn (điểm đã công bố, lần học tốt nhất mỗi học phần).
+- `THESIS_ELIGIBILITY_ENFORCEMENT` (`thesis.eligibility.enforcement`, mặc định `ADVISORY` kể từ release 2): `ENFORCE` từ chối tạo nhóm/thêm thành viên/chọn đề tài bằng `409 THESIS_ELIGIBILITY_NOT_MET` kèm `details` số liệu; `ADVISORY` vẫn tính và hiển thị trong read model (`enforced=false`) nhưng không chặn. Giá trị không nhận diện được được xử như `ADVISORY` và cảnh báo lúc khởi động (rollout an toàn: không bao giờ chặn ngoài ý muốn). Override roster của governance không bị chặn nhưng ghi nhận tình trạng không đủ điều kiện vào audit.
+- `THESIS_ELIGIBILITY_ROUND_TYPES` (`thesis.eligibility.round-types`, mặc định `KLTN`): danh sách loại đợt (phẩy) mà quy chế tín chỉ áp dụng — quy chế chỉ nói khóa luận tốt nghiệp (KLTN); `TLCN`, `MON_HOC`, `NCKH` không bị chặn và read model không trả `eligibility` cho các loại đó.
+- Quyền riêng tư: sinh viên chỉ thấy `eligible`/số liệu của chính mình trong roster và lỗi 409; giảng viên/head/dean/admin thấy đầy đủ.
+- V143 (demo data) seed thêm 142 dòng `academic."Enrollment"` lịch sử (semester `semester-history-demo`/`semester-history-demo-1`, section do giảng viên demo phụ trách): 058=122tc/CPA 3.14, 059=124/3.13, team-004=117/2.78 đủ điều kiện; 105/106/107/108/021 và `student-profile` vẫn chưa đủ (tài khoản login duy nhất còn ineligible là `student@campuscore.demo`). Idempotent: chạy lại chèn 0 dòng.
