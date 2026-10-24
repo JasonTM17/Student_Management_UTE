@@ -1,10 +1,11 @@
 package io.campuscore.restfulapi.thesis.service;
 
-import io.campuscore.restfulapi.thesis.domain.ThesisTopic;
-import io.campuscore.restfulapi.thesis.domain.TopicStatus;
+import io.campuscore.restfulapi.thesis.entity.ThesisTopic;
+import io.campuscore.restfulapi.thesis.model.TopicStatus;
 import io.campuscore.restfulapi.thesis.repository.ThesisRoundReadPort;
+import io.campuscore.restfulapi.thesis.repository.ThesisScopeRepository;
 import io.campuscore.restfulapi.thesis.repository.ThesisTopicRepository;
-import io.campuscore.restfulapi.thesis.web.ThesisTopicDtos.TopicResponse;
+import io.campuscore.restfulapi.thesis.dto.ThesisTopicDtos.TopicResponse;
 import java.util.List;
 import java.util.UUID;
 import org.springframework.context.annotation.Profile;
@@ -13,6 +14,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 import org.springframework.http.HttpStatus;
+import io.campuscore.restfulapi.thesis.scope.ThesisDeanScope;
+import io.campuscore.restfulapi.thesis.scope.ThesisDepartmentScope;
 
 @Service
 @Profile("persistence")
@@ -20,13 +23,13 @@ public class ThesisTopicService {
 
     private final ThesisTopicRepository topics;
     private final ThesisRoundReadPort rounds;
-    private final org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate jdbc;
+    private final ThesisScopeRepository scope;
 
     public ThesisTopicService(ThesisTopicRepository topics, ThesisRoundReadPort rounds,
-            org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate jdbc) {
+            ThesisScopeRepository scope) {
         this.topics = topics;
         this.rounds = rounds;
-        this.jdbc = jdbc;
+        this.scope = scope;
     }
 
     /**
@@ -65,20 +68,13 @@ public class ThesisTopicService {
         java.util.Set<String> deanFacultyDepts = java.util.Set.of();
         java.util.Set<UUID> deanSupervisedIds = java.util.Set.of();
         if (!isAdmin(actor) && ThesisDeanScope.isFacultyHead(actor)) {
-            String facultyId = ThesisDeanScope.facultyId(jdbc, actor);
+            String facultyId = ThesisDeanScope.facultyId(scope, actor);
             deanFacultyDepts = facultyId == null ? java.util.Set.of() : new java.util.HashSet<>(
-                    jdbc.queryForList(
-                            "SELECT \"id\" FROM academic.\"Department\" WHERE \"facultyId\" = :facultyId",
-                            new org.springframework.jdbc.core.namedparam.MapSqlParameterSource("facultyId", facultyId),
-                            String.class));
+                    scope.findDepartmentIdsInFaculty(facultyId));
             String deanLecturerId = normalize(actor == null ? null : actor.getClaimAsString("lecturerId"));
             deanSupervisedIds = deanLecturerId.isEmpty() || result.isEmpty() ? java.util.Set.of() : new java.util.HashSet<>(
-                    jdbc.queryForList(
-                            "SELECT topic_id FROM thesis.thesis_topic_supervisor WHERE lecturer_id = :lecturerId AND topic_id IN (:topicIds)",
-                            new org.springframework.jdbc.core.namedparam.MapSqlParameterSource()
-                                    .addValue("lecturerId", deanLecturerId)
-                                    .addValue("topicIds", result.stream().map(ThesisTopic::getId).toList()),
-                            UUID.class));
+                    scope.findSupervisedTopicIds(deanLecturerId,
+                            result.stream().map(ThesisTopic::getId).toList()));
             java.util.Set<String> inFacultyDepts = deanFacultyDepts;
             java.util.Set<UUID> supervisedByDean = deanSupervisedIds;
             result = result.stream()
@@ -87,7 +83,7 @@ public class ThesisTopicService {
                             || supervisedByDean.contains(topic.getId()))
                     .toList();
         } else if (!isAdmin(actor) && ThesisDepartmentScope.isDepartmentHead(actor)) {
-            String departmentId = ThesisDepartmentScope.departmentId(jdbc, actor);
+            String departmentId = ThesisDepartmentScope.departmentId(scope, actor);
             result = result.stream().filter(topic -> topic.getDepartmentId().equals(departmentId)).toList();
         }
         // A withdrawn topic's outcome is masked for students, so listing it
@@ -107,14 +103,8 @@ public class ThesisTopicService {
         java.util.Set<UUID> gradingTopicIds = new java.util.HashSet<>();
         String lecturerId = normalize(actor == null ? null : actor.getClaimAsString("lecturerId"));
         if (!published && !isAdmin(actor) && !lecturerId.isEmpty() && !result.isEmpty()) {
-            gradingTopicIds.addAll(jdbc.queryForList(
-                    "SELECT ct.topic_id FROM thesis.thesis_council_topic ct "
-                            + "JOIN thesis.thesis_council_member m ON m.council_id = ct.council_id "
-                            + "WHERE m.lecturer_id = :lecturerId AND ct.topic_id IN (:topicIds)",
-                    new org.springframework.jdbc.core.namedparam.MapSqlParameterSource()
-                            .addValue("lecturerId", lecturerId)
-                            .addValue("topicIds", result.stream().map(ThesisTopic::getId).toList()),
-                    UUID.class));
+            gradingTopicIds.addAll(scope.findGradingCouncilTopicIds(lecturerId,
+                    result.stream().map(ThesisTopic::getId).toList()));
         }
         boolean adminCaller = isAdmin(actor);
         java.util.Set<String> inFacultyDepts = deanFacultyDepts;
@@ -139,10 +129,10 @@ public class ThesisTopicService {
         ThesisTopic topic = topics.findById(id)
                 .orElseThrow(() -> new ResponseStatusException(
                         HttpStatus.NOT_FOUND, "Thesis topic not found"));
-        boolean deanInScope = ThesisDeanScope.canAccessTopic(jdbc, actor, topic.getId(), topic.getDepartmentId());
+        boolean deanInScope = ThesisDeanScope.canAccessTopic(scope, actor, topic.getId(), topic.getDepartmentId());
         if (topic.getStatus() != TopicStatus.PUBLISHED && topic.getStatus() != TopicStatus.APPROVED
                 && !isAdmin(actor) && !deanInScope && !isOwner(topic, actor)
-                && !ThesisDepartmentScope.owns(jdbc, actor, topic.getDepartmentId())) {
+                && !ThesisDepartmentScope.owns(scope, actor, topic.getDepartmentId())) {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Thesis topic not found");
         }
         return maskScoreIfNeeded(TopicResponse.from(topic), isRoundResultsPublished(topic.getRoundId()),
@@ -196,22 +186,12 @@ public class ThesisTopicService {
         if (lecturerId.isEmpty()) {
             return false;
         }
-        Integer member = jdbc.queryForObject(
-                "SELECT COUNT(*) FROM thesis.thesis_council_topic ct "
-                        + "JOIN thesis.thesis_council_member m ON m.council_id = ct.council_id "
-                        + "WHERE ct.topic_id = :topicId AND m.lecturer_id = :lecturerId",
-                new org.springframework.jdbc.core.namedparam.MapSqlParameterSource()
-                        .addValue("topicId", topicId)
-                        .addValue("lecturerId", lecturerId),
-                Integer.class);
+        Integer member = scope.countCouncilGrader(topicId, lecturerId);
         return member != null && member > 0;
     }
 
     private boolean isRoundResultsPublished(UUID roundId) {
-        Integer published = jdbc.queryForObject(
-                "SELECT COUNT(*) FROM thesis.thesis_registration_round WHERE id = :roundId AND status = 'RESULTS_PUBLISHED'",
-                new org.springframework.jdbc.core.namedparam.MapSqlParameterSource().addValue("roundId", roundId),
-                Integer.class);
+        Integer published = scope.countPublishedResultsRounds(roundId);
         return published != null && published > 0;
     }
 

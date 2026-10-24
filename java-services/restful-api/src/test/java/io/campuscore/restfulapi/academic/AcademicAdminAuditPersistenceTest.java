@@ -4,11 +4,11 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.mock;
 
-import io.campuscore.restfulapi.academic.registration.RegistrationService;
+import io.campuscore.restfulapi.academic.registration.service.RegistrationService;
 import io.campuscore.restfulapi.academic.service.AcademicMutationService;
-import io.campuscore.restfulapi.academic.web.AcademicMutationDtos.GradeUpdate;
-import io.campuscore.restfulapi.audit.AdminAuditRecorder;
-import io.campuscore.restfulapi.web.DomainException;
+import io.campuscore.restfulapi.academic.dto.AcademicMutationDtos.GradeUpdate;
+import io.campuscore.restfulapi.audit.service.AdminAuditRecorder;
+import io.campuscore.restfulapi.exception.DomainException;
 import java.math.BigDecimal;
 import java.util.List;
 import java.util.Map;
@@ -159,7 +159,7 @@ class AcademicAdminAuditPersistenceTest {
                 namedJdbc,
                 mock(io.campuscore.restfulapi.academic.service.AcademicEnrollmentReadService.class),
                 mock(RegistrationService.class),
-                new AdminAuditRecorder(namedJdbc),
+                new AdminAuditRecorder(new io.campuscore.restfulapi.audit.repository.AdminAuditWriteRepository(namedJdbc)),
                 new io.campuscore.restfulapi.engagement.service.GradePublishNotifier(
                         new io.campuscore.restfulapi.notification.repository.NotificationWriteRepository(namedJdbc)));
     }

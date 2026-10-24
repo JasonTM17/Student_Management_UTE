@@ -1,0 +1,256 @@
+package io.campuscore.restfulapi.engagement.dto;
+
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.node.ObjectNode;
+import jakarta.validation.constraints.NotNull;
+import java.time.Instant;
+import java.time.format.DateTimeParseException;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Iterator;
+import java.util.LinkedHashSet;
+import java.util.List;
+import java.util.Set;
+
+/** Request records for announcement mutations. */
+public final class AnnouncementWriteDtos {
+
+    private static final Set<String> ANNOUNCEMENT_FIELDS = Set.of(
+            "title",
+            "content",
+            "priority",
+            "targetRoles",
+            "targetYears",
+            "isGlobal",
+            "publishAt",
+            "expiresAt",
+            "semesterId",
+            "sectionId",
+            "lecturerId");
+    private static final Set<String> LIFECYCLE_FIELDS = Set.of("reason", "expectedVersion");
+
+    private AnnouncementWriteDtos() {
+    }
+
+    public record CreateAnnouncementRequest(
+            @NotNull String title,
+            @NotNull String content,
+            String priority,
+            List<?> targetRoles,
+            List<?> targetYears,
+            Boolean isGlobal,
+            Instant publishAt,
+            Instant expiresAt,
+            String semesterId,
+            String sectionId,
+            String lecturerId) {
+
+        public static CreateAnnouncementRequest from(JsonNode body) {
+            ObjectNode object = objectBody(body);
+            ensureAllowedFields(object);
+            return new CreateAnnouncementRequest(
+                    stringValue(object, "title", false),
+                    stringValue(object, "content", false),
+                    stringValue(object, "priority", false),
+                    listValue(object, "targetRoles"),
+                    listValue(object, "targetYears"),
+                    booleanValue(object, "isGlobal"),
+                    instantValue(object, "publishAt"),
+                    instantValue(object, "expiresAt"),
+                    stringValue(object, "semesterId", true),
+                    stringValue(object, "sectionId", true),
+                    stringValue(object, "lecturerId", true));
+        }
+    }
+
+    public record UpdateAnnouncementRequest(
+            Set<String> presentFields,
+            String title,
+            String content,
+            String priority,
+            List<?> targetRoles,
+            List<?> targetYears,
+            Boolean isGlobal,
+            Instant publishAt,
+            Instant expiresAt,
+            String semesterId,
+            String sectionId,
+            String lecturerId,
+            String reason,
+            Integer expectedVersion) {
+
+        public static UpdateAnnouncementRequest from(JsonNode body) {
+            ObjectNode object = objectBody(body);
+            Set<String> presentFields = presentAllowedFields(object, true);
+            return new UpdateAnnouncementRequest(
+                    Collections.unmodifiableSet(presentFields),
+                    stringValue(object, "title", false),
+                    stringValue(object, "content", false),
+                    stringValue(object, "priority", false),
+                    listValue(object, "targetRoles"),
+                    listValue(object, "targetYears"),
+                    booleanValue(object, "isGlobal"),
+                    instantValue(object, "publishAt"),
+                    instantValue(object, "expiresAt"),
+                    stringValue(object, "semesterId", true),
+                    stringValue(object, "sectionId", true),
+                    stringValue(object, "lecturerId", true),
+                    stringValue(object, "reason", false),
+                    integerValue(object, "expectedVersion"));
+        }
+
+        public boolean has(String field) {
+            return presentFields.contains(field);
+        }
+    }
+
+    public record LifecycleRequest(String reason, Integer expectedVersion) {
+
+        public static LifecycleRequest from(JsonNode body) {
+            ObjectNode object = objectBody(body);
+            presentLifecycleFields(object);
+            return new LifecycleRequest(
+                    stringValue(object, "reason", false),
+                    integerValue(object, "expectedVersion"));
+        }
+    }
+
+    public record DeleteAnnouncementResponse(String message) {
+    }
+
+    /**
+     * Body of PATCH /{id}/order — an administrator-assigned homepage display
+     * order. Zero or positive; clearing an order is not part of the JSON
+     * contract so the field stays a plain required integer.
+     */
+    public record UpdateDisplayOrderRequest(
+            @NotNull(message = "displayOrder is required")
+            @jakarta.validation.constraints.Min(value = 0, message = "displayOrder must be zero or positive")
+            Integer displayOrder) {
+    }
+
+    private static ObjectNode objectBody(JsonNode body) {
+        if (body == null || body.isNull()) {
+            throw new IllegalArgumentException("request body is required");
+        }
+        if (!(body instanceof ObjectNode object)) {
+            throw new IllegalArgumentException("request body must be an object");
+        }
+        return object;
+    }
+
+    private static void ensureAllowedFields(ObjectNode body) {
+        presentAllowedFields(body, false);
+    }
+
+    private static Set<String> presentAllowedFields(ObjectNode body, boolean lifecycleAllowed) {
+        Set<String> present = new LinkedHashSet<>();
+        Iterator<String> fieldNames = body.fieldNames();
+        while (fieldNames.hasNext()) {
+            String field = fieldNames.next();
+            if (!ANNOUNCEMENT_FIELDS.contains(field)) {
+                if (!lifecycleAllowed || !LIFECYCLE_FIELDS.contains(field)) {
+                    throw new IllegalArgumentException("Unexpected body property: " + field);
+                }
+            }
+            present.add(field);
+        }
+        return present;
+    }
+
+    private static void presentLifecycleFields(ObjectNode body) {
+        Iterator<String> fieldNames = body.fieldNames();
+        while (fieldNames.hasNext()) {
+            String field = fieldNames.next();
+            if (!LIFECYCLE_FIELDS.contains(field)) {
+                throw new IllegalArgumentException("Unexpected body property: " + field);
+            }
+        }
+    }
+
+    private static boolean has(ObjectNode body, String field) {
+        return body.has(field);
+    }
+
+    private static String stringValue(ObjectNode body, String field, boolean allowNull) {
+        if (!has(body, field)) {
+            return null;
+        }
+        JsonNode value = body.get(field);
+        if (value.isNull()) {
+            if (allowNull) {
+                return null;
+            }
+            throw new IllegalArgumentException(field + " must be a string");
+        }
+        if (!value.isTextual()) {
+            throw new IllegalArgumentException(field + " must be a string");
+        }
+        return value.asText();
+    }
+
+    private static Boolean booleanValue(ObjectNode body, String field) {
+        if (!has(body, field)) {
+            return null;
+        }
+        JsonNode value = body.get(field);
+        if (!value.isBoolean()) {
+            throw new IllegalArgumentException(field + " must be a boolean");
+        }
+        return value.booleanValue();
+    }
+
+    private static Integer integerValue(ObjectNode body, String field) {
+        if (!has(body, field)) {
+            return null;
+        }
+        JsonNode value = body.get(field);
+        if (!value.isIntegralNumber() || !value.canConvertToInt()) {
+            throw new IllegalArgumentException(field + " must be an integer");
+        }
+        return value.intValue();
+    }
+
+    private static List<?> listValue(ObjectNode body, String field) {
+        if (!has(body, field)) {
+            return null;
+        }
+        JsonNode value = body.get(field);
+        if (!value.isArray()) {
+            throw new IllegalArgumentException(field + " must be an array");
+        }
+        List<Object> values = new ArrayList<>();
+        for (JsonNode item : value) {
+            if (item.isTextual()) {
+                values.add(item.asText());
+            } else if (item.isIntegralNumber() && item.canConvertToInt()) {
+                values.add(item.intValue());
+            } else if (item.isNumber()) {
+                values.add(item.decimalValue());
+            } else if (item.isBoolean()) {
+                values.add(item.booleanValue());
+            } else {
+                values.add(item);
+            }
+        }
+        return List.copyOf(values);
+    }
+
+    private static Instant instantValue(ObjectNode body, String field) {
+        if (!has(body, field)) {
+            return null;
+        }
+        JsonNode value = body.get(field);
+        if (value.isNull()) {
+            return null;
+        }
+        if (!value.isTextual()) {
+            throw new IllegalArgumentException(field + " must be an ISO-8601 timestamp");
+        }
+        try {
+            return Instant.parse(value.asText());
+        } catch (DateTimeParseException exception) {
+            throw new IllegalArgumentException(field + " must be an ISO-8601 timestamp", exception);
+        }
+    }
+}

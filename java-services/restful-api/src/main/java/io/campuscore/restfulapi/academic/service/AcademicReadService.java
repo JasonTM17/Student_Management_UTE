@@ -1,30 +1,32 @@
 package io.campuscore.restfulapi.academic.service;
 
+import io.campuscore.restfulapi.academic.model.CourseBriefRow;
+import io.campuscore.restfulapi.academic.model.CourseProgressRow;
 import io.campuscore.restfulapi.academic.repository.AcademicReadRepository;
-import io.campuscore.restfulapi.academic.web.AcademicReadDtos.AcademicYearListResponse;
-import io.campuscore.restfulapi.academic.web.AcademicReadDtos.AcademicYearResponse;
-import io.campuscore.restfulapi.academic.web.AcademicReadDtos.ClassroomListResponse;
-import io.campuscore.restfulapi.academic.web.AcademicReadDtos.ClassroomResponse;
-import io.campuscore.restfulapi.academic.web.AcademicReadDtos.ClassroomSectionSummary;
-import io.campuscore.restfulapi.academic.web.AcademicReadDtos.CourseListResponse;
-import io.campuscore.restfulapi.academic.web.AcademicReadDtos.CourseResponse;
-import io.campuscore.restfulapi.academic.web.AcademicReadDtos.CurriculumCourseSummary;
-import io.campuscore.restfulapi.academic.web.AcademicReadDtos.CurriculumBrief;
-import io.campuscore.restfulapi.academic.web.AcademicReadDtos.CurriculumListResponse;
-import io.campuscore.restfulapi.academic.web.AcademicReadDtos.CurriculumResponse;
-import io.campuscore.restfulapi.academic.web.AcademicReadDtos.MyCurriculumCourse;
-import io.campuscore.restfulapi.academic.web.AcademicReadDtos.MyCurriculumResponse;
-import io.campuscore.restfulapi.academic.web.AcademicReadDtos.DepartmentLecturerSummary;
-import io.campuscore.restfulapi.academic.web.AcademicReadDtos.DepartmentListResponse;
-import io.campuscore.restfulapi.academic.web.AcademicReadDtos.DepartmentResponse;
-import io.campuscore.restfulapi.academic.web.AcademicReadDtos.FacultyDepartmentSummary;
-import io.campuscore.restfulapi.academic.web.AcademicReadDtos.FacultyListResponse;
-import io.campuscore.restfulapi.academic.web.AcademicReadDtos.FacultyResponse;
-import io.campuscore.restfulapi.academic.web.AcademicReadDtos.PageMeta;
-import io.campuscore.restfulapi.academic.web.AcademicReadDtos.SemesterCatalogSummary;
-import io.campuscore.restfulapi.academic.web.AcademicReadDtos.SemesterListResponse;
-import io.campuscore.restfulapi.academic.web.AcademicReadDtos.SemesterResponse;
-import io.campuscore.restfulapi.common.LikePattern;
+import io.campuscore.restfulapi.academic.dto.AcademicReadDtos.AcademicYearListResponse;
+import io.campuscore.restfulapi.academic.dto.AcademicReadDtos.AcademicYearResponse;
+import io.campuscore.restfulapi.academic.dto.AcademicReadDtos.ClassroomListResponse;
+import io.campuscore.restfulapi.academic.dto.AcademicReadDtos.ClassroomResponse;
+import io.campuscore.restfulapi.academic.dto.AcademicReadDtos.ClassroomSectionSummary;
+import io.campuscore.restfulapi.academic.dto.AcademicReadDtos.CourseListResponse;
+import io.campuscore.restfulapi.academic.dto.AcademicReadDtos.CourseResponse;
+import io.campuscore.restfulapi.academic.dto.AcademicReadDtos.CurriculumCourseSummary;
+import io.campuscore.restfulapi.academic.dto.AcademicReadDtos.CurriculumBrief;
+import io.campuscore.restfulapi.academic.dto.AcademicReadDtos.CurriculumListResponse;
+import io.campuscore.restfulapi.academic.dto.AcademicReadDtos.CurriculumResponse;
+import io.campuscore.restfulapi.academic.dto.AcademicReadDtos.MyCurriculumCourse;
+import io.campuscore.restfulapi.academic.dto.AcademicReadDtos.MyCurriculumResponse;
+import io.campuscore.restfulapi.academic.dto.AcademicReadDtos.DepartmentLecturerSummary;
+import io.campuscore.restfulapi.academic.dto.AcademicReadDtos.DepartmentListResponse;
+import io.campuscore.restfulapi.academic.dto.AcademicReadDtos.DepartmentResponse;
+import io.campuscore.restfulapi.academic.dto.AcademicReadDtos.FacultyDepartmentSummary;
+import io.campuscore.restfulapi.academic.dto.AcademicReadDtos.FacultyListResponse;
+import io.campuscore.restfulapi.academic.dto.AcademicReadDtos.FacultyResponse;
+import io.campuscore.restfulapi.academic.dto.AcademicReadDtos.PageMeta;
+import io.campuscore.restfulapi.academic.dto.AcademicReadDtos.SemesterCatalogSummary;
+import io.campuscore.restfulapi.academic.dto.AcademicReadDtos.SemesterListResponse;
+import io.campuscore.restfulapi.academic.dto.AcademicReadDtos.SemesterResponse;
+import io.campuscore.restfulapi.common.util.LikePattern;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -167,14 +169,14 @@ public class AcademicReadService {
         CurriculumResponse curriculum = academic.findCurriculumById(curriculumId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Curriculum not found"));
         List<CurriculumCourseSummary> plan = academic.findCurriculumCoursesByCurriculumIds(List.of(curriculumId));
-        Map<String, AcademicReadRepository.CourseBriefRow> coursesById = academic
+        Map<String, CourseBriefRow> coursesById = academic
                 .findCourseBriefsByIds(plan.stream().map(CurriculumCourseSummary::courseId).toList())
                 .stream()
-                .collect(Collectors.toMap(AcademicReadRepository.CourseBriefRow::id, row -> row));
-        Map<String, AcademicReadRepository.CourseProgressRow> progressByCourse = academic
+                .collect(Collectors.toMap(CourseBriefRow::id, row -> row));
+        Map<String, CourseProgressRow> progressByCourse = academic
                 .findCourseProgressByStudentId(studentId)
                 .stream()
-                .collect(Collectors.toMap(AcademicReadRepository.CourseProgressRow::courseId, row -> row));
+                .collect(Collectors.toMap(CourseProgressRow::courseId, row -> row));
         Map<String, List<String>> prerequisitesByCourse = new java.util.HashMap<>();
         academic.findPrerequisiteCodesByCourseIds(plan.stream().map(CurriculumCourseSummary::courseId).toList())
                 .forEach(row -> prerequisitesByCourse
@@ -203,8 +205,8 @@ public class AcademicReadService {
 
     private static MyCurriculumCourse toCurriculumCourse(
             CurriculumCourseSummary item,
-            AcademicReadRepository.CourseBriefRow course,
-            AcademicReadRepository.CourseProgressRow progress,
+            CourseBriefRow course,
+            CourseProgressRow progress,
             List<String> prerequisites) {
         String status = switch (progress == null ? 0 : progress.progressLevel()) {
             case 2 -> "COMPLETED";

@@ -1,7 +1,7 @@
 package io.campuscore.restfulapi.thesis.repository;
 
-import io.campuscore.restfulapi.thesis.domain.ThesisTopic;
-import io.campuscore.restfulapi.thesis.domain.TopicStatus;
+import io.campuscore.restfulapi.thesis.entity.ThesisTopic;
+import io.campuscore.restfulapi.thesis.model.TopicStatus;
 import java.util.List;
 import java.util.UUID;
 import org.springframework.data.jpa.repository.JpaRepository;

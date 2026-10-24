@@ -1,5 +1,6 @@
 package io.campuscore.restfulapi.mail.repository;
 
+import io.campuscore.restfulapi.mail.model.ScopedRecipient;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.List;
@@ -22,8 +23,6 @@ public class MailRecipientScopeRepository {
     private static final String USER = "\"campuscore_auth\".\"User\"";
     private static final String SECTION = "\"academic\".\"Section\"";
     private static final String ENROLLMENT = "\"academic\".\"Enrollment\"";
-
-    public record ScopedRecipient(String email, String fullName, String studentNumber) {}
 
     private final NamedParameterJdbcTemplate jdbc;
 

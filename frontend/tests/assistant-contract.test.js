@@ -3,6 +3,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 const ts = require('typescript');
+const { readJavaSource } = require('./helpers/java-source');
 
 const root = path.resolve(__dirname, '..');
 
@@ -207,10 +208,7 @@ test('assistant stop-race and quota-retry regressions stay guarded', () => {
 });
 
 test('assistant local quota override remains opt-in while production defaults stay enforced', () => {
-  const propertiesSource = fs.readFileSync(
-    path.join(root, '../java-services/restful-api/src/main/java/io/campuscore/restfulapi/thesis/assistant/AssistantProperties.java'),
-    'utf8',
-  );
+  const propertiesSource = readJavaSource('AssistantProperties');
   const configSource = fs.readFileSync(
     path.join(root, '../java-services/restful-api/src/main/resources/application.yml'),
     'utf8',
@@ -1149,10 +1147,7 @@ test('client guard and server guard stay pattern-synced (drift gate)', () => {
   // Java string literals double their regex backslashes; collapse both sides
   // to the single-backslash regex form before comparing tokens.
   const normalizeGuardSource = (text) => text.replace(/\\\\/g, '\\');
-  const serverGuard = normalizeGuardSource(fs.readFileSync(
-    path.join(root, '../java-services/restful-api/src/main/java/io/campuscore/restfulapi/thesis/assistant/AssistantInputGuard.java'),
-    'utf8',
-  ));
+  const serverGuard = normalizeGuardSource(readJavaSource('AssistantInputGuard'));
   const clientGuard = normalizeGuardSource(fs.readFileSync(path.join(root, 'src/lib/assistant-input-guard.ts'), 'utf8'));
   // Core refusal tokens must exist on both sides; if either drops one, the
   // two guards diverge and one entry point silently bypasses the other.

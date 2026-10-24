@@ -55,7 +55,7 @@ avoids dependence on an API container's lifetime and lets database backups
 include those bytes. The trade-off is increased database and backup size;
 choose durable object storage when that cost becomes unsuitable.
 
-The executable owners are [storage selection](../../java-services/restful-api/src/main/java/io/campuscore/restfulapi/thesis/service/ThesisReportStorageConfiguration.java),
+The executable owners are [storage selection](../../java-services/restful-api/src/main/java/io/campuscore/restfulapi/thesis/config/ThesisReportStorageConfiguration.java),
 [report persistence](../../java-services/restful-api/src/main/java/io/campuscore/restfulapi/thesis/service/ThesisReportService.java)
 and the [database-storage regression](../../java-services/restful-api/src/test/java/io/campuscore/restfulapi/thesis/ThesisReportDatabaseStorageTest.java).
 

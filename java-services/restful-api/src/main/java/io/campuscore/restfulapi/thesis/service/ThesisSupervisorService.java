@@ -1,11 +1,12 @@
 package io.campuscore.restfulapi.thesis.service;
 
-import io.campuscore.restfulapi.audit.AdminAuditRecorder;
-import io.campuscore.restfulapi.thesis.domain.RoundStatus;
-import io.campuscore.restfulapi.thesis.domain.ThesisTopic;
-import io.campuscore.restfulapi.thesis.domain.TopicStatus;
+import io.campuscore.restfulapi.audit.service.AdminAuditRecorder;
+import io.campuscore.restfulapi.thesis.model.RoundStatus;
+import io.campuscore.restfulapi.thesis.entity.ThesisTopic;
+import io.campuscore.restfulapi.thesis.model.TopicStatus;
+import io.campuscore.restfulapi.thesis.dto.SupervisorRow;
 import io.campuscore.restfulapi.thesis.repository.ThesisTopicRepository;
-import io.campuscore.restfulapi.web.DomainException;
+import io.campuscore.restfulapi.exception.DomainException;
 import java.util.List;
 import java.util.UUID;
 import org.slf4j.Logger;
@@ -14,12 +15,15 @@ import org.springframework.context.annotation.Profile;
 import org.springframework.http.HttpStatus;
 import org.springframework.jdbc.core.namedparam.MapSqlParameterSource;
 import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
+import io.campuscore.restfulapi.thesis.repository.ThesisScopeRepository;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 import org.springframework.util.StringUtils;
+import io.campuscore.restfulapi.thesis.scope.ThesisDeanScope;
+import io.campuscore.restfulapi.thesis.scope.ThesisDepartmentScope;
 
 /**
  * Brief R3: every topic is supervised by one or two lecturers. The creator is
@@ -34,19 +38,21 @@ public class ThesisSupervisorService {
     private static final Logger log = LoggerFactory.getLogger(ThesisSupervisorService.class);
 
     private final NamedParameterJdbcTemplate jdbc;
+    private final ThesisScopeRepository scope;
     private final ThesisTopicRepository topics;
     private final AdminAuditRecorder audit;
     private final ThesisNotificationService notifier;
 
     /** Compatibility constructor for tests that only exercise supervisor math. */
     public ThesisSupervisorService(NamedParameterJdbcTemplate jdbc, ThesisTopicRepository topics, AdminAuditRecorder audit) {
-        this(jdbc, topics, audit, null);
+        this(jdbc, topics, audit, null, new ThesisScopeRepository(jdbc));
     }
 
     @org.springframework.beans.factory.annotation.Autowired
     public ThesisSupervisorService(NamedParameterJdbcTemplate jdbc, ThesisTopicRepository topics,
-            AdminAuditRecorder audit, ThesisNotificationService notifier) {
+            AdminAuditRecorder audit, ThesisNotificationService notifier, ThesisScopeRepository scope) {
         this.jdbc = jdbc;
+        this.scope = scope;
         this.topics = topics;
         this.audit = audit;
         this.notifier = notifier;
@@ -250,8 +256,8 @@ public class ThesisSupervisorService {
         return topic.getStatus() == TopicStatus.PUBLISHED
                 || topic.getStatus() == TopicStatus.APPROVED
                 || isStaff(actor)
-                || ThesisDeanScope.canAccessTopic(jdbc, actor, topic.getId(), topic.getDepartmentId())
-                || ThesisDepartmentScope.owns(jdbc, actor, topic.getDepartmentId())
+                || ThesisDeanScope.canAccessTopic(scope, actor, topic.getId(), topic.getDepartmentId())
+                || ThesisDepartmentScope.owns(scope, actor, topic.getDepartmentId())
                 || isOwner(topic, actor);
     }
 
@@ -273,8 +279,8 @@ public class ThesisSupervisorService {
 
     private boolean maySeeContactDetails(ThesisTopic topic, Jwt actor) {
         return isStaff(actor) || isOwner(topic, actor)
-                || ThesisDeanScope.canAccessTopic(jdbc, actor, topic.getId(), topic.getDepartmentId())
-                || ThesisDepartmentScope.owns(jdbc, actor, topic.getDepartmentId());
+                || ThesisDeanScope.canAccessTopic(scope, actor, topic.getId(), topic.getDepartmentId())
+                || ThesisDepartmentScope.owns(scope, actor, topic.getDepartmentId());
     }
 
     private void authorize(ThesisTopic topic, Jwt actor) {
@@ -297,7 +303,7 @@ public class ThesisSupervisorService {
             // ordinary topic work would let a foreign dean who co-supervises
             // replace the home supervisor after registration closed.
             try {
-                ThesisDeanScope.requireTopicGovernanceScope(jdbc, actor, topicId);
+                ThesisDeanScope.requireTopicGovernanceScope(scope, actor, topicId);
                 return;
             } catch (DomainException refusal) {
                 // Ownership is an ordinary right, not a governance grant:
@@ -310,7 +316,7 @@ public class ThesisSupervisorService {
             }
         }
         if (deanRefusal == null && ThesisDepartmentScope.isDepartmentHead(actor)
-                && ThesisDepartmentScope.owns(jdbc, actor, departmentId)) {
+                && ThesisDepartmentScope.owns(scope, actor, departmentId)) {
             return;
         }
         String actorId = subject(actor);
@@ -381,12 +387,4 @@ public class ThesisSupervisorService {
     private static DomainException notFound(String code, String message) {
         return new DomainException(HttpStatus.NOT_FOUND, code, message);
     }
-
-    /** `firstName`/`lastName`/`email` are null when the lecturer has no directory row. */
-    public record SupervisorRow(
-            String lecturerId,
-            int supervisorOrder,
-            String firstName,
-            String lastName,
-            String email) { }
 }

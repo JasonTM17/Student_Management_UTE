@@ -190,17 +190,8 @@ export default function AdminAuditTrailPage() {
                     <Fragment key={entry.id}>
                       <tr
                         key={entry.id}
-                        className="cursor-pointer border-t border-border/60 hover:bg-muted/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-chrome-accent focus-visible:ring-inset"
-                        tabIndex={0}
-                        aria-expanded={expanded === entry.id}
-                        aria-controls={`audit-detail-${entry.id}`}
+                        className="cursor-pointer border-t border-border/60 hover:bg-muted/40"
                         onClick={() => setExpanded((current) => (current === entry.id ? null : entry.id))}
-                        onKeyDown={(event) => {
-                          if (event.key === 'Enter' || event.key === ' ') {
-                            event.preventDefault();
-                            setExpanded((current) => (current === entry.id ? null : entry.id));
-                          }
-                        }}
                       >
                         <td className="whitespace-nowrap px-3 py-2 text-muted-foreground">
                           {formatDateTime(entry.createdAt)}
@@ -225,11 +216,23 @@ export default function AdminAuditTrailPage() {
                           {entry.summary || '—'}
                         </td>
                         <td className="px-2 py-2 text-muted-foreground">
-                          {expanded === entry.id ? (
-                            <ChevronDown className="h-4 w-4" aria-hidden="true" />
-                          ) : (
-                            <ChevronRight className="h-4 w-4" aria-hidden="true" />
-                          )}
+                          <button
+                            type="button"
+                            className="rounded p-1 hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-chrome-accent"
+                            aria-expanded={expanded === entry.id}
+                            aria-controls={`audit-detail-${entry.id}`}
+                            aria-label={copy.toggleDetails}
+                            onClick={(event) => {
+                              event.stopPropagation();
+                              setExpanded((current) => (current === entry.id ? null : entry.id));
+                            }}
+                          >
+                            {expanded === entry.id ? (
+                              <ChevronDown className="h-4 w-4" aria-hidden="true" />
+                            ) : (
+                              <ChevronRight className="h-4 w-4" aria-hidden="true" />
+                            )}
+                          </button>
                         </td>
                       </tr>
                       {expanded === entry.id ? (

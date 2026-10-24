@@ -1,10 +1,10 @@
 package io.campuscore.restfulapi.notification.service;
 
 import io.campuscore.restfulapi.notification.repository.NotificationReadRepository;
-import io.campuscore.restfulapi.notification.web.NotificationReadDtos.NotificationListResponse;
-import io.campuscore.restfulapi.notification.web.NotificationReadDtos.NotificationResponse;
-import io.campuscore.restfulapi.notification.web.NotificationReadDtos.PageMeta;
-import io.campuscore.restfulapi.notification.web.NotificationReadDtos.UnreadCountResponse;
+import io.campuscore.restfulapi.notification.dto.NotificationReadDtos.NotificationListResponse;
+import io.campuscore.restfulapi.notification.dto.NotificationReadDtos.NotificationResponse;
+import io.campuscore.restfulapi.notification.dto.NotificationReadDtos.PageMeta;
+import io.campuscore.restfulapi.notification.dto.NotificationReadDtos.UnreadCountResponse;
 import java.util.List;
 import org.springframework.context.annotation.Profile;
 import org.springframework.http.HttpStatus;

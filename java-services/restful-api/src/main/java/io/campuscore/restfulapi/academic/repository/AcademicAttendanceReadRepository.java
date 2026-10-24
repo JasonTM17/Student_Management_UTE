@@ -1,5 +1,9 @@
 package io.campuscore.restfulapi.academic.repository;
 
+import io.campuscore.restfulapi.academic.model.AttendanceRow;
+import io.campuscore.restfulapi.academic.model.RosterRow;
+import io.campuscore.restfulapi.academic.model.SectionSummaryRow;
+import io.campuscore.restfulapi.academic.model.StudentSummaryRow;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Timestamp;
@@ -345,58 +349,5 @@ public class AcademicAttendanceReadRepository {
     private static void bindDay(MapSqlParameterSource parameters, Instant date) {
         Instant start = date.truncatedTo(java.time.temporal.ChronoUnit.DAYS);
         parameters.addValue("dayStart", utcTimestamp(start)).addValue("dayEnd", utcTimestamp(start.plusSeconds(86400)));
-    }
-
-    public record AttendanceRow(
-            String id,
-            String studentId,
-            String sectionId,
-            Instant date,
-            String status,
-            String notes,
-            Instant createdAt,
-            String studentNumber,
-            String studentUserId,
-            String studentEmail,
-            String studentFirstName,
-            String studentLastName,
-            String sectionNumber,
-            String semesterId,
-            String courseId,
-            String courseCode,
-            String courseName,
-            String courseNameEn,
-            String courseNameVi) {
-    }
-
-    public record RosterRow(
-            String studentId,
-            String studentNumber,
-            String studentEmail,
-            String studentFirstName,
-            String studentLastName,
-            String enrollmentStatus) {
-    }
-
-    public record StudentSummaryRow(
-            String sectionId,
-            String courseCode,
-            String courseName,
-            String courseNameEn,
-            String courseNameVi,
-            long total,
-            long present,
-            long absent,
-            long late,
-            long excused) {
-    }
-
-    public record SectionSummaryRow(
-            long totalSessions,
-            long totalRecords,
-            long present,
-            long absent,
-            long late,
-            long excused) {
     }
 }

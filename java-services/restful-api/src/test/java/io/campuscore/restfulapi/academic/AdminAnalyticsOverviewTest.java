@@ -64,7 +64,7 @@ class AdminAnalyticsOverviewTest {
                 """);
         jdbc.execute("DELETE FROM \"campuscore_auth\".\"User\"");
         AccountAuthorityFixture.ensureSchema(jdbc);
-        io.campuscore.restfulapi.security.DatabaseAvailabilityTracker.recordSuccess();
+        io.campuscore.restfulapi.security.availability.DatabaseAvailabilityTracker.recordSuccess();
         jdbc.execute("DROP TABLE IF EXISTS academic.\"Enrollment\"");
         jdbc.execute("DROP TABLE IF EXISTS academic.\"Section\"");
         jdbc.execute("DROP TABLE IF EXISTS academic.\"Student\"");

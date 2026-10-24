@@ -12,11 +12,11 @@ import io.campuscore.restfulapi.engagement.repository.AnnouncementAuditRepositor
 import io.campuscore.restfulapi.engagement.repository.AnnouncementWriteRepository;
 import io.campuscore.restfulapi.engagement.service.AnnouncementStudentNotifier;
 import io.campuscore.restfulapi.engagement.service.AnnouncementWriteService;
-import io.campuscore.restfulapi.engagement.web.AnnouncementReadDtos.AnnouncementResponse;
-import io.campuscore.restfulapi.engagement.web.AnnouncementWriteDtos.CreateAnnouncementRequest;
-import io.campuscore.restfulapi.engagement.web.AnnouncementWriteDtos.LifecycleRequest;
-import io.campuscore.restfulapi.engagement.web.AnnouncementWriteDtos.UpdateAnnouncementRequest;
-import io.campuscore.restfulapi.web.DomainException;
+import io.campuscore.restfulapi.engagement.dto.AnnouncementReadDtos.AnnouncementResponse;
+import io.campuscore.restfulapi.engagement.dto.AnnouncementWriteDtos.CreateAnnouncementRequest;
+import io.campuscore.restfulapi.engagement.dto.AnnouncementWriteDtos.LifecycleRequest;
+import io.campuscore.restfulapi.engagement.dto.AnnouncementWriteDtos.UpdateAnnouncementRequest;
+import io.campuscore.restfulapi.exception.DomainException;
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;

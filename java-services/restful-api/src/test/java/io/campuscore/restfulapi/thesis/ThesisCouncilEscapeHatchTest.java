@@ -10,8 +10,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import io.campuscore.restfulapi.thesis.service.ThesisCouncilService;
 import io.campuscore.restfulapi.thesis.service.ThesisMutationService;
-import io.campuscore.restfulapi.thesis.web.ThesisMutationDtos.PublishResultsPreviewResponse;
-import io.campuscore.restfulapi.web.DomainException;
+import io.campuscore.restfulapi.thesis.dto.ThesisMutationDtos.PublishResultsPreviewResponse;
+import io.campuscore.restfulapi.exception.DomainException;
 import java.math.BigDecimal;
 import java.sql.Timestamp;
 import java.time.Instant;
@@ -46,7 +46,10 @@ import org.springframework.test.web.servlet.MockMvc;
         "spring.datasource.username=sa",
         "spring.datasource.password=",
         "spring.flyway.enabled=true",
-        "spring.flyway.locations=classpath:db/migration-h2"
+        "spring.flyway.locations=classpath:db/migration-h2",
+        // The waiver is off for every shipped undergraduate round type; this
+        // suite exercises the capability-on path the future level reuses.
+        "thesis.governance.counter-review-waiver.enabled=true"
 })
 class ThesisCouncilEscapeHatchTest {
 
@@ -653,7 +656,7 @@ class ThesisCouncilEscapeHatchTest {
         UUID roundId = insertRound("Esc Round Late Topic", "REGISTRATION_OPEN",
                 now.plusSeconds(86_400), now.plusSeconds(5 * 86_400));
         ensureLecturer("esc-lt-supervisor");
-        var request = new io.campuscore.restfulapi.thesis.web.ThesisMutationDtos.LateTopicRequest(
+        var request = new io.campuscore.restfulapi.thesis.dto.ThesisMutationDtos.LateTopicRequest(
                 "department-demo", "Esc Late Topic", "Late topic description",
                 2, "esc-lt-supervisor", "supervisor missed the window");
         var topic = mutations.createLateTopic(roundId, request, admin());
@@ -666,7 +669,7 @@ class ThesisCouncilEscapeHatchTest {
         // Validation still applies: unknown supervisor and a closed round both
         // refuse, and a non-governance caller is rejected at service level.
         assertThatThrownBy(() -> mutations.createLateTopic(roundId,
-                new io.campuscore.restfulapi.thesis.web.ThesisMutationDtos.LateTopicRequest(
+                new io.campuscore.restfulapi.thesis.dto.ThesisMutationDtos.LateTopicRequest(
                         "department-demo", "T", "D", 1, "esc-lt-missing", "reason"), admin()))
                 .isInstanceOf(DomainException.class);
         UUID closedRound = insertRound("Esc Round Late Closed", "REGISTRATION_CLOSED",
@@ -692,7 +695,7 @@ class ThesisCouncilEscapeHatchTest {
         // Happy path: an active student joins an unscored group in a closed
         // round, audited with the reason.
         var added = mutations.overrideGroupRoster(groupId,
-                new io.campuscore.restfulapi.thesis.web.ThesisMutationDtos.RosterOverrideRequest(
+                new io.campuscore.restfulapi.thesis.dto.ThesisMutationDtos.RosterOverrideRequest(
                         "esc-ro-new", "medical leave resolved", null), admin());
         assertThat(added.memberStudentIds()).contains("esc-ro-new");
         assertThat(auditCount(groupId.toString(), "THESIS_GROUP_ROSTER_OVERRIDE")).isEqualTo(1);
@@ -705,13 +708,13 @@ class ThesisCouncilEscapeHatchTest {
                 + "size_exception_by = 'esc-admin', size_exception_at = CURRENT_TIMESTAMP WHERE id = ?", smallGroup);
         ensureStudent("esc-ro2-new");
         assertThatThrownBy(() -> mutations.overrideGroupRoster(smallGroup,
-                new io.campuscore.restfulapi.thesis.web.ThesisMutationDtos.RosterOverrideRequest(
+                new io.campuscore.restfulapi.thesis.dto.ThesisMutationDtos.RosterOverrideRequest(
                         "esc-ro2-new", "reason", null), admin()))
                 .isInstanceOf(DomainException.class)
                 .isInstanceOfSatisfying(DomainException.class,
                         e -> assertThat(e.getCode()).isEqualTo("GROUP_SIZE_EXCEPTION_REQUIRED"));
         mutations.overrideGroupRoster(smallGroup,
-                new io.campuscore.restfulapi.thesis.web.ThesisMutationDtos.RosterOverrideRequest(
+                new io.campuscore.restfulapi.thesis.dto.ThesisMutationDtos.RosterOverrideRequest(
                         "esc-ro2-new", "partner dropped out", true), admin());
         assertThat(jdbc.queryForObject(
                 "SELECT size_exception_reason FROM thesis.thesis_group WHERE id = ?",
@@ -724,7 +727,7 @@ class ThesisCouncilEscapeHatchTest {
         UUID openGroup = insertGroupWithMembers(openRound, insertTopic(openRound, "Esc Open Topic"), "esc-ro3", 3);
         ensureStudent("esc-ro3-new");
         assertThatThrownBy(() -> mutations.overrideGroupRoster(openGroup,
-                new io.campuscore.restfulapi.thesis.web.ThesisMutationDtos.RosterOverrideRequest(
+                new io.campuscore.restfulapi.thesis.dto.ThesisMutationDtos.RosterOverrideRequest(
                         "esc-ro3-new", "reason", null), admin()))
                 .isInstanceOf(DomainException.class)
                 .isInstanceOfSatisfying(DomainException.class,
@@ -736,7 +739,7 @@ class ThesisCouncilEscapeHatchTest {
                 UUID.randomUUID(), topicId, scoredCouncil, "esc-ro-scorer");
         ensureStudent("esc-ro4-new");
         assertThatThrownBy(() -> mutations.overrideGroupRoster(groupId,
-                new io.campuscore.restfulapi.thesis.web.ThesisMutationDtos.RosterOverrideRequest(
+                new io.campuscore.restfulapi.thesis.dto.ThesisMutationDtos.RosterOverrideRequest(
                         "esc-ro4-new", "reason", null), admin()))
                 .isInstanceOf(DomainException.class)
                 .isInstanceOfSatisfying(DomainException.class,
@@ -769,10 +772,10 @@ class ThesisCouncilEscapeHatchTest {
                         + "CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)");
 
         var req = new java.util.function.Function<String,
-                io.campuscore.restfulapi.thesis.web.ThesisMutationDtos.RetractPublicationRequest>() {
+                io.campuscore.restfulapi.thesis.dto.ThesisMutationDtos.RetractPublicationRequest>() {
             @Override
-            public io.campuscore.restfulapi.thesis.web.ThesisMutationDtos.RetractPublicationRequest apply(String c) {
-                return new io.campuscore.restfulapi.thesis.web.ThesisMutationDtos
+            public io.campuscore.restfulapi.thesis.dto.ThesisMutationDtos.RetractPublicationRequest apply(String c) {
+                return new io.campuscore.restfulapi.thesis.dto.ThesisMutationDtos
                         .RetractPublicationRequest("published before appeal resolved", c);
             }
         };
@@ -873,12 +876,12 @@ class ThesisCouncilEscapeHatchTest {
         // and member edits are frozen — so the approved roster sits excluded
         // from publication with no way back to a live topic.
         assertThatThrownBy(() -> mutations.assignTopic(groupId,
-                new io.campuscore.restfulapi.thesis.web.ThesisMutationDtos.TopicAssignmentRequest(targetTopic),
+                new io.campuscore.restfulapi.thesis.dto.ThesisMutationDtos.TopicAssignmentRequest(targetTopic),
                 admin()))
                 .isInstanceOfSatisfying(DomainException.class,
                         e -> assertThat(e.getCode()).isEqualTo("ROUND_CLOSED"));
         assertThatThrownBy(() -> mutations.rejectGroup(groupId,
-                new io.campuscore.restfulapi.thesis.web.ThesisMutationDtos.GroupRejectionRequest("orphaned"),
+                new io.campuscore.restfulapi.thesis.dto.ThesisMutationDtos.GroupRejectionRequest("orphaned"),
                 admin()))
                 .isInstanceOfSatisfying(DomainException.class,
                         e -> assertThat(e.getCode()).isEqualTo("GROUP_APPROVAL_STATE_CONFLICT"));
@@ -972,7 +975,7 @@ class ThesisCouncilEscapeHatchTest {
         // re-add path is open again — deterministic, not a shadow block.
         UUID secondGroup = insertGroupWithMembers(closed, topicId, "esc-rm2", 3);
         mutations.overrideGroupRoster(secondGroup,
-                new io.campuscore.restfulapi.thesis.web.ThesisMutationDtos.RosterOverrideRequest(
+                new io.campuscore.restfulapi.thesis.dto.ThesisMutationDtos.RosterOverrideRequest(
                         "esc-rm-student-4", "re-seated", null), admin());
         assertThat(jdbc.queryForObject(
                 "SELECT COUNT(*) FROM thesis.thesis_group_member WHERE round_id = ? AND student_id = 'esc-rm-student-4'",
@@ -1085,19 +1088,19 @@ class ThesisCouncilEscapeHatchTest {
 
         Jwt foreignDean = foreignDean();
         assertThatThrownBy(() -> mutations.overrideGroupRoster(topicless,
-                new io.campuscore.restfulapi.thesis.web.ThesisMutationDtos.RosterOverrideRequest(
+                new io.campuscore.restfulapi.thesis.dto.ThesisMutationDtos.RosterOverrideRequest(
                         "esc-tl-new", "foreign dean add", null), foreignDean))
                 .isInstanceOfSatisfying(DomainException.class,
                         e -> assertThat(e.getCode()).isEqualTo("THESIS_GROUP_NOT_FOUND"));
         assertThatThrownBy(() -> mutations.overrideGroupRoster(topicless,
-                new io.campuscore.restfulapi.thesis.web.ThesisMutationDtos.RosterOverrideRequest(
+                new io.campuscore.restfulapi.thesis.dto.ThesisMutationDtos.RosterOverrideRequest(
                         "esc-tl-student-3", "REMOVE", "foreign dean remove", null, null), foreignDean))
                 .isInstanceOfSatisfying(DomainException.class,
                         e -> assertThat(e.getCode()).isEqualTo("THESIS_GROUP_NOT_FOUND"));
 
         // An in-faculty dean and a global admin both keep the hatch.
         mutations.overrideGroupRoster(topicless,
-                new io.campuscore.restfulapi.thesis.web.ThesisMutationDtos.RosterOverrideRequest(
+                new io.campuscore.restfulapi.thesis.dto.ThesisMutationDtos.RosterOverrideRequest(
                         "esc-tl-new", "own faculty add", null), facultyDean("esc-dean-se"));
         assertThat(jdbc.queryForObject(
                 "SELECT COUNT(*) FROM thesis.thesis_group_member WHERE group_id = ? AND student_id = 'esc-tl-new'",
@@ -1108,7 +1111,7 @@ class ThesisCouncilEscapeHatchTest {
         jdbc.update("UPDATE thesis.thesis_group SET status = 'CANCELLED' WHERE id = ?", cancelled);
         ensureStudent("esc-tlc-new");
         assertThatThrownBy(() -> mutations.overrideGroupRoster(cancelled,
-                new io.campuscore.restfulapi.thesis.web.ThesisMutationDtos.RosterOverrideRequest(
+                new io.campuscore.restfulapi.thesis.dto.ThesisMutationDtos.RosterOverrideRequest(
                         "esc-tlc-new", "add to cancelled", null), admin()))
                 .isInstanceOfSatisfying(DomainException.class,
                         e -> assertThat(e.getCode()).isEqualTo("GROUP_STATE_CONFLICT"));
@@ -1118,7 +1121,7 @@ class ThesisCouncilEscapeHatchTest {
         UUID topicGroup = insertGroupWithMembers(closed, topicId, "esc-td", 3);
         ensureStudent("esc-td-new");
         assertThatThrownBy(() -> mutations.overrideGroupRoster(topicGroup,
-                new io.campuscore.restfulapi.thesis.web.ThesisMutationDtos.RosterOverrideRequest(
+                new io.campuscore.restfulapi.thesis.dto.ThesisMutationDtos.RosterOverrideRequest(
                         "esc-td-new", "foreign dean on topic group", null), foreignDean))
                 .isInstanceOfSatisfying(DomainException.class,
                         e -> assertThat(e.getCode()).isEqualTo("THESIS_GROUP_NOT_FOUND"));
@@ -1137,7 +1140,7 @@ class ThesisCouncilEscapeHatchTest {
         jdbc.update("UPDATE thesis.thesis_group SET approval_status = 'PENDING' WHERE id = ?", pending);
         ensureStudent("esc-mg-new");
         mutations.overrideGroupRoster(pending,
-                new io.campuscore.restfulapi.thesis.web.ThesisMutationDtos.RosterOverrideRequest(
+                new io.campuscore.restfulapi.thesis.dto.ThesisMutationDtos.RosterOverrideRequest(
                         "esc-mg-new", "kept under minimum", true), admin());
         assertThat(jdbc.queryForObject(
                 "SELECT COUNT(*) FROM thesis.thesis_group_member WHERE group_id = ?",
@@ -1209,13 +1212,13 @@ class ThesisCouncilEscapeHatchTest {
         jdbc.update("UPDATE thesis.thesis_group SET approval_status = 'PENDING' WHERE id = ?", picking);
 
         assertThatThrownBy(() -> mutations.assignTopic(picking,
-                new io.campuscore.restfulapi.thesis.web.ThesisMutationDtos.TopicAssignmentRequest(withdrawn),
+                new io.campuscore.restfulapi.thesis.dto.ThesisMutationDtos.TopicAssignmentRequest(withdrawn),
                 admin()))
                 .isInstanceOfSatisfying(DomainException.class,
                         e -> assertThat(e.getCode()).isEqualTo("TOPIC_WITHDRAWN"));
         // The live topic still binds.
         mutations.assignTopic(picking,
-                new io.campuscore.restfulapi.thesis.web.ThesisMutationDtos.TopicAssignmentRequest(live),
+                new io.campuscore.restfulapi.thesis.dto.ThesisMutationDtos.TopicAssignmentRequest(live),
                 admin());
 
         // A group that still points at a withdrawn topic is orphaned — the
@@ -1301,7 +1304,7 @@ class ThesisCouncilEscapeHatchTest {
                 + "'Kết quả đợt Esc Shared đã công bố khác', 'SUCCESS', '/dashboard/thesis', NULL, FALSE, "
                 + "CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)");
         mutations.retractResults(sharedA,
-                new io.campuscore.restfulapi.thesis.web.ThesisMutationDtos
+                new io.campuscore.restfulapi.thesis.dto.ThesisMutationDtos
                         .RetractPublicationRequest("correct and republish", "RETRACT"),
                 admin());
         assertThat(jdbc.queryForObject(
@@ -1336,7 +1339,7 @@ class ThesisCouncilEscapeHatchTest {
                 .when(notifier).recallResultsPublished(org.mockito.ArgumentMatchers.any());
         try {
             mutations.retractResults(broken,
-                    new io.campuscore.restfulapi.thesis.web.ThesisMutationDtos
+                    new io.campuscore.restfulapi.thesis.dto.ThesisMutationDtos
                             .RetractPublicationRequest("inbox is down", "RETRACT"),
                     admin());
         } finally {

@@ -12,7 +12,7 @@ function armLoginResponse(page: Page) {
 export async function submitLiveLogin(
   page: Page,
   submit: Locator,
-  expectedPort: '3101' | '3110' = '3101',
+  expectedPort: string = '3101',
 ): Promise<Response> {
   const { hostname, port } = new URL(page.url());
   expect(['localhost', '127.0.0.1']).toContain(hostname);

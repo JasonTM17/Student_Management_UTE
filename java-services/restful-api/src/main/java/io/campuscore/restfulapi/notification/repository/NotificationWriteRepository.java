@@ -1,6 +1,9 @@
 package io.campuscore.restfulapi.notification.repository;
 
-import io.campuscore.restfulapi.notification.web.NotificationReadDtos.NotificationResponse;
+import io.campuscore.restfulapi.notification.dto.NotificationReadDtos.NotificationResponse;
+import io.campuscore.restfulapi.notification.model.CreateNotificationCommand;
+import io.campuscore.restfulapi.notification.model.PatchValue;
+import io.campuscore.restfulapi.notification.model.UpdateNotificationCommand;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Timestamp;
@@ -266,48 +269,5 @@ public class NotificationWriteRepository {
 
     private static java.time.Instant instant(Timestamp timestamp) {
         return timestamp == null ? null : timestamp.toInstant();
-    }
-
-    public record CreateNotificationCommand(
-            String id,
-            String userId,
-            String title,
-            String message,
-            String type,
-            String link,
-            java.time.Instant createdAt,
-            String announcementId) {
-
-        /** Non-announcement notices carry no source link. */
-        public CreateNotificationCommand(
-                String id,
-                String userId,
-                String title,
-                String message,
-                String type,
-                String link,
-                java.time.Instant createdAt) {
-            this(id, userId, title, message, type, link, createdAt, null);
-        }
-    }
-
-    public record UpdateNotificationCommand(
-            String id,
-            PatchValue<String> userId,
-            PatchValue<String> title,
-            PatchValue<String> message,
-            PatchValue<String> type,
-            PatchValue<String> link) {
-    }
-
-    public record PatchValue<T>(boolean present, T value) {
-
-        public static <T> PatchValue<T> omitted() {
-            return new PatchValue<>(false, null);
-        }
-
-        public static <T> PatchValue<T> present(T value) {
-            return new PatchValue<>(true, value);
-        }
     }
 }

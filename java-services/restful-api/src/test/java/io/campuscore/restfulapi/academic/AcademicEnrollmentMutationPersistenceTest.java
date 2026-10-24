@@ -24,7 +24,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
-import io.campuscore.restfulapi.academic.registration.RegistrationPdfRenderer;
+import io.campuscore.restfulapi.academic.registration.renderer.RegistrationPdfRenderer;
 import io.campuscore.restfulapi.testsupport.AccountAuthorityFixture;
 import io.campuscore.restfulapi.testsupport.CurrentAccountJwt;
 import org.hamcrest.Matchers;

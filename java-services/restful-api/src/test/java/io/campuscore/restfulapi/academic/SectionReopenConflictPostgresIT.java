@@ -5,9 +5,9 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.doAnswer;
 
-import io.campuscore.restfulapi.academic.registration.RegistrationService;
+import io.campuscore.restfulapi.academic.registration.service.RegistrationService;
 import io.campuscore.restfulapi.academic.service.AdminCatalogMutationService;
-import io.campuscore.restfulapi.web.DomainException;
+import io.campuscore.restfulapi.exception.DomainException;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CountDownLatch;

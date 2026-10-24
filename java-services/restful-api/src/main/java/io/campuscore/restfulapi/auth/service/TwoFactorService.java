@@ -1,10 +1,10 @@
 package io.campuscore.restfulapi.auth.service;
 
 import io.campuscore.restfulapi.auth.repository.AuthUserRepository;
-import io.campuscore.restfulapi.auth.repository.AuthUserRepository.AuthUserRecord;
+import io.campuscore.restfulapi.auth.model.AuthUserRecord;
 import io.campuscore.restfulapi.auth.repository.TwoFactorChallengeRepository;
-import io.campuscore.restfulapi.auth.repository.TwoFactorChallengeRepository.ChallengeRecord;
-import io.campuscore.restfulapi.auth.web.SessionCookieService;
+import io.campuscore.restfulapi.auth.model.ChallengeRecord;
+import io.campuscore.restfulapi.auth.service.SessionCookieService;
 import io.campuscore.restfulapi.exception.AppException;
 import io.campuscore.restfulapi.mail.config.MailConfig;
 import io.campuscore.restfulapi.mail.service.EmailService;
@@ -24,7 +24,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Profile;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.crypto.password.PasswordEncoder;
-import io.campuscore.restfulapi.audit.AdminAuditRecorder;
+import io.campuscore.restfulapi.audit.service.AdminAuditRecorder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.context.request.RequestAttributes;

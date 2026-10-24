@@ -456,10 +456,10 @@ class AnnouncementStudentFanoutPersistenceTest {
                 Integer.class, announcementId));
     }
 
-    private static io.campuscore.restfulapi.engagement.web.AnnouncementReadDtos.AnnouncementResponse scopedNotice(
+    private static io.campuscore.restfulapi.engagement.dto.AnnouncementReadDtos.AnnouncementResponse scopedNotice(
             String section, List<Integer> years, java.time.Instant expires, java.time.Instant archived,
             List<String> roles, boolean global) {
-        return new io.campuscore.restfulapi.engagement.web.AnnouncementReadDtos.AnnouncementResponse(
+        return new io.campuscore.restfulapi.engagement.dto.AnnouncementReadDtos.AnnouncementResponse(
                 "scoped", "Private title", "Private content", "NORMAL", roles, years, global,
                 null, expires, "publisher", null, null, section, null, null, null, null, null,
                 java.time.Instant.now(), java.time.Instant.now(), 0, archived, null, null, null, null);

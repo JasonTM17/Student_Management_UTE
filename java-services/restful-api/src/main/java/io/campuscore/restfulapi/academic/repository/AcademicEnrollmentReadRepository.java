@@ -1,6 +1,11 @@
 package io.campuscore.restfulapi.academic.repository;
 
-import io.campuscore.restfulapi.common.LikePattern;
+import io.campuscore.restfulapi.academic.model.EnrollmentRow;
+import io.campuscore.restfulapi.academic.model.GradeItemRow;
+import io.campuscore.restfulapi.academic.model.GradeSummaryRow;
+import io.campuscore.restfulapi.academic.model.ScheduleRow;
+import io.campuscore.restfulapi.academic.model.StudentGradeRow;
+import io.campuscore.restfulapi.common.util.LikePattern;
 import java.math.BigDecimal;
 import java.sql.ResultSet;
 import java.sql.SQLException;
@@ -414,38 +419,5 @@ public class AcademicEnrollmentReadRepository {
             return null;
         }
         return timestamp.toLocalDateTime().toInstant(ZoneOffset.UTC);
-    }
-
-    public record EnrollmentRow(String id, String studentId, String sectionId, String semesterId, String status,
-            Instant enrolledAt, Instant droppedAt, String gradeStatus, BigDecimal finalGrade, String letterGrade,
-            Instant createdAt, Instant updatedAt, String studentNumber, String studentUserId, String studentEmail,
-            String studentFirstName, String studentLastName, String sectionNumber, int capacity, int enrolledCount,
-            String sectionStatus, String courseId, String courseCode, String courseName, String courseNameEn,
-            String courseNameVi, int credits, String semesterIdValue, String semesterName, String semesterNameEn,
-            String semesterNameVi, Instant semesterStartDate, String lecturerId, String employeeId, String lecturerUserId,
-            String lecturerEmail, String lecturerFirstName, String lecturerLastName) {
-    }
-
-    public record ScheduleRow(String id, String sectionId, int dayOfWeek, String startTime, String endTime,
-            String classroomId, String building, String roomNumber) {
-    }
-
-    public record GradeSummaryRow(String id, String courseCode, String courseName, String courseNameEn, String courseNameVi,
-            int credits, String sectionCode, String lecturerName, String semester, String semesterNameEn, String semesterNameVi,
-            String semesterId, BigDecimal processScore, BigDecimal finalExamScore, BigDecimal finalGrade,
-            String letterGrade, String gradeStatus, String enrollmentStatus) {
-    }
-
-    public record GradeItemRow(String id, String sectionId, String name, String type, BigDecimal maxScore, BigDecimal weight,
-            Instant gradedAt, Instant createdAt, String sectionNumber, int capacity, int enrolledCount, String sectionStatus,
-            String courseId, String courseCode, String courseName, String courseNameEn, String courseNameVi, int credits,
-            String semesterId, String semesterName, String semesterNameEn, String semesterNameVi, Instant semesterStartDate) {
-    }
-
-    public record StudentGradeRow(String enrollmentId, String studentId, String studentName, String studentNumber,
-            String sectionId, String sectionNumber, String courseCode, String courseName, String courseNameEn,
-            String courseNameVi, String semester, String semesterNameEn, String semesterNameVi, BigDecimal finalGrade,
-            String letterGrade, String gradeStatus, String gradeId, String gradeItemId, String gradeItemName,
-            String gradeItemType, BigDecimal score, BigDecimal maxScore, BigDecimal weight) {
     }
 }

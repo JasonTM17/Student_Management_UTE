@@ -1,6 +1,6 @@
 package io.campuscore.restfulapi.engagement.repository;
 
-import io.campuscore.restfulapi.engagement.domain.ArticleAttachment;
+import io.campuscore.restfulapi.engagement.entity.ArticleAttachment;
 import java.util.List;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;

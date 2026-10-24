@@ -1,5 +1,6 @@
 package io.campuscore.restfulapi.exception;
 
+import io.campuscore.restfulapi.exception.code.ErrorCode;
 import org.springframework.http.HttpStatus;
 
 /**

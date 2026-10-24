@@ -6,8 +6,8 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
-import io.campuscore.restfulapi.thesis.domain.ThesisTopic;
-import io.campuscore.restfulapi.thesis.domain.TopicStatus;
+import io.campuscore.restfulapi.thesis.entity.ThesisTopic;
+import io.campuscore.restfulapi.thesis.model.TopicStatus;
 import io.campuscore.restfulapi.thesis.repository.ThesisRoundReadPort;
 import io.campuscore.restfulapi.thesis.repository.ThesisTopicRepository;
 import io.campuscore.restfulapi.thesis.service.ThesisTopicService;
@@ -34,7 +34,7 @@ class ThesisTopicVisibilityTest {
     void setUp() {
         repository = mock(ThesisTopicRepository.class);
         rounds = mock(ThesisRoundReadPort.class);
-        service = new ThesisTopicService(repository, rounds, mock(NamedParameterJdbcTemplate.class));
+        service = new ThesisTopicService(repository, rounds, mock(io.campuscore.restfulapi.thesis.repository.ThesisScopeRepository.class));
     }
 
     @Test

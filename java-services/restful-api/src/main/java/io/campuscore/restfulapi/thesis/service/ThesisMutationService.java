@@ -1,37 +1,39 @@
 package io.campuscore.restfulapi.thesis.service;
 
-import io.campuscore.restfulapi.audit.AdminAuditRecorder;
-import io.campuscore.restfulapi.thesis.domain.ApprovalStatus;
-import io.campuscore.restfulapi.thesis.domain.GroupStatus;
-import io.campuscore.restfulapi.thesis.domain.RoundStatus;
-import io.campuscore.restfulapi.thesis.domain.RoundType;
-import io.campuscore.restfulapi.thesis.domain.ThesisTopic;
-import io.campuscore.restfulapi.thesis.domain.TopicStatus;
+import io.campuscore.restfulapi.audit.service.AdminAuditRecorder;
+import io.campuscore.restfulapi.thesis.model.ApprovalStatus;
+import io.campuscore.restfulapi.thesis.model.GroupStatus;
+import io.campuscore.restfulapi.thesis.model.LecturerScope;
+import io.campuscore.restfulapi.thesis.model.RoundStatus;
+import io.campuscore.restfulapi.thesis.model.RoundType;
+import io.campuscore.restfulapi.thesis.entity.ThesisTopic;
+import io.campuscore.restfulapi.thesis.model.TopicStatus;
 import io.campuscore.restfulapi.thesis.repository.ThesisGroupReadRepository;
 import io.campuscore.restfulapi.thesis.repository.ThesisRegistrationRoundRepository;
 import io.campuscore.restfulapi.thesis.repository.ThesisRoundReadPort;
 import io.campuscore.restfulapi.thesis.repository.ThesisTopicRepository;
-import io.campuscore.restfulapi.thesis.web.ThesisGroupReadDtos.GroupResponse;
-import io.campuscore.restfulapi.thesis.web.ThesisMutationDtos.CloseRegistrationPreviewResponse;
-import io.campuscore.restfulapi.thesis.web.ThesisMutationDtos.GroupApprovalRequest;
-import io.campuscore.restfulapi.thesis.web.ThesisMutationDtos.GroupCreateRequest;
-import io.campuscore.restfulapi.thesis.web.ThesisMutationDtos.MemberRequest;
-import io.campuscore.restfulapi.thesis.web.ThesisMutationDtos.ProgressRequest;
-import io.campuscore.restfulapi.thesis.web.ThesisMutationDtos.PublishResultsExcludedTopic;
-import io.campuscore.restfulapi.thesis.web.ThesisMutationDtos.PublishResultsPreviewResponse;
-import io.campuscore.restfulapi.thesis.web.ThesisMutationDtos.RoundCreateRequest;
-import io.campuscore.restfulapi.thesis.web.ThesisMutationDtos.StudentSearchResponse;
-import io.campuscore.restfulapi.thesis.web.ThesisMutationDtos.TopicAssignmentRequest;
-import io.campuscore.restfulapi.thesis.web.ThesisMutationDtos.TopicCreateRequest;
-import io.campuscore.restfulapi.thesis.web.ThesisMutationDtos.TopicUpdateRequest;
-import io.campuscore.restfulapi.thesis.web.ThesisMutationDtos.GroupRejectionRequest;
-import io.campuscore.restfulapi.thesis.web.ThesisMutationDtos.LateTopicRequest;
-import io.campuscore.restfulapi.thesis.web.ThesisMutationDtos.RetractPublicationRequest;
-import io.campuscore.restfulapi.thesis.web.ThesisMutationDtos.RosterOverrideRequest;
-import io.campuscore.restfulapi.thesis.web.ThesisMutationDtos.TopicReassignRequest;
-import io.campuscore.restfulapi.thesis.web.ThesisRoundDtos.RoundResponse;
-import io.campuscore.restfulapi.thesis.web.ThesisTopicDtos.TopicResponse;
-import io.campuscore.restfulapi.web.DomainException;
+import io.campuscore.restfulapi.thesis.dto.ThesisGroupReadDtos.GroupResponse;
+import io.campuscore.restfulapi.thesis.dto.ThesisMutationDtos.CloseRegistrationPreviewResponse;
+import io.campuscore.restfulapi.thesis.dto.ThesisMutationDtos.GroupApprovalRequest;
+import io.campuscore.restfulapi.thesis.dto.ThesisMutationDtos.GroupCreateRequest;
+import io.campuscore.restfulapi.thesis.dto.ThesisMutationDtos.MemberRequest;
+import io.campuscore.restfulapi.thesis.dto.ThesisMutationDtos.ProgressRequest;
+import io.campuscore.restfulapi.thesis.dto.ThesisMutationDtos.PublishResultsExcludedTopic;
+import io.campuscore.restfulapi.thesis.dto.ThesisMutationDtos.PublishResultsPreviewResponse;
+import io.campuscore.restfulapi.thesis.dto.ThesisMutationDtos.RoundCreateRequest;
+import io.campuscore.restfulapi.thesis.dto.ThesisMutationDtos.StudentSearchResponse;
+import io.campuscore.restfulapi.thesis.dto.ThesisMutationDtos.TopicAssignmentRequest;
+import io.campuscore.restfulapi.thesis.dto.ThesisMutationDtos.TopicCreateRequest;
+import io.campuscore.restfulapi.thesis.dto.ThesisMutationDtos.TopicUpdateRequest;
+import io.campuscore.restfulapi.thesis.dto.ThesisMutationDtos.GroupRejectionRequest;
+import io.campuscore.restfulapi.thesis.dto.ThesisMutationDtos.LateTopicRequest;
+import io.campuscore.restfulapi.thesis.dto.ThesisMutationDtos.RetractPublicationRequest;
+import io.campuscore.restfulapi.thesis.dto.ThesisMutationDtos.RosterOverrideRequest;
+import io.campuscore.restfulapi.thesis.dto.ThesisMutationDtos.TopicReassignRequest;
+import io.campuscore.restfulapi.thesis.dto.ThesisRoundDtos.RoundDeletionInfo;
+import io.campuscore.restfulapi.thesis.dto.ThesisRoundDtos.RoundResponse;
+import io.campuscore.restfulapi.thesis.dto.ThesisTopicDtos.TopicResponse;
+import io.campuscore.restfulapi.exception.DomainException;
 import java.time.Instant;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -43,11 +45,14 @@ import org.springframework.dao.EmptyResultDataAccessException;
 import org.springframework.http.HttpStatus;
 import org.springframework.jdbc.core.namedparam.MapSqlParameterSource;
 import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
+import io.campuscore.restfulapi.thesis.repository.ThesisScopeRepository;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
+import io.campuscore.restfulapi.thesis.scope.ThesisDeanScope;
+import io.campuscore.restfulapi.thesis.scope.ThesisDepartmentScope;
 
 /** Transaction boundary for the thesis core: rounds, topics and student groups. */
 @Service
@@ -61,6 +66,7 @@ public class ThesisMutationService {
             org.slf4j.LoggerFactory.getLogger(ThesisMutationService.class);
 
     private final NamedParameterJdbcTemplate jdbc;
+    private final ThesisScopeRepository scope;
     private final ThesisRegistrationRoundRepository rounds;
     private final ThesisRoundReadPort roundReadPort;
     private final ThesisTopicRepository topics;
@@ -94,7 +100,8 @@ public class ThesisMutationService {
             ThesisGroupReadRepository groups,
             ThesisRoundReadService roundReads,
             AdminAuditRecorder audit) {
-        this(jdbc, rounds, roundReadPort, topics, groups, roundReads, audit, null);
+        this(jdbc, rounds, roundReadPort, topics, groups, roundReads, audit, null,
+                new ThesisScopeRepository(jdbc));
     }
 
     @org.springframework.beans.factory.annotation.Autowired
@@ -106,8 +113,10 @@ public class ThesisMutationService {
             ThesisGroupReadRepository groups,
             ThesisRoundReadService roundReads,
             AdminAuditRecorder audit,
-            ThesisNotificationService notifier) {
+            ThesisNotificationService notifier,
+            ThesisScopeRepository scope) {
         this.jdbc = jdbc;
+        this.scope = scope;
         this.rounds = rounds;
         this.roundReadPort = roundReadPort;
         this.topics = topics;
@@ -523,6 +532,80 @@ public class ThesisMutationService {
     }
 
     /**
+     * Hard-deletes a round that was created by mistake. Only an EMPTY round in
+     * DRAFT or CANCELLED may be removed — cancel + restore stays the escape
+     * hatch for anything that already holds thesis data.
+     *
+     * <p>The round row is locked FOR UPDATE before any check, matching the
+     * round-first lock order every other round mutation already follows, so a
+     * concurrent topic/group/council create or a restore either commits first
+     * (and is counted, producing ROUND_HAS_DATA) or waits for the delete and
+     * then fails its own round lookup. The audit row is written in the same
+     * transaction before the DELETE so the log records the round snapshot and
+     * the checked counts even though the row itself is gone.
+     *
+     * <p>Inbox rows are left alone deliberately: result notices are only
+     * produced for published rounds (never deletable), and any notice pointing
+     * at a group's round implies the group row still exists, which is already
+     * a ROUND_HAS_DATA blocker.
+     *
+     * @param id round to delete
+     * @param reason governance reason stored on the audit row
+     * @param actor caller JWT recorded in the audit row
+     */
+    @Transactional
+    public void deleteRound(UUID id, String reason, Jwt actor) {
+        requireGovernanceRole(actor);
+        // Rounds are university-wide (no faculty column): the existing
+        // governance predicate is a dean whose faculty scope resolves, so a
+        // faculty head without an active bound lecturer profile is refused.
+        if (hasRole(actor, "TRUONG_KHOA") && !isGlobalAdmin(actor)
+                && ThesisDeanScope.facultyId(scope, actor) == null) {
+            throw new DomainException(HttpStatus.FORBIDDEN, "FACULTY_PROFILE_REQUIRED",
+                    "An active lecturer profile bound to the faculty head is required");
+        }
+        String cleanReason = requireReason(reason);
+        Map<String, Object> row = one(
+                "SELECT name, status, thesis_type, cancelled_from_status "
+                        + "FROM thesis.thesis_registration_round WHERE id = :id FOR UPDATE",
+                params().addValue("id", id), "ROUND_NOT_FOUND", "Thesis registration round not found");
+        RoundStatus status = RoundStatus.valueOf((String) row.get("status"));
+        if (status != RoundStatus.DRAFT && status != RoundStatus.CANCELLED) {
+            throw conflict("ROUND_NOT_DELETABLE",
+                    "Only a never-opened or cancelled round can be deleted; cancel it instead");
+        }
+        RoundDeletionInfo info = roundReads.deletionInfo(id, status);
+        if (!info.deletable()) {
+            throw new DomainException(HttpStatus.CONFLICT, "ROUND_HAS_DATA",
+                    "Round still has thesis data; cancel it instead of deleting",
+                    Map.of("topics", info.topics(), "groups", info.groups(),
+                            "members", info.members(), "reports", info.reports(),
+                            "councils", info.councils()));
+        }
+        Map<String, Object> before = new LinkedHashMap<>();
+        before.put("name", row.get("name"));
+        before.put("status", row.get("status"));
+        before.put("thesis_type", row.get("thesis_type"));
+        before.put("reason", cleanReason);
+        before.put("checkedCounts", Map.of("topics", info.topics(), "groups", info.groups(),
+                "members", info.members(), "reports", info.reports(), "councils", info.councils()));
+        audit.record(subject(actor), null, "THESIS_ROUND_DELETED", "THESIS_ROUND", id.toString(),
+                "Empty round deleted; reason: " + cleanReason, before, null);
+        try {
+            jdbc.update("DELETE FROM thesis.thesis_registration_round WHERE id = :id",
+                    params().addValue("id", id));
+        } catch (org.springframework.dao.DataIntegrityViolationException referenced) {
+            // A dependency that slipped past the count — e.g. a new referencing
+            // table added without a round lock — must still never cascade.
+            throw new DomainException(HttpStatus.CONFLICT, "ROUND_HAS_DATA",
+                    "Round is still referenced by thesis data; cancel it instead of deleting",
+                    Map.of("topics", info.topics(), "groups", info.groups(),
+                            "members", info.members(), "reports", info.reports(),
+                            "councils", info.councils()));
+        }
+    }
+
+    /**
      * A restore may never skip the lifecycle. With a recorded marker the only
      * legal targets are that marker itself and — the documented escape hatch —
      * REGISTRATION_CLOSED when the marker is REGISTRATION_OPEN (the window may
@@ -789,7 +872,7 @@ public class ThesisMutationService {
     private List<PublishResultsExcludedTopic> excludedTopicsQuery(UUID roundId, Jwt actor) {
         String facultyScope = "";
         String facultyId = ThesisDeanScope.isFacultyHead(actor) && !ThesisDeanScope.isGlobalAdmin(actor)
-                ? ThesisDeanScope.facultyId(jdbc, actor) : null;
+                ? ThesisDeanScope.facultyId(scope, actor) : null;
         if (facultyId != null) {
             facultyScope = " AND d.\"facultyId\" = :facultyId";
         }
@@ -836,7 +919,7 @@ public class ThesisMutationService {
         lockTopicForGovernance(id);
         // An outcome decision is governance-only: the dean must own the
         // topic's faculty, not merely supervise it.
-        ThesisDeanScope.requireTopicGovernanceScope(jdbc, actor, id);
+        ThesisDeanScope.requireTopicGovernanceScope(scope, actor, id);
         Map<String, Object> topic = one(
                 "SELECT status, final_score, result_status, title FROM thesis.thesis_topic WHERE id = :id",
                 params().addValue("id", id), "TOPIC_NOT_FOUND", "Thesis topic not found");
@@ -871,7 +954,7 @@ public class ThesisMutationService {
         String cleanReason = requireReason(reason);
         requireMutableTopicRound(id);
         lockTopicForGovernance(id);
-        ThesisDeanScope.requireTopicGovernanceScope(jdbc, actor, id);
+        ThesisDeanScope.requireTopicGovernanceScope(scope, actor, id);
         Map<String, Object> topic = one(
                 "SELECT status, final_score, result_status, gvpb_waived_reason, title "
                         + "FROM thesis.thesis_topic WHERE id = :id",
@@ -886,7 +969,7 @@ public class ThesisMutationService {
         // the shared ThesisReviewOutcome helper: a live sub-threshold
         // counter-review without a waiver marks the topic again.
         boolean failed = topic.get("gvpb_waived_reason") == null
-                && ThesisReviewOutcome.isFailingScore(ThesisReviewOutcome.latestGvpbScore(jdbc, id));
+                && ThesisReviewOutcome.isFailingScore(ThesisReviewOutcome.latestGvpbScore(scope, id));
         jdbc.update(
                 "UPDATE thesis.thesis_topic SET result_status = :outcome, "
                         + "result_reason = CASE WHEN :outcome = 'REVIEW_FAILED' THEN 'Counter-review score below the 5.0 pass threshold' ELSE NULL END, "
@@ -1200,8 +1283,8 @@ public class ThesisMutationService {
         // either end from another faculty confers no write. Foreign topics
         // conceal as not-found on either end.
         if (!ThesisDeanScope.isGlobalAdmin(actor)) {
-            ThesisDeanScope.requireTopicGovernanceScope(jdbc, actor, oldTopicId);
-            ThesisDeanScope.requireTopicGovernanceScope(jdbc, actor, newTopicId);
+            ThesisDeanScope.requireTopicGovernanceScope(scope, actor, oldTopicId);
+            ThesisDeanScope.requireTopicGovernanceScope(scope, actor, newTopicId);
         }
         // Any score on either side freezes the binding: re-pointing a scored
         // pair would silently move a verdict the group never earned.
@@ -1620,7 +1703,7 @@ public class ThesisMutationService {
         // a foreign topic cannot be claimed by rewriting it onto an in-faculty
         // department. The helper is a no-op for global admins and non-deans,
         // and keeps the personally-supervised exception.
-        ThesisDeanScope.requireTopicAccess(jdbc, actor, id);
+        ThesisDeanScope.requireTopicAccess(scope, actor, id);
         requireMutableRound(UUID.fromString(String.valueOf(gate.get("round_id"))));
         lockTopicForGovernance(id);
         ThesisTopic topic = topics.findById(id).orElseThrow(() -> notFound("TOPIC_NOT_FOUND", "Thesis topic not found"));
@@ -1629,7 +1712,7 @@ public class ThesisMutationService {
         // department the caller does not govern between the early check and
         // this lock (the same re-check publishTopic/archiveTopic already do).
         authorizeTopicOwnerOrDepartmentHead(topic.getCreatedBy(), topic.getDepartmentId(), actor);
-        ThesisDeanScope.requireTopicAccess(jdbc, actor, id);
+        ThesisDeanScope.requireTopicAccess(scope, actor, id);
         if (topic.getStatus() != TopicStatus.DRAFT) {
             throw conflict("TOPIC_STATE_CONFLICT", "Only draft topics can be edited");
         }
@@ -1660,7 +1743,7 @@ public class ThesisMutationService {
         Map<String, Object> gate = one(
                 "SELECT round_id, department_id FROM thesis.thesis_topic WHERE id = :id",
                 params().addValue("id", id), "TOPIC_NOT_FOUND", "Thesis topic not found");
-        if (!isAdmin(actor) && !ThesisDepartmentScope.owns(jdbc, actor, String.valueOf(gate.get("department_id")))) {
+        if (!isAdmin(actor) && !ThesisDepartmentScope.owns(scope, actor, String.valueOf(gate.get("department_id")))) {
             throw new DomainException(HttpStatus.FORBIDDEN, "TOPIC_APPROVER_REQUIRED",
                     "Only department governance can approve a topic");
         }
@@ -1675,14 +1758,14 @@ public class ThesisMutationService {
         // The scope decision must use the department read under the topic
         // lock: the earlier gate read can go stale if a concurrent update
         // moves the topic to another department between the check and here.
-        if (!isAdmin(actor) && !ThesisDepartmentScope.owns(jdbc, actor, topic.getDepartmentId())) {
+        if (!isAdmin(actor) && !ThesisDepartmentScope.owns(scope, actor, topic.getDepartmentId())) {
             throw new DomainException(HttpStatus.FORBIDDEN, "TOPIC_APPROVER_REQUIRED",
                     "Only department governance can approve a topic");
         }
         Integer supervisorCount = jdbc.queryForObject(
                 "SELECT COUNT(*) FROM thesis.thesis_topic_supervisor WHERE topic_id = :topicId",
                 params().addValue("topicId", id), Integer.class);
-        ThesisDeanScope.requireTopicAccess(jdbc, actor, id);
+        ThesisDeanScope.requireTopicAccess(scope, actor, id);
         if (supervisorCount == null || supervisorCount < 1 || supervisorCount > 2) {
             throw conflict("TOPIC_SUPERVISOR_REQUIRED",
                     "A topic must have one or two active supervisors before it can be published");
@@ -1706,7 +1789,7 @@ public class ThesisMutationService {
         Map<String, Object> gate = one(
                 "SELECT round_id, department_id, created_by FROM thesis.thesis_topic WHERE id = :id",
                 params().addValue("id", id), "TOPIC_NOT_FOUND", "Thesis topic not found");
-        if (!isAdmin(actor) && !ThesisDepartmentScope.owns(jdbc, actor, String.valueOf(gate.get("department_id")))) {
+        if (!isAdmin(actor) && !ThesisDepartmentScope.owns(scope, actor, String.valueOf(gate.get("department_id")))) {
             if (!isLecturer(actor)) {
                 throw new DomainException(HttpStatus.FORBIDDEN, "TOPIC_OWNER_REQUIRED",
                         "Only the topic owner or department governance can archive this topic");
@@ -1720,14 +1803,14 @@ public class ThesisMutationService {
         ThesisTopic topic = topics.findById(id).orElseThrow(() -> notFound("TOPIC_NOT_FOUND", "Thesis topic not found"));
         // Re-verify scope on the locked read: a concurrent update may have
         // moved the topic between departments since the gate read.
-        if (!isAdmin(actor) && !ThesisDepartmentScope.owns(jdbc, actor, topic.getDepartmentId())) {
+        if (!isAdmin(actor) && !ThesisDepartmentScope.owns(scope, actor, topic.getDepartmentId())) {
             if (!isLecturer(actor)) {
                 throw new DomainException(HttpStatus.FORBIDDEN, "TOPIC_OWNER_REQUIRED",
                         "Only the topic owner or department governance can archive this topic");
             }
             authorizeTopicOwner(topic, actor);
         }
-        ThesisDeanScope.requireTopicAccess(jdbc, actor, id);
+        ThesisDeanScope.requireTopicAccess(scope, actor, id);
         if (topic.getFinalScore() != null || topic.getResultStatus() != null || topic.getGvpbLecturerId() != null
                 || count("SELECT COUNT(*) FROM thesis.thesis_group WHERE topic_id = :topicId", "topicId", id) > 0
                 || count("SELECT COUNT(*) FROM thesis.thesis_council_topic WHERE topic_id = :topicId", "topicId", id) > 0
@@ -1928,7 +2011,7 @@ public class ThesisMutationService {
             throw conflict("GROUP_STATE_CONFLICT", "An approved group cannot change its topic");
         }
         Map<String, Object> topic = one("SELECT id, round_id, status, max_groups, department_id, final_score, result_status FROM thesis.thesis_topic WHERE id = :id FOR UPDATE", params().addValue("id", topicId), "TOPIC_NOT_FOUND", "Thesis topic not found");
-        ThesisDeanScope.requireTopicAccess(jdbc, actor, topicId);
+        ThesisDeanScope.requireTopicAccess(scope, actor, topicId);
         if (!group.roundId().equals(topic.get("round_id"))) {
             throw conflict("TOPIC_ROUND_MISMATCH", "Topic belongs to another registration round");
         }
@@ -2230,13 +2313,13 @@ public class ThesisMutationService {
         if (liveRounds == null || liveRounds == 0) {
             return List.of();
         }
-        List<String> tokens = io.campuscore.restfulapi.common.LikePattern.tokens(normalized);
+        List<String> tokens = io.campuscore.restfulapi.common.util.LikePattern.tokens(normalized);
         if (tokens.isEmpty()) {
             return List.of();
         }
         MapSqlParameterSource searchParams = params()
-                .addValue("foldFrom", io.campuscore.restfulapi.common.LikePattern.FOLD_FROM)
-                .addValue("foldTo", io.campuscore.restfulapi.common.LikePattern.FOLD_TO);
+                .addValue("foldFrom", io.campuscore.restfulapi.common.util.LikePattern.FOLD_FROM)
+                .addValue("foldTo", io.campuscore.restfulapi.common.util.LikePattern.FOLD_TO);
         StringBuilder tokenPredicates = new StringBuilder();
         for (int i = 0; i < tokens.size(); i++) {
             String paramName = "token" + i;
@@ -2379,15 +2462,15 @@ public class ThesisMutationService {
     private boolean isGroupAdmin(GroupRow group, Jwt actor) {
         if (isGlobalAdmin(actor)) return true;
         if (!hasRole(actor, "TRUONG_KHOA")) return false;
-        ThesisGroupReadRepository.LecturerScope scope = requireDeanScope(actor);
+        LecturerScope scope = requireDeanScope(actor);
         if (groups.groupInFaculty(group.id(), scope.facultyId()) || isDeanSupervisor(group.topicId(), actor)) {
             return true;
         }
         throw notFound("THESIS_GROUP_NOT_FOUND", "Thesis group not found");
     }
 
-    private ThesisGroupReadRepository.LecturerScope requireDeanScope(Jwt actor) {
-        ThesisGroupReadRepository.LecturerScope scope = groups.findLecturerScope(
+    private LecturerScope requireDeanScope(Jwt actor) {
+        LecturerScope scope = groups.findLecturerScope(
                 normalize(actor.getClaimAsString("lecturerId")), subject(actor));
         if (scope == null) {
             throw new DomainException(HttpStatus.FORBIDDEN, "FACULTY_PROFILE_REQUIRED",
@@ -2398,7 +2481,7 @@ public class ThesisMutationService {
 
     /** Check the destination too: an own-faculty group cannot confer access to a foreign topic. */
     private void authorizeTopicOwnerOrDepartmentHead(String createdBy, String departmentId, Jwt actor) {
-        if (isAdmin(actor) || ThesisDepartmentScope.owns(jdbc, actor, departmentId)) return;
+        if (isAdmin(actor) || ThesisDepartmentScope.owns(scope, actor, departmentId)) return;
         authorizeTopicOwner(createdBy, actor);
     }
 
@@ -2663,7 +2746,7 @@ public class ThesisMutationService {
     }
 
     private void requireDeanTopicDepartment(Jwt actor, String departmentId) {
-        ThesisGroupReadRepository.LecturerScope scope = requireDeanScope(actor);
+        LecturerScope scope = requireDeanScope(actor);
         Integer matches = jdbc.queryForObject(
                 "SELECT COUNT(*) FROM academic.\"Department\" "
                         + "WHERE \"id\" = :departmentId AND \"facultyId\" = :facultyId AND \"isActive\" = TRUE",

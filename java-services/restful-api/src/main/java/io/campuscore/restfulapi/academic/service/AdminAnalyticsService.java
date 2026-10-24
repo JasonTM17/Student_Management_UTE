@@ -1,7 +1,7 @@
 package io.campuscore.restfulapi.academic.service;
 
 import io.campuscore.restfulapi.academic.repository.AdminAnalyticsRepository;
-import io.campuscore.restfulapi.academic.web.AdminAnalyticsDtos.AnalyticsOverview;
+import io.campuscore.restfulapi.academic.dto.AdminAnalyticsDtos.AnalyticsOverview;
 import java.util.Collections;
 import java.util.List;
 import org.springframework.context.annotation.Profile;
@@ -29,7 +29,7 @@ public class AdminAnalyticsService {
     public AnalyticsOverview overview() {
         // The repository returns newest-first; the trend chart reads left to
         // right, so the last N semesters are reversed into ascending order.
-        List<io.campuscore.restfulapi.academic.web.AdminAnalyticsDtos.SemesterTrend> trends =
+        List<io.campuscore.restfulapi.academic.dto.AdminAnalyticsDtos.SemesterTrend> trends =
                 repository.semesterTrends(TREND_SEMESTERS);
         Collections.reverse(trends);
         return new AnalyticsOverview(

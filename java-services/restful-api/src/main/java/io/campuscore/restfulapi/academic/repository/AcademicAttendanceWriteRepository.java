@@ -1,5 +1,6 @@
 package io.campuscore.restfulapi.academic.repository;
 
+import io.campuscore.restfulapi.academic.model.AttendanceInsertRow;
 import java.sql.Timestamp;
 import java.time.Instant;
 import java.util.List;
@@ -86,17 +87,6 @@ public class AcademicAttendanceWriteRepository {
                 "INSERT INTO " + ATTENDANCE + " (\"id\", \"studentId\", \"sectionId\", \"date\", \"status\", \"notes\", \"createdAt\", \"updatedAt\")"
                         + " VALUES (:id, :studentId, :sectionId, :date, :status, :notes, :createdAt, :updatedAt)",
                 batch);
-    }
-
-    public record AttendanceInsertRow(
-            String id,
-            String studentId,
-            String sectionId,
-            Instant date,
-            String status,
-            String notes,
-            Instant createdAt,
-            Instant updatedAt) {
     }
 
     private static java.time.OffsetDateTime utcTimestamp(Instant date) {

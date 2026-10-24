@@ -1,9 +1,9 @@
 package io.campuscore.restfulapi.mail.service;
 
 import io.campuscore.restfulapi.mail.config.MailConfig;
-import io.campuscore.restfulapi.mail.web.MailDtos.AcademicNoticeRequest;
-import io.campuscore.restfulapi.mail.web.MailDtos.CourseRegistrationRequest;
-import io.campuscore.restfulapi.mail.web.MailDtos.GradeAlertRequest;
+import io.campuscore.restfulapi.mail.dto.MailDtos.AcademicNoticeRequest;
+import io.campuscore.restfulapi.mail.dto.MailDtos.CourseRegistrationRequest;
+import io.campuscore.restfulapi.mail.dto.MailDtos.GradeAlertRequest;
 import jakarta.mail.MessagingException;
 import jakarta.mail.internet.InternetAddress;
 import jakarta.mail.internet.MimeMessage;

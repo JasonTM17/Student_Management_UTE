@@ -1,10 +1,16 @@
 package io.campuscore.restfulapi.thesis.service;
 
-import io.campuscore.restfulapi.audit.AdminAuditRecorder;
-import io.campuscore.restfulapi.thesis.domain.RoundStatus;
-import io.campuscore.restfulapi.thesis.domain.RoundType;
-import io.campuscore.restfulapi.thesis.domain.TopicStatus;
-import io.campuscore.restfulapi.web.DomainException;
+import io.campuscore.restfulapi.audit.service.AdminAuditRecorder;
+import io.campuscore.restfulapi.thesis.model.RoundStatus;
+import io.campuscore.restfulapi.thesis.model.RoundType;
+import io.campuscore.restfulapi.thesis.model.TopicStatus;
+import io.campuscore.restfulapi.exception.DomainException;
+import io.campuscore.restfulapi.thesis.dto.CouncilMember;
+import io.campuscore.restfulapi.thesis.dto.CouncilResponse;
+import io.campuscore.restfulapi.thesis.dto.ScoreComment;
+import io.campuscore.restfulapi.thesis.dto.ScoreResponse;
+import io.campuscore.restfulapi.thesis.dto.StudentResultRow;
+import io.campuscore.restfulapi.thesis.dto.TopicResult;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.Instant;
@@ -17,12 +23,14 @@ import org.springframework.dao.EmptyResultDataAccessException;
 import org.springframework.http.HttpStatus;
 import org.springframework.jdbc.core.namedparam.MapSqlParameterSource;
 import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
+import io.campuscore.restfulapi.thesis.repository.ThesisScopeRepository;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 import org.springframework.util.StringUtils;
+import io.campuscore.restfulapi.thesis.scope.ThesisDeanScope;
 
 /**
  * Defense councils and component scoring (brief R6–R9): councils of three to
@@ -50,8 +58,10 @@ public class ThesisCouncilService {
             org.slf4j.LoggerFactory.getLogger(ThesisCouncilService.class);
 
     private final NamedParameterJdbcTemplate jdbc;
+    private final ThesisScopeRepository scope;
     private final AdminAuditRecorder audit;
     private final ThesisNotificationService notifier;
+    private final ThesisGovernanceCapabilities capabilities;
 
     /**
      * Creates the service over the shared named-parameter JDBC template.
@@ -61,15 +71,18 @@ public class ThesisCouncilService {
      *              caller's transaction so the grade and its trace commit together
      */
     public ThesisCouncilService(NamedParameterJdbcTemplate jdbc, AdminAuditRecorder audit) {
-        this(jdbc, audit, null);
+        this(jdbc, audit, null, new ThesisScopeRepository(jdbc), new ThesisGovernanceCapabilities(false));
     }
 
     @org.springframework.beans.factory.annotation.Autowired
     public ThesisCouncilService(NamedParameterJdbcTemplate jdbc, AdminAuditRecorder audit,
-            ThesisNotificationService notifier) {
+            ThesisNotificationService notifier, ThesisScopeRepository scope,
+            ThesisGovernanceCapabilities capabilities) {
         this.jdbc = jdbc;
+        this.scope = scope;
         this.audit = audit;
         this.notifier = notifier;
+        this.capabilities = capabilities;
     }
 
     // ---------- councils ----------
@@ -278,7 +291,7 @@ public class ThesisCouncilService {
                 params().addValue("topicId", topicId), "TOPIC_NOT_FOUND", "Thesis topic not found");
         // Binding a topic to a grading panel is outcome governance, not
         // supervision: the dean must own the topic's faculty.
-        ThesisDeanScope.requireTopicGovernanceScope(jdbc, actor, topicId);
+        ThesisDeanScope.requireTopicGovernanceScope(scope, actor, topicId);
         if (!"PUBLISHED".equals(topic.get("status")) && !"APPROVED".equals(topic.get("status"))) {
             throw conflict("TOPIC_NOT_PUBLISHED",
                     "Only a published topic can be assigned to a defense council");
@@ -436,7 +449,7 @@ public class ThesisCouncilService {
         if (ThesisDeanScope.isGlobalAdmin(actor) || !ThesisDeanScope.isFacultyHead(actor)) {
             return;
         }
-        String facultyId = ThesisDeanScope.facultyId(jdbc, actor);
+        String facultyId = ThesisDeanScope.facultyId(scope, actor);
         if (facultyId == null) {
             throw new DomainException(HttpStatus.FORBIDDEN, "FACULTY_PROFILE_REQUIRED",
                     "An active lecturer profile bound to the faculty head is required");
@@ -474,7 +487,7 @@ public class ThesisCouncilService {
         for (UUID assignedTopic : assigned) {
             // Restaffing the panel that grades a topic is governance on that
             // topic; the dean must own its faculty, not merely supervise it.
-            ThesisDeanScope.requireTopicGovernanceScope(jdbc, actor, assignedTopic);
+            ThesisDeanScope.requireTopicGovernanceScope(scope, actor, assignedTopic);
         }
     }
 
@@ -675,7 +688,7 @@ public class ThesisCouncilService {
                 params().addValue("topicId", topicId), "TOPIC_NOT_FOUND", "Thesis topic not found");
         // Naming the counter-reviewer is outcome governance: the dean must
         // own the topic's faculty, not merely supervise it.
-        ThesisDeanScope.requireTopicGovernanceScope(jdbc, actor, topicId);
+        ThesisDeanScope.requireTopicGovernanceScope(scope, actor, topicId);
         if (RoundStatus.CANCELLED.name().equals(topic.get("round_status"))
                 || RoundStatus.RESULTS_PUBLISHED.name().equals(topic.get("round_status"))) {
             throw conflict("ROUND_STATE_CONFLICT", "The round no longer accepts a counter-reviewer assignment");
@@ -860,7 +873,7 @@ public class ThesisCouncilService {
         // A dean caller is governance but stays faculty-bound: without this the
         // unconditional governance branch leaked foreign-faculty counter-review
         // scores and comments pre-publication.
-        ThesisDeanScope.requireTopicAccess(jdbc, actor, topicId);
+        ThesisDeanScope.requireTopicAccess(scope, actor, topicId);
         if (assigned == null) {
             throw new DomainException(HttpStatus.NOT_FOUND, "REVIEW_SCORE_NOT_FOUND",
                     "No counter-reviewer is assigned to this topic");
@@ -1068,7 +1081,7 @@ public class ThesisCouncilService {
         // detaching still needs the topic's own governance scope so a mixed
         // council cannot release foreign topics — or topics a foreign dean
         // merely supervises.
-        ThesisDeanScope.requireTopicGovernanceScope(jdbc, actor, topicId);
+        ThesisDeanScope.requireTopicGovernanceScope(scope, actor, topicId);
         if (!councilHasTopic(councilId, topicId)) {
             throw conflict("TOPIC_NOT_ASSIGNED", "This council has not been assigned the topic");
         }
@@ -1260,7 +1273,14 @@ public class ThesisCouncilService {
                 params().addValue("topicId", topicId), "TOPIC_NOT_FOUND", "Thesis topic not found");
         // A waiver is a governance outcome: supervising the topic — even as
         // a dean from another faculty — must not grant it.
-        ThesisDeanScope.requireTopicGovernanceScope(jdbc, actor, topicId);
+        ThesisDeanScope.requireTopicGovernanceScope(scope, actor, topicId);
+        // Every shipped round level is undergraduate: the counter-reviewer is
+        // always required, so the waiver is refused before any state check or
+        // write. A stored waiver stays revocable (see revokeCounterReviewWaiver).
+        if (!capabilities.counterReviewWaiverAllowed((String) topic.get("thesis_type"))) {
+            throw conflict("COUNTER_REVIEW_WAIVER_NOT_SUPPORTED",
+                    "This round type always requires a counter-reviewer");
+        }
         if (!TopicStatus.PUBLISHED.name().equals(topic.get("status"))
                 && !TopicStatus.APPROVED.name().equals(topic.get("status"))) {
             throw conflict("TOPIC_NOT_PUBLISHED", "Only published topics can waive a counter-review");
@@ -1338,7 +1358,7 @@ public class ThesisCouncilService {
                         + "JOIN thesis.thesis_registration_round r ON r.id = t.round_id "
                         + "WHERE t.id = :topicId FOR UPDATE OF t",
                 params().addValue("topicId", topicId), "TOPIC_NOT_FOUND", "Thesis topic not found");
-        ThesisDeanScope.requireTopicGovernanceScope(jdbc, actor, topicId);
+        ThesisDeanScope.requireTopicGovernanceScope(scope, actor, topicId);
         if (topic.get("gvpb_waived_reason") == null) {
             throw conflict("GVPB_NOT_WAIVED", "The counter-review requirement is not waived");
         }
@@ -1551,7 +1571,7 @@ public class ThesisCouncilService {
             // A dean reads unpublished scores only inside their faculty (or on
             // topics they supervise); the unconditional bypass let any dean
             // read foreign-faculty defense scores.
-            ThesisDeanScope.requireTopicAccess(jdbc, actor, topicId);
+            ThesisDeanScope.requireTopicAccess(scope, actor, topicId);
             return;
         }
         String lecturerId = normalize(actor == null ? null : actor.getClaimAsString("lecturerId"));
@@ -1807,30 +1827,4 @@ public class ThesisCouncilService {
     private static DomainException notFound(String code, String message) {
         return new DomainException(HttpStatus.NOT_FOUND, code, message);
     }
-
-    public record CouncilMember(String lecturerId, String memberRole) { }
-
-    public record CouncilResponse(
-            UUID id,
-            UUID roundId,
-            String name,
-            String status,
-            List<CouncilMember> members,
-            List<UUID> topicIds) { }
-
-    public record ScoreResponse(UUID topicId, String lecturerId, String component, BigDecimal score, String comment) { }
-
-    public record TopicResult(UUID topicId, BigDecimal finalScore, String finalizedBy, Instant finalizedAt, String status) { }
-
-    public record StudentResultRow(
-            UUID groupId,
-            String topicTitle,
-            BigDecimal finalScore,
-            String councilName,
-            String leaderStudentId,
-            String resultStatus,
-            String resultReason,
-            List<ScoreComment> comments) { }
-
-    public record ScoreComment(String component, String comment) { }
 }

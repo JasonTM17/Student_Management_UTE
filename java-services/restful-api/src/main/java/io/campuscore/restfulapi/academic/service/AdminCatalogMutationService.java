@@ -1,8 +1,8 @@
 package io.campuscore.restfulapi.academic.service;
 
-import io.campuscore.restfulapi.academic.registration.CreditLimitApplicationService;
-import io.campuscore.restfulapi.audit.AdminAuditRecorder;
-import io.campuscore.restfulapi.web.DomainException;
+import io.campuscore.restfulapi.academic.registration.service.CreditLimitApplicationService;
+import io.campuscore.restfulapi.audit.service.AdminAuditRecorder;
+import io.campuscore.restfulapi.exception.DomainException;
 import java.time.Instant;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -50,7 +50,7 @@ public class AdminCatalogMutationService {
     public AdminCatalogMutationService(NamedParameterJdbcTemplate jdbc,
             CreditLimitApplicationService creditLimitApplications) {
         this.jdbc = jdbc;
-        this.audit = new AdminAuditRecorder(jdbc);
+        this.audit = new AdminAuditRecorder(new io.campuscore.restfulapi.audit.repository.AdminAuditWriteRepository(jdbc));
         this.creditLimitApplications = creditLimitApplications;
     }
 

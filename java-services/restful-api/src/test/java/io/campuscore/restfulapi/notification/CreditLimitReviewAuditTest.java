@@ -11,10 +11,10 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
-import io.campuscore.restfulapi.academic.registration.CreditLimitApplicationDtos.Response;
-import io.campuscore.restfulapi.academic.registration.CreditLimitApplicationService;
-import io.campuscore.restfulapi.audit.AdminAuditRecorder;
-import io.campuscore.restfulapi.web.DomainException;
+import io.campuscore.restfulapi.academic.registration.dto.CreditLimitApplicationDtos.Response;
+import io.campuscore.restfulapi.academic.registration.service.CreditLimitApplicationService;
+import io.campuscore.restfulapi.audit.service.AdminAuditRecorder;
+import io.campuscore.restfulapi.exception.DomainException;
 import java.util.HashMap;
 import java.util.Map;
 import org.junit.jupiter.api.BeforeEach;

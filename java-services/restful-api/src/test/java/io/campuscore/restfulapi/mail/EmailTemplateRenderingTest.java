@@ -4,8 +4,8 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-import io.campuscore.restfulapi.mail.web.MailDtos.CourseItem;
-import io.campuscore.restfulapi.mail.web.MailDtos.GradeItem;
+import io.campuscore.restfulapi.mail.dto.MailDtos.CourseItem;
+import io.campuscore.restfulapi.mail.dto.MailDtos.GradeItem;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.util.HashMap;
