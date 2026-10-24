@@ -1,4 +1,4 @@
-package io.campuscore.restfulapi.web;
+package io.campuscore.restfulapi.exception.response;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.servlet.http.HttpServletRequest;

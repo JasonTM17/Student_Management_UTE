@@ -8,7 +8,7 @@ import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
-import io.campuscore.restfulapi.web.ApiErrorWriter;
+import io.campuscore.restfulapi.exception.response.ApiErrorWriter;
 import org.springframework.http.HttpStatus;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpMethod;

@@ -14,7 +14,7 @@ import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.campuscore.restfulapi.security.JsonBodyCapFilter;
 import io.campuscore.restfulapi.security.RequestIdFilter;
-import io.campuscore.restfulapi.web.ApiErrorWriter;
+import io.campuscore.restfulapi.exception.response.ApiErrorWriter;
 import io.campuscore.restfulapi.exception.handler.GlobalExceptionHandler;
 import jakarta.servlet.FilterChain;
 import jakarta.validation.Valid;

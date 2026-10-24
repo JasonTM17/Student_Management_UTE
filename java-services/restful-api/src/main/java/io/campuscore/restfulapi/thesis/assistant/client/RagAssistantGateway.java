@@ -11,7 +11,7 @@ import io.campuscore.restfulapi.thesis.assistant.controller.ThesisAssistantContr
 import io.campuscore.restfulapi.thesis.assistant.dto.ThesisAssistantDtos.ChatRequest;
 import io.campuscore.restfulapi.thesis.assistant.dto.ThesisAssistantDtos.ChatResponse;
 import io.campuscore.restfulapi.thesis.assistant.dto.ThesisAssistantDtos.FeedbackRequest;
-import io.campuscore.restfulapi.web.ApiExceptionHandler.ApiError;
+import io.campuscore.restfulapi.exception.response.ApiError;
 import io.campuscore.restfulapi.exception.DomainException;
 import java.io.BufferedReader;
 import java.io.IOException;

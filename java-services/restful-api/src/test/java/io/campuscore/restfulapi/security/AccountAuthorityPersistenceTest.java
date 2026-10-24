@@ -7,7 +7,7 @@ import static org.mockito.Mockito.verify;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.campuscore.restfulapi.auth.repository.AuthUserRepository;
-import io.campuscore.restfulapi.web.ApiErrorWriter;
+import io.campuscore.restfulapi.exception.response.ApiErrorWriter;
 import jakarta.servlet.FilterChain;
 import java.time.Instant;
 import java.util.List;
