@@ -331,6 +331,36 @@ class AcademicAttendanceMutationPersistenceTest {
     }
 
     @Test
+    void withdrawnStudentCannotBeMarked() throws Exception {
+        // After an approved withdrawal the enrollment is WITHDRAWN (letter W):
+        // no longer an attending seat, so the write path must refuse marks
+        // exactly like a dropped or never-enrolled student.
+        jdbc.update("UPDATE \"academic\".\"Enrollment\" SET \"status\" = 'WITHDRAWN'"
+                + " WHERE \"id\" = 'enroll-2'");
+
+        String payload = """
+                {
+                    "date": "2026-08-25",
+                    "records": [
+                        {"studentId": "student-2", "status": "ABSENT", "notes": null}
+                    ]
+                }
+                """;
+
+        mvc.perform(put("/api/v1/attendance/sections/section-1")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(payload)
+                        .with(lecturerJwt("lecturer-1")))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("STUDENT_NOT_ENROLLED"));
+
+        Integer written = jdbc.queryForObject(
+                "SELECT COUNT(*) FROM \"academic\".\"Attendance\" WHERE \"sectionId\" = 'section-1' AND \"studentId\" = 'student-2'",
+                Integer.class);
+        assertThat(written).isZero();
+    }
+
+    @Test
     void nonExistentSectionReturnsNotFound() throws Exception {
         String payload = """
                 {

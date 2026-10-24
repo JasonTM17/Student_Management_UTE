@@ -36,6 +36,7 @@ const menuItems = [
   { href: '/admin/assistant-knowledge', icon: BrainCircuit, tone: 'info' as const },
   { href: '/admin/appearance', icon: Palette, tone: 'success' as const },
   { href: '/admin/credit-limit-applications', icon: FileText, tone: 'info' as const },
+  { href: '/admin/withdrawal-applications', icon: FileText, tone: 'info' as const },
   { href: '/admin/academic-years', icon: CalendarDays, tone: 'neutral' as const },
   { href: '/admin/knowledge', icon: Database, tone: 'success' as const },
   { href: '/admin/editor', icon: FileEdit, tone: 'warning' as const },

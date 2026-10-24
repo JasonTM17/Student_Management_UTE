@@ -128,6 +128,22 @@ class AcademicCourseProgressIntegrityTest {
         assertThat(tied.letterGrade()).isEqualTo("B");
     }
 
+    @Test
+    void withdrawnCourseIsNotCurriculumProgress() {
+        // An approved withdrawal leaves status WITHDRAWN, published letter W:
+        // visible on the transcript but never a pass, so it must land on the
+        // same NOT_STARTED tier as a dropped or failed attempt.
+        insertEnrollment("enrollment-withdrawn", "WITHDRAWN", "PUBLISHED", null, "W");
+
+        CourseProgressRow withdrawn = reads.findCourseProgressByStudentId("student-1").stream()
+                .filter(row -> row.courseId().equals("course-withdrawn"))
+                .findFirst().orElseThrow();
+
+        assertThat(withdrawn.progressLevel()).as("a W row must not read as COMPLETED").isZero();
+        assertThat(withdrawn.letterGrade()).as("a W row has no passed letter").isNull();
+        assertThat(withdrawn.finalGrade()).isNull();
+    }
+
     private void insertEnrollment(
             String id, String status, String gradeStatus, String finalGrade, String letterGrade) {
         String courseCode = id.substring("enrollment-".length());

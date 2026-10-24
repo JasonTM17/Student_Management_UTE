@@ -121,6 +121,14 @@ async function mockRegistration(page: Page, options: FixtureOptions = {}) {
       '/api/v1/me/registration/eligibility': { eligible: true, creditLimit: 18, creditsUsed: 6, creditsRemaining: 12 },
       '/api/v1/me/registration/summary': { creditLimit: 18, creditsUsed: 6, creditsRemaining: 12 },
       '/api/v1/me/registration/credit-limit-application': null,
+      // The register page polls the withdrawal window and the caller's
+      // applications on mount; a closed window keeps the Withdraw action
+      // absent so these registration-UX cases see the same DOM as before.
+      '/api/v1/me/registration/withdrawal-window': {
+        semesterId: 'term-3', semesterName: 'Future term', regularSemester: true,
+        semesterOpen: false, windowStart: null, windowEnd: null, open: false,
+      },
+      '/api/v1/me/registration/withdrawal-applications': [],
       '/api/v1/me/registration/sections': [
         { id: knownSection.id, sectionNumber: knownSection.sectionNumber, courseId: 'course-mf101', courseCode: 'MF101', courseName: 'Mathematical Methods', credits: 3, capacity: 40, enrolledCount: 20, remainingSeats: 20, status: 'OPEN', alreadyEnrolled: !dropped, scheduleConflict: false, schedules: knownSection.schedules },
         { id: 'section-new', sectionNumber: 'NEW105-01', courseId: 'course-new', courseCode: 'NEW105', courseName: 'New registration', credits: 3, capacity: 40, enrolledCount: 20, remainingSeats: 20, status: 'OPEN', alreadyEnrolled: added, scheduleConflict: false, schedules: [{ dayOfWeek: 4, startTime: '10:00', endTime: '11:30' }] },

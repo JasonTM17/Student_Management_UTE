@@ -133,6 +133,15 @@ class AcademicAttendanceReadPersistenceTest {
                 .andExpect(jsonPath("$[1].student.user.firstName").value("Linh"))
                 .andExpect(jsonPath("$[2].student.user.firstName").value("Minh"));
 
+        mvc.perform(get("/api/v1/attendance/section/section-1")
+                        .queryParam("date", "2026-08-21")
+                        .with(lecturerJwt("lecturer-2")))
+                .andExpect(status().isForbidden());
+
+        mvc.perform(get("/api/v1/attendance/section/section-1/summary")
+                        .with(lecturerJwt("lecturer-2")))
+                .andExpect(status().isForbidden());
+
         mvc.perform(get("/api/v1/attendance/section/section-1/summary").with(adminJwt()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.sectionId").value("section-1"))
@@ -170,6 +179,32 @@ class AcademicAttendanceReadPersistenceTest {
         mvc.perform(get("/api/v1/attendance/section/section-1/roster")
                         .with(studentJwt("student-user-1", "student-1")))
                 .andExpect(status().isForbidden());
+
+        mvc.perform(get("/api/v1/attendance/section/section-1")
+                        .queryParam("date", "2026-08-21")
+                        .with(studentJwt("student-user-1", "student-1")))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void withdrawnEnrollmentsAreExcludedFromTheAttendanceRoster() throws Exception {
+        // An approved withdrawal leaves the enrollment WITHDRAWN (letter W):
+        // transcript history, never a markable seat. A withdrawn-only student
+        // must vanish from roll call, while a student who re-enrolled after
+        // withdrawing keeps the newest eligible (ENROLLED) row.
+        insertUser("student-user-withdrawn", "withdrawn@example.test", "Withdrawn", "Student");
+        insertStudent("student-withdrawn", "student-user-withdrawn", "S900");
+        insertEnrollment("enrollment-withdrawn", "student-withdrawn", "section-1", "semester-1", "WITHDRAWN");
+        insertEnrollment("enrollment-withdrawn-old", "student-1", "section-1", "semester-1", "WITHDRAWN");
+
+        for (var identity : List.of(lecturerJwt("lecturer-1"), adminJwt())) {
+            mvc.perform(get("/api/v1/attendance/section/section-1/roster").with(identity))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.length()").value(2))
+                    .andExpect(jsonPath("$[?(@.studentId == 'student-withdrawn')]").isEmpty())
+                    .andExpect(jsonPath("$[?(@.studentId == 'student-1')].enrollmentStatus")
+                            .value(org.hamcrest.Matchers.contains("ENROLLED")));
+        }
     }
 
     @Test

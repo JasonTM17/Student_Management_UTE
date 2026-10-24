@@ -885,8 +885,9 @@ public class AcademicReadRepository {
 
     /**
      * Best progress per course for a student: 2 = passed/completed, 1 = active
-     * enrollment, 0 = touched but not running (dropped/cancelled/failed).
-     * Numeric and letter grades come from the same best published passing attempt.
+     * enrollment, 0 = touched but not running (dropped/cancelled/withdrawn/
+     * failed). A published W is transcript history, not a pass. Numeric and
+     * letter grades come from the same best published passing attempt.
      */
     public List<CourseProgressRow> findCourseProgressByStudentId(String studentId) {
         return jdbc.query(
@@ -898,7 +899,7 @@ public class AcademicReadRepository {
                 ), progress AS (
                     SELECT "courseId" AS course_id,
                            MAX(CASE
-                               WHEN "gradeStatus" = 'PUBLISHED' AND "letterGrade" IS NOT NULL AND "letterGrade" <> 'F' THEN 2
+                               WHEN "gradeStatus" = 'PUBLISHED' AND "letterGrade" IS NOT NULL AND "letterGrade" NOT IN ('F', 'W') THEN 2
                                WHEN "status" IN ('ENROLLED', 'CONFIRMED', 'PENDING') THEN 1
                                ELSE 0 END) AS progress_level
                     FROM student_enrollments
@@ -909,7 +910,7 @@ public class AcademicReadRepository {
                                ORDER BY CASE WHEN "finalGrade" IS NULL THEN 1 ELSE 0 END,
                                         "finalGrade" DESC, "id" ASC) AS attempt_rank
                     FROM student_enrollments
-                    WHERE "gradeStatus" = 'PUBLISHED' AND "letterGrade" IS NOT NULL AND "letterGrade" <> 'F'
+                    WHERE "gradeStatus" = 'PUBLISHED' AND "letterGrade" IS NOT NULL AND "letterGrade" NOT IN ('F', 'W')
                 )
                 SELECT p.course_id, p.progress_level,
                        a."finalGrade" AS passed_grade, a."letterGrade" AS passed_letter

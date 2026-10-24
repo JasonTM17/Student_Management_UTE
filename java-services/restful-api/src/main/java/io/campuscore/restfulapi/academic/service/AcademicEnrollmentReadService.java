@@ -207,6 +207,12 @@ public class AcademicEnrollmentReadService {
     private static TranscriptSummary summarizeBestAttempts(List<GradeSummary> grades) {
         Map<String, GradeSummary> bestAttemptByCourse = new LinkedHashMap<>();
         for (GradeSummary grade : grades) {
+            // A W attempt is transcript history, never a best attempt: it
+            // must not displace a real attempt or fill the map for a course
+            // whose only outcome is a withdrawal.
+            if (isWithdrawnAttempt(grade)) {
+                continue;
+            }
             String courseKey = grade.courseCode() != null && !grade.courseCode().isBlank()
                     ? grade.courseCode() : grade.id();
             GradeSummary existing = bestAttemptByCourse.get(courseKey);
@@ -607,6 +613,10 @@ public class AcademicEnrollmentReadService {
             return isHigherFinalGrade(candidate, current);
         }
         return false;
+    }
+
+    private static boolean isWithdrawnAttempt(GradeSummary grade) {
+        return "W".equals(grade.letterGrade()) || "WITHDRAWN".equals(grade.enrollmentStatus());
     }
 
     private static boolean isPassed(GradeSummary grade, BigDecimal point) {

@@ -18,12 +18,16 @@ import { useRequireAuth } from '@/context/AuthContext';
 import { enrollmentsApi, registrationApi, semestersApi } from '@/lib/api';
 import { STATIC_STALE_TIME_MS, useApiQuery } from '@/lib/query';
 import { hasCsrfSessionHint } from '@/lib/session-hint';
-import { isActiveEnrollment, isCancelledSection } from '@/lib/enrollment-status';
 import { getLocalizedName } from '@/lib/academic-content';
 import { pickPreferredSemesterId } from '@/lib/semesters';
+import { deriveStudentDashboardMetrics } from '@/lib/student-dashboard-metrics';
 import { WorkspaceForbiddenState } from '@/components/ProtectedRoute';
 import { LinkButton } from '@/components/ui/link-button';
 import { LocalizedLink } from '@/components/LocalizedLink';
+import {
+  StudentDashboardCreditProgress,
+  StudentDashboardMetricCards,
+} from '@/components/dashboard/StudentDashboardMetrics';
 import { PageHeader, SectionEyebrow } from '@/components/ui/page-header';
 import { metricToneClass } from '@/components/ui/status';
 import { EmptyState, ErrorState, LoadingState } from '@/components/ui/state-block';
@@ -249,23 +253,10 @@ export default function DashboardPage() {
 
   // Seat accounting mirrors the backend: PENDING rows occupy a seat and count
   // toward the credit cap exactly like ENROLLED ones (lib/enrollment-status).
-  const activeCourses = enrollments.filter((enrollment) =>
-    isActiveEnrollment(enrollment.status) && !isCancelledSection(enrollment),
-  );
-  const pendingCourses = enrollments.filter(
-    (enrollment) => enrollment.status === 'PENDING' && !isCancelledSection(enrollment),
-  );
+  const dashboardMetrics = deriveStudentDashboardMetrics(enrollments, termCreditCap);
+  const activeCourses = dashboardMetrics.activeCourses;
+  const pendingCourses = dashboardMetrics.pendingCourses;
   const highlightedCourses = activeCourses.slice(0, 3);
-
-  const activeCredits = activeCourses.reduce(
-    (sum, enrollment) => sum + (enrollment.section?.course?.credits ?? 0),
-    0,
-  );
-  const creditCap = termCreditCap;
-  const creditPercent = creditCap
-    ? Math.min(100, Math.round((activeCredits / creditCap) * 100))
-    : null;
-  const creditRemaining = creditCap ? Math.max(0, creditCap - activeCredits) : null;
 
   // Next class meetings derived from active sections.
   // DB schedule.dayOfWeek: 1=Sunday, 2=Monday, ..., 7=Saturday (0=Sunday).
@@ -307,30 +298,21 @@ export default function DashboardPage() {
       ? { 1: 'T2', 2: 'T3', 3: 'T4', 4: 'T5', 5: 'T6', 6: 'T7', 7: 'CN' }
       : { 1: 'Mon', 2: 'Tue', 3: 'Wed', 4: 'Thu', 5: 'Fri', 6: 'Sat', 7: 'Sun' };
 
-  const enrollmentStatusLabel = (status: string) =>
-    messages.common.statuses[status as keyof typeof messages.common.statuses] ??
-    messages.common.statuses.UNKNOWN;
-
   const statChips = [
     {
       label: copy.stats.courses,
-      // Live registrations only: dropped/cancelled rows from add/drop
-      // experiments must not inflate the term count (PENDING included —
-      // activeCourses follows the seat-accounting definition).
+      // Count live seat requests (including PENDING), but not dropped rows.
       value: formatNumber(activeCourses.length),
       icon: BookOpen,
       tone: metricToneClass('info'),
       href: '/dashboard/enrollments',
       tooltip: locale === 'vi' ? 'Xem danh sách học phần' : 'View enrolled courses',
-      // Numeric chips are short by construction and may stay single-line.
       wraps: false,
     },
     {
-      // "Active" is the subset that has actually been enrolled — confirmed
-      // seats only. Counting activeCourses here would duplicate the term
-      // chip above and silently promote PENDING requests to active status.
       label: copy.stats.active,
-      value: formatNumber(enrollments.filter((enrollment) => enrollment.status === 'ENROLLED' && !isCancelledSection(enrollment)).length),
+      // Pending seats count toward the term total, not confirmed enrollment.
+      value: formatNumber(dashboardMetrics.enrolledCourseCount),
       icon: GraduationCap,
       tone: metricToneClass('success'),
       href: '/dashboard/enrollments',
@@ -348,10 +330,7 @@ export default function DashboardPage() {
     },
     {
       label: copy.stats.term,
-      // The semester name is authored data ('Học kỳ 1 năm học 2026-2027' and
-      // longer). `truncate` turned it into "Học kỳ 1 n…" in the 4-column
-      // desktop grid, so this chip wraps instead; the three-line clamp keeps
-      // an arbitrarily long import from stretching the row.
+      // Semester names are authored data and wrap in the four-card grid.
       value: currentSemesterName,
       icon: Calendar,
       tone: metricToneClass('neutral'),
@@ -360,6 +339,10 @@ export default function DashboardPage() {
       wraps: true,
     },
   ];
+
+  const enrollmentStatusLabel = (status: string) =>
+    messages.common.statuses[status as keyof typeof messages.common.statuses] ??
+    messages.common.statuses.UNKNOWN;
 
   if (authLoading) {
     return <LoadingState label={messages.studentDashboard.errors.loading} />;
@@ -402,54 +385,9 @@ export default function DashboardPage() {
         <LoadingState label={messages.studentDashboard.errors.loading} />
       ) : (
         <>
-          <div
-            data-dashboard-metrics="student-overview"
-            className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4"
-          >
-            {statChips.map((chip) => (
-              <LocalizedLink
-                key={chip.label}
-                href={chip.href}
-                title={chip.tooltip}
-                className="group relative flex min-w-0 items-center justify-between gap-3 rounded-xl border border-border/70 bg-card p-3.5 shadow-xs transition-all duration-200 hover:-translate-y-0.5 hover:border-primary/50 hover:bg-muted/30 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring cursor-pointer"
-              >
-                <div className="flex min-w-0 items-center gap-3">
-                  <span
-                    className={cn(
-                      'flex h-10 w-10 shrink-0 items-center justify-center rounded-lg transition-transform duration-200 group-hover:scale-105',
-                      chip.tone,
-                    )}
-                  >
-                    <chip.icon className="h-5 w-5" />
-                  </span>
-                  <div className="min-w-0">
-                    <div
-                      className={cn(
-                        'font-bold leading-6 text-foreground group-hover:text-primary transition-colors',
-                        chip.wraps
-                          ? // Authored names wrap instead of being clipped
-                            // mid-word by `truncate`; three lines clears the
-                            // seeded Vietnamese names down to the tightest
-                            // 4-column desktop card (~121px of text column).
-                            'line-clamp-3 break-words text-lg'
-                          : 'truncate text-xl',
-                      )}
-                      title={chip.value}
-                    >
-                      {chip.value}
-                    </div>
-                    <div
-                      className="truncate text-xs font-medium text-muted-foreground"
-                      title={chip.label}
-                    >
-                      {chip.label}
-                    </div>
-                  </div>
-                </div>
-                <ArrowRight className="h-4 w-4 shrink-0 text-muted-foreground/40 opacity-0 transition-all duration-200 group-hover:translate-x-0.5 group-hover:text-primary group-hover:opacity-100" />
-              </LocalizedLink>
-            ))}
-          </div>
+          <StudentDashboardMetricCards
+            chips={statChips}
+          />
 
           <div className="grid gap-6 xl:grid-cols-[1.15fr_0.85fr]">
             <WorkspacePanel
@@ -545,37 +483,19 @@ export default function DashboardPage() {
               )}
             </WorkspacePanel>
 
-            <WorkspacePanel title={copy.progressTitle} contentClassName="space-y-3.5">
-              <div className="flex items-center justify-between gap-2 text-sm">
-                <span className="font-medium text-foreground">{copy.creditLabel}</span>
-                <span className="font-semibold tabular-nums text-foreground">
-                  {formatNumber(activeCredits)}{creditCap ? ` / ${formatNumber(creditCap)}` : ''}
-                </span>
-              </div>
-              <div className="h-2.5 w-full overflow-hidden rounded-full bg-secondary">
-                <div
-                  className="h-full rounded-full bg-primary transition-all duration-300"
-                  style={{ width: `${creditPercent ?? 0}%` }}
-                />
-              </div>
-              <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-muted-foreground pt-0.5">
-                <span>{creditPercent === null ? copy.creditsEarnedOnly : copy.progressStatus(creditPercent)}</span>
-                {creditRemaining !== null ? (
-                  <span className="font-medium text-foreground/80">
-                    {creditRemaining > 0
-                      ? copy.creditsAvailable(creditRemaining)
-                      : copy.creditsCapped}
-                  </span>
-                ) : null}
-              </div>
-              {pendingCourses.length > 0 ? (
-                <div className="pt-0.5">
-                  <span className="inline-flex items-center gap-1.5 rounded-md border border-status-warning/30 bg-status-warning/10 px-2.5 py-1 text-xs font-semibold text-status-warning-foreground">
-                    {copy.pendingBadge(formatNumber(pendingCourses.length))}
-                  </span>
-                </div>
-              ) : null}
-            </WorkspacePanel>
+            <StudentDashboardCreditProgress
+              metrics={dashboardMetrics}
+              formatNumber={formatNumber}
+              copy={{
+                title: copy.progressTitle,
+                creditLabel: copy.creditLabel,
+                creditsEarnedOnly: copy.creditsEarnedOnly,
+                progressStatus: copy.progressStatus,
+                creditsAvailable: copy.creditsAvailable,
+                creditsCapped: copy.creditsCapped,
+                pendingBadge: copy.pendingBadge,
+              }}
+            />
           </div>
 
           <WorkspacePanel

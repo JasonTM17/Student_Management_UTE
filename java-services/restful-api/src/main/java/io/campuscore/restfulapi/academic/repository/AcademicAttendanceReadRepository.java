@@ -1,6 +1,7 @@
 package io.campuscore.restfulapi.academic.repository;
 
 import io.campuscore.restfulapi.academic.model.AttendanceRow;
+import io.campuscore.restfulapi.academic.model.EnrollmentStatuses;
 import io.campuscore.restfulapi.academic.model.RosterRow;
 import io.campuscore.restfulapi.academic.model.SectionSummaryRow;
 import io.campuscore.restfulapi.academic.model.StudentSummaryRow;
@@ -141,10 +142,11 @@ public class AcademicAttendanceReadRepository {
     }
 
     /**
-     * Attendance roster uses the write path's markable predicate: every
-     * enrollment except DROPPED/CANCELLED. The grading read model deliberately
+     * Attendance roster uses the write path's markable predicate: the shared
+     * active-enrollment statuses. The grading read model deliberately
      * excludes PENDING (publishing completeness), but a still-pending
      * enrollment is an actively attending student who must be markable.
+     * WITHDRAWN is not markable — an approved withdrawal releases the seat.
      * Historical/repeated enrollments must not duplicate a student in roll
      * call, its counts or exports. Use the latest eligible row for status;
      * enrollment and attendance history remain unchanged.
@@ -161,7 +163,7 @@ public class AcademicAttendanceReadRepository {
                         + " ORDER BY \"enrolledAt\" DESC, \"id\" DESC) AS roster_rank"
                         + " FROM " + ENROLLMENT
                         + " WHERE \"sectionId\" = :sectionId"
-                        + " AND \"status\" NOT IN ('DROPPED', 'CANCELLED')) enrollment"
+                        + " AND \"status\" IN " + EnrollmentStatuses.ACTIVE_STATUS_PREDICATE + ") enrollment"
                         + " JOIN " + STUDENT + " student ON student.\"id\" = enrollment.\"studentId\""
                         + " JOIN " + USER + " student_user ON student_user.\"id\" = student.\"userId\""
                         + " WHERE enrollment.roster_rank = 1"

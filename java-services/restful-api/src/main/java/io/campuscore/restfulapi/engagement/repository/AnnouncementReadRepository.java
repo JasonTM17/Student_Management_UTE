@@ -1,5 +1,6 @@
 package io.campuscore.restfulapi.engagement.repository;
 
+import io.campuscore.restfulapi.academic.model.EnrollmentStatuses;
 import io.campuscore.restfulapi.common.util.LikePattern;
 import io.campuscore.restfulapi.engagement.model.AnnouncementFilter;
 import io.campuscore.restfulapi.engagement.model.UserVisibility;
@@ -290,12 +291,14 @@ public class AnnouncementReadRepository {
             // restriction, but the reader previously ignored "sectionId"
             // entirely, so every section-scoped notice was visible to the whole
             // role/year cohort. The predicate only narrows notices that name a
-            // section, and DROPPED/CANCELLED rows do not count as enrolled —
-            // the same rule AcademicMutationService uses for credit load.
+            // section, and only the shared active-enrollment statuses count as
+            // enrolled — WITHDRAWN released the seat, same as the credit-load
+            // rule AcademicMutationService uses.
             conditions.add("(\"sectionId\" IS NULL OR \"sectionId\" IN ("
                     + "SELECT enrollment.\"sectionId\" FROM academic.\"Enrollment\" enrollment"
                     + " WHERE enrollment.\"studentId\" = :viewerStudentId"
-                    + " AND enrollment.\"status\" NOT IN ('DROPPED', 'CANCELLED')))");
+                    + " AND enrollment.\"status\" IN "
+                    + EnrollmentStatuses.ACTIVE_STATUS_PREDICATE + "))");
             parameters.addValue("viewerStudentId", visibility.studentId());
         }
 
