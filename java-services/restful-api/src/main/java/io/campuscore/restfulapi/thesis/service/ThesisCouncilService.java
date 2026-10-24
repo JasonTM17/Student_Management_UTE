@@ -1,9 +1,9 @@
 package io.campuscore.restfulapi.thesis.service;
 
 import io.campuscore.restfulapi.audit.service.AdminAuditRecorder;
-import io.campuscore.restfulapi.thesis.domain.RoundStatus;
-import io.campuscore.restfulapi.thesis.domain.RoundType;
-import io.campuscore.restfulapi.thesis.domain.TopicStatus;
+import io.campuscore.restfulapi.thesis.model.RoundStatus;
+import io.campuscore.restfulapi.thesis.model.RoundType;
+import io.campuscore.restfulapi.thesis.model.TopicStatus;
 import io.campuscore.restfulapi.exception.DomainException;
 import io.campuscore.restfulapi.thesis.dto.CouncilMember;
 import io.campuscore.restfulapi.thesis.dto.CouncilResponse;

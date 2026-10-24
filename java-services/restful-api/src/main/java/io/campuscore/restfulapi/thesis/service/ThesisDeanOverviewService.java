@@ -79,7 +79,7 @@ public class ThesisDeanOverviewService {
             // A cancelled group is a historical row, not active work: it stays
             // in overview.groups but never enters the pending/member/department
             // or supervisor counters.
-            if (group.status() == io.campuscore.restfulapi.thesis.domain.GroupStatus.CANCELLED) {
+            if (group.status() == io.campuscore.restfulapi.thesis.model.GroupStatus.CANCELLED) {
                 continue;
             }
             switch (group.approvalStatus()) {
@@ -112,7 +112,7 @@ public class ThesisDeanOverviewService {
         for (DeanGroup group : groups) {
             // Cancelled groups keep their supervisors historically, but they
             // hold no active workload.
-            if (group.status() == io.campuscore.restfulapi.thesis.domain.GroupStatus.CANCELLED) {
+            if (group.status() == io.campuscore.restfulapi.thesis.model.GroupStatus.CANCELLED) {
                 continue;
             }
             for (DeanSupervisor supervisor : group.supervisors()) {

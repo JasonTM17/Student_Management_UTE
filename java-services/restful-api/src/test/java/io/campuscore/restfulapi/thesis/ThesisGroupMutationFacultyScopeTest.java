@@ -7,7 +7,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import io.campuscore.restfulapi.thesis.service.ThesisMutationService;
 import io.campuscore.restfulapi.thesis.dto.ThesisMutationDtos.ProgressRequest;
-import io.campuscore.restfulapi.thesis.domain.GroupStatus;
+import io.campuscore.restfulapi.thesis.model.GroupStatus;
 import io.campuscore.restfulapi.exception.DomainException;
 import java.sql.Timestamp;
 import java.time.Instant;

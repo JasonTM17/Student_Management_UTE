@@ -1,13 +1,13 @@
 package io.campuscore.restfulapi.thesis.service;
 
 import io.campuscore.restfulapi.audit.service.AdminAuditRecorder;
-import io.campuscore.restfulapi.thesis.domain.ApprovalStatus;
-import io.campuscore.restfulapi.thesis.domain.GroupStatus;
-import io.campuscore.restfulapi.thesis.domain.LecturerScope;
-import io.campuscore.restfulapi.thesis.domain.RoundStatus;
-import io.campuscore.restfulapi.thesis.domain.RoundType;
-import io.campuscore.restfulapi.thesis.domain.ThesisTopic;
-import io.campuscore.restfulapi.thesis.domain.TopicStatus;
+import io.campuscore.restfulapi.thesis.model.ApprovalStatus;
+import io.campuscore.restfulapi.thesis.model.GroupStatus;
+import io.campuscore.restfulapi.thesis.model.LecturerScope;
+import io.campuscore.restfulapi.thesis.model.RoundStatus;
+import io.campuscore.restfulapi.thesis.model.RoundType;
+import io.campuscore.restfulapi.thesis.entity.ThesisTopic;
+import io.campuscore.restfulapi.thesis.model.TopicStatus;
 import io.campuscore.restfulapi.thesis.repository.ThesisGroupReadRepository;
 import io.campuscore.restfulapi.thesis.repository.ThesisRegistrationRoundRepository;
 import io.campuscore.restfulapi.thesis.repository.ThesisRoundReadPort;

@@ -1,4 +1,4 @@
-package io.campuscore.restfulapi.thesis.domain;
+package io.campuscore.restfulapi.thesis.model;
 
 /**
  * Round lifecycle, ordered to match the course brief's two phases: lecturers

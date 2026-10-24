@@ -9,7 +9,7 @@ import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
-import io.campuscore.restfulapi.thesis.domain.ThesisTopic;
+import io.campuscore.restfulapi.thesis.entity.ThesisTopic;
 import io.campuscore.restfulapi.thesis.dto.SupervisorRow;
 import io.campuscore.restfulapi.thesis.repository.ThesisTopicRepository;
 import io.campuscore.restfulapi.thesis.service.ThesisSupervisorService;

@@ -1,8 +1,8 @@
 package io.campuscore.restfulapi.thesis.dto;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
-import io.campuscore.restfulapi.thesis.domain.ApprovalStatus;
-import io.campuscore.restfulapi.thesis.domain.GroupStatus;
+import io.campuscore.restfulapi.thesis.model.ApprovalStatus;
+import io.campuscore.restfulapi.thesis.model.GroupStatus;
 import java.time.Instant;
 import java.util.List;
 import java.util.UUID;

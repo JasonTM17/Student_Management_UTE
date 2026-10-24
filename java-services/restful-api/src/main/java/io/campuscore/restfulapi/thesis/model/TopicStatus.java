@@ -1,4 +1,4 @@
-package io.campuscore.restfulapi.thesis.domain;
+package io.campuscore.restfulapi.thesis.model;
 
 public enum TopicStatus {
     DRAFT,

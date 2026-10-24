@@ -1,5 +1,6 @@
-package io.campuscore.restfulapi.thesis.domain;
+package io.campuscore.restfulapi.thesis.entity;
 
+import io.campuscore.restfulapi.thesis.model.RoundStatus;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
