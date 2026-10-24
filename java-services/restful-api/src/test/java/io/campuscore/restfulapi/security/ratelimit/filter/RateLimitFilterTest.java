@@ -1,4 +1,4 @@
-package io.campuscore.restfulapi.security.ratelimit;
+package io.campuscore.restfulapi.security.ratelimit.filter;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -9,6 +9,9 @@ import static org.mockito.Mockito.verify;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.campuscore.restfulapi.exception.response.ApiErrorWriter;
+import io.campuscore.restfulapi.security.ratelimit.properties.RateLimitProperties;
+import io.campuscore.restfulapi.security.ratelimit.service.ClientIpResolver;
+import io.campuscore.restfulapi.security.ratelimit.service.RateLimiterService;
 import jakarta.servlet.FilterChain;
 import java.util.List;
 import org.junit.jupiter.api.BeforeEach;

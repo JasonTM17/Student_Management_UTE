@@ -1,4 +1,4 @@
-package io.campuscore.restfulapi.security.ratelimit;
+package io.campuscore.restfulapi.security.ratelimit.model;
 
 /**
  * Defines semantic categories of mutating POST APIs and their default rate limits.

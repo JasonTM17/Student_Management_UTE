@@ -1,5 +1,6 @@
-package io.campuscore.restfulapi.security.ratelimit;
+package io.campuscore.restfulapi.security.ratelimit.service;
 
+import io.campuscore.restfulapi.security.ratelimit.model.RateLimitResult;
 import java.time.Clock;
 import java.util.ArrayDeque;
 import java.util.Deque;

@@ -1,4 +1,4 @@
-package io.campuscore.restfulapi.security;
+package io.campuscore.restfulapi.security.model;
 
 import java.util.List;
 

@@ -223,7 +223,7 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ErrorResponse> handleUnhandledException(Exception exception, HttpServletRequest request) {
-        Object requestId = request.getAttribute(io.campuscore.restfulapi.security.RequestIdFilter.ATTRIBUTE);
+        Object requestId = request.getAttribute(io.campuscore.restfulapi.security.filter.RequestIdFilter.ATTRIBUTE);
         LOGGER.error("Unhandled internal server exception at {} (requestId: {})",
                 request.getRequestURI(), requestId, exception);
         return buildErrorResponse(
@@ -250,7 +250,7 @@ public class GlobalExceptionHandler {
             HttpServletRequest request,
             Map<String, String> fields,
             Map<String, Object> details) {
-        Object requestId = request.getAttribute(io.campuscore.restfulapi.security.RequestIdFilter.ATTRIBUTE);
+        Object requestId = request.getAttribute(io.campuscore.restfulapi.security.filter.RequestIdFilter.ATTRIBUTE);
         ErrorResponse body = new ErrorResponse(
                 Instant.now(),
                 status.value(),

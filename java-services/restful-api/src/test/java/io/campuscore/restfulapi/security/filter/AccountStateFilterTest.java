@@ -1,4 +1,4 @@
-package io.campuscore.restfulapi.security;
+package io.campuscore.restfulapi.security.filter;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -11,6 +11,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import io.campuscore.restfulapi.auth.model.AccountAuthorization;
 import io.campuscore.restfulapi.auth.repository.AuthUserRepository;
 import io.campuscore.restfulapi.exception.response.ApiErrorWriter;
+import io.campuscore.restfulapi.security.availability.DatabaseAvailabilityTracker;
 import jakarta.servlet.FilterChain;
 import java.time.Instant;
 import java.util.Collections;

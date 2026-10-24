@@ -1,4 +1,4 @@
-package io.campuscore.restfulapi.security.ratelimit;
+package io.campuscore.restfulapi.security.ratelimit.model;
 
 /**
  * Value object holding the outcome of a rate limit check.

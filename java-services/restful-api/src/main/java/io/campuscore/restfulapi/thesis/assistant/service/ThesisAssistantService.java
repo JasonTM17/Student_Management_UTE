@@ -854,7 +854,7 @@ public class ThesisAssistantService {
         // A stopped database fails retrieval slower than every layered timeout
         // (gateway 15s > local budget 5s > Hikari 15s), so the outage must be
         // recognised BEFORE any retrieval attempt: the tracker already knows.
-        if (io.campuscore.restfulapi.security.DatabaseAvailabilityTracker.isRecentlyUnavailable()) {
+        if (io.campuscore.restfulapi.security.availability.DatabaseAvailabilityTracker.isRecentlyUnavailable()) {
             return knowledgeUnavailableResponse(locale, null);
         }
         ChatResponse lexical;

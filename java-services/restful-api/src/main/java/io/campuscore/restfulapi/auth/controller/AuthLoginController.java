@@ -4,7 +4,7 @@ import io.campuscore.restfulapi.auth.service.AuthLoginService;
 import io.campuscore.restfulapi.auth.model.LoginResult;
 import io.campuscore.restfulapi.auth.service.PasswordResetRequestDispatcher;
 import io.campuscore.restfulapi.auth.service.PasswordResetService;
-import io.campuscore.restfulapi.security.ratelimit.ClientIpResolver;
+import io.campuscore.restfulapi.security.ratelimit.service.ClientIpResolver;
 import io.campuscore.restfulapi.auth.dto.AuthDtos.AuthUserResponse;
 import io.campuscore.restfulapi.auth.dto.AuthDtos.ChangePasswordRequest;
 import io.campuscore.restfulapi.auth.dto.AuthDtos.ChangePasswordResponse;

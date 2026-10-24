@@ -1,4 +1,4 @@
-package io.campuscore.restfulapi.security;
+package io.campuscore.restfulapi.security.filter;
 
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;

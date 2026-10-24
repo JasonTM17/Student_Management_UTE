@@ -540,7 +540,7 @@ class RbacAndApiErrorSecurityChallengeTest {
 
             for (HttpStatus testStatus : testStatuses) {
                 MockHttpServletRequest request = new MockHttpServletRequest("GET", "/api/v1/probe");
-                request.setAttribute(io.campuscore.restfulapi.security.RequestIdFilter.ATTRIBUTE, "req-test-99");
+                request.setAttribute(io.campuscore.restfulapi.security.filter.RequestIdFilter.ATTRIBUTE, "req-test-99");
                 MockHttpServletResponse response = new MockHttpServletResponse();
 
                 writer.write(request, response, testStatus, "TEST_ERR", "Test error message");

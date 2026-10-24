@@ -1,8 +1,9 @@
-package io.campuscore.restfulapi.security;
+package io.campuscore.restfulapi.security.token;
 
 import com.nimbusds.jose.jwk.source.ImmutableSecret;
 import io.campuscore.restfulapi.auth.model.IssuedAccessToken;
 import io.campuscore.restfulapi.auth.model.IssuedRefreshToken;
+import io.campuscore.restfulapi.security.model.AuthPrincipal;
 import java.nio.charset.StandardCharsets;
 import java.time.Clock;
 import java.time.Duration;

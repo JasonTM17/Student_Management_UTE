@@ -1,4 +1,4 @@
-package io.campuscore.restfulapi.security;
+package io.campuscore.restfulapi.security.config;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;

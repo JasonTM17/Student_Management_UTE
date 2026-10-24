@@ -1,8 +1,9 @@
-package io.campuscore.restfulapi.security;
+package io.campuscore.restfulapi.security.filter;
 
 import io.campuscore.restfulapi.auth.model.AccountAuthorization;
 import io.campuscore.restfulapi.auth.repository.AuthUserRepository;
 import io.campuscore.restfulapi.exception.response.ApiErrorWriter;
+import io.campuscore.restfulapi.security.availability.DatabaseAvailabilityTracker;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;

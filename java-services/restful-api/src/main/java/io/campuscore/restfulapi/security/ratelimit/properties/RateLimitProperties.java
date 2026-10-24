@@ -1,4 +1,4 @@
-package io.campuscore.restfulapi.security.ratelimit;
+package io.campuscore.restfulapi.security.ratelimit.properties;
 
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;

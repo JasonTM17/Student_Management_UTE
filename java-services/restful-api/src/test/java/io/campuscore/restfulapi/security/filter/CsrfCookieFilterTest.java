@@ -1,4 +1,4 @@
-package io.campuscore.restfulapi.security;
+package io.campuscore.restfulapi.security.filter;
 
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;

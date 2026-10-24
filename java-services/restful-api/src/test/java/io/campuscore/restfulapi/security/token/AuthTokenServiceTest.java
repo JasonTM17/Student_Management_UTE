@@ -1,4 +1,4 @@
-package io.campuscore.restfulapi.security;
+package io.campuscore.restfulapi.security.token;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -6,6 +6,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import io.campuscore.restfulapi.auth.model.IssuedAccessToken;
 import io.campuscore.restfulapi.auth.model.IssuedRefreshToken;
+import io.campuscore.restfulapi.security.config.SecurityConfig;
+import io.campuscore.restfulapi.security.model.AuthPrincipal;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
