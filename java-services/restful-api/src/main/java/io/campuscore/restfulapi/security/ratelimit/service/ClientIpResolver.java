@@ -1,5 +1,6 @@
-package io.campuscore.restfulapi.security.ratelimit;
+package io.campuscore.restfulapi.security.ratelimit.service;
 
+import io.campuscore.restfulapi.security.ratelimit.properties.RateLimitProperties;
 import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.stereotype.Component;
 

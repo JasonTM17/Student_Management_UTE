@@ -1,5 +1,6 @@
-package io.campuscore.restfulapi.security.ratelimit;
+package io.campuscore.restfulapi.security.ratelimit.annotation;
 
+import io.campuscore.restfulapi.security.ratelimit.model.RateLimitCategory;
 import java.lang.annotation.Documented;
 import java.lang.annotation.ElementType;
 import java.lang.annotation.Retention;

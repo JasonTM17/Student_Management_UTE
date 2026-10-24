@@ -12,8 +12,8 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import io.campuscore.restfulapi.security.JsonBodyCapFilter;
-import io.campuscore.restfulapi.security.RequestIdFilter;
+import io.campuscore.restfulapi.security.filter.JsonBodyCapFilter;
+import io.campuscore.restfulapi.security.filter.RequestIdFilter;
 import io.campuscore.restfulapi.exception.response.ApiErrorWriter;
 import io.campuscore.restfulapi.exception.code.ErrorCode;
 import io.campuscore.restfulapi.exception.handler.GlobalExceptionHandler;

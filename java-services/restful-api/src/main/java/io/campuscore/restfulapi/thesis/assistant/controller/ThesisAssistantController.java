@@ -24,7 +24,7 @@ import io.campuscore.restfulapi.thesis.assistant.model.PersonalTurn;
 import io.campuscore.restfulapi.thesis.assistant.model.RemotePage;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
-import io.campuscore.restfulapi.security.DatabaseAvailabilityTracker;
+import io.campuscore.restfulapi.security.availability.DatabaseAvailabilityTracker;
 import org.springframework.dao.DataAccessException;
 import jakarta.validation.Valid;
 import java.util.List;

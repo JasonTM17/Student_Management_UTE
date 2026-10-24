@@ -20,7 +20,7 @@ class ApiErrorWriterTest {
         ApiErrorWriter writer = new ApiErrorWriter(mapper);
 
         MockHttpServletRequest request = new MockHttpServletRequest("GET", "/api/v1/test/resource");
-        request.setAttribute(io.campuscore.restfulapi.security.RequestIdFilter.ATTRIBUTE, "req-12345");
+        request.setAttribute(io.campuscore.restfulapi.security.filter.RequestIdFilter.ATTRIBUTE, "req-12345");
         MockHttpServletResponse response = new MockHttpServletResponse();
 
         writer.write(request, response, HttpStatus.UNAUTHORIZED, "UNAUTHORIZED", "Authentication required");

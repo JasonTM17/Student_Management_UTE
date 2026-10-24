@@ -1,4 +1,4 @@
-package io.campuscore.restfulapi.security;
+package io.campuscore.restfulapi.security.token;
 
 import java.util.Locale;
 import java.util.Set;
@@ -55,7 +55,7 @@ public final class JwtSecretPolicy {
      * @throws IllegalStateException when the secret is missing, too short, or a
      *                               known default while {@code strict} is set
      */
-    static void enforce(String variable, String secret, boolean strict) {
+    public static void enforce(String variable, String secret, boolean strict) {
         if (secret == null || secret.length() < MINIMUM_LENGTH) {
             throw new IllegalStateException(variable + " must contain at least " + MINIMUM_LENGTH + " characters");
         }
@@ -83,7 +83,7 @@ public final class JwtSecretPolicy {
      * both variables gets a loud warning (or, in strict mode, a refused boot)
      * instead of silence.
      */
-    static void enforceDistinct(
+    public static void enforceDistinct(
             String accessVariable, String accessSecret, String refreshVariable, String refreshSecret, boolean strict) {
         if (accessSecret == null || accessSecret.isBlank()) {
             return; // A missing or blank secret is reported by enforce() instead.

@@ -1,4 +1,4 @@
-package io.campuscore.restfulapi.security;
+package io.campuscore.restfulapi.security.availability;
 
 import java.util.concurrent.atomic.AtomicLong;
 

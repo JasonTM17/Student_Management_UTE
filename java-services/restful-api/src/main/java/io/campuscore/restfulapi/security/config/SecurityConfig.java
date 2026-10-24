@@ -1,7 +1,11 @@
-package io.campuscore.restfulapi.security;
+package io.campuscore.restfulapi.security.config;
 
 import com.nimbusds.jose.jwk.source.ImmutableSecret;
 import io.campuscore.restfulapi.exception.response.ApiErrorWriter;
+import io.campuscore.restfulapi.security.filter.AccountStateFilter;
+import io.campuscore.restfulapi.security.filter.CsrfCookieFilter;
+import io.campuscore.restfulapi.security.token.CookieOrBearerTokenResolver;
+import io.campuscore.restfulapi.security.token.JwtSecretPolicy;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -40,7 +44,7 @@ import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 public class SecurityConfig {
 
     @Bean
-    JwtDecoder jwtDecoder(
+    public JwtDecoder jwtDecoder(
             @Value("${security.jwt.secret}") String secret,
             @Value("${security.jwt.reject-known-defaults:false}") boolean rejectKnownDefaults) {
         SecretKeySpec key = jwtSecretKey("JWT_SECRET", secret, rejectKnownDefaults);
@@ -85,7 +89,7 @@ public class SecurityConfig {
     }
 
     @Bean
-    JwtEncoder jwtEncoder(
+    public JwtEncoder jwtEncoder(
             @Value("${security.jwt.secret}") String secret,
             @Value("${security.jwt.reject-known-defaults:false}") boolean rejectKnownDefaults) {
         return new NimbusJwtEncoder(new ImmutableSecret<>(jwtSecretKey("JWT_SECRET", secret, rejectKnownDefaults)));
@@ -141,7 +145,7 @@ public class SecurityConfig {
             HttpSecurity http,
             CookieOrBearerTokenResolver tokenResolver,
             CsrfCookieFilter csrfCookieFilter,
-            io.campuscore.restfulapi.security.ratelimit.RateLimitFilter rateLimitFilter,
+            io.campuscore.restfulapi.security.ratelimit.filter.RateLimitFilter rateLimitFilter,
             AccountStateFilter accountStateFilter,
             ApiErrorWriter errorWriter,
             CorsConfigurationSource corsConfigurationSource) throws Exception {
@@ -246,7 +250,7 @@ public class SecurityConfig {
         return converter;
     }
 
-    static Collection<GrantedAuthority> authoritiesFromClaims(Jwt jwt) {
+    public static Collection<GrantedAuthority> authoritiesFromClaims(Jwt jwt) {
         List<GrantedAuthority> authorities = new ArrayList<>();
         addAuthorities(authorities, jwt.getClaims().get("roles"), "ROLE_");
         addAuthorities(authorities, jwt.getClaims().get("permissions"), "PERM_");

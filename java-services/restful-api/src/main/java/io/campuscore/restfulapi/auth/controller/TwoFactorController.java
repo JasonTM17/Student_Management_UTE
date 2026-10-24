@@ -43,13 +43,13 @@ public class TwoFactorController {
     private final TwoFactorService twoFactor;
     private final AuthLoginService auth;
     private final SessionCookieService cookies;
-    private final io.campuscore.restfulapi.security.ratelimit.ClientIpResolver clientIps;
+    private final io.campuscore.restfulapi.security.ratelimit.service.ClientIpResolver clientIps;
 
     public TwoFactorController(
             TwoFactorService twoFactor,
             AuthLoginService auth,
             SessionCookieService cookies,
-            io.campuscore.restfulapi.security.ratelimit.ClientIpResolver clientIps) {
+            io.campuscore.restfulapi.security.ratelimit.service.ClientIpResolver clientIps) {
         this.twoFactor = twoFactor;
         this.auth = auth;
         this.cookies = cookies;
