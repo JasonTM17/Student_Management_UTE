@@ -6,6 +6,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.doAnswer;
 
+import io.campuscore.restfulapi.auth.model.LoginResult;
 import io.campuscore.restfulapi.auth.service.AuthLoginService;
 import io.campuscore.restfulapi.exception.AppException;
 import java.net.URI;
@@ -76,7 +77,7 @@ class AuthCredentialRevocationPostgresIT {
                         + " VALUES (?, ?, ?, ?, ?, 'ACTIVE', TRUE, FALSE, 0, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)",
                 userId, email, passwordEncoder.encode(rawPassword), "Cred", "Race");
 
-        AuthLoginService.LoginResult preRotation =
+        LoginResult preRotation =
                 authLogin.login(email, rawPassword, "127.0.0.1", "cred-it");
         String staleAccess = preRotation.response().accessToken();
         String staleRefresh = preRotation.response().refreshToken();
@@ -114,7 +115,7 @@ class AuthCredentialRevocationPostgresIT {
                     .as("rotation must hold the user row lock before login starts")
                     .isTrue();
 
-            Future<AuthLoginService.LoginResult> login = pool.submit(() -> {
+            Future<LoginResult> login = pool.submit(() -> {
                 Thread.currentThread().setName("pgw-login-" + suffix);
                 return authLogin.login(email, rotatedPassword, "127.0.0.1", "cred-it");
             });
@@ -145,7 +146,7 @@ class AuthCredentialRevocationPostgresIT {
 
             releaseRotation.countDown();
             rotation.get(WAIT_SECONDS, TimeUnit.SECONDS);
-            AuthLoginService.LoginResult postRotation = login.get(WAIT_SECONDS, TimeUnit.SECONDS);
+            LoginResult postRotation = login.get(WAIT_SECONDS, TimeUnit.SECONDS);
 
             long epoch = jdbc.queryForObject(
                     "SELECT \"credentialVersion\" FROM campuscore_auth.\"User\" WHERE \"id\" = ?",
@@ -184,7 +185,7 @@ class AuthCredentialRevocationPostgresIT {
                         + " VALUES (?, ?, 'LOGIN', ?, CURRENT_TIMESTAMP + INTERVAL '1 hour', 0)",
                 challengeId, userId, "0".repeat(64));
 
-        AuthLoginService.LoginResult preRotation =
+        LoginResult preRotation =
                 authLogin.login(email, rawPassword, "127.0.0.1", "cred-it");
         authLogin.changePassword(userId, rawPassword, rawPassword + "-rotated",
                 preRotation.response().refreshToken());

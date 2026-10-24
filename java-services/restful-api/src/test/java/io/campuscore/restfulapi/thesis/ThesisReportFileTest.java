@@ -25,7 +25,7 @@ import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.request.RequestPostProcessor;
-import io.campuscore.restfulapi.thesis.service.ThesisReportStorage;
+import io.campuscore.restfulapi.thesis.storage.ThesisReportStorage;
 
 /**
  * Feedback item 7: the leader can attach the report as a Word/PDF document.

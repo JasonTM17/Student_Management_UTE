@@ -1,0 +1,180 @@
+package io.campuscore.restfulapi.engagement.job;
+
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.inOrder;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
+
+import com.fasterxml.jackson.databind.ObjectMapper;
+import io.campuscore.restfulapi.engagement.repository.AnnouncementAuditRepository;
+import io.campuscore.restfulapi.engagement.repository.AnnouncementWriteRepository;
+import io.campuscore.restfulapi.engagement.service.AnnouncementStudentNotifier;
+import io.campuscore.restfulapi.engagement.service.AnnouncementWriteService;
+import io.campuscore.restfulapi.engagement.job.ScheduledAnnouncementNotifyJob;
+import io.campuscore.restfulapi.engagement.dto.AnnouncementReadDtos.AnnouncementResponse;
+import io.campuscore.restfulapi.engagement.dto.AnnouncementWriteDtos.CreateAnnouncementRequest;
+import io.campuscore.restfulapi.engagement.dto.AnnouncementWriteDtos.UpdateAnnouncementRequest;
+import java.time.Instant;
+import java.util.List;
+import java.util.Optional;
+import java.util.Set;
+import org.junit.jupiter.api.Test;
+import org.mockito.InOrder;
+
+/** Marker contract for the scheduled-announcement notification refire (V104). */
+class ScheduledAnnouncementNotifyTest {
+
+    // Wall-clock-relative base: the service and job compare publishAt against
+    // Instant.now() at call time, so a fixed epoch would silently flip these
+    // fixtures' due/not-due meaning once the calendar passes it.
+    private static final Instant NOW = Instant.now();
+
+    @Test
+    void createStampsNotifiedOnlyWhenVisibleNow() throws Exception {
+        AnnouncementWriteRepository announcements = mock(AnnouncementWriteRepository.class);
+        AnnouncementStudentNotifier notifier = mock(AnnouncementStudentNotifier.class);
+        AnnouncementWriteService service = service(announcements, notifier);
+        when(announcements.create(any())).thenReturn(announcement(null));
+
+        service.create("admin-1", "Admin", List.of("ADMIN"), null, createRequest(null));
+
+        verify(notifier).notifyAfterPublication("notice-1");
+    }
+
+    @Test
+    void createScheduledLeavesMarkerNullForTheJob() throws Exception {
+        AnnouncementWriteRepository announcements = mock(AnnouncementWriteRepository.class);
+        AnnouncementStudentNotifier notifier = mock(AnnouncementStudentNotifier.class);
+        AnnouncementWriteService service = service(announcements, notifier);
+        Instant future = NOW.plusSeconds(3600);
+        when(announcements.create(any())).thenReturn(announcement(future));
+
+        service.create("admin-1", "Admin", List.of("ADMIN"), null, createRequest(future));
+
+        verify(announcements, never()).markNotified(any(), any());
+    }
+
+    @Test
+    void failedFanOutReArmsTheClaimSoTheJobRetries() throws Exception {
+        AnnouncementWriteRepository announcements = mock(AnnouncementWriteRepository.class);
+        AnnouncementStudentNotifier notifier = mock(AnnouncementStudentNotifier.class);
+        AnnouncementWriteService service = service(announcements, notifier);
+        when(announcements.create(any())).thenReturn(announcement(null));
+        when(notifier.notifyAfterPublication(any())).thenThrow(new RuntimeException("inbox down"));
+
+        service.create("admin-1", "Admin", List.of("ADMIN"), null, createRequest(null));
+
+        // Claim and inbox write are owned by the notifier's one new transaction.
+        // Its rollback/retry eligibility is checked by the persistence test.
+        verify(notifier).notifyAfterPublication("notice-1");
+        verify(announcements, never()).markNotified(any(), any());
+    }
+
+    @Test
+    void reschedulingPublishAtIntoFutureReArmsTheMarker() throws Exception {
+        AnnouncementWriteRepository announcements = mock(AnnouncementWriteRepository.class);
+        AnnouncementWriteService service = service(announcements, mock(AnnouncementStudentNotifier.class));
+        AnnouncementResponse existing = announcement(null);
+        when(announcements.findByIdForUpdate("notice-1")).thenReturn(Optional.of(existing));
+        when(announcements.findById("notice-1")).thenReturn(Optional.of(existing));
+        when(announcements.update(any())).thenReturn(1);
+        UpdateAnnouncementRequest request = new UpdateAnnouncementRequest(
+                Set.of("publishAt", "reason", "expectedVersion"),
+                null, null, null, null, null, null,
+                NOW.plusSeconds(7200), null, null, null, null, "Reschedule", 0);
+
+        service.update("admin-1", "admin@campuscore.edu", List.of("ADMIN"), null, "notice-1", request);
+
+        verify(announcements).clearNotifiedAt("notice-1");
+    }
+
+    @Test
+    void jobFansOutAndStampsEachDueAnnouncement() {
+        AnnouncementWriteRepository announcements = mock(AnnouncementWriteRepository.class);
+        AnnouncementStudentNotifier notifier = mock(AnnouncementStudentNotifier.class);
+        ScheduledAnnouncementNotifyJob job = new ScheduledAnnouncementNotifyJob(announcements, notifier);
+        when(announcements.findDueForNotification(any(), anyInt()))
+                .thenReturn(List.of(announcement(NOW.minusSeconds(60))));
+        when(notifier.notifyAfterPublication("notice-1")).thenReturn(3);
+
+        job.refireDueAnnouncements();
+
+        verify(notifier).notifyAfterPublication("notice-1");
+    }
+
+    @Test
+    void jobSkipsFanOutWhenClaimIsLostToAnotherWorker() {
+        AnnouncementWriteRepository announcements = mock(AnnouncementWriteRepository.class);
+        AnnouncementStudentNotifier notifier = mock(AnnouncementStudentNotifier.class);
+        ScheduledAnnouncementNotifyJob job = new ScheduledAnnouncementNotifyJob(announcements, notifier);
+        when(announcements.findDueForNotification(any(), anyInt()))
+                .thenReturn(List.of(announcement(NOW.minusSeconds(60))));
+        when(notifier.notifyAfterPublication("notice-1")).thenReturn(0);
+
+        job.refireDueAnnouncements();
+
+        verify(notifier, never()).fanOutToActiveStudents(any());
+        verify(notifier).notifyAfterPublication("notice-1");
+        verify(announcements, never()).clearNotifiedAt(any());
+        verify(announcements, never()).clearNotifiedAt(any(), any());
+    }
+
+    @Test
+    void jobReArmsMarkerWhenFanOutThrowsSoRowRetriesNextTick() {
+        AnnouncementWriteRepository announcements = mock(AnnouncementWriteRepository.class);
+        AnnouncementStudentNotifier notifier = mock(AnnouncementStudentNotifier.class);
+        ScheduledAnnouncementNotifyJob job = new ScheduledAnnouncementNotifyJob(announcements, notifier);
+        when(announcements.findDueForNotification(any(), anyInt()))
+                .thenReturn(List.of(announcement(NOW.minusSeconds(60))));
+        when(notifier.notifyAfterPublication("notice-1")).thenThrow(new RuntimeException("inbox down"));
+
+        job.refireDueAnnouncements();
+
+        verify(notifier).notifyAfterPublication("notice-1");
+        verify(announcements, never()).clearNotifiedAt(any(), any());
+    }
+
+    @Test
+    void notifierClaimsBeforeReadingFreshAudienceAndSkipsLostClaim() {
+        AnnouncementWriteRepository announcements = mock(AnnouncementWriteRepository.class);
+        var people = mock(io.campuscore.restfulapi.people.service.PeopleReadService.class);
+        var notifications = mock(io.campuscore.restfulapi.notification.repository.NotificationWriteRepository.class);
+        var notifier = new AnnouncementStudentNotifier(people, notifications, announcements);
+        when(announcements.markNotified(eq("notice-1"), any())).thenReturn(0);
+        org.junit.jupiter.api.Assertions.assertEquals(0, notifier.notifyAfterPublication("notice-1"));
+        verify(announcements, never()).findById(any());
+        when(announcements.markNotified(eq("notice-1"), any())).thenReturn(1);
+        when(announcements.findById("notice-1")).thenReturn(Optional.of(announcement(null)));
+        when(people.findAnnouncementStudentUserIds(List.of(1), null, List.of("STUDENT"), null)).thenReturn(List.of("current-student"));
+        notifier.notifyAfterPublication("notice-1");
+        verify(people).findAnnouncementStudentUserIds(List.of(1), null, List.of("STUDENT"), null);
+        verify(notifications).createBatch(any());
+    }
+
+    private static AnnouncementWriteService service(
+            AnnouncementWriteRepository announcements, AnnouncementStudentNotifier notifier) throws Exception {
+        ObjectMapper mapper = mock(ObjectMapper.class);
+        when(mapper.writeValueAsString(any())).thenReturn("{}");
+        return new AnnouncementWriteService(
+                announcements, mock(AnnouncementAuditRepository.class), notifier, mapper);
+    }
+
+    private static CreateAnnouncementRequest createRequest(Instant publishAt) {
+        return new CreateAnnouncementRequest(
+                "Notice", "<p>Body</p>", "NORMAL", List.of("STUDENT"), List.of(), false,
+                publishAt, null, null, null, null);
+    }
+
+    private static AnnouncementResponse announcement(Instant publishAt) {
+        return new AnnouncementResponse(
+                "notice-1", "Title", "Content", "NORMAL",
+                List.of("STUDENT"), List.of(1), false,
+                publishAt, null, "publisher-1",
+                null, null, null, null, null, null, null, null,
+                NOW, NOW, 0, null, null, null, null, null);
+    }
+}

@@ -24,18 +24,18 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.campuscore.restfulapi.mail.repository.MailRecipientScopeRepository;
-import io.campuscore.restfulapi.mail.repository.MailRecipientScopeRepository.ScopedRecipient;
+import io.campuscore.restfulapi.mail.model.ScopedRecipient;
 import io.campuscore.restfulapi.mail.service.EmailService;
-import io.campuscore.restfulapi.thesis.domain.ApprovalStatus;
-import io.campuscore.restfulapi.thesis.domain.GroupStatus;
-import io.campuscore.restfulapi.thesis.domain.ThesisTopic;
-import io.campuscore.restfulapi.thesis.domain.TopicStatus;
+import io.campuscore.restfulapi.thesis.model.ApprovalStatus;
+import io.campuscore.restfulapi.thesis.model.GroupStatus;
+import io.campuscore.restfulapi.thesis.entity.ThesisTopic;
+import io.campuscore.restfulapi.thesis.model.TopicStatus;
 import io.campuscore.restfulapi.thesis.repository.ThesisRoundReadPort;
 import io.campuscore.restfulapi.thesis.repository.ThesisTopicRepository;
 import io.campuscore.restfulapi.thesis.service.ThesisGroupReadService;
 import io.campuscore.restfulapi.thesis.service.ThesisTopicService;
-import io.campuscore.restfulapi.thesis.web.ThesisGroupReadDtos.GroupResponse;
-import io.campuscore.restfulapi.web.ApiErrorWriter;
+import io.campuscore.restfulapi.thesis.dto.ThesisGroupReadDtos.GroupResponse;
+import io.campuscore.restfulapi.exception.response.ApiErrorWriter;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -401,7 +401,7 @@ class RbacAndApiErrorSecurityChallengeTest {
         private ThesisTopicRepository topicRepo = mock(ThesisTopicRepository.class);
         private ThesisRoundReadPort roundPort = mock(ThesisRoundReadPort.class);
         private ThesisTopicService topicService = new ThesisTopicService(topicRepo, roundPort,
-                mock(org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate.class));
+                mock(io.campuscore.restfulapi.thesis.repository.ThesisScopeRepository.class));
 
         private ThesisTopic createTopic(String id, String owner, TopicStatus status) {
             ThesisTopic t = new ThesisTopic(ROUND_ID, "IT", "Topic " + id, "Desc", 3, owner);
@@ -540,7 +540,7 @@ class RbacAndApiErrorSecurityChallengeTest {
 
             for (HttpStatus testStatus : testStatuses) {
                 MockHttpServletRequest request = new MockHttpServletRequest("GET", "/api/v1/probe");
-                request.setAttribute(io.campuscore.restfulapi.security.RequestIdFilter.ATTRIBUTE, "req-test-99");
+                request.setAttribute(io.campuscore.restfulapi.security.filter.RequestIdFilter.ATTRIBUTE, "req-test-99");
                 MockHttpServletResponse response = new MockHttpServletResponse();
 
                 writer.write(request, response, testStatus, "TEST_ERR", "Test error message");

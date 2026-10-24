@@ -1241,7 +1241,7 @@ class AdminUserMutationPersistenceTest {
         // refuses it; only the whole unchanged pair may be echoed back.
         assertThat(org.assertj.core.api.Assertions.catchThrowable(() ->
                 userMutations.update("dean-self", Map.of("role", "LECTURER"), true, "dean-self")))
-                .isInstanceOf(io.campuscore.restfulapi.web.DomainException.class)
+                .isInstanceOf(io.campuscore.restfulapi.exception.DomainException.class)
                 .extracting("code").isEqualTo("SELF_ROLE_CHANGE_NOT_ALLOWED");
         assertThat(roleNames("dean-self")).containsExactlyInAnyOrder("LECTURER", "TRUONG_KHOA");
 

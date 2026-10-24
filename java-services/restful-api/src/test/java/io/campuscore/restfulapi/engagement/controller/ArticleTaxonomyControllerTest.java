@@ -1,0 +1,232 @@
+package io.campuscore.restfulapi.engagement.controller;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
+
+import io.campuscore.restfulapi.engagement.entity.ArticleAttachment;
+import io.campuscore.restfulapi.engagement.entity.ArticleCategory;
+import io.campuscore.restfulapi.engagement.entity.ArticleMediaGallery;
+import io.campuscore.restfulapi.engagement.entity.ArticleTag;
+import io.campuscore.restfulapi.engagement.repository.ArticleAttachmentRepository;
+import io.campuscore.restfulapi.engagement.repository.ArticleCategoryRepository;
+import io.campuscore.restfulapi.engagement.repository.ArticleMediaGalleryRepository;
+import io.campuscore.restfulapi.engagement.repository.ArticleTagRepository;
+import io.campuscore.restfulapi.engagement.controller.ArticleTaxonomyController;
+import io.campuscore.restfulapi.engagement.dto.ArticleTaxonomyDtos.AttachmentDto;
+import io.campuscore.restfulapi.engagement.dto.ArticleTaxonomyDtos.AttachmentListResponse;
+import io.campuscore.restfulapi.engagement.dto.ArticleTaxonomyDtos.CategoryDto;
+import io.campuscore.restfulapi.engagement.dto.ArticleTaxonomyDtos.MediaGalleryListResponse;
+import io.campuscore.restfulapi.engagement.dto.ArticleTaxonomyDtos.TagDto;
+import java.util.List;
+import java.util.Optional;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.http.HttpStatus;
+import org.springframework.web.server.ResponseStatusException;
+
+class ArticleTaxonomyControllerTest {
+
+    private ArticleCategoryRepository categoryRepository;
+    private ArticleTagRepository tagRepository;
+    private ArticleMediaGalleryRepository mediaGalleryRepository;
+    private ArticleAttachmentRepository attachmentRepository;
+    private ArticleTaxonomyController controller;
+
+    @BeforeEach
+    void setUp() {
+        categoryRepository = mock(ArticleCategoryRepository.class);
+        tagRepository = mock(ArticleTagRepository.class);
+        mediaGalleryRepository = mock(ArticleMediaGalleryRepository.class);
+        attachmentRepository = mock(ArticleAttachmentRepository.class);
+        controller = new ArticleTaxonomyController(
+                categoryRepository, tagRepository, mediaGalleryRepository, attachmentRepository);
+    }
+
+    @Test
+    @DisplayName("getCategories should return active categories sorted by displayOrder")
+    void getCategoriesReturnsActiveCategories() {
+        ArticleCategory cat = new ArticleCategory(
+                "cat-1", "RESEARCH_TECH", "Nghiên cứu & Công nghệ", "Research & Technology",
+                "nghien-cuu-cong-nghe", "Desc", "indigo", "flask", 1, true);
+
+        when(categoryRepository.findByIsActiveTrueOrderByDisplayOrderAsc()).thenReturn(List.of(cat));
+
+        List<ArticleCategory> result = controller.getCategories();
+        assertEquals(1, result.size());
+        assertEquals("RESEARCH_TECH", result.get(0).getCode());
+    }
+
+    @Test
+    @DisplayName("getCategoryBySlug should return category when found and 404 when missing")
+    void getCategoryBySlugHandlesFoundAndMissing() {
+        ArticleCategory cat = new ArticleCategory(
+                "cat-2", "AWARDS_HONORS", "Học bổng & Khen thưởng", "Scholarships",
+                "scholarships", "Desc", "amber", "trophy", 2, true);
+
+        when(categoryRepository.findBySlug("scholarships")).thenReturn(Optional.of(cat));
+        when(categoryRepository.findBySlug("missing")).thenReturn(Optional.empty());
+
+        assertEquals(cat, controller.getCategoryBySlug("scholarships"));
+
+        ResponseStatusException ex = assertThrows(
+                ResponseStatusException.class,
+                () -> controller.getCategoryBySlug("missing"));
+        assertEquals(HttpStatus.NOT_FOUND, ex.getStatusCode());
+    }
+
+    @Test
+    @DisplayName("getTags should return top tags by usage count")
+    void getTagsReturnsTopTags() {
+        ArticleTag tag = new ArticleTag("tag-ai", "ai", "Trí tuệ nhân tạo", "Artificial Intelligence", 25);
+
+        when(tagRepository.findTop20ByOrderByUsageCountDesc()).thenReturn(List.of(tag));
+
+        List<ArticleTag> result = controller.getTags();
+        assertEquals(1, result.size());
+        assertEquals("ai", result.get(0).getSlug());
+    }
+
+    @Test
+    @DisplayName("getMediaGalleries filters by announcementId when provided")
+    void getMediaGalleriesFiltersByAnnouncement() {
+        ArticleMediaGallery gallery = new ArticleMediaGallery();
+        gallery.setId("gal-1");
+        gallery.setAnnouncementId("ann-1");
+        gallery.setMediaUrl("https://theses.campusute.io.vn/photo.jpg");
+        gallery.setCaptionVi("Lễ tốt nghiệp");
+
+        when(mediaGalleryRepository.findByAnnouncementIdOrderByDisplayOrderAsc("ann-1"))
+                .thenReturn(List.of(gallery));
+        // Legacy feed is bounded through the page query now — the unbounded
+        // findAll() used to dump the whole table to any authenticated caller.
+        when(mediaGalleryRepository.findAll(any(Pageable.class)))
+                .thenAnswer(invocation -> new PageImpl<>(
+                        List.of(gallery), invocation.getArgument(0, Pageable.class), 1));
+
+        List<ArticleMediaGallery> filtered = controller.getMediaGalleries("ann-1");
+        assertEquals(1, filtered.size());
+        assertEquals("ann-1", filtered.get(0).getAnnouncementId());
+
+        List<ArticleMediaGallery> all = controller.getMediaGalleries(null);
+        assertEquals(1, all.size());
+    }
+
+    @Test
+    @DisplayName("getAttachments filters by announcementId and only exposes public rows")
+    void getAttachmentsFiltersByAnnouncement() {
+        ArticleAttachment attachment = new ArticleAttachment();
+        attachment.setId("att-1");
+        attachment.setAnnouncementId("ann-1");
+        attachment.setFileName("thong_bao.pdf");
+
+        // Regression: the scoped feed must use the public-only query so
+        // non-public attachments cannot be enumerated by article id.
+        when(attachmentRepository.findByAnnouncementIdAndIsPublicTrue("ann-1"))
+                .thenReturn(List.of(attachment));
+        when(attachmentRepository.findByIsPublicTrue(any(Pageable.class)))
+                .thenAnswer(invocation -> new PageImpl<>(
+                        List.of(attachment), invocation.getArgument(0, Pageable.class), 1));
+
+        List<AttachmentDto> filtered = controller.getAttachments("ann-1");
+        assertEquals(1, filtered.size());
+        assertEquals("thong_bao.pdf", filtered.get(0).fileName());
+
+        List<AttachmentDto> allPublic = controller.getAttachments(null);
+        assertEquals(1, allPublic.size());
+    }
+
+    @Test
+    @DisplayName("getCategoriesV2 projects the entity onto the audit-free category DTO")
+    void getCategoriesV2MapsPublicFieldsOnly() {
+        ArticleCategory cat = new ArticleCategory(
+                "cat-1", "RESEARCH_TECH", "Nghiên cứu & Công nghệ", "Research & Technology",
+                "nghien-cuu-cong-nghe", "Desc", "indigo", "flask", 1, true);
+
+        when(categoryRepository.findByIsActiveTrueOrderByDisplayOrderAsc()).thenReturn(List.of(cat));
+
+        // Exact record equality is the guard: adding an entity audit field to CategoryDto
+        // would break this assertion instead of silently shipping it on the wire.
+        assertEquals(
+                List.of(new CategoryDto(
+                        "cat-1", "RESEARCH_TECH", "nghien-cuu-cong-nghe",
+                        "Nghiên cứu & Công nghệ", "Research & Technology",
+                        "Desc", "indigo", "flask", 1, true)),
+                controller.getCategoriesV2());
+    }
+
+    @Test
+    @DisplayName("getTagsV2 maps tags onto DTOs and keeps the 404 contract for unknown slugs")
+    void getTagsV2MapsDtoAndKeepsNotFound() {
+        ArticleTag tag = new ArticleTag("tag-ai", "ai", "Trí tuệ nhân tạo", "Artificial Intelligence", 25);
+        when(tagRepository.findTop20ByOrderByUsageCountDesc()).thenReturn(List.of(tag));
+        when(tagRepository.findBySlug("ai")).thenReturn(Optional.of(tag));
+        when(tagRepository.findBySlug("missing")).thenReturn(Optional.empty());
+
+        assertEquals(List.of(new TagDto("tag-ai", "ai", "Trí tuệ nhân tạo", "Artificial Intelligence", 25)),
+                controller.getTagsV2());
+        assertEquals("ai", controller.getTagBySlugV2("ai").slug());
+        ResponseStatusException ex = assertThrows(
+                ResponseStatusException.class,
+                () -> controller.getTagBySlugV2("missing"));
+        assertEquals(HttpStatus.NOT_FOUND, ex.getStatusCode());
+    }
+
+    @Test
+    @DisplayName("getMediaGalleriesV2 caps an oversized page at 200 and sorts by displayOrder")
+    void getMediaGalleriesV2CapsPageSize() {
+        ArticleMediaGallery gallery = new ArticleMediaGallery();
+        gallery.setId("gal-1");
+        gallery.setAnnouncementId("ann-1");
+        gallery.setMediaUrl("https://theses.campusute.io.vn/photo.jpg");
+        when(mediaGalleryRepository.findByAnnouncementId(eq("ann-1"), any(Pageable.class)))
+                .thenAnswer(invocation -> new PageImpl<>(
+                        List.of(gallery), invocation.getArgument(1, Pageable.class), 1));
+
+        MediaGalleryListResponse response = controller.getMediaGalleriesV2("ann-1", 1, 10_000);
+
+        ArgumentCaptor<Pageable> pageable = ArgumentCaptor.forClass(Pageable.class);
+        verify(mediaGalleryRepository).findByAnnouncementId(eq("ann-1"), pageable.capture());
+        assertEquals(200, pageable.getValue().getPageSize());
+        assertEquals(0, pageable.getValue().getPageNumber());
+        assertEquals("displayOrder", pageable.getValue().getSort().iterator().next().getProperty());
+        assertEquals(200, response.meta().limit());
+        assertEquals(1, response.meta().page());
+        assertEquals(1, response.meta().totalPages());
+        assertEquals("gal-1", response.data().get(0).id());
+    }
+
+    @Test
+    @DisplayName("getAttachmentsV2 falls back to the 50-row page and pages public rows by createdAt")
+    void getAttachmentsV2UsesDefaultPublicPage() {
+        ArticleAttachment attachment = new ArticleAttachment();
+        attachment.setId("att-1");
+        attachment.setFileName("quyet_dinh.pdf");
+        when(attachmentRepository.findByIsPublicTrue(any(Pageable.class)))
+                .thenAnswer(invocation -> new PageImpl<>(
+                        List.of(attachment), invocation.getArgument(0, Pageable.class), 100));
+
+        AttachmentListResponse response = controller.getAttachmentsV2(null, 2, 0);
+
+        ArgumentCaptor<Pageable> pageable = ArgumentCaptor.forClass(Pageable.class);
+        verify(attachmentRepository).findByIsPublicTrue(pageable.capture());
+        assertEquals(50, pageable.getValue().getPageSize());
+        assertEquals(1, pageable.getValue().getPageNumber());
+        assertEquals("createdAt", pageable.getValue().getSort().iterator().next().getProperty());
+        assertEquals(
+                List.of(new AttachmentDto("att-1", null, "quyet_dinh.pdf", null, 0L, null, 0)),
+                response.data());
+        assertEquals(50, response.meta().limit());
+        assertEquals(2, response.meta().page());
+        assertEquals(100, response.meta().total());
+        assertEquals(2, response.meta().totalPages());
+    }
+}

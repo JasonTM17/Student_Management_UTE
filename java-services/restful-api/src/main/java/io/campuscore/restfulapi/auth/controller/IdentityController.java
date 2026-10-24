@@ -1,0 +1,47 @@
+package io.campuscore.restfulapi.auth.controller;
+
+import io.campuscore.restfulapi.auth.dto.IdentityResponse;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.tags.Tag;
+import java.util.Collection;
+import java.util.List;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.security.oauth2.jwt.Jwt;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
+
+/** Verifies that the future modules can consume the frozen identity claims. */
+@RestController
+@RequestMapping("/api/v1/me")
+@Tag(name = "Identity Claims", description = "Kiểm tra và truy xuất thông tin xác thực định danh (claims) đóng băng từ JWT")
+public class IdentityController {
+
+    @GetMapping
+    @Operation(summary = "Định danh tài khoản hiện tại", description = "Trả về danh sách vai trò, quyền hạn và mã số sinh viên/giảng viên được giải mã từ JWT token.")
+    @ApiResponse(responseCode = "200", description = "Định danh tài khoản thành công")
+    public IdentityResponse currentUser(@AuthenticationPrincipal Jwt jwt) {
+        return new IdentityResponse(
+                jwt.getSubject(),
+                values(jwt.getClaims().get("roles")),
+                values(jwt.getClaims().get("permissions")),
+                stringClaim(jwt, "studentId"),
+                stringClaim(jwt, "lecturerId"));
+    }
+
+    private List<String> values(Object claim) {
+        if (!(claim instanceof Collection<?> collection)) {
+            return List.of();
+        }
+        return collection.stream()
+                .filter(value -> value != null && !value.toString().isBlank())
+                .map(Object::toString)
+                .toList();
+    }
+
+    private String stringClaim(Jwt jwt, String name) {
+        Object value = jwt.getClaims().get(name);
+        return value == null ? null : value.toString();
+    }
+}

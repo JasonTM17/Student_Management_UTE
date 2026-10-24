@@ -1,10 +1,10 @@
 package io.campuscore.restfulapi.academic.repository;
 
-import io.campuscore.restfulapi.academic.web.AdminAnalyticsDtos.DepartmentStat;
-import io.campuscore.restfulapi.academic.web.AdminAnalyticsDtos.FacultyRank;
-import io.campuscore.restfulapi.academic.web.AdminAnalyticsDtos.GradeDistributionEntry;
-import io.campuscore.restfulapi.academic.web.AdminAnalyticsDtos.SemesterTrend;
-import io.campuscore.restfulapi.academic.web.AdminAnalyticsDtos.Totals;
+import io.campuscore.restfulapi.academic.dto.AdminAnalyticsDtos.DepartmentStat;
+import io.campuscore.restfulapi.academic.dto.AdminAnalyticsDtos.FacultyRank;
+import io.campuscore.restfulapi.academic.dto.AdminAnalyticsDtos.GradeDistributionEntry;
+import io.campuscore.restfulapi.academic.dto.AdminAnalyticsDtos.SemesterTrend;
+import io.campuscore.restfulapi.academic.dto.AdminAnalyticsDtos.Totals;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.util.List;

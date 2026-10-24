@@ -1,10 +1,9 @@
 package io.campuscore.restfulapi.thesis.service;
 
+import io.campuscore.restfulapi.thesis.repository.ThesisScopeRepository;
 import java.math.BigDecimal;
 import java.util.List;
 import java.util.UUID;
-import org.springframework.jdbc.core.namedparam.MapSqlParameterSource;
-import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
 
 /**
  * The single definition of a topic's review outcome. Finalization, the
@@ -31,12 +30,8 @@ final class ThesisReviewOutcome {
     static final List<String> PUBLICATION_EXCLUDED = List.of(REVIEW_FAILED, WITHDRAWN);
 
     /** Latest recorded counter-review score for a topic (null when none). */
-    static BigDecimal latestGvpbScore(NamedParameterJdbcTemplate jdbc, UUID topicId) {
-        List<BigDecimal> scores = jdbc.queryForList(
-                "SELECT score FROM thesis.thesis_topic_score "
-                        + "WHERE topic_id = :topicId AND component = 'GVPB' "
-                        + "ORDER BY graded_at DESC, created_at DESC",
-                new MapSqlParameterSource("topicId", topicId), BigDecimal.class);
+    static BigDecimal latestGvpbScore(ThesisScopeRepository scope, UUID topicId) {
+        List<BigDecimal> scores = scope.findGvpbScoresNewestFirst(topicId);
         return scores.isEmpty() ? null : scores.get(0);
     }
 

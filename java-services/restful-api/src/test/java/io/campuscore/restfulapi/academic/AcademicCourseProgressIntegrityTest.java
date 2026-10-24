@@ -2,6 +2,7 @@ package io.campuscore.restfulapi.academic;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import io.campuscore.restfulapi.academic.model.CourseProgressRow;
 import io.campuscore.restfulapi.academic.repository.AcademicReadRepository;
 import java.sql.Timestamp;
 import java.time.Instant;
@@ -71,17 +72,17 @@ class AcademicCourseProgressIntegrityTest {
 
     @Test
     void failedCourseIsNotCurriculumProgressWhilePassingCourseIs() {
-        Map<String, AcademicReadRepository.CourseProgressRow> byCourse =
+        Map<String, CourseProgressRow> byCourse =
                 reads.findCourseProgressByStudentId("student-1").stream()
                         .collect(Collectors.toMap(
-                                AcademicReadRepository.CourseProgressRow::courseId,
+                                CourseProgressRow::courseId,
                                 Function.identity()));
 
-        AcademicReadRepository.CourseProgressRow failed = byCourse.get("course-failed");
+        CourseProgressRow failed = byCourse.get("course-failed");
         assertThat(failed.progressLevel()).as("an F row must not read as COMPLETED").isZero();
         assertThat(failed.letterGrade()).as("an F row has no passed letter").isNull();
 
-        AcademicReadRepository.CourseProgressRow passed = byCourse.get("course-passed");
+        CourseProgressRow passed = byCourse.get("course-passed");
         assertThat(passed.progressLevel()).as("a published passing row stays COMPLETED")
                 .isEqualTo(2);
         assertThat(passed.letterGrade()).isEqualTo("B");
@@ -103,7 +104,7 @@ class AcademicCourseProgressIntegrityTest {
         jdbc.update("UPDATE \"academic\".\"Enrollment\" SET \"studentId\" = 'student-2'"
                 + " WHERE \"id\" = 'enrollment-repeat-other-student'");
 
-        AcademicReadRepository.CourseProgressRow repeated = reads.findCourseProgressByStudentId("student-1")
+        CourseProgressRow repeated = reads.findCourseProgressByStudentId("student-1")
                 .stream().filter(row -> row.courseId().equals("course-repeat")).findFirst().orElseThrow();
 
         assertThat(repeated.progressLevel()).isEqualTo(2);
@@ -119,7 +120,7 @@ class AcademicCourseProgressIntegrityTest {
         jdbc.update("UPDATE \"academic\".\"Enrollment\" SET \"courseId\" = 'course-tie'"
                 + " WHERE \"id\" LIKE 'enrollment-tie-%'");
 
-        AcademicReadRepository.CourseProgressRow tied = reads.findCourseProgressByStudentId("student-1")
+        CourseProgressRow tied = reads.findCourseProgressByStudentId("student-1")
                 .stream().filter(row -> row.courseId().equals("course-tie")).findFirst().orElseThrow();
 
         assertThat(tied.progressLevel()).isEqualTo(2);

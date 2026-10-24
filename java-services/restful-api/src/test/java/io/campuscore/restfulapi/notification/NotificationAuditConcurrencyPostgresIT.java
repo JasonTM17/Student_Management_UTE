@@ -2,10 +2,10 @@ package io.campuscore.restfulapi.notification;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import io.campuscore.restfulapi.audit.AdminAuditRecorder;
+import io.campuscore.restfulapi.audit.service.AdminAuditRecorder;
 import io.campuscore.restfulapi.notification.repository.NotificationWriteRepository;
 import io.campuscore.restfulapi.notification.service.NotificationWriteService;
-import io.campuscore.restfulapi.notification.web.NotificationWriteDtos.UpdateNotificationRequest;
+import io.campuscore.restfulapi.notification.dto.NotificationWriteDtos.UpdateNotificationRequest;
 import java.net.URI;
 import java.sql.Connection;
 import java.util.Set;
@@ -121,7 +121,7 @@ class NotificationAuditConcurrencyPostgresIT {
     }
 
     private static NotificationWriteService service(NamedParameterJdbcTemplate template) {
-        return new NotificationWriteService(new NotificationWriteRepository(template),new AdminAuditRecorder(template));
+        return new NotificationWriteService(new NotificationWriteRepository(template),new AdminAuditRecorder(new io.campuscore.restfulapi.audit.repository.AdminAuditWriteRepository(template)));
     }
 
     private static void insert(String id) {

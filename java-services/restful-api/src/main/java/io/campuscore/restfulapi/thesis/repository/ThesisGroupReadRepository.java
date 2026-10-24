@@ -1,9 +1,10 @@
 package io.campuscore.restfulapi.thesis.repository;
 
-import io.campuscore.restfulapi.thesis.domain.ApprovalStatus;
-import io.campuscore.restfulapi.thesis.domain.GroupStatus;
-import io.campuscore.restfulapi.thesis.web.ThesisGroupReadDtos.GroupMemberResponse;
-import io.campuscore.restfulapi.thesis.web.ThesisGroupReadDtos.GroupResponse;
+import io.campuscore.restfulapi.thesis.model.ApprovalStatus;
+import io.campuscore.restfulapi.thesis.model.GroupStatus;
+import io.campuscore.restfulapi.thesis.model.LecturerScope;
+import io.campuscore.restfulapi.thesis.dto.ThesisGroupReadDtos.GroupMemberResponse;
+import io.campuscore.restfulapi.thesis.dto.ThesisGroupReadDtos.GroupResponse;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.ArrayList;
@@ -95,9 +96,6 @@ public class ThesisGroupReadRepository {
                 ThesisGroupReadRepository::row);
         return hydrate(rows);
     }
-
-    /** A governance reader's live scope: their own department and its faculty. */
-    public record LecturerScope(String departmentId, String facultyId) { }
 
     /** Mirrors ThesisDeanOverviewRepository.findDeanFaculty: dept + faculty of an active lecturer. */
     public LecturerScope findLecturerScope(String lecturerId, String subject) {

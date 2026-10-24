@@ -3,7 +3,8 @@ package io.campuscore.restfulapi.engagement.repository;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.NullNode;
-import io.campuscore.restfulapi.engagement.web.AnnouncementReadDtos.AnnouncementHistoryResponse;
+import io.campuscore.restfulapi.engagement.model.AuditCommand;
+import io.campuscore.restfulapi.engagement.dto.AnnouncementReadDtos.AnnouncementHistoryResponse;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Timestamp;
@@ -113,18 +114,5 @@ public class AnnouncementAuditRepository {
                 column,
                 Calendar.getInstance(TimeZone.getTimeZone("UTC")));
         return timestamp == null ? null : timestamp.toInstant();
-    }
-
-    public record AuditCommand(
-            String id,
-            String announcementId,
-            String action,
-            String actorId,
-            String actorLabel,
-            String reason,
-            int version,
-            String beforeState,
-            String afterState,
-            Instant createdAt) {
     }
 }

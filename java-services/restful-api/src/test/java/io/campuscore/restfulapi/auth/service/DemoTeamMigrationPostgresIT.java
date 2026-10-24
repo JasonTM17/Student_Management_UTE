@@ -3,7 +3,7 @@ package io.campuscore.restfulapi.auth.service;
 import static org.junit.jupiter.api.Assertions.*;
 
 import io.campuscore.restfulapi.thesis.repository.ThesisGroupReadRepository;
-import io.campuscore.restfulapi.thesis.web.ThesisGroupReadDtos.GroupResponse;
+import io.campuscore.restfulapi.thesis.dto.ThesisGroupReadDtos.GroupResponse;
 import java.net.URI;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -370,7 +370,7 @@ class DemoTeamMigrationPostgresIT {
         String realUserStatuses = fingerprint(connection,
                 "SELECT to_jsonb(x)::text FROM (SELECT \"id\",\"status\" FROM campuscore_auth.\"User\""
                         + " WHERE \"email\" NOT IN (" + nonDemoEmails + ")) x");
-        new DemoAccountGate(jdbc, true, "STUDENT").run(null);
+        new DemoAccountGate(new io.campuscore.restfulapi.auth.repository.DemoAccountRepository(jdbc), true, "STUDENT").run(null);
         for (Member m : TEAM) {
             assertEquals("ACTIVE", scalar(connection,
                     "SELECT \"status\" FROM campuscore_auth.\"User\" WHERE \"id\"='" + m.userId() + "'"));
@@ -378,7 +378,7 @@ class DemoTeamMigrationPostgresIT {
         assertEquals(realUserStatuses, fingerprint(connection,
                 "SELECT to_jsonb(x)::text FROM (SELECT \"id\",\"status\" FROM campuscore_auth.\"User\""
                         + " WHERE \"email\" NOT IN (" + nonDemoEmails + ")) x"));
-        new DemoAccountGate(jdbc, false, "").run(null);
+        new DemoAccountGate(new io.campuscore.restfulapi.auth.repository.DemoAccountRepository(jdbc), false, "").run(null);
         for (Member m : TEAM) {
             assertEquals("LOCKED", scalar(connection,
                     "SELECT \"status\" FROM campuscore_auth.\"User\" WHERE \"id\"='" + m.userId() + "'"));

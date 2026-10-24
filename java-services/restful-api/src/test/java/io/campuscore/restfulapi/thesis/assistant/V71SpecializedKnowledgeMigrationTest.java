@@ -9,6 +9,7 @@ import java.util.regex.Pattern;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import io.campuscore.restfulapi.thesis.assistant.guard.AssistantInputGuard;
 
 /**
  * Migration validation test for Flyway V71:

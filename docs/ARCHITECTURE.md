@@ -260,7 +260,98 @@ Trên màn hình hẹp, truy cập trợ lý phải giữ chỗ cho thao tác h�
 
 ---
 
-## 7. Ranh giới ngoài phạm vi (Non-goals)
+## 7. Cấu trúc Package Backend (Layered Package Layout)
+
+Backend `java-services/restful-api` (góc `io.campuscore.restfulapi`) được tổ chức theo **module → vai trò (role)** để người đọc tìm code theo chức năng thay vì theo một thư mục phẳng. Mọi lớp nằm trong một package vai trò; chỉ `RestfulApiApplication` ở package gốc. Mỗi module dùng cùng một bộ package con:
+
+| Package | Vai trò |
+| --- | --- |
+| `controller/` | Chỉ REST controller (`@RestController`/`@Controller`). |
+| `dto/` | Các lớp holder request/response (`*Dtos`, record lồng nhau). |
+| `service/` | Business services. |
+| `repository/` | Data access (JDBC repositories, read ports). |
+| `entity/` | JPA `@Entity`/`@Table` types (`thesis.entity.ThesisTopic`, `engagement.entity.Article*`, `academic.registration.entity.*`). |
+| `model/` | Tên duy nhất cho kiểu dữ liệu plain (record/enum/value) dùng chung giữa các tầng: row/projection của repository, command/filter/result của service, status enums. Không phụ thuộc `repository`/`service`/`controller`. Không còn package `domain/` — plain data cũ ở `domain` đã gộp vào `model`, JPA entities đã tách sang `entity`. |
+| `config/` | `@Configuration` / `@ConfigurationProperties` của module. |
+| `job/` | Scheduled jobs, retention/reconcile jobs. |
+| `filter/` | Servlet filters (`security.filter.*`). |
+| `scope/` | Authorization/scope helpers (`thesis.scope.ThesisDeanScope`, `ThesisDepartmentScope`). |
+| `storage/` | Report-storage implementations (`thesis.storage.*ThesisReportStorage`). |
+| `renderer/` | Renderer rõ vai trò (`academic.registration.renderer.RegistrationPdfRenderer`). |
+
+Bản đồ module → subpackage hiện tại:
+
+| Top-level package | Loại | Subpackages |
+| --- | --- | --- |
+| `academic` | module | `controller`, `dto`, `job`, `model`, `repository`, `service`, `registration/{controller,dto,entity,model,renderer,repository,service}` |
+| `audit` | module | `controller`, `model`, `repository`, `service` |
+| `auth` | module | `controller`, `dto`, `job`, `model`, `repository`, `service` |
+| `engagement` | module | `controller`, `dto`, `entity`, `job`, `model`, `repository`, `service` |
+| `mail` | module | `config`, `controller`, `dto`, `model`, `repository`, `service` |
+| `notification` | module | `controller`, `dto`, `model`, `repository`, `service` |
+| `people` | module | `controller`, `dto`, `model`, `repository`, `service` |
+| `site` | module | `controller`, `dto`, `repository`, `service` |
+| `thesis` | module | `config`, `controller`, `dto`, `entity`, `exception`, `model`, `repository`, `scope`, `service`, `storage`, `assistant/{client,config,controller,dto,exception,guard,job,model,properties,repository,rls,service}` |
+| `common` | cross-cutting | `dto` (response envelopes), `util` (`LikePattern`) |
+| `config` | cross-cutting | `env` (`EnvironmentPostProcessor` đăng ký trong `META-INF/spring.factories`), `jpa` (naming strategy trong `application.yml`), `openapi` |
+| `exception` | cross-cutting | `code`, `handler`, `response` (+ các exception base types dùng chung ở package root `exception/` — xem mục Error handling) |
+| `security` | cross-cutting | `availability`, `config`, `filter`, `model`, `token`, `ratelimit/{annotation,filter,model,properties,service}` |
+| `system` | cross-cutting | `controller` (`Contract`, `Health`), `dto`, `job` (`DatabaseKeepAliveScheduler`) |
+
+`academic.registration` là sub-module của `academic` và tự nó cũng được chia đủ vai trò (`controller`, `dto`, `entity`, `model`, `repository`, `service`, `renderer`); `thesis.assistant` tương tự với các vai trò riêng (`client` gateways, `guard` input/output, `rls` boundary/context/aspect, `properties`, `job`). Các package `controller/`, `dto/`, `job/` ở root cũ đã bị xóa: `Identity` vào `auth`, `Contract`/`Health`/keep-alive vào `system`; `web/` cũ cũng đã bị xóa hoàn toàn từ vòng refactor trước.
+
+**Thêm module hoặc lớp mới:** tạo `<module>/<role>/TênLớp.java` (một kiểu top-level mỗi file, tên file trùng tên kiểu, visibility tối thiểu). Module business mới bắt đầu bằng `controller`/`service`/`repository` (+`dto`/`model` khi có payload/carrier); không đặt lớp trực tiếp trong package root của module. Plain data (record/enum/value type) luôn vào `model/`; chỉ JPA entity vào `entity/`; tên `domain` không còn được dùng.
+
+**Kiểu dữ liệu lồng nhau:** `record`/`enum`/`interface`/`class` public hoặc protected xuất hiện trong signature không được khai báo bên trong `repository`/`service`/`controller` (kể cả `job`/`client`). Payload request/response serialize ra client đi vào `<module>/dto/`; carrier nội bộ/persistence đi vào `<module>/model/`. Chỉ helper `private`/package-private dùng nội bộ mới được ở lồng.
+
+Quy tắc được bảo đảm bởi `ArchitectureGuardTest` (quét `.class` trên classpath, không cần dependency mới): mọi lớp nằm trong role subpackage (root của mỗi module và các nested root `academic/registration`, `security/ratelimit`, `thesis/assistant` không chứa lớp trực tiếp; chỉ `RestfulApiApplication` ở package gốc); package cross-cutting (`common`, `config`, `exception`, `security`, `system`) không phụ thuộc module business ngoài các cạnh được liệt kê tường minh kèm lý do trong test; `security`/`security.ratelimit` giữ chiều phụ thuộc đã có (filter → service → model/properties; annotation chỉ tham chiếu model); controller chỉ nằm trong package `controller` và phải mang `@RestController`/`@Controller`; package `controller` không phụ thuộc `repository`; `repository` không phụ thuộc `controller`/`service`; các lớp `*Dtos` nằm trong package `dto`; lớp `*Exception` top-level chỉ nằm trong package `..exception..` và phải kế thừa `RuntimeException`/họ `AppException`; exception handler (`*ExceptionHandler`, `@ControllerAdvice`) chỉ nằm trong `..exception.handler..`; package ngoài `exception` không được phụ thuộc `exception.handler`; lớp `*Filter` không được tự serialize body lỗi (không tham chiếu `ObjectMapper`/`PrintWriter` — mọi body lỗi của filter đi qua `ApiErrorWriter`).
+
+**Tên logger và bean theo package mới:** logger SLF4J mang FQN nên các category cũ đổi theo — `….<module>.web` → `….<module>.controller`, `….security` phẳng → `….security.{filter,token,config,model,availability}` + `….security.ratelimit.*`, `….thesis.assistant` phẳng → `….thesis.assistant.{controller,service,repository,rls,guard,client,job,properties,config,dto,model,exception}`, `….config` phẳng → `….config.{env,jpa,openapi}` (keep-alive/health sang `….system.*`), `….common`/`….exception` phẳng → role subpackage tương ứng; bộ lọc log theo package phải dùng tên mới. Bean `@ConfigurationProperties` cũng mang tên `<prefix>-<FQN>` theo package mới (`assistant-….thesis.assistant.properties.*`, `deepseek-….*`, `assistant.rag-….*`, `assistant.supabase-….*`, `thesis.report.storage-….thesis.config.*`) — prefix key không đổi.
+
+### Xử lý lỗi (Error handling)
+
+Mọi quan tâm về exception nằm trong các package riêng theo vai trò:
+
+| Package | Chứa gì |
+| --- | --- |
+| `exception/` | Exception types dùng chung cho mọi module: `AppException` (base), `DomainException`, `BadRequestException`, `ConflictException`, `ForbiddenException`, `ResourceNotFoundException`, `UnauthorizedException`, `ValidationException`. |
+| `exception/code/` | `ErrorCode` — catalog mã lỗi chuẩn kèm HTTP status + message mặc định. |
+| `exception/handler/` | `GlobalExceptionHandler` (`@RestControllerAdvice`) — mapper exception → response duy nhất; không chứa gì khác. |
+| `exception/response/` | `ErrorResponse` (envelope JSON chuẩn), `ApiErrorWriter` (writer JSON ở tầng filter), `ApiError`/`FieldError` (record đọc error payload upstream của assistant gateways). |
+| `<module>/exception/` | Exception riêng của module: `thesis.exception.ThesisReportStorageException`, `thesis.assistant.exception.Provider{Cancelled,Unavailable}Exception`. |
+
+**Nên throw loại nào?** Hai style song song được giữ nguyên (không gộp): `new AppException(ErrorCode.X[, customMessage])` dùng khi lỗi đã có sẵn trong catalog `ErrorCode` — code/status/message đi kèm enum; `new DomainException(status, code, message[, details])` dùng khi cần mã lỗi ad-hoc ngoài catalog hoặc payload `details` cho client xử lý được (ví dụ danh sách conflict ở reopen section). Với các trường hợp phổ biến hơn, dùng typed subclass (`BadRequestException`, `ConflictException`, `ForbiddenException`, `ResourceNotFoundException`, `UnauthorizedException`, `ValidationException` kèm `fieldErrors`). Exception riêng của module (storage/provider) đặt trong `<module>/exception/` — chúng là lỗi kỹ thuật nội bộ, được handler catch-all quy về 500 nếu lọt ra ngoài.
+
+**Hai đường lỗi dùng chung một hình dáng response:** exception từ controller/service đi qua `GlobalExceptionHandler` → record `ErrorResponse` (`timestamp, status, code, message, path, requestId, fieldErrors, fields, details` — field `null` bị ẩn). Lỗi bị chặn ở filter (rate limit, CSRF, body-cap, account-state) đi qua `ApiErrorWriter` và serialize cùng các khóa envelope để client chỉ cần một parser.
+
+**Thêm exception mới cho một module:** tạo lớp `XxxException extends RuntimeException` (hoặc `AppException` nếu cần status/code riêng cho client) trong `<module>/exception/`; nếu cần mã lỗi dùng chung nhiều nơi thì bổ sung hằng vào `exception/code/ErrorCode`; không đặt exception type ngoài package `..exception..` và không thêm handler mới ngoài `exception/handler/` — `ArchitectureGuardTest` sẽ chặn.
+
+---
+
+## 8. Truy cập dữ liệu (Data Access)
+
+**Chuẩn data-access của backend là JDBC** (`NamedParameterJdbcTemplate`, `JdbcTemplate`, `JdbcOperations`). Toàn bộ SQL và row mapping nằm trong package `repository/` của từng module; service sở hữu transaction (`@Transactional`) và thứ tự lời gọi; controller, service và job không chứa câu lệnh SQL. `ArchitectureGuardTest` bắt buộc quy tắc này: tham chiếu tới `org.springframework.jdbc.core` chỉ được phép trong `..repository..`, `..rls..`, `..config..`, ngoại trừ một allow-list chỉ-giảm (shrink-only) các lớp chưa được di chuyển.
+
+**JPA bị đóng băng trong các "đảo" hiện có** — không thêm entity hay repository JPA mới:
+- `engagement.entity` — `ArticleCategory`, `ArticleTag`, `ArticleAttachment`, `ArticleMediaGallery` + các Spring Data repository tương ứng; chỉ `ArticleTaxonomyController` sử dụng.
+- `thesis.entity` — `ThesisTopic`, `ThesisRegistrationRound` + `thesis.repository.ThesisTopicRepository`, `ThesisRegistrationRoundRepository`; được dùng bên trong các service chủ yếu là JDBC.
+- `thesis.assistant.config.AssistantDatabaseConfiguration` — hạ tầng: primary `JpaTransactionManager`, assistant DataSource + `DataSourceTransactionManager` riêng phục vụ RLS, và `NamedParameterJdbcTemplate` beans.
+
+Tham chiếu `jakarta.persistence` chỉ được phép trong các package entity của hai đảo trên và trong `AssistantDatabaseConfiguration` — guard test cũng chặn điều này.
+
+**Hợp đồng thứ tự khóa (lock order) sống trong SQL:**
+- Academic: `Student -> Section -> Round` (`RegistrationService`); auth dùng `User -> Session` và `User -> ResetToken`.
+- Thesis: `group -> round` (`ThesisMutationService`); council khóa `round -> topic` (`ThesisSupervisorService`).
+- Assistant: `conversation -> ledger` (`ThesisAssistantRepository`).
+- Phương thức khóa đặt tên `lock...ForUpdate` và chú thích `@Transactional(propagation = MANDATORY)` để không bao giờ chạy ngoài transaction của caller.
+
+**Thêm một câu query mới:** đặt SQL + `RowMapper` trong `repository/` của module; service gọi method đó và sở hữu `@Transactional` khi cần; query `FOR UPDATE`/`FOR SHARE` phải đi qua method `lock...ForUpdate` có `MANDATORY`; exception translation (`DuplicateKeyException`, `DataIntegrityViolationException`, …) ở lại đúng statement trong repository method.
+
+**Không bao giờ chuyển sang JPA:** mọi đường `FOR UPDATE`/`FOR SHARE` và chuỗi lock order; luồng giữ chỗ/idempotency của đăng ký học phần; roster/council/publication/round-restore của thesis; assistant RLS DataSource + turn ledger (`AssistantRlsTransactionRunner` gọi `set_config` per-transaction); các bảng có trigger bảo vệ (thesis group/member, V94/V113/V141); audit writes trong cùng transaction (`AdminAuditRecorder`, `MANDATORY`); read model analytics/dean-overview/report; upsert `ON CONFLICT`. Lý do: thứ tự khóa, ranh giới RLS, trigger bắn trong transaction và việc bắt lỗi theo-từng-statement đều nằm trong SQL — flush trì hoãn của ORM sẽ đổi ngữ nghĩa cả bốn. Boot JPA autoconfig bị exclude trong `application.yml`, `ddl-auto: none` (Flyway sở hữu schema).
+
+---
+
+## 9. Ranh giới ngoài phạm vi (Non-goals)
 
 Các thành phần sau đây được xác định rõ ràng là **nằm ngoài phạm vi của đồ án môn học** để giữ cho hệ thống tập trung vào bài toán cốt lõi:
 - **Tài chính & Cổng thanh toán trực tuyến** (Finance, Payment gateways).

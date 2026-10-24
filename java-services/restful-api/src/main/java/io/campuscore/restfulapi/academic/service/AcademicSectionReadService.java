@@ -1,24 +1,24 @@
 package io.campuscore.restfulapi.academic.service;
 
 import io.campuscore.restfulapi.academic.repository.AcademicSectionReadRepository;
-import io.campuscore.restfulapi.academic.repository.AcademicSectionReadRepository.GradingSectionRow;
-import io.campuscore.restfulapi.academic.repository.AcademicSectionReadRepository.SectionGradeEnrollmentRow;
-import io.campuscore.restfulapi.academic.repository.AcademicSectionReadRepository.SectionRow;
-import io.campuscore.restfulapi.academic.repository.AcademicSectionReadRepository.SectionScheduleRow;
-import io.campuscore.restfulapi.academic.web.AcademicSectionReadDtos.ClassroomSummary;
-import io.campuscore.restfulapi.academic.web.AcademicSectionReadDtos.CourseSummary;
-import io.campuscore.restfulapi.academic.web.AcademicSectionReadDtos.DepartmentSummary;
-import io.campuscore.restfulapi.academic.web.AcademicSectionReadDtos.LecturerGradingSectionResponse;
-import io.campuscore.restfulapi.academic.web.AcademicSectionReadDtos.LecturerScheduleResponse;
-import io.campuscore.restfulapi.academic.web.AcademicSectionReadDtos.LecturerSummary;
-import io.campuscore.restfulapi.academic.web.AcademicSectionReadDtos.PageMeta;
-import io.campuscore.restfulapi.academic.web.AcademicSectionReadDtos.SectionGradeEnrollmentResponse;
-import io.campuscore.restfulapi.academic.web.AcademicSectionReadDtos.SectionGradesResponse;
-import io.campuscore.restfulapi.academic.web.AcademicSectionReadDtos.SectionListResponse;
-import io.campuscore.restfulapi.academic.web.AcademicSectionReadDtos.SectionResponse;
-import io.campuscore.restfulapi.academic.web.AcademicSectionReadDtos.SectionScheduleResponse;
-import io.campuscore.restfulapi.academic.web.AcademicSectionReadDtos.SemesterSummary;
-import io.campuscore.restfulapi.academic.web.AcademicSectionReadDtos.UserSummary;
+import io.campuscore.restfulapi.academic.model.GradingSectionRow;
+import io.campuscore.restfulapi.academic.model.SectionGradeEnrollmentRow;
+import io.campuscore.restfulapi.academic.model.SectionRow;
+import io.campuscore.restfulapi.academic.model.SectionScheduleRow;
+import io.campuscore.restfulapi.academic.dto.AcademicSectionReadDtos.ClassroomSummary;
+import io.campuscore.restfulapi.academic.dto.AcademicSectionReadDtos.CourseSummary;
+import io.campuscore.restfulapi.academic.dto.AcademicSectionReadDtos.DepartmentSummary;
+import io.campuscore.restfulapi.academic.dto.AcademicSectionReadDtos.LecturerGradingSectionResponse;
+import io.campuscore.restfulapi.academic.dto.AcademicSectionReadDtos.LecturerScheduleResponse;
+import io.campuscore.restfulapi.academic.dto.AcademicSectionReadDtos.LecturerSummary;
+import io.campuscore.restfulapi.academic.dto.AcademicSectionReadDtos.PageMeta;
+import io.campuscore.restfulapi.academic.dto.AcademicSectionReadDtos.SectionGradeEnrollmentResponse;
+import io.campuscore.restfulapi.academic.dto.AcademicSectionReadDtos.SectionGradesResponse;
+import io.campuscore.restfulapi.academic.dto.AcademicSectionReadDtos.SectionListResponse;
+import io.campuscore.restfulapi.academic.dto.AcademicSectionReadDtos.SectionResponse;
+import io.campuscore.restfulapi.academic.dto.AcademicSectionReadDtos.SectionScheduleResponse;
+import io.campuscore.restfulapi.academic.dto.AcademicSectionReadDtos.SemesterSummary;
+import io.campuscore.restfulapi.academic.dto.AcademicSectionReadDtos.UserSummary;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -97,7 +97,7 @@ public class AcademicSectionReadService {
         SectionRow section = sections.findSectionById(normalizeRequired("sectionId", sectionId))
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Section not found"));
         if (!sections.hasSectionAccess(section.id(), roles, normalizeOptional("lecturerId", lecturerId))) {
-            throw new io.campuscore.restfulapi.web.DomainException(
+            throw new io.campuscore.restfulapi.exception.DomainException(
                     HttpStatus.FORBIDDEN, "SECTION_FORBIDDEN", "Section is not assigned to the current lecturer");
         }
         return new SectionGradesResponse(

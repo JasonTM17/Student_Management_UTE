@@ -1,5 +1,6 @@
 package io.campuscore.restfulapi.engagement.service;
 
+import io.campuscore.restfulapi.engagement.model.SanitizationResult;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
@@ -33,9 +34,6 @@ import org.jsoup.safety.Safelist;
  * already renders through the frontend sanitizer.
  */
 public final class AnnouncementHtmlSanitizer {
-
-    /** Sanitized body plus how many elements the policy removed (observability). */
-    public record SanitizationResult(String html, int removedElements) {}
 
     private static final Set<String> ALLOWED_TAGS = Set.of(
             "a", "abbr", "b", "blockquote", "br", "caption", "code", "col", "colgroup",
