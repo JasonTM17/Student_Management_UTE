@@ -15,11 +15,13 @@ import io.campuscore.restfulapi.thesis.repository.ThesisTopicRepository;
 import io.campuscore.restfulapi.thesis.dto.ThesisGroupReadDtos.GroupResponse;
 import io.campuscore.restfulapi.thesis.dto.ThesisMutationDtos.CloseRegistrationPreviewResponse;
 import io.campuscore.restfulapi.thesis.dto.ThesisMutationDtos.GroupApprovalRequest;
+import io.campuscore.restfulapi.thesis.dto.ThesisMutationDtos.GroupApprovalWithdrawalRequest;
 import io.campuscore.restfulapi.thesis.dto.ThesisMutationDtos.GroupCreateRequest;
 import io.campuscore.restfulapi.thesis.dto.ThesisMutationDtos.MemberRequest;
 import io.campuscore.restfulapi.thesis.dto.ThesisMutationDtos.ProgressRequest;
 import io.campuscore.restfulapi.thesis.dto.ThesisMutationDtos.PublishResultsExcludedTopic;
 import io.campuscore.restfulapi.thesis.dto.ThesisMutationDtos.PublishResultsPreviewResponse;
+import io.campuscore.restfulapi.thesis.dto.ThesisMutationDtos.RoundClosureRequest;
 import io.campuscore.restfulapi.thesis.dto.ThesisMutationDtos.RoundCreateRequest;
 import io.campuscore.restfulapi.thesis.dto.ThesisMutationDtos.StudentSearchResponse;
 import io.campuscore.restfulapi.thesis.dto.ThesisMutationDtos.TopicAssignmentRequest;
@@ -59,8 +61,8 @@ import io.campuscore.restfulapi.thesis.scope.ThesisDepartmentScope;
 @Profile("persistence")
 public class ThesisMutationService {
 
-    private static final int MIN_GROUP_MEMBERS = 3;
-    private static final int MAX_GROUP_MEMBERS = 5;
+    static final int MIN_GROUP_MEMBERS = 3;
+    static final int MAX_GROUP_MEMBERS = 5;
 
     private static final org.slf4j.Logger log =
             org.slf4j.LoggerFactory.getLogger(ThesisMutationService.class);
@@ -74,6 +76,7 @@ public class ThesisMutationService {
     private final ThesisRoundReadService roundReads;
     private final AdminAuditRecorder audit;
     private final ThesisNotificationService notifier;
+    private final ThesisGroupWithdrawalPolicy withdrawalPolicy;
 
     /**
      * Retract-publication grace window in days
@@ -101,7 +104,20 @@ public class ThesisMutationService {
             ThesisRoundReadService roundReads,
             AdminAuditRecorder audit) {
         this(jdbc, rounds, roundReadPort, topics, groups, roundReads, audit, null,
-                new ThesisScopeRepository(jdbc));
+                new ThesisScopeRepository(jdbc), null);
+    }
+
+    public ThesisMutationService(
+            NamedParameterJdbcTemplate jdbc,
+            ThesisRegistrationRoundRepository rounds,
+            ThesisRoundReadPort roundReadPort,
+            ThesisTopicRepository topics,
+            ThesisGroupReadRepository groups,
+            ThesisRoundReadService roundReads,
+            AdminAuditRecorder audit,
+            ThesisNotificationService notifier) {
+        this(jdbc, rounds, roundReadPort, topics, groups, roundReads, audit, notifier,
+                new ThesisScopeRepository(jdbc), null);
     }
 
     @org.springframework.beans.factory.annotation.Autowired
@@ -114,7 +130,8 @@ public class ThesisMutationService {
             ThesisRoundReadService roundReads,
             AdminAuditRecorder audit,
             ThesisNotificationService notifier,
-            ThesisScopeRepository scope) {
+            ThesisScopeRepository scope,
+            ThesisGroupWithdrawalPolicy withdrawalPolicy) {
         this.jdbc = jdbc;
         this.scope = scope;
         this.rounds = rounds;
@@ -124,6 +141,7 @@ public class ThesisMutationService {
         this.roundReads = roundReads;
         this.audit = audit;
         this.notifier = notifier;
+        this.withdrawalPolicy = withdrawalPolicy;
     }
 
     /**
@@ -1152,7 +1170,7 @@ public class ThesisMutationService {
                 notifier.notifyGroupRosterChanged(groupId);
             }
         });
-        return groups.findById(groupId);
+        return groupView(groupId, actor);
     }
 
     /**
@@ -1232,7 +1250,7 @@ public class ThesisMutationService {
                 notifier.notifyGroupMemberRemoved(group.id(), studentId);
             }
         });
-        return groups.findById(group.id());
+        return groupView(group.id(), actor);
     }
 
     /**
@@ -1323,7 +1341,7 @@ public class ThesisMutationService {
                 notifier.notifyTopicAssigned(groupId, newTopicId);
             }
         });
-        return groups.findById(groupId);
+        return groupView(groupId, actor);
     }
 
     /**
@@ -1391,6 +1409,98 @@ public class ThesisMutationService {
                 }
             }
         });
+        return roundReads.get(id);
+    }
+
+    /**
+     * Archives a published round: RESULTS_PUBLISHED -> CLOSED. Closing is the
+     * audited end of the lifecycle — the round and everything in it becomes
+     * read-only for every mutation path while the published results stay
+     * readable. While the retraction grace window is still open the close is
+     * refused so a mistaken publication keeps its documented undo path, and
+     * {@code results_published_at} is deliberately left untouched so a
+     * reopened round is the same publication, not a new one. No notifications
+     * are sent: students were already told results are out and an archive is
+     * not a result change.
+     */
+    @Transactional
+    public RoundResponse closeRound(UUID id, RoundClosureRequest request, Jwt actor) {
+        if (!ThesisDeanScope.isGlobalAdmin(actor)) {
+            throw new DomainException(HttpStatus.FORBIDDEN, "CLOSE_ADMIN_REQUIRED",
+                    "Only a global admin can close a published round");
+        }
+        String cleanReason = requireReason(request == null ? null : request.reason());
+        Map<String, Object> round = one(
+                "SELECT status, name, results_published_at FROM thesis.thesis_registration_round "
+                        + "WHERE id = :id FOR UPDATE",
+                params().addValue("id", id), "ROUND_NOT_FOUND", "Thesis registration round not found");
+        if (!RoundStatus.RESULTS_PUBLISHED.name().equals(round.get("status"))) {
+            throw conflict("ROUND_STATE_CONFLICT", "Only a published round can be closed");
+        }
+        Instant publishedAt = instantOf(round.get("results_published_at"));
+        if (publishedAt != null) {
+            Instant windowEnds = publishedAt.plus(java.time.Duration.ofDays(retractGraceDays));
+            if (Instant.now().isBefore(windowEnds)) {
+                throw new DomainException(HttpStatus.CONFLICT, "RETRACT_WINDOW_OPEN",
+                        "The retraction grace period is still open for " + windowEnds
+                                + "; closing now would silently remove that undo path",
+                        Map.of("retractWindowEndsAt", windowEnds.toString(),
+                                "remainingHours", java.time.Duration.between(Instant.now(), windowEnds).toHours() + 1));
+            }
+        }
+        int moved = jdbc.update(
+                "UPDATE thesis.thesis_registration_round SET status = 'CLOSED', updated_at = CURRENT_TIMESTAMP, "
+                        + "version = version + 1 WHERE id = :id AND status = 'RESULTS_PUBLISHED'",
+                params().addValue("id", id));
+        if (moved != 1) {
+            throw conflict("ROUND_STATE_CONFLICT", "Only a published round can be closed");
+        }
+        Integer topics = jdbc.queryForObject(
+                "SELECT COUNT(*) FROM thesis.thesis_topic WHERE round_id = :id",
+                params().addValue("id", id), Integer.class);
+        Integer groups = jdbc.queryForObject(
+                "SELECT COUNT(*) FROM thesis.thesis_group WHERE round_id = :id",
+                params().addValue("id", id), Integer.class);
+        audit.record(subject(actor), null, "THESIS_ROUND_CLOSED", "THESIS_ROUND", id.toString(),
+                "Round closed (archived); reason: " + cleanReason,
+                Map.of("status", RoundStatus.RESULTS_PUBLISHED.name(), "name", round.get("name"),
+                        "topics", topics == null ? 0 : topics, "groups", groups == null ? 0 : groups),
+                Map.of("status", RoundStatus.CLOSED.name(), "reason", cleanReason));
+        return roundReads.get(id);
+    }
+
+    /**
+     * Reopens an archived round: CLOSED -> RESULTS_PUBLISHED. Only the status
+     * moves back — {@code results_published_at} was preserved at close so the
+     * round returns to exactly the published state it left, and the retract
+     * grace window is already past (close was refused while it was open). No
+     * notifications are sent.
+     */
+    @Transactional
+    public RoundResponse reopenRound(UUID id, RoundClosureRequest request, Jwt actor) {
+        if (!ThesisDeanScope.isGlobalAdmin(actor)) {
+            throw new DomainException(HttpStatus.FORBIDDEN, "REOPEN_ADMIN_REQUIRED",
+                    "Only a global admin can reopen a closed round");
+        }
+        String cleanReason = requireReason(request == null ? null : request.reason());
+        Map<String, Object> round = one(
+                "SELECT status, name FROM thesis.thesis_registration_round WHERE id = :id FOR UPDATE",
+                params().addValue("id", id), "ROUND_NOT_FOUND", "Thesis registration round not found");
+        if (!RoundStatus.CLOSED.name().equals(round.get("status"))) {
+            throw conflict("ROUND_STATE_CONFLICT", "Only a closed round can be reopened");
+        }
+        int moved = jdbc.update(
+                "UPDATE thesis.thesis_registration_round SET status = 'RESULTS_PUBLISHED', "
+                        + "updated_at = CURRENT_TIMESTAMP, version = version + 1 "
+                        + "WHERE id = :id AND status = 'CLOSED'",
+                params().addValue("id", id));
+        if (moved != 1) {
+            throw conflict("ROUND_STATE_CONFLICT", "Only a closed round can be reopened");
+        }
+        audit.record(subject(actor), null, "THESIS_ROUND_REOPENED", "THESIS_ROUND", id.toString(),
+                "Round reopened to results published; reason: " + cleanReason,
+                Map.of("status", RoundStatus.CLOSED.name(), "name", round.get("name")),
+                Map.of("status", RoundStatus.RESULTS_PUBLISHED.name(), "reason", cleanReason));
         return roundReads.get(id);
     }
 
@@ -1857,7 +1967,7 @@ public class ThesisMutationService {
         UUID groupId = UUID.randomUUID();
         jdbc.update("INSERT INTO thesis.thesis_group (id, round_id, leader_student_id, status, approval_status) VALUES (:id, :roundId, :studentId, 'DRAFT', 'PENDING')", params().addValue("id", groupId).addValue("roundId", roundId).addValue("studentId", studentId));
         jdbc.update("INSERT INTO thesis.thesis_group_member (id, group_id, round_id, student_id, member_order, is_leader) VALUES (:id, :groupId, :roundId, :studentId, 1, TRUE)", params().addValue("id", UUID.randomUUID()).addValue("groupId", groupId).addValue("roundId", roundId).addValue("studentId", studentId));
-        return groups.findById(groupId);
+        return groupView(groupId, actor);
     }
 
     /**
@@ -1888,7 +1998,7 @@ public class ThesisMutationService {
         String studentId = normalize(request == null ? null : request.studentId());
         if (studentId.isBlank()) {
             addExternalMember(group, request, actor);
-            return groups.findById(groupId);
+            return groupView(groupId, actor);
         }
         requireActiveStudent(studentId);
         requireNotInAnotherActiveGroup(group.roundId(), studentId);
@@ -1898,7 +2008,7 @@ public class ThesisMutationService {
         // a removed member cannot prove they ever belonged to the group.
         audit.record(subject(actor), null, "THESIS_GROUP_MEMBER_ADDED", "THESIS_GROUP", groupId.toString(),
                 "Member " + studentId + " added to thesis group");
-        return groups.findById(groupId);
+        return groupView(groupId, actor);
     }
 
     /**
@@ -1977,7 +2087,7 @@ public class ThesisMutationService {
         jdbc.update("UPDATE thesis.thesis_group SET updated_at = CURRENT_TIMESTAMP, version = version + 1 WHERE id = :groupId", params().addValue("groupId", groupId));
         audit.record(subject(actor), null, "THESIS_GROUP_MEMBER_REMOVED", "THESIS_GROUP", groupId.toString(),
                 "Member " + normalized + " removed from thesis group");
-        return groups.findById(groupId);
+        return groupView(groupId, actor);
     }
 
     /**
@@ -2051,7 +2161,7 @@ public class ThesisMutationService {
                 }
             });
         }
-        return groups.findById(groupId);
+        return groupView(groupId, actor);
     }
 
     /**
@@ -2124,7 +2234,7 @@ public class ThesisMutationService {
             audit.record(subject(actor), null, "THESIS_GROUP_STATUS_CHANGED", "THESIS_GROUP", groupId.toString(),
                     "Group status changed from " + group.status() + " to " + status);
         }
-        return groups.findById(groupId);
+        return groupView(groupId, actor);
     }
 
     /**
@@ -2146,7 +2256,7 @@ public class ThesisMutationService {
     @Transactional
     public GroupResponse approveGroup(UUID groupId, GroupApprovalRequest request, Jwt actor) {
         GroupRow group = lockGroup(groupId);
-        authorizeReviewer(group, actor);
+        boolean supervisorActor = authorizeReviewer(group, actor);
         // The round row is locked so an approval cannot slip between
         // publishResults' completeness check and its guarded transition —
         // a published round must never contain an ungraded approved group.
@@ -2211,6 +2321,22 @@ public class ThesisMutationService {
         if (leaderCount == null || leaderCount != 1 || matchingLeader == null || matchingLeader != 1) {
             throw conflict("GROUP_LEADER_INVALID", "A thesis group must have exactly one matching leader");
         }
+        // An approver who is not the topic's own supervisor acts as a
+        // governance override (admin, faculty head in scope): the decision
+        // stays allowed, but the reason becomes mandatory so the override is
+        // accountable in the audit trail. A supervisor approving their own
+        // topic needs no reason — unchanged. The dedicated code lets clients
+        // open the documented-reason dialog instead of a dead-end error.
+        String overrideReason = null;
+        if (!supervisorActor) {
+            String raw = request == null ? null : request.reason();
+            if (raw == null || raw.isBlank()) {
+                throw new DomainException(HttpStatus.BAD_REQUEST,
+                        "GROUP_APPROVAL_OVERRIDE_REASON_REQUIRED",
+                        "A governance override approval requires a documented reason");
+            }
+            overrideReason = requireReason(raw);
+        }
         int changed;
         if (sizeExceptionReason == null) {
             changed = jdbc.update("UPDATE thesis.thesis_group SET approval_status='APPROVED', approved_by=:actor, approved_at=CURRENT_TIMESTAMP, rejection_reason=NULL, updated_at=CURRENT_TIMESTAMP, version=version+1 WHERE id=:id AND approval_status='PENDING'",
@@ -2228,8 +2354,10 @@ public class ThesisMutationService {
         // proceeds to the defense phase, so the approving actor must be
         // traceable even though approved_by already stores them on the row.
         audit.record(subject(actor), null, "THESIS_GROUP_APPROVED", "THESIS_GROUP", groupId.toString(),
-                "Thesis group approved" + (sizeExceptionReason == null
-                        ? "" : "; below-minimum size exception: " + sizeExceptionReason));
+                "Thesis group approved"
+                        + (overrideReason == null ? "" : "; governance override: " + overrideReason)
+                        + (sizeExceptionReason == null
+                                ? "" : "; below-minimum size exception: " + sizeExceptionReason));
         if (notifier != null) {
             afterCommit(() -> {
                 try {
@@ -2239,7 +2367,7 @@ public class ThesisMutationService {
                 }
             });
         }
-        return groups.findById(groupId);
+        return groupView(groupId, actor);
     }
 
     /**
@@ -2282,7 +2410,159 @@ public class ThesisMutationService {
                 }
             });
         }
-        return groups.findById(groupId);
+        return groupView(groupId, actor);
+    }
+
+    /**
+     * Withdraws a mistaken group approval and returns the group to PENDING —
+     * the release path approve previously lacked (reject needs PENDING,
+     * cancel refuses APPROVED, and the roster override is REGISTRATION_CLOSED
+     * only). The group keeps its roster and topic pick; the approval columns
+     * (including any size-exception marker) are cleared so the state is
+     * exactly as if it had never been approved.
+     *
+     * <p>Authorization mirrors the narrow post-close discipline, not the
+     * wider reviewer rule: the topic's own supervisors, ADMIN/SUPER_ADMIN,
+     * and TRUONG_KHOA / TRUONG_BO_MON strictly through their governance
+     * scope — a dean or department head supervising a foreign-scope topic
+     * gets no supervisor escape. The round must sit in the same window where
+     * approve is legal (PROPOSALS_PUBLISHED, REGISTRATION_OPEN,
+     * REGISTRATION_CLOSED), and any downstream work — group report, topic
+     * scores, council assignment, assigned reviewer, topic result — blocks
+     * the withdrawal with per-kind counts so governance knows to use the
+     * roster override instead.
+     *
+     * <p>Lock order is the same as approve/reject: the group row FOR UPDATE
+     * first, then the round row FOR UPDATE, so a concurrent approve, reject,
+     * cancel, roster override, council assignment or round transition
+     * serializes on one of the two rows before the state is re-checked.
+     *
+     * @param groupId group whose approval is withdrawn
+     * @param request mandatory withdrawal reason (1-500 characters)
+     * @param actor caller JWT; supervisor or governance officer in scope
+     * @return the group, back in PENDING
+     * @throws DomainException with code GROUP_APPROVAL_STATE_CONFLICT unless
+     *         the group is approved and submitted in a reviewable round,
+     *         GROUP_WITHDRAWAL_BLOCKED (with per-kind counts) once downstream
+     *         work exists, VALIDATION_ERROR for a missing or over-long
+     *         reason, THESIS_GROUP_NOT_FOUND for out-of-scope governance,
+     *         or GROUP_REVIEWER_REQUIRED for anyone else
+     */
+    @Transactional
+    public GroupResponse withdrawGroupApproval(UUID groupId, GroupApprovalWithdrawalRequest request, Jwt actor) {
+        GroupRow group = lockGroup(groupId);
+        authorizeApprovalWithdrawal(group, actor);
+        // Same FOR UPDATE read as approve: the approval may only move while
+        // the round still reviews registrations, and the lock fences a
+        // concurrent close/publish transition.
+        String roundStatus = (String) one(
+                "SELECT status FROM thesis.thesis_registration_round WHERE id = :id FOR UPDATE",
+                params().addValue("id", group.roundId()), "ROUND_NOT_FOUND", "Thesis registration round not found")
+                .get("status");
+        if (!Set.of(RoundStatus.PROPOSALS_PUBLISHED.name(), RoundStatus.REGISTRATION_OPEN.name(),
+                RoundStatus.REGISTRATION_CLOSED.name()).contains(roundStatus)) {
+            throw conflict("GROUP_APPROVAL_STATE_CONFLICT",
+                    "Approvals can only be withdrawn while the round is accepting or reviewing registrations");
+        }
+        if (group.approvalStatus() != ApprovalStatus.APPROVED
+                || group.status() != GroupStatus.SUBMITTED || group.topicId() == null) {
+            throw conflict("GROUP_APPROVAL_STATE_CONFLICT",
+                    "Only an approved submitted group can have its approval withdrawn");
+        }
+        String reason = requireReason(request == null ? null : request.reason());
+        // Once downstream work exists the approval is load-bearing: undoing
+        // it would orphan the report, score, council slot, reviewer or
+        // result. Refuse with the per-kind counts so governance reaches for
+        // the roster override instead.
+        Map<String, Object> boundTopic = one(
+                "SELECT gvpb_lecturer_id, result_status, final_score FROM thesis.thesis_topic WHERE id = :id",
+                params().addValue("id", group.topicId()), "TOPIC_NOT_FOUND", "Thesis topic not found");
+        long reports = count(
+                "SELECT COUNT(*) FROM thesis.thesis_group_report WHERE group_id = :groupId", "groupId", groupId);
+        long scores = count(
+                "SELECT COUNT(*) FROM thesis.thesis_topic_score WHERE topic_id = :topicId", "topicId", group.topicId());
+        long councilTopics = count(
+                "SELECT COUNT(*) FROM thesis.thesis_council_topic WHERE topic_id = :topicId", "topicId", group.topicId());
+        long reviewers = boundTopic.get("gvpb_lecturer_id") != null ? 1 : 0;
+        long results = boundTopic.get("result_status") != null || boundTopic.get("final_score") != null ? 1 : 0;
+        if (reports + scores + councilTopics + reviewers + results > 0) {
+            throw new DomainException(HttpStatus.CONFLICT, "GROUP_WITHDRAWAL_BLOCKED",
+                    "The group already has downstream work — reports, scores, council or reviewer "
+                            + "assignments, results — so its approval cannot be withdrawn; "
+                            + "use the governance roster override instead",
+                    Map.of("reports", reports, "scores", scores, "councilTopics", councilTopics,
+                            "reviewers", reviewers, "results", results));
+        }
+        int changed = jdbc.update("UPDATE thesis.thesis_group SET approval_status='PENDING',"
+                + " approved_by=NULL, approved_at=NULL, rejection_reason=NULL,"
+                + " size_exception_reason=NULL, size_exception_by=NULL, size_exception_at=NULL,"
+                + " updated_at=CURRENT_TIMESTAMP, version=version+1"
+                + " WHERE id=:id AND approval_status='APPROVED'",
+                params().addValue("id", groupId));
+        if (changed != 1) {
+            throw conflict("GROUP_APPROVAL_STATE_CONFLICT",
+                    "Only an approved group can have its approval withdrawn");
+        }
+        // Same lockstep transaction as the mutation (recorder runs MANDATORY):
+        // who, when, why, plus the group/topic/round coordinates.
+        audit.record(subject(actor), null, "THESIS_GROUP_APPROVAL_WITHDRAWN", "THESIS_GROUP",
+                groupId.toString(),
+                "Thesis group approval withdrawn; reason: " + reason,
+                Map.of("approvalStatus", "APPROVED", "topicId", group.topicId().toString(),
+                        "roundId", group.roundId().toString()),
+                Map.of("approvalStatus", "PENDING"));
+        if (notifier != null) {
+            String notifyReason = reason;
+            afterCommit(() -> {
+                try {
+                    notifier.notifyGroupApprovalWithdrawn(groupId, notifyReason);
+                } catch (RuntimeException exception) {
+                    log.warn("Thesis approval-withdrawal notification fan-out failed for group {}", groupId, exception);
+                }
+            });
+        }
+        return groupView(groupId, actor);
+    }
+
+    /**
+     * Withdraw-approval authority is narrower than {@link #authorizeReviewer}:
+     * governance officers act only inside their scope and get no supervisor
+     * escape (the same discipline {@link #updateProgress} and the roster
+     * override apply); everyone else must be a current supervisor of the
+     * group's topic.
+     */
+    private void authorizeApprovalWithdrawal(GroupRow group, Jwt actor) {
+        if (isGlobalAdmin(actor)) {
+            return;
+        }
+        if (hasRole(actor, "TRUONG_KHOA")) {
+            if (groups.groupInFaculty(group.id(), requireDeanScope(actor).facultyId())) {
+                return;
+            }
+            throw notFound("THESIS_GROUP_NOT_FOUND", "Thesis group not found");
+        }
+        if (ThesisDepartmentScope.isDepartmentHead(actor)) {
+            String department = ThesisDepartmentScope.departmentId(scope, actor);
+            if (!department.isEmpty() && groups.groupInDepartment(group.id(), department)) {
+                return;
+            }
+            throw notFound("THESIS_GROUP_NOT_FOUND", "Thesis group not found");
+        }
+        if (group.topicId() != null && isCurrentSupervisor(group.topicId(), actor)) {
+            return;
+        }
+        throw new DomainException(HttpStatus.FORBIDDEN, "GROUP_REVIEWER_REQUIRED",
+                "Only an assigned supervisor or a governance officer in scope can withdraw this approval");
+    }
+
+    /**
+     * The group response enriched with the actor's withdraw-approval
+     * affordance; the policy bean stays optional so plain fixture
+     * constructors keep working.
+     */
+    private GroupResponse groupView(UUID groupId, Jwt actor) {
+        GroupResponse group = groups.findById(groupId);
+        return withdrawalPolicy == null ? group : withdrawalPolicy.attach(group, actor);
     }
 
     /**
@@ -2410,33 +2690,45 @@ public class ThesisMutationService {
         return count != null && count > 0;
     }
 
-    private void authorizeReviewer(GroupRow group, Jwt actor) {
-        if (isGroupAdmin(group, actor)) return;
-        if (group.topicId() == null) {
+    /**
+     * Review authority for approve/reject: a governance admin, or the topic's
+     * own current supervisor.
+     *
+     * @return true when the caller reviews as the topic's supervisor — a dean
+     *         who supervises the topic counts as a supervisor, so an approve
+     *         from them stays a normal (non-override) approval
+     */
+    private boolean authorizeReviewer(GroupRow group, Jwt actor) {
+        boolean supervised = group.topicId() != null && isCurrentSupervisor(group.topicId(), actor);
+        if (isGroupAdmin(group, actor)) {
+            return supervised;
+        }
+        if (!supervised) {
             throw new DomainException(HttpStatus.FORBIDDEN, "GROUP_REVIEWER_REQUIRED", "Only an assigned supervisor or admin can review this group");
         }
+        return true;
+    }
+
+    /**
+     * Whether the actor is a CURRENT supervisor of the topic — the topic
+     * creator loses this right when setSupervisors replaces them, otherwise a
+     * stale creator retains approval power over groups they no longer
+     * supervise. The active-lecturer join keeps a deactivated profile from
+     * retaining the same approval power after the account is disabled.
+     */
+    private boolean isCurrentSupervisor(UUID topicId, Jwt actor) {
         String actorId = subject(actor);
         String lecturerId = normalize(actor == null ? null : actor.getClaimAsString("lecturerId"));
-
-        // The reviewer must be a CURRENT supervisor — the topic creator loses
-        // this right when setSupervisors replaces them, otherwise a stale
-        // creator retains approval power over groups they no longer supervise.
-        // The active-lecturer join keeps a deactivated profile from retaining
-        // the same approval power after the account is disabled.
         Integer supervisorCount = jdbc.queryForObject(
                 "SELECT COUNT(*) FROM thesis.thesis_topic_supervisor s "
                         + "JOIN campuscore_auth.\"Lecturer\" l ON (l.\"id\" = s.lecturer_id OR l.\"userId\" = s.lecturer_id) "
                         + "AND l.\"isActive\" = TRUE "
                         + "WHERE s.topic_id = :topicId AND (s.lecturer_id = :lecturerId OR s.lecturer_id = :actorId)",
-                params().addValue("topicId", group.topicId())
+                params().addValue("topicId", topicId)
                         .addValue("actorId", actorId)
                         .addValue("lecturerId", lecturerId.isBlank() ? actorId : lecturerId),
                 Integer.class);
-        if (supervisorCount != null && supervisorCount > 0) {
-            return;
-        }
-
-        throw new DomainException(HttpStatus.FORBIDDEN, "GROUP_REVIEWER_REQUIRED", "Only an assigned supervisor or admin can review this group");
+        return supervisorCount != null && supervisorCount > 0;
     }
 
     /**

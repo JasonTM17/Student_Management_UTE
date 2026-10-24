@@ -71,6 +71,14 @@ public class ThesisRegistrationRound {
     @Column(name = "cancelled_from_status", length = 32)
     private RoundStatus cancelledFromStatus;
 
+    /**
+     * Publication instant of the current result set. Deliberately preserved
+     * through CLOSE/REOPEN so the retraction grace window always measures the
+     * original publication; retract sets it back to NULL.
+     */
+    @Column(name = "results_published_at")
+    private Instant resultsPublishedAt;
+
     protected ThesisRegistrationRound() {
     }
 
@@ -88,4 +96,5 @@ public class ThesisRegistrationRound {
     public Instant getDefenseDate() { return defenseDate; }
     public RoundStatus getStatus() { return status; }
     public RoundStatus getCancelledFromStatus() { return cancelledFromStatus; }
+    public Instant getResultsPublishedAt() { return resultsPublishedAt; }
 }

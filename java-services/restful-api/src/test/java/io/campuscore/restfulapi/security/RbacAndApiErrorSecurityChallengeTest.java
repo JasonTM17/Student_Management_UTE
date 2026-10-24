@@ -222,7 +222,7 @@ class RbacAndApiErrorSecurityChallengeTest {
             GroupResponse dummy = new GroupResponse(
                     GROUP_ID, ROUND_ID, "leader-01", null,
                     GroupStatus.DRAFT, ApprovalStatus.PENDING, null,
-                    List.of(), List.of());
+                    List.of(), List.of(), null);
 
             when(groupReadService.list(eq(ROUND_ID), any(), any(), any(), any())).thenReturn(List.of(dummy));
             when(groupReadService.get(eq(GROUP_ID), any(), any(), any(), any())).thenReturn(dummy);

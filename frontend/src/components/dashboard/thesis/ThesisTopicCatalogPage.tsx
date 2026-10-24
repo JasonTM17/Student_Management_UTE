@@ -18,6 +18,7 @@ import { StatusBadge } from '@/components/thesis/StatusBadge';
 import { TopicCardGridSkeleton } from '@/components/ui/skeleton';
 import { normalizeVietnameseText } from '@/lib/registration-browse';
 import { plainTextThesisDescription as plainTextDescription } from '@/lib/thesis-text';
+import { roundsForPicker } from '@/lib/thesis-round';
 import { cn } from '@/lib/utils';
 import { useThesisWorkspace } from './useThesisWorkspace';
 
@@ -220,7 +221,8 @@ export default function ThesisTopicCatalogPage() {
           options={
             workspace.cohortGroups && workspace.cohortGroups.length > 0
               ? undefined
-              : workspace.rounds.map((round) => ({ value: round.id, label: round.name }))
+              : roundsForPicker(workspace.rounds, workspace.selectedRoundId)
+                  .map((round) => ({ value: round.id, label: round.name }))
           }
         />
         {workspace.selectedRound ? (

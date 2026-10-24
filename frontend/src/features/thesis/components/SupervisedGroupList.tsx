@@ -24,6 +24,14 @@ interface SupervisedGroupListProps {
   onGroupUpdated: (group: ThesisGroup) => void;
   onApprove: (groupId: string) => void | Promise<void>;
   onReject: (groupId: string) => void;
+  /** Round read model bound — when present the card shows the missing-member
+   * state and approval gating follows it instead of a failed round-trip. */
+  minGroupSize?: number | null;
+  /** Governance-only: actors with the documented size-exception power see the
+   * exception action instead of a disabled Approve below the minimum. */
+  canSizeException?: boolean;
+  onApproveWithException?: (groupId: string) => void;
+  onWithdrawApproval?: (groupId: string) => void;
   onDownloadReport: (
     groupId: string,
     report: ThesisGroupReport | null | undefined,
@@ -44,6 +52,10 @@ export default function SupervisedGroupList({
   onGroupUpdated,
   onApprove,
   onReject,
+  minGroupSize = null,
+  canSizeException = false,
+  onApproveWithException,
+  onWithdrawApproval,
   onDownloadReport,
 }: SupervisedGroupListProps) {
   const pageCopy = messages.thesisWorkflow.page;
@@ -79,6 +91,9 @@ export default function SupervisedGroupList({
               // topic authorship — a department head who merely proposed the
               // topic must not see dead approve/reject buttons.
               const mayReview = !canReviewGroup || canReviewGroup(group);
+              const memberCount = group.memberStudentIds.length;
+              const belowMinimum =
+                minGroupSize != null && minGroupSize > 0 && memberCount < minGroupSize;
               return (
                 <div
                   key={group.id}
@@ -96,9 +111,20 @@ export default function SupervisedGroupList({
                       <span>
                         {messages.thesis.memberCount.replace(
                           '{count}',
-                          String(group.memberStudentIds.length),
+                          String(memberCount),
                         )}
                       </span>
+                      {belowMinimum ? (
+                        <span
+                          className="rounded-md bg-amber-500/15 px-1.5 py-0.5 text-[11px] font-medium text-amber-700 dark:text-amber-400"
+                          data-testid="members-needed"
+                        >
+                          {messages.thesis.membersNeededShort.replace(
+                            '{count}',
+                            String(minGroupSize - memberCount),
+                          )}
+                        </span>
+                      ) : null}
                       <MemberAvatars memberIds={group.memberStudentIds} members={group.members} max={3} />
                     </div>
                     {group.rejectionReason ? (
@@ -155,16 +181,41 @@ export default function SupervisedGroupList({
                   <div className="flex shrink-0 items-center gap-2">
                     {isPending && mayReview ? (
                       <>
-                        <Button
-                          type="button"
-                          size="sm"
-                          className="bg-emerald-700 text-white hover:bg-emerald-800"
-                          onClick={() => void onApprove(group.id)}
-                          disabled={isActionPending}
-                        >
-                          <Check className="mr-1.5 h-4 w-4" />
-                          {messages.thesis.approve}
-                        </Button>
+                        {belowMinimum && canSizeException ? (
+                          <Button
+                            type="button"
+                            size="sm"
+                            className="bg-amber-600 text-white hover:bg-amber-700"
+                            onClick={() =>
+                              onApproveWithException
+                                ? onApproveWithException(group.id)
+                                : void onApprove(group.id)
+                            }
+                            disabled={isActionPending}
+                          >
+                            <Check className="mr-1.5 h-4 w-4" />
+                            {messages.thesis.approveWithException}
+                          </Button>
+                        ) : (
+                          <Button
+                            type="button"
+                            size="sm"
+                            className="bg-emerald-700 text-white hover:bg-emerald-800"
+                            onClick={() => void onApprove(group.id)}
+                            disabled={isActionPending || belowMinimum}
+                            title={
+                              belowMinimum
+                                ? messages.thesis.membersNeededShort.replace(
+                                    '{count}',
+                                    String(minGroupSize - memberCount),
+                                  )
+                                : undefined
+                            }
+                          >
+                            <Check className="mr-1.5 h-4 w-4" />
+                            {messages.thesis.approve}
+                          </Button>
+                        )}
                         <Button
                           type="button"
                           size="sm"
@@ -176,6 +227,17 @@ export default function SupervisedGroupList({
                           {messages.thesis.reject}
                         </Button>
                       </>
+                    ) : null}
+                    {group.approvalWithdrawal?.withdrawable && mayReview && onWithdrawApproval ? (
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        onClick={() => onWithdrawApproval(group.id)}
+                        disabled={isActionPending}
+                      >
+                        {messages.thesis.withdrawApproval}
+                      </Button>
                     ) : null}
                   </div>
                 </div>

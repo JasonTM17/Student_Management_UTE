@@ -132,6 +132,10 @@ export const en = {
           'You already have a pending credit limit exception application.',
         IDEMPOTENCY_IN_PROGRESS: 'Your previous request is still being processed. Try again in a moment.',
         GROUP_APPROVAL_STATE_CONFLICT: 'Only a submitted group with a topic can be reviewed.',
+        GROUP_WITHDRAWAL_BLOCKED:
+          'The group already has reports, scores, council or reviewer assignments — use the roster override instead.',
+        GROUP_APPROVAL_OVERRIDE_REASON_REQUIRED:
+          'A governance override approval requires a documented reason.',
         // Thesis group/member management
         STUDENT_ALREADY_IN_GROUP: 'This student is already a member of a group.',
         STUDENT_ACTIVE_IN_OTHER_GROUP:
@@ -262,6 +266,10 @@ export const en = {
         RESULTS_ALL_EXCLUDED: 'Every approved topic is excluded from publication.',
         RETRACT_ADMIN_REQUIRED: 'Only an administrator can retract published results.',
         RETRACT_WINDOW_CLOSED: 'The retraction grace period has passed.',
+        RETRACT_WINDOW_OPEN:
+          'The retraction grace period is still open — wait for it to end before closing this round.',
+        CLOSE_ADMIN_REQUIRED: 'Only an administrator can close a round.',
+        REOPEN_ADMIN_REQUIRED: 'Only an administrator can reopen a closed round.',
         REVIEW_WINDOW_OPEN: 'The counter-review window is still open for some topics.',
         SECTION_STATUS_CHANGED:
           'This section changed while the edit was open. Review the latest version and try again.',
@@ -2371,6 +2379,18 @@ export const en = {
     sizeExceptionReasonPlaceholder:
       'Document why the under-size roster is approved (required)...',
     approveWithException: 'Approve with exception',
+    membersNeededShort: 'Needs {count} more to approve',
+    approveOverrideModalTitle: 'Approve as governance override',
+    approveOverrideModalDescription:
+      'You are not this topic’s supervisor. The approval is recorded as a governance override with your reason.',
+    withdrawApproval: 'Withdraw approval',
+    withdrawApprovalModalTitle: 'Withdraw group approval',
+    withdrawApprovalModalDescription:
+      'The group returns to pending review and keeps its members and topic.',
+    withdrawApprovalReason: 'Withdrawal reason',
+    withdrawApprovalReasonPlaceholder:
+      'Document why this approval is withdrawn (required)...',
+    withdrawApprovalSuccess: 'Approval withdrawn; the group is pending again.',
     groupTooSmall:
       'A thesis group needs 3 to 5 members, with exactly one group leader, before it can be approved. A draft with 1 or 2 members can be completed before approval.',
     groupStateConflict:
@@ -2748,6 +2768,16 @@ export const en = {
       retractResultsConfirmLabel: 'Type RETRACT to confirm',
       retractResultsSuccess: 'Publication retracted; students were notified.',
       retractResultsHint: 'Sent e-mails cannot be recalled.',
+      closeRound: 'Close round',
+      closeRoundTitle: 'Close this round?',
+      closeRoundHint: 'The round becomes read-only; results stay viewable and it can be reopened.',
+      closeRoundConfirmLabel: 'Type the round name to confirm',
+      closeBlockedRetractWindow: 'Closing unlocks once the retraction grace period ends.',
+      roundClosed: 'Round closed.',
+      reopenRound: 'Reopen',
+      reopenRoundTitle: 'Reopen this round?',
+      roundReopened: 'Round reopened.',
+      showClosedRounds: 'Show closed',
       publishReviewOpen: 'Counter-review still open: {titles}.',
       publishAllExcluded: 'Every approved group is excluded; publishing will show no results.',
     },
@@ -3210,6 +3240,10 @@ export const vi: I18nMessages = {
           'Sinh viên đã có đơn xin nâng hạn mức tín chỉ đang chờ xử lý.',
         IDEMPOTENCY_IN_PROGRESS: 'Yêu cầu trước của bạn đang được xử lý. Vui lòng thử lại sau chốc lát.',
         GROUP_APPROVAL_STATE_CONFLICT: 'Chỉ nhóm đã gửi kèm đề tài mới có thể được duyệt.',
+        GROUP_WITHDRAWAL_BLOCKED:
+          'Nhóm đã có tiến độ, điểm, hội đồng hoặc phản biện — hãy dùng thao tác ghi đè danh sách.',
+        GROUP_APPROVAL_OVERRIDE_REASON_REQUIRED:
+          'Quyết định duyệt theo thẩm quyền quản trị phải kèm lý do.',
         // Quản lý nhóm/thành viên khóa luận
         STUDENT_ALREADY_IN_GROUP: 'Sinh viên này đã là thành viên của một nhóm.',
         STUDENT_ACTIVE_IN_OTHER_GROUP:
@@ -3340,6 +3374,10 @@ export const vi: I18nMessages = {
         RESULTS_ALL_EXCLUDED: 'Tất cả đề tài đã duyệt đều bị loại khỏi công bố.',
         RETRACT_ADMIN_REQUIRED: 'Chỉ quản trị viên mới có thể thu hồi kết quả đã công bố.',
         RETRACT_WINDOW_CLOSED: 'Đã hết thời hạn thu hồi kết quả.',
+        RETRACT_WINDOW_OPEN:
+          'Thời hạn thu hồi kết quả vẫn còn mở — hãy đợi hết hạn trước khi đóng đợt này.',
+        CLOSE_ADMIN_REQUIRED: 'Chỉ quản trị viên mới được đóng đợt.',
+        REOPEN_ADMIN_REQUIRED: 'Chỉ quản trị viên mới được mở lại đợt đã đóng.',
         REVIEW_WINDOW_OPEN: 'Cửa sổ phản biện vẫn đang mở cho một số đề tài.',
         SECTION_STATUS_CHANGED:
           'Lớp học phần đã thay đổi trong lúc chỉnh sửa. Hãy xem lại phiên bản mới nhất rồi thử lại.',
@@ -5443,6 +5481,18 @@ export const vi: I18nMessages = {
     sizeExceptionReasonPlaceholder:
       'Ghi rõ lý do duyệt nhóm dưới sĩ số tối thiểu (bắt buộc)...',
     approveWithException: 'Duyệt kèm ngoại lệ',
+    membersNeededShort: 'Cần thêm {count} thành viên để duyệt',
+    approveOverrideModalTitle: 'Duyệt theo thẩm quyền quản trị',
+    approveOverrideModalDescription:
+      'Bạn không phải giảng viên hướng dẫn của đề tài này. Quyết định duyệt được ghi nhận như ngoại lệ quản trị kèm lý do của bạn.',
+    withdrawApproval: 'Rút duyệt',
+    withdrawApprovalModalTitle: 'Rút duyệt nhóm đề tài',
+    withdrawApprovalModalDescription:
+      'Nhóm quay lại trạng thái chờ duyệt và giữ nguyên thành viên cùng đề tài đã chọn.',
+    withdrawApprovalReason: 'Lý do rút duyệt',
+    withdrawApprovalReasonPlaceholder:
+      'Ghi rõ lý do rút lại quyết định duyệt (bắt buộc)...',
+    withdrawApprovalSuccess: 'Đã rút duyệt; nhóm quay lại trạng thái chờ duyệt.',
     groupTooSmall:
       'Nhóm khóa luận cần từ 3 đến 5 thành viên, với đúng một nhóm trưởng, trước khi được xét duyệt. Nhóm nháp có 1 hoặc 2 thành viên có thể tiếp tục bổ sung trước khi duyệt.',
     groupStateConflict:
@@ -5820,6 +5870,16 @@ export const vi: I18nMessages = {
       retractResultsConfirmLabel: 'Nhập RETRACT để xác nhận',
       retractResultsSuccess: 'Đã thu hồi công bố và thông báo cho sinh viên.',
       retractResultsHint: 'Email đã gửi không thể thu hồi.',
+      closeRound: 'Đóng đợt',
+      closeRoundTitle: 'Đóng đợt này?',
+      closeRoundHint: 'Đợt sẽ chuyển sang chỉ đọc; kết quả vẫn xem được và có thể mở lại sau.',
+      closeRoundConfirmLabel: 'Nhập tên đợt để xác nhận',
+      closeBlockedRetractWindow: 'Có thể đóng sau khi hết thời hạn thu hồi kết quả.',
+      roundClosed: 'Đã đóng đợt.',
+      reopenRound: 'Mở lại',
+      reopenRoundTitle: 'Mở lại đợt này?',
+      roundReopened: 'Đã mở lại đợt.',
+      showClosedRounds: 'Hiện đợt đã đóng',
       publishReviewOpen: 'Phản biện còn mở: {titles}.',
       publishAllExcluded: 'Mọi nhóm đã duyệt đều bị loại; công bố sẽ không có kết quả.',
     },

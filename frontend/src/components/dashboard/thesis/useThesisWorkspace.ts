@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type SetStateAction } from 'react';
 import { useAuth } from '@/context/AuthContext';
 import { useI18n } from '@/i18n';
-import { pickPreferredThesisRound } from '@/lib/thesis-round';
+import { pickPreferredThesisRound, roundsForPicker } from '@/lib/thesis-round';
 import {
   thesisApi,
   type ThesisGroup,
@@ -59,7 +59,13 @@ export function useThesisWorkspace(
     setRoundsLoading(true);
     setError('');
     try {
-      const nextRounds = await thesisApi.listRounds();
+      // Archived rounds stay resolvable so a closed membership/workspace still
+      // serves its read-only results and history; the pickers filter them out.
+      const [liveRounds, closedRounds] = await Promise.all([
+        thesisApi.listRounds(),
+        thesisApi.listRounds('CLOSED').catch(() => [] as ThesisRound[]),
+      ]);
+      const nextRounds = [...liveRounds, ...closedRounds];
       if (requestId !== roundsRequestRef.current) return;
       const sortedRounds = [...nextRounds].sort((a, b) => {
         // Academic rule priority: OPEN registration > KLTN thesis type > newest start date
@@ -89,7 +95,7 @@ export function useThesisWorkspace(
           sortedRounds.find((r) => r.status === 'REGISTRATION_OPEN') ||
           sortedRounds.find((r) => r.status === 'REGISTRATION_CLOSED' && r.thesisType === 'KLTN') ||
           sortedRounds.find((r) => r.status === 'REGISTRATION_CLOSED') ||
-          sortedRounds[0];
+          sortedRounds.find((r) => r.status !== 'CLOSED');
         return preferred?.id || '';
       });
     } catch {
@@ -205,7 +211,7 @@ export function useThesisWorkspace(
 
   const cohortGroups = useMemo(() => {
     const map = new Map<string, ThesisRound[]>();
-    for (const r of rounds) {
+    for (const r of roundsForPicker(rounds, selectedRoundId)) {
       const match = r.name.match(/Ni\u00ean kh\u00f3a\s+\d{4}\s*[-–]\s*\d{4}/i);
       const cohortKey = match ? match[0] : (r.thesisType === 'KLTN' ? 'Khóa luận Tốt nghiệp' : 'Học phần Tốt nghiệp / Chuyên ngành');
       if (!map.has(cohortKey)) {
@@ -217,7 +223,7 @@ export function useThesisWorkspace(
       cohort,
       rounds: groupedRounds,
     }));
-  }, [rounds]);
+  }, [rounds, selectedRoundId]);
 
   return {
     rounds,

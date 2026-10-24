@@ -395,7 +395,10 @@ class ThesisGroupMembershipIntegrityTest {
                         .content("{\"topicId\":\"" + topicId + "\"}")
                         .with(studentJwt(LEADER)))
                 .andExpect(status().isOk());
-        mvc.perform(post("/api/v1/thesis/groups/{id}/approve", groupId).with(adminJwt()))
+        mvc.perform(post("/api/v1/thesis/groups/{id}/approve", groupId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"reason\":\"Administrative approval\"}")
+                        .with(adminJwt()))
                 .andExpect(status().isOk());
     }
 
