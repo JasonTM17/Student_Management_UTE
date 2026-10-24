@@ -117,12 +117,16 @@ public class ThesisProgressService {
         boolean approvedGroup = "APPROVED".equals(approvalStatus) && validApprovedSize;
         boolean scoreFinalized = finalScore != null
                 && "GRADED".equals(string(row.get("result_status")));
-        boolean publishedResult = "RESULTS_PUBLISHED".equals(roundStatus)
+        // CLOSED keeps its published result set readable — closing archives
+        // the round, it never unpublishes.
+        boolean resultsPublished = "RESULTS_PUBLISHED".equals(roundStatus)
+                || "CLOSED".equals(roundStatus);
+        boolean publishedResult = resultsPublished
                 && approvedGroup
                 && scoreFinalized;
         // Students must never see a score or council assignment before the
         // round publishes results — the finalize step is internal evidence only.
-        boolean resultsVisible = "RESULTS_PUBLISHED".equals(roundStatus);
+        boolean resultsVisible = resultsPublished;
         BigDecimal visibleFinalScore = resultsVisible ? finalScore : null;
         Instant visibleFinalizedAt = resultsVisible ? finalScoreFinalizedAt : null;
         UUID visibleCouncilId = resultsVisible ? councilId : null;
@@ -172,15 +176,15 @@ public class ThesisProgressService {
             attention = "GROUP_INVALID_MEMBER_COUNT";
         } else if (inconsistentLaterEvidence) {
             attention = "PROGRESS_INCONSISTENT";
-        } else if ("RESULTS_PUBLISHED".equals(roundStatus)
+        } else if (resultsPublished
                 && "REVIEW_FAILED".equals(string(row.get("result_status")))) {
             // A counter-review exclusion is a definitive published outcome,
             // not a pending one — it must never render as "result pending".
             attention = "TOPIC_REVIEW_FAILED";
-        } else if ("RESULTS_PUBLISHED".equals(roundStatus)
+        } else if (resultsPublished
                 && "WITHDRAWN".equals(string(row.get("result_status")))) {
             attention = "TOPIC_WITHDRAWN";
-        } else if ("RESULTS_PUBLISHED".equals(roundStatus) && finalScore == null) {
+        } else if (resultsPublished && finalScore == null) {
             attention = "RESULT_NOT_AVAILABLE";
         }
 

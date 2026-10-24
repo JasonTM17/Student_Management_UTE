@@ -175,6 +175,14 @@ public final class ThesisMutationDtos {
     }
 
     /**
+     * Governance reason for closing a published round (archive) or reopening
+     * a closed one. The UI collects the typed round name for close separately
+     * as its own confirmation gate; the API only requires the reason.
+     */
+    public record RoundClosureRequest(String reason) {
+    }
+
+    /**
      * Consequence preview the admin reviews before confirming
      * close-registration: non-cancelled group counts by approval state, the
      * number of report rows already submitted in the round, and the effective

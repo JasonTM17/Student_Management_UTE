@@ -119,7 +119,7 @@ test('advisor directory and admin round list share the overview ordering', () =>
   assert.match(advisors, /sortThesisRoundsForOverview\(roundsList\)/);
   assert.doesNotMatch(advisors, /roundsList\[0\]/);
   const admin = fs.readFileSync(path.join(root, 'src/app/admin/thesis/page.tsx'), 'utf8');
-  assert.match(admin, /setRounds\(sortThesisRoundsForOverview\(data\)\)/);
+  assert.match(admin, /setRounds\(sortThesisRoundsForOverview\(\[\.\.\.data, \.\.\.closed\]\)\)/);
 });
 
 test('advisor directory action buttons say they open the topic proposal form', () => {

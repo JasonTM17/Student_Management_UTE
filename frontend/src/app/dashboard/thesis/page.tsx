@@ -29,7 +29,7 @@ import {
 import { useAuth } from '@/context/AuthContext';
 import { toast } from 'sonner';
 import { classifyThesisScore } from '@/lib/grade-scale';
-import { pickPreferredThesisRound } from '@/lib/thesis-round';
+import { pickPreferredThesisRound, roundsForPicker } from '@/lib/thesis-round';
 import { Button } from '@/components/ui/button';
 import { LinkButton } from '@/components/ui/link-button';
 import { Input } from '@/components/ui/input';
@@ -574,7 +574,13 @@ export default function ThesisPage() {
     setIsLoading(true);
     setError('');
     try {
-      const nextRounds = await thesisApi.listRounds();
+      // Archived rounds stay resolvable so a closed membership or supervised
+      // round still serves its read-only results; the picker filters them out.
+      const [liveRounds, closedRounds] = await Promise.all([
+        thesisApi.listRounds(),
+        thesisApi.listRounds('CLOSED').catch(() => [] as ThesisRound[]),
+      ]);
+      const nextRounds = [...liveRounds, ...closedRounds];
       if (signal.cancelled) return;
       const sortedRounds = [...nextRounds].sort((a, b) => {
         const isOpenA = a.status === 'REGISTRATION_OPEN' ? 0 : 1;
@@ -594,7 +600,7 @@ export default function ThesisPage() {
         const preferred =
           sortedRounds.find((r) => r.status === 'REGISTRATION_OPEN' && r.thesisType === 'KLTN') ||
           sortedRounds.find((r) => r.status === 'REGISTRATION_OPEN') ||
-          sortedRounds[0];
+          sortedRounds.find((r) => r.status !== 'CLOSED');
         return preferred?.id || '';
       });
     } catch {
@@ -922,14 +928,14 @@ export default function ThesisPage() {
   const selectedRound = rounds.find((round) => round.id === selectedRoundId);
   const roundGroups = useMemo(() => {
     const map = new Map<string, { value: string; label: string }[]>();
-    for (const r of rounds) {
+    for (const r of roundsForPicker(rounds, selectedRoundId)) {
       const match = r.name.match(/Ni\u00ean kh\u00f3a\s+\d{4}\s*[-–]\s*\d{4}/i);
       const cohort = match ? match[0] : (r.thesisType === 'KLTN' ? 'Khóa luận Tốt nghiệp' : 'Học phần Tốt nghiệp / Chuyên ngành');
       if (!map.has(cohort)) map.set(cohort, []);
       map.get(cohort)!.push({ value: r.id, label: r.name });
     }
     return Array.from(map.entries()).map(([label, opts]) => ({ label, options: opts }));
-  }, [rounds]);
+  }, [rounds, selectedRoundId]);
   const studentId = user?.studentId ?? '';
   const ownGroups = groups.filter(
     (group) =>
@@ -1019,7 +1025,11 @@ export default function ThesisPage() {
   }, [reportGroupId, reportApprovalStatus, groupReportReloadToken, messages.thesis.report.loadFailed]);
 
   useEffect(() => {
-    if (!isStudent || !selectedRoundId || selectedRound?.status !== 'RESULTS_PUBLISHED') {
+    // CLOSED still serves the published result set — closing archives the
+    // round, it does not unpublish.
+    const resultsPublished =
+      selectedRound?.status === 'RESULTS_PUBLISHED' || selectedRound?.status === 'CLOSED';
+    if (!isStudent || !selectedRoundId || !resultsPublished) {
       setRoundResults([]);
       setResultsState('hidden');
       return;
@@ -2669,7 +2679,7 @@ export default function ThesisPage() {
                 }}
                 aria-label={messages.thesis.selectRound}
                 groups={roundGroups}
-                options={rounds.map((round) => ({
+                options={roundsForPicker(rounds, selectedRoundId).map((round) => ({
                   value: round.id,
                   label: round.name,
                 }))}

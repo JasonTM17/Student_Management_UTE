@@ -21,6 +21,7 @@ import io.campuscore.restfulapi.thesis.web.ThesisMutationDtos.ProgressRequest;
 import io.campuscore.restfulapi.thesis.web.ThesisMutationDtos.PublishResultsPreviewResponse;
 import io.campuscore.restfulapi.thesis.web.ThesisMutationDtos.ReportDeadlineUpdateRequest;
 import io.campuscore.restfulapi.thesis.web.ThesisMutationDtos.ReportUpdateRequest;
+import io.campuscore.restfulapi.thesis.web.ThesisMutationDtos.RoundClosureRequest;
 import io.campuscore.restfulapi.thesis.web.ThesisMutationDtos.RoundCreateRequest;
 import io.campuscore.restfulapi.thesis.web.ThesisMutationDtos.RoundDeleteRequest;
 import io.campuscore.restfulapi.thesis.web.ThesisMutationDtos.RoundRestoreRequest;
@@ -304,6 +305,39 @@ public class ThesisMutationController {
             @RequestBody RetractPublicationRequest request,
             @AuthenticationPrincipal Jwt actor) {
         return mutations.retractResults(id, request, actor);
+    }
+
+    /**
+     * End-of-life archive: RESULTS_PUBLISHED -> CLOSED makes the round
+     * read-only for every mutation while its published results stay
+     * viewable. Refused while the retraction grace window is still open so
+     * the documented undo path cannot silently disappear. Reason required,
+     * audited, and no notifications are sent.
+     */
+    @Operation(summary = "Đóng đợt khóa luận", description = "Lưu trữ đợt RESULTS_PUBLISHED sang CLOSED: đợt trở nên chỉ-đọc, kết quả vẫn xem được; từ chối khi hạn thu hồi còn mở; bắt buộc lý do, ghi audit, không gửi thông báo")
+    @PostMapping("/rounds/{id}/close")
+    @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN')")
+    public RoundResponse closeRound(
+            @Parameter(description = "Mã UUID của đợt", required = true) @PathVariable UUID id,
+            @RequestBody RoundClosureRequest request,
+            @AuthenticationPrincipal Jwt actor) {
+        return mutations.closeRound(id, request, actor);
+    }
+
+    /**
+     * Reverses the archive: CLOSED -> RESULTS_PUBLISHED restores exactly the
+     * published state the round left (results_published_at is preserved, so
+     * the retract window stays measured from the original publication).
+     * Reason required, audited, no notifications.
+     */
+    @Operation(summary = "Mở lại đợt đã đóng", description = "Đưa đợt CLOSED về RESULTS_PUBLISHED với đúng trạng thái công bố trước đó; bắt buộc lý do, ghi audit, không gửi thông báo")
+    @PostMapping("/rounds/{id}/reopen")
+    @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN')")
+    public RoundResponse reopenRound(
+            @Parameter(description = "Mã UUID của đợt", required = true) @PathVariable UUID id,
+            @RequestBody RoundClosureRequest request,
+            @AuthenticationPrincipal Jwt actor) {
+        return mutations.reopenRound(id, request, actor);
     }
 
     /**

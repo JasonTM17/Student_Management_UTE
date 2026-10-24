@@ -1,3 +1,4 @@
+import { execFileSync } from 'node:child_process';
 import { expect, test, type Page } from '@playwright/test';
 import { submitLiveLogin } from './fixtures/live-login';
 
@@ -579,5 +580,70 @@ test('stages 2-9: proposal through published results and reporting', async ({ pa
     .map((row) => row.action);
   for (const expected of ['THESIS_ROUND_TRANSITION', 'THESIS_RESULTS_RETRACTED']) {
     expect(actions, `audit contains ${expected}`).toContain(expected);
+  }
+
+  // Stage 10: end-of-life governance. While the retract grace window is open
+  // the close must refuse with its stable blocker, the read model must say so,
+  // and non-governance roles are refused. When the disposable stack exposes
+  // its fixture postgres (E2E_THESIS_PG_CONTAINER/E2E_THESIS_PG_DATABASE) the
+  // round is aged past the window — the only way to age a live round — and
+  // the full close -> read-only -> reopen cycle runs against the real API.
+  const publishedList = await apiAs(page, admin, 'GET', '/thesis/rounds?status=RESULTS_PUBLISHED');
+  expect(publishedList.status(), 'published rounds list').toBe(200);
+  const liveRound = ((await publishedList.json()) as Array<{
+    id: string;
+    closure?: { closeAllowed?: boolean; reopenAllowed?: boolean; closeBlocker?: string | null } | null;
+  }>).find((row) => row.id === round.id);
+  expect(liveRound?.closure?.closeAllowed, 'read model blocks close in-window').toBe(false);
+  expect(liveRound?.closure?.closeBlocker).toBe('RETRACT_WINDOW_OPEN');
+  const studentClose = await apiAs(page, memberToken, 'POST', `/thesis/rounds/${round.id}/close`, { reason: 'probe' });
+  expect(studentClose.status(), 'student cannot close').toBe(403);
+  const noCloseReason = await apiAs(page, admin, 'POST', `/thesis/rounds/${round.id}/close`, {});
+  expect(noCloseReason.status(), 'close needs a reason').toBe(400);
+  const earlyClose = await apiAs(page, admin, 'POST', `/thesis/rounds/${round.id}/close`, { reason: 'too early' });
+  expect(earlyClose.status(), 'close inside the retract window refuses').toBe(409);
+  expect((await earlyClose.json()).code).toBe('RETRACT_WINDOW_OPEN');
+
+  const pgContainer = process.env.E2E_THESIS_PG_CONTAINER;
+  const pgDatabase = process.env.E2E_THESIS_PG_DATABASE;
+  if (!pgContainer || !pgDatabase) {
+    test.info().annotations.push({
+      type: 'note',
+      description: 'E2E_THESIS_PG_* unset: close -> read-only -> reopen positive cycle skipped.',
+    });
+    return;
+  }
+  execFileSync('docker', ['exec', '-i', pgContainer, 'psql', '-U', 'campuscore', '-d', pgDatabase,
+    '-v', 'ON_ERROR_STOP=1', '-c',
+    `UPDATE thesis.thesis_registration_round SET results_published_at = CURRENT_TIMESTAMP - interval '30 days' WHERE id = '${round.id}'`]);
+
+  const closeRes = await apiAs(page, admin, 'POST', `/thesis/rounds/${round.id}/close`, { reason: 'lifecycle e2e archive' });
+  expect(closeRes.status(), 'admin closes the round').toBe(200);
+  expect((await closeRes.json()).status).toBe('CLOSED');
+  const closedCouncil = await apiAs(page, admin, 'POST', '/thesis/councils', { roundId: round.id, name: 'late' });
+  expect(closedCouncil.status(), 'council refused on a closed round').toBe(409);
+  const closedResult = await apiAs(page, leaderToken, 'GET', `/thesis/me/results?roundId=${round.id}`);
+  expect(closedResult.status(), 'student still reads results on a closed round').toBe(200);
+  const activeList = await apiAs(page, admin, 'GET', '/thesis/rounds');
+  expect((((await activeList.json()) as Array<{ id: string }>).map((row) => row.id)),
+    'closed round leaves the default active list').not.toContain(round.id);
+  const closedList = await apiAs(page, admin, 'GET', '/thesis/rounds?status=CLOSED');
+  expect((((await closedList.json()) as Array<{ id: string }>).map((row) => row.id)),
+    'closed round appears under the explicit CLOSED filter').toContain(round.id);
+  const doubleClose = await apiAs(page, admin, 'POST', `/thesis/rounds/${round.id}/close`, { reason: 'again' });
+  expect(doubleClose.status(), 'double close refuses').toBe(409);
+
+  const studentReopen = await apiAs(page, memberToken, 'POST', `/thesis/rounds/${round.id}/reopen`, { reason: 'probe' });
+  expect(studentReopen.status(), 'student cannot reopen').toBe(403);
+  const reopen = await apiAs(page, admin, 'POST', `/thesis/rounds/${round.id}/reopen`, { reason: 'lifecycle e2e reopen' });
+  expect(reopen.status(), 'admin reopens the round').toBe(200);
+  const reopened = await reopen.json();
+  expect(reopened.status).toBe('RESULTS_PUBLISHED');
+  expect(reopened.closure?.reopenAllowed ?? false, 'reopened round is published again').toBe(false);
+  const auditTrail2 = await apiAs(page, admin, 'GET', `/admin/audit?entityId=${round.id}&entityType=THESIS_ROUND&limit=50`);
+  const actions2 = (((await auditTrail2.json()).data ?? []) as Array<{ action?: string }>)
+    .map((row) => row.action);
+  for (const expected of ['THESIS_ROUND_CLOSED', 'THESIS_ROUND_REOPENED']) {
+    expect(actions2, `audit contains ${expected}`).toContain(expected);
   }
 });
