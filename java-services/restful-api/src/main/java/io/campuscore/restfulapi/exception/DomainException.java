@@ -1,4 +1,4 @@
-package io.campuscore.restfulapi.web;
+package io.campuscore.restfulapi.exception;
 
 import io.campuscore.restfulapi.exception.AppException;
 import java.util.Map;

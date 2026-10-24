@@ -29,7 +29,7 @@ import io.campuscore.restfulapi.thesis.assistant.ThesisAssistantDtos.Citation;
 import io.campuscore.restfulapi.thesis.assistant.ThesisAssistantService.StreamDelta;
 import io.campuscore.restfulapi.thesis.assistant.ThesisAssistantService.StreamEvent;
 import io.campuscore.restfulapi.thesis.assistant.ThesisAssistantService.StreamReplace;
-import io.campuscore.restfulapi.web.DomainException;
+import io.campuscore.restfulapi.exception.DomainException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;

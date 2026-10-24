@@ -1,7 +1,7 @@
 package io.campuscore.restfulapi.site.controller;
 
 import com.fasterxml.jackson.databind.JsonNode;
-import io.campuscore.restfulapi.web.DomainException;
+import io.campuscore.restfulapi.exception.DomainException;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;

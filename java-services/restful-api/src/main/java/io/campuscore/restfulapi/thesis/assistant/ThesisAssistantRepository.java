@@ -216,7 +216,7 @@ public class ThesisAssistantRepository {
         if (owned == null || owned == 0) {
             // Same contract as deleteConversation: a conversation the caller
             // does not own is indistinguishable from one that does not exist.
-            throw new io.campuscore.restfulapi.web.DomainException(
+            throw new io.campuscore.restfulapi.exception.DomainException(
                     org.springframework.http.HttpStatus.NOT_FOUND, "CONVERSATION_NOT_FOUND", "Conversation not found");
         }
     }

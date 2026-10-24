@@ -8,7 +8,7 @@ import static org.mockito.Mockito.doAnswer;
 
 import io.campuscore.restfulapi.thesis.service.ThesisCouncilService;
 import io.campuscore.restfulapi.thesis.service.ThesisMutationService;
-import io.campuscore.restfulapi.web.DomainException;
+import io.campuscore.restfulapi.exception.DomainException;
 import java.math.BigDecimal;
 import java.net.URI;
 import java.sql.Timestamp;

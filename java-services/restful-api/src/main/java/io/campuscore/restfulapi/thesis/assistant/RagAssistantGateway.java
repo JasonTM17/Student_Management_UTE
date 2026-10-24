@@ -12,7 +12,7 @@ import io.campuscore.restfulapi.thesis.assistant.ThesisAssistantDtos.ChatRequest
 import io.campuscore.restfulapi.thesis.assistant.ThesisAssistantDtos.ChatResponse;
 import io.campuscore.restfulapi.thesis.assistant.ThesisAssistantDtos.FeedbackRequest;
 import io.campuscore.restfulapi.web.ApiExceptionHandler.ApiError;
-import io.campuscore.restfulapi.web.DomainException;
+import io.campuscore.restfulapi.exception.DomainException;
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;

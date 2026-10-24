@@ -1,6 +1,6 @@
 package io.campuscore.restfulapi.audit.controller;
 
-import io.campuscore.restfulapi.web.DomainException;
+import io.campuscore.restfulapi.exception.DomainException;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;

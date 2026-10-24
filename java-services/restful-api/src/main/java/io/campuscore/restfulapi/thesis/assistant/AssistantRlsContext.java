@@ -1,7 +1,7 @@
 package io.campuscore.restfulapi.thesis.assistant;
 
 import io.campuscore.restfulapi.thesis.assistant.AssistantRlsBoundary.Access;
-import io.campuscore.restfulapi.web.DomainException;
+import io.campuscore.restfulapi.exception.DomainException;
 import java.util.Set;
 import java.util.function.Supplier;
 import org.springframework.http.HttpStatus;

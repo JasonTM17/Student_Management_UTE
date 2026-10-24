@@ -204,7 +204,7 @@ class AdminCatalogMutationPersistenceTest {
                         "schedules", List.of(
                                 Map.of("dayOfWeek", 3, "startTime", "08:00", "endTime", "10:00", "classroomId", "room-2"),
                                 Map.of("dayOfWeek", 5, "startTime", "08:00", "endTime", "10:00", "classroomId", "missing-room")))))
-                .isInstanceOf(io.campuscore.restfulapi.web.DomainException.class)
+                .isInstanceOf(io.campuscore.restfulapi.exception.DomainException.class)
                 .hasMessageContaining("missing-room");
 
         assertThat(jdbc.queryForObject(

@@ -14,7 +14,7 @@ import static org.mockito.Mockito.when;
 
 import io.campuscore.restfulapi.auth.repository.AuthUserRepository;
 import io.campuscore.restfulapi.auth.service.AdminUserMutationService;
-import io.campuscore.restfulapi.web.DomainException;
+import io.campuscore.restfulapi.exception.DomainException;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;

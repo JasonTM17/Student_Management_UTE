@@ -1,6 +1,6 @@
 package io.campuscore.restfulapi.notification.service;
 
-import io.campuscore.restfulapi.web.DomainException;
+import io.campuscore.restfulapi.exception.DomainException;
 import java.util.regex.Pattern;
 import org.springframework.http.HttpStatus;
 

@@ -3,7 +3,7 @@ package io.campuscore.restfulapi.academic;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import io.campuscore.restfulapi.academic.registration.service.RegistrationService;
-import io.campuscore.restfulapi.web.DomainException;
+import io.campuscore.restfulapi.exception.DomainException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;

@@ -18,7 +18,7 @@ import io.campuscore.restfulapi.thesis.assistant.ThesisAssistantService.StreamDe
 import io.campuscore.restfulapi.thesis.assistant.ThesisAssistantService.StreamDone;
 import io.campuscore.restfulapi.thesis.assistant.ThesisAssistantService.StreamEvent;
 import io.campuscore.restfulapi.thesis.assistant.ThesisAssistantService.StreamMeta;
-import io.campuscore.restfulapi.web.DomainException;
+import io.campuscore.restfulapi.exception.DomainException;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.util.ArrayList;

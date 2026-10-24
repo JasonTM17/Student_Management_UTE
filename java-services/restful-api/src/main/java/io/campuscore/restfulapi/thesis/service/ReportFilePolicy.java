@@ -5,7 +5,7 @@ import java.util.Set;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.multipart.MultipartFile;
 import io.campuscore.restfulapi.exception.AppException;
-import io.campuscore.restfulapi.web.DomainException;
+import io.campuscore.restfulapi.exception.DomainException;
 
 /**
  * Feedback item 7: the report artifact may be an attached Word/PDF file.

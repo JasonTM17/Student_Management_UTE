@@ -1,7 +1,7 @@
 package io.campuscore.restfulapi.thesis.service;
 
 import io.campuscore.restfulapi.thesis.web.ThesisProgressDtos.ProgressResponse;
-import io.campuscore.restfulapi.web.DomainException;
+import io.campuscore.restfulapi.exception.DomainException;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.ArrayList;
