@@ -37,13 +37,13 @@
 -- every check-then-act window between the guard and the writes. The locks are
 -- held until COMMIT; the script is short (sub-second on a local connection, a
 -- few seconds over a remote one), so that is also the longest an application
--- write can ever wait behind it. lock_timeout = 300 ms — deliberately below
--- the default deadlock_timeout (1 s) — makes the package ALWAYS the victim of
--- any lock-ordering conflict: it aborts cleanly instead of queueing, and the
--- application transaction is never killed. run.mjs retries the whole script a
--- bounded number of times with jitter, each attempt a fresh transaction, so no
--- lock is ever held while the runner waits. Run it in a quiet maintenance
--- window, exactly like rollback.
+-- write can ever wait behind it. Every lock is requested with NOWAIT: the
+-- package never queues behind an application write or an autovacuum/ANALYZE
+-- worker, so it can never be half a wait-for cycle — no deadlock can form and
+-- the application transaction is never killed. The package aborts cleanly
+-- instead; run.mjs retries the whole script a bounded number of times with
+-- jitter, each attempt a fresh transaction, so no lock is ever held while the
+-- runner waits. Run it in a quiet maintenance window, exactly like rollback.
 
 BEGIN;
 
@@ -59,9 +59,28 @@ SET LOCAL bytea_output = 'hex';
 SET LOCAL extra_float_digits = 0;
 SET LOCAL IntervalStyle = 'iso_8601';
 SET LOCAL standard_conforming_strings = 'on';
+-- the payload literals are UTF-8: pin the client encoding so a session
+-- started with a different PGCLIENTENCODING (e.g. LATIN1) cannot silently
+-- transcode the Vietnamese text into mojibake.
+SET LOCAL client_encoding = 'UTF8';
+
+-- fail closed if either end of the session is not UTF-8: a UTF-8 literal
+-- stored through a non-UTF-8 client encoding, or a non-UTF-8 server, would
+-- garble every non-ASCII character in the demo rows.
+DO $$
+BEGIN
+  IF current_setting('client_encoding') <> 'UTF8'
+     OR current_setting('server_encoding') <> 'UTF8' THEN
+    RAISE EXCEPTION 'apply aborted: client_encoding=% server_encoding=% — UTF8 is required end-to-end or the Vietnamese demo text would be stored garbled',
+      current_setting('client_encoding'), current_setting('server_encoding')
+      USING ERRCODE = '22000', CONSTRAINT = 'thesis_demo_apply_encoding';
+  END IF;
+END $$;
 
 -- locks in the application's own write order: thesis business tables first,
--- the hot app-wide notification and audit tables last.
+-- the hot app-wide notification and audit tables last. NOWAIT: the package
+-- never waits for a lock, so it can never be one edge of a deadlock cycle —
+-- it is always the transaction that loses, instantly.
 DO $$
 BEGIN
   BEGIN
@@ -69,9 +88,9 @@ BEGIN
          || ' thesis.thesis_group, thesis.thesis_group_member, thesis.thesis_group_report,'
          || ' thesis.thesis_registration_round, thesis.thesis_topic, thesis.thesis_topic_score,'
          || ' thesis.thesis_topic_supervisor, notifications.notification,'
-         || ' campuscore_audit."AdminAudit" IN SHARE ROW EXCLUSIVE MODE';
+         || ' campuscore_audit."AdminAudit" IN SHARE ROW EXCLUSIVE MODE NOWAIT';
   EXCEPTION WHEN lock_not_available THEN
-    RAISE EXCEPTION 'apply aborted: could not lock the package tables within lock_timeout — an application write is in progress; nothing was changed, retry when the app is idle'
+    RAISE EXCEPTION 'apply aborted: a package table is locked (an application write or an autovacuum/analyze worker holds it) — nothing was changed, retry when the database is idle'
       USING ERRCODE = '55P03', CONSTRAINT = 'thesis_demo_apply_lock';
   END;
 END $$;

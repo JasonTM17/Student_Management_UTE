@@ -13,6 +13,7 @@
 // any FAIL. Requires the database to start at baseline (no marker rows).
 
 import { spawn, spawnSync } from 'node:child_process';
+import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { once } from 'node:events';
@@ -507,6 +508,18 @@ async function main() {
   record('e2.package_is_lock_victim_not_app', r.status !== 0 && p4code === 0 && markerTotal() === MARKER_EXPECTED,
          `rollback_exit=${r.status} app_exit=${p4code}`);
 
+  // Part 1b: the same schedule against apply — the package must be the lock
+  // victim on the apply side too, not only on rollback (kills the mutant
+  // that stretches apply's lock wait).
+  const p4appA = spawn(psql, [...connArgs(), '-X', '-v', 'ON_ERROR_STOP=1', '-P', 'pager=off', '-c', p4AppSql('a2')],
+    { env: process.env, windowsHide: true });
+  const p4doneA = once(p4appA, 'exit');
+  await delay(300);
+  r = runFile('apply.sql', { dry_run: '0' });
+  const [p4codeA] = await p4doneA;
+  record('e2.apply_side_lock_victim', r.status !== 0 && p4codeA === 0 && markerTotal() === MARKER_EXPECTED,
+         `apply_exit=${r.status} app_exit=${p4codeA}`);
+
   // Part 2: same schedule again, this time through run.mjs — the runner's
   // bounded retry (fresh transaction per attempt) must ride out the app's
   // lock window and complete the rollback.
@@ -522,6 +535,135 @@ async function main() {
   const [pv, pu, ps] = p4Snap.split('|');
   sql(`UPDATE thesis.thesis_registration_round SET version=${pv}, updated_at='${pu}'::timestamptz, status='${ps}'
        WHERE id='b35e9ff1-1eb8-4e73-812e-04e1a66041f1'`);
+
+  // ---- F3 (DL1): the reviewer's deadlock schedule — four staggered app
+  // holders on council_member / council_topic / thesis_group / group_member
+  // releasing at +0.15/+0.42/+0.69/+0.96 s, plus app transaction A that holds
+  // the round and requests thesis_council at +0.10 s. Every package lock is
+  // NOWAIT, so the package gives up instantly instead of closing the
+  // wait-for cycle — the application transaction must NEVER be the victim.
+  r = runFile('apply.sql', { dry_run: '0' });
+  const dl1Snap = sql(`SELECT version||'|'||(to_jsonb(updated_at)#>>'{}')||'|'||status
+                       FROM thesis.thesis_registration_round WHERE id='b35e9ff1-1eb8-4e73-812e-04e1a66041f1'`).out.trim();
+  let dl1AppLost = 0;
+  const dl1PkgExit = [];
+  for (let i = 0; i < 3; i++) {
+    const holders = ['thesis.thesis_council_member|0.15', 'thesis.thesis_council_topic|0.42',
+                     'thesis.thesis_group|0.69', 'thesis.thesis_group_member|0.96']
+      .map(spec => {
+        const [t, s] = spec.split('|');
+        const p = spawn(psql, [...connArgs(), '-X', '-v', 'ON_ERROR_STOP=1', '-P', 'pager=off', '-c',
+          `BEGIN; LOCK TABLE ${t} IN ROW EXCLUSIVE MODE; SELECT pg_sleep(${s}); COMMIT;`],
+          { env: process.env, windowsHide: true });
+        return once(p, 'exit');
+      });
+    const appA = spawn(psql, [...connArgs(), '-X', '-v', 'ON_ERROR_STOP=1', '-P', 'pager=off', '-c',
+      `BEGIN;
+       UPDATE thesis.thesis_registration_round SET updated_at=now() WHERE id='b35e9ff1-1eb8-4e73-812e-04e1a66041f1';
+       SELECT pg_sleep(0.10);
+       LOCK TABLE thesis.thesis_council IN ROW EXCLUSIVE MODE;
+       COMMIT;`],
+      { env: process.env, windowsHide: true });
+    const appADone = once(appA, 'exit');
+    await delay(60);
+    const rb3 = runFile('rollback.sql');
+    const [aCode] = await appADone;
+    await Promise.all(holders);
+    dl1PkgExit.push(rb3.status);
+    if (aCode !== 0) dl1AppLost++;
+    if (markerTotal() === 0) runFile('apply.sql', { dry_run: '0' });
+  }
+  const [dv, du, ds] = dl1Snap.split('|');
+  sql(`UPDATE thesis.thesis_registration_round SET version=${dv}, updated_at='${du}'::timestamptz, status='${ds}'
+       WHERE id='b35e9ff1-1eb8-4e73-812e-04e1a66041f1'`);
+  record('f3.dl1_app_never_deadlock_victim', dl1AppLost === 0,
+         `runs=3 app_lost=${dl1AppLost} pkg_exits=${dl1PkgExit.join(',')}`);
+
+  // ---- statement-wait cap pinned at 300 ms (mutant
+  // ap.lock_timeout_300ms_to_5s): every mutating script must pin
+  // lock_timeout <= 300 ms so an implicit row/FK wait can never outlast
+  // deadlock_timeout and turn the package into a long waiter. Parse the
+  // literal from each script — stretching or removing it must fail here. ----
+  const ltNames = ['apply.sql', 'rollback.sql', 'recover-before-image.sql'];
+  const ltCheck = ltNames.map(f => {
+    const src = readFileSync(join(here, f), 'utf8');
+    const vals = [...src.matchAll(/SET\s+LOCAL\s+lock_timeout\s*=\s*'(\d+)\s*(ms|s)'/gi)]
+      .map(m => parseInt(m[1], 10) * (m[2].toLowerCase() === 's' ? 1000 : 1));
+    return vals.length > 0 && vals.every(v => v <= 300);
+  });
+  record('f3.lock_timeout_capped_300ms', ltCheck.every(Boolean),
+         ltNames.map((f, i) => `${f}=${ltCheck[i] ? 'ok' : 'bad'}`).join(','));
+
+  // ---- guarded-drift restore (mutant rb.unguarded_restore_overwrites_drift):
+  // a column the application changed after apply must be SKIPPED, never
+  // overwritten back to the apply-time value. ----
+  // Snapshot at baseline: if a previous scenario left markers on, roll back
+  // first so driftBase holds before-values, not applied ones.
+  if (markerTotal() > 0) runFile('rollback.sql');
+  const driftBase = sql(`SELECT version||'|'||(to_jsonb(updated_at)#>>'{}')||'|'||coalesce(to_jsonb(results_published_at)#>>'{}','~')||'|'||status
+                          FROM thesis.thesis_registration_round WHERE id='b35e9ff1-1eb8-4e73-812e-04e1a66041f1'`).out.trim();
+  runFile('apply.sql', { dry_run: '0' });
+  sql(`UPDATE thesis.thesis_registration_round SET status='REGISTRATION_CLOSED',
+       results_published_at='2099-01-01T00:00:00Z'::timestamptz, updated_at='2099-01-01T00:00:00Z'::timestamptz,
+       version=version+9 WHERE id='b35e9ff1-1eb8-4e73-812e-04e1a66041f1'`);
+  r = runFile('rollback.sql');
+  const driftLeft = sql(`SELECT count(*) FROM thesis.thesis_registration_round
+    WHERE id='b35e9ff1-1eb8-4e73-812e-04e1a66041f1' AND status='REGISTRATION_CLOSED'
+      AND results_published_at='2099-01-01T00:00:00Z'::timestamptz AND updated_at='2099-01-01T00:00:00Z'::timestamptz`).out.trim();
+  record('e1.guarded_drift_preserved', r.status === 0 && markerTotal() === 0 && driftLeft === '1',
+         `exit=${r.status} drifted_cols_kept=${driftLeft}`);
+  const [dbv, dbu, dbp, dbs] = driftBase.split('|');
+  sql(`UPDATE thesis.thesis_registration_round SET version=${dbv}, updated_at='${dbu}'::timestamptz,
+       results_published_at=${dbp === '~' ? 'NULL' : `'${dbp}'::timestamptz`}, status='${dbs}'
+       WHERE id='b35e9ff1-1eb8-4e73-812e-04e1a66041f1'`);
+
+  // ---- F4: a future child table with ON DELETE CASCADE into a package
+  // table changes the reviewed nine-key FK inventory — rollback must REFUSE
+  // before any cascade can silently delete the application's row. ----
+  r = runFile('apply.sql', { dry_run: '0' });
+  const repId2 = sql(`SELECT id::text FROM thesis.thesis_group_report WHERE id::text LIKE 'ed1a0000-%' ORDER BY id LIMIT 1`).out.trim();
+  sql(`CREATE TABLE thesis.enr5_fk_probe (id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+        report_id uuid NOT NULL REFERENCES thesis.thesis_group_report(id) ON DELETE CASCADE);
+       INSERT INTO thesis.enr5_fk_probe (report_id) VALUES ('${repId2}')`);
+  r = runFile('rollback.sql');
+  const probeLeft = sql(`SELECT count(*) FROM thesis.enr5_fk_probe`).out.trim();
+  record('f4.future_cascade_child_refused',
+         r.status !== 0 && /enr5_fk_probe|foreign-key inventory/.test(r.out + r.err)
+           && probeLeft === '1' && markerTotal() === MARKER_EXPECTED,
+         `exit=${r.status} probe_rows=${probeLeft} markers=${markerTotal()}`);
+  sql(`DROP TABLE thesis.enr5_fk_probe`);
+  r = runFile('rollback.sql');
+  record('f4.rollback_after_probe_dropped', r.status === 0 && markerTotal() === 0, `exit=${r.status}`);
+
+  // ---- F2: a LATIN1 client session must never produce mojibake — the
+  // script's pinned client_encoding either aborts the run or writes correct
+  // UTF-8 that the byte-level verify check confirms. ----
+  r = runFile('apply.sql', { dry_run: '0' }, { PGCLIENTENCODING: 'LATIN1' });
+  const latinHex = sql(`SELECT count(*) FROM notifications.notification WHERE id='demo-th-notif-0001'
+     AND encode(convert_to(title,'UTF8'),'hex')='4be1babf74207175e1baa3206b68c3b361206c75e1baad6e20c491c3a32063c3b46e672062e1bb91'`).out.trim();
+  record('e4.latin1_client_encoding_safe',
+         (r.status !== 0 && markerTotal() === 0) || (r.status === 0 && latinHex === '1' && markerTotal() === MARKER_EXPECTED),
+         `exit=${r.status} utf8_bytes_match=${latinHex} markers=${markerTotal()}`);
+  if (markerTotal() > 0) {
+    r = runFile('rollback.sql');
+    record('e4.latin1_cycle_rollback', r.status === 0 && markerTotal() === 0, `exit=${r.status}`);
+  }
+
+  // ---- F5: a lock holder at SHARE UPDATE EXCLUSIVE level (the lock mode
+  // autovacuum/ANALYZE holds) must be reported by the runner's blocked-by
+  // diagnosis while it retries, then the run completes once it releases. ----
+  r = runFile('apply.sql', { dry_run: '0' });
+  const avHolder = spawn(psql, [...connArgs(), '-X', '-v', 'ON_ERROR_STOP=1', '-P', 'pager=off', '-c',
+    `BEGIN; LOCK TABLE thesis.thesis_topic IN SHARE UPDATE EXCLUSIVE MODE; SELECT pg_sleep(3); COMMIT;`],
+    { env: process.env, windowsHide: true });
+  const avDone = once(avHolder, 'exit');
+  await delay(300);
+  const avm = spawnSync('node', [join(here, 'run.mjs'), 'rollback'],
+    { encoding: 'utf8', env: { ...process.env, THESIS_DEMO_MAX_ATTEMPTS: '16' }, windowsHide: true });
+  const [avCode] = await avDone;
+  record('f5.lock_holder_reported_and_retried',
+         avm.status === 0 && avCode === 0 && /blocked by/i.test(avm.stderr || '') && markerTotal() === 0,
+         `runner_exit=${avm.status} blocked_msg=${/blocked by/i.test(avm.stderr || '')}`);
 
   // ---- final clean cycle under default session + end state ----
   r = runFile('apply.sql', { dry_run: '0' });
