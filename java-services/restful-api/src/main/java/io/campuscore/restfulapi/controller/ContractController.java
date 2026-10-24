@@ -1,5 +1,6 @@
 package io.campuscore.restfulapi.controller;
 
+import io.campuscore.restfulapi.dto.PingRequest;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -40,6 +41,4 @@ public class ContractController {
                 "writer", "restful-api"));
     }
 
-    public record PingRequest(@NotBlank(message = "message is required") String message) {
-    }
 }
