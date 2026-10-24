@@ -904,6 +904,8 @@ export const registrationApi = {
       creditsUsed: number;
       creditsRemaining: number;
       enrollmentIds: string[];
+      minCredits: number;
+      belowMinimum: boolean;
     }>('/me/registration/summary', { params: { semesterId } });
     return response.data;
   },

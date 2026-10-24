@@ -133,6 +133,15 @@ class AcademicAttendanceReadPersistenceTest {
                 .andExpect(jsonPath("$[1].student.user.firstName").value("Linh"))
                 .andExpect(jsonPath("$[2].student.user.firstName").value("Minh"));
 
+        mvc.perform(get("/api/v1/attendance/section/section-1")
+                        .queryParam("date", "2026-08-21")
+                        .with(lecturerJwt("lecturer-2")))
+                .andExpect(status().isForbidden());
+
+        mvc.perform(get("/api/v1/attendance/section/section-1/summary")
+                        .with(lecturerJwt("lecturer-2")))
+                .andExpect(status().isForbidden());
+
         mvc.perform(get("/api/v1/attendance/section/section-1/summary").with(adminJwt()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.sectionId").value("section-1"))
@@ -168,6 +177,11 @@ class AcademicAttendanceReadPersistenceTest {
                         .with(lecturerJwt("lecturer-2")))
                 .andExpect(status().isForbidden());
         mvc.perform(get("/api/v1/attendance/section/section-1/roster")
+                        .with(studentJwt("student-user-1", "student-1")))
+                .andExpect(status().isForbidden());
+
+        mvc.perform(get("/api/v1/attendance/section/section-1")
+                        .queryParam("date", "2026-08-21")
                         .with(studentJwt("student-user-1", "student-1")))
                 .andExpect(status().isForbidden());
     }

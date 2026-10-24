@@ -61,6 +61,7 @@ import { WorkspaceForbiddenState } from '@/components/ProtectedRoute';
 import { campusCodeMessage, campusErrorCode } from '@/lib/campus-error';
 import { toast } from 'sonner';
 import { RegisteredCoursesPanel } from '@/components/registration/registered-courses-panel';
+import { MinimumCreditsNotice } from '@/components/registration/minimum-credits-notice';
 import { RegistrationTabs, type RegistrationTab } from '@/components/registration/registration-tabs';
 
 const ROUND_UNAVAILABLE_CODES = new Set(['WINDOW_CLOSED', 'COHORT_INELIGIBLE', 'ROUND_NOT_FOUND']);
@@ -359,6 +360,8 @@ export default function RegisterPage() {
       : summaryQuery.data && typeof summaryQuery.data.creditLimit === 'number' && summaryQuery.data.creditLimit > 0
         ? summaryQuery.data.creditLimit
         : null;
+  const belowMinimum =
+    summaryQuery.data?.belowMinimum === true && (summaryQuery.data?.minCredits ?? 0) > 0;
 
   // ---- filters (all client-side, live counts) ----
   const searchedSections = useMemo(
@@ -1504,6 +1507,17 @@ export default function RegisterPage() {
                     </>
                   )}
                 </div>
+
+                {belowMinimum && summaryQuery.data ? (
+                  <MinimumCreditsNotice
+                    belowMinimum={belowMinimum}
+                    minCredits={summaryQuery.data.minCredits}
+                    message={copy.minimumCreditsNotice.replace(
+                      '{count}',
+                      formatNumber(summaryQuery.data.minCredits),
+                    )}
+                  />
+                ) : null}
 
                 {railWarnings.length === 0 ? null : (
                     <div

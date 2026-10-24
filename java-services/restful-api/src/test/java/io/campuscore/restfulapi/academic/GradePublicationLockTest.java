@@ -246,6 +246,29 @@ class GradePublicationLockTest {
     }
 
     @Test
+    void republishingCannotClearAnAppealedGrade() throws Exception {
+        mvc.perform(put("/api/v1/sections/section-1/grades")
+                        .with(lecturerJwt("lecturer-1"))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"grades":[{"enrollmentId":"enrollment-1","processScore":8.0,"finalExamScore":9.0}]}
+                                """))
+                .andExpect(status().isOk());
+        mvc.perform(post("/api/v1/sections/section-1/grades/publish")
+                        .with(lecturerJwt("lecturer-1")))
+                .andExpect(status().isOk());
+        jdbc.update("UPDATE \"academic\".\"Enrollment\" SET \"gradeStatus\" = 'APPEALED'"
+                + " WHERE \"id\" = 'enrollment-1'");
+
+        mvc.perform(post("/api/v1/sections/section-1/grades/publish")
+                        .with(lecturerJwt("lecturer-1")))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("GRADES_EMPTY"));
+
+        assertEnrollmentStatus("enrollment-1", "COMPLETED", "APPEALED");
+    }
+
+    @Test
     void publishCompletesOnlyTheGradeableEnrollments() throws Exception {
         insertEnrollment("enrollment-2-dropped", "DROPPED");
         insertCompleteComponents("enrollment-2-dropped");

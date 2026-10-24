@@ -30,7 +30,7 @@ import {
 import { Textarea } from '@/components/ui/textarea';
 import { useConfirmationDialog } from '@/components/ui/use-confirmation-dialog';
 import { useI18n } from '@/i18n';
-import { campusErrorMessage } from '@/lib/campus-error';
+import { campusCodeMessage } from '@/lib/campus-error';
 import {
   getLocalizedDescription,
   getLocalizedName,
@@ -415,7 +415,7 @@ export default function AdminCoursesPage() {
       await fetchCourses();
     } catch (requestError: unknown) {
       toast.error(
-        campusErrorMessage(
+        campusCodeMessage(
           requestError,
           messages.common.campusErrors,
           copy.saveFailed,
