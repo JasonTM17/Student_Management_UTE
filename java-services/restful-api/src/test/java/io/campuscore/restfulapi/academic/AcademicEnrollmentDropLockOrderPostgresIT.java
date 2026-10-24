@@ -5,7 +5,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.doAnswer;
 
-import io.campuscore.restfulapi.academic.registration.RegistrationService;
+import io.campuscore.restfulapi.academic.registration.service.RegistrationService;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CountDownLatch;

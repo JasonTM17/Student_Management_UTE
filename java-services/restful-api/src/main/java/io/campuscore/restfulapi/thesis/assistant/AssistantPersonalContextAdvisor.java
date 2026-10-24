@@ -1,24 +1,24 @@
 package io.campuscore.restfulapi.thesis.assistant;
 
-import io.campuscore.restfulapi.academic.registration.CreditLimitApplicationService;
-import io.campuscore.restfulapi.academic.registration.RegistrationDtos.SummaryResponse;
-import io.campuscore.restfulapi.academic.registration.RegistrationService;
+import io.campuscore.restfulapi.academic.registration.service.CreditLimitApplicationService;
+import io.campuscore.restfulapi.academic.registration.dto.RegistrationDtos.SummaryResponse;
+import io.campuscore.restfulapi.academic.registration.service.RegistrationService;
 import io.campuscore.restfulapi.academic.service.AcademicAttendanceReadService;
 import io.campuscore.restfulapi.academic.service.AcademicConductService;
 import io.campuscore.restfulapi.academic.service.AcademicEnrollmentReadService;
 import io.campuscore.restfulapi.academic.service.AcademicSectionReadService;
-import io.campuscore.restfulapi.academic.web.AcademicAttendanceReadDtos.AttendanceResponse;
-import io.campuscore.restfulapi.academic.web.AcademicConductDtos.StudentConductSummaryDto;
-import io.campuscore.restfulapi.academic.web.AcademicEnrollmentReadDtos.ClassroomSummary;
-import io.campuscore.restfulapi.academic.web.AcademicEnrollmentReadDtos.CourseSummary;
-import io.campuscore.restfulapi.academic.web.AcademicEnrollmentReadDtos.EnrollmentResponse;
-import io.campuscore.restfulapi.academic.web.AcademicEnrollmentReadDtos.GradeSummary;
-import io.campuscore.restfulapi.academic.web.AcademicEnrollmentReadDtos.SectionScheduleResponse;
-import io.campuscore.restfulapi.academic.web.AcademicEnrollmentReadDtos.SemesterSummary;
-import io.campuscore.restfulapi.academic.web.AcademicEnrollmentReadDtos.TranscriptResponse;
-import io.campuscore.restfulapi.academic.web.AcademicEnrollmentReadDtos.TranscriptSummary;
-import io.campuscore.restfulapi.academic.web.AcademicSectionReadDtos.LecturerGradingSectionResponse;
-import io.campuscore.restfulapi.academic.web.AcademicSectionReadDtos.LecturerScheduleResponse;
+import io.campuscore.restfulapi.academic.dto.AcademicAttendanceReadDtos.AttendanceResponse;
+import io.campuscore.restfulapi.academic.dto.AcademicConductDtos.StudentConductSummaryDto;
+import io.campuscore.restfulapi.academic.dto.AcademicEnrollmentReadDtos.ClassroomSummary;
+import io.campuscore.restfulapi.academic.dto.AcademicEnrollmentReadDtos.CourseSummary;
+import io.campuscore.restfulapi.academic.dto.AcademicEnrollmentReadDtos.EnrollmentResponse;
+import io.campuscore.restfulapi.academic.dto.AcademicEnrollmentReadDtos.GradeSummary;
+import io.campuscore.restfulapi.academic.dto.AcademicEnrollmentReadDtos.SectionScheduleResponse;
+import io.campuscore.restfulapi.academic.dto.AcademicEnrollmentReadDtos.SemesterSummary;
+import io.campuscore.restfulapi.academic.dto.AcademicEnrollmentReadDtos.TranscriptResponse;
+import io.campuscore.restfulapi.academic.dto.AcademicEnrollmentReadDtos.TranscriptSummary;
+import io.campuscore.restfulapi.academic.dto.AcademicSectionReadDtos.LecturerGradingSectionResponse;
+import io.campuscore.restfulapi.academic.dto.AcademicSectionReadDtos.LecturerScheduleResponse;
 import io.campuscore.restfulapi.thesis.assistant.ThesisAssistantDtos.ChatRequest;
 import io.campuscore.restfulapi.thesis.assistant.ThesisAssistantDtos.ChatResponse;
 import io.campuscore.restfulapi.thesis.service.ThesisLecturerWorkloadService;
@@ -3455,9 +3455,9 @@ public class AssistantPersonalContextAdvisor {
         for (LecturerScheduleResponse section : scoped) {
             String label = courseName(section.courseCode(), locale.equals("en")
                     ? section.courseNameEn() : section.courseNameVi(), section.courseName());
-            for (io.campuscore.restfulapi.academic.web.AcademicSectionReadDtos.SectionScheduleResponse schedule
+            for (io.campuscore.restfulapi.academic.dto.AcademicSectionReadDtos.SectionScheduleResponse schedule
                     : section.schedules() == null
-                            ? java.util.List.<io.campuscore.restfulapi.academic.web.AcademicSectionReadDtos.SectionScheduleResponse>of()
+                            ? java.util.List.<io.campuscore.restfulapi.academic.dto.AcademicSectionReadDtos.SectionScheduleResponse>of()
                             : section.schedules()) {
                 slots.add(new Slot(
                         schedule.dayOfWeek(),

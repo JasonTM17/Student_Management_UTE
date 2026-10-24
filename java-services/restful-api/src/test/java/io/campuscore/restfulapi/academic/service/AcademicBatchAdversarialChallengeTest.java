@@ -7,11 +7,11 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.mock;
 
-import io.campuscore.restfulapi.academic.registration.RegistrationService;
-import io.campuscore.restfulapi.academic.web.AcademicConductDtos.ConductActivityDto;
-import io.campuscore.restfulapi.academic.web.AcademicConductDtos.ConductSemesterScoreDto;
-import io.campuscore.restfulapi.academic.web.AcademicConductDtos.StudentConductSummaryDto;
-import io.campuscore.restfulapi.academic.web.AcademicMutationDtos.GradeUpdate;
+import io.campuscore.restfulapi.academic.registration.service.RegistrationService;
+import io.campuscore.restfulapi.academic.dto.AcademicConductDtos.ConductActivityDto;
+import io.campuscore.restfulapi.academic.dto.AcademicConductDtos.ConductSemesterScoreDto;
+import io.campuscore.restfulapi.academic.dto.AcademicConductDtos.StudentConductSummaryDto;
+import io.campuscore.restfulapi.academic.dto.AcademicMutationDtos.GradeUpdate;
 import io.campuscore.restfulapi.web.DomainException;
 import java.math.BigDecimal;
 import java.sql.Date;

@@ -1,13 +1,13 @@
 package io.campuscore.restfulapi.academic.service;
 
-import io.campuscore.restfulapi.academic.web.AcademicReadDtos.CourseResponse;
-import io.campuscore.restfulapi.academic.web.AcademicReadDtos.CurriculumResponse;
-import io.campuscore.restfulapi.academic.web.AcademicReadDtos.DepartmentResponse;
-import io.campuscore.restfulapi.academic.web.AcademicReadDtos.DepartmentSummary;
-import io.campuscore.restfulapi.academic.web.AcademicReadDtos.FacultyDepartmentSummary;
-import io.campuscore.restfulapi.academic.web.AcademicReadDtos.FacultyResponse;
-import io.campuscore.restfulapi.academic.web.AcademicReadDtos.FacultySummary;
-import io.campuscore.restfulapi.academic.web.AcademicReadDtos.SemesterResponse;
+import io.campuscore.restfulapi.academic.dto.AcademicReadDtos.CourseResponse;
+import io.campuscore.restfulapi.academic.dto.AcademicReadDtos.CurriculumResponse;
+import io.campuscore.restfulapi.academic.dto.AcademicReadDtos.DepartmentResponse;
+import io.campuscore.restfulapi.academic.dto.AcademicReadDtos.DepartmentSummary;
+import io.campuscore.restfulapi.academic.dto.AcademicReadDtos.FacultyDepartmentSummary;
+import io.campuscore.restfulapi.academic.dto.AcademicReadDtos.FacultyResponse;
+import io.campuscore.restfulapi.academic.dto.AcademicReadDtos.FacultySummary;
+import io.campuscore.restfulapi.academic.dto.AcademicReadDtos.SemesterResponse;
 import java.util.Map;
 
 final class AcademicCatalogLocalizer {
