@@ -139,6 +139,15 @@ test('login step two and the profile card are wired to the new flows', () => {
   }
 });
 
+test('profile 2FA forms read the password from the submitted form', () => {
+  // The password input is uncontrolled (no onChange writes React state), so
+  // the submit handlers must read it off the form like handlePasswordSubmit.
+  const profile = read('src/app/dashboard/profile/page.tsx');
+
+  assert.match(profile, /namedItem\('twoFactorPassword'\)/);
+  assert.doesNotMatch(profile, /if \(!twoFactorPassword\)/);
+});
+
 test('the one-time code is never persisted or logged', () => {
   const sources = [
     read('src/lib/two-factor.ts'),

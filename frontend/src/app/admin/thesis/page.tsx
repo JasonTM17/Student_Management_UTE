@@ -144,13 +144,19 @@ export default function AdminThesisPage() {
   const [extendDeadlineValue, setExtendDeadlineValue] = useState('');
   const [extendDeadlineError, setExtendDeadlineError] = useState('');
 
+  // Failure inside a modal must be readable inside that modal: the page-level
+  // `error` banner renders behind the modal overlay, so a refused submit used
+  // to look like nothing happened. Cleared on each open and each retry.
+  const [modalError, setModalError] = useState('');
+
   // Reason-bearing governance actions share one modal: unassign a topic,
   // replace a council seat, waive/restore a counter-review, withdraw or
   // reinstate a topic. Each call is audited server-side with the reason.
   const [reasonAction, setReasonAction] = useState<{
     kind: 'unassignTopic' | 'replaceMember' | 'waiveGvpb' | 'revokeGvpbWaiver' | 'withdrawTopic' | 'reinstateTopic'
-        | 'lateTopic' | 'rosterOverride' | 'topicReassign' | 'retractResults';
+        | 'lateTopic' | 'rosterOverride' | 'topicReassign' | 'retractResults' | 'deleteRound';
     roundId: string;
+    roundName?: string;
     councilId?: string;
     topicId?: string;
     lecturerId?: string;
@@ -265,6 +271,7 @@ export default function AdminThesisPage() {
     setIsSaving(true);
     setError('');
     setSuccess('');
+    setModalError('');
     try {
       await thesisApi.createCouncil(roundId, councilNameInput.trim());
       setSuccess(messages.thesis.councils.councilCreatedSuccess);
@@ -273,7 +280,7 @@ export default function AdminThesisPage() {
       const c = await thesisApi.listCouncils(roundId);
       if (expandedRoundRef.current === roundId) setCouncils(c);
     } catch (err: unknown) {
-      setError(transitionErrorMessage(err));
+      setModalError(transitionErrorMessage(err));
     } finally {
       setIsSaving(false);
     }
@@ -292,6 +299,7 @@ export default function AdminThesisPage() {
     setIsSaving(true);
     setError('');
     setSuccess('');
+    setModalError('');
     try {
       await thesisApi.addCouncilMember(councilId, selectedLecturerId, nextRole);
       setSuccess(messages.thesis.councils.memberAddedSuccess);
@@ -300,7 +308,7 @@ export default function AdminThesisPage() {
       const c = await thesisApi.listCouncils(roundId);
       if (expandedRoundRef.current === roundId) setCouncils(c);
     } catch (err: unknown) {
-      setError(transitionErrorMessage(err));
+      setModalError(transitionErrorMessage(err));
     } finally {
       setIsSaving(false);
     }
@@ -335,6 +343,7 @@ export default function AdminThesisPage() {
     setIsSaving(true);
     setError('');
     setSuccess('');
+    setModalError('');
     try {
       await thesisApi.assignTopicToCouncil(councilId, selectedTopicIdToAssign);
       setSuccess(messages.thesis.councils.assignSuccess);
@@ -343,7 +352,7 @@ export default function AdminThesisPage() {
       const c = await thesisApi.listCouncils(roundId);
       if (expandedRoundRef.current === roundId) setCouncils(c);
     } catch (assignErr) {
-      setError(campusCodeMessage(assignErr, messages.common.campusErrors, messages.thesis.actionFailed));
+      setModalError(campusCodeMessage(assignErr, messages.common.campusErrors, messages.thesis.actionFailed));
     } finally {
       setIsSaving(false);
     }
@@ -374,12 +383,13 @@ export default function AdminThesisPage() {
     if (!formName || !formStart || !formEnd || !formLecturerStart || !formLecturerEnd
         || (needsGvpb && (!formGvpb || !formReportDate))
         || (needsDefense && !formDefenseDate)) {
-      setError(messages.thesis.admin.createIncomplete);
+      setModalError(messages.thesis.admin.createIncomplete);
       return;
     }
     setIsSaving(true);
     setError('');
     setSuccess('');
+    setModalError('');
     try {
       await thesisApi.createRound({
         name: formName,
@@ -412,7 +422,7 @@ export default function AdminThesisPage() {
       setFormDefenseDate('');
       await loadData();
     } catch {
-      setError(messages.thesis.actionFailed);
+      setModalError(messages.thesis.actionFailed);
     } finally {
       setIsSaving(false);
     }
@@ -602,6 +612,7 @@ export default function AdminThesisPage() {
     setFormGvpb(toLocalInput(round.gvpbDeadline));
     setFormReportDate(toLocalInput(round.reportDate));
     setFormDefenseDate(toLocalInput(round.defenseDate));
+    setModalError('');
     setShowEditRoundModal(true);
   };
 
@@ -610,12 +621,13 @@ export default function AdminThesisPage() {
     if (!formName || !formStart || !formEnd || !formLecturerStart || !formLecturerEnd
         || (needsGvpb && (!formGvpb || !formReportDate))
         || (needsDefense && !formDefenseDate)) {
-      setError(messages.thesis.admin.createIncomplete);
+      setModalError(messages.thesis.admin.createIncomplete);
       return;
     }
     setIsSaving(true);
     setError('');
     setSuccess('');
+    setModalError('');
     try {
       await thesisApi.updateRound(editingRoundId, {
         name: formName,
@@ -637,7 +649,7 @@ export default function AdminThesisPage() {
         await loadRoundDetail(editingRoundId);
       }
     } catch (err: unknown) {
-      setError(transitionErrorMessage(err));
+      setModalError(transitionErrorMessage(err));
     } finally {
       setIsSaving(false);
     }
@@ -670,6 +682,7 @@ export default function AdminThesisPage() {
     setIsSaving(true);
     setError('');
     setSuccess('');
+    setModalError('');
     try {
       await thesisApi.restoreRound(roundId, targetStatus);
       setSuccess(messages.thesis.admin.roundRestored);
@@ -679,7 +692,10 @@ export default function AdminThesisPage() {
         await loadRoundDetail(roundId);
       }
     } catch (err: unknown) {
+      // Restore runs both from the target-picker modal and the plain confirm
+      // flow — write both sinks so the failure is visible on either path.
       setError(transitionErrorMessage(err));
+      setModalError(transitionErrorMessage(err));
     } finally {
       setIsSaving(false);
     }
@@ -698,6 +714,7 @@ export default function AdminThesisPage() {
     }
     const plan = planThesisRoundRestore(round, hasLiveGroups);
     if (plan.requiresChoice) {
+      setModalError('');
       setRestoreTargetRound(round);
       setRestoreTargets(plan.explicitTargets);
       setRestoreStatusDraft(plan.explicitTargets[0]);
@@ -834,17 +851,43 @@ export default function AdminThesisPage() {
         }
         await thesisApi.retractResults(action.roundId, reason, 'RETRACT');
         setSuccess(messages.thesis.admin.retractResultsSuccess);
+      } else if (action.kind === 'deleteRound') {
+        if (retractConfirmation.trim() !== action.roundName) {
+          setReasonActionError(messages.thesis.admin.deleteRoundConfirmLabel);
+          return;
+        }
+        await thesisApi.deleteRound(action.roundId, reason);
+        setSuccess(messages.thesis.admin.roundDeleted);
       } else {
         return;
       }
       setReasonAction(null);
+      if (action.kind === 'deleteRound' && expandedRoundRef.current === action.roundId) {
+        expandedRoundRef.current = null;
+        setExpandedRoundId(null);
+      }
       await loadData();
-      await loadRoundDetail(action.roundId);
+      if (action.kind !== 'deleteRound') {
+        await loadRoundDetail(action.roundId);
+      }
     } catch (err: unknown) {
       setReasonActionError(transitionErrorMessage(err));
     } finally {
       setIsSaving(false);
     }
+  };
+
+  const deleteBlockerSummary = (round: ThesisRound): string => {
+    const info = round.deletion;
+    if (!info) return '';
+    const copy = messages.thesis.admin;
+    const parts: string[] = [];
+    if (info.topics > 0) parts.push(copy.deleteBlockerTopics.replace('{count}', String(info.topics)));
+    if (info.groups > 0) parts.push(copy.deleteBlockerGroups.replace('{count}', String(info.groups)));
+    if (info.members > 0) parts.push(copy.deleteBlockerMembers.replace('{count}', String(info.members)));
+    if (info.reports > 0) parts.push(copy.deleteBlockerReports.replace('{count}', String(info.reports)));
+    if (info.councils > 0) parts.push(copy.deleteBlockerCouncils.replace('{count}', String(info.councils)));
+    return parts.join(' · ');
   };
 
   const reasonActionTitle = reasonAction
@@ -859,6 +902,7 @@ export default function AdminThesisPage() {
         rosterOverride: messages.thesis.admin.rosterOverrideTitle,
         topicReassign: messages.thesis.admin.topicReassignTitle,
         retractResults: messages.thesis.admin.retractResultsTitle,
+        deleteRound: messages.thesis.admin.deleteRoundTitle,
       }[reasonAction.kind]
     : '';
 
@@ -925,7 +969,7 @@ export default function AdminThesisPage() {
       title={messages.thesis.admin.title}
       description={messages.thesis.admin.description}
       actions={
-        <Button type="button" onClick={() => setShowCreateModal(true)} disabled={!canAccess}>
+        <Button type="button" onClick={() => { setModalError(''); setShowCreateModal(true); }} disabled={!canAccess}>
           <Plus className="mr-2 h-4 w-4" />
           {messages.thesis.admin.createRound}
         </Button>
@@ -989,6 +1033,13 @@ export default function AdminThesisPage() {
           <div className="space-y-4">
             {rounds.map((round) => {
               const isExpanded = expandedRoundId === round.id;
+              // Mirrors ThesisCouncilService.lockMutableRound: once a round is
+              // terminal every council control below can only be refused, so
+              // the card keeps the roster readable but drops the actions.
+              const councilLocked =
+                round.status === 'CANCELLED'
+                || round.status === 'CLOSED'
+                || round.status === 'RESULTS_PUBLISHED';
               return (
                 <Card key={round.id} className="overflow-hidden">
                   <CardHeader
@@ -1174,6 +1225,27 @@ export default function AdminThesisPage() {
                               {messages.thesis.admin.cancelRound}
                             </Button>
                           ) : null}
+                          {round.deletion?.deletable ? (
+                            <Button
+                              type="button"
+                              size="sm"
+                              variant="ghost"
+                              className="text-destructive hover:text-destructive"
+                              onClick={() => openReasonAction({
+                                kind: 'deleteRound', roundId: round.id, roundName: round.name,
+                              })}
+                              disabled={isSaving}
+                            >
+                              <Trash2 className="h-3.5 w-3.5" />
+                              {messages.thesis.admin.deleteRound}
+                            </Button>
+                          ) : null}
+                          {round.status === 'CANCELLED' && deleteBlockerSummary(round) ? (
+                            <span className="text-xs text-muted-foreground">
+                              {messages.thesis.admin.deleteBlockersLabel
+                                .replace('{counts}', deleteBlockerSummary(round))}
+                            </span>
+                          ) : null}
                         </div>
 
                         <div className="flex flex-wrap items-center gap-2">
@@ -1206,18 +1278,21 @@ export default function AdminThesisPage() {
                               {messages.thesis.councils.description}
                             </p>
                           </div>
-                          <Button
-                            type="button"
-                            size="sm"
-                            variant="outline"
-                            onClick={() => {
-                              setTargetRoundIdForCouncil(round.id);
-                              setShowCreateCouncilModal(true);
-                            }}
-                          >
-                            <Plus className="mr-1.5 h-3.5 w-3.5" />
-                            {messages.thesis.councils.createCouncil}
-                          </Button>
+                          {!councilLocked ? (
+                            <Button
+                              type="button"
+                              size="sm"
+                              variant="outline"
+                              onClick={() => {
+                                setModalError('');
+                                setTargetRoundIdForCouncil(round.id);
+                                setShowCreateCouncilModal(true);
+                              }}
+                            >
+                              <Plus className="mr-1.5 h-3.5 w-3.5" />
+                              {messages.thesis.councils.createCouncil}
+                            </Button>
+                          ) : null}
                         </div>
 
                         {councils.length === 0 ? (
@@ -1266,13 +1341,14 @@ export default function AdminThesisPage() {
                                       <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
                                         {messages.thesis.councils.membersList}
                                       </span>
-                                      {members.length < 5 && (
+                                      {members.length < 5 && !councilLocked && (
                                         <Button
                                           type="button"
                                           variant="ghost"
                                           size="sm"
                                           className="h-7 text-xs px-2 text-primary"
                                           onClick={() => {
+                                            setModalError('');
                                             setTargetCouncilIdForMember(council.id);
                                             setTargetRoundIdForCouncil(round.id);
                                             setShowAddMemberModal(true);
@@ -1325,35 +1401,37 @@ export default function AdminThesisPage() {
                                                   <span className="text-muted-foreground">({lect.employeeId})</span>
                                                 )}
                                               </div>
-                                              <div className="flex items-center gap-1">
-                                                <button
-                                                  type="button"
-                                                  className="text-muted-foreground hover:text-primary p-1 transition-colors"
-                                                  title={messages.thesis.councils.replaceMember}
-                                                  aria-label={messages.thesis.councils.replaceMember}
-                                                  onClick={() =>
-                                                    openReasonAction({
-                                                      kind: 'replaceMember',
-                                                      roundId: round.id,
-                                                      councilId: council.id,
-                                                      lecturerId: m.lecturerId,
-                                                    })
-                                                  }
-                                                  disabled={isSaving}
-                                                >
-                                                  <RefreshCw className="h-3.5 w-3.5" />
-                                                </button>
-                                                <button
-                                                  type="button"
-                                                  className="text-muted-foreground hover:text-destructive p-1 transition-colors"
-                                                  title={messages.thesis.councils.removeMember}
-                                                  aria-label={messages.thesis.councils.removeMember}
-                                                  onClick={() => void handleRemoveMember(council.id, m.lecturerId, round.id)}
-                                                  disabled={isSaving}
-                                                >
-                                                  <Trash2 className="h-3.5 w-3.5" />
-                                                </button>
-                                              </div>
+                                              {!councilLocked ? (
+                                                <div className="flex items-center gap-1">
+                                                  <button
+                                                    type="button"
+                                                    className="text-muted-foreground hover:text-primary p-1 transition-colors"
+                                                    title={messages.thesis.councils.replaceMember}
+                                                    aria-label={messages.thesis.councils.replaceMember}
+                                                    onClick={() =>
+                                                      openReasonAction({
+                                                        kind: 'replaceMember',
+                                                        roundId: round.id,
+                                                        councilId: council.id,
+                                                        lecturerId: m.lecturerId,
+                                                      })
+                                                    }
+                                                    disabled={isSaving}
+                                                  >
+                                                    <RefreshCw className="h-3.5 w-3.5" />
+                                                  </button>
+                                                  <button
+                                                    type="button"
+                                                    className="text-muted-foreground hover:text-destructive p-1 transition-colors"
+                                                    title={messages.thesis.councils.removeMember}
+                                                    aria-label={messages.thesis.councils.removeMember}
+                                                    onClick={() => void handleRemoveMember(council.id, m.lecturerId, round.id)}
+                                                    disabled={isSaving}
+                                                  >
+                                                    <Trash2 className="h-3.5 w-3.5" />
+                                                  </button>
+                                                </div>
+                                              ) : null}
                                             </div>
                                           );
                                         })}
@@ -1367,13 +1445,14 @@ export default function AdminThesisPage() {
                                       <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
                                         {messages.thesis.councils.assignedTopics} ({topicIds.length})
                                       </span>
-                                      {isComplete && (
+                                      {isComplete && !councilLocked && (
                                         <Button
                                           type="button"
                                           variant="ghost"
                                           size="sm"
                                           className="h-7 text-xs px-2 text-primary"
                                           onClick={() => {
+                                            setModalError('');
                                             setTargetCouncilIdForTopic(council.id);
                                             setTargetRoundIdForCouncil(round.id);
                                             setShowAssignTopicModal(true);
@@ -1416,6 +1495,7 @@ export default function AdminThesisPage() {
                                                 )}
                                               </div>
                                               {/* GVPB counter-reviewer (spec: one reviewer per defended topic) */}
+                                              {!councilLocked ? (
                                               <div className="flex items-center gap-1.5">
                                                 <Select
                                                   aria-label={messages.thesis.admin.assignReviewer}
@@ -1457,6 +1537,7 @@ export default function AdminThesisPage() {
                                                     : messages.thesis.admin.assignReviewer}
                                                 </Button>
                                               </div>
+                                              ) : null}
                                               {reviewerId ? (
                                                 <p className="text-[11px] text-muted-foreground">
                                                   {messages.thesis.admin.currentReviewer}: {reviewerName}
@@ -1479,7 +1560,7 @@ export default function AdminThesisPage() {
                                               ) : null}
                                               {top ? (
                                                 <div className="flex flex-wrap gap-1">
-                                                  {top.finalScore == null ? (
+                                                  {top.finalScore == null && !councilLocked ? (
                                                     <Button
                                                       type="button"
                                                       variant="ghost"
@@ -1498,8 +1579,8 @@ export default function AdminThesisPage() {
                                                       {messages.thesis.councils.unassignTopic}
                                                     </Button>
                                                   ) : null}
-                                                  {top.finalScore == null &&
-                                                  (round.thesisType === 'TLCN' || round.thesisType === 'KLTN') ? (
+                                                  {top.finalScore == null && !councilLocked &&
+                                                  (top.gvpbWaivedReason != null || round.counterReviewWaiverAllowed) ? (
                                                     top.gvpbWaivedReason ? (
                                                       <Button
                                                         type="button"
@@ -1536,7 +1617,7 @@ export default function AdminThesisPage() {
                                                       </Button>
                                                     )
                                                   ) : null}
-                                                  {top.finalScore == null ? (
+                                                  {top.finalScore == null && !councilLocked ? (
                                                     top.resultStatus === 'WITHDRAWN' ? (
                                                       <Button
                                                         type="button"
@@ -1602,6 +1683,11 @@ export default function AdminThesisPage() {
         title={messages.thesis.admin.createRound}
       >
         <div className="space-y-4">
+          {modalError ? (
+            <div className="rounded-md border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive">
+              {modalError}
+            </div>
+          ) : null}
           <label className="flex flex-col gap-2 text-sm font-medium text-foreground">
             {messages.thesis.admin.roundName}
             <Input placeholder={messages.thesis.admin.roundNamePlaceholder} value={formName} onChange={(e) => setFormName(e.target.value)} />
@@ -1693,6 +1779,11 @@ export default function AdminThesisPage() {
         title={messages.thesis.councils.createCouncil}
       >
         <div className="space-y-4">
+          {modalError ? (
+            <div className="rounded-md border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive">
+              {modalError}
+            </div>
+          ) : null}
           <label className="flex flex-col gap-2 text-sm font-medium text-foreground">
             {messages.thesis.councils.councilName}
             <Input
@@ -1723,6 +1814,11 @@ export default function AdminThesisPage() {
         title={messages.thesis.councils.addMember}
       >
         <div className="space-y-4">
+          {modalError ? (
+            <div className="rounded-md border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive">
+              {modalError}
+            </div>
+          ) : null}
           <p className="text-xs text-muted-foreground">
             {messages.thesis.councils.councilSeatOrderHint}
           </p>
@@ -1805,6 +1901,11 @@ export default function AdminThesisPage() {
         title={messages.thesis.admin.editRoundTitle}
       >
         <div className="space-y-4">
+          {modalError ? (
+            <div className="rounded-md border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive">
+              {modalError}
+            </div>
+          ) : null}
           <label className="flex flex-col gap-2 text-sm font-medium text-foreground">
             {messages.thesis.admin.roundName}
             <Input placeholder={messages.thesis.admin.roundNamePlaceholder} value={formName} onChange={(e) => setFormName(e.target.value)} />
@@ -1896,6 +1997,11 @@ export default function AdminThesisPage() {
         title={messages.thesis.councils.assignTopic}
       >
         <div className="space-y-4">
+          {modalError ? (
+            <div className="rounded-md border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive">
+              {modalError}
+            </div>
+          ) : null}
           {(() => {
             const allAssigned = new Set<string>();
             for (const c of councils) {
@@ -2176,6 +2282,21 @@ export default function AdminThesisPage() {
               </label>
             </>
           ) : null}
+          {reasonAction?.kind === 'deleteRound' ? (
+            <>
+              <p className="text-sm text-muted-foreground">
+                {messages.thesis.admin.deleteRoundHint}
+              </p>
+              <label className="flex flex-col gap-2 text-sm font-medium text-foreground">
+                {messages.thesis.admin.deleteRoundConfirmLabel}
+                <Input
+                  value={retractConfirmation}
+                  onChange={(e) => setRetractConfirmation(e.target.value)}
+                  required
+                />
+              </label>
+            </>
+          ) : null}
           {reasonAction?.kind === 'retractResults' ? (
             <>
               <p className="text-sm text-muted-foreground">
@@ -2227,6 +2348,11 @@ export default function AdminThesisPage() {
         title={messages.thesis.admin.restoreRoundTitle}
       >
         <div className="space-y-4">
+          {modalError ? (
+            <div className="rounded-md border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive">
+              {modalError}
+            </div>
+          ) : null}
           <p className="text-sm text-muted-foreground">
             {restoreTargetRound?.cancelledFromStatus
               ? messages.thesis.admin.restoreRoundWindowPassed

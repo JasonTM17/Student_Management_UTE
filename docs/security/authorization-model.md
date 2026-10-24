@@ -177,6 +177,15 @@ retroactively identify password changes made before the revision existed.
 - **Internal AI calls** use a distinct service credential and owner boundary.
   See [ThesisAssistantInternalController](../../java-services/restful-api/src/main/java/io/campuscore/restfulapi/thesis/assistant/controller/ThesisAssistantInternalController.java)
   and [SupabaseKnowledgeInternalController](../../java-services/restful-api/src/main/java/io/campuscore/restfulapi/thesis/assistant/controller/SupabaseKnowledgeInternalController.java).
+- **Thesis governance actions** run after the dean-scope check
+  (`ThesisDeanScope`), so capability gates never leak topic existence or bypass
+  faculty ownership. The counter-review waiver is one such action: it stays
+  implemented but is off for every shipped undergraduate round type
+  (`409 COUNTER_REVIEW_WAIVER_NOT_SUPPORTED`), because those rounds always
+  require a counter-reviewer. `ThesisGovernanceCapabilities` owns the decision
+  (`RoundType.allowsCounterReviewWaiver()` plus the
+  `thesis.governance.counter-review-waiver.enabled` override, default `false`);
+  revoke stays ungated so stored waivers can always be cleared.
 
 ## Signing configuration
 

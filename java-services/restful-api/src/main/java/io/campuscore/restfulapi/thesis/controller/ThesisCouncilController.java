@@ -240,12 +240,12 @@ public class ThesisCouncilController {
         return councils.submitReviewerScore(id, parseScore(request.score()), request.comment(), actor);
     }
 
-    @Operation(summary = "Miễn yêu cầu phản biện (GVPB) cho đề tài", description = "Bỏ qua yêu cầu điểm phản biện cho một đề tài (ví dụ khi hết hạn mà chưa có phản biện); ghi audit kèm lý do, có thể hoàn tác khi chưa chốt điểm")
+    @Operation(summary = "Miễn yêu cầu phản biện (GVPB) cho đề tài", description = "Bỏ qua yêu cầu điểm phản biện cho một đề tài (ví dụ khi hết hạn mà chưa có phản biện); ghi audit kèm lý do, có thể hoàn tác khi chưa chốt điểm. Chỉ áp dụng cho loại đợt cho phép miễn phản biện — các đợt đại học hiện có luôn yêu cầu phản biện")
     @ApiResponses({
         @ApiResponse(responseCode = "200", description = "Miễn phản biện thành công"),
         @ApiResponse(responseCode = "400", description = "Dữ liệu không hợp lệ"),
         @ApiResponse(responseCode = "403", description = "Không có quyền thực hiện"),
-        @ApiResponse(responseCode = "409", description = "Đề tài đã chốt điểm hoặc đã được miễn")
+        @ApiResponse(responseCode = "409", description = "Đề tài đã chốt điểm, đã được miễn, hoặc loại đợt luôn yêu cầu phản biện")
     })
     @PostMapping("/topics/{id}/gvpb-waiver")
     @PreAuthorize("hasAnyRole('ADMIN','TRUONG_KHOA','SUPER_ADMIN')")

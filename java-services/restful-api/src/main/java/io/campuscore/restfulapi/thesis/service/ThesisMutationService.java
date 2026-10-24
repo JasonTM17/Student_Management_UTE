@@ -30,6 +30,7 @@ import io.campuscore.restfulapi.thesis.dto.ThesisMutationDtos.LateTopicRequest;
 import io.campuscore.restfulapi.thesis.dto.ThesisMutationDtos.RetractPublicationRequest;
 import io.campuscore.restfulapi.thesis.dto.ThesisMutationDtos.RosterOverrideRequest;
 import io.campuscore.restfulapi.thesis.dto.ThesisMutationDtos.TopicReassignRequest;
+import io.campuscore.restfulapi.thesis.dto.ThesisRoundDtos.RoundDeletionInfo;
 import io.campuscore.restfulapi.thesis.dto.ThesisRoundDtos.RoundResponse;
 import io.campuscore.restfulapi.thesis.dto.ThesisTopicDtos.TopicResponse;
 import io.campuscore.restfulapi.exception.DomainException;
@@ -528,6 +529,80 @@ public class ThesisMutationService {
                         "cancelled_from_status", recorded == null ? "" : recorded),
                 Map.of("status", target.name(), "target_source", targetSource));
         return roundReads.get(id);
+    }
+
+    /**
+     * Hard-deletes a round that was created by mistake. Only an EMPTY round in
+     * DRAFT or CANCELLED may be removed — cancel + restore stays the escape
+     * hatch for anything that already holds thesis data.
+     *
+     * <p>The round row is locked FOR UPDATE before any check, matching the
+     * round-first lock order every other round mutation already follows, so a
+     * concurrent topic/group/council create or a restore either commits first
+     * (and is counted, producing ROUND_HAS_DATA) or waits for the delete and
+     * then fails its own round lookup. The audit row is written in the same
+     * transaction before the DELETE so the log records the round snapshot and
+     * the checked counts even though the row itself is gone.
+     *
+     * <p>Inbox rows are left alone deliberately: result notices are only
+     * produced for published rounds (never deletable), and any notice pointing
+     * at a group's round implies the group row still exists, which is already
+     * a ROUND_HAS_DATA blocker.
+     *
+     * @param id round to delete
+     * @param reason governance reason stored on the audit row
+     * @param actor caller JWT recorded in the audit row
+     */
+    @Transactional
+    public void deleteRound(UUID id, String reason, Jwt actor) {
+        requireGovernanceRole(actor);
+        // Rounds are university-wide (no faculty column): the existing
+        // governance predicate is a dean whose faculty scope resolves, so a
+        // faculty head without an active bound lecturer profile is refused.
+        if (hasRole(actor, "TRUONG_KHOA") && !isGlobalAdmin(actor)
+                && ThesisDeanScope.facultyId(scope, actor) == null) {
+            throw new DomainException(HttpStatus.FORBIDDEN, "FACULTY_PROFILE_REQUIRED",
+                    "An active lecturer profile bound to the faculty head is required");
+        }
+        String cleanReason = requireReason(reason);
+        Map<String, Object> row = one(
+                "SELECT name, status, thesis_type, cancelled_from_status "
+                        + "FROM thesis.thesis_registration_round WHERE id = :id FOR UPDATE",
+                params().addValue("id", id), "ROUND_NOT_FOUND", "Thesis registration round not found");
+        RoundStatus status = RoundStatus.valueOf((String) row.get("status"));
+        if (status != RoundStatus.DRAFT && status != RoundStatus.CANCELLED) {
+            throw conflict("ROUND_NOT_DELETABLE",
+                    "Only a never-opened or cancelled round can be deleted; cancel it instead");
+        }
+        RoundDeletionInfo info = roundReads.deletionInfo(id, status);
+        if (!info.deletable()) {
+            throw new DomainException(HttpStatus.CONFLICT, "ROUND_HAS_DATA",
+                    "Round still has thesis data; cancel it instead of deleting",
+                    Map.of("topics", info.topics(), "groups", info.groups(),
+                            "members", info.members(), "reports", info.reports(),
+                            "councils", info.councils()));
+        }
+        Map<String, Object> before = new LinkedHashMap<>();
+        before.put("name", row.get("name"));
+        before.put("status", row.get("status"));
+        before.put("thesis_type", row.get("thesis_type"));
+        before.put("reason", cleanReason);
+        before.put("checkedCounts", Map.of("topics", info.topics(), "groups", info.groups(),
+                "members", info.members(), "reports", info.reports(), "councils", info.councils()));
+        audit.record(subject(actor), null, "THESIS_ROUND_DELETED", "THESIS_ROUND", id.toString(),
+                "Empty round deleted; reason: " + cleanReason, before, null);
+        try {
+            jdbc.update("DELETE FROM thesis.thesis_registration_round WHERE id = :id",
+                    params().addValue("id", id));
+        } catch (org.springframework.dao.DataIntegrityViolationException referenced) {
+            // A dependency that slipped past the count — e.g. a new referencing
+            // table added without a round lock — must still never cascade.
+            throw new DomainException(HttpStatus.CONFLICT, "ROUND_HAS_DATA",
+                    "Round is still referenced by thesis data; cancel it instead of deleting",
+                    Map.of("topics", info.topics(), "groups", info.groups(),
+                            "members", info.members(), "reports", info.reports(),
+                            "councils", info.councils()));
+        }
     }
 
     /**
