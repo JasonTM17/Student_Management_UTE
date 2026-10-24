@@ -22,6 +22,9 @@ import { submitLiveLogin } from './fixtures/live-login';
  * independent counter-reviewer who scores the topic, a council is seated in
  * the required order (the reviewer and the topic supervisor cannot grade),
  * members score the defense, and only the chair finalizes the mean score.
+ * The journey then publishes results, retracts them inside the grace window,
+ * republishes, and checks the end-state reads: dean overview, round reports,
+ * and the admin audit trail.
  * Re-running it needs two releasable demo students, so it prefers a freshly
  * seeded stack.
  */
@@ -31,6 +34,7 @@ const ADMIN = { email: 'admin@campuscore.edu', password: 'password123' };
 const STUDENT = { email: 'student@campuscore.edu', password: 'password123' };
 const LECTURER = { email: 'lecturer@campuscore.edu', password: 'password123' };
 const DEPT_HEAD = { email: 'truongbomon@campuscore.demo', password: 'password123' };
+const DEAN = { email: 'truongkhoa@campuscore.demo', password: 'password123' };
 const LEADER = { email: 'student2@campuscore.edu', password: 'password123' };
 const MEMBER_A = { email: 'student3@campuscore.edu', password: 'password123' };
 const MEMBER_B = { email: 'student4@campuscore.edu', password: 'password123' };
@@ -277,7 +281,7 @@ async function apiAs(page: Page, token: string, method: string, path: string, bo
   return response;
 }
 
-test('stages 2-7: proposal, registration, governance, report, review, council', async ({ page }) => {
+test('stages 2-9: proposal through published results and reporting', async ({ page }) => {
   const stamp = Date.now().toString(36);
   // Spaced sequentially: the brute-force guard counts logins per IP in a
   // window, and a burst of role tokens trips it with a plain 403.
@@ -507,4 +511,56 @@ test('stages 2-7: proposal, registration, governance, report, review, council', 
   expect(rescore.status(), 'scoring freezes after finalize').toBe(409);
   const lateSeat = await apiAs(page, admin, 'POST', `/thesis/councils/${council.id}/members`, { lecturerId: 'lecturer-profile-006', memberRole: 'MEMBER' });
   expect(lateSeat.status(), 'roster locks after scoring').toBe(409);
+
+  // Stage 8: results publication is governance-only, previewed, and
+  // reversible through the typed-confirmation retract inside its grace window.
+  const studentPreview = await apiAs(page, memberToken, 'GET', `/thesis/rounds/${round.id}/publish-results-preview`);
+  expect(studentPreview.status(), 'student cannot preview publication').toBe(403);
+  const preview = await apiAs(page, admin, 'GET', `/thesis/rounds/${round.id}/publish-results-preview`);
+  expect(preview.status(), 'publication preview').toBe(200);
+  const studentPublish = await apiAs(page, memberToken, 'POST', `/thesis/rounds/${round.id}/publish-results`, {});
+  expect(studentPublish.status(), 'student cannot publish results').toBe(403);
+  const publishResults = await apiAs(page, admin, 'POST', `/thesis/rounds/${round.id}/publish-results`, {});
+  expect(publishResults.status(), 'admin publishes results').toBe(200);
+  expect((await publishResults.json()).status).toBe('RESULTS_PUBLISHED');
+  const myResult = await apiAs(page, leaderToken, 'GET', `/thesis/me/results?roundId=${round.id}`);
+  expect(myResult.status(), 'student reads the published result').toBe(200);
+  // Publication is terminal: council mutation and re-publishing both refuse.
+  const lateCouncil = await apiAs(page, admin, 'POST', '/thesis/councils', { roundId: round.id, name: 'late' });
+  expect(lateCouncil.status(), 'no council changes after publish').toBe(409);
+  const publishAgain = await apiAs(page, admin, 'POST', `/thesis/rounds/${round.id}/publish-results`, {});
+  expect(publishAgain.status(), 're-publish on a published round refused').toBe(409);
+  // Retract needs governance, a reason and the typed confirmation.
+  const studentRetract = await apiAs(page, memberToken, 'POST', `/thesis/rounds/${round.id}/retract-results`, { reason: 'probe', confirmation: 'RETRACT' });
+  expect(studentRetract.status(), 'student cannot retract').toBe(403);
+  const noConfirm = await apiAs(page, admin, 'POST', `/thesis/rounds/${round.id}/retract-results`, { reason: 'probe' });
+  expect(noConfirm.status(), 'retract needs the typed confirmation').toBe(400);
+  const retract = await apiAs(page, admin, 'POST', `/thesis/rounds/${round.id}/retract-results`, { reason: 'lifecycle e2e retract probe', confirmation: 'RETRACT' });
+  expect(retract.status(), 'retract inside the grace window').toBe(200);
+  expect((await retract.json()).status).toBe('REGISTRATION_CLOSED');
+  const republish = await apiAs(page, admin, 'POST', `/thesis/rounds/${round.id}/publish-results`, {});
+  expect(republish.status(), 're-publish after retract').toBe(200);
+  expect((await republish.json()).status).toBe('RESULTS_PUBLISHED');
+
+  // Stage 9: there is no further lifecycle transition — RESULTS_PUBLISHED is
+  // the end state. Reporting, the dean overview and the audit trail stay
+  // readable for governance and refuse students.
+  const deanToken = await tokenFor(page, DEAN.email, DEAN.password);
+  const deanOverview = await apiAs(page, deanToken, 'GET', `/thesis/dean/overview?roundId=${round.id}`);
+  expect(deanOverview.status(), 'dean reads the faculty overview').toBe(200);
+  const studentDean = await apiAs(page, memberToken, 'GET', `/thesis/dean/overview?roundId=${round.id}`);
+  expect(studentDean.status(), 'student refused the dean overview').toBe(403);
+  const studentReports = await apiAs(page, memberToken, 'GET', `/thesis/rounds/${round.id}/reports`);
+  expect(studentReports.status(), 'student refused round reports').toBe(403);
+  const staffReports = await apiAs(page, admin, 'GET', `/thesis/rounds/${round.id}/reports`);
+  expect(staffReports.status(), 'governance reads round reports').toBe(200);
+  const studentAudit = await apiAs(page, memberToken, 'GET', '/admin/audit?search=THESIS');
+  expect(studentAudit.status(), 'student refused the audit trail').toBe(403);
+  const auditTrail = await apiAs(page, admin, 'GET', `/admin/audit?entityId=${round.id}&entityType=THESIS_ROUND&limit=50`);
+  expect(auditTrail.status(), 'admin reads the audit trail').toBe(200);
+  const actions = (((await auditTrail.json()).data ?? []) as Array<{ action?: string }>)
+    .map((row) => row.action);
+  for (const expected of ['THESIS_ROUND_TRANSITION', 'THESIS_RESULTS_RETRACTED']) {
+    expect(actions, `audit contains ${expected}`).toContain(expected);
+  }
 });

@@ -1033,6 +1033,13 @@ export default function AdminThesisPage() {
           <div className="space-y-4">
             {rounds.map((round) => {
               const isExpanded = expandedRoundId === round.id;
+              // Mirrors ThesisCouncilService.lockMutableRound: once a round is
+              // terminal every council control below can only be refused, so
+              // the card keeps the roster readable but drops the actions.
+              const councilLocked =
+                round.status === 'CANCELLED'
+                || round.status === 'CLOSED'
+                || round.status === 'RESULTS_PUBLISHED';
               return (
                 <Card key={round.id} className="overflow-hidden">
                   <CardHeader
@@ -1271,19 +1278,21 @@ export default function AdminThesisPage() {
                               {messages.thesis.councils.description}
                             </p>
                           </div>
-                          <Button
-                            type="button"
-                            size="sm"
-                            variant="outline"
-                            onClick={() => {
-                              setModalError('');
-                              setTargetRoundIdForCouncil(round.id);
-                              setShowCreateCouncilModal(true);
-                            }}
-                          >
-                            <Plus className="mr-1.5 h-3.5 w-3.5" />
-                            {messages.thesis.councils.createCouncil}
-                          </Button>
+                          {!councilLocked ? (
+                            <Button
+                              type="button"
+                              size="sm"
+                              variant="outline"
+                              onClick={() => {
+                                setModalError('');
+                                setTargetRoundIdForCouncil(round.id);
+                                setShowCreateCouncilModal(true);
+                              }}
+                            >
+                              <Plus className="mr-1.5 h-3.5 w-3.5" />
+                              {messages.thesis.councils.createCouncil}
+                            </Button>
+                          ) : null}
                         </div>
 
                         {councils.length === 0 ? (
@@ -1332,7 +1341,7 @@ export default function AdminThesisPage() {
                                       <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
                                         {messages.thesis.councils.membersList}
                                       </span>
-                                      {members.length < 5 && (
+                                      {members.length < 5 && !councilLocked && (
                                         <Button
                                           type="button"
                                           variant="ghost"
@@ -1392,35 +1401,37 @@ export default function AdminThesisPage() {
                                                   <span className="text-muted-foreground">({lect.employeeId})</span>
                                                 )}
                                               </div>
-                                              <div className="flex items-center gap-1">
-                                                <button
-                                                  type="button"
-                                                  className="text-muted-foreground hover:text-primary p-1 transition-colors"
-                                                  title={messages.thesis.councils.replaceMember}
-                                                  aria-label={messages.thesis.councils.replaceMember}
-                                                  onClick={() =>
-                                                    openReasonAction({
-                                                      kind: 'replaceMember',
-                                                      roundId: round.id,
-                                                      councilId: council.id,
-                                                      lecturerId: m.lecturerId,
-                                                    })
-                                                  }
-                                                  disabled={isSaving}
-                                                >
-                                                  <RefreshCw className="h-3.5 w-3.5" />
-                                                </button>
-                                                <button
-                                                  type="button"
-                                                  className="text-muted-foreground hover:text-destructive p-1 transition-colors"
-                                                  title={messages.thesis.councils.removeMember}
-                                                  aria-label={messages.thesis.councils.removeMember}
-                                                  onClick={() => void handleRemoveMember(council.id, m.lecturerId, round.id)}
-                                                  disabled={isSaving}
-                                                >
-                                                  <Trash2 className="h-3.5 w-3.5" />
-                                                </button>
-                                              </div>
+                                              {!councilLocked ? (
+                                                <div className="flex items-center gap-1">
+                                                  <button
+                                                    type="button"
+                                                    className="text-muted-foreground hover:text-primary p-1 transition-colors"
+                                                    title={messages.thesis.councils.replaceMember}
+                                                    aria-label={messages.thesis.councils.replaceMember}
+                                                    onClick={() =>
+                                                      openReasonAction({
+                                                        kind: 'replaceMember',
+                                                        roundId: round.id,
+                                                        councilId: council.id,
+                                                        lecturerId: m.lecturerId,
+                                                      })
+                                                    }
+                                                    disabled={isSaving}
+                                                  >
+                                                    <RefreshCw className="h-3.5 w-3.5" />
+                                                  </button>
+                                                  <button
+                                                    type="button"
+                                                    className="text-muted-foreground hover:text-destructive p-1 transition-colors"
+                                                    title={messages.thesis.councils.removeMember}
+                                                    aria-label={messages.thesis.councils.removeMember}
+                                                    onClick={() => void handleRemoveMember(council.id, m.lecturerId, round.id)}
+                                                    disabled={isSaving}
+                                                  >
+                                                    <Trash2 className="h-3.5 w-3.5" />
+                                                  </button>
+                                                </div>
+                                              ) : null}
                                             </div>
                                           );
                                         })}
@@ -1434,7 +1445,7 @@ export default function AdminThesisPage() {
                                       <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
                                         {messages.thesis.councils.assignedTopics} ({topicIds.length})
                                       </span>
-                                      {isComplete && (
+                                      {isComplete && !councilLocked && (
                                         <Button
                                           type="button"
                                           variant="ghost"
@@ -1484,6 +1495,7 @@ export default function AdminThesisPage() {
                                                 )}
                                               </div>
                                               {/* GVPB counter-reviewer (spec: one reviewer per defended topic) */}
+                                              {!councilLocked ? (
                                               <div className="flex items-center gap-1.5">
                                                 <Select
                                                   aria-label={messages.thesis.admin.assignReviewer}
@@ -1525,6 +1537,7 @@ export default function AdminThesisPage() {
                                                     : messages.thesis.admin.assignReviewer}
                                                 </Button>
                                               </div>
+                                              ) : null}
                                               {reviewerId ? (
                                                 <p className="text-[11px] text-muted-foreground">
                                                   {messages.thesis.admin.currentReviewer}: {reviewerName}
@@ -1547,7 +1560,7 @@ export default function AdminThesisPage() {
                                               ) : null}
                                               {top ? (
                                                 <div className="flex flex-wrap gap-1">
-                                                  {top.finalScore == null ? (
+                                                  {top.finalScore == null && !councilLocked ? (
                                                     <Button
                                                       type="button"
                                                       variant="ghost"
@@ -1566,7 +1579,7 @@ export default function AdminThesisPage() {
                                                       {messages.thesis.councils.unassignTopic}
                                                     </Button>
                                                   ) : null}
-                                                  {top.finalScore == null &&
+                                                  {top.finalScore == null && !councilLocked &&
                                                   (top.gvpbWaivedReason != null || round.counterReviewWaiverAllowed) ? (
                                                     top.gvpbWaivedReason ? (
                                                       <Button
@@ -1604,7 +1617,7 @@ export default function AdminThesisPage() {
                                                       </Button>
                                                     )
                                                   ) : null}
-                                                  {top.finalScore == null ? (
+                                                  {top.finalScore == null && !councilLocked ? (
                                                     top.resultStatus === 'WITHDRAWN' ? (
                                                       <Button
                                                         type="button"
