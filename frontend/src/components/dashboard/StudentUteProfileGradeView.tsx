@@ -370,7 +370,7 @@ export function StudentUteProfileGradeView({
                 <h4 className="font-bold text-sm text-foreground tracking-tight">
                   {card.chartTitle}
                 </h4>
-                <div className="flex items-center gap-1.5 text-muted-foreground/70">
+                <div className="flex items-center gap-1.5 text-muted-foreground">
                   <button
                     type="button"
                     onClick={handleDownloadChart}

@@ -71,7 +71,7 @@ export default function ErrorBoundary({
             {copy.body}
           </p>
           {error.digest && (
-            <p className="text-xs font-mono text-muted-foreground/70 bg-muted py-1 px-2 rounded">
+            <p className="text-xs font-mono text-muted-foreground bg-muted py-1 px-2 rounded">
               {copy.digest}: {error.digest}
             </p>
           )}
