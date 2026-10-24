@@ -1,7 +1,7 @@
 package io.campuscore.restfulapi.mail.controller;
 
 import io.campuscore.restfulapi.mail.repository.MailRecipientScopeRepository;
-import io.campuscore.restfulapi.mail.repository.MailRecipientScopeRepository.ScopedRecipient;
+import io.campuscore.restfulapi.mail.model.ScopedRecipient;
 import io.campuscore.restfulapi.mail.service.EmailService;
 import io.campuscore.restfulapi.mail.dto.MailDtos.AcademicNoticeRequest;
 import io.campuscore.restfulapi.mail.dto.MailDtos.CourseItem;

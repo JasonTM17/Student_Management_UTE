@@ -24,7 +24,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.campuscore.restfulapi.mail.repository.MailRecipientScopeRepository;
-import io.campuscore.restfulapi.mail.repository.MailRecipientScopeRepository.ScopedRecipient;
+import io.campuscore.restfulapi.mail.model.ScopedRecipient;
 import io.campuscore.restfulapi.mail.service.EmailService;
 import io.campuscore.restfulapi.thesis.domain.ApprovalStatus;
 import io.campuscore.restfulapi.thesis.domain.GroupStatus;

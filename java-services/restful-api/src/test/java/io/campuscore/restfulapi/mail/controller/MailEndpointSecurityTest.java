@@ -14,7 +14,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import java.util.List;
 import io.campuscore.restfulapi.mail.repository.MailRecipientScopeRepository;
-import io.campuscore.restfulapi.mail.repository.MailRecipientScopeRepository.ScopedRecipient;
+import io.campuscore.restfulapi.mail.model.ScopedRecipient;
 import io.campuscore.restfulapi.mail.service.EmailService;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
