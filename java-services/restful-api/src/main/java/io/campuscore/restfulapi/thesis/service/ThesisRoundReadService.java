@@ -3,6 +3,7 @@ package io.campuscore.restfulapi.thesis.service;
 import io.campuscore.restfulapi.thesis.model.RoundStatus;
 import io.campuscore.restfulapi.thesis.entity.ThesisRegistrationRound;
 import io.campuscore.restfulapi.thesis.repository.ThesisRegistrationRoundRepository;
+import io.campuscore.restfulapi.thesis.model.EligibilityView;
 import io.campuscore.restfulapi.thesis.repository.ThesisRoundDeletionRepository;
 import io.campuscore.restfulapi.thesis.dto.ThesisRoundDtos.RoundClosureInfo;
 import io.campuscore.restfulapi.thesis.dto.ThesisRoundDtos.RoundDeletionInfo;
@@ -11,6 +12,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import org.springframework.context.annotation.Profile;
+import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -30,6 +32,10 @@ public class ThesisRoundReadService {
     private final ThesisRoundDeletionRepository deletions;
     private final ThesisGovernanceCapabilities capabilities;
 
+    /** Optional; round listing still works when the policy bean is absent. */
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private ThesisEligibilityService eligibility;
+
     public ThesisRoundReadService(
             ThesisRegistrationRoundRepository rounds,
             ThesisRoundDeletionRepository deletions,
@@ -46,16 +52,40 @@ public class ThesisRoundReadService {
      */
     @Transactional(readOnly = true)
     public List<RoundResponse> list(RoundStatus status) {
+        return list(status, null);
+    }
+
+    /**
+     * Same round list; a student caller additionally receives their own
+     * registration eligibility on every row so the thesis page renders the
+     * eligibility card without a second request.
+     */
+    @Transactional(readOnly = true)
+    public List<RoundResponse> list(RoundStatus status, Jwt actor) {
         List<ThesisRegistrationRound> list = status == null
                 ? rounds.findAllByStatusNotOrderByRegistrationStartDesc(RoundStatus.CLOSED)
                 : rounds.findAllByStatusOrderByRegistrationStartDesc(status);
         Map<UUID, Map<String, Number>> counts = deletions.dependentCounts(
                 list.stream().map(ThesisRegistrationRound::getId).toList());
+        EligibilityView callerEligibility = callerEligibility(actor);
         return list.stream()
                 .map(round -> RoundResponse.from(round, deletionInfo(round, counts), closureInfo(round),
                         capabilities.counterReviewWaiverAllowed(round.getThesisType()),
-                        ThesisMutationService.MIN_GROUP_MEMBERS, ThesisMutationService.MAX_GROUP_MEMBERS))
+                        ThesisMutationService.MIN_GROUP_MEMBERS, ThesisMutationService.MAX_GROUP_MEMBERS,
+                        callerEligibility))
                 .toList();
+    }
+
+    /** One evaluation per request; only a student principal gets a view. */
+    private EligibilityView callerEligibility(Jwt actor) {
+        if (eligibility == null || actor == null) {
+            return null;
+        }
+        String studentId = actor.getClaimAsString("studentId");
+        if (studentId == null || studentId.isBlank()) {
+            return null;
+        }
+        return eligibility.evaluate(studentId);
     }
 
     @Transactional(readOnly = true)

@@ -25,6 +25,7 @@ import org.springframework.stereotype.Repository;
 @Profile("persistence")
 public class ThesisGroupReadRepository {
     private final NamedParameterJdbcTemplate jdbc;
+
     public ThesisGroupReadRepository(NamedParameterJdbcTemplate jdbc) { this.jdbc = jdbc; }
 
     public List<GroupResponse> findByRoundId(UUID roundId) {
@@ -294,7 +295,8 @@ public class ThesisGroupReadRepository {
                     external ? contact : rs.getString("email"),
                     external,
                     rs.getBoolean("is_leader"),
-                    rs.getInt("member_order")));
+                    rs.getInt("member_order"),
+                    null));
         });
         return rows.stream().map(row -> new GroupResponse(row.id(), row.roundId(), row.leaderStudentId(), row.topicId(), row.status(), row.approvalStatus(), row.rejectionReason(), List.copyOf(members.get(row.id())), List.copyOf(memberDetails.get(row.id())), null)).toList();
     }
