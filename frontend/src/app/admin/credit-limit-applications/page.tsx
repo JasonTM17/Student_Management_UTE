@@ -25,7 +25,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { statusToneClass, type StatusTone } from '@/components/ui/status';
 import { EmptyState, ErrorState, LoadingState } from '@/components/ui/state-block';
 import { WorkspaceForbiddenState } from '@/components/ProtectedRoute';
-import { campusErrorMessage } from '@/lib/campus-error';
+import { campusCodeMessage } from '@/lib/campus-error';
 
 type StatusFilter = 'PENDING' | 'APPROVED' | 'REJECTED' | 'ALL';
 type ReviewDecision = 'APPROVED' | 'REJECTED';
@@ -75,7 +75,7 @@ export default function AdminCreditLimitApplicationsPage() {
     try {
       setApplications(await adminRegistrationApi.creditLimitApplications(filter));
     } catch (cause) {
-      setError(campusErrorMessage(cause, messages.common.campusErrors, copy.loadFailed));
+      setError(campusCodeMessage(cause, messages.common.campusErrors, copy.loadFailed));
     } finally {
       setLoading(false);
     }
@@ -119,7 +119,7 @@ export default function AdminCreditLimitApplicationsPage() {
       toast.success(copy.reviewed);
       await load();
     } catch (cause) {
-      setReviewError(campusErrorMessage(cause, messages.common.campusErrors, copy.loadFailed));
+      setReviewError(campusCodeMessage(cause, messages.common.campusErrors, copy.loadFailed));
     } finally {
       setSaving(false);
     }

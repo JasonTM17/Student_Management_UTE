@@ -140,3 +140,53 @@ test('shipped campusErrorMessage maps representative payloads without envelope t
     );
   }
 });
+
+test('academic registration and catalog failures have bilingual code copy', () => {
+  const source = read('src/i18n/messages.ts');
+  const viStart = source.indexOf('export const vi: I18nMessages = {');
+  assert.notEqual(viStart, -1);
+  const en = source.slice(source.indexOf('export const en = {'), viStart);
+  const vi = source.slice(viStart);
+  const codes = [
+    'CAPACITY_BELOW_ENROLLED',
+    'CAPACITY_EXCEEDS_ROOM',
+    'CLASSROOM_INACTIVE',
+    'CREDIT_LIMIT_APPLICATION_DECISION_INVALID',
+    'CREDIT_LIMIT_APPLICATION_NOT_FOUND',
+    'CREDIT_LIMIT_APPLICATION_NOT_PENDING',
+    'CREDIT_LIMIT_APPLICATION_NOTE_INVALID',
+    'CREDIT_LIMIT_APPLICATION_REASON_INVALID',
+    'CREDIT_LIMIT_APPLICATION_STATUS_INVALID',
+    'ENROLLMENT_FORBIDDEN',
+    'ENROLLMENT_NOT_ACTIVE',
+    'IDEMPOTENCY_CONFLICT',
+    'IDEMPOTENCY_KEY_REQUIRED',
+    'INVALID_CAPACITY',
+    'INVALID_CREDITS',
+    'INVALID_DATE_RANGE',
+    'INVALID_DATE_VALUE',
+    'INVALID_SCHEDULE',
+    'INVALID_SECTION_STATUS',
+    'INVALID_SEMESTER_STATUS',
+    'REFERENCE_NOT_FOUND',
+    'RESOURCE_IN_USE',
+    'SECTION_NOT_FOUND',
+    'SEMESTER_DATES_OVERLAP',
+    'STUDENT_NOT_FOUND',
+  ];
+
+  for (const code of codes) {
+    const key = new RegExp(`\\b${code}:\\s*['\"]`);
+    assert.ok(key.test(en), `English campusErrors.codes is missing ${code}`);
+    assert.ok(key.test(vi), `Vietnamese campusErrors.codes is missing ${code}`);
+  }
+
+  for (const page of [
+    'src/app/admin/courses/page.tsx',
+    'src/app/admin/semesters/page.tsx',
+    'src/app/admin/sections/page.tsx',
+    'src/app/admin/credit-limit-applications/page.tsx',
+  ]) {
+    assert.match(read(page), /campusCodeMessage\(/, `${page} should show mapped business errors`);
+  }
+});
