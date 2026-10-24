@@ -27,6 +27,18 @@ class ArchitectureGuardTest {
             "Lorg/springframework/web/bind/annotation/RestController;".getBytes();
     private static final byte[] CONTROLLER =
             "Lorg/springframework/stereotype/Controller;".getBytes();
+    private static final byte[] CONTROLLER_ADVICE =
+            "Lorg/springframework/web/bind/annotation/ControllerAdvice;".getBytes();
+    private static final byte[] REST_CONTROLLER_ADVICE =
+            "Lorg/springframework/web/bind/annotation/RestControllerAdvice;".getBytes();
+    private static final byte[] OBJECT_MAPPER =
+            "Lcom/fasterxml/jackson/databind/ObjectMapper;".getBytes();
+    private static final byte[] PRINT_WRITER =
+            "Ljava/io/PrintWriter;".getBytes();
+    private static final byte[] RUNTIME_EXCEPTION =
+            "java/lang/RuntimeException".getBytes();
+    private static final String CAMPUSCORE_EXCEPTION_REF =
+            "io/campuscore/restfulapi/exception/";
 
     /** Pre-existing controller classes that call a repository directly. */
     private static final Map<String, List<String>> CONTROLLER_TO_REPOSITORY_EXCEPTIONS = Map.of(
@@ -89,6 +101,70 @@ class ArchitectureGuardTest {
                 .map(ScannedClass::binaryName)
                 .toList();
         assertTrue(violations.isEmpty(), () -> "DTO holders outside dto packages: " + violations);
+    }
+
+    @Test
+    void exceptionTypesLiveInExceptionPackagesAndExtendRuntimeFamily() throws Exception {
+        List<String> problems = scan().stream()
+                .filter(c -> c.simpleName().endsWith("Exception"))
+                .flatMap(c -> {
+                    var problemsHere = new java.util.ArrayList<String>();
+                    if (!inLayer(c, "exception")) {
+                        problemsHere.add(c.binaryName() + " is not in an exception package");
+                    }
+                    if (!referencesRuntimeExceptionFamily(c)) {
+                        problemsHere.add(c.binaryName() + " does not extend RuntimeException or the app exception family");
+                    }
+                    return problemsHere.stream();
+                })
+                .toList();
+        assertTrue(problems.isEmpty(), () -> "exception type violations: " + problems);
+    }
+
+    @Test
+    void exceptionHandlersLiveInExceptionHandlerPackages() throws Exception {
+        List<String> violations = scan().stream()
+                .filter(c -> c.simpleName().endsWith("ExceptionHandler") || isControllerAdvice(c))
+                .filter(c -> !inExceptionHandlerPackage(c))
+                .map(ScannedClass::binaryName)
+                .toList();
+        assertTrue(violations.isEmpty(), () -> "exception handlers outside exception.handler packages: " + violations);
+    }
+
+    @Test
+    void businessLayersDoNotDependOnExceptionHandlers() throws Exception {
+        List<String> violations = scan().stream()
+                .filter(c -> !inLayer(c, "exception"))
+                .filter(c -> references(c, "/exception/handler/"))
+                .map(ScannedClass::binaryName)
+                .toList();
+        assertTrue(violations.isEmpty(), () -> "non-exception packages depending on exception handlers: " + violations);
+    }
+
+    @Test
+    void filtersWriteErrorBodiesOnlyThroughTheErrorWriter() throws Exception {
+        List<String> violations = scan().stream()
+                .filter(c -> c.simpleName().endsWith("Filter"))
+                .filter(c -> contains(c.bytes(), OBJECT_MAPPER) || contains(c.bytes(), PRINT_WRITER))
+                .map(ScannedClass::binaryName)
+                .toList();
+        assertTrue(violations.isEmpty(),
+                () -> "filters constructing error bodies outside the error writer: " + violations);
+    }
+
+    private static boolean inExceptionHandlerPackage(ScannedClass c) {
+        String pkg = c.packagePath();
+        return pkg.endsWith("exception/handler") || pkg.contains("exception/handler/");
+    }
+
+    private static boolean isControllerAdvice(ScannedClass c) {
+        return contains(c.bytes(), CONTROLLER_ADVICE) || contains(c.bytes(), REST_CONTROLLER_ADVICE);
+    }
+
+    private static boolean referencesRuntimeExceptionFamily(ScannedClass c) {
+        return contains(c.bytes(), RUNTIME_EXCEPTION)
+                || new String(c.bytes(), java.nio.charset.StandardCharsets.ISO_8859_1)
+                        .contains(CAMPUSCORE_EXCEPTION_REF);
     }
 
     private static boolean inLayer(ScannedClass c, String layer) {
