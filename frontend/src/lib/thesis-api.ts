@@ -48,6 +48,18 @@ export interface ThesisRound {
    * currently CANCELLED (older cancellations carry nothing and restore to
    * DRAFT). */
   cancelledFromStatus?: ThesisRoundStatus | null;
+  /** Read-only deletability view: `deletable` only when the round is an empty
+   * DRAFT/CANCELLED; the per-kind counts explain every blocker. */
+  deletion?: ThesisRoundDeletionInfo | null;
+}
+
+export interface ThesisRoundDeletionInfo {
+  deletable: boolean;
+  topics: number;
+  groups: number;
+  members: number;
+  reports: number;
+  councils: number;
 }
 
 export interface ThesisTopicSupervisor {
@@ -851,6 +863,13 @@ export const thesisApi = {
       targetStatus ? { targetStatus } : {},
     );
     return response.data;
+  },
+
+  /** Hard-deletes an empty DRAFT/CANCELLED round (xóa đợt tạo nhầm). The
+   * server refuses with ROUND_HAS_DATA while any thesis data still points at
+   * the round, so cancel stays the archive path. */
+  deleteRound: async (roundId: string, reason: string): Promise<void> => {
+    await api.delete('/thesis/rounds/' + roundId, { data: { reason } });
   },
 
   /** Assigns the GVPB counter-reviewer of a topic (governance only). */
