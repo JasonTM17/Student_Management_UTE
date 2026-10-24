@@ -5,15 +5,24 @@
 -- (The script manages its own single transaction; do NOT pass -1.)
 --
 -- Steps, all inside one transaction:
---   1) LOCK every table the script reads or deletes from, in one fixed order,
---      SHARE ROW EXCLUSIVE MODE — the weakest level that blocks every
---      application write (INSERT/UPDATE/DELETE take ROW EXCLUSIVE) and that
---      serializes two concurrent package runs against each other, while plain
---      reads stay untouched. lock_timeout = 5 s makes the script give up
---      cleanly instead of queueing behind an application write; the app waits
---      behind us for at most the short remainder of this script (well under a
---      second on a local connection, a few seconds worst-case over a remote
---      one — the lock is held only until COMMIT).
+--   1) LOCK every table the script reads or deletes from, SHARE ROW EXCLUSIVE
+--      MODE — the weakest level that blocks every application write
+--      (INSERT/UPDATE/DELETE take ROW EXCLUSIVE) and that serializes two
+--      concurrent package runs, while plain reads stay untouched. Locks are
+--      taken IN THE APPLICATION'S OWN WRITE ORDER: all thesis business tables
+--      first (the app writes them first), then any FK-referencing tables the
+--      preflight discovers, and only then — LAST — the hot app-wide tables
+--      notifications.notification and campuscore_audit."AdminAudit" (the app
+--      writes its notification/audit rows last). Because the package can only
+--      ever WAIT on a thesis table while holding no audit/notification lock,
+--      no wait-for cycle back to the app is possible; and lock_timeout =
+--      300 ms, deliberately below the default deadlock_timeout (1 s), makes
+--      the package abort before deadlock detection would even run — the
+--      package is always the victim, the application transaction never loses.
+--      run.mjs retries the whole script a bounded number of times with
+--      jitter; each retry is a fresh transaction and no lock is held while
+--      the runner waits. The locks are held only until COMMIT — sub-second
+--      on a local connection, a few seconds worst-case over a remote one.
 --   2) PREFLIGHT (re-checked only after the locks are held, so a committed
 --      write is always seen and an in-flight write can never slip under us):
 --      enumerate every foreign key into the three marker parent tables
@@ -28,11 +37,20 @@
 --      checksum-protected copy in the thesis.thesis_topic table comment is the
 --      fallback. When both copies exist they must agree. Missing, unreadable
 --      or disagreeing copies ABORT the script with nothing changed.
---   4) CONTENT CHECK: every marker row is hashed (md5 of the whole row) and
---      compared with the hash recorded at apply time. Any difference — an
---      in-place edit, a deleted marker row — means the application touched
---      demo data; the script ABORTS with per-table counts and the owner
---      decides. Nothing is deleted.
+--   4) CONTENT CHECK: for every marker row the image recorded, the hashed
+--      columns (an explicit per-table list — every column apply writes EXCEPT
+--      volatile bookkeeping columns: version, updated_at everywhere and
+--      is_read/read_at on notifications) are re-hashed canonically and
+--      compared per column. Three-way classification per marker row:
+--        MISSING (the app deleted it — e.g. a results retract removes the
+--          demo notifications): tolerated; counted and reported as
+--          'already removed by app', deletion continues with what remains.
+--        DIFFERS (row exists but a hashed column changed — an in-place app
+--          edit): BLOCKS rollback; nothing is deleted.
+--        EXTRA (a marker id exists that the image never wrote): BLOCKS
+--          rollback; nothing is deleted.
+--      A migration that ADDs a column changes no hash; a migration that drops
+--      a hashed column narrows the comparison to the surviving columns.
 --   5) RESTORE: re-apply the before-image column values (baseline round/topic
 --      column values, including version and updated_at). A column is restored
 --      only when its current value still equals the value apply wrote;
@@ -42,18 +60,25 @@
 
 BEGIN;
 
-SET LOCAL lock_timeout = '5s';
+-- every session setting that can change text/bytea/timestamp rendering is
+-- pinned for the transaction so the recorded hashes round-trip under any
+-- client settings (the runner also uses psql -X).
+SET LOCAL lock_timeout = '300ms';
 SET LOCAL statement_timeout = '120s';
 SET LOCAL TimeZone = 'UTC';
 SET LOCAL DateStyle = 'ISO, MDY';
+SET LOCAL bytea_output = 'hex';
+SET LOCAL extra_float_digits = 0;
+SET LOCAL IntervalStyle = 'iso_8601';
+SET LOCAL standard_conforming_strings = 'on';
 
--- 1) fixed-order table locks; a lock wait that exceeds lock_timeout aborts the
---    whole run with a clear reason instead of silently queueing behind the app.
+-- 1) locks in the application's write order, phase 1: the thesis business
+--    tables. A lock wait that exceeds lock_timeout aborts the whole run with
+--    a clear reason — the package gives up, the app is never the victim.
 DO $$
 BEGIN
   BEGIN
-    EXECUTE 'LOCK TABLE campuscore_audit."AdminAudit", notifications.notification,'
-         || ' thesis.thesis_council, thesis.thesis_council_member, thesis.thesis_council_topic,'
+    EXECUTE 'LOCK TABLE thesis.thesis_council, thesis.thesis_council_member, thesis.thesis_council_topic,'
          || ' thesis.thesis_group, thesis.thesis_group_member, thesis.thesis_group_report,'
          || ' thesis.thesis_registration_round, thesis.thesis_topic, thesis.thesis_topic_score,'
          || ' thesis.thesis_topic_supervisor IN SHARE ROW EXCLUSIVE MODE';
@@ -134,6 +159,20 @@ BEGIN
   END IF;
 END $$;
 
+-- locks, phase 2 (LAST, matching the app which writes audit/notification
+-- last): the two hot app-wide tables. Taken only after every thesis lock is
+-- held, so the package never holds an audit/notification lock while waiting
+-- on a thesis table — no wait-for cycle back to the app can form.
+DO $$
+BEGIN
+  BEGIN
+    EXECUTE 'LOCK TABLE notifications.notification, campuscore_audit."AdminAudit" IN SHARE ROW EXCLUSIVE MODE';
+  EXCEPTION WHEN lock_not_available THEN
+    RAISE EXCEPTION 'rollback aborted: could not lock the audit/notification tables within lock_timeout — an application write is in progress; nothing was changed, retry when the app is idle'
+      USING ERRCODE = '55P03', CONSTRAINT = 'thesis_demo_rollback_lock';
+  END;
+END $$;
+
 -- marker census reused by the image gate, the hash check and the residue report
 CREATE TEMP TABLE _marker_counts ON COMMIT DROP AS
 SELECT 'thesis_topic' AS name, count(*) AS cnt FROM thesis.thesis_topic WHERE id::text LIKE 'ed1a0000-0000-4000-8000-%'
@@ -147,6 +186,46 @@ UNION ALL SELECT 'thesis_topic_score', count(*) FROM thesis.thesis_topic_score W
 UNION ALL SELECT 'thesis_group_report', count(*) FROM thesis.thesis_group_report WHERE id::text LIKE 'ed1a0000-0000-4000-8000-%'
 UNION ALL SELECT 'notification', count(*) FROM notifications.notification WHERE id LIKE 'demo-th-%'
 UNION ALL SELECT 'admin_audit', count(*) FROM campuscore_audit."AdminAudit" WHERE id LIKE 'demo-th-%';
+
+-- the eleven marker tables and their marker-row predicates (same list as
+-- apply.sql; the audit image row demo-th-audit-000 is excluded — it carries
+-- the image and is deleted unconditionally below).
+CREATE TEMP TABLE _tables (tbl text, pred text) ON COMMIT DROP;
+INSERT INTO _tables VALUES
+  ('thesis.thesis_topic','id::text LIKE ''ed1a0000-0000-4000-8000-%'''),
+  ('thesis.thesis_topic_supervisor','id::text LIKE ''ed1a0000-0000-4000-8000-%'''),
+  ('thesis.thesis_group','id::text LIKE ''ed1a0000-0000-4000-8000-%'''),
+  ('thesis.thesis_group_member','id::text LIKE ''ed1a0000-0000-4000-8000-%'''),
+  ('thesis.thesis_council','id::text LIKE ''ed1a0000-0000-4000-8000-%'''),
+  ('thesis.thesis_council_member','id::text LIKE ''ed1a0000-0000-4000-8000-%'''),
+  ('thesis.thesis_council_topic','id::text LIKE ''ed1a0000-0000-4000-8000-%'''),
+  ('thesis.thesis_topic_score','id::text LIKE ''ed1a0000-0000-4000-8000-%'''),
+  ('thesis.thesis_group_report','id::text LIKE ''ed1a0000-0000-4000-8000-%'''),
+  ('notifications.notification','id LIKE ''demo-th-%'''),
+  ('campuscore_audit."AdminAudit"','id LIKE ''demo-th-%'' AND id <> ''demo-th-audit-000''');
+
+-- explicit, versioned per-table column lists the row hashes cover — the same
+-- literal list as apply.sql (every column apply writes EXCEPT version,
+-- updated_at and notification is_read/read_at). Columns a migration dropped
+-- simply fall out of the comparison via the pg_attribute join below; columns
+-- a migration added are never hashed.
+CREATE TEMP TABLE _hashcols (tbl text, col text, ord int) ON COMMIT DROP;
+INSERT INTO _hashcols
+SELECT j.tbl, c.col, c.ord::int
+FROM (VALUES
+  ('thesis.thesis_topic', '["id","round_id","department_id","title","description","max_groups","status","created_by","created_at","final_score","final_score_finalized_by","final_score_finalized_at","result_status","gvpb_lecturer_id","gvpb_waived_reason","gvpb_waived_by","gvpb_waived_at","result_reason","result_by","result_at"]'),
+  ('thesis.thesis_topic_supervisor', '["id","topic_id","lecturer_id","supervisor_order","created_at"]'),
+  ('thesis.thesis_group', '["id","round_id","leader_student_id","topic_id","status","approval_status","approved_by","approved_at","rejection_reason","created_at","legacy_group_size_exception","size_exception_reason","size_exception_by","size_exception_at"]'),
+  ('thesis.thesis_group_member', '["id","group_id","round_id","student_id","member_order","is_leader","created_at","display_name","contact","is_external","active_participation"]'),
+  ('thesis.thesis_council', '["id","round_id","name","status","created_by","created_at"]'),
+  ('thesis.thesis_council_member', '["id","council_id","lecturer_id","member_role","created_at"]'),
+  ('thesis.thesis_council_topic', '["id","council_id","topic_id","assigned_by","created_at"]'),
+  ('thesis.thesis_topic_score', '["id","topic_id","council_id","lecturer_id","component","score","graded_at","created_at","comment"]'),
+  ('thesis.thesis_group_report', '["id","group_id","round_id","submitted_by","title","url","note","submitted_at","file_name","file_type","file_size","file_data","storage_provider","storage_bucket","storage_key","file_sha256"]'),
+  ('notifications.notification', '["id","user_id","title","message","type","link","created_at","announcement_id","source_key"]'),
+  ('campuscore_audit."AdminAudit"', '["id","actorId","actorLabel","action","entityType","entityId","summary","beforeState","afterState"]')
+) j(tbl, cols)
+CROSS JOIN LATERAL jsonb_array_elements_text(j.cols::jsonb) WITH ORDINALITY c(col, ord);
 
 -- 3) locate and validate the before-image: primary copy in audit row
 --    'demo-th-audit-000', checksum-protected fallback in the table comment.
@@ -175,7 +254,7 @@ BEGIN
   END IF;
 
   v_comment := obj_description('thesis.thesis_topic'::regclass);
-  IF v_comment LIKE 'thesis-demo-data v2 md5:%' THEN
+  IF v_comment LIKE 'thesis-demo-data v3 md5:%' THEN
     v_decl := substring(v_comment from 'md5:([0-9a-f]{32})');
     v_payload := substr(v_comment, position(E'\n' in v_comment) + 1);
     IF v_decl IS NOT NULL AND coalesce(v_payload, '') <> '' AND md5(v_payload) = v_decl THEN
@@ -197,19 +276,31 @@ BEGIN
   END IF;
 
   IF v_img IS NULL
-     OR coalesce(v_img->>'format', '') <> '2'
+     OR coalesce(v_img->>'format', '') <> '3'
      OR jsonb_typeof(v_img->'cols') IS DISTINCT FROM 'array'
-     OR coalesce(jsonb_array_length(v_img->'cols'), 0) = 0
-     OR jsonb_typeof(v_img->'rows') IS DISTINCT FROM 'object' THEN
+     OR jsonb_typeof(v_img->'rows') IS DISTINCT FROM 'object'
+     OR jsonb_typeof(v_img->'hashcols') IS DISTINCT FROM 'object' THEN
     RAISE EXCEPTION 'rollback aborted: marker rows exist but the before-image is missing or unreadable (audit-row copy and checksum-protected comment copy both failed) — nothing was changed; rebuild it with recover-before-image.sql first'
+      USING ERRCODE = '22000', CONSTRAINT = 'thesis_demo_rollback_image';
+  END IF;
+  -- the image's recorded hash column lists must match this script's literals:
+  -- a hand-built or foreign image could otherwise narrow the comparison.
+  IF EXISTS (
+    SELECT 1 FROM _hashcols hc
+    GROUP BY hc.tbl
+    HAVING (SELECT coalesce(jsonb_agg(c ORDER BY c), '[]'::jsonb)
+              FROM jsonb_array_elements_text(coalesce(v_img->'hashcols'->hc.tbl, '[]'::jsonb)) c)
+           IS DISTINCT FROM jsonb_agg(hc.col ORDER BY hc.col)) THEN
+    RAISE EXCEPTION 'rollback aborted: the before-image hash column lists do not match this rollback script — refusing to trust a foreign image'
       USING ERRCODE = '22000', CONSTRAINT = 'thesis_demo_rollback_image';
   END IF;
   INSERT INTO _image VALUES (v_img, v_src);
 END $$;
 
--- 4) content check: every marker row is re-hashed and compared with the hash
---    the image recorded at apply time (whole-row md5, order-free by id).
-CREATE TEMP TABLE _hash_actual (tbl text, id text, h text) ON COMMIT DROP;
+-- 4) content check: the hashed columns of every live marker row are re-hashed
+--    canonically (to_jsonb(...)#>>'{}' under the pinned settings, encode hex
+--    for bytea) and compared with the per-column hashes the image recorded.
+CREATE TEMP TABLE _hash_actual (tbl text, id text, hashes jsonb) ON COMMIT DROP;
 
 DO $$
 DECLARE
@@ -218,46 +309,74 @@ DECLARE
 BEGIN
   SELECT img INTO v_img FROM _image;
   IF v_img IS NULL THEN RETURN; END IF;
-  FOR r IN SELECT e.key AS tbl FROM jsonb_each(v_img->'rows') e ORDER BY 1 LOOP
-    IF r.tbl NOT IN ('thesis.thesis_topic','thesis.thesis_topic_supervisor','thesis.thesis_group',
-                     'thesis.thesis_group_member','thesis.thesis_council','thesis.thesis_council_member',
-                     'thesis.thesis_council_topic','thesis.thesis_topic_score','thesis.thesis_group_report',
-                     'notifications.notification','campuscore_audit."AdminAudit"') THEN
+  FOR r IN
+    SELECT hc.tbl,
+           string_agg(format('%L, md5(CASE WHEN t.%I IS NULL THEN chr(1) ELSE %s END)',
+                             hc.col, hc.col,
+                             CASE WHEN a.atttypid = 'bytea'::regtype
+                                  THEN format('encode(t.%I, ''hex'')', hc.col)
+                                  ELSE format('to_jsonb(t.%I) #>> ''{}''', hc.col) END),
+                             ', ' ORDER BY hc.ord) AS pairs
+      FROM _hashcols hc
+      JOIN pg_attribute a ON a.attrelid = hc.tbl::regclass AND a.attname = hc.col
+                         AND a.attnum > 0 AND NOT a.attisdropped
+      JOIN _tables pt ON pt.tbl = hc.tbl
+      GROUP BY hc.tbl
+  LOOP
+    EXECUTE format('INSERT INTO _hash_actual SELECT %L, id::text, jsonb_build_object(%s) FROM %s t WHERE %s',
+                   r.tbl, r.pairs, r.tbl,
+                   (SELECT pred FROM _tables WHERE tbl = r.tbl));
+  END LOOP;
+END $$;
+
+-- three-way classification per marker row and per table:
+--   missing: image id absent live (the app deleted it) -> tolerated
+--   differs: id live, a hashed column changed (or none shared) -> blocks
+--   extra:   live marker id the image never wrote                -> blocks
+CREATE TEMP TABLE _hash_report (tbl text, missing bigint, differs bigint, extra bigint) ON COMMIT DROP;
+
+DO $$
+DECLARE
+  r record;
+  v_img jsonb;
+BEGIN
+  SELECT img INTO v_img FROM _image;
+  IF v_img IS NULL THEN RETURN; END IF;
+  FOR r IN
+    SELECT e.key AS tbl FROM jsonb_each(v_img->'rows') e ORDER BY 1 LOOP
+    IF r.tbl NOT IN (SELECT tbl FROM _tables) THEN
       RAISE EXCEPTION 'rollback aborted: before-image names an unknown table (%) — refusing to trust a corrupted image', r.tbl
         USING ERRCODE = '22000', CONSTRAINT = 'thesis_demo_rollback_image';
     END IF;
     EXECUTE format(
-      'INSERT INTO _hash_actual SELECT %L, id::text, md5(t::text) FROM %s t WHERE %s',
-      r.tbl, r.tbl,
-      CASE r.tbl
-        WHEN 'notifications.notification'      THEN 'id LIKE ''demo-th-%'''
-        WHEN 'campuscore_audit."AdminAudit"'   THEN 'id LIKE ''demo-th-%'' AND id <> ''demo-th-audit-000'''
-        ELSE 'id::text LIKE ''ed1a0000-0000-4000-8000-%''' END);
+      'WITH exp AS (SELECT e.key AS id, e.value AS hashes
+                      FROM jsonb_each(coalesce($1, ''{}''::jsonb)) e),
+            act AS (SELECT id, hashes FROM _hash_actual WHERE tbl = %L)
+       INSERT INTO _hash_report
+       SELECT %L,
+         (SELECT count(*) FROM exp e WHERE NOT EXISTS (SELECT 1 FROM act a WHERE a.id = e.id)),
+         (SELECT count(*) FROM exp e JOIN act a ON a.id = e.id
+           WHERE NOT EXISTS (SELECT 1 FROM jsonb_object_keys(e.hashes) k WHERE a.hashes ? k)
+              OR EXISTS (SELECT 1 FROM jsonb_each_text(e.hashes) x
+                          WHERE a.hashes ? x.key AND a.hashes->>x.key IS DISTINCT FROM x.value)),
+         (SELECT count(*) FROM act a WHERE NOT EXISTS (SELECT 1 FROM exp e WHERE e.id = a.id))',
+      r.tbl, r.tbl, r.tbl) USING (v_img->'rows'->r.tbl);
   END LOOP;
-END $$;
-
-CREATE TEMP TABLE _hash_mismatch (tbl text, n bigint) ON COMMIT DROP;
-
-DO $$
-DECLARE v_img jsonb;
-BEGIN
-  SELECT img INTO v_img FROM _image;
-  IF v_img IS NULL THEN RETURN; END IF;
-  INSERT INTO _hash_mismatch
-  WITH exp AS (
-    SELECT rt.key AS tbl, e.key AS id, e.value AS h
-    FROM _image i, jsonb_each(i.img->'rows') rt, jsonb_each_text(rt.value) e
-  )
-  SELECT coalesce(e.tbl, a.tbl) AS tbl, count(*) AS n
-  FROM exp e
-  FULL OUTER JOIN _hash_actual a ON a.tbl = e.tbl AND a.id = e.id
-  WHERE e.h IS NULL OR a.h IS NULL OR a.h <> e.h
-  GROUP BY 1;
-  IF EXISTS (SELECT 1 FROM _hash_mismatch) THEN
-    RAISE EXCEPTION 'rollback aborted: % marker row(s) differ from the apply-time content hash (%) — the application touched demo data; nothing was deleted. Inspect the reported table(s), then either restore the rows or remove the markers deliberately.',
-      (SELECT sum(n) FROM _hash_mismatch),
-      (SELECT string_agg(tbl || '=' || n, ', ' ORDER BY tbl) FROM _hash_mismatch)
+  IF EXISTS (SELECT 1 FROM _hash_report WHERE differs > 0 OR extra > 0) THEN
+    RAISE EXCEPTION 'rollback aborted: % marker row(s) differ from the apply-time content and % unexpected marker row(s) are not in the image (%) — the application touched demo data; nothing was deleted. Inspect the reported table(s), then either restore the rows or remove the markers deliberately.',
+      (SELECT coalesce(sum(differs),0) FROM _hash_report),
+      (SELECT coalesce(sum(extra),0) FROM _hash_report),
+      (SELECT string_agg(tbl || ': ' ||
+               CASE WHEN differs > 0 THEN differs || ' differed' ELSE '' END ||
+               CASE WHEN differs > 0 AND extra > 0 THEN ', ' ELSE '' END ||
+               CASE WHEN extra > 0 THEN extra || ' unknown' ELSE '' END,
+             '; ' ORDER BY tbl) FROM _hash_report WHERE differs > 0 OR extra > 0)
       USING ERRCODE = '22000', CONSTRAINT = 'thesis_demo_rollback_hash';
+  END IF;
+  IF EXISTS (SELECT 1 FROM _hash_report WHERE missing > 0) THEN
+    RAISE NOTICE 'rollback: % marker row(s) were already removed by the application (%) — continuing with the remaining rows',
+      (SELECT sum(missing) FROM _hash_report),
+      (SELECT string_agg(tbl || '=' || missing, ', ' ORDER BY tbl) FROM _hash_report WHERE missing > 0);
   END IF;
 END $$;
 
@@ -310,7 +429,7 @@ DELETE FROM campuscore_audit."AdminAudit" WHERE id LIKE 'demo-th-%';
 -- clear the checksum-protected comment copy so no package residue survives
 DO $$
 BEGIN
-  IF obj_description('thesis.thesis_topic'::regclass) LIKE 'thesis-demo-data v2 %' THEN
+  IF obj_description('thesis.thesis_topic'::regclass) LIKE 'thesis-demo-data v3 %' THEN
     EXECUTE 'COMMENT ON TABLE thesis.thesis_topic IS NULL';
   END IF;
 END $$;
@@ -330,7 +449,8 @@ UNION ALL SELECT 'thesis_topic_score', count(*) FROM thesis.thesis_topic_score W
 UNION ALL SELECT 'thesis_group_report', count(*) FROM thesis.thesis_group_report WHERE id::text LIKE 'ed1a0000-0000-4000-8000-%'
 UNION ALL SELECT 'notification', count(*) FROM notifications.notification WHERE id LIKE 'demo-th-%'
 UNION ALL SELECT 'admin_audit', count(*) FROM campuscore_audit."AdminAudit" WHERE id LIKE 'demo-th-%'
-UNION ALL SELECT 'image_comment_copy', coalesce((obj_description('thesis.thesis_topic'::regclass) LIKE 'thesis-demo-data v2 %')::int, 0)
+UNION ALL SELECT 'image_comment_copy', coalesce((obj_description('thesis.thesis_topic'::regclass) LIKE 'thesis-demo-data v3 %')::int, 0)
+UNION ALL SELECT 'already_removed_by_app', coalesce((SELECT sum(missing) FROM _hash_report), 0)
 UNION ALL SELECT 'baseline.topics', (SELECT count(*) FROM thesis.thesis_topic WHERE id::text NOT LIKE 'ed1a0000-0000-4000-8000-%')
 UNION ALL SELECT 'baseline.groups', (SELECT count(*) FROM thesis.thesis_group WHERE id::text NOT LIKE 'ed1a0000-0000-4000-8000-%')
 ORDER BY 1;
