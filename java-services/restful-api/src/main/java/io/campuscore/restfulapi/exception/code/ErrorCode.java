@@ -1,4 +1,4 @@
-package io.campuscore.restfulapi.exception;
+package io.campuscore.restfulapi.exception.code;
 
 import org.springframework.http.HttpStatus;
 
