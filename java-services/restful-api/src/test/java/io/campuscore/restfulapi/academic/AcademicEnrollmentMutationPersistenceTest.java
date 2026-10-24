@@ -576,6 +576,63 @@ class AcademicEnrollmentMutationPersistenceTest {
     }
 
     @Test
+    void inactiveCourseIsHiddenFromRegistrationCatalog() throws Exception {
+        jdbc.update("UPDATE \"academic\".\"Course\" SET \"isActive\" = FALSE WHERE \"id\" = 'course-open'");
+
+        MvcResult catalog = mvc.perform(get("/api/v1/me/registration/sections")
+                        .with(studentJwt("student-user-1", "student-1")))
+                .andExpect(status().isOk())
+                .andReturn();
+
+        JsonNode sections = objectMapper.readTree(catalog.getResponse().getContentAsString());
+        for (JsonNode section : sections) {
+            assertThat(section.get("id").asText()).isNotEqualTo("section-open");
+        }
+    }
+
+    @Test
+    void inactiveCourseBlocksNewEnrollmentInAnOpenSection() throws Exception {
+        jdbc.update("UPDATE \"academic\".\"Course\" SET \"isActive\" = FALSE WHERE \"id\" = 'course-open'");
+
+        mvc.perform(post("/api/v1/enrollments/enroll")
+                        .with(studentJwt("student-user-1", "student-1"))
+                        .header("Idempotency-Key", "inactive-course-enroll")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"sectionId\":\"section-open\"}"))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("COURSE_INACTIVE"));
+    }
+
+    @Test
+    void inactiveCourseDoesNotHideOrTrapAnExistingEnrollment() throws Exception {
+        MvcResult enrolled = mvc.perform(post("/api/v1/enrollments/enroll")
+                        .with(studentJwt("student-user-1", "student-1"))
+                        .header("Idempotency-Key", "enroll-before-course-inactive")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"sectionId\":\"section-open\"}"))
+                .andExpect(status().isOk())
+                .andReturn();
+        String enrollmentId = objectMapper.readTree(enrolled.getResponse().getContentAsString()).get("id").asText();
+
+        jdbc.update("UPDATE \"academic\".\"Course\" SET \"isActive\" = FALSE WHERE \"id\" = 'course-open'");
+
+        mvc.perform(get("/api/v1/enrollments/my").with(studentJwt("student-user-1", "student-1")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].id").value(enrollmentId))
+                .andExpect(jsonPath("$[0].status").value("ENROLLED"));
+
+        mvc.perform(post("/api/v1/enrollments/" + enrollmentId + "/drop")
+                        .with(studentJwt("student-user-1", "student-1"))
+                        .header("Idempotency-Key", "drop-after-course-inactive"))
+                .andExpect(status().isOk());
+
+        mvc.perform(get("/api/v1/enrollments/my").with(studentJwt("student-user-1", "student-1")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].id").value(enrollmentId))
+                .andExpect(jsonPath("$[0].status").value("DROPPED"));
+    }
+
+    @Test
     void prerequisiteMinLetterGradeFloorBlocksBelowAndPassesAtFloor() throws Exception {
         // Requirement floor 'B': a D+ pass must NOT satisfy it.
         jdbc.update(
