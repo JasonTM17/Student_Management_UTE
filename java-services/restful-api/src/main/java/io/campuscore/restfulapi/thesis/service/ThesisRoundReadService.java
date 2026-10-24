@@ -49,12 +49,15 @@ public class ThesisRoundReadService {
 
     private final ThesisRegistrationRoundRepository rounds;
     private final NamedParameterJdbcTemplate jdbc;
+    private final ThesisGovernanceCapabilities capabilities;
 
     public ThesisRoundReadService(
             ThesisRegistrationRoundRepository rounds,
-            NamedParameterJdbcTemplate jdbc) {
+            NamedParameterJdbcTemplate jdbc,
+            ThesisGovernanceCapabilities capabilities) {
         this.rounds = rounds;
         this.jdbc = jdbc;
+        this.capabilities = capabilities;
     }
 
     @Transactional(readOnly = true)
@@ -65,7 +68,8 @@ public class ThesisRoundReadService {
         Map<UUID, Map<String, Number>> counts = dependentCounts(
                 list.stream().map(ThesisRegistrationRound::getId).toList());
         return list.stream()
-                .map(round -> RoundResponse.from(round, deletionInfo(round, counts)))
+                .map(round -> RoundResponse.from(round, deletionInfo(round, counts),
+                        capabilities.counterReviewWaiverAllowed(round.getThesisType())))
                 .toList();
     }
 
@@ -76,7 +80,8 @@ public class ThesisRoundReadService {
                         org.springframework.http.HttpStatus.NOT_FOUND,
                         "ROUND_NOT_FOUND",
                         "Thesis registration round not found"));
-        return RoundResponse.from(round, deletionInfo(round, dependentCounts(List.of(id))));
+        return RoundResponse.from(round, deletionInfo(round, dependentCounts(List.of(id))),
+                capabilities.counterReviewWaiverAllowed(round.getThesisType()));
     }
 
     /**
