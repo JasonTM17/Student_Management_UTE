@@ -34,6 +34,7 @@ import { Button } from '@/components/ui/button';
 import { LinkButton } from '@/components/ui/link-button';
 import { Input } from '@/components/ui/input';
 import { Select } from '@/components/ui/select';
+import { Combobox } from '@/components/ui/combobox';
 import { Textarea } from '@/components/ui/textarea';
 import { Modal } from '@/components/ui/modal';
 import { RichTextEditor } from '@/components/ui/rich-text-editor';
@@ -3446,31 +3447,57 @@ export default function ThesisPage() {
             />
           ) : lecturers.length > 0 ? (
             <div className="grid gap-4 sm:grid-cols-2">
-              <Select
+              <Combobox
                 label={messages.thesis.supervisorPrimaryLabel}
                 value={proposeSupervisorId}
-                onChange={(e) => setProposeSupervisorId(e.target.value)}
+                onChange={(next) => setProposeSupervisorId(next)}
                 disabled={isActionPending}
-                options={[
-                  { value: '', label: messages.thesis.supervisorNoneOption },
-                  ...lecturers.map((lecturer) => ({
+                allowClear
+                emptyLabel={messages.thesis.supervisorNoneOption}
+                options={lecturers.map((lecturer) => {
+                  const duplicated =
+                    proposeSecondSupervisorId !== '' && lecturer.id === proposeSecondSupervisorId;
+                  return {
                     value: lecturer.id,
                     label: getLecturerLabel(lecturer),
-                  })),
-                ]}
+                    description: [lecturer.department?.name, lecturer.employeeId]
+                      .filter(Boolean)
+                      .join(' · '),
+                    keywords: [lecturer.employeeId, lecturer.user?.email]
+                      .filter(Boolean)
+                      .join(' '),
+                    disabled: duplicated,
+                    disabledReason: duplicated
+                      ? messages.thesis.supervisorAlreadySelected
+                      : undefined,
+                  };
+                })}
               />
-              <Select
+              <Combobox
                 label={messages.thesis.supervisorSecondaryLabel}
                 value={proposeSecondSupervisorId}
-                onChange={(e) => setProposeSecondSupervisorId(e.target.value)}
+                onChange={(next) => setProposeSecondSupervisorId(next)}
                 disabled={isActionPending}
-                options={[
-                  { value: '', label: messages.thesis.supervisorNoneOption },
-                  ...lecturers.map((lecturer) => ({
+                allowClear
+                emptyLabel={messages.thesis.supervisorNoneOption}
+                options={lecturers.map((lecturer) => {
+                  const duplicated =
+                    proposeSupervisorId !== '' && lecturer.id === proposeSupervisorId;
+                  return {
                     value: lecturer.id,
                     label: getLecturerLabel(lecturer),
-                  })),
-                ]}
+                    description: [lecturer.department?.name, lecturer.employeeId]
+                      .filter(Boolean)
+                      .join(' · '),
+                    keywords: [lecturer.employeeId, lecturer.user?.email]
+                      .filter(Boolean)
+                      .join(' '),
+                    disabled: duplicated,
+                    disabledReason: duplicated
+                      ? messages.thesis.supervisorAlreadySelected
+                      : undefined,
+                  };
+                })}
               />
             </div>
           ) : (
