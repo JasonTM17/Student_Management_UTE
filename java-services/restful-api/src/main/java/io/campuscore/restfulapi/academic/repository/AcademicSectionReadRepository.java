@@ -4,7 +4,7 @@ import io.campuscore.restfulapi.academic.model.GradingSectionRow;
 import io.campuscore.restfulapi.academic.model.SectionGradeEnrollmentRow;
 import io.campuscore.restfulapi.academic.model.SectionRow;
 import io.campuscore.restfulapi.academic.model.SectionScheduleRow;
-import io.campuscore.restfulapi.common.LikePattern;
+import io.campuscore.restfulapi.common.util.LikePattern;
 import java.math.BigDecimal;
 import java.sql.ResultSet;
 import java.sql.SQLException;

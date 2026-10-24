@@ -4,7 +4,7 @@ import io.campuscore.restfulapi.academic.dto.AcademicReadDtos.AcademicYearSummar
 import io.campuscore.restfulapi.academic.model.CourseBriefRow;
 import io.campuscore.restfulapi.academic.model.CourseProgressRow;
 import io.campuscore.restfulapi.academic.model.PrerequisiteCodeRow;
-import io.campuscore.restfulapi.common.LikePattern;
+import io.campuscore.restfulapi.common.util.LikePattern;
 import io.campuscore.restfulapi.academic.dto.AcademicReadDtos.AcademicYearResponse;import io.campuscore.restfulapi.academic.dto.AcademicReadDtos.ClassroomResponse;
 import io.campuscore.restfulapi.academic.dto.AcademicReadDtos.ClassroomSectionSummary;
 import io.campuscore.restfulapi.academic.dto.AcademicReadDtos.CourseResponse;

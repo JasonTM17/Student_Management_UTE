@@ -4,7 +4,7 @@ import io.campuscore.restfulapi.academic.registration.service.RegistrationServic
 import io.campuscore.restfulapi.academic.dto.AcademicEnrollmentReadDtos.EnrollmentResponse;
 import io.campuscore.restfulapi.academic.dto.AcademicMutationDtos.GradeUpdate;
 import io.campuscore.restfulapi.audit.service.AdminAuditRecorder;
-import io.campuscore.restfulapi.common.LikePattern;
+import io.campuscore.restfulapi.common.util.LikePattern;
 import io.campuscore.restfulapi.engagement.service.GradePublishNotifier;
 import io.campuscore.restfulapi.exception.DomainException;
 import java.sql.Timestamp;

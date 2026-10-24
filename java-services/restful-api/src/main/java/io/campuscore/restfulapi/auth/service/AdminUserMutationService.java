@@ -2,7 +2,7 @@ package io.campuscore.restfulapi.auth.service;
 
 import io.campuscore.restfulapi.audit.service.AdminAuditRecorder;
 import io.campuscore.restfulapi.auth.repository.AuthUserRepository;
-import io.campuscore.restfulapi.common.LikePattern;
+import io.campuscore.restfulapi.common.util.LikePattern;
 import io.campuscore.restfulapi.exception.DomainException;
 import java.security.SecureRandom;
 import java.sql.Types;
@@ -489,7 +489,7 @@ public class AdminUserMutationService {
                 .toList());
     }
 
-    // Shared escaping/folding moved to common.LikePattern: the private copy is
+    // Shared escaping/folding moved to common.util.LikePattern: the private copy is
     // retired so every admin list folds diacritics identically.
 
     private void assignRole(String userId, String roleName) {

@@ -1,4 +1,4 @@
-package io.campuscore.restfulapi.common;
+package io.campuscore.restfulapi.common.dto;
 
 import java.util.List;
 

@@ -1,4 +1,4 @@
-package io.campuscore.restfulapi.common;
+package io.campuscore.restfulapi.common.dto;
 
 import com.fasterxml.jackson.annotation.JsonFormat;
 import com.fasterxml.jackson.annotation.JsonInclude;
