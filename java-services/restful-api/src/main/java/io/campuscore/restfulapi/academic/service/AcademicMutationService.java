@@ -502,6 +502,7 @@ public class AcademicMutationService {
                         + " WHERE e.\"sectionId\" = :sectionId"
                         + " AND e.\"status\" IN (:gradeableStatuses)"
                         + " AND e.\"gradeStatus\" IS DISTINCT FROM 'PUBLISHED'"
+                        + " AND e.\"gradeStatus\" IS DISTINCT FROM 'APPEALED'"
                         + " AND e.\"finalGrade\" IS NOT NULL AND e.\"letterGrade\" IS NOT NULL"
                         + " AND student.\"userId\" IS NOT NULL",
                 new MapSqlParameterSource("sectionId", sectionId)
