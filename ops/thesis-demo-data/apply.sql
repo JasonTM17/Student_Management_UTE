@@ -13,12 +13,65 @@
 -- recon statuses and baseline row counts) or already fully enriched. On the
 -- baseline path it also aborts when a guarded column already carries a value
 -- (pre-existing reviewer, waiver or council assignment), so apply can never
--- insert a counter-review score that mismatches an existing reviewer.
+-- insert a counter-review score that mismatches an existing reviewer. When the
+-- full marker set is already present the script is a strict no-op: it prints
+-- 'already applied' plus the marker census and writes nothing, so it can never
+-- overwrite application changes made since the first apply (retracted rounds,
+-- removed waivers). Partial marker states are refused.
+--
+-- LOCKING: before anything is checked or written the script takes fixed-order
+-- SHARE ROW EXCLUSIVE locks on every table it touches — the weakest level that
+-- blocks application INSERT/UPDATE/DELETE (ROW EXCLUSIVE) and serializes two
+-- concurrent package runs, while plain reads stay untouched. That removes every
+-- check-then-act window between the guard and the writes. The locks are held
+-- until COMMIT; the script is short (sub-second on a local connection, a few
+-- seconds over a remote one), so that is also the longest an application write
+-- can ever wait behind it. lock_timeout = 5 s makes apply abort cleanly
+-- instead of queueing behind an in-flight app transaction. Run it in a quiet
+-- maintenance window, exactly like rollback.
 
 BEGIN;
 
 SET LOCAL lock_timeout = '5s';
 SET LOCAL statement_timeout = '120s';
+SET LOCAL TimeZone = 'UTC';
+SET LOCAL DateStyle = 'ISO, MDY';
+
+DO $$
+BEGIN
+  BEGIN
+    EXECUTE 'LOCK TABLE campuscore_audit."AdminAudit", notifications.notification,'
+         || ' thesis.thesis_council, thesis.thesis_council_member, thesis.thesis_council_topic,'
+         || ' thesis.thesis_group, thesis.thesis_group_member, thesis.thesis_group_report,'
+         || ' thesis.thesis_registration_round, thesis.thesis_topic, thesis.thesis_topic_score,'
+         || ' thesis.thesis_topic_supervisor IN SHARE ROW EXCLUSIVE MODE';
+  EXCEPTION WHEN lock_not_available THEN
+    RAISE EXCEPTION 'apply aborted: could not lock the package tables within lock_timeout — an application write is in progress; nothing was changed, retry when the app is idle'
+      USING ERRCODE = '55P03', CONSTRAINT = 'thesis_demo_apply_lock';
+  END;
+END $$;
+
+-- marker census: computed once while the locks are held and reused by the
+-- guard, the already-applied branch and the final summary.
+CREATE TEMP TABLE _marker_counts ON COMMIT DROP AS
+SELECT s.name, s.expected,
+  CASE s.name
+    WHEN 'thesis_topic'            THEN (SELECT count(*) FROM thesis.thesis_topic            WHERE id::text LIKE 'ed1a0000-0000-4000-8000-%')
+    WHEN 'thesis_topic_supervisor' THEN (SELECT count(*) FROM thesis.thesis_topic_supervisor WHERE id::text LIKE 'ed1a0000-0000-4000-8000-%')
+    WHEN 'thesis_group'            THEN (SELECT count(*) FROM thesis.thesis_group            WHERE id::text LIKE 'ed1a0000-0000-4000-8000-%')
+    WHEN 'thesis_group_member'     THEN (SELECT count(*) FROM thesis.thesis_group_member     WHERE id::text LIKE 'ed1a0000-0000-4000-8000-%')
+    WHEN 'thesis_council'          THEN (SELECT count(*) FROM thesis.thesis_council          WHERE id::text LIKE 'ed1a0000-0000-4000-8000-%')
+    WHEN 'thesis_council_member'   THEN (SELECT count(*) FROM thesis.thesis_council_member   WHERE id::text LIKE 'ed1a0000-0000-4000-8000-%')
+    WHEN 'thesis_council_topic'    THEN (SELECT count(*) FROM thesis.thesis_council_topic    WHERE id::text LIKE 'ed1a0000-0000-4000-8000-%')
+    WHEN 'thesis_topic_score'      THEN (SELECT count(*) FROM thesis.thesis_topic_score      WHERE id::text LIKE 'ed1a0000-0000-4000-8000-%')
+    WHEN 'thesis_group_report'     THEN (SELECT count(*) FROM thesis.thesis_group_report     WHERE id::text LIKE 'ed1a0000-0000-4000-8000-%')
+    WHEN 'notification'            THEN (SELECT count(*) FROM notifications.notification     WHERE id LIKE 'demo-th-%')
+    WHEN 'admin_audit'             THEN (SELECT count(*) FROM campuscore_audit."AdminAudit"  WHERE id LIKE 'demo-th-%')
+  END AS cnt
+FROM (VALUES ('thesis_topic',17),('thesis_topic_supervisor',18),('thesis_group',20),
+             ('thesis_group_member',64),('thesis_council',4),('thesis_council_member',16),
+             ('thesis_council_topic',16),('thesis_topic_score',62),('thesis_group_report',17),
+             ('notification',107),('admin_audit',6)) s(name, expected);
 
 DO $$
 DECLARE
@@ -53,27 +106,8 @@ BEGIN
 
   -- baseline or fully-enriched state required, per marker table (nothing in
   -- between in either direction)
-  SELECT bool_and(c.cnt = 0), bool_and(c.cnt = c.expected)
-    INTO v_all_zero, v_all_full
-  FROM (
-    SELECT s.name, s.expected,
-      CASE s.name
-        WHEN 'thesis_topic'            THEN (SELECT count(*) FROM thesis.thesis_topic            WHERE id::text LIKE 'ed1a0000-0000-4000-8000-%')
-        WHEN 'thesis_topic_supervisor' THEN (SELECT count(*) FROM thesis.thesis_topic_supervisor WHERE id::text LIKE 'ed1a0000-0000-4000-8000-%')
-        WHEN 'thesis_group'            THEN (SELECT count(*) FROM thesis.thesis_group            WHERE id::text LIKE 'ed1a0000-0000-4000-8000-%')
-        WHEN 'thesis_group_member'     THEN (SELECT count(*) FROM thesis.thesis_group_member     WHERE id::text LIKE 'ed1a0000-0000-4000-8000-%')
-        WHEN 'thesis_council'          THEN (SELECT count(*) FROM thesis.thesis_council          WHERE id::text LIKE 'ed1a0000-0000-4000-8000-%')
-        WHEN 'thesis_council_member'   THEN (SELECT count(*) FROM thesis.thesis_council_member   WHERE id::text LIKE 'ed1a0000-0000-4000-8000-%')
-        WHEN 'thesis_council_topic'    THEN (SELECT count(*) FROM thesis.thesis_council_topic    WHERE id::text LIKE 'ed1a0000-0000-4000-8000-%')
-        WHEN 'thesis_topic_score'      THEN (SELECT count(*) FROM thesis.thesis_topic_score      WHERE id::text LIKE 'ed1a0000-0000-4000-8000-%')
-        WHEN 'thesis_group_report'     THEN (SELECT count(*) FROM thesis.thesis_group_report     WHERE id::text LIKE 'ed1a0000-0000-4000-8000-%')
-        WHEN 'notification'            THEN (SELECT count(*) FROM notifications.notification     WHERE id LIKE 'demo-th-%')
-        WHEN 'admin_audit'             THEN (SELECT count(*) FROM campuscore_audit."AdminAudit"  WHERE id LIKE 'demo-th-%')
-      END AS cnt
-    FROM (VALUES ('thesis_topic',17),('thesis_topic_supervisor',18),('thesis_group',20),
-                 ('thesis_group_member',64),('thesis_council',4),('thesis_council_member',16),
-                 ('thesis_council_topic',16),('thesis_topic_score',62),('thesis_group_report',17),
-                 ('notification',107),('admin_audit',6)) s(name, expected)) c;
+  SELECT bool_and(cnt = 0), bool_and(cnt = expected)
+    INTO v_all_zero, v_all_full FROM _marker_counts;
   IF NOT (v_all_zero OR v_all_full) THEN
     RAISE EXCEPTION 'demo-data guard: partial marker state detected — run rollback.sql first, then re-apply'
       USING ERRCODE = '23514', CONSTRAINT = 'thesis_demo_data_guard';
@@ -166,8 +200,62 @@ BEGIN
       RAISE EXCEPTION 'demo-data guard: referenced departments are missing — dataset must be re-reviewed'
         USING ERRCODE = '23514', CONSTRAINT = 'thesis_demo_data_guard';
     END IF;
+
+    -- the redundant before-image copy lives in this table's comment; refuse to
+    -- overwrite a foreign one rather than destroy operator metadata
+    IF obj_description('thesis.thesis_topic'::regclass) IS NOT NULL
+       AND obj_description('thesis.thesis_topic'::regclass) NOT LIKE 'thesis-demo-data v2 %' THEN
+      RAISE EXCEPTION 'demo-data guard: thesis.thesis_topic carries a non-package comment — refusing to overwrite metadata'
+        USING ERRCODE = '23514', CONSTRAINT = 'thesis_demo_data_guard';
+    END IF;
   END IF;
 END $$;
+
+-- full marker set already present: a re-apply must change NOTHING. It prints
+-- 'already applied' plus the census and skips every guarded update, so it can
+-- never overwrite application changes made since the first apply.
+SELECT bool_and(cnt = expected) AS already_applied FROM _marker_counts \gset
+
+\if :already_applied
+
+SELECT 'thesis demo-data already applied — no-op, 0 rows written' AS result;
+
+-- report drift on the guarded columns against the recorded applied values so
+-- post-apply application changes stay visible without being touched
+DO $$
+DECLARE
+  r record;
+  n int;
+  v_img jsonb;
+  v_drift int := 0;
+  v_names text := '';
+BEGIN
+  SELECT "beforeState"::jsonb INTO v_img FROM campuscore_audit."AdminAudit"
+   WHERE id = 'demo-th-audit-000' AND "beforeState" ~ '^\s*\{';
+  IF v_img IS NULL OR jsonb_typeof(v_img->'cols') IS DISTINCT FROM 'array' THEN
+    RAISE WARNING 'demo-data already applied, but the before-image is missing — rollback will refuse; rebuild it with recover-before-image.sql';
+    RETURN;
+  END IF;
+  FOR r IN
+    SELECT (e->>'tbl') AS tbl, (e->>'id') AS rid, (e->>'col') AS col, (e->>'applied') AS app,
+           format_type(a.atttypid, a.atttypmod) AS coltype
+    FROM jsonb_array_elements(v_img->'cols') e
+    JOIN pg_attribute a ON a.attrelid = ('thesis.' || (e->>'tbl'))::regclass
+                        AND a.attname = (e->>'col')
+  LOOP
+    EXECUTE format('SELECT count(*) FROM thesis.%I WHERE id::text = $1 AND %I IS DISTINCT FROM $2::%s',
+                   r.tbl, r.col, r.coltype)
+      INTO n USING r.rid, r.app;
+    IF n > 0 THEN v_drift := v_drift + 1; v_names := v_names || r.tbl || '.' || r.col || ' '; END IF;
+  END LOOP;
+  IF v_drift > 0 THEN
+    RAISE WARNING 'demo-data already applied — % guarded column(s) drifted since apply (%); nothing was changed', v_drift, v_names;
+  END IF;
+END $$;
+
+SELECT name AS section, cnt AS rows FROM _marker_counts ORDER BY 1;
+
+\else
 
 -- topics (17)
 INSERT INTO thesis.thesis_topic
@@ -665,47 +753,50 @@ ON CONFLICT (id) DO NOTHING;
 -- topic-level governance writes (gvpb reviewer assignments + waiver) and round publication instants.
 -- Before writing, snapshot the current values of every column the package touches so
 -- rollback.sql can restore them exactly (stored in audit row 'demo-th-audit-000').
+-- Values are encoded with to_jsonb(... )#>>'{}' — ISO 8601 with offset for
+-- timestamps, never the session DateStyle — under the pinned UTC/ISO session
+-- settings above, so the image round-trips byte-identically under any client.
 CREATE TEMP TABLE _demo_before (tbl text, id text, col text, before_val text, applied_val text) ON COMMIT DROP;
 INSERT INTO _demo_before
 SELECT 'thesis_registration_round', r.id::text, x.col, x.val,
-       CASE x.col WHEN 'version' THEN (r.version + 1)::text
-                  WHEN 'updated_at' THEN '2026-10-16 17:00:00+00'
-                  WHEN 'results_published_at' THEN '2026-10-16 17:00:00+00' END
+       CASE x.col WHEN 'version' THEN to_jsonb(r.version + 1)#>>'{}'
+                  WHEN 'updated_at' THEN '2026-10-16T17:00:00+00:00'
+                  WHEN 'results_published_at' THEN '2026-10-16T17:00:00+00:00' END
 FROM thesis.thesis_registration_round r
-CROSS JOIN LATERAL (VALUES ('version', r.version::text),
-                           ('updated_at', r.updated_at::text),
-                           ('results_published_at', r.results_published_at::text)) x(col, val)
+CROSS JOIN LATERAL (VALUES ('version', to_jsonb(r.version)#>>'{}'),
+                           ('updated_at', to_jsonb(r.updated_at)#>>'{}'),
+                           ('results_published_at', to_jsonb(r.results_published_at)#>>'{}')) x(col, val)
 WHERE r.id = 'b35e9ff1-1eb8-4e73-812e-04e1a66041f1' AND r.results_published_at IS NULL;
 INSERT INTO _demo_before
 SELECT 'thesis_registration_round', r.id::text, x.col, x.val,
-       CASE x.col WHEN 'version' THEN (r.version + 1)::text
-                  WHEN 'updated_at' THEN '2026-10-23 09:00:00+00'
-                  WHEN 'results_published_at' THEN '2026-10-23 09:00:00+00' END
+       CASE x.col WHEN 'version' THEN to_jsonb(r.version + 1)#>>'{}'
+                  WHEN 'updated_at' THEN '2026-10-23T09:00:00+00:00'
+                  WHEN 'results_published_at' THEN '2026-10-23T09:00:00+00:00' END
 FROM thesis.thesis_registration_round r
-CROSS JOIN LATERAL (VALUES ('version', r.version::text),
-                           ('updated_at', r.updated_at::text),
-                           ('results_published_at', r.results_published_at::text)) x(col, val)
+CROSS JOIN LATERAL (VALUES ('version', to_jsonb(r.version)#>>'{}'),
+                           ('updated_at', to_jsonb(r.updated_at)#>>'{}'),
+                           ('results_published_at', to_jsonb(r.results_published_at)#>>'{}')) x(col, val)
 WHERE r.id = 'be1aa853-f153-4f2e-a5cb-ed1b6c3c1bf1' AND r.results_published_at IS NULL;
 INSERT INTO _demo_before
 SELECT 'thesis_registration_round', r.id::text, x.col, x.val,
-       CASE x.col WHEN 'version' THEN (r.version + 1)::text
-                  WHEN 'updated_at' THEN '2026-10-22 09:00:00+00'
-                  WHEN 'results_published_at' THEN '2026-10-22 09:00:00+00' END
+       CASE x.col WHEN 'version' THEN to_jsonb(r.version + 1)#>>'{}'
+                  WHEN 'updated_at' THEN '2026-10-22T09:00:00+00:00'
+                  WHEN 'results_published_at' THEN '2026-10-22T09:00:00+00:00' END
 FROM thesis.thesis_registration_round r
-CROSS JOIN LATERAL (VALUES ('version', r.version::text),
-                           ('updated_at', r.updated_at::text),
-                           ('results_published_at', r.results_published_at::text)) x(col, val)
+CROSS JOIN LATERAL (VALUES ('version', to_jsonb(r.version)#>>'{}'),
+                           ('updated_at', to_jsonb(r.updated_at)#>>'{}'),
+                           ('results_published_at', to_jsonb(r.results_published_at)#>>'{}')) x(col, val)
 WHERE r.id = 'bad8eba0-2d12-4414-8aab-7424174b3b97' AND r.results_published_at IS NULL;
 INSERT INTO _demo_before
 SELECT 'thesis_topic', t.id::text, x.col, x.val,
-       CASE x.col WHEN 'version' THEN (t.version + 1)::text
-                  WHEN 'updated_at' THEN '2026-10-23 15:30:00+00'
+       CASE x.col WHEN 'version' THEN to_jsonb(t.version + 1)#>>'{}'
+                  WHEN 'updated_at' THEN '2026-10-23T15:30:00+00:00'
                   WHEN 'gvpb_lecturer_id' THEN x.new END
 FROM thesis.thesis_topic t
 CROSS JOIN LATERAL (VALUES
-       ('version', t.version::text, NULL::text),
-       ('updated_at', t.updated_at::text, NULL::text),
-       ('gvpb_lecturer_id', t.gvpb_lecturer_id,
+       ('version', to_jsonb(t.version)#>>'{}', NULL::text),
+       ('updated_at', to_jsonb(t.updated_at)#>>'{}', NULL::text),
+       ('gvpb_lecturer_id', to_jsonb(t.gvpb_lecturer_id)#>>'{}',
             CASE t.id::text WHEN '018f4a7c-3b12-4d90-a5e1-7c82b9045001' THEN 'lecturer-profile-025'
                             WHEN '6f64670b-cd6b-4e1b-ae9d-0b497f2472a8' THEN 'lecturer-profile-024'
                             WHEN 'f580eadf-fffb-4db2-a7d8-423e83934dc2' THEN 'lecturer-profile-013' END)
@@ -716,12 +807,12 @@ INSERT INTO _demo_before
 SELECT 'thesis_topic', t.id::text, x.col, x.val, x.new
 FROM thesis.thesis_topic t
 CROSS JOIN LATERAL (VALUES
-       ('version', t.version::text, (t.version + 1)::text),
-       ('updated_at', t.updated_at::text, '2026-10-23 15:30:00+00'),
-       ('gvpb_waived_reason', t.gvpb_waived_reason,
+       ('version', to_jsonb(t.version)#>>'{}', to_jsonb(t.version + 1)#>>'{}'),
+       ('updated_at', to_jsonb(t.updated_at)#>>'{}', '2026-10-23T15:30:00+00:00'),
+       ('gvpb_waived_reason', to_jsonb(t.gvpb_waived_reason)#>>'{}',
             'Miễn phản biện theo Quyết định 214/QĐ-KCNTT: đề tài thuộc nhóm chuyên ngành hẹp, đã qua hai vòng xét duyệt của Bộ môn'),
-       ('gvpb_waived_by', t.gvpb_waived_by, 'truongkhoa-user-001'),
-       ('gvpb_waived_at', t.gvpb_waived_at::text, '2026-10-15 09:00:00+00')
+       ('gvpb_waived_by', to_jsonb(t.gvpb_waived_by)#>>'{}', 'truongkhoa-user-001'),
+       ('gvpb_waived_at', to_jsonb(t.gvpb_waived_at)#>>'{}', '2026-10-15T09:00:00+00:00')
        ) x(col, val, new)
 WHERE t.id = '67c74df5-5c7f-4e74-aa02-d51af7207fe9' AND t.gvpb_waived_reason IS NULL;
 
@@ -747,14 +838,50 @@ FROM (VALUES
 ) AS v(id, actor, action, etype, eid, summary, after)
 ON CONFLICT (id) DO NOTHING;
 
--- persist the before-image captured above into the audit row (same transaction).
--- Only written when the guarded updates actually ran and no image exists yet, so an
--- idempotent re-apply never erases the original baseline.
+-- persist the apply-time state into the durable before-image (same transaction):
+--   cols: the guarded-column before/applied values (ISO 8601 with offset for
+--         timestamps — session-format independent)
+--   rows: the whole-row md5 hash of every marker row, per table. rollback.sql
+--         re-hashes and ABORTS on any difference, so an application edit or a
+--         delete of a marker row can never be silently cascaded away.
+-- demo-th-audit-000 itself is excluded from the hash set: it carries the image.
+CREATE TEMP TABLE _row_hashes (tbl text, id text, h text) ON COMMIT DROP;
+INSERT INTO _row_hashes SELECT 'thesis.thesis_topic', id::text, md5(t::text) FROM thesis.thesis_topic t WHERE id::text LIKE 'ed1a0000-0000-4000-8000-%';
+INSERT INTO _row_hashes SELECT 'thesis.thesis_topic_supervisor', id::text, md5(t::text) FROM thesis.thesis_topic_supervisor t WHERE id::text LIKE 'ed1a0000-0000-4000-8000-%';
+INSERT INTO _row_hashes SELECT 'thesis.thesis_group', id::text, md5(t::text) FROM thesis.thesis_group t WHERE id::text LIKE 'ed1a0000-0000-4000-8000-%';
+INSERT INTO _row_hashes SELECT 'thesis.thesis_group_member', id::text, md5(t::text) FROM thesis.thesis_group_member t WHERE id::text LIKE 'ed1a0000-0000-4000-8000-%';
+INSERT INTO _row_hashes SELECT 'thesis.thesis_council', id::text, md5(t::text) FROM thesis.thesis_council t WHERE id::text LIKE 'ed1a0000-0000-4000-8000-%';
+INSERT INTO _row_hashes SELECT 'thesis.thesis_council_member', id::text, md5(t::text) FROM thesis.thesis_council_member t WHERE id::text LIKE 'ed1a0000-0000-4000-8000-%';
+INSERT INTO _row_hashes SELECT 'thesis.thesis_council_topic', id::text, md5(t::text) FROM thesis.thesis_council_topic t WHERE id::text LIKE 'ed1a0000-0000-4000-8000-%';
+INSERT INTO _row_hashes SELECT 'thesis.thesis_topic_score', id::text, md5(t::text) FROM thesis.thesis_topic_score t WHERE id::text LIKE 'ed1a0000-0000-4000-8000-%';
+INSERT INTO _row_hashes SELECT 'thesis.thesis_group_report', id::text, md5(t::text) FROM thesis.thesis_group_report t WHERE id::text LIKE 'ed1a0000-0000-4000-8000-%';
+INSERT INTO _row_hashes SELECT 'notifications.notification', id::text, md5(t::text) FROM notifications.notification t WHERE id LIKE 'demo-th-%';
+INSERT INTO _row_hashes SELECT 'campuscore_audit."AdminAudit"', id::text, md5(t::text) FROM campuscore_audit."AdminAudit" t WHERE id LIKE 'demo-th-%' AND id <> 'demo-th-audit-000';
+
+CREATE TEMP TABLE _image (img jsonb) ON COMMIT DROP;
+INSERT INTO _image
+SELECT jsonb_build_object(
+  'format', 2,
+  'cols', (SELECT jsonb_agg(jsonb_build_object('tbl', b.tbl, 'id', b.id, 'col', b.col, 'before', b.before_val, 'applied', b.applied_val))
+             FROM _demo_before b),
+  'rows', (SELECT jsonb_object_agg(tbl, ids)
+             FROM (SELECT tbl, jsonb_object_agg(id, h) AS ids FROM _row_hashes GROUP BY tbl) s));
+
+-- only written when the guarded updates actually ran and no image exists yet,
+-- so a re-apply never erases the original baseline
 UPDATE campuscore_audit."AdminAudit"
-SET "beforeState" = (SELECT jsonb_agg(jsonb_build_object('tbl', b.tbl, 'id', b.id, 'col', b.col, 'before', b.before_val, 'applied', b.applied_val))::text FROM _demo_before b)
+SET "beforeState" = (SELECT img::text FROM _image)
 WHERE id = 'demo-th-audit-000'
   AND EXISTS (SELECT 1 FROM _demo_before)
-  AND coalesce("beforeState", '') IN ('', '[]');
+  AND coalesce("beforeState", '') IN ('', '[]', 'null');
+
+-- checksum-protected redundant copy in the table comment: it survives a single
+-- audit-row deletion (and any AdminAudit pruning), and rollback verifies the
+-- md5 before trusting it. The comment is cleared by rollback.
+SELECT format('COMMENT ON TABLE thesis.thesis_topic IS %L',
+              'thesis-demo-data v2 md5:' || md5(img::text) || E'\n' || img::text)
+FROM _image
+WHERE EXISTS (SELECT 1 FROM _demo_before) \gexec
 
 -- post-write assertion: abort the whole transaction if the marker set is incomplete
 -- or any report blob disagrees with its recorded size/sha256 metadata.
@@ -769,6 +896,13 @@ BEGIN
   IF n <> 107 THEN RAISE EXCEPTION 'demo apply incomplete: expected 107 marker notifications, found %', n; END IF;
   SELECT count(*) INTO n FROM campuscore_audit."AdminAudit" WHERE id LIKE 'demo-th-audit-%';
   IF n <> 6 THEN RAISE EXCEPTION 'demo apply incomplete: expected 6 marker audit rows, found %', n; END IF;
+  -- durable before-image must exist in both copies before commit
+  SELECT count(*) INTO n FROM campuscore_audit."AdminAudit"
+   WHERE id = 'demo-th-audit-000' AND "beforeState" ~ '^\s*\{';
+  IF n <> 1 THEN RAISE EXCEPTION 'demo apply incomplete: audit-row before-image missing'; END IF;
+  IF obj_description('thesis.thesis_topic'::regclass) NOT LIKE 'thesis-demo-data v2 md5:%' THEN
+    RAISE EXCEPTION 'demo apply incomplete: checksum-protected comment copy missing';
+  END IF;
   SELECT count(*) INTO n FROM thesis.thesis_group_report
    WHERE id::text LIKE 'ed1a0000-0000-4000-8000-%'
      AND (file_size IS DISTINCT FROM octet_length(file_data)
@@ -789,6 +923,8 @@ UNION ALL SELECT 'thesis_group_report', count(*) FROM thesis.thesis_group_report
 UNION ALL SELECT 'notification', count(*) FROM notifications.notification WHERE id LIKE 'demo-th-%'
 UNION ALL SELECT 'admin_audit', count(*) FROM campuscore_audit."AdminAudit" WHERE id LIKE 'demo-th-%'
 ORDER BY 1;
+
+\endif
 
 -- psql client-side branch: dry-run rolls the whole transaction back so the
 -- printed counts describe exactly what WOULD be written; real run commits.

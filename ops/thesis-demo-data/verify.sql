@@ -9,6 +9,8 @@
 
 SET lock_timeout = '5s';
 SET statement_timeout = '120s';
+SET TimeZone = 'UTC';
+SET DateStyle = 'ISO, MDY';
 
 WITH m(p) AS (VALUES ('ed1a0000-0000-4000-8000-%'))
 SELECT 'marker_count.' || sec.name AS check_name,
@@ -360,3 +362,93 @@ SELECT 'audit.not_in_future', '0', count(*)::text,
        CASE WHEN count(*) = 0 THEN 'PASS' ELSE 'FAIL' END
 FROM campuscore_audit."AdminAudit" a
 WHERE a.id LIKE 'demo-th-%' AND a."createdAt" > now() + interval '1 minute';
+
+-- before-image durability: the v2 image must be present and well-formed in the
+-- audit row, and the checksum-protected comment copy must agree with it
+SELECT 'image.before_image_valid' AS check_name, '1' AS expected, count(*)::text AS actual,
+       CASE WHEN count(*) = 1 THEN 'PASS' ELSE 'FAIL' END AS verdict
+FROM campuscore_audit."AdminAudit" a
+WHERE a.id = 'demo-th-audit-000'
+  AND a."beforeState" ~ '^\s*\{'
+  AND (a."beforeState"::jsonb ->> 'format') = '2'
+  AND jsonb_typeof(a."beforeState"::jsonb -> 'cols') = 'array'
+  AND jsonb_array_length(a."beforeState"::jsonb -> 'cols') >= 1
+  AND jsonb_typeof(a."beforeState"::jsonb -> 'rows') = 'object';
+
+WITH c AS (
+  SELECT obj_description('thesis.thesis_topic'::regclass) AS d,
+         (SELECT a."beforeState" FROM campuscore_audit."AdminAudit" a WHERE a.id = 'demo-th-audit-000') AS bs
+), p AS (
+  SELECT CASE WHEN d LIKE 'thesis-demo-data v2 md5:%' AND position(E'\n' in d) > 0
+              THEN substr(d, position(E'\n' in d) + 1) END AS payload,
+         substring(d from 'md5:([0-9a-f]{32})') AS decl, bs
+  FROM c
+), q AS (
+  SELECT CASE WHEN payload IS NOT NULL AND payload ~ '^\s*\{' AND md5(payload) = decl
+              THEN payload::jsonb END AS pimg,
+         CASE WHEN bs ~ '^\s*\{' THEN bs::jsonb END AS bimg
+  FROM p
+)
+SELECT 'image.comment_copy_consistent' AS check_name, '0' AS expected,
+       (CASE WHEN pimg IS NOT NULL AND bimg IS NOT NULL AND pimg = bimg THEN 0 ELSE 1 END)::text AS actual,
+       CASE WHEN pimg IS NOT NULL AND bimg IS NOT NULL AND pimg = bimg THEN 'PASS' ELSE 'FAIL' END AS verdict
+FROM q;
+
+-- every marker row's whole-row md5 must still equal the apply-time hash
+WITH exp AS (
+  SELECT rt.key AS tbl, e.key AS id, e.value AS h
+  FROM campuscore_audit."AdminAudit" a,
+       jsonb_each(a."beforeState"::jsonb -> 'rows') rt,
+       jsonb_each_text(rt.value) e
+  WHERE a.id = 'demo-th-audit-000' AND a."beforeState" ~ '^\s*\{'
+), act AS (
+  SELECT 'thesis.thesis_topic' AS tbl, id::text AS id, md5(t::text) AS h FROM thesis.thesis_topic t WHERE id::text LIKE 'ed1a0000-0000-4000-8000-%'
+  UNION ALL SELECT 'thesis.thesis_topic_supervisor', id::text, md5(t::text) FROM thesis.thesis_topic_supervisor t WHERE id::text LIKE 'ed1a0000-0000-4000-8000-%'
+  UNION ALL SELECT 'thesis.thesis_group', id::text, md5(t::text) FROM thesis.thesis_group t WHERE id::text LIKE 'ed1a0000-0000-4000-8000-%'
+  UNION ALL SELECT 'thesis.thesis_group_member', id::text, md5(t::text) FROM thesis.thesis_group_member t WHERE id::text LIKE 'ed1a0000-0000-4000-8000-%'
+  UNION ALL SELECT 'thesis.thesis_council', id::text, md5(t::text) FROM thesis.thesis_council t WHERE id::text LIKE 'ed1a0000-0000-4000-8000-%'
+  UNION ALL SELECT 'thesis.thesis_council_member', id::text, md5(t::text) FROM thesis.thesis_council_member t WHERE id::text LIKE 'ed1a0000-0000-4000-8000-%'
+  UNION ALL SELECT 'thesis.thesis_council_topic', id::text, md5(t::text) FROM thesis.thesis_council_topic t WHERE id::text LIKE 'ed1a0000-0000-4000-8000-%'
+  UNION ALL SELECT 'thesis.thesis_topic_score', id::text, md5(t::text) FROM thesis.thesis_topic_score t WHERE id::text LIKE 'ed1a0000-0000-4000-8000-%'
+  UNION ALL SELECT 'thesis.thesis_group_report', id::text, md5(t::text) FROM thesis.thesis_group_report t WHERE id::text LIKE 'ed1a0000-0000-4000-8000-%'
+  UNION ALL SELECT 'notifications.notification', id::text, md5(t::text) FROM notifications.notification t WHERE id LIKE 'demo-th-%'
+  UNION ALL SELECT 'campuscore_audit."AdminAudit"', id::text, md5(t::text) FROM campuscore_audit."AdminAudit" t WHERE id LIKE 'demo-th-%' AND id <> 'demo-th-audit-000'
+)
+SELECT 'image.row_hash_mismatch' AS check_name, '0' AS expected, count(*)::text AS actual,
+       CASE WHEN count(*) = 0 THEN 'PASS' ELSE 'FAIL' END AS verdict
+FROM exp e
+FULL OUTER JOIN act a ON a.tbl = e.tbl AND a.id = e.id
+WHERE e.h IS NULL OR a.h IS NULL OR a.h <> e.h;
+
+-- every guarded column must still carry the applied value
+WITH exp AS (
+  SELECT (e ->> 'tbl') AS tbl, (e ->> 'id') AS rid, (e ->> 'col') AS col, (e ->> 'applied') AS app
+  FROM campuscore_audit."AdminAudit" a,
+       jsonb_array_elements(a."beforeState"::jsonb -> 'cols') e
+  WHERE a.id = 'demo-th-audit-000' AND a."beforeState" ~ '^\s*\{'
+), act AS (
+  SELECT 'thesis_registration_round' AS tbl, r.id::text AS rid, x.col, x.val
+  FROM thesis.thesis_registration_round r
+  CROSS JOIN LATERAL (VALUES
+    ('version', to_jsonb(r.version) #>> '{}'),
+    ('updated_at', to_jsonb(r.updated_at) #>> '{}'),
+    ('results_published_at', to_jsonb(r.results_published_at) #>> '{}')) x(col, val)
+  WHERE r.id IN ('b35e9ff1-1eb8-4e73-812e-04e1a66041f1','be1aa853-f153-4f2e-a5cb-ed1b6c3c1bf1','bad8eba0-2d12-4414-8aab-7424174b3b97')
+  UNION ALL
+  SELECT 'thesis_topic', t.id::text, x.col, x.val
+  FROM thesis.thesis_topic t
+  CROSS JOIN LATERAL (VALUES
+    ('version', to_jsonb(t.version) #>> '{}'),
+    ('updated_at', to_jsonb(t.updated_at) #>> '{}'),
+    ('gvpb_lecturer_id', to_jsonb(t.gvpb_lecturer_id) #>> '{}'),
+    ('gvpb_waived_reason', to_jsonb(t.gvpb_waived_reason) #>> '{}'),
+    ('gvpb_waived_by', to_jsonb(t.gvpb_waived_by) #>> '{}'),
+    ('gvpb_waived_at', to_jsonb(t.gvpb_waived_at) #>> '{}')) x(col, val)
+  WHERE t.id IN ('018f4a7c-3b12-4d90-a5e1-7c82b9045001','6f64670b-cd6b-4e1b-ae9d-0b497f2472a8',
+                 'f580eadf-fffb-4db2-a7d8-423e83934dc2','67c74df5-5c7f-4e74-aa02-d51af7207fe9')
+)
+SELECT 'image.guarded_cols_at_applied' AS check_name, '0' AS expected, count(*)::text AS actual,
+       CASE WHEN count(*) = 0 THEN 'PASS' ELSE 'FAIL' END AS verdict
+FROM exp
+JOIN act ON act.tbl = exp.tbl AND act.rid = exp.rid AND act.col = exp.col
+WHERE act.val IS DISTINCT FROM exp.app;

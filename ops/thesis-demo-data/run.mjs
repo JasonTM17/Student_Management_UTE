@@ -23,6 +23,7 @@ const FILES = {
   'verify':  { file: 'verify.sql', vars: {} },
   'rollback':{ file: 'rollback.sql', vars: {} },
   'manifest':{ file: 'manifest.sql', vars: {} },
+  'recover': { file: 'recover-before-image.sql', vars: {} },
 };
 
 function connectionArgs() {
@@ -68,7 +69,7 @@ ORDER BY 1;`;
 
 const spec = FILES[action];
 if (!spec) {
-  console.error('usage: node run.mjs <dry-run|apply|verify|rollback|manifest|counts>');
+  console.error('usage: node run.mjs <dry-run|apply|verify|rollback|manifest|recover|counts>');
   process.exit(2);
 }
 process.exit(runPsql(spec.file, spec.vars));
