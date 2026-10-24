@@ -1,4 +1,4 @@
-package io.campuscore.restfulapi.web;
+package io.campuscore.restfulapi.exception.handler;
 
 import jakarta.servlet.http.HttpServletRequest;
 import java.time.Instant;

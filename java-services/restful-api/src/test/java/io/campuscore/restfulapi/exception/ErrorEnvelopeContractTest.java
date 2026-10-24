@@ -15,7 +15,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import io.campuscore.restfulapi.security.JsonBodyCapFilter;
 import io.campuscore.restfulapi.security.RequestIdFilter;
 import io.campuscore.restfulapi.web.ApiErrorWriter;
-import io.campuscore.restfulapi.web.GlobalExceptionHandler;
+import io.campuscore.restfulapi.exception.handler.GlobalExceptionHandler;
 import jakarta.servlet.FilterChain;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
