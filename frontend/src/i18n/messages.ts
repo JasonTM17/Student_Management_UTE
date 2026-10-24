@@ -254,6 +254,8 @@ export const en = {
         GVPB_NOT_WAIVED: 'The counter-review requirement is not waived.',
         GVPB_SCORE_EXISTS:
           'A counter-review score already exists; it can only change through re-review.',
+        COUNTER_REVIEW_WAIVER_NOT_SUPPORTED:
+          'This round type always requires a counter-reviewer.',
         INVALID_NOTIFICATION_LINK: 'The notification link is not a safe internal path.',
         LEADER_SUCCESSOR_REQUIRED: 'Removing the leader requires naming a successor member.',
         REOPEN_CONFLICTS: 'Reopening this section would create student conflicts.',
@@ -3329,6 +3331,8 @@ export const vi: I18nMessages = {
         GVPB_NOT_WAIVED: 'Yêu cầu phản biện (GVPB) chưa được miễn.',
         GVPB_SCORE_EXISTS:
           'Đã có điểm phản biện; chỉ có thể thay đổi qua phản biện lại.',
+        COUNTER_REVIEW_WAIVER_NOT_SUPPORTED:
+          'Loại đợt này luôn yêu cầu giảng viên phản biện.',
         INVALID_NOTIFICATION_LINK: 'Liên kết thông báo không phải là đường dẫn nội bộ hợp lệ.',
         LEADER_SUCCESSOR_REQUIRED: 'Xóa nhóm trưởng cần chỉ định thành viên kế nhiệm.',
         REOPEN_CONFLICTS: 'Mở lại học phần này sẽ tạo xung đột cho sinh viên.',

@@ -51,6 +51,10 @@ export interface ThesisRound {
   /** Read-only deletability view: `deletable` only when the round is an empty
    * DRAFT/CANCELLED; the per-kind counts explain every blocker. */
   deletion?: ThesisRoundDeletionInfo | null;
+  /** Server-decided waiver capability: only round types that permit a
+   * counter-review waiver return true (none of the shipped undergraduate
+   * types do). Absent on older backends — treat as not allowed. */
+  counterReviewWaiverAllowed?: boolean;
 }
 
 export interface ThesisRoundDeletionInfo {

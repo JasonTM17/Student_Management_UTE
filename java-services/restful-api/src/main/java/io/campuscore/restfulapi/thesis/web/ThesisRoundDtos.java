@@ -54,20 +54,28 @@ public final class ThesisRoundDtos {
             Instant defenseDate,
             RoundStatus status,
             RoundStatus cancelledFromStatus,
-            RoundDeletionInfo deletion) {
+            RoundDeletionInfo deletion,
+            /**
+             * Whether governance may waive a topic's counter-review in this
+             * round (see ThesisGovernanceCapabilities). False on every
+             * shipped undergraduate round type; the UI hides the waive action
+             * and must not keep its own round-type list.
+             */
+            boolean counterReviewWaiverAllowed) {
 
         public static RoundResponse from(ThesisRegistrationRound round) {
-            return from(round, null);
+            return from(round, null, false);
         }
 
-        public static RoundResponse from(ThesisRegistrationRound round, RoundDeletionInfo deletion) {
+        public static RoundResponse from(ThesisRegistrationRound round, RoundDeletionInfo deletion,
+                boolean counterReviewWaiverAllowed) {
             return new RoundResponse(
                     round.getId(), round.getName(), round.getThesisType(),
                     round.getLecturerSubmitStart(), round.getLecturerSubmitEnd(),
                     round.getRegistrationStart(), round.getRegistrationEnd(),
                     round.getGvpbDeadline(), round.getReportDeadline(), round.getProposalPublishAt(),
                     round.getReportDate(), round.getDefenseDate(), round.getStatus(),
-                    round.getCancelledFromStatus(), deletion);
+                    round.getCancelledFromStatus(), deletion, counterReviewWaiverAllowed);
         }
     }
 }

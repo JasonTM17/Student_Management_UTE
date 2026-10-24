@@ -1548,7 +1548,7 @@ export default function AdminThesisPage() {
                                                     </Button>
                                                   ) : null}
                                                   {top.finalScore == null &&
-                                                  (round.thesisType === 'TLCN' || round.thesisType === 'KLTN') ? (
+                                                  (top.gvpbWaivedReason != null || round.counterReviewWaiverAllowed) ? (
                                                     top.gvpbWaivedReason ? (
                                                       <Button
                                                         type="button"

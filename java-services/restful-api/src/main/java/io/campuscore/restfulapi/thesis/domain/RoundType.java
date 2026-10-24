@@ -16,6 +16,20 @@ public enum RoundType {
         return this == TLCN || this == KLTN;
     }
 
+    /**
+     * Whether governance may waive a topic's counter-review requirement in a
+     * round of this type. Every shipped undergraduate level always requires a
+     * counter-reviewer, so the waiver stays closed; a future postgraduate
+     * round type opts in by returning true. The operator override
+     * {@code thesis.governance.counter-review-waiver.enabled} and this
+     * per-type answer meet in
+     * {@link io.campuscore.restfulapi.thesis.service.ThesisGovernanceCapabilities#counterReviewWaiverAllowed},
+     * the single decision point the write path and the read model share.
+     */
+    public boolean allowsCounterReviewWaiver() {
+        return false;
+    }
+
     public boolean requiresCouncilReportDate() {
         return this == TLCN || this == KLTN;
     }

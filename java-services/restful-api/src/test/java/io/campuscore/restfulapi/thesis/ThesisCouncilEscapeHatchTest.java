@@ -46,7 +46,10 @@ import org.springframework.test.web.servlet.MockMvc;
         "spring.datasource.username=sa",
         "spring.datasource.password=",
         "spring.flyway.enabled=true",
-        "spring.flyway.locations=classpath:db/migration-h2"
+        "spring.flyway.locations=classpath:db/migration-h2",
+        // The waiver is off for every shipped undergraduate round type; this
+        // suite exercises the capability-on path the future level reuses.
+        "thesis.governance.counter-review-waiver.enabled=true"
 })
 class ThesisCouncilEscapeHatchTest {
 
