@@ -8,7 +8,7 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-import io.campuscore.restfulapi.thesis.assistant.repository.ThesisAssistantTurnRepository.ExpiredLease;
+import io.campuscore.restfulapi.thesis.assistant.model.ExpiredLease;
 import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;

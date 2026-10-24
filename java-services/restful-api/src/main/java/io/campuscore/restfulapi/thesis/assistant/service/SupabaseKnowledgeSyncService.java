@@ -2,6 +2,7 @@ package io.campuscore.restfulapi.thesis.assistant.service;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import io.campuscore.restfulapi.thesis.assistant.dto.SyncResult;
 import java.io.IOException;
 import java.net.URI;
 import java.net.URLEncoder;
@@ -306,11 +307,6 @@ public class SupabaseKnowledgeSyncService {
     private static String url(String value) { return URLEncoder.encode(value, StandardCharsets.UTF_8); }
     private static String sha256(String value) { try { return HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(value.getBytes(StandardCharsets.UTF_8))); } catch (Exception impossible) { throw new IllegalStateException(impossible); } }
 
-    public record SyncResult(String status, String releaseId, String corpusVersion, String corpusHash, int rowCount,
-            boolean degraded, String message) {
-        static SyncResult disabled() { return new SyncResult("DISABLED", null, null, null, 0, true, "Supabase authoring sync is not configured"); }
-        public static SyncResult failed(String message) { return new SyncResult("FAILED", null, null, null, 0, true, message == null ? "Knowledge sync failed" : message); }
-    }
     private record ReleasePayload(UUID id, String corpusVersion, String corpusHash, int rowCount, String manifestJson) { }
     private record DocumentPayload(String sourceId, UUID revisionId, int version, String domain, String slug, String locale,
             String title, String content, String source, int priority, boolean active, String visibility, Instant publishedAt) { }

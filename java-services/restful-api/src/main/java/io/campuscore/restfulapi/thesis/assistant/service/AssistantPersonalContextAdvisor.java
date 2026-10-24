@@ -19,6 +19,10 @@ import io.campuscore.restfulapi.academic.dto.AcademicEnrollmentReadDtos.Transcri
 import io.campuscore.restfulapi.academic.dto.AcademicEnrollmentReadDtos.TranscriptSummary;
 import io.campuscore.restfulapi.academic.dto.AcademicSectionReadDtos.LecturerGradingSectionResponse;
 import io.campuscore.restfulapi.academic.dto.AcademicSectionReadDtos.LecturerScheduleResponse;
+import io.campuscore.restfulapi.thesis.assistant.dto.StreamDone;
+import io.campuscore.restfulapi.thesis.assistant.dto.StreamEvent;
+import io.campuscore.restfulapi.thesis.assistant.dto.StreamMeta;
+import io.campuscore.restfulapi.thesis.assistant.dto.StreamReplace;
 import io.campuscore.restfulapi.thesis.assistant.dto.ThesisAssistantDtos.ChatRequest;
 import io.campuscore.restfulapi.thesis.assistant.dto.ThesisAssistantDtos.ChatResponse;
 import io.campuscore.restfulapi.thesis.dto.SupervisedTopic;
@@ -1717,7 +1721,7 @@ public class AssistantPersonalContextAdvisor {
     }
 
     /** Emits the personal answer over the SSE contract as meta → replace → done. */
-    public void stream(ChatRequest request, Jwt actor, Consumer<ThesisAssistantService.StreamEvent> sink) {
+    public void stream(ChatRequest request, Jwt actor, Consumer<StreamEvent> sink) {
         stream(answer(request, actor), request, sink);
     }
 
@@ -1727,7 +1731,7 @@ public class AssistantPersonalContextAdvisor {
      * twice and makes JSON/SSE reason metadata identical.
      */
     public void stream(ChatResponse response, ChatRequest request,
-            Consumer<ThesisAssistantService.StreamEvent> sink) {
+            Consumer<StreamEvent> sink) {
         String locale = normalizedLocale(request);
         String answer = response == null ? fallbackMessage(locale) : response.answer();
         String reasonCode = response == null || !StringUtils.hasText(response.reasonCode())
@@ -1738,16 +1742,16 @@ public class AssistantPersonalContextAdvisor {
             reasonCode = "TECHNICAL_REQUEST_BLOCKED";
             degraded = true;
         }
-        sink.accept(new ThesisAssistantService.StreamMeta(
+        sink.accept(new StreamMeta(
                 UUID.randomUUID(), request.clientRequestId(), null, uuidOrNull(response == null ? null : response.conversationId()),
                 MODEL, locale));
-        sink.accept(new ThesisAssistantService.StreamReplace(answer, List.of(), reasonCode));
+        sink.accept(new StreamReplace(answer, List.of(), reasonCode));
         // terminalStatus rides the response so a privacy refusal streams the
         // same "REJECTED" shape the JSON route returns — ordinary personal
         // answers carry null and keep the existing "COMPLETED".
         String terminalStatus = response != null && StringUtils.hasText(response.terminalStatus())
                 ? response.terminalStatus() : "COMPLETED";
-        sink.accept(new ThesisAssistantService.StreamDone(uuidOrNull(response == null ? null : response.messageId()),
+        sink.accept(new StreamDone(uuidOrNull(response == null ? null : response.messageId()),
                 reasonCode, degraded, terminalStatus));
     }
 

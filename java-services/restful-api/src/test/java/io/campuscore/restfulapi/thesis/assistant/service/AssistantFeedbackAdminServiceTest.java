@@ -2,7 +2,8 @@ package io.campuscore.restfulapi.thesis.assistant.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import io.campuscore.restfulapi.thesis.assistant.service.AssistantFeedbackAdminService.FeedbackSummary;
+import io.campuscore.restfulapi.thesis.assistant.dto.ReasonCount;
+import io.campuscore.restfulapi.thesis.assistant.dto.FeedbackSummary;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -80,7 +81,7 @@ class AssistantFeedbackAdminServiceTest {
         assertThat(summary.totals().down()).isEqualTo(1);
         assertThat(summary.totals().total()).isEqualTo(2);
         assertThat(summary.byReason())
-                .extracting(AssistantFeedbackAdminService.ReasonCount::reason)
+                .extracting(ReasonCount::reason)
                 .containsExactlyInAnyOrder("INCORRECT", "HELPFUL");
         assertThat(summary.recent()).hasSize(2);
         assertThat(summary.recent().get(0).rating()).isEqualTo("UP");

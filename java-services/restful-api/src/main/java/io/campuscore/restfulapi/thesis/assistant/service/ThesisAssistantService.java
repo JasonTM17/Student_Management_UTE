@@ -1,10 +1,32 @@
 package io.campuscore.restfulapi.thesis.assistant.service;
 
-import io.campuscore.restfulapi.thesis.assistant.client.AssistantCompletionProvider.CompletionRequest;
-import io.campuscore.restfulapi.thesis.assistant.client.AssistantCompletionProvider.ProviderSegment;
+import io.campuscore.restfulapi.thesis.assistant.dto.StreamCitation;
+import io.campuscore.restfulapi.thesis.assistant.dto.StreamDelta;
+import io.campuscore.restfulapi.thesis.assistant.dto.StreamDone;
+import io.campuscore.restfulapi.thesis.assistant.dto.StreamError;
+import io.campuscore.restfulapi.thesis.assistant.dto.StreamEvent;
+import io.campuscore.restfulapi.thesis.assistant.dto.StreamMeta;
+import io.campuscore.restfulapi.thesis.assistant.dto.StreamReplace;
+import io.campuscore.restfulapi.thesis.assistant.model.CompletionRequest;
+import io.campuscore.restfulapi.thesis.assistant.model.PersonalTurn;
+import io.campuscore.restfulapi.thesis.assistant.model.ProviderSegment;
 import io.campuscore.restfulapi.thesis.assistant.dto.ThesisAssistantDtos.ChatResponse;
 import io.campuscore.restfulapi.thesis.assistant.dto.ThesisAssistantDtos.Citation;
 import io.campuscore.restfulapi.exception.DomainException;
+import io.campuscore.restfulapi.thesis.assistant.model.CancelResult;
+import io.campuscore.restfulapi.thesis.assistant.model.CatalogDocument;
+import io.campuscore.restfulapi.thesis.assistant.model.Conversation;
+import io.campuscore.restfulapi.thesis.assistant.model.ConversationPage;
+import io.campuscore.restfulapi.thesis.assistant.model.DispatchDecision;
+import io.campuscore.restfulapi.thesis.assistant.model.ExpiredLease;
+import io.campuscore.restfulapi.thesis.assistant.model.KnowledgeDocument;
+import io.campuscore.restfulapi.thesis.assistant.model.Message;
+import io.campuscore.restfulapi.thesis.assistant.model.MessagePage;
+import io.campuscore.restfulapi.thesis.assistant.model.ReplayResult;
+import io.campuscore.restfulapi.thesis.assistant.model.Reservation;
+import io.campuscore.restfulapi.thesis.assistant.model.ReservationStatus;
+import io.campuscore.restfulapi.thesis.assistant.model.TerminalResult;
+import io.campuscore.restfulapi.thesis.assistant.model.TurnRow;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
@@ -1074,7 +1096,7 @@ public class ThesisAssistantService {
         }
         String generated;
         try {
-            generated = provider.complete(new DeepSeekClient.CompletionRequest(
+            generated = provider.complete(new CompletionRequest(
                     normalized, normalizedLocale, "", List.of(), DeepSeekClient.generalPrompt(normalizedLocale)),
                     ignored -> { }).answer();
         } catch (ProviderUnavailableException | ProviderCancelledException
@@ -1286,7 +1308,7 @@ public class ThesisAssistantService {
             return null;
         }
         if (result.error() || result.documents().isEmpty()) return null;
-        ThesisAssistantKnowledgeRepository.KnowledgeDocument top = result.documents().get(0);
+        KnowledgeDocument top = result.documents().get(0);
         // A per-course prerequisite question with the generated map on top is
         // answered deterministically regardless of the score gate: the map is
         // machine-generated from the requirement table, and the provider path
@@ -1334,7 +1356,7 @@ public class ThesisAssistantService {
      * the gate cannot drift from the retrieval engine.
      */
     private static boolean hasTermCorroboration(
-            ThesisAssistantKnowledgeRepository.KnowledgeDocument document, List<String> terms) {
+            KnowledgeDocument document, List<String> terms) {
         if (document == null || terms == null) return false;
         int strong = 0;
         for (String term : terms.stream().filter(term -> term.length() >= 2).distinct().limit(16).toList()) {
@@ -1350,7 +1372,7 @@ public class ThesisAssistantService {
     }
 
     private static boolean hasSpecializedQuestionFit(String message, String scope,
-            ThesisAssistantKnowledgeRepository.KnowledgeDocument document) {
+            KnowledgeDocument document) {
         return !"specialized".equalsIgnoreCase(scope)
                 || SpringInjectionQuestionFocus.coveredBy(message, document.content());
     }
@@ -1460,9 +1482,9 @@ public class ThesisAssistantService {
         return answer(message, locale, conversationId, ownerId, clientRequestId, sink, scope);
     }
 
-    public ThesisAssistantTurnRepository.CancelResult cancel(UUID clientRequestId, String ownerId) {
-        if (turns == null) return new ThesisAssistantTurnRepository.CancelResult(false, "TURN_NOT_FOUND");
-        ThesisAssistantTurnRepository.TurnRow row = turns.findByRequest(ownerId, clientRequestId);
+    public CancelResult cancel(UUID clientRequestId, String ownerId) {
+        if (turns == null) return new CancelResult(false, "TURN_NOT_FOUND");
+        TurnRow row = turns.findByRequest(ownerId, clientRequestId);
         if (row == null) throw problem(404, "TURN_NOT_FOUND", "Request was not found");
         return turns.cancel(row.turnId(), ownerId, clientRequestId,
                 handle -> { if (cancellations != null) cancellations.fence(ownerId, handle.clientRequestId(), handle.leaseGeneration()); });
@@ -1478,17 +1500,17 @@ public class ThesisAssistantService {
         return turns.deleteFeedback(messageId, ownerId);
     }
 
-    public List<ThesisAssistantRepository.Conversation> conversations(String ownerId) {
+    public List<Conversation> conversations(String ownerId) {
         if (legacyHistory == null) return List.of();
         return legacyHistory.conversations(ownerId);
     }
 
-    public ThesisAssistantRepository.ConversationPage conversationPage(String ownerId, Integer limit, String cursor) {
+    public ConversationPage conversationPage(String ownerId, Integer limit, String cursor) {
         return conversationPage(ownerId, limit, cursor, null);
     }
 
-    public ThesisAssistantRepository.ConversationPage conversationPage(String ownerId, Integer limit, String cursor, String scope) {
-        if (legacyHistory == null) return new ThesisAssistantRepository.ConversationPage(List.of(), null);
+    public ConversationPage conversationPage(String ownerId, Integer limit, String cursor, String scope) {
+        if (legacyHistory == null) return new ConversationPage(List.of(), null);
         return legacyHistory.conversations(ownerId, limit == null ? 20 : limit, cursor, scope);
     }
 
@@ -1545,13 +1567,6 @@ public class ThesisAssistantService {
     }
 
     /**
-     * Result of {@link #recordPersonalTurn}: the conversation the turn landed
-     * in plus the persisted assistant message id so responses can stamp both —
-     * the stream's done frame needs messageId for feedback to bind.
-     */
-    public record PersonalTurn(String conversationId, String messageId) { }
-
-    /**
      * Runs under the assistant transaction so a mid-write failure rolls both
      * message rows back instead of persisting a user question with no answer
      * while the response reports null ids.
@@ -1604,13 +1619,13 @@ public class ThesisAssistantService {
         }
     }
 
-    public List<ThesisAssistantRepository.Message> messages(UUID conversationId, String ownerId) {
+    public List<Message> messages(UUID conversationId, String ownerId) {
         if (legacyHistory == null) return List.of();
         return legacyHistory.messages(conversationId, ownerId);
     }
 
-    public ThesisAssistantRepository.MessagePage messagePage(UUID conversationId, String ownerId, Integer limit, String cursor) {
-        if (legacyHistory == null) return new ThesisAssistantRepository.MessagePage(List.of(), null);
+    public MessagePage messagePage(UUID conversationId, String ownerId, Integer limit, String cursor) {
+        if (legacyHistory == null) return new MessagePage(List.of(), null);
         // The page query itself silently scopes to the owner, which used to
         // make a foreign conversation read answer 200 [] while DELETE on the
         // same id answered 404. Assert ownership first so both verbs agree.
@@ -1693,20 +1708,20 @@ public class ThesisAssistantService {
 
         String hash = AssistantInputGuard.canonicalHash(normalized, normalizedLocale, requestedConversation);
         String leaseOwner = "assistant-" + UUID.randomUUID();
-        ThesisAssistantTurnRepository.Reservation reservation = cancellations == null
+        Reservation reservation = cancellations == null
                 ? turns.reserve(ownerId, clientRequestId, hash, requestedConversation, normalizedLocale,
                         leaseOwner, properties.retentionDays())
                 : turns.reserve(ownerId, clientRequestId, hash, requestedConversation, normalizedLocale,
                         leaseOwner, properties.retentionDays(), this::fenceExpired);
-        if (reservation.status() == ThesisAssistantTurnRepository.ReservationStatus.REPLAY) {
-            ThesisAssistantTurnRepository.ReplayResult replay = turns.replay(reservation.turnId(), ownerId);
+        if (reservation.status() == ReservationStatus.REPLAY) {
+            ReplayResult replay = turns.replay(reservation.turnId(), ownerId);
             emitReplay(sink, replay, clientRequestId, requestId, normalizedLocale, reservation.turnId());
             return response(replay, clientRequestId, requestId, reservation.turnId(), true, normalizedLocale);
         }
-        if (reservation.status() == ThesisAssistantTurnRepository.ReservationStatus.ACTIVE) {
+        if (reservation.status() == ReservationStatus.ACTIVE) {
             throw problem(409, "TURN_IN_PROGRESS", "A turn with this conversation is already active");
         }
-        if (reservation.status() == ThesisAssistantTurnRepository.ReservationStatus.AMBIGUOUS) {
+        if (reservation.status() == ReservationStatus.AMBIGUOUS) {
             throw problem(409, "FAILED_AMBIGUOUS", "The provider outcome is ambiguous; automatic redispatch is disabled");
         }
         if (reservation.createdConversation() && turns != null) {
@@ -1738,7 +1753,7 @@ public class ThesisAssistantService {
                         ? properties.userDailyQuota() : Integer.MAX_VALUE;
                 int globalDailyQuota = properties.quotaEnforced()
                         ? properties.globalDailyQuota() : Integer.MAX_VALUE;
-                ThesisAssistantTurnRepository.DispatchDecision dispatch = cancellations == null
+                DispatchDecision dispatch = cancellations == null
                         ? turns.dispatch(reservation.turnId(), ownerId, reservation.leaseGeneration(),
                                 userDailyQuota, globalDailyQuota)
                         : turns.dispatch(reservation.turnId(), ownerId, reservation.leaseGeneration(),
@@ -1862,7 +1877,7 @@ public class ThesisAssistantService {
             List<Citation> terminalCitations = "ANSWERED".equals(reason)
                     ? (isPortalDenialAnswer(answer) ? List.of() : lexical.citations())
                     : fallbackCitations;
-            ThesisAssistantTurnRepository.TerminalResult terminal = cancellations == null
+            TerminalResult terminal = cancellations == null
                     ? turns.complete(reservation.turnId(), ownerId, reservation.leaseGeneration(), normalized,
                             reason.equals("ANSWERED") ? deepSeek.model() : MODEL, answer, degraded, reason, terminalCitations)
                     : turns.complete(reservation.turnId(), ownerId, reservation.leaseGeneration(), normalized,
@@ -1889,7 +1904,7 @@ public class ThesisAssistantService {
         }
     }
 
-    private void fenceExpired(ThesisAssistantTurnRepository.ExpiredLease lease) {
+    private void fenceExpired(ExpiredLease lease) {
         if (cancellations != null && lease != null) {
             cancellations.fence(lease.ownerId(), lease.clientRequestId(), lease.leaseGeneration());
         }
@@ -1964,7 +1979,7 @@ public class ThesisAssistantService {
             return noMatchResult(locale);
         }
         List<String> terms = retrievalTerms(message);
-        List<ThesisAssistantKnowledgeRepository.KnowledgeDocument> documents = new ArrayList<>();
+        List<KnowledgeDocument> documents = new ArrayList<>();
         Set<String> seen = new LinkedHashSet<>();
         // Scoped intents need a wider candidate window before their semantic
         // filter runs. A noisy top-five window could otherwise hide the one
@@ -1992,9 +2007,9 @@ public class ThesisAssistantService {
         // must never dilute a professional answer with course-catalog rows.
         if (!specializedScope && catalog != null && documents.size() < topK) {
             try {
-                for (ThesisAssistantCatalogRepository.CatalogDocument row : catalog.search(locale, terms, topK - documents.size())) {
+                for (CatalogDocument row : catalog.search(locale, terms, topK - documents.size())) {
                     String sourceId = row.entityType() + ":" + row.entityId();
-                    ThesisAssistantKnowledgeRepository.KnowledgeDocument candidate = new ThesisAssistantKnowledgeRepository.KnowledgeDocument(
+                    KnowledgeDocument candidate = new KnowledgeDocument(
                             sourceId, sourceId, locale, row.title(), row.text(), "academic-catalog", row.entityType(), row.entityId(), row.updatedAt() == null ? null : row.updatedAt().toInstant());
                     if (isPublicKnowledgeSafe(candidate) && seen.add(sourceId)) documents.add(candidate);
                 }
@@ -2032,7 +2047,7 @@ public class ThesisAssistantService {
             // crowded out of the prompt window entirely. Families without a
             // predicate keep their retrieval share through the backfill.
             String folded = foldForMatching(message);
-            List<java.util.function.Predicate<ThesisAssistantKnowledgeRepository.KnowledgeDocument>> familyPredicates =
+            List<java.util.function.Predicate<KnowledgeDocument>> familyPredicates =
                     new ArrayList<>();
             if (isCertificateQuery(message)) familyPredicates.add(ThesisAssistantService::isCertificateDocument);
             if (thesisGroupQuery) familyPredicates.add(ThesisAssistantService::isThesisGroupPolicyDocument);
@@ -2043,15 +2058,15 @@ public class ThesisAssistantService {
             if (INTENT_EXAM.matcher(folded).find()) familyPredicates.add(ThesisAssistantService::isExamDocument);
             if (INTENT_GRADES.matcher(folded).find()) familyPredicates.add(ThesisAssistantService::isGradesDocument);
             if (INTENT_FEES.matcher(folded).find()) familyPredicates.add(ThesisAssistantService::isFeesDocument);
-            List<ThesisAssistantKnowledgeRepository.KnowledgeDocument> ordered = new ArrayList<>();
-            for (java.util.function.Predicate<ThesisAssistantKnowledgeRepository.KnowledgeDocument> predicate
+            List<KnowledgeDocument> ordered = new ArrayList<>();
+            for (java.util.function.Predicate<KnowledgeDocument> predicate
                     : familyPredicates) {
                 documents.stream().filter(predicate).findFirst().ifPresent(document -> {
                     if (!ordered.contains(document)) ordered.add(document);
                 });
             }
             if (!ordered.isEmpty()) {
-                for (ThesisAssistantKnowledgeRepository.KnowledgeDocument document : documents) {
+                for (KnowledgeDocument document : documents) {
                     if (!ordered.contains(document)) ordered.add(document);
                 }
                 documents = ordered;
@@ -2073,7 +2088,7 @@ public class ThesisAssistantService {
             // "tiên quyết" in its title. Fail open: without the map in the
             // window (fresh DB, missing migration) the policy doc keeps
             // answering the generic rule.
-            List<ThesisAssistantKnowledgeRepository.KnowledgeDocument> prerequisiteDocuments = documents.stream()
+            List<KnowledgeDocument> prerequisiteDocuments = documents.stream()
                     .filter(ThesisAssistantService::isPrerequisiteMapDocument)
                     .toList();
             if (prerequisiteDocuments.isEmpty()) {
@@ -2130,7 +2145,7 @@ public class ThesisAssistantService {
                     .filter(ThesisAssistantService::isCertificateDocument)
                     .toList();
         } else if (isCourseRegistrationQuery(message)) {
-            List<ThesisAssistantKnowledgeRepository.KnowledgeDocument> registrationDocuments = documents.stream()
+            List<KnowledgeDocument> registrationDocuments = documents.stream()
                     .filter(document -> "REGISTRATION".equalsIgnoreCase(safe(document.domain())))
                     .toList();
             // If the scoped search did not find a registration document, fail
@@ -2141,7 +2156,7 @@ public class ThesisAssistantService {
         // The model prompt only carries the top ranked documents: five cited
         // sources were pure prompt weight for direct lookups. Retrieval keeps
         // its wider candidate window above; this trims what is injected.
-        List<ThesisAssistantKnowledgeRepository.KnowledgeDocument> promptDocuments = documents.stream()
+        List<KnowledgeDocument> promptDocuments = documents.stream()
                 .limit(PROMPT_DOCUMENT_LIMIT).toList();
         List<Citation> citations = promptDocuments.stream().map(ThesisAssistantService::citation).toList();
         String answer = normalizeAssistantCopy(documents.isEmpty() ? noMatchMessage(locale)
@@ -2177,11 +2192,11 @@ public class ThesisAssistantService {
      * boundary exists the document is omitted entirely, because a half-sentence
      * must never reach the model as a "complete" source.
      */
-    static String buildGroundedContext(List<ThesisAssistantKnowledgeRepository.KnowledgeDocument> documents,
+    static String buildGroundedContext(List<KnowledgeDocument> documents,
             int maxContextChars) {
         if (maxContextChars <= 0) return "";
         StringBuilder context = new StringBuilder();
-        for (ThesisAssistantKnowledgeRepository.KnowledgeDocument document : documents) {
+        for (KnowledgeDocument document : documents) {
             String block = "### " + safe(document.title()) + "\n" + safe(document.content());
             if (context.length() == 0) {
                 String fitted = truncateAtBoundary(block, maxContextChars);
@@ -2265,7 +2280,7 @@ public class ThesisAssistantService {
                 && THESIS_GROUP_HEADCOUNT.matcher(folded).find();
     }
 
-    static boolean isThesisGroupPolicyDocument(ThesisAssistantKnowledgeRepository.KnowledgeDocument document) {
+    static boolean isThesisGroupPolicyDocument(KnowledgeDocument document) {
         if (document == null || !"THESIS".equalsIgnoreCase(safe(document.domain()))) return false;
         return safe(document.slug()).equals("thesis-group-members-rules-vi")
                 || safe(document.slug()).equals("thesis-group-members-rules-en");
@@ -2292,13 +2307,13 @@ public class ThesisAssistantService {
      * nhận" inside its procedure text but is ABOUT the card. An empty filtered
      * window degrades to NO_MATCH rather than a wrong-topic citation.
      */
-    static boolean isCertificateDocument(ThesisAssistantKnowledgeRepository.KnowledgeDocument document) {
+    static boolean isCertificateDocument(KnowledgeDocument document) {
         if (document == null) return false;
         return CERTIFICATE_TITLE.matcher(foldForMatching(safe(document.title()))).find();
     }
 
     /** Exam-family KB documents: the V87 exam schedule plus the exam rules. */
-    static boolean isExamDocument(ThesisAssistantKnowledgeRepository.KnowledgeDocument document) {
+    static boolean isExamDocument(KnowledgeDocument document) {
         if (document == null) return false;
         String slug = safe(document.slug());
         return slug.startsWith("campus-exam-schedule") || slug.startsWith("exam-regulations")
@@ -2306,7 +2321,7 @@ public class ThesisAssistantService {
     }
 
     /** Grades-family KB documents, including the phúc khảo/appeals procedure. */
-    static boolean isGradesDocument(ThesisAssistantKnowledgeRepository.KnowledgeDocument document) {
+    static boolean isGradesDocument(KnowledgeDocument document) {
         if (document == null) return false;
         String slug = safe(document.slug());
         return slug.startsWith("grades-transcript") || slug.startsWith("grade-f-retake")
@@ -2315,7 +2330,7 @@ public class ThesisAssistantService {
     }
 
     /** Fees-family KB documents (tuition/công nợ policy). */
-    static boolean isFeesDocument(ThesisAssistantKnowledgeRepository.KnowledgeDocument document) {
+    static boolean isFeesDocument(KnowledgeDocument document) {
         return document != null && safe(document.slug()).startsWith("campus-tuition");
     }
 
@@ -2363,7 +2378,7 @@ public class ThesisAssistantService {
                 || folded.contains("prerequisite");
     }
 
-    static boolean isPrerequisiteMapDocument(ThesisAssistantKnowledgeRepository.KnowledgeDocument document) {
+    static boolean isPrerequisiteMapDocument(KnowledgeDocument document) {
         return document != null && "campuscore-prerequisite-map".equals(document.source());
     }
 
@@ -2382,7 +2397,7 @@ public class ThesisAssistantService {
      * falls back to the full document.
      */
     static String prerequisiteAnswer(String message,
-            ThesisAssistantKnowledgeRepository.KnowledgeDocument document) {
+            KnowledgeDocument document) {
         java.util.regex.Matcher code = COURSE_CODE.matcher(message);
         if (!code.find()) return null;
         String requested = code.group().toUpperCase(java.util.Locale.ROOT);
@@ -2421,7 +2436,7 @@ public class ThesisAssistantService {
 
     /** Picks the per-course map section when the question names a course. */
     private static String lexicalAnswerFor(String message,
-            ThesisAssistantKnowledgeRepository.KnowledgeDocument document) {
+            KnowledgeDocument document) {
         if (isPrerequisiteQuery(message) && isPrerequisiteMapDocument(document)) {
             String section = prerequisiteAnswer(message, document);
             if (section != null) return section;
@@ -2592,7 +2607,7 @@ public class ThesisAssistantService {
      * threshold incidentally (for example thesis eligibility), which is not
      * enough to present them as sources for a capacity question.
      */
-    static boolean isCreditLimitDocument(ThesisAssistantKnowledgeRepository.KnowledgeDocument document) {
+    static boolean isCreditLimitDocument(KnowledgeDocument document) {
         if (document == null) return false;
         String folded = foldForMatching(safe(document.title()) + " " + safe(document.content()));
         boolean hasCreditTerm = folded.contains("tin chi") || folded.matches(".*\\bcredits?\\b.*");
@@ -2612,7 +2627,7 @@ public class ThesisAssistantService {
      * fall back to the full source instead of guessing which sentence is safe.
      */
     private static String answerFromDocument(String message,
-            ThesisAssistantKnowledgeRepository.KnowledgeDocument document) {
+            KnowledgeDocument document) {
         String content = safe(document.content()).trim();
         if (isCreditLimitQuery(message) && !content.isBlank()) {
             java.util.regex.Matcher section = CREDIT_LIMIT_SECTION.matcher(content);
@@ -2644,7 +2659,7 @@ public class ThesisAssistantService {
      * never rewritten — only separators are added. Content that already
      * carries markdown headings, or has no numbered segments, passes through.
      */
-    static String formatDocumentAnswer(ThesisAssistantKnowledgeRepository.KnowledgeDocument document, String content) {
+    static String formatDocumentAnswer(KnowledgeDocument document, String content) {
         if (content == null || content.isBlank()) return content == null ? "" : content;
         if (content.contains("\n#") || content.startsWith("# ")) return content;
         java.util.List<Integer> marks = new java.util.ArrayList<>();
@@ -2721,7 +2736,7 @@ public class ThesisAssistantService {
             return new ChatResponse(result.answer(), MODEL, true, "KNOWLEDGE_UNAVAILABLE", AssistantInputGuard.normalizeLocale(locale), List.of());
         }
         if (!result.documents().isEmpty()) {
-            ThesisAssistantKnowledgeRepository.KnowledgeDocument top = result.documents().get(0);
+            KnowledgeDocument top = result.documents().get(0);
             // Catalog rows carry no lexical score (structured authoritative
             // records — the catalog search already verified term overlap), so
             // the corroboration gate applies to curated-corpus answers only.
@@ -2741,7 +2756,7 @@ public class ThesisAssistantService {
         return new ChatResponse(result.answer(), MODEL, false, result.documents().isEmpty() ? "NO_MATCH" : "ANSWERED", AssistantInputGuard.normalizeLocale(locale), primaryCitations(result.citations()));
     }
 
-    private static Citation citation(ThesisAssistantKnowledgeRepository.KnowledgeDocument document) {
+    private static Citation citation(KnowledgeDocument document) {
         String sourceId = "academic-catalog".equals(document.source())
                 ? document.catalogEntityType() + ":" + document.catalogEntityId() : document.id();
         String hash = sha256(String.join("|", sourceId, document.title(), document.content(), document.source(),
@@ -2788,7 +2803,7 @@ public class ThesisAssistantService {
         private static final long serialVersionUID = 1L;
     }
 
-    private static void emitReplay(Consumer<StreamEvent> sink, ThesisAssistantTurnRepository.ReplayResult replay, UUID clientRequestId,
+    private static void emitReplay(Consumer<StreamEvent> sink, ReplayResult replay, UUID clientRequestId,
             UUID requestId, String locale, UUID turnId) {
         emit(sink, new StreamMeta(requestId, clientRequestId, turnId, replay.conversationId(), replay.model(), locale));
         List<Citation> citations = replay.citations().stream().map(citation -> normalizeCitation(citation, locale)).toList();
@@ -2799,7 +2814,7 @@ public class ThesisAssistantService {
 
     private static void emit(Consumer<StreamEvent> sink, StreamEvent event) { if (sink != null) sink.accept(event); }
 
-    private static ChatResponse response(ThesisAssistantTurnRepository.ReplayResult replay, UUID clientRequestId, UUID requestId,
+    private static ChatResponse response(ReplayResult replay, UUID clientRequestId, UUID requestId,
             UUID turnId, boolean replayed, String locale) {
         List<Citation> citations = replay.citations().stream().map(citation -> normalizeCitation(citation, locale)).toList();
         return new ChatResponse(normalizeAssistantCopy(replay.answer(), locale), replay.model(), replay.degraded(), replay.reasonCode(), locale, citations,
@@ -2810,13 +2825,13 @@ public class ThesisAssistantService {
     private static UUID parseUuid(String value) { try { return value == null ? null : UUID.fromString(value); } catch (IllegalArgumentException ignored) { return null; } }
     private static String sha256(String value) { try { return java.util.HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(value.getBytes(StandardCharsets.UTF_8))); } catch (NoSuchAlgorithmException impossible) { throw new IllegalStateException(impossible); } }
     private static String excerpt(String content) { String value = content == null ? "" : content.replaceAll("\\s+", " ").trim(); return value.length() <= 280 ? value : value.substring(0, 277) + "..."; }
-    private static boolean containsAnyTerm(ThesisAssistantKnowledgeRepository.KnowledgeDocument document, List<String> terms) { String searchable = (safe(document.title()) + " " + safe(document.content())).toLowerCase(Locale.ROOT); return terms.isEmpty() || terms.stream().anyMatch(searchable::contains); }
-    private static void addDocuments(List<ThesisAssistantKnowledgeRepository.KnowledgeDocument> target, Set<String> seen, List<ThesisAssistantKnowledgeRepository.KnowledgeDocument> candidates) {
+    private static boolean containsAnyTerm(KnowledgeDocument document, List<String> terms) { String searchable = (safe(document.title()) + " " + safe(document.content())).toLowerCase(Locale.ROOT); return terms.isEmpty() || terms.stream().anyMatch(searchable::contains); }
+    private static void addDocuments(List<KnowledgeDocument> target, Set<String> seen, List<KnowledgeDocument> candidates) {
         for (var candidate : candidates) {
             if (isPublicKnowledgeSafe(candidate) && seen.add(candidate.slug())) target.add(candidate);
         }
     }
-    private static boolean isPublicKnowledgeSafe(ThesisAssistantKnowledgeRepository.KnowledgeDocument document) {
+    private static boolean isPublicKnowledgeSafe(KnowledgeDocument document) {
         // Sensitive-data and injection screening still applies. AssistantOutputGuard
         // deliberately does NOT: the corpus has already passed knowledge governance
         // (authored, reviewed and published through a release), and the SPECIALIZED
@@ -2980,32 +2995,8 @@ public class ThesisAssistantService {
     private static String safe(String value) { return value == null ? "" : value; }
     private static DomainException problem(int status, String code, String message) { return new DomainException(org.springframework.http.HttpStatus.valueOf(status), code, message); }
 
-    public sealed interface StreamEvent permits StreamMeta, StreamDelta, StreamReplace, StreamCitation, StreamDone, StreamError { }
-    public record StreamMeta(UUID requestId, UUID clientRequestId, UUID turnId, UUID conversationId, String model, String locale) implements StreamEvent {
-        @JsonProperty("type") public String type() { return "meta"; }
-    }
-    public record StreamDelta(int sequence, String text, List<String> sourceIds) implements StreamEvent {
-        @JsonProperty("type") public String type() { return "delta"; }
-    }
-    public record StreamReplace(String text, List<String> sourceIds, String reasonCode) implements StreamEvent {
-        @JsonProperty("type") public String type() { return "replace"; }
-    }
-    public record StreamCitation(Citation citation) implements StreamEvent {
-        @JsonProperty("type") public String type() { return "citation"; }
-    }
-    public record StreamDone(UUID messageId, String reasonCode, boolean degraded, String terminalStatus, java.time.Instant resetAt) implements StreamEvent {
-        /** Pre-resetAt arity retained for existing emitters; {@code resetAt} stays null. */
-        public StreamDone(UUID messageId, String reasonCode, boolean degraded, String terminalStatus) {
-            this(messageId, reasonCode, degraded, terminalStatus, null);
-        }
-
-        @JsonProperty("type") public String type() { return "done"; }
-    }
-    public record StreamError(String code, boolean retryable) implements StreamEvent {
-        @JsonProperty("type") public String type() { return "error"; }
-    }
-    private record LexicalResult(String answer, List<ThesisAssistantKnowledgeRepository.KnowledgeDocument> documents, List<Citation> citations, String context, boolean error, boolean ignored, List<String> sourceIds, String snapshotHash) {
-        LexicalResult(String answer, List<ThesisAssistantKnowledgeRepository.KnowledgeDocument> documents, List<Citation> citations, String context, boolean error, boolean ignored) { this(answer, documents, citations, context, error, ignored, List.of(), ""); }
+    private record LexicalResult(String answer, List<KnowledgeDocument> documents, List<Citation> citations, String context, boolean error, boolean ignored, List<String> sourceIds, String snapshotHash) {
+        LexicalResult(String answer, List<KnowledgeDocument> documents, List<Citation> citations, String context, boolean error, boolean ignored) { this(answer, documents, citations, context, error, ignored, List.of(), ""); }
     }
     private static final class InvalidSegmentException extends RuntimeException { }
 }

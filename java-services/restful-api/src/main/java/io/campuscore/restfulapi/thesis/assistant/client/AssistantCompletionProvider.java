@@ -1,5 +1,8 @@
 package io.campuscore.restfulapi.thesis.assistant.client;
 
+import io.campuscore.restfulapi.thesis.assistant.model.CompletionRequest;
+import io.campuscore.restfulapi.thesis.assistant.model.CompletionResult;
+import io.campuscore.restfulapi.thesis.assistant.model.ProviderSegment;
 import java.util.List;
 import java.util.function.Consumer;
 import java.util.function.BooleanSupplier;
@@ -22,19 +25,4 @@ public interface AssistantCompletionProvider {
         return complete(request, segmentSink);
     }
 
-    /**
-     * {@code systemPromptOverride} lets a caller swap the academic RAG prompt
-     * (e.g. the general-knowledge fallback for off-topic questions); {@code
-     * null} keeps the standard academic system prompt.
-     */
-    record CompletionRequest(String question, String locale, String context, List<String> sourceIds,
-            String systemPromptOverride) {
-        public CompletionRequest(String question, String locale, String context, List<String> sourceIds) {
-            this(question, locale, context, sourceIds, null);
-        }
-    }
-
-    record ProviderSegment(int sequence, String text, List<String> sourceIds) { }
-
-    record CompletionResult(String answer, List<ProviderSegment> segments, String finishReason) { }
 }

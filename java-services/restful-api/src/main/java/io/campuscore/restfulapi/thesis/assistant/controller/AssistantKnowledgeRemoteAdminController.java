@@ -1,9 +1,10 @@
 package io.campuscore.restfulapi.thesis.assistant.controller;
 
-import io.campuscore.restfulapi.thesis.assistant.controller.ThesisAssistantKnowledgeAdminController.KnowledgeDocumentView;
-import io.campuscore.restfulapi.thesis.assistant.controller.ThesisAssistantKnowledgeAdminController.KnowledgeRequest;
-import io.campuscore.restfulapi.thesis.assistant.controller.ThesisAssistantKnowledgeAdminController.KnowledgeRevision;
+import io.campuscore.restfulapi.thesis.assistant.dto.KnowledgeDocumentView;
+import io.campuscore.restfulapi.thesis.assistant.dto.KnowledgeRequest;
+import io.campuscore.restfulapi.thesis.assistant.dto.KnowledgeRevision;
 import io.campuscore.restfulapi.exception.DomainException;
+import io.campuscore.restfulapi.thesis.assistant.dto.SyncResult;
 import java.util.List;
 import java.util.UUID;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
@@ -127,7 +128,7 @@ public class AssistantKnowledgeRemoteAdminController {
     })
     @DeleteMapping("/{id}")
     @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN')")
-    public SupabaseKnowledgeSyncService.SyncResult archive(
+    public SyncResult archive(
             @Parameter(description = "Mã định danh (UUID)", required = true) @PathVariable UUID id,
             @AuthenticationPrincipal Jwt actor) {
         return authority.archive(id, subject(actor));
@@ -139,7 +140,7 @@ public class AssistantKnowledgeRemoteAdminController {
     })
     @PostMapping("/sync")
     @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN')")
-    public SupabaseKnowledgeSyncService.SyncResult sync(@AuthenticationPrincipal Jwt actor) {
+    public SyncResult sync(@AuthenticationPrincipal Jwt actor) {
         return authority.sync(subject(actor));
     }
 
@@ -149,7 +150,7 @@ public class AssistantKnowledgeRemoteAdminController {
     })
     @GetMapping("/sync-status")
     @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN')")
-    public SupabaseKnowledgeSyncService.SyncResult status(@AuthenticationPrincipal Jwt actor) {
+    public SyncResult status(@AuthenticationPrincipal Jwt actor) {
         return authority.status(subject(actor));
     }
 

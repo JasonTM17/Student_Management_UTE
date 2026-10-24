@@ -1,5 +1,6 @@
 package io.campuscore.restfulapi.thesis.assistant.controller;
 
+import io.campuscore.restfulapi.thesis.assistant.dto.SyncResult;
 import org.springframework.context.annotation.Profile;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -33,7 +34,7 @@ public class AssistantKnowledgeSyncController {
     })
     @PostMapping("/sync")
     @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN')")
-    public SupabaseKnowledgeSyncService.SyncResult sync() {
+    public SyncResult sync() {
         return sync.syncNow();
     }
 
@@ -43,7 +44,7 @@ public class AssistantKnowledgeSyncController {
     })
     @GetMapping("/sync-status")
     @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN')")
-    public SupabaseKnowledgeSyncService.SyncResult status() {
+    public SyncResult status() {
         return sync.status();
     }
 }

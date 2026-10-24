@@ -1,5 +1,9 @@
 package io.campuscore.restfulapi.thesis.assistant.repository;
 
+import io.campuscore.restfulapi.thesis.assistant.model.Conversation;
+import io.campuscore.restfulapi.thesis.assistant.model.ConversationPage;
+import io.campuscore.restfulapi.thesis.assistant.model.Message;
+import io.campuscore.restfulapi.thesis.assistant.model.MessagePage;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Timestamp;
@@ -272,17 +276,6 @@ public class ThesisAssistantRepository {
     private static UUID parseUuid(String value) { try { return value == null || value.isBlank() ? null : UUID.fromString(value); } catch (IllegalArgumentException ignored) { return null; } }
     private static Integer nullableInt(ResultSet rs, String column) throws SQLException { int value = rs.getInt(column); return rs.wasNull() ? null : value; }
 
-    public record Conversation(UUID id, String title, String locale, Instant createdAt, Instant updatedAt, @com.fasterxml.jackson.annotation.JsonIgnore String ownerId, String scope) {
-        public Conversation(UUID id, String title, String locale, Instant createdAt, Instant updatedAt) { this(id, title, locale, createdAt, updatedAt, null, "academic"); }
-        public Conversation(UUID id, String title, String locale, Instant createdAt, Instant updatedAt, String ownerId) { this(id, title, locale, createdAt, updatedAt, ownerId, "academic"); }
-    }
-    public record Message(UUID id, String role, String content, String model, boolean degraded, String reasonCode, Instant createdAt, List<ThesisAssistantDtos.Citation> citations, String feedback) {
-        public Message(UUID id, String role, String content, String model, boolean degraded, String reasonCode, Instant createdAt, List<ThesisAssistantDtos.Citation> citations) {
-            this(id, role, content, model, degraded, reasonCode, createdAt, citations, null);
-        }
-    }
-    public record ConversationPage(List<Conversation> data, String nextCursor) { }
-    public record MessagePage(List<Message> data, String nextCursor) { }
     private record Cursor(Instant instant, UUID id) { }
     private record BucketKey(LocalDate date, String ownerId, String scope) { }
     private static MapSqlParameterSource p() { return new MapSqlParameterSource(); }

@@ -4,15 +4,25 @@ import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
-import io.campuscore.restfulapi.thesis.assistant.controller.ThesisAssistantController.CancelResponse;
-import io.campuscore.restfulapi.thesis.assistant.controller.ThesisAssistantController.ConversationCreated;
-import io.campuscore.restfulapi.thesis.assistant.controller.ThesisAssistantController.CreateConversationRequest;
-import io.campuscore.restfulapi.thesis.assistant.controller.ThesisAssistantController.FeedbackResponse;
+import io.campuscore.restfulapi.thesis.assistant.dto.CancelResponse;
+import io.campuscore.restfulapi.thesis.assistant.dto.ConversationCreated;
+import io.campuscore.restfulapi.thesis.assistant.dto.CreateConversationRequest;
+import io.campuscore.restfulapi.thesis.assistant.dto.FeedbackResponse;
+import io.campuscore.restfulapi.thesis.assistant.dto.StreamCitation;
+import io.campuscore.restfulapi.thesis.assistant.dto.StreamDelta;
+import io.campuscore.restfulapi.thesis.assistant.dto.StreamDone;
+import io.campuscore.restfulapi.thesis.assistant.dto.StreamError;
+import io.campuscore.restfulapi.thesis.assistant.dto.StreamEvent;
+import io.campuscore.restfulapi.thesis.assistant.dto.StreamMeta;
+import io.campuscore.restfulapi.thesis.assistant.dto.StreamReplace;
 import io.campuscore.restfulapi.thesis.assistant.dto.ThesisAssistantDtos.ChatRequest;
 import io.campuscore.restfulapi.thesis.assistant.dto.ThesisAssistantDtos.ChatResponse;
 import io.campuscore.restfulapi.thesis.assistant.dto.ThesisAssistantDtos.FeedbackRequest;
 import io.campuscore.restfulapi.exception.response.ApiError;
 import io.campuscore.restfulapi.exception.DomainException;
+import io.campuscore.restfulapi.thesis.assistant.model.Conversation;
+import io.campuscore.restfulapi.thesis.assistant.model.Message;
+import io.campuscore.restfulapi.thesis.assistant.model.RemotePage;
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
@@ -114,7 +124,7 @@ public class RagAssistantGateway {
         send("DELETE", "/messages/{id}/feedback", Map.of("id", messageId.toString()), null, ownerId);
     }
 
-    public RemotePage<List<ThesisAssistantRepository.Conversation>> conversations(String ownerId, Integer limit, String cursor) {
+    public RemotePage<List<Conversation>> conversations(String ownerId, Integer limit, String cursor) {
         return conversations(ownerId, limit, cursor, null);
     }
 
@@ -123,28 +133,28 @@ public class RagAssistantGateway {
      * same corpus-pinned history as the local path — without it, both
      * panels would list mixed-scope conversations.
      */
-    public RemotePage<List<ThesisAssistantRepository.Conversation>> conversations(String ownerId, Integer limit,
+    public RemotePage<List<Conversation>> conversations(String ownerId, Integer limit,
             String cursor, String scope) {
         Map<String, String> seed = scope != null && !scope.isBlank() ? Map.of("scope", scope) : Map.of();
         return exchangeJson("GET", "/conversations", Map.of(), query(limit, cursor, seed), null, ownerId,
-                new TypeReference<List<ThesisAssistantRepository.Conversation>>() { });
+                new TypeReference<List<Conversation>>() { });
     }
 
     public ConversationCreated createConversation(CreateConversationRequest request, String ownerId) {
         return exchangeJson("POST", "/conversations", Map.of(), Map.of(), request, ownerId, new TypeReference<ConversationCreated>() { }).data();
     }
 
-    public RemotePage<List<ThesisAssistantRepository.Message>> messages(UUID conversationId, String ownerId, Integer limit, String cursor) {
+    public RemotePage<List<Message>> messages(UUID conversationId, String ownerId, Integer limit, String cursor) {
         return exchangeJson("GET", "/conversations/{id}/messages",
                 Map.of("id", conversationId.toString()), query(limit, cursor), null, ownerId,
-                new TypeReference<List<ThesisAssistantRepository.Message>>() { });
+                new TypeReference<List<Message>>() { });
     }
 
     public void deleteConversation(UUID id, String ownerId) {
         send("DELETE", "/conversations/{id}", Map.of("id", id.toString()), null, ownerId);
     }
 
-    public void stream(ChatRequest request, String ownerId, Consumer<ThesisAssistantService.StreamEvent> sink) {
+    public void stream(ChatRequest request, String ownerId, Consumer<StreamEvent> sink) {
         ensureReady();
         long deadline = System.nanoTime() + TimeUnit.MILLISECONDS.toNanos(properties.readTimeoutMs());
         HttpRequest httpRequest = requestBuilder(uri("/chat/stream", Map.of(), Map.of()), ownerId, "text/event-stream", true)
@@ -291,7 +301,7 @@ public class RagAssistantGateway {
         }
     }
 
-    private boolean parseStream(BufferedReader reader, Consumer<ThesisAssistantService.StreamEvent> sink) throws IOException {
+    private boolean parseStream(BufferedReader reader, Consumer<StreamEvent> sink) throws IOException {
         String line;
         String eventName = null;
         StringBuilder data = new StringBuilder();
@@ -319,14 +329,14 @@ public class RagAssistantGateway {
      * RAG service is older, misconfigured, or returns an answer that bypasses
      * the local service guard.
      */
-    private static Consumer<ThesisAssistantService.StreamEvent> guardedSink(
-            Consumer<ThesisAssistantService.StreamEvent> downstream, String locale, String scope) {
+    private static Consumer<StreamEvent> guardedSink(
+            Consumer<StreamEvent> downstream, String locale, String scope) {
         if (downstream == null) {
             return ignored -> { };
         }
         String normalizedLocale = AssistantInputGuard.normalizeLocale(locale);
         StringBuilder answer = new StringBuilder();
-        List<ThesisAssistantService.StreamCitation> citations = new ArrayList<>();
+        List<StreamCitation> citations = new ArrayList<>();
         Set<String> sourceIds = new LinkedHashSet<>();
         boolean[] blocked = { false };
         // Set once the first provider delta reaches the client: the done frame
@@ -334,14 +344,14 @@ public class RagAssistantGateway {
         // and renders it twice.
         boolean[] forwardedDelta = { false };
         return event -> {
-            if (event instanceof ThesisAssistantService.StreamDelta delta) {
+            if (event instanceof StreamDelta delta) {
                 if (blocked[0]) return;
                 String text = delta.text() == null ? "" : delta.text();
                 String candidate = answer + text;
                 if (!AssistantOutputGuard.isSafeForScope(candidate, scope)) {
                     blocked[0] = true;
                     answer.setLength(0);
-                    downstream.accept(new ThesisAssistantService.StreamReplace(
+                    downstream.accept(new StreamReplace(
                             ThesisAssistantService.technicalOutputMessage(normalizedLocale), List.of(),
                             "PROVIDER_UNSAFE_OUTPUT"));
                     return;
@@ -359,13 +369,13 @@ public class RagAssistantGateway {
                 }
                 return;
             }
-            if (event instanceof ThesisAssistantService.StreamReplace replace) {
+            if (event instanceof StreamReplace replace) {
                 if (blocked[0]) return;
                 String text = replace.text() == null ? "" : replace.text();
                 if (!AssistantOutputGuard.isSafeForScope(text, scope)) {
                     blocked[0] = true;
                     answer.setLength(0);
-                    downstream.accept(new ThesisAssistantService.StreamReplace(
+                    downstream.accept(new StreamReplace(
                             ThesisAssistantService.technicalOutputMessage(normalizedLocale), List.of(),
                             "PROVIDER_UNSAFE_OUTPUT"));
                     return;
@@ -383,17 +393,17 @@ public class RagAssistantGateway {
                 downstream.accept(replace);
                 return;
             }
-            if (event instanceof ThesisAssistantService.StreamCitation citation) {
+            if (event instanceof StreamCitation citation) {
                 ThesisAssistantDtos.Citation normalizedCitation = ThesisAssistantService.normalizeCitation(
                         citation.citation(), normalizedLocale);
                 if (!blocked[0] && safeCitation(normalizedCitation, scope)) {
-                    citations.add(new ThesisAssistantService.StreamCitation(normalizedCitation));
+                    citations.add(new StreamCitation(normalizedCitation));
                 }
                 return;
             }
-            if (event instanceof ThesisAssistantService.StreamDone done) {
+            if (event instanceof StreamDone done) {
                 if (blocked[0]) {
-                    downstream.accept(new ThesisAssistantService.StreamDone(
+                    downstream.accept(new StreamDone(
                             done.messageId(), "PROVIDER_UNSAFE_OUTPUT", true, done.terminalStatus()));
                     return;
                 }
@@ -404,7 +414,7 @@ public class RagAssistantGateway {
                     String normalized = ThesisAssistantService.normalizeAssistantCopy(
                             answer.toString(), normalizedLocale);
                     if (normalized != null && !normalized.isBlank()) {
-                        downstream.accept(new ThesisAssistantService.StreamDelta(
+                        downstream.accept(new StreamDelta(
                                 0, normalized, noMatch ? List.of() : List.copyOf(sourceIds)));
                     }
                 }
@@ -450,26 +460,26 @@ public class RagAssistantGateway {
                 && AssistantOutputGuard.isSafeForScope(citation.source(), scope);
     }
 
-    private boolean emit(String eventName, String payload, Consumer<ThesisAssistantService.StreamEvent> sink) throws IOException {
+    private boolean emit(String eventName, String payload, Consumer<StreamEvent> sink) throws IOException {
         if (eventName == null || eventName.isBlank() || payload == null || payload.isBlank()) {
             return false;
         }
-        ThesisAssistantService.StreamEvent event = switch (eventName) {
-            case "meta" -> decode(payload, ThesisAssistantService.StreamMeta.class);
-            case "delta" -> decode(payload, ThesisAssistantService.StreamDelta.class);
-            case "replace" -> decode(payload, ThesisAssistantService.StreamReplace.class);
-            case "citation" -> decode(payload, ThesisAssistantService.StreamCitation.class);
-            case "done" -> decode(payload, ThesisAssistantService.StreamDone.class);
-            case "error" -> decode(payload, ThesisAssistantService.StreamError.class);
+        StreamEvent event = switch (eventName) {
+            case "meta" -> decode(payload, StreamMeta.class);
+            case "delta" -> decode(payload, StreamDelta.class);
+            case "replace" -> decode(payload, StreamReplace.class);
+            case "citation" -> decode(payload, StreamCitation.class);
+            case "done" -> decode(payload, StreamDone.class);
+            case "error" -> decode(payload, StreamError.class);
             default -> null;
         };
         if (event != null && sink != null) {
             sink.accept(event);
         }
-        return event instanceof ThesisAssistantService.StreamDone || event instanceof ThesisAssistantService.StreamError;
+        return event instanceof StreamDone || event instanceof StreamError;
     }
 
-    private <T extends ThesisAssistantService.StreamEvent> T decode(String payload, Class<T> type) throws IOException {
+    private <T extends StreamEvent> T decode(String payload, Class<T> type) throws IOException {
         JsonNode node = objectMapper.readTree(payload);
         if (node instanceof ObjectNode objectNode) {
             objectNode.remove("type");
@@ -506,5 +516,4 @@ public class RagAssistantGateway {
         return statusCode >= 200 && statusCode < 300;
     }
 
-    public record RemotePage<T>(T data, String nextCursor) { }
 }

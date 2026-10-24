@@ -3,6 +3,7 @@ package io.campuscore.restfulapi.thesis.assistant.service;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import io.campuscore.restfulapi.thesis.assistant.model.KnowledgeDocument;
 import java.util.List;
 import org.junit.jupiter.api.Test;
 import io.campuscore.restfulapi.thesis.assistant.repository.ThesisAssistantKnowledgeRepository;
@@ -114,8 +115,8 @@ class AssistantDifficultyRouterTest {
         assertFalse(AssistantDifficultyRouter.requiresSynthesis("Câu hỏi bất kỳ", null));
     }
 
-    private static ThesisAssistantKnowledgeRepository.KnowledgeDocument document(String domain) {
-        return new ThesisAssistantKnowledgeRepository.KnowledgeDocument(
+    private static KnowledgeDocument document(String domain) {
+        return new KnowledgeDocument(
                 "source-1", "source-1", "vi", "Title", "Content", "seed", domain,
                 null, null, null, null, null, null, null, null);
     }

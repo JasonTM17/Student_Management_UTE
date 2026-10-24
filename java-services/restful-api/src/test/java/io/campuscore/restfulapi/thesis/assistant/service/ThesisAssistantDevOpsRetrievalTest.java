@@ -12,6 +12,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import io.campuscore.restfulapi.thesis.assistant.dto.ThesisAssistantDtos.ChatResponse;
+import io.campuscore.restfulapi.thesis.assistant.model.KnowledgeDocument;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
@@ -87,8 +88,8 @@ class ThesisAssistantDevOpsRetrievalTest {
     void ciCdQuestionRetrievesTheSeededDevOpsDocument() {
         ThesisAssistantKnowledgeRepository knowledge = mock(ThesisAssistantKnowledgeRepository.class);
         String seeded = seededDevOpsDocumentText().toLowerCase(java.util.Locale.ROOT);
-        List<ThesisAssistantKnowledgeRepository.KnowledgeDocument> devops = List.of(
-                new ThesisAssistantKnowledgeRepository.KnowledgeDocument(
+        List<KnowledgeDocument> devops = List.of(
+                new KnowledgeDocument(
                         "77777777-7777-7777-7777-777777777777", DEVOPS_SLUG, "en",
                         "DevOps for students: Docker, CI/CD and reproducible runtime environments",
                         seeded, "office", "SPECIALIZED", null, null, null, null, null, null, null, null, 30));

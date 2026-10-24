@@ -12,6 +12,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import io.campuscore.restfulapi.thesis.assistant.dto.ThesisAssistantDtos.ChatResponse;
+import io.campuscore.restfulapi.thesis.assistant.model.KnowledgeDocument;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
@@ -62,8 +63,8 @@ class ThesisAssistantCsdlRetrievalTest {
     void csdlQuestionRetrievesTheSeededDocument() {
         ThesisAssistantKnowledgeRepository knowledge = mock(ThesisAssistantKnowledgeRepository.class);
         String seeded = seededCsdlDocumentText().toLowerCase(Locale.ROOT);
-        List<ThesisAssistantKnowledgeRepository.KnowledgeDocument> documents = List.of(
-                new ThesisAssistantKnowledgeRepository.KnowledgeDocument(
+        List<KnowledgeDocument> documents = List.of(
+                new KnowledgeDocument(
                         "88888888-8888-8888-8888-888888888888", CSDL_SLUG, "vi",
                         "Thiết kế cơ sở dữ liệu quan hệ và tối ưu truy vấn SQL",
                         seeded, "office", "SPECIALIZED", null, null, null, null, null, null, null, null, 30));

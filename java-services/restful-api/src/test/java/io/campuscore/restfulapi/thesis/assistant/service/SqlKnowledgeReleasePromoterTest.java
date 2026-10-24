@@ -5,6 +5,7 @@ import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import io.campuscore.restfulapi.exception.DomainException;
+import io.campuscore.restfulapi.thesis.assistant.dto.KnowledgeRequest;
 import java.time.Instant;
 import java.util.Map;
 import java.util.UUID;
@@ -68,7 +69,7 @@ class SqlKnowledgeReleasePromoterTest {
 
     @Test
     void secondAdminPublishAndArchiveSwitchOnlyTheActiveImmutableRelease() {
-        var request = new ThesisAssistantKnowledgeAdminController.KnowledgeRequest(
+        var request = new KnowledgeRequest(
                 "test-registration-rule", "en", "Registration rule", "Public registration guidance", "academic office", 10, "REGISTRATION");
         UUID document = tx(() -> controller.create(request, actor("admin-a"))).documentId();
         tx(() -> controller.submit(document, actor("admin-a")));
@@ -94,7 +95,7 @@ class SqlKnowledgeReleasePromoterTest {
     @Test
     void supabaseOwnedPointerRejectsLocalPublishAndRollsBackAuthoring() {
         raw.update("UPDATE assistant.knowledge_release SET source='SUPABASE' WHERE id=?", initialRelease);
-        var request = new ThesisAssistantKnowledgeAdminController.KnowledgeRequest(
+        var request = new KnowledgeRequest(
                 "test-authority-boundary", "en", "Public notice", "Public semester notice", "academic office", 10, "ANNOUNCEMENT");
         UUID document = tx(() -> controller.create(request, actor("admin-a"))).documentId();
         tx(() -> controller.submit(document, actor("admin-a")));
@@ -108,7 +109,7 @@ class SqlKnowledgeReleasePromoterTest {
 
     @Test
     void archivedDocumentRejectsPublishWithConflict() {
-        var request = new ThesisAssistantKnowledgeAdminController.KnowledgeRequest(
+        var request = new KnowledgeRequest(
                 "test-archive-resurrection", "en", "Archive rule", "Public archive guidance", "academic office", 10, "REGISTRATION");
         UUID document = tx(() -> controller.create(request, actor("admin-a"))).documentId();
         tx(() -> controller.submit(document, actor("admin-a")));
@@ -124,7 +125,7 @@ class SqlKnowledgeReleasePromoterTest {
 
     @Test
     void listProjectionOmitsContentWhileGetIncludesIt() {
-        var request = new ThesisAssistantKnowledgeAdminController.KnowledgeRequest(
+        var request = new KnowledgeRequest(
                 "test-list-projection", "en", "Projection test", "Detailed guidance body content", "academic office", 10, "REGISTRATION");
         UUID document = tx(() -> controller.create(request, actor("admin-a"))).documentId();
 

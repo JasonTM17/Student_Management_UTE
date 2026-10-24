@@ -1,5 +1,6 @@
 package io.campuscore.restfulapi.thesis.assistant.repository;
 
+import io.campuscore.restfulapi.thesis.assistant.model.CatalogDocument;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.ArrayList;
@@ -56,5 +57,4 @@ public class ThesisAssistantCatalogRepository {
                 rs.getString("public_text"), rs.getTimestamp("updated_at"));
     }
 
-    public record CatalogDocument(String entityType, String entityId, String title, String text, java.sql.Timestamp updatedAt) { }
 }

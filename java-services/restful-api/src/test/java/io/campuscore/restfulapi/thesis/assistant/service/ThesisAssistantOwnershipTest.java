@@ -4,6 +4,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.*;
+import io.campuscore.restfulapi.thesis.assistant.model.KnowledgeDocument;
 import java.util.List;
 import java.util.UUID;
 import org.springframework.dao.DataAccessResourceFailureException;
@@ -22,7 +23,7 @@ class ThesisAssistantOwnershipTest {
         ThesisAssistantRepository history = mock(ThesisAssistantRepository.class);
         // Two-term corroboration ("học" + "phí" both whole-word hits) keeps the
         // confident-gate honest while still reaching the quota path.
-        var document = new ThesisAssistantKnowledgeRepository.KnowledgeDocument(
+        var document = new KnowledgeDocument(
                 "11111111-1111-1111-1111-111111111111", "hoc-phi", "vi", "Học phí học kỳ",
                 "Grounded context", "office", "THESIS", null, null, null, null, null, null, null, null, 30);
         when(knowledge.search(anyString(), any(), anyInt())).thenReturn(List.of(document));
@@ -46,7 +47,7 @@ class ThesisAssistantOwnershipTest {
     void historyOutageFallsBackToGroundedLexicalAnswer() {
         ThesisAssistantKnowledgeRepository knowledge = mock(ThesisAssistantKnowledgeRepository.class);
         ThesisAssistantRepository history = mock(ThesisAssistantRepository.class);
-        var document = new ThesisAssistantKnowledgeRepository.KnowledgeDocument(
+        var document = new KnowledgeDocument(
                 "11111111-1111-1111-1111-111111111111", "hoc-phi", "vi", "Học phí học kỳ",
                 "Grounded context", "office", "THESIS", null, null, null, null, null, null, null, null, 30);
         when(knowledge.search(anyString(), any(), anyInt())).thenReturn(List.of(document));
@@ -71,7 +72,7 @@ class ThesisAssistantOwnershipTest {
         ThesisAssistantKnowledgeRepository knowledge = mock(ThesisAssistantKnowledgeRepository.class);
         DeepSeekClient provider = mock(DeepSeekClient.class);
         ThesisAssistantRepository history = mock(ThesisAssistantRepository.class);
-        var document = new ThesisAssistantKnowledgeRepository.KnowledgeDocument(
+        var document = new KnowledgeDocument(
                 "11111111-1111-1111-1111-111111111111", "hoc-phi", "vi", "Học phí học kỳ",
                 "Grounded context", "office", "THESIS", null, null, null, null, null, null, null, null, 30);
         when(knowledge.search(anyString(), any(), anyInt())).thenReturn(List.of(document));
@@ -101,7 +102,7 @@ class ThesisAssistantOwnershipTest {
         ThesisAssistantKnowledgeRepository knowledge = mock(ThesisAssistantKnowledgeRepository.class);
         DeepSeekClient provider = mock(DeepSeekClient.class);
         ThesisAssistantRepository history = mock(ThesisAssistantRepository.class);
-        var document = new ThesisAssistantKnowledgeRepository.KnowledgeDocument(
+        var document = new KnowledgeDocument(
                 "11111111-1111-1111-1111-111111111111", "hoc-phi", "vi", "Học phí học kỳ",
                 "Grounded context", "office", "THESIS", null, null, null, null, null, null, null, null, 30);
         when(knowledge.search(anyString(), any(), anyInt())).thenReturn(List.of(document));
@@ -137,7 +138,7 @@ class ThesisAssistantOwnershipTest {
         DeepSeekClient provider = mock(DeepSeekClient.class);
         ThesisAssistantRepository history = mock(ThesisAssistantRepository.class);
         String sourceId = "11111111-1111-1111-1111-111111111111";
-        var document = new ThesisAssistantKnowledgeRepository.KnowledgeDocument(
+        var document = new KnowledgeDocument(
                 sourceId, "hoc-phi", "vi", "Học phí học kỳ",
                 "Grounded context", "office", "THESIS", null, null, null, null, null, null, null, null, 30);
         when(knowledge.search(anyString(), any(), anyInt())).thenReturn(List.of(document));

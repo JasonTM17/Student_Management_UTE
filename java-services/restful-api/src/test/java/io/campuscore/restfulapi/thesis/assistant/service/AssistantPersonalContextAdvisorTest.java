@@ -29,6 +29,10 @@ import io.campuscore.restfulapi.academic.dto.AcademicEnrollmentReadDtos.SectionS
 import io.campuscore.restfulapi.academic.dto.AcademicEnrollmentReadDtos.SemesterSummary;
 import io.campuscore.restfulapi.academic.dto.AcademicSectionReadDtos.LecturerGradingSectionResponse;
 import io.campuscore.restfulapi.academic.dto.AcademicSectionReadDtos.LecturerScheduleResponse;
+import io.campuscore.restfulapi.thesis.assistant.dto.StreamDone;
+import io.campuscore.restfulapi.thesis.assistant.dto.StreamEvent;
+import io.campuscore.restfulapi.thesis.assistant.dto.StreamMeta;
+import io.campuscore.restfulapi.thesis.assistant.dto.StreamReplace;
 import io.campuscore.restfulapi.thesis.assistant.dto.ThesisAssistantDtos.ChatRequest;
 import io.campuscore.restfulapi.thesis.assistant.dto.ThesisAssistantDtos.ChatResponse;
 import io.campuscore.restfulapi.thesis.dto.CouncilAssignment;
@@ -731,18 +735,18 @@ class AssistantPersonalContextAdvisorTest {
         UUID clientRequestId = UUID.randomUUID();
         ChatRequest request = new ChatRequest("Lịch học của tôi tuần này?", "vi", clientRequestId, null);
         ChatResponse response = advisor.answer(request, jwtStudent());
-        List<ThesisAssistantService.StreamEvent> events = new ArrayList<>();
+        List<StreamEvent> events = new ArrayList<>();
 
         advisor.stream(response, request, events::add);
 
         // Kongming F10: JSON/SSE parity — the streamed meta must echo the
         // clientRequestId exactly like the JSON response does.
-        assertTrue(events.stream().anyMatch(event -> event instanceof ThesisAssistantService.StreamMeta meta
+        assertTrue(events.stream().anyMatch(event -> event instanceof StreamMeta meta
                 && clientRequestId.equals(meta.clientRequestId())));
-        assertTrue(events.stream().anyMatch(event -> event instanceof ThesisAssistantService.StreamReplace replace
+        assertTrue(events.stream().anyMatch(event -> event instanceof StreamReplace replace
                 && replace.text().equals(response.answer())
                 && "PERSONAL_CONTEXT".equals(replace.reasonCode())));
-        assertTrue(events.stream().anyMatch(event -> event instanceof ThesisAssistantService.StreamDone done
+        assertTrue(events.stream().anyMatch(event -> event instanceof StreamDone done
                 && "PERSONAL_CONTEXT".equals(done.reasonCode())
                 && !done.degraded()));
         org.mockito.Mockito.verify(enrollmentService).findStudentEnrollments("student-profile", null);
@@ -2682,16 +2686,16 @@ class AssistantPersonalContextAdvisorTest {
         // the JSON route returns.
         ChatRequest request = chatRequest("vi", "Điểm của Nam là bao nhiêu?");
         ChatResponse refusal = advisor.privacyRefusal(request);
-        List<ThesisAssistantService.StreamEvent> events = new ArrayList<>();
+        List<StreamEvent> events = new ArrayList<>();
 
         advisor.stream(refusal, request, events::add);
 
-        assertTrue(events.stream().anyMatch(event -> event instanceof ThesisAssistantService.StreamMeta meta
+        assertTrue(events.stream().anyMatch(event -> event instanceof StreamMeta meta
                 && request.clientRequestId().equals(meta.clientRequestId())));
-        assertTrue(events.stream().anyMatch(event -> event instanceof ThesisAssistantService.StreamReplace replace
+        assertTrue(events.stream().anyMatch(event -> event instanceof StreamReplace replace
                 && "PRIVACY_REFUSAL".equals(replace.reasonCode())
                 && replace.text().equals(refusal.answer())));
-        assertTrue(events.stream().anyMatch(event -> event instanceof ThesisAssistantService.StreamDone done
+        assertTrue(events.stream().anyMatch(event -> event instanceof StreamDone done
                 && "PRIVACY_REFUSAL".equals(done.reasonCode())
                 && "REJECTED".equals(done.terminalStatus())));
     }

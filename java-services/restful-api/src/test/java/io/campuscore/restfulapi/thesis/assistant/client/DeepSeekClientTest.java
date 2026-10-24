@@ -3,6 +3,8 @@ package io.campuscore.restfulapi.thesis.assistant.client;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import io.campuscore.restfulapi.thesis.assistant.model.CompletionRequest;
+import io.campuscore.restfulapi.thesis.assistant.model.ProviderSegment;
 import java.io.ByteArrayInputStream;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
@@ -43,7 +45,7 @@ class DeepSeekClientTest {
     void whitespaceOnlyTokensPreserveWordAndParagraphBoundariesWithoutBlankSegments() {
         DeepSeekClient client = new DeepSeekClient(new DeepSeekProperties(false, "",
                 "https://api.deepseek.com", "deepseek-v4-flash", 8000, 800), new ObjectMapper());
-        var request = new AssistantCompletionProvider.CompletionRequest("question", "vi", "context", List.of("source-1"));
+        var request = new CompletionRequest("question", "vi", "context", List.of("source-1"));
         StringBuilder wire = new StringBuilder();
         for (String text : List.of("lợi", " ", "ích", "\n\n", "Tối", " ", "ưu", " ", "SE421", " ", "A-101")) {
             wire.append("data: {\"choices\":[{\"delta\":{\"content\":")
@@ -51,11 +53,11 @@ class DeepSeekClientTest {
         }
         wire.append("data: {\"choices\":[{\"delta\":{},\"finish_reason\":\"stop\"}]}\n\n")
                 .append("data: [DONE]\n\n");
-        var emitted = new ArrayList<AssistantCompletionProvider.ProviderSegment>();
+        var emitted = new ArrayList<ProviderSegment>();
         var result = client.parseBody(new ByteArrayInputStream(wire.toString().getBytes(StandardCharsets.UTF_8)),
                 request, emitted::add, () -> false, Instant.now().plusSeconds(2));
         assertEquals("lợi ích\n\nTối ưu SE421 A-101", result.answer());
-        assertEquals(result.answer(), emitted.stream().map(AssistantCompletionProvider.ProviderSegment::text)
+        assertEquals(result.answer(), emitted.stream().map(ProviderSegment::text)
                 .collect(java.util.stream.Collectors.joining()));
         assertEquals(6, emitted.size());
         for (int index = 0; index < emitted.size(); index++) {
@@ -85,7 +87,7 @@ class DeepSeekClientTest {
     void providerStreamRequiresDoneMarkerAndTerminalStopReason() {
         DeepSeekProperties properties = new DeepSeekProperties(false, "", "https://api.deepseek.com", "deepseek-v4-flash", 8000, 800);
         DeepSeekClient client = new DeepSeekClient(properties, new ObjectMapper());
-        var request = new AssistantCompletionProvider.CompletionRequest("question", "en", "context", List.of("source-1"));
+        var request = new CompletionRequest("question", "en", "context", List.of("source-1"));
         String missingDone = "data: {\"choices\":[{\"delta\":{\"content\":\"answer\"},\"finish_reason\":\"stop\"}]}\n\n";
         ProviderUnavailableException exception = assertThrows(ProviderUnavailableException.class,
                 () -> client.parseBody(new ByteArrayInputStream(missingDone.getBytes(StandardCharsets.UTF_8)), request,

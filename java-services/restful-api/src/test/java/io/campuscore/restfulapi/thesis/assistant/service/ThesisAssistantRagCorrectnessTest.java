@@ -14,10 +14,15 @@ import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import io.campuscore.restfulapi.thesis.assistant.dto.ThesisAssistantDtos.ChatResponse;
-import io.campuscore.restfulapi.thesis.assistant.service.ThesisAssistantService.StreamDelta;
-import io.campuscore.restfulapi.thesis.assistant.service.ThesisAssistantService.StreamDone;
-import io.campuscore.restfulapi.thesis.assistant.service.ThesisAssistantService.StreamEvent;
-import io.campuscore.restfulapi.thesis.assistant.service.ThesisAssistantService.StreamMeta;
+import io.campuscore.restfulapi.thesis.assistant.model.DispatchDecision;
+import io.campuscore.restfulapi.thesis.assistant.model.KnowledgeDocument;
+import io.campuscore.restfulapi.thesis.assistant.model.Reservation;
+import io.campuscore.restfulapi.thesis.assistant.model.ReservationStatus;
+import io.campuscore.restfulapi.thesis.assistant.model.TerminalResult;
+import io.campuscore.restfulapi.thesis.assistant.dto.StreamDelta;
+import io.campuscore.restfulapi.thesis.assistant.dto.StreamDone;
+import io.campuscore.restfulapi.thesis.assistant.dto.StreamEvent;
+import io.campuscore.restfulapi.thesis.assistant.dto.StreamMeta;
 import io.campuscore.restfulapi.exception.DomainException;
 import java.time.Instant;
 import java.time.LocalDate;
@@ -54,8 +59,8 @@ class ThesisAssistantRagCorrectnessTest {
                 new AssistantProperties(6000, 2000, 20, 200, 90, true));
     }
 
-    private ThesisAssistantKnowledgeRepository.KnowledgeDocument document(String slug, String title, String content) {
-        return new ThesisAssistantKnowledgeRepository.KnowledgeDocument(
+    private KnowledgeDocument document(String slug, String title, String content) {
+        return new KnowledgeDocument(
                 "11111111-1111-1111-1111-" + "111111111111", slug, "en", title, content, "office");
     }
 
@@ -77,18 +82,18 @@ class ThesisAssistantRagCorrectnessTest {
         UUID message = UUID.randomUUID();
         when(turns.reserve(anyString(), eq(request), anyString(), isNull(), eq("en"), anyString(), anyInt(),
                 any(java.util.function.Consumer.class)))
-                .thenReturn(new ThesisAssistantTurnRepository.Reservation(
-                        ThesisAssistantTurnRepository.ReservationStatus.NEW, turn, conversation, 1L, true, null, null, false));
+                .thenReturn(new Reservation(
+                        ReservationStatus.NEW, turn, conversation, 1L, true, null, null, false));
         when(turns.markSnapshotReady(eq(turn), anyString(), eq(1L), anyString(),
                 any(java.util.function.Consumer.class))).thenReturn(true);
         // The repository keeps the turn SNAPSHOT_READY and reports the quota block.
         when(turns.dispatch(eq(turn), anyString(), eq(1L), anyInt(), anyInt(),
                 any(java.util.function.Consumer.class)))
-                .thenReturn(new ThesisAssistantTurnRepository.DispatchDecision(false, false, "QUOTA_EXCEEDED"));
+                .thenReturn(new DispatchDecision(false, false, "QUOTA_EXCEEDED"));
         when(turns.complete(eq(turn), anyString(), eq(1L), anyString(), eq("curated-lexical-rag"),
                 anyString(), eq(true), eq("QUOTA_EXCEEDED"), anyList(),
                 any(java.util.function.Consumer.class)))
-                .thenReturn(new ThesisAssistantTurnRepository.TerminalResult(
+                .thenReturn(new TerminalResult(
                         conversation, message, "Deferring results preserves credits.",
                         "curated-lexical-rag", true, "QUOTA_EXCEEDED", List.of(), false, "COMPLETED"));
 
@@ -161,7 +166,7 @@ class ThesisAssistantRagCorrectnessTest {
     void contextNearLimitContainsOnlyCompleteDocuments() {
         String docOneContent = "First document sentence one. First document sentence two. Final sentence of one.";
         String docTwoContent = "Second document opens here. Second document continues with more words and never fits.";
-        List<ThesisAssistantKnowledgeRepository.KnowledgeDocument> documents = List.of(
+        List<KnowledgeDocument> documents = List.of(
                 document("doc-one", "Doc One", docOneContent),
                 document("doc-two", "Doc Two", docTwoContent));
         // Budget fits document one's whole block but not document two's.
@@ -181,7 +186,7 @@ class ThesisAssistantRagCorrectnessTest {
     @DisplayName("CB-P2-7: a single oversized document truncates at a sentence boundary, never mid-sentence")
     void singleOversizedDocumentTruncatesAtSentenceBoundary() {
         String content = "Short opener. " + "A deliberately long sentence that will not fit inside the budget. ".repeat(6);
-        List<ThesisAssistantKnowledgeRepository.KnowledgeDocument> documents = List.of(
+        List<KnowledgeDocument> documents = List.of(
                 document("big-doc", "Big Doc", content));
 
         String context = ThesisAssistantService.buildGroundedContext(documents, 80);

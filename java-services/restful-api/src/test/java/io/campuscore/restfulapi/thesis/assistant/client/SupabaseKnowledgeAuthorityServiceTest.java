@@ -10,9 +10,10 @@ import static org.mockito.Mockito.verify;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import io.campuscore.restfulapi.thesis.assistant.controller.ThesisAssistantKnowledgeAdminController.KnowledgeRequest;
-import io.campuscore.restfulapi.thesis.assistant.controller.ThesisAssistantKnowledgeAdminController.KnowledgeRevision;
+import io.campuscore.restfulapi.thesis.assistant.dto.KnowledgeRequest;
+import io.campuscore.restfulapi.thesis.assistant.dto.KnowledgeRevision;
 import io.campuscore.restfulapi.exception.DomainException;
+import io.campuscore.restfulapi.thesis.assistant.dto.SyncResult;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
@@ -106,7 +107,7 @@ class SupabaseKnowledgeAuthorityServiceTest {
         SupabaseKnowledgeInternalController controller = new SupabaseKnowledgeInternalController(authority, sync, rag,
                 false);
         UUID document = UUID.randomUUID();
-        when(sync.syncNow()).thenReturn(SupabaseKnowledgeSyncService.SyncResult.failed("Sync unavailable"));
+        when(sync.syncNow()).thenReturn(SyncResult.failed("Sync unavailable"));
 
         var result = controller.archive(document, "expected-token", "admin-b");
 

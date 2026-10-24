@@ -5,6 +5,10 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import io.campuscore.restfulapi.thesis.assistant.model.ExpiredLease;
+import io.campuscore.restfulapi.thesis.assistant.model.Reservation;
+import io.campuscore.restfulapi.thesis.assistant.model.ReservationStatus;
+import io.campuscore.restfulapi.thesis.assistant.model.TurnRow;
 import java.util.ArrayList;
 import java.sql.Timestamp;
 import java.time.Instant;
@@ -63,7 +67,7 @@ class ThesisAssistantTurnLedgerPostgresIT {
         CountDownLatch ready = new CountDownLatch(8);
         CountDownLatch start = new CountDownLatch(1);
         ExecutorService pool = Executors.newFixedThreadPool(8);
-        List<Future<ThesisAssistantTurnRepository.Reservation>> futures = new ArrayList<>();
+        List<Future<Reservation>> futures = new ArrayList<>();
         for (int i = 0; i < 8; i++) {
             futures.add(pool.submit(() -> {
                 ready.countDown();
@@ -78,7 +82,7 @@ class ThesisAssistantTurnLedgerPostgresIT {
 
         assertEquals(1, count("SELECT COUNT(*) FROM assistant.chat_turn_ledger WHERE owner_id=:owner", owner));
         assertEquals(1, count("SELECT COUNT(*) FROM assistant.chat_conversation WHERE owner_id=:owner", owner));
-        ThesisAssistantTurnRepository.TurnRow row = turns.findByRequest(owner, request);
+        TurnRow row = turns.findByRequest(owner, request);
         assertNotNull(row);
         int globalBefore = count("SELECT request_count FROM assistant.usage_bucket WHERE owner_id=:owner AND scope='GLOBAL'", "*");
         assertTrue(tx(() -> turns.markSnapshotReady(row.turnId(), owner, row.leaseGeneration(), "a".repeat(64))));
@@ -206,14 +210,14 @@ class ThesisAssistantTurnLedgerPostgresIT {
                         .addValue("turn", reservation.turnId())
                         .addValue("expired", Timestamp.from(Instant.now().minusSeconds(1))));
 
-        List<ThesisAssistantTurnRepository.ExpiredLease> recovered = tx(() -> turns.recoverExpiredLeases());
+        List<ExpiredLease> recovered = tx(() -> turns.recoverExpiredLeases());
         assertTrue(recovered.stream().anyMatch(lease -> lease.turnId().equals(reservation.turnId())
                 && "FAILED_AMBIGUOUS".equals(lease.terminalState())));
         assertEquals("FAILED_AMBIGUOUS", jdbc.queryForObject(
                 "SELECT state FROM assistant.chat_turn_ledger WHERE turn_id=:turn",
                 java.util.Map.of("turn", reservation.turnId()), String.class));
         assertEquals(1, count("SELECT request_count FROM assistant.usage_bucket WHERE owner_id=:owner AND scope='USER'", owner));
-        assertEquals(ThesisAssistantTurnRepository.ReservationStatus.AMBIGUOUS,
+        assertEquals(ReservationStatus.AMBIGUOUS,
                 tx(() -> turns.reserve(owner, request, hash(request), null, "vi", "retry", 90)).status());
     }
 
@@ -245,7 +249,7 @@ class ThesisAssistantTurnLedgerPostgresIT {
         assertEquals(1, count("SELECT request_count FROM assistant.usage_bucket WHERE owner_id=:owner AND scope='USER'", owner));
         assertFalse(registry.emitIfActive(owner, request, reservation.leaseGeneration(),
                 () -> { throw new AssertionError("expired dispatched generation emitted after cancel recovery"); }));
-        assertEquals(ThesisAssistantTurnRepository.ReservationStatus.AMBIGUOUS,
+        assertEquals(ReservationStatus.AMBIGUOUS,
                 tx(() -> turns.reserve(owner, request, hash(request), null, "vi", "retry", 90)).status());
     }
 
