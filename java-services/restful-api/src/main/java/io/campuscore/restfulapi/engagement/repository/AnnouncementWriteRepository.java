@@ -1,10 +1,10 @@
 package io.campuscore.restfulapi.engagement.repository;
 
-import io.campuscore.restfulapi.engagement.web.AnnouncementReadDtos.AnnouncementResponse;
-import io.campuscore.restfulapi.engagement.web.AnnouncementReadDtos.CourseSummary;
-import io.campuscore.restfulapi.engagement.web.AnnouncementReadDtos.LecturerSummary;
-import io.campuscore.restfulapi.engagement.web.AnnouncementReadDtos.SectionSummary;
-import io.campuscore.restfulapi.engagement.web.AnnouncementReadDtos.SemesterSummary;
+import io.campuscore.restfulapi.engagement.dto.AnnouncementReadDtos.AnnouncementResponse;
+import io.campuscore.restfulapi.engagement.dto.AnnouncementReadDtos.CourseSummary;
+import io.campuscore.restfulapi.engagement.dto.AnnouncementReadDtos.LecturerSummary;
+import io.campuscore.restfulapi.engagement.dto.AnnouncementReadDtos.SectionSummary;
+import io.campuscore.restfulapi.engagement.dto.AnnouncementReadDtos.SemesterSummary;
 import java.sql.Array;
 import java.sql.Connection;
 import java.sql.PreparedStatement;

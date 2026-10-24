@@ -1,4 +1,4 @@
-package io.campuscore.restfulapi.engagement;
+package io.campuscore.restfulapi.engagement.controller;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -16,12 +16,12 @@ import io.campuscore.restfulapi.engagement.repository.ArticleAttachmentRepositor
 import io.campuscore.restfulapi.engagement.repository.ArticleCategoryRepository;
 import io.campuscore.restfulapi.engagement.repository.ArticleMediaGalleryRepository;
 import io.campuscore.restfulapi.engagement.repository.ArticleTagRepository;
-import io.campuscore.restfulapi.engagement.web.ArticleTaxonomyController;
-import io.campuscore.restfulapi.engagement.web.ArticleTaxonomyDtos.AttachmentDto;
-import io.campuscore.restfulapi.engagement.web.ArticleTaxonomyDtos.AttachmentListResponse;
-import io.campuscore.restfulapi.engagement.web.ArticleTaxonomyDtos.CategoryDto;
-import io.campuscore.restfulapi.engagement.web.ArticleTaxonomyDtos.MediaGalleryListResponse;
-import io.campuscore.restfulapi.engagement.web.ArticleTaxonomyDtos.TagDto;
+import io.campuscore.restfulapi.engagement.controller.ArticleTaxonomyController;
+import io.campuscore.restfulapi.engagement.dto.ArticleTaxonomyDtos.AttachmentDto;
+import io.campuscore.restfulapi.engagement.dto.ArticleTaxonomyDtos.AttachmentListResponse;
+import io.campuscore.restfulapi.engagement.dto.ArticleTaxonomyDtos.CategoryDto;
+import io.campuscore.restfulapi.engagement.dto.ArticleTaxonomyDtos.MediaGalleryListResponse;
+import io.campuscore.restfulapi.engagement.dto.ArticleTaxonomyDtos.TagDto;
 import java.util.List;
 import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;

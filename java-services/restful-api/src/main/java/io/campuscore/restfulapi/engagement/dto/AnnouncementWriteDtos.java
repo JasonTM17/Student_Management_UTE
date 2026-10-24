@@ -1,4 +1,4 @@
-package io.campuscore.restfulapi.engagement.web;
+package io.campuscore.restfulapi.engagement.dto;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;

@@ -1,7 +1,7 @@
-package io.campuscore.restfulapi.engagement.service;
+package io.campuscore.restfulapi.engagement.job;
 
 import io.campuscore.restfulapi.engagement.repository.AnnouncementWriteRepository;
-import io.campuscore.restfulapi.engagement.web.AnnouncementReadDtos.AnnouncementResponse;
+import io.campuscore.restfulapi.engagement.dto.AnnouncementReadDtos.AnnouncementResponse;
 import java.time.Clock;
 import java.time.Instant;
 import java.util.List;
@@ -13,6 +13,7 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Profile;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
+import io.campuscore.restfulapi.engagement.service.AnnouncementStudentNotifier;
 
 /**
  * Refires the student inbox fan-out for announcements created with a future
