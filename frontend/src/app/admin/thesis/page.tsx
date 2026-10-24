@@ -33,7 +33,11 @@ import { metricToneClass, statusToneClass } from '@/components/ui/status';
 import { cn } from '@/lib/utils';
 import { toThesisLocalInput as toLocalInput } from '@/lib/thesis-datetime';
 import { planThesisRoundRestore, sortThesisRoundsForOverview } from '@/lib/thesis-round';
-import { reviewerConflict } from '@/lib/thesis-picker-rules';
+import {
+  assignTopicConflict,
+  councilMemberConflict,
+  reviewerConflict,
+} from '@/lib/thesis-picker-rules';
 import {
   EmptyState,
   ForbiddenState,
@@ -1486,6 +1490,23 @@ export default function AdminThesisPage() {
                                             setModalError('');
                                             setTargetCouncilIdForTopic(council.id);
                                             setTargetRoundIdForCouncil(round.id);
+                                            // Warm supervisor rows for every
+                                            // topic the modal may offer so the
+                                            // disabled reasons land together.
+                                            const assigned = new Set(
+                                              councils.flatMap((c) => c.topicIds ?? []),
+                                            );
+                                            ensureTopicSupervisors(
+                                              topics
+                                                .filter(
+                                                  (t) =>
+                                                    !assigned.has(t.id) &&
+                                                    t.finalScore == null &&
+                                                    (t.status === 'PUBLISHED' ||
+                                                      t.status === 'APPROVED'),
+                                                )
+                                                .map((t) => t.id),
+                                            );
                                             setShowAssignTopicModal(true);
                                           }}
                                         >
@@ -1884,6 +1905,9 @@ export default function AdminThesisPage() {
 
             const existingLecturerIds = new Set(members.map((m) => m.lecturerId));
             const availableLecturers = lecturers.filter((l) => !existingLecturerIds.has(l.id));
+            const councilTopics = (activeCouncil?.topicIds ?? [])
+              .map((tid) => topics.find((t) => t.id === tid))
+              .filter((t): t is ThesisTopic => Boolean(t));
 
             return (
               <>
@@ -1891,19 +1915,30 @@ export default function AdminThesisPage() {
                   <span className="text-muted-foreground">{messages.thesis.councils.nextSeatRequired}</span>
                   <span className="font-semibold text-primary">{nextRoleLabel}</span>
                 </div>
-                <Select
+                <Combobox
                   label={messages.thesis.councils.selectLecturer}
                   value={selectedLecturerId}
-                  onChange={(e) => setSelectedLecturerId(e.target.value)}
-                  options={[
-                    { value: '', label: `-- ${messages.thesis.councils.selectLecturer} --` },
-                    ...availableLecturers.map((l) => ({
+                  onChange={(next) => setSelectedLecturerId(next)}
+                  placeholder={`-- ${messages.thesis.councils.selectLecturer} --`}
+                  options={availableLecturers.map((l) => {
+                    const conflict = councilMemberConflict({
+                      lecturer: l,
+                      assignedTopics: councilTopics,
+                      topicSupervisors,
+                    });
+                    return {
                       value: l.id,
-                      label: l.user
-                        ? `${l.user.lastName} ${l.user.firstName} (${l.employeeId || l.user.email})`
-                        : l.id,
-                    })),
-                  ]}
+                      label: l.user ? `${l.user.lastName} ${l.user.firstName}` : l.id,
+                      description: [l.department?.name, l.employeeId || l.user?.email]
+                        .filter(Boolean)
+                        .join(' · '),
+                      keywords: [l.employeeId, l.user?.email].filter(Boolean).join(' '),
+                      disabled: conflict != null,
+                      disabledReason: conflict
+                        ? messages.thesis.councils.conflicts[conflict]
+                        : undefined,
+                    };
+                  })}
                 />
                 {lecturerLoadError ? (
                   <div className="flex items-center justify-between gap-3 rounded-md border border-status-warning/30 bg-status-warning/10 px-3 py-2 text-xs text-status-warning-foreground">
@@ -2063,6 +2098,11 @@ export default function AdminThesisPage() {
                 t.finalScore == null &&
                 (t.status === 'PUBLISHED' || t.status === 'APPROVED')
             );
+            const targetCouncil = councils.find((c) => c.id === targetCouncilIdForTopic);
+            const targetMemberIds = (targetCouncil?.members ?? []).map((m) => m.lecturerId);
+            const targetOfficerIds = (targetCouncil?.members ?? [])
+              .filter((m) => m.memberRole === 'CHAIR' || m.memberRole === 'SECRETARY')
+              .map((m) => m.lecturerId);
 
             return (
               <>
@@ -2073,14 +2113,28 @@ export default function AdminThesisPage() {
                       {messages.thesis.councils.noAssignedTopics}
                     </p>
                   ) : (
-                    <Select
+                    <Combobox
                       aria-label={messages.thesis.councils.selectTopic}
                       value={selectedTopicIdToAssign}
-                      onChange={(e) => setSelectedTopicIdToAssign(e.target.value)}
-                      options={[
-                        { value: '', label: `-- ${messages.thesis.councils.selectTopic} --` },
-                        ...assignableTopics.map((t) => ({ value: t.id, label: t.title })),
-                      ]}
+                      onChange={(next) => setSelectedTopicIdToAssign(next)}
+                      placeholder={`-- ${messages.thesis.councils.selectTopic} --`}
+                      options={assignableTopics.map((t) => {
+                        const conflict = assignTopicConflict({
+                          topicSupervisorIds: topicSupervisors[t.id] ?? [],
+                          reviewerId: t.gvpbLecturerId,
+                          memberIds: targetMemberIds,
+                          officerIds: targetOfficerIds,
+                          lecturers,
+                        });
+                        return {
+                          value: t.id,
+                          label: t.title,
+                          disabled: conflict != null,
+                          disabledReason: conflict
+                            ? messages.thesis.councils.conflicts[conflict]
+                            : undefined,
+                        };
+                      })}
                     />
                   )}
                 </label>
@@ -2188,26 +2242,45 @@ export default function AdminThesisPage() {
             </div>
           ) : null}
           {reasonAction?.kind === 'replaceMember' ? (
-            <Select
-              label={messages.thesis.councils.selectLecturer}
-              value={replacementLecturerId}
-              onChange={(e) => setReplacementLecturerId(e.target.value)}
-              options={[
-                { value: '', label: `-- ${messages.thesis.councils.selectLecturer} --` },
-                ...lecturers
-                  .filter(
-                    (l) =>
-                      l.id !== reasonAction.lecturerId &&
-                      !(councils.find((c) => c.id === reasonAction.councilId)?.members ?? []).some(
-                        (m) => m.lecturerId === l.id,
-                      ),
-                  )
-                  .map((l) => ({
-                    value: l.id,
-                    label: l.user ? `${l.user.lastName} ${l.user.firstName}` : l.id,
-                  })),
-              ]}
-            />
+            (() => {
+              const replaceCouncil = councils.find((c) => c.id === reasonAction.councilId);
+              const replaceCouncilTopics = (replaceCouncil?.topicIds ?? [])
+                .map((tid) => topics.find((t) => t.id === tid))
+                .filter((t): t is ThesisTopic => Boolean(t));
+              return (
+                <Combobox
+                  label={messages.thesis.councils.selectLecturer}
+                  value={replacementLecturerId}
+                  onChange={(next) => setReplacementLecturerId(next)}
+                  placeholder={`-- ${messages.thesis.councils.selectLecturer} --`}
+                  options={lecturers
+                    .filter(
+                      (l) =>
+                        l.id !== reasonAction.lecturerId &&
+                        !(replaceCouncil?.members ?? []).some((m) => m.lecturerId === l.id),
+                    )
+                    .map((l) => {
+                      const conflict = councilMemberConflict({
+                        lecturer: l,
+                        assignedTopics: replaceCouncilTopics,
+                        topicSupervisors,
+                      });
+                      return {
+                        value: l.id,
+                        label: l.user ? `${l.user.lastName} ${l.user.firstName}` : l.id,
+                        description: [l.department?.name, l.employeeId]
+                          .filter(Boolean)
+                          .join(' · '),
+                        keywords: [l.employeeId, l.user?.email].filter(Boolean).join(' '),
+                        disabled: conflict != null,
+                        disabledReason: conflict
+                          ? messages.thesis.councils.conflicts[conflict]
+                          : undefined,
+                      };
+                    })}
+                />
+              );
+            })()
           ) : null}
           {reasonAction?.kind === 'lateTopic' ? (
             <>
