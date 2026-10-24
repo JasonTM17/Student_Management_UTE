@@ -86,6 +86,18 @@ $env:BASE_URL="http://localhost:3100"; node scripts/prod-smoke.mjs   # stack loc
 
 *Danh bạ giảng viên phụ `lecturer002@campuscore.demo` đến `lecturer012@campuscore.demo` cũng được seed sẵn để lịch dạy và hội đồng phản ánh quy mô trường thực tế.*
 
+> **Tài khoản giảng viên nào đăng nhập được.** Tập đăng nhập giảng viên dùng được
+> cho demo là **`lecturer002@campuscore.demo` … `lecturer011@campuscore.demo`**
+> (`password123`) — đây là lựa chọn chuẩn cho chấm viên hội đồng và các luồng
+> GVHD. Các giảng viên **được ghi tên làm GVHD của các đề tài demo** (hồ sơ
+> `lecturer-profile-*`, ví dụ GVHD của nhóm KLTN sẵn có) là tài khoản **KHOÁ cố
+> ý** theo thiết kế (`DemoAccountGate` áp lại mỗi lần khởi động): **không mở
+> khoá các tài khoản này**, vì chúng tồn tại để thể hiện luật
+> `SUPERVISOR_CANNOT_GRADE` và để nhóm/đề tài seed sẵn có người hướng dẫn.
+> Kịch bản hội đồng ở mục 5 gán `lecturer-profile-*` vào ghế hội đồng chỉ là
+> dữ liệu API; khi trình diễn chấm điểm trực tiếp hãy đăng nhập bằng các tài
+> khoản `lecturer002–011` ở trên.
+
 > **Nhóm KLTN demo sẵn (không cần dựng lại)**: bốn tài khoản `student@`, `student2@`,
 > `student3@`, `student4@` đã nằm chung một nhóm KLTN thật trong đợt *"Khóa luận Tốt nghiệp -
 > Niên khóa 2022 - 2026"* — nhóm trưởng Tiến Sơn, đề tài "Cổng quản lý học vụ
@@ -100,7 +112,11 @@ $env:BASE_URL="http://localhost:3100"; node scripts/prod-smoke.mjs   # stack loc
 > 122/124/117 tín chỉ, CPA 3.14/3.13/2.78) để thao tác nhóm/đề tài bình thường.
 > `student@` cố tình để dưới ngưỡng (38 tín chỉ) — tài khoản đăng nhập được
 > duy nhất còn thiếu điều kiện — để trình diễn thẻ cảnh báo **"Chưa đủ điều
-> kiện"**; nhóm sẵn có không bị hủy (luật không áp dụng hồi tố). Khi
+> kiện"**. Hồ sơ `student-profile` đứng sau tài khoản này đồng thời là **nhóm
+> trưởng của nhóm KLTN seed sẵn** và đang chạy dưới chế độ kiểm tra điều kiện
+> **ADVISORY** (`THESIS_ELIGIBILITY_ENFORCEMENT=ADVISORY`): thẻ cảnh báo hiển
+> thị nhưng không chặn thao tác, nên nhóm sẵn có không bị hủy (luật không áp
+> dụng hồi tố). Khi
 > `THESIS_ELIGIBILITY_ENFORCEMENT=ENFORCE` thử tạo nhóm trong đợt mới sẽ nhận
 > `THESIS_ELIGIBILITY_NOT_MET`; mặc định release 2 là `ADVISORY` — vẫn hiện
 > thẻ cảnh báo nhưng không chặn. Trong DB cũng có các hồ sơ
