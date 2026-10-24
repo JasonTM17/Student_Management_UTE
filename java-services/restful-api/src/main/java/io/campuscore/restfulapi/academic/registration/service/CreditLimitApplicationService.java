@@ -287,11 +287,16 @@ public class CreditLimitApplicationService {
     }
 
     private void ensureStudent(String studentId) {
-        Long count = jdbc.queryForObject(
-                "SELECT COUNT(*) FROM " + STUDENT + " WHERE \"id\" = :studentId",
-                new MapSqlParameterSource("studentId", studentId), Long.class);
-        if (count == null || count == 0) {
+        String status;
+        try {
+            status = jdbc.queryForObject(
+                    "SELECT \"status\" FROM " + STUDENT + " WHERE \"id\" = :studentId",
+                    new MapSqlParameterSource("studentId", studentId), String.class);
+        } catch (EmptyResultDataAccessException exception) {
             throw problem(HttpStatus.NOT_FOUND, "STUDENT_NOT_FOUND", "Student profile not found");
+        }
+        if (!"ACTIVE".equals(status)) {
+            throw problem(HttpStatus.FORBIDDEN, "STUDENT_PROFILE_REQUIRED", "Student profile is not active");
         }
     }
 
