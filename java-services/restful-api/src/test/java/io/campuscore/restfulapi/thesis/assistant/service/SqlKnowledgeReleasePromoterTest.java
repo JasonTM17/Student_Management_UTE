@@ -21,6 +21,7 @@ import org.springframework.jdbc.datasource.DriverManagerDataSource;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.transaction.support.TransactionTemplate;
 import io.campuscore.restfulapi.thesis.assistant.controller.ThesisAssistantKnowledgeAdminController;
+import io.campuscore.restfulapi.thesis.assistant.repository.ThesisAssistantKnowledgeAdminRepository;
 
 class SqlKnowledgeReleasePromoterTest {
     private JdbcTemplate raw;
@@ -64,7 +65,8 @@ class SqlKnowledgeReleasePromoterTest {
         raw.update("INSERT INTO assistant.knowledge_release (id,corpus_version,corpus_hash,row_count,source,status,manifest,created_by) VALUES (?,?,?,?,?,?,JSON '{}',?)",
                 initialRelease, "legacy", "a".repeat(64), 0, "LEGACY", "PUBLISHED", "seed");
         raw.update("INSERT INTO assistant.knowledge_runtime_state (singleton,active_release_id) VALUES(TRUE,?)", initialRelease);
-        controller = new ThesisAssistantKnowledgeAdminController(jdbc, new SqlKnowledgeReleasePromoter(jdbc, false));
+        controller = new ThesisAssistantKnowledgeAdminController(new AssistantKnowledgeAdminService(
+                new ThesisAssistantKnowledgeAdminRepository(jdbc), new SqlKnowledgeReleasePromoter(jdbc, false)));
     }
 
     @Test

@@ -29,6 +29,7 @@ import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import io.campuscore.restfulapi.thesis.assistant.client.AssistantKnowledgeAuthorityGateway;
+import io.campuscore.restfulapi.thesis.assistant.service.AssistantKnowledgeAdminService;
 import io.campuscore.restfulapi.thesis.assistant.service.SupabaseKnowledgeSyncService;
 
 /**
@@ -80,7 +81,7 @@ public class AssistantKnowledgeRemoteAdminController {
     @PostMapping
     @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN')")
     public KnowledgeRevision create(@RequestBody KnowledgeRequest request, @AuthenticationPrincipal Jwt actor) {
-        ThesisAssistantKnowledgeAdminController.validate(request);
+        AssistantKnowledgeAdminService.validate(request);
         return authority.create(request, subject(actor));
     }
 
@@ -94,7 +95,7 @@ public class AssistantKnowledgeRemoteAdminController {
             @Parameter(description = "Mã định danh (UUID)", required = true) @PathVariable UUID id,
             @RequestBody KnowledgeRequest request,
             @AuthenticationPrincipal Jwt actor) {
-        ThesisAssistantKnowledgeAdminController.validate(request);
+        AssistantKnowledgeAdminService.validate(request);
         return authority.update(id, request, subject(actor));
     }
 

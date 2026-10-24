@@ -27,6 +27,7 @@ import org.springframework.web.bind.annotation.RestController;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import io.campuscore.restfulapi.thesis.assistant.client.SupabaseKnowledgeAuthorityService;
 import io.campuscore.restfulapi.thesis.assistant.properties.AssistantRagProperties;
+import io.campuscore.restfulapi.thesis.assistant.service.AssistantKnowledgeAdminService;
 import io.campuscore.restfulapi.thesis.assistant.service.SupabaseKnowledgeSyncService;
 
 /** Private RAG-side authority boundary.  Never expose this route through Caddy. */
@@ -79,7 +80,7 @@ public class SupabaseKnowledgeInternalController {
             @RequestHeader(name = TOKEN_HEADER, required = false) String token,
             @RequestHeader(name = "X-Assistant-Owner", required = false) String actor) {
         verify(token);
-        ThesisAssistantKnowledgeAdminController.validate(request);
+        AssistantKnowledgeAdminService.validate(request);
         return authority.create(request, owner(actor));
     }
 
@@ -88,7 +89,7 @@ public class SupabaseKnowledgeInternalController {
             @RequestHeader(name = TOKEN_HEADER, required = false) String token,
             @RequestHeader(name = "X-Assistant-Owner", required = false) String actor) {
         verify(token);
-        ThesisAssistantKnowledgeAdminController.validate(request);
+        AssistantKnowledgeAdminService.validate(request);
         return authority.update(id, request, owner(actor));
     }
 
