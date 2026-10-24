@@ -61,21 +61,30 @@ public final class ThesisRoundDtos {
              * shipped undergraduate round type; the UI hides the waive action
              * and must not keep its own round-type list.
              */
-            boolean counterReviewWaiverAllowed) {
+            boolean counterReviewWaiverAllowed,
+            /**
+             * Roster policy bounds for this round (ThesisMutationService's
+             * MIN/MAX_GROUP_MEMBERS): advisory while joining, enforced on
+             * supervisor approval — surfaced so the group card can show the
+             * missing-member state without a client-side constant.
+             */
+            int minGroupSize,
+            int maxGroupSize) {
 
         public static RoundResponse from(ThesisRegistrationRound round) {
-            return from(round, null, false);
+            return from(round, null, false, 0, 0);
         }
 
         public static RoundResponse from(ThesisRegistrationRound round, RoundDeletionInfo deletion,
-                boolean counterReviewWaiverAllowed) {
+                boolean counterReviewWaiverAllowed, int minGroupSize, int maxGroupSize) {
             return new RoundResponse(
                     round.getId(), round.getName(), round.getThesisType(),
                     round.getLecturerSubmitStart(), round.getLecturerSubmitEnd(),
                     round.getRegistrationStart(), round.getRegistrationEnd(),
                     round.getGvpbDeadline(), round.getReportDeadline(), round.getProposalPublishAt(),
                     round.getReportDate(), round.getDefenseDate(), round.getStatus(),
-                    round.getCancelledFromStatus(), deletion, counterReviewWaiverAllowed);
+                    round.getCancelledFromStatus(), deletion, counterReviewWaiverAllowed,
+                    minGroupSize, maxGroupSize);
         }
     }
 }

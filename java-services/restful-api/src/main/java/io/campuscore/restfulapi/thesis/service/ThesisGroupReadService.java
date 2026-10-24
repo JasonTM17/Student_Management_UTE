@@ -18,12 +18,15 @@ public class ThesisGroupReadService {
 
     private final ThesisGroupReadRepository groups;
     private final ThesisRoundReadPort rounds;
+    private final ThesisGroupWithdrawalPolicy withdrawalPolicy;
 
     public ThesisGroupReadService(
             ThesisGroupReadRepository groups,
-            ThesisRoundReadPort rounds) {
+            ThesisRoundReadPort rounds,
+            ThesisGroupWithdrawalPolicy withdrawalPolicy) {
         this.groups = groups;
         this.rounds = rounds;
+        this.withdrawalPolicy = withdrawalPolicy;
     }
 
     @Transactional(readOnly = true)
@@ -35,7 +38,8 @@ public class ThesisGroupReadService {
             String subject) {
         rounds.requireExisting(roundId);
         if (isFacultyAdmin(roles)) {
-            return groups.findByRoundId(roundId);
+            return withdrawalPolicy.attachAll(
+                    groups.findByRoundId(roundId), roles, lecturerId, subject);
         }
         // Governance readers are scoped like the dean overview: a faculty
         // head sees only their faculty, a department head only their
@@ -54,13 +58,16 @@ public class ThesisGroupReadService {
             List<GroupResponse> supervised = lecturerId == null || lecturerId.isBlank()
                     ? List.of()
                     : groups.findByRoundIdAndSupervisorId(roundId, lecturerId);
-            return mergeScopedWithSupervised(scoped, supervised, lecturerId);
+            return withdrawalPolicy.attachAll(
+                    mergeScopedWithSupervised(scoped, supervised, lecturerId), roles, lecturerId, subject);
         }
         if (roles.contains("LECTURER")) {
             // External members declare an email/phone in `contact`, so a
             // lecturer only sees the groups whose topic they supervise — the
             // same supervisor rule the report-read path applies.
-            return groups.findByRoundIdAndSupervisorId(roundId, requireLecturerId(lecturerId));
+            return withdrawalPolicy.attachAll(
+                    groups.findByRoundIdAndSupervisorId(roundId, requireLecturerId(lecturerId)),
+                    roles, lecturerId, subject);
         }
         return groups.findByRoundIdAndStudentId(roundId, requireStudentId(roles, studentId));
     }
@@ -81,7 +88,8 @@ public class ThesisGroupReadService {
             return groups.findByStudentId(requireStudentId(roles, studentId));
         }
         if (roles.contains("LECTURER")) {
-            return groups.findBySupervisorId(requireLecturerId(lecturerId));
+            return withdrawalPolicy.attachAll(
+                    groups.findBySupervisorId(requireLecturerId(lecturerId)), roles, lecturerId, null);
         }
         return List.of();
     }
@@ -115,7 +123,7 @@ public class ThesisGroupReadService {
                     "THESIS_GROUP_NOT_FOUND",
                     "Thesis group not found");
         }
-        return group;
+        return withdrawalPolicy.attach(group, roles, lecturerId, subject);
     }
 
     /** Merge the governance-scoped groups with any group the caller supervises. */
@@ -167,7 +175,8 @@ public class ThesisGroupReadService {
                         .map(m -> new io.campuscore.restfulapi.thesis.web.ThesisGroupReadDtos.GroupMemberResponse(
                                 m.studentId(), m.studentNumber(), m.displayName(), null,
                                 m.isExternal(), m.isLeader(), m.memberOrder()))
-                        .toList());
+                        .toList(),
+                group.approvalWithdrawal());
     }
 
     private GroupResponse supervisedGroup(UUID id, String lecturerId) {

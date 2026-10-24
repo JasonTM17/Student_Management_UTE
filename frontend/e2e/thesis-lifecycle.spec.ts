@@ -408,6 +408,23 @@ test('stages 2-9: proposal through published results and reporting', async ({ pa
     expect(approve.status(), 'supervisor approves').toBe(200);
   }
 
+  // GV1: a mistaken approval in an open round is withdrawn back to PENDING,
+  // then approved again — the release path that used to be missing entirely.
+  const withdrawal = await apiAs(page, lecturer, 'POST', `/thesis/groups/${group.id}/withdraw-approval`, {
+    reason: 'mistaken approval — withdraw for lifecycle coverage',
+  });
+  expect(withdrawal.status(), 'withdraw approval succeeds in an open round').toBe(200);
+  expect((await withdrawal.json()).approvalStatus, 'group returns to pending').toBe('PENDING');
+  const reApprove = await apiAs(page, lecturer, 'POST', `/thesis/groups/${group.id}/approve`, {});
+  if (reApprove.status() === 409) {
+    const sizedAgain = await apiAs(page, admin, 'POST', `/thesis/groups/${group.id}/approve`, {
+      allowSizeException: true, reason: 'undersized demo roster',
+    });
+    expect(sizedAgain.status(), 're-approve via size exception').toBe(200);
+  } else {
+    expect(reApprove.status(), 're-approve after withdrawal').toBe(200);
+  }
+
   // Registration mutations freeze once the round closes.
   const close = await apiAs(page, admin, 'POST', `/thesis/rounds/${round.id}/close-registration`);
   expect(close.status(), 'close registration').toBe(200);

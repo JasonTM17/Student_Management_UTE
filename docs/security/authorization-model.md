@@ -179,7 +179,14 @@ retroactively identify password changes made before the revision existed.
   and [SupabaseKnowledgeInternalController](../../java-services/restful-api/src/main/java/io/campuscore/restfulapi/thesis/assistant/SupabaseKnowledgeInternalController.java).
 - **Thesis governance actions** run after the dean-scope check
   (`ThesisDeanScope`), so capability gates never leak topic existence or bypass
-  faculty ownership. The counter-review waiver is one such action: it stays
+  faculty ownership. Group approval withdrawal
+  (`ThesisMutationService.withdrawGroupApproval`) applies the same discipline:
+  `TRUONG_KHOA`/`TRUONG_BO_MON` act only inside their faculty/department scope
+  with no supervisor escape, while the topic's own supervisors and global
+  admins retain the direct path. Approval by anyone who is not the topic's
+  supervisor is a governance override and requires a documented reason
+  (`GROUP_APPROVAL_OVERRIDE_REASON_REQUIRED`), recorded on the audit row;
+  supervisor self-approval is unchanged. The counter-review waiver is one such action: it stays
   implemented but is off for every shipped undergraduate round type
   (`409 COUNTER_REVIEW_WAIVER_NOT_SUPPORTED`), because those rounds always
   require a counter-reviewer. `ThesisGovernanceCapabilities` owns the decision
