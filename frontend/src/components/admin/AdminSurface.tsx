@@ -148,6 +148,7 @@ export function AdminToolbarMeta({
 
 interface AdminTableCardProps {
   title: React.ReactNode;
+  titleAs?: 'h2' | 'h3' | 'h4';
   description?: React.ReactNode;
   children: React.ReactNode;
   footer?: React.ReactNode;
@@ -157,6 +158,7 @@ interface AdminTableCardProps {
 
 export function AdminTableCard({
   title,
+  titleAs,
   description,
   children,
   footer,
@@ -166,7 +168,7 @@ export function AdminTableCard({
   return (
     <Card variant="elevated" className={cn('min-w-0', className)}>
       <CardHeader className="min-w-0 border-b border-border/70 pb-4">
-        <CardTitle>{title}</CardTitle>
+        <CardTitle as={titleAs}>{title}</CardTitle>
         {description ? <CardDescription>{description}</CardDescription> : null}
       </CardHeader>
       <CardContent className={cn('min-w-0 space-y-0', contentClassName)}>

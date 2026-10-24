@@ -142,6 +142,7 @@ export interface Enrollment {
   enrolledAt: string;
   droppedAt?: string;
   gradeStatus: 'NOT_GRADED' | 'DRAFT' | 'PUBLISHED' | 'APPEALED';
+  registrationSource?: string | null;
   finalGrade?: number;
   letterGrade?: string;
   createdAt: string;
