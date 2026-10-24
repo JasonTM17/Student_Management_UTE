@@ -1,4 +1,4 @@
-package io.campuscore.restfulapi.auth.web;
+package io.campuscore.restfulapi.auth.service;
 
 import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletRequest;

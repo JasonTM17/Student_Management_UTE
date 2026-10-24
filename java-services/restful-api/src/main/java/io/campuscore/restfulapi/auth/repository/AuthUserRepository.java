@@ -1,7 +1,7 @@
 package io.campuscore.restfulapi.auth.repository;
 
-import io.campuscore.restfulapi.auth.web.AuthDtos.AuthUserResponse;
-import io.campuscore.restfulapi.auth.web.AuthDtos.StudentContext;
+import io.campuscore.restfulapi.auth.dto.AuthDtos.AuthUserResponse;
+import io.campuscore.restfulapi.auth.dto.AuthDtos.StudentContext;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Timestamp;

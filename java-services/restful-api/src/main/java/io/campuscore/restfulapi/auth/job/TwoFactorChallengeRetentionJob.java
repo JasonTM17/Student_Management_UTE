@@ -1,4 +1,4 @@
-package io.campuscore.restfulapi.auth.service;
+package io.campuscore.restfulapi.auth.job;
 
 import java.time.Clock;
 import java.time.Duration;

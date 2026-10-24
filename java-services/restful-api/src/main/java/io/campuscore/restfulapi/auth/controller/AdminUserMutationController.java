@@ -1,8 +1,8 @@
-package io.campuscore.restfulapi.auth.web;
+package io.campuscore.restfulapi.auth.controller;
 
 import io.campuscore.restfulapi.auth.service.AdminUserMutationService;
-import io.campuscore.restfulapi.auth.web.AdminUserRequestDtos.AdminUserCreateRequest;
-import io.campuscore.restfulapi.auth.web.AdminUserRequestDtos.AdminUserUpdateRequest;
+import io.campuscore.restfulapi.auth.dto.AdminUserRequestDtos.AdminUserCreateRequest;
+import io.campuscore.restfulapi.auth.dto.AdminUserRequestDtos.AdminUserUpdateRequest;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
@@ -25,6 +25,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import io.campuscore.restfulapi.auth.dto.AdminUserRequestDtos;
 
 @RestController
 @Profile("persistence")

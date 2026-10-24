@@ -1,4 +1,4 @@
-package io.campuscore.restfulapi.auth.web;
+package io.campuscore.restfulapi.auth.dto;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
 import jakarta.validation.constraints.NotBlank;
