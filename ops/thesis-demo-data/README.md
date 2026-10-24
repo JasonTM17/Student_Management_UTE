@@ -107,17 +107,25 @@ referenced set; `verify.sql` asserts no real account is referenced.
   audit last) never forms a deadlock cycle against the package. There is no
   check-then-act window: a concurrent write either commits first (and the
   post-lock preflight sees it) or waits for the locks.
-- **Package is the lock victim, never the app**: every lock is requested
-  with `NOWAIT`, so the package never queues behind an application write or
-  an autovacuum/ANALYZE worker — it can never be one edge of a wait-for
-  cycle, no deadlock can form, and the application transaction is never
-  killed; the package simply fails fast with nothing changed. `run.mjs`
-  retries only lock failures — up to 8 attempts, fresh psql process and
-  transaction per attempt, jittered backoff; it never holds locks while
-  waiting, and reports `blocked by autovacuum/analyze` (counts only) when
-  the conflicting side is a vacuum worker. Raw `psql -f` runs fail once
-  with a clear message instead of retrying. Run it in a quiet maintenance
-  window regardless.
+- **Package is the lock victim**: every lock is requested with `NOWAIT` —
+  `SHARE ROW EXCLUSIVE MODE NOWAIT` table locks first (in application write
+  order), then `FOR UPDATE NOWAIT` row locks on every baseline row the
+  script will update and every marker row it may delete or rewrite — so the
+  package never queues: a conflict aborts it instantly with a retryable
+  error and nothing is written. `SET LOCAL lock_timeout = '300ms'` (verified
+  at runtime) additionally caps any residual wait well under the stock 1 s
+  `deadlock_timeout`, so the package cannot become one edge of a wait-for
+  cycle long enough for PostgreSQL to pick the *application* as victim.
+  `run.mjs` retries only lock failures — up to 8 attempts, fresh psql
+  process and transaction per attempt, jittered backoff; it never holds
+  locks while waiting, and reports `blocked by autovacuum/analyze worker(s)
+  (counts: N)` only when a real autovacuum/ANALYZE backend holds or waits
+  on a package-table lock, otherwise `blocked by another session
+  (counts: N)` — counts only, never query text or user data. Raw `psql -f`
+  runs fail once with a clear message instead of retrying. The package
+  itself never kills the application — but an app transaction that writes
+  *while the package holds locks* can still lose a deadlock draw, so pause
+  application writes during the window (see the checklist below).
 - **One transaction**: the script `BEGIN`s and either `COMMIT`s or `ROLLBACK`s
   (dry-run). Any error aborts everything. Do NOT pass `-1`; the file manages
   its own transaction. `statement_timeout` is 120 s; `TimeZone`/`DateStyle`
@@ -140,23 +148,38 @@ referenced set; `verify.sql` asserts no real account is referenced.
   real emails, names, companies, phones, or external URLs.
 - **Reversible, fail-closed**: `rollback.sql` holds the table locks while it
   (a) enumerates every FK into ALL eleven package tables from
-  `pg_constraint`, recursively following `ON DELETE CASCADE` edges so a
-  future grandchild table is covered too, and refuses when the live
-  inventory differs from the reviewed nine-key set —
-  `thesis.thesis_council_member.council_id>thesis.thesis_council(c)`,
-  `thesis.thesis_council_topic.council_id>thesis.thesis_council(c)`,
-  `thesis.thesis_council_topic.topic_id>thesis.thesis_topic(c)`,
-  `thesis.thesis_group_member.group_id>thesis.thesis_group(c)`,
-  `thesis.thesis_group_report.group_id>thesis.thesis_group(r)`,
-  `thesis.thesis_group.topic_id>thesis.thesis_topic(a)`,
-  `thesis.thesis_topic_score.council_id>thesis.thesis_council(c)`,
-  `thesis.thesis_topic_score.topic_id>thesis.thesis_topic(c)`,
-  `thesis.thesis_topic_supervisor.topic_id>thesis.thesis_topic(c)` —
+  `pg_constraint` — every schema — recursively following `ON DELETE CASCADE`
+  edges so a future grandchild table is covered too, and refuses when the
+  live inventory differs from the reviewed set. The comparison is a MULTISET
+  (`EXCEPT ALL` both ways — a duplicated constraint counts twice) keyed on
+  `child_schema.table.(ordered child column list)>parent_schema.table.
+  (ordered parent column list)[delete rule]`, so a composite replacement or
+  a changed ON DELETE action also refuses. The reviewed multiset has nine
+  keys — `thesis.thesis_council_member.(council_id)>thesis.thesis_council.(id)[c]`,
+  `thesis.thesis_council_topic.(council_id)>thesis.thesis_council.(id)[c]`,
+  `thesis.thesis_council_topic.(topic_id)>thesis.thesis_topic.(id)[c]`,
+  `thesis.thesis_group_member.(group_id)>thesis.thesis_group.(id)[c]`,
+  `thesis.thesis_group_report.(group_id)>thesis.thesis_group.(id)[r]`,
+  `thesis.thesis_group.(topic_id)>thesis.thesis_topic.(id)[a]`,
+  `thesis.thesis_topic_score.(council_id)>thesis.thesis_council.(id)[c]`,
+  `thesis.thesis_topic_score.(topic_id)>thesis.thesis_topic.(id)[c]`,
+  `thesis.thesis_topic_supervisor.(topic_id)>thesis.thesis_topic.(id)[c]` —
   then locks each referencing table and counts the application rows the
   delete would cascade through plus the rows pinning a doomed parent
   (matched by ctid, so a referencing table without an `id` column is
   covered), plus non-marker counter-review scores on the three guarded
-  topics; any hit ABORTS with per-table counts and deletes nothing;
+  topics; any hit ABORTS with per-table counts and deletes nothing.
+  Separately it refuses when any DELETE-capable user trigger on a package
+  table is outside the reviewed set — the fixture carries four, and none of
+  them deletes rows: three AFTER-row triggers
+  (`thesis.thesis_group.thesis_legacy_group_size_marker`, which raises on
+  deleting a flagged legacy group, and
+  `thesis.thesis_group_member.thesis_group_member_active_participation` +
+  `thesis.thesis_group_member.thesis_group_member_legacy_size_read_only`,
+  which maintain/validate roster state) plus the BEFORE-row
+  `thesis.thesis_group_member.thesis_group_membership_state_member`
+  membership enforcer. A trigger-based cascade sits outside the FK
+  inventory, so any fifth DELETE-capable trigger ABORTS the rollback;
   (b) requires a validated before-image (audit copy, or checksum-protected
   comment copy, or agreement of both); (c) re-hashes every live marker row
   over the image's `hashcols` lists — a row that exists and differs, or a
@@ -191,14 +214,23 @@ PGDATABASE=<template> node mutants.mjs   # guard-weakening mutation harness
 
 `run.mjs` always invokes psql with `-X --no-psqlrc` and
 `PGCLIENTENCODING=UTF8`, and retries lock-window failures
-(`could not obtain lock` / `deadlock detected` / `lock timeout`)
 up to 8 attempts with jitter — each attempt a fresh process and transaction.
-`THESIS_DEMO_MAX_ATTEMPTS` overrides the cap. When a lock failure carries
-SQLSTATE 55P03 the runner queries `pg_stat_activity`/`pg_locks` and says
-whether the blocker looked like autovacuum/ANALYZE or another lock holder —
-counts only, never query text or user data. If all attempts are exhausted,
-check `pg_stat_activity` for autovacuum/ANALYZE workers (or other lock
-holders) on the package tables before retrying.
+`THESIS_DEMO_MAX_ATTEMPTS` overrides the cap. Retried errors are the
+NOWAIT failures the scripts raise with SQLSTATE `55P03`
+(`lock_not_available`, message `... a package table is locked ...` /
+`... a row the package must write is locked by another transaction ...`),
+PostgreSQL's own `could not obtain lock`, `canceling statement due to lock
+timeout`, `deadlock detected` (`40P01`) and `lock_not_available` texts.
+When a retryable failure occurs the runner queries
+`pg_stat_activity`/`pg_locks` and prints either
+`blocked by autovacuum/analyze worker(s) (counts: N)` — only when a real
+autovacuum worker or a session running `VACUUM`/`ANALYZE` holds or waits on
+a lock on one of the eleven package tables — or
+`blocked by another session (counts: N)`. The permanent autovacuum
+*launcher* is never counted; output is counts only, never query text or
+user data. If all attempts are exhausted, check `pg_stat_activity` for
+autovacuum/ANALYZE workers (or other lock holders) on the package tables
+before retrying.
 
 Raw psql equivalent (no retry — one attempt each):
 
@@ -258,11 +290,21 @@ deletes a round's marker notifications, a migration `ADD COLUMN`, volatile
 separately and together, runs the recovery path and proves a re-uploaded
 report survives, tampers with each image copy (disagreement, bad checksum),
 runs apply/rollback under hostile `DateStyle`/`TimeZone`/`bytea_output`
-session settings and under a `PGCLIENTENCODING=LATIN1` client, runs the
+session settings and under a `PGCLIENTENCODING=LATIN1` client, proves apply
+aborts on a database whose `server_encoding` is not UTF-8, runs the
 deterministic five-writer deadlock schedule (four staggered app holders +
 an app transaction requesting `thesis_council`) proving the NOWAIT package
-— never the app — gives up, proves a future `ON DELETE CASCADE` child table
-makes rollback refuse on the FK inventory, proves a guarded column the app
+— never the app — gives up, then runs the row-level deadlock schedule from
+the independent retest 5× against apply and 5× against rollback (helper
+transactions hold `FOR UPDATE` row locks on the baseline rounds/topics and
+an app transaction holds a topic `FOR UPDATE` before writing a score —
+every run the package exits retryably with nothing written and the app
+commits), proves a `FOR KEY SHARE` row holder fails both scripts' row-lock
+phase without queuing, proves a future `ON DELETE CASCADE` child table and
+even an empty new FK into a package table make rollback refuse on the FK
+inventory, proves an unreviewed DELETE-capable trigger refuses, proves a
+plain app UPDATE under the runner reports `blocked by another session`
+(never autovacuum), proves a guarded column the app
 drifted is restored as `skipped_drift` rather than overwritten, and
 compares whole-table md5 sets of all 12 touched tables before and after.
 It prints one PASS/FAIL line per check plus counts, and exits non-zero on
@@ -277,13 +319,19 @@ PGDATABASE=enr_scratch node selftest.mjs
 `mutants.mjs` is the mutation harness: for each entry in its patch table (one
 guard removal per guard in apply/rollback/recover) it clones the baseline
 template database, applies the patch to a scratch copy of the package, runs
-the selftest inside the copy, and prints `killed`/`SURVIVED`/`EQUIVALENT`
-per mutant. Kill detection is structured — a kill needs a non-zero selftest
-exit AND a real `FAIL ` detail line (or a parsed totals line with FAIL>0);
-summary text like `0 FAIL` can never count. `control.identity_noop` replaces
-a line by itself and must come back SURVIVED — if it is 'killed' the oracle
-is broken and the harness exits non-zero, as it does for any surviving
-non-equivalent mutant. Rerunnable:
+the selftest inside the copy, and prints `killed`/`SURVIVED`/`EQUIVALENT`/
+`INCONCLUSIVE` per mutant with the first failing check as the kill reason.
+`EQUIVALENT` marks a mutant that documents why the removed guard code can
+never fire (the equivalent rationale is carried in the patch table). Kill
+detection
+is structured — a kill needs a non-zero selftest exit AND a real `FAIL `
+detail line (or a parsed totals line with FAIL>0); a selftest that crashes
+at start-up, times out, is signaled, or ends without a parsable totals line
+is `INCONCLUSIVE` — counted as not killed and failing the harness.
+`control.identity_noop` replaces a line by itself and must come back
+SURVIVED — if it is 'killed' the oracle is broken and the harness exits
+non-zero, as it does for any surviving non-equivalent mutant or any
+unexpected INCONCLUSIVE. Rerunnable:
 
 ```bash
 PGDATABASE=<restored-fixture-template-db> node mutants.mjs
@@ -305,19 +353,28 @@ the production application database (flyway 142, ~22 MB):
   pinned session encoding overrides the client), confirmed by the
   `encoding.vietnamese_utf8_bytes` check; a session that cannot be UTF-8
   aborts before writing
-- dean retract simulation: round flipped to non-published + its 16
-  `THESIS_RESULTS:<round>` marker notifications deleted → re-apply reports
+- dean retract simulation: round `be1aa853` flipped to non-published + its
+  `THESIS_RESULTS:be1aa853…` marker notifications deleted → re-apply reports
   `already applied` (app-deleted subset, no-op, nothing recreated);
   rollback reports `already removed by the application: 16` and completes;
-  the app's own round changes are left alone
+  the app's own round changes are left alone. Marker notification counts
+  per round in the fixture: `b35e9ff1`=21, `be1aa853`=16, `bad8eba0`=13
+  (50 `THESIS_RESULTS:` of 107 marker notifications total)
 - migration simulation: `ALTER TABLE … ADD COLUMN` on marker tables →
   rollback still succeeds (hashes cover an explicit column list)
-- deadlock schedule: app transaction writes thesis → sleeps → writes audit
-  last while rollback runs → the PACKAGE fails instantly on `NOWAIT` and
-  the app commits; the five-writer schedule (four staggered app holders on
-  council_member/council_topic/group/group_member + an app transaction
+- deadlock schedules: (a) app transaction writes thesis → sleeps → writes
+  audit last while rollback runs → the PACKAGE fails instantly on `NOWAIT`
+  and the app commits; the five-writer schedule (four staggered app holders
+  on council_member/council_topic/group/group_member + an app transaction
   requesting `thesis_council`) repeats 3× with the app never the victim;
-  `node run.mjs rollback` retries and completes
+  `node run.mjs rollback` retries and completes; (b) the retest's row-level
+  schedule — helpers hold `FOR UPDATE` on three rounds and two baseline
+  topics while an app transaction holds a fourth baseline topic `FOR UPDATE`
+  then writes a score — runs 5× against apply and 5× against rollback:
+  every run the package aborts on its `FOR UPDATE NOWAIT` row locks with a
+  retryable `55P03`, the app transaction commits 10/10, and nothing is
+  written; `FOR KEY SHARE` holders on rows the package must lock also fail
+  both scripts instantly without queuing
 - race: an app transaction that commits a referencing score mid-rollback →
   rollback **aborts** with per-table counts; the app row survives
 - simulated app activity (non-marker score, council-topic, group member,
@@ -342,7 +399,10 @@ the production application database (flyway 142, ~22 MB):
 - mutation harness: every guard-removal mutant (image disagreement, checksum,
   reviewer-score + FK preflights, image-required, foreign-partial refuse,
   flyway floor, real-account guard, baseline checks, comment guard, recover
-  refusals) is killed by the suite — `mutants.mjs` prints the table
+  refusals, table- and row-lock `NOWAIT` removal on both scripts, FK
+  inventory abort removal, encoding abort removal) is killed by the suite;
+  the identity control survives and the selftest start-up crash control is
+  INCONCLUSIVE as designed — `mutants.mjs` prints the table
 
 ## Production application (separate gated release — do not run from here)
 
@@ -362,11 +422,13 @@ Pre-apply checklist — all six conditions must hold before `apply` runs:
    Require `tableowner = current_user` (or a member of it); if not, STOP —
    the package would apply fine but the comment copy would fail.
 3. **Quiet window with application writes paused.** Every lock is NOWAIT —
-   a busy table makes the package exit immediately (exit 3-style failure)
-   and the runner retries with jitter; after `run.mjs` exhausts its
-   attempts, check `pg_stat_activity` for autovacuum/ANALYZE workers (the
-   runner prints `blocked by autovacuum/analyze` when it sees them, counts
-   only) before retrying — the package cannot out-wait a worker that is
+   a busy table makes the package exit immediately (a retryable `55P03`
+   lock failure) and the runner retries with jitter; after `run.mjs`
+   exhausts its attempts, check `pg_stat_activity` for real
+   autovacuum/ANALYZE workers holding package-table locks (the runner
+   prints `blocked by autovacuum/analyze worker(s) (counts: N)` only for
+   those — an ordinary app writer reports as `blocked by another session`)
+   before retrying — the package cannot out-wait a worker that is
    only cancelled after ~1 s, so retry once the worker finishes.
 4. **Snapshot including campuscore_audit, with a tested restore**:
    `pg_dump -n thesis -n notifications -n campuscore_audit -Fc` of the
@@ -392,10 +454,12 @@ Then:
   locally, roughly 60–90 SQL round trips (estimate, not measured — on a
   remote connection such as Neon expect seconds, not milliseconds; live
   Neon timing was NOT measured). Every lock is `NOWAIT`, so a busy database
-  makes the PACKAGE give up, never the app; the runner retries lock
-  failures up to 8 times with jitter. Pause or quiet application writes
-  during the window for the cleanest run — the package still fails closed
-  if you do not.
+  makes the PACKAGE give up — the package itself never waits on and never
+  kills the application, and `lock_timeout` is pinned at 300 ms so no
+  residual wait can approach the 1 s deadlock detector; an app transaction
+  that keeps writing against the window can still lose a deadlock draw, so
+  pause or quiet application writes during the window for the cleanest run
+  — the package still fails closed and writes nothing if you do not.
 - `node run.mjs verify` — every row must read PASS (59 expected).
 - Public smoke: open the three published rounds' pages and confirm topics,
   councils, results and report downloads render — and that the Vietnamese
