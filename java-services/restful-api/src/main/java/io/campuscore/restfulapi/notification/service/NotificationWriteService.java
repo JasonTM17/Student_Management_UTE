@@ -2,9 +2,9 @@ package io.campuscore.restfulapi.notification.service;
 
 import io.campuscore.restfulapi.audit.service.AdminAuditRecorder;
 import io.campuscore.restfulapi.notification.repository.NotificationWriteRepository;
-import io.campuscore.restfulapi.notification.repository.NotificationWriteRepository.CreateNotificationCommand;
-import io.campuscore.restfulapi.notification.repository.NotificationWriteRepository.PatchValue;
-import io.campuscore.restfulapi.notification.repository.NotificationWriteRepository.UpdateNotificationCommand;
+import io.campuscore.restfulapi.notification.model.CreateNotificationCommand;
+import io.campuscore.restfulapi.notification.model.PatchValue;
+import io.campuscore.restfulapi.notification.model.UpdateNotificationCommand;
 import io.campuscore.restfulapi.notification.dto.NotificationReadDtos.NotificationResponse;
 import io.campuscore.restfulapi.notification.dto.NotificationWriteDtos.CreateNotificationRequest;
 import io.campuscore.restfulapi.notification.dto.NotificationWriteDtos.DeleteNotificationResponse;

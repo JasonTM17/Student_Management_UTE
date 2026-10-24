@@ -2,7 +2,7 @@ package io.campuscore.restfulapi.engagement.service;
 
 import io.campuscore.restfulapi.engagement.dto.AnnouncementReadDtos.AnnouncementResponse;
 import io.campuscore.restfulapi.notification.repository.NotificationWriteRepository;
-import io.campuscore.restfulapi.notification.repository.NotificationWriteRepository.CreateNotificationCommand;
+import io.campuscore.restfulapi.notification.model.CreateNotificationCommand;
 import io.campuscore.restfulapi.people.service.PeopleReadService;
 import io.campuscore.restfulapi.engagement.repository.AnnouncementWriteRepository;
 import java.time.Clock;
