@@ -1920,6 +1920,8 @@ export default function AdminThesisPage() {
                   value={selectedLecturerId}
                   onChange={(next) => setSelectedLecturerId(next)}
                   placeholder={`-- ${messages.thesis.councils.selectLecturer} --`}
+                  allowClear
+                  emptyLabel={`-- ${messages.thesis.councils.selectLecturer} --`}
                   options={availableLecturers.map((l) => {
                     const conflict = councilMemberConflict({
                       lecturer: l,
@@ -2118,6 +2120,8 @@ export default function AdminThesisPage() {
                       value={selectedTopicIdToAssign}
                       onChange={(next) => setSelectedTopicIdToAssign(next)}
                       placeholder={`-- ${messages.thesis.councils.selectTopic} --`}
+                      allowClear
+                      emptyLabel={`-- ${messages.thesis.councils.selectTopic} --`}
                       options={assignableTopics.map((t) => {
                         const conflict = assignTopicConflict({
                           topicSupervisorIds: topicSupervisors[t.id] ?? [],
@@ -2253,6 +2257,8 @@ export default function AdminThesisPage() {
                   value={replacementLecturerId}
                   onChange={(next) => setReplacementLecturerId(next)}
                   placeholder={`-- ${messages.thesis.councils.selectLecturer} --`}
+                  allowClear
+                  emptyLabel={`-- ${messages.thesis.councils.selectLecturer} --`}
                   options={lecturers
                     .filter(
                       (l) =>

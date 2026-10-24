@@ -167,6 +167,16 @@ test('ArrowDown/ArrowUp move within the open list, skipping disabled and wrappin
     { preventDefault: true, activeIndex: 1 });
 });
 
+test('ArrowUp with no active option lands on the last enabled option', () => {
+  // Regression: activeIndex -1 used to skip the final row (off-by-one wrap).
+  assert.deepEqual(nav('ArrowUp', { open: true, activeIndex: -1, options: list() }),
+    { preventDefault: true, activeIndex: 3 });
+  assert.deepEqual(nav('ArrowUp', { open: true, activeIndex: -1, options: list([3]) }),
+    { preventDefault: true, activeIndex: 2 });
+  assert.deepEqual(nav('ArrowDown', { open: true, activeIndex: -1, options: list([0]) }),
+    { preventDefault: true, activeIndex: 1 });
+});
+
 test('Home and End jump to the first and last enabled option', () => {
   assert.deepEqual(nav('Home', { open: true, activeIndex: 2, options: list([0]) }),
     { preventDefault: true, activeIndex: 1 });
