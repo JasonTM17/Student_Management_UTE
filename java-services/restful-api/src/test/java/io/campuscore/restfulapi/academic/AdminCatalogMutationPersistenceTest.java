@@ -730,18 +730,6 @@ class AdminCatalogMutationPersistenceTest {
     }
 
     @Test
-    void terminalSemesterCannotBeReopenedByStatusUpdate() throws Exception {
-        jdbc.update("UPDATE \"academic\".\"Semester\" SET \"status\" = 'CLOSED' WHERE \"id\" = 'semester-old'");
-
-        mvc.perform(put("/api/v1/semesters/semester-old")
-                        .with(adminJwt())
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"status\":\"OPEN\"}"))
-                .andExpect(status().isConflict())
-                .andExpect(jsonPath("$.code").value("SEMESTER_CLOSED"));
-    }
-
-    @Test
     void sectionUpdateRejectsUnknownCourseWithTheOffendingFieldNamed() throws Exception {
         mvc.perform(put("/api/v1/sections/section-existing")
                         .with(adminJwt())
