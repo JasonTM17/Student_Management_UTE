@@ -226,3 +226,26 @@ test('en and vi both carry the combobox strings', () => {
       `${key} is actually translated, not copied`);
   }
 });
+
+test('en and vi carry every picker conflict reason and the supervisor hint', () => {
+  const { en, vi } = loadMessages();
+  const conflicts = [
+    'conflictSupervisorOfTopic',
+    'conflictCouncilMemberOfTopic',
+    'conflictReviewsAssignedTopic',
+    'conflictSupervisesAssignedTopic',
+    'conflictSupervisorOfficer',
+    'conflictReviewerOnCouncil',
+    'conflictTooFewGraders',
+  ];
+  for (const key of conflicts) {
+    assert.equal(typeof en.thesis.councils.conflicts[key], 'string', `en ${key}`);
+    assert.equal(typeof vi.thesis.councils.conflicts[key], 'string', `vi ${key}`);
+    assert.notEqual(en.thesis.councils.conflicts[key], vi.thesis.councils.conflicts[key],
+      `${key} is actually translated, not copied`);
+  }
+  for (const key of ['supervisorAlreadySelected', 'supervisorNoneOption']) {
+    assert.equal(typeof en.thesis[key], 'string', `en ${key}`);
+    assert.equal(typeof vi.thesis[key], 'string', `vi ${key}`);
+  }
+});
