@@ -9,6 +9,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.regex.Pattern;
 import java.util.stream.Stream;
 import org.junit.jupiter.api.Test;
@@ -157,12 +158,12 @@ class ArchitectureGuardTest {
 
     /** dto classes that legitimately referenced a domain type before model/ packages existed. */
     private static final Map<String, List<String>> DTO_TO_DOMAIN_EXCEPTIONS = Map.of(
-            "thesis/dto/ThesisDeanOverviewDtos", List.of("uses thesis.domain status enums"),
-            "thesis/dto/ThesisGroupReadDtos", List.of("uses thesis.domain status enums"),
-            "thesis/dto/ThesisMutationDtos", List.of("uses thesis.domain status enums"),
-            "thesis/dto/ThesisRoundDtos", List.of("uses thesis.domain round vocabulary"),
-            "thesis/dto/ThesisTopicDtos", List.of("uses thesis.domain topic vocabulary"),
-            "engagement/dto/ArticleTaxonomyDtos", List.of("uses engagement.domain article entities"));
+            "thesis/dto/ThesisDeanOverviewDtos", List.of("uses thesis.model status enums"),
+            "thesis/dto/ThesisGroupReadDtos", List.of("uses thesis.model status enums"),
+            "thesis/dto/ThesisMutationDtos", List.of("uses thesis.model status enums"),
+            "thesis/dto/ThesisRoundDtos", List.of("uses thesis.model round vocabulary"),
+            "thesis/dto/ThesisTopicDtos", List.of("uses thesis.model topic vocabulary"),
+            "engagement/dto/ArticleTaxonomyDtos", List.of("uses engagement.entity article entities"));
 
     @Test
     void layeredClassesDoNotDeclarePublicNestedDataTypesInSignatures() throws Exception {
@@ -196,6 +197,155 @@ class ArchitectureGuardTest {
         }
         assertTrue(violations.isEmpty(),
                 () -> "public/protected nested types in layered classes: " + violations);
+    }
+
+    /**
+     * Recognized top-level packages: business modules and cross-cutting
+     * packages. Anything else directly under the application root is a
+     * misplaced class.
+     */
+    private static final Set<String> TOP_LEVEL_PACKAGES = Set.of(
+            "academic", "audit", "auth", "common", "config", "engagement",
+            "exception", "mail", "notification", "people", "security", "site",
+            "system", "thesis");
+
+    /**
+     * Package roots that must stay empty: every class under them sits one
+     * level deeper in a role subpackage (controller/service/repository/dto/
+     * model/...). {@code exception} is absent on purpose: the shared base
+     * exception family lives at the exception root by design.
+     */
+    private static final Set<String> PACKAGE_ROOTS_REQUIRING_ROLE_SUBPACKAGES = Set.of(
+            "academic", "audit", "auth", "common", "config", "engagement",
+            "mail", "notification", "people", "security", "site", "system",
+            "thesis", "academic/registration", "security/ratelimit",
+            "thesis/assistant");
+
+    private static final Set<String> BUSINESS_MODULES = Set.of(
+            "academic", "audit", "auth", "engagement", "mail", "notification",
+            "people", "site", "thesis");
+
+    private static final Set<String> CROSS_CUTTING_PACKAGES = Set.of(
+            "common", "config", "exception", "security", "system");
+
+    /**
+     * Cross-cutting classes that legitimately referenced a business module
+     * before this rule existed (class -> allowed business module -> reason).
+     */
+    private static final Map<String, Map<String, String>> CROSS_CUTTING_TO_BUSINESS_EXCEPTIONS = Map.of(
+            "security/filter/AccountStateFilter", Map.of("auth",
+                    "reads the account authorization row and model on every authenticated request"),
+            "security/token/AuthTokenService", Map.of("auth",
+                    "issues the auth module's token carriers"),
+            "system/controller/HealthController", Map.of("thesis",
+                    "readiness reports the assistant RLS verdict"));
+
+    /**
+     * Internal dependency direction inside the security package: each key is a
+     * subpackage that must not reference the listed sibling subpackages. The
+     * config package owns the wiring, so it has no entry (it may reach
+     * everything).
+     */
+    private static final Map<String, List<String>> SECURITY_FORBIDDEN_REFS = Map.of(
+            "security/model", List.of("security/filter", "security/token", "security/config",
+                    "security/availability", "security/ratelimit"),
+            "security/availability", List.of("security/filter", "security/token", "security/config",
+                    "security/model", "security/ratelimit"),
+            "security/filter", List.of("security/config", "security/ratelimit"),
+            "security/token", List.of("security/config", "security/filter", "security/ratelimit"),
+            "security/ratelimit/model", List.of("security/filter", "security/token", "security/config",
+                    "security/availability", "security/ratelimit/filter", "security/ratelimit/service",
+                    "security/ratelimit/properties", "security/ratelimit/annotation", "security/model"),
+            "security/ratelimit/properties", List.of("security/filter", "security/token", "security/config",
+                    "security/availability", "security/ratelimit/filter", "security/ratelimit/service",
+                    "security/ratelimit/model", "security/ratelimit/annotation", "security/model"),
+            "security/ratelimit/annotation", List.of("security/filter", "security/token", "security/config",
+                    "security/availability", "security/ratelimit/filter", "security/ratelimit/service",
+                    "security/ratelimit/properties", "security/model"),
+            "security/ratelimit/service", List.of("security/filter", "security/token", "security/config",
+                    "security/availability", "security/ratelimit/filter", "security/ratelimit/annotation",
+                    "security/model"),
+            "security/ratelimit/filter", List.of("security/filter", "security/token", "security/config",
+                    "security/availability", "security/ratelimit/annotation", "security/model"));
+
+    @Test
+    void classesSitInRoleSubpackagesBelowPackageRoots() throws Exception {
+        List<String> violations = scan().stream()
+                .filter(c -> !c.binaryName().equals("RestfulApiApplication"))
+                .flatMap(c -> {
+                    var problemsHere = new java.util.ArrayList<String>();
+                    String pkg = c.packagePath();
+                    if (pkg.isEmpty()) {
+                        problemsHere.add(c.binaryName() + " sits in the application root package");
+                        return problemsHere.stream();
+                    }
+                    String topSegment = pkg.contains("/") ? pkg.substring(0, pkg.indexOf('/')) : pkg;
+                    if (!TOP_LEVEL_PACKAGES.contains(topSegment)) {
+                        problemsHere.add(c.binaryName() + " is not inside a recognized top-level package");
+                    } else if (PACKAGE_ROOTS_REQUIRING_ROLE_SUBPACKAGES.contains(pkg)) {
+                        problemsHere.add(c.binaryName() + " sits directly in package root " + pkg
+                                + " instead of a role subpackage");
+                    }
+                    return problemsHere.stream();
+                })
+                .toList();
+        assertTrue(violations.isEmpty(), () -> "classes outside role subpackages: " + violations);
+    }
+
+    @Test
+    void crossCuttingPackagesDoNotDependOnBusinessModules() throws Exception {
+        List<String> violations = new java.util.ArrayList<>();
+        for (ScannedClass c : scan()) {
+            String pkg = c.packagePath();
+            String topSegment = pkg.contains("/") ? pkg.substring(0, pkg.indexOf('/')) : pkg;
+            if (!CROSS_CUTTING_PACKAGES.contains(topSegment)) {
+                continue;
+            }
+            for (String module : referencedTopSegments(c)) {
+                if (!BUSINESS_MODULES.contains(module)) {
+                    continue;
+                }
+                Map<String, String> tolerated = CROSS_CUTTING_TO_BUSINESS_EXCEPTIONS.get(c.binaryName());
+                if (tolerated == null || !tolerated.containsKey(module)) {
+                    violations.add(c.binaryName() + " -> " + module);
+                }
+            }
+        }
+        assertTrue(violations.isEmpty(),
+                () -> "cross-cutting packages depending on business modules: " + violations);
+    }
+
+    @Test
+    void securityPackagesKeepTheirDependencyDirection() throws Exception {
+        List<String> violations = new java.util.ArrayList<>();
+        for (ScannedClass c : scan()) {
+            String pkg = c.packagePath();
+            for (Map.Entry<String, List<String>> rule : SECURITY_FORBIDDEN_REFS.entrySet()) {
+                if (!pkg.equals(rule.getKey()) && !pkg.startsWith(rule.getKey() + "/")) {
+                    continue;
+                }
+                for (String forbidden : rule.getValue()) {
+                    if (references(c, "/" + forbidden + "/")) {
+                        violations.add(c.binaryName() + " -> " + forbidden);
+                    }
+                }
+            }
+        }
+        assertTrue(violations.isEmpty(),
+                () -> "security packages with a backwards dependency: " + violations);
+    }
+
+    private static java.util.Set<String> referencedTopSegments(ScannedClass c) {
+        var modules = new java.util.LinkedHashSet<String>();
+        var matcher = CLASS_REF.matcher(new String(c.bytes(), java.nio.charset.StandardCharsets.ISO_8859_1));
+        while (matcher.find()) {
+            String rel = matcher.group().substring(ROOT.length() + 1);
+            int slash = rel.indexOf('/');
+            if (slash > 0 && !rel.equals(c.binaryName())) {
+                modules.add(rel.substring(0, slash));
+            }
+        }
+        return modules;
     }
 
     @Test
