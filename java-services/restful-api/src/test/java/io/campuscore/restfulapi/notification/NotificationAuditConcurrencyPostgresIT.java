@@ -121,7 +121,7 @@ class NotificationAuditConcurrencyPostgresIT {
     }
 
     private static NotificationWriteService service(NamedParameterJdbcTemplate template) {
-        return new NotificationWriteService(new NotificationWriteRepository(template),new AdminAuditRecorder(template));
+        return new NotificationWriteService(new NotificationWriteRepository(template),new AdminAuditRecorder(new io.campuscore.restfulapi.audit.repository.AdminAuditWriteRepository(template)));
     }
 
     private static void insert(String id) {
