@@ -1,4 +1,4 @@
-package io.campuscore.restfulapi.common;
+package io.campuscore.restfulapi.common.util;
 
 import java.text.Normalizer;
 import java.util.ArrayList;

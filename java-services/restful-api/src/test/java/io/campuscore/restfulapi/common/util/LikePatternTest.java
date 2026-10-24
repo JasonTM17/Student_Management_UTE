@@ -1,4 +1,4 @@
-package io.campuscore.restfulapi.common;
+package io.campuscore.restfulapi.common.util;
 
 import static org.assertj.core.api.Assertions.assertThat;
 

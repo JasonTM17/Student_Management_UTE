@@ -2233,13 +2233,13 @@ public class ThesisMutationService {
         if (liveRounds == null || liveRounds == 0) {
             return List.of();
         }
-        List<String> tokens = io.campuscore.restfulapi.common.LikePattern.tokens(normalized);
+        List<String> tokens = io.campuscore.restfulapi.common.util.LikePattern.tokens(normalized);
         if (tokens.isEmpty()) {
             return List.of();
         }
         MapSqlParameterSource searchParams = params()
-                .addValue("foldFrom", io.campuscore.restfulapi.common.LikePattern.FOLD_FROM)
-                .addValue("foldTo", io.campuscore.restfulapi.common.LikePattern.FOLD_TO);
+                .addValue("foldFrom", io.campuscore.restfulapi.common.util.LikePattern.FOLD_FROM)
+                .addValue("foldTo", io.campuscore.restfulapi.common.util.LikePattern.FOLD_TO);
         StringBuilder tokenPredicates = new StringBuilder();
         for (int i = 0; i < tokens.size(); i++) {
             String paramName = "token" + i;

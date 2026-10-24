@@ -26,7 +26,7 @@ import io.campuscore.restfulapi.academic.dto.AcademicReadDtos.PageMeta;
 import io.campuscore.restfulapi.academic.dto.AcademicReadDtos.SemesterCatalogSummary;
 import io.campuscore.restfulapi.academic.dto.AcademicReadDtos.SemesterListResponse;
 import io.campuscore.restfulapi.academic.dto.AcademicReadDtos.SemesterResponse;
-import io.campuscore.restfulapi.common.LikePattern;
+import io.campuscore.restfulapi.common.util.LikePattern;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;

@@ -1,6 +1,6 @@
 package io.campuscore.restfulapi.engagement.repository;
 
-import io.campuscore.restfulapi.common.LikePattern;
+import io.campuscore.restfulapi.common.util.LikePattern;
 import io.campuscore.restfulapi.engagement.domain.AnnouncementFilter;
 import io.campuscore.restfulapi.engagement.domain.UserVisibility;
 import io.campuscore.restfulapi.engagement.dto.AnnouncementReadDtos.AnnouncementResponse;

@@ -2,7 +2,7 @@ package io.campuscore.restfulapi.audit.repository;
 
 import io.campuscore.restfulapi.audit.model.AuditEntry;
 import io.campuscore.restfulapi.audit.model.AuditPage;
-import io.campuscore.restfulapi.common.LikePattern;
+import io.campuscore.restfulapi.common.util.LikePattern;
 import java.sql.Timestamp;
 import java.time.Instant;
 import java.util.List;

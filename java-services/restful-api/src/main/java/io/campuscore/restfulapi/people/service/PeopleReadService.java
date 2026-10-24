@@ -1,6 +1,6 @@
 package io.campuscore.restfulapi.people.service;
 
-import io.campuscore.restfulapi.common.LikePattern;
+import io.campuscore.restfulapi.common.util.LikePattern;
 import io.campuscore.restfulapi.people.repository.PeopleReadRepository;
 import io.campuscore.restfulapi.people.model.LecturerDirectoryScope;
 import io.campuscore.restfulapi.people.dto.PeopleReadDtos.LecturerListResponse;
