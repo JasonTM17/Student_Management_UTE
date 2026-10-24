@@ -18,6 +18,10 @@ import { submitLiveLogin } from './fixtures/live-login';
  * refused), department head publishes, a student group registers and is
  * reviewed, registration closes, governance withdraws and re-points an
  * orphaned topic, and the leader submits a report while members are refused.
+ * The same journey then runs review and defense: governance assigns an
+ * independent counter-reviewer who scores the topic, a council is seated in
+ * the required order (the reviewer and the topic supervisor cannot grade),
+ * members score the defense, and only the chair finalizes the mean score.
  * Re-running it needs two releasable demo students, so it prefers a freshly
  * seeded stack.
  */
@@ -30,8 +34,12 @@ const DEPT_HEAD = { email: 'truongbomon@campuscore.demo', password: 'password123
 const LEADER = { email: 'student2@campuscore.edu', password: 'password123' };
 const MEMBER_A = { email: 'student3@campuscore.edu', password: 'password123' };
 const MEMBER_B = { email: 'student4@campuscore.edu', password: 'password123' };
+const LECTURER2 = { email: 'lecturer002@campuscore.demo', password: 'password123' };
+const LECTURER3 = { email: 'lecturer003@campuscore.demo', password: 'password123' };
+const LECTURER4 = { email: 'lecturer004@campuscore.demo', password: 'password123' };
+const LECTURER5 = { email: 'lecturer005@campuscore.demo', password: 'password123' };
 
-test.describe.configure({ timeout: 120_000 });
+test.describe.configure({ timeout: 180_000 });
 
 async function login(page: Page, email: string, password: string) {
   await page.goto('/en/login?portal=student');
@@ -226,11 +234,26 @@ test('a student token is refused by the delete endpoint', async ({ page }) => {
  * are about backend behaviour, not the proxy.
  */
 async function tokenFor(page: Page, email: string, password: string) {
-  const res = await page.request.fetch(`${API_BASE}/auth/login`, {
-    method: 'POST',
-    data: { email, password },
-    headers: { 'Content-Type': 'application/json' },
-  });
+  // page.request shares the browser cookie jar, and cookies ignore the port:
+  // a previous minted login leaves cc_access_token for 127.0.0.1, and the API
+  // refuses login-while-authenticated with 403. Clear before each mint.
+  const send = async () => {
+    await page.context().clearCookies();
+    return page.request.fetch(`${API_BASE}/auth/login`, {
+      method: 'POST',
+      data: { email, password },
+      headers: { 'Content-Type': 'application/json' },
+    });
+  };
+  let res = await send();
+  // Successful-login fixtures may wait out a validated retry window: the
+  // limiter answers 429 with Retry-After.
+  if (res.status() === 429) {
+    const retryAfter = Number(res.headers()['retry-after']);
+    await page.waitForTimeout(
+      (Number.isFinite(retryAfter) ? Math.min(retryAfter, 60) : 10) * 1_000 + 500);
+    res = await send();
+  }
   expect(res.status(), `login ${email}`).toBe(200);
   return (await res.json()).accessToken as string;
 }
@@ -254,16 +277,16 @@ async function apiAs(page: Page, token: string, method: string, path: string, bo
   return response;
 }
 
-test('stages 2-5: proposal, registration, post-close governance, report', async ({ page }) => {
+test('stages 2-7: proposal, registration, governance, report, review, council', async ({ page }) => {
   const stamp = Date.now().toString(36);
-  const [admin, lecturer, deptHead, leader, memberA, memberB] = await Promise.all([
-    tokenFor(page, ADMIN.email, ADMIN.password),
-    tokenFor(page, LECTURER.email, LECTURER.password),
-    tokenFor(page, DEPT_HEAD.email, DEPT_HEAD.password),
-    tokenFor(page, LEADER.email, LEADER.password),
-    tokenFor(page, MEMBER_A.email, MEMBER_A.password),
-    tokenFor(page, MEMBER_B.email, MEMBER_B.password),
-  ]);
+  // Spaced sequentially: the brute-force guard counts logins per IP in a
+  // window, and a burst of role tokens trips it with a plain 403.
+  const tokens: string[] = [];
+  for (const account of [ADMIN, LECTURER, DEPT_HEAD, LEADER, MEMBER_A, MEMBER_B]) {
+    tokens.push(await tokenFor(page, account.email, account.password));
+    await page.waitForTimeout(1_200);
+  }
+  const [admin, lecturer, deptHead, leader, memberA, memberB] = tokens;
 
   // A fresh round held open the whole journey; registration closes later.
   const schedule = roundPayload(`Stage25 ${stamp}`, 30);
@@ -412,4 +435,76 @@ test('stages 2-5: proposal, registration, post-close governance, report', async 
   expect(report.status(), 'leader submits report link').toBe(200);
   const outsiderReport = await apiAs(page, memberToken, 'POST', `/thesis/groups/${group.id}/report`, { title: 'x' });
   expect(outsiderReport.status(), 'member cannot write report').toBe(403);
+
+  // Stage 6: the counter-reviewer is governance-assigned and independent;
+  // the score is bounds-checked and readable by reviewer + governance only.
+  const extraTokens: string[] = [];
+  for (const account of [LECTURER2, LECTURER3, LECTURER4, LECTURER5]) {
+    extraTokens.push(await tokenFor(page, account.email, account.password));
+    await page.waitForTimeout(1_200);
+  }
+  const [reviewerToken, chairToken, secretaryToken, memberSeatToken] = extraTokens;
+  const studentAssign = await apiAs(page, memberToken, 'POST', `/thesis/topics/${topicB.id}/reviewer`, { lecturerId: 'lecturer-profile-002' });
+  expect(studentAssign.status(), 'student cannot assign reviewer').toBe(403);
+  const selfReview = await apiAs(page, admin, 'POST', `/thesis/topics/${topicB.id}/reviewer`, { lecturerId: 'lecturer-profile' });
+  expect(selfReview.status(), 'supervisor cannot review own topic').toBe(409);
+  const assignReviewer = await apiAs(page, admin, 'POST', `/thesis/topics/${topicB.id}/reviewer`, { lecturerId: 'lecturer-profile-002' });
+  expect(assignReviewer.status(), 'admin assigns counter-reviewer').toBe(200);
+  const strangerScore = await apiAs(page, leaderToken, 'POST', `/thesis/topics/${topicB.id}/reviewer-score`, { score: '8' });
+  expect(strangerScore.status(), 'non-reviewer cannot score').toBe(403);
+  const outOfBounds = await apiAs(page, reviewerToken, 'POST', `/thesis/topics/${topicB.id}/reviewer-score`, { score: '10.5' });
+  expect(outOfBounds.status(), 'score above 10 refused').toBe(400);
+  const reviewScore = await apiAs(page, reviewerToken, 'POST', `/thesis/topics/${topicB.id}/reviewer-score`, { score: '6.5', comment: 'solid report' });
+  expect(reviewScore.status(), 'reviewer submits score').toBe(200);
+  const strangerRead = await apiAs(page, memberToken, 'GET', `/thesis/topics/${topicB.id}/reviewer-score`);
+  expect(strangerRead.status(), 'outsider cannot read reviewer score').toBe(403);
+
+  // Stage 7: council seat order, topic assignment, member-only scoring,
+  // chair-only finalize, and the roster lock once scoring begins.
+  const studentCouncil = await apiAs(page, memberToken, 'POST', '/thesis/councils', { roundId: round.id, name: 'X' });
+  expect(studentCouncil.status(), 'student cannot create council').toBe(403);
+  const councilRes = await apiAs(page, admin, 'POST', '/thesis/councils', { roundId: round.id, name: `Council ${stamp}` });
+  expect(councilRes.status(), 'admin creates council').toBe(200);
+  const council = await councilRes.json();
+  const seatEarly = await apiAs(page, admin, 'POST', `/thesis/councils/${council.id}/members`, { lecturerId: 'lecturer-profile-003', memberRole: 'MEMBER' });
+  expect(seatEarly.status(), 'member cannot precede the chair').toBe(409);
+  // Three eligible graders (chair, secretary, member); the topic supervisor
+  // also sits as a plain member — present at the defense, barred from grading.
+  for (const [lecturerId, memberRole] of [
+    ['lecturer-profile-003', 'CHAIR'],
+    ['lecturer-profile-004', 'SECRETARY'],
+    ['lecturer-profile-005', 'MEMBER'],
+    ['lecturer-profile', 'MEMBER'],
+  ] as const) {
+    const seat = await apiAs(page, admin, 'POST', `/thesis/councils/${council.id}/members`, { lecturerId, memberRole });
+    expect(seat.status(), `seat ${memberRole} ${lecturerId}`).toBe(200);
+  }
+  const outsiderRead = await apiAs(page, memberToken, 'GET', `/thesis/councils/${council.id}`);
+  expect(outsiderRead.status(), 'outsider cannot read the council').toBe(403);
+  const assignTopic = await apiAs(page, admin, 'POST', `/thesis/councils/${council.id}/topics`, { topicId: topicB.id });
+  expect(assignTopic.status(), 'topic assigned to council').toBe(200);
+  const dupAssign = await apiAs(page, admin, 'POST', `/thesis/councils/${council.id}/topics`, { topicId: topicB.id });
+  expect(dupAssign.status(), 'duplicate assignment refused').toBe(409);
+  const seatReviewer = await apiAs(page, admin, 'POST', `/thesis/councils/${council.id}/members`, { lecturerId: 'lecturer-profile-002', memberRole: 'MEMBER' });
+  expect(seatReviewer.status(), 'the topic reviewer cannot sit on its council').toBe(409);
+  const outsiderScore = await apiAs(page, memberToken, 'POST', `/thesis/councils/${council.id}/topics/${topicB.id}/scores`, { component: 'DEFENSE', score: '8' });
+  expect(outsiderScore.status(), 'student cannot score').toBe(403);
+  const supScore = await apiAs(page, lecturer, 'POST', `/thesis/councils/${council.id}/topics/${topicB.id}/scores`, { component: 'DEFENSE', score: '8' });
+  expect(supScore.status(), 'supervisor cannot grade own topic').toBe(403);
+  const earlyFinal = await apiAs(page, chairToken, 'POST', `/thesis/councils/${council.id}/topics/${topicB.id}/finalize`);
+  expect(earlyFinal.status(), 'incomplete scores block finalize').toBe(409);
+  for (const [token, score] of [[chairToken, '8.5'], [secretaryToken, '7'], [memberSeatToken, '7']] as const) {
+    const res = await apiAs(page, token, 'POST', `/thesis/councils/${council.id}/topics/${topicB.id}/scores`, { component: 'DEFENSE', score });
+    expect(res.status(), `DEFENSE score ${score}`).toBe(200);
+  }
+  const wrongFinalize = await apiAs(page, secretaryToken, 'POST', `/thesis/councils/${council.id}/topics/${topicB.id}/finalize`);
+  expect(wrongFinalize.status(), 'only the chair finalizes').toBe(403);
+  const finRes = await apiAs(page, chairToken, 'POST', `/thesis/councils/${council.id}/topics/${topicB.id}/finalize`);
+  expect(finRes.status(), 'chair finalizes').toBe(200);
+  // Mean of the three eligible DEFENSE scores (8.5 + 7 + 7) / 3.
+  expect(String((await finRes.json()).finalScore), 'mean of three defense scores').toBe('7.5');
+  const rescore = await apiAs(page, memberSeatToken, 'POST', `/thesis/councils/${council.id}/topics/${topicB.id}/scores`, { component: 'DEFENSE', score: '9' });
+  expect(rescore.status(), 'scoring freezes after finalize').toBe(409);
+  const lateSeat = await apiAs(page, admin, 'POST', `/thesis/councils/${council.id}/members`, { lecturerId: 'lecturer-profile-006', memberRole: 'MEMBER' });
+  expect(lateSeat.status(), 'roster locks after scoring').toBe(409);
 });
