@@ -1,4 +1,4 @@
-package io.campuscore.restfulapi.site;
+package io.campuscore.restfulapi.site.controller;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import io.campuscore.restfulapi.web.DomainException;
@@ -19,6 +19,7 @@ import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+import io.campuscore.restfulapi.site.service.SiteAppearanceStore;
 
 /**
  * Site-wide appearance (accent theme, homepage hero copy, homepage post order).
