@@ -277,6 +277,10 @@ export default function AdminAnnouncementsPage() {
   const [reorderList, setReorderList] = useState<AnnouncementRecord[]>([]);
   const [isSavingOrder, setIsSavingOrder] = useState(false);
   const [editorEngine, setEditorEngine] = useState<'tinymce' | 'markdown'>('tinymce');
+  // Touched-field flags drive the required hint under each field, matching
+  // the mail form pattern: untouched empties stay quiet until the user has
+  // actually visited the control.
+  const [touched, setTouched] = useState({ title: false, content: false });
 
   const reorderCopy = vi ? reorderCopyVi : reorderCopyEn;
   const reorderGuard = useMemo(() => canReorder({ page, filters }), [filters, page]);
@@ -623,6 +627,7 @@ export default function AdminAnnouncementsPage() {
     setEditorMode('create');
     setSelected(null);
     setDraft(nextDraft);
+    setTouched({ title: false, content: false });
     editorSnapshot.current = serializeDraft(nextDraft);
     setPreviewRole('STUDENT');
     setPreviewYear('1');
@@ -634,6 +639,7 @@ export default function AdminAnnouncementsPage() {
     setEditorMode('edit');
     setSelected(item);
     setDraft(nextDraft);
+    setTouched({ title: false, content: false });
     editorSnapshot.current = serializeDraft(nextDraft);
     setPreviewRole('STUDENT');
     setPreviewYear(String(item.targetYears?.[0] ?? 1));
@@ -1074,9 +1080,18 @@ export default function AdminAnnouncementsPage() {
               <div className="space-y-5">
                 <AdminFormSection title={vi ? 'Nội dung chính' : 'Core content'} description={vi ? 'Giữ tiêu đề ngắn gọn và nội dung dễ đọc trên mọi vai trò.' : 'Keep the title concise and the message readable for every role.'}>
                   <AdminFormField label={`${vi ? 'Tiêu đề' : 'Title'} · ${copy.required}`}>
-                    <Input autoFocus value={draft.title} maxLength={240} required onChange={(event) => setDraft((current) => ({ ...current, title: event.target.value }))} />
+                    <Input
+                      autoFocus
+                      value={draft.title}
+                      maxLength={240}
+                      required
+                      error={touched.title && !draft.title.trim() ? copy.required : undefined}
+                      onChange={(event) => setDraft((current) => ({ ...current, title: event.target.value }))}
+                      onBlur={() => setTouched((current) => ({ ...current, title: true }))}
+                    />
                   </AdminFormField>
                   <AdminFormField label={`${vi ? 'Nội dung' : 'Content'} · ${copy.required}`} description={vi ? 'Nội dung cập nhật ngay trên bảng tin; hỗ trợ trình soạn thảo TinyMCE WYSIWYG chuyên sâu hoặc Markdown bảng biểu, liên kết và hộp ghi chú callout.' : 'Changes appear in the feed immediately; supports TinyMCE visual editor or Markdown with tables and callouts.'}>
+                  <div onBlur={() => setTouched((current) => ({ ...current, content: true }))}>
                     <div className="mb-2 flex items-center justify-between border-b border-border/60 pb-2">
                       <div className="inline-flex rounded-lg border border-border/80 bg-muted/40 p-0.5 text-xs">
                         <button
@@ -1117,7 +1132,10 @@ export default function AdminAnnouncementsPage() {
                       <div className="space-y-1">
                         <TinyMceEditor
                           value={draft.content}
-                          onChange={(newContent) => setDraft((current) => ({ ...current, content: newContent }))}
+                          onChange={(newContent) => {
+                            setTouched((current) => ({ ...current, content: true }));
+                            setDraft((current) => ({ ...current, content: newContent }));
+                          }}
                           locale={locale}
                           height={360}
                           placeholder={
@@ -1132,12 +1150,19 @@ export default function AdminAnnouncementsPage() {
                     <div className={editorEngine === 'markdown' ? 'block' : 'hidden'}>
                       <RichTextEditor
                         value={draft.content}
-                        onChange={(newContent) => setDraft((current) => ({ ...current, content: newContent }))}
+                        onChange={(newContent) => {
+                          setTouched((current) => ({ ...current, content: true }));
+                          setDraft((current) => ({ ...current, content: newContent }));
+                        }}
                         locale={locale}
                         minHeight="220px"
                         placeholder={vi ? 'Soạn thảo nội dung thông báo... (Hỗ trợ tiêu đề, in đậm, bảng biểu, ghi chú khẩn)' : 'Compose announcement body... (Supports headings, bold, tables, alert callouts)'}
                       />
                     </div>
+                  </div>
+                    {touched.content && !draft.content.trim() ? (
+                      <p className="mt-1 text-xs text-destructive" role="alert">{copy.required}</p>
+                    ) : null}
                   </AdminFormField>
                 </AdminFormSection>
 
@@ -1283,7 +1308,7 @@ export default function AdminAnnouncementsPage() {
             <div className="sticky bottom-4 z-10 -mx-5 bg-card px-5">
               <AdminDialogFooter className="border-t border-border/70 pt-4">
                 <Button type="button" variant="outline" onClick={closeModal} disabled={busy}>{copy.cancel}</Button>
-                <Button type="submit" disabled={busy}>{busy ? (vi ? 'Đang lưu…' : 'Saving…') : editorMode === 'edit' ? copy.save : copy.createSave}</Button>
+                <Button type="submit" disabled={busy || !draft.title.trim() || !draft.content.trim()}>{busy ? (vi ? 'Đang lưu…' : 'Saving…') : editorMode === 'edit' ? copy.save : copy.createSave}</Button>
               </AdminDialogFooter>
             </div>
           </form>

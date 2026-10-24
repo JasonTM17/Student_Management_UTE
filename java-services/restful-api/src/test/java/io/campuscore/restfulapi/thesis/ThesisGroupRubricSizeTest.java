@@ -281,6 +281,8 @@ class ThesisGroupRubricSizeTest {
 
     private ResultActions approve(UUID groupId) throws Exception {
         return mvc.perform(post("/api/v1/thesis/groups/{id}/approve", groupId)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"reason\":\"Administrative approval\"}")
                 .with(ThesisAuthorityFixture.role(jdbc, "rgs-admin", "ADMIN")));
     }
 

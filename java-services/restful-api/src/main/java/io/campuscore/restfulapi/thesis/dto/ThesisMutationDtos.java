@@ -57,11 +57,17 @@ public final class ThesisMutationDtos {
     public record GroupRejectionRequest(String reason) {
     }
 
+    /** Mandatory reason for withdrawing a mistaken group approval. */
+    public record GroupApprovalWithdrawalRequest(String reason) {
+    }
+
     /**
      * Optional approval body. {@code allowSizeException} lets governance
      * (admin or the in-scope faculty head — never a plain topic supervisor)
      * approve a below-minimum roster; {@code reason} is the documented
-     * exception recorded on the marker in the same transaction.
+     * exception recorded on the marker in the same transaction. When the
+     * approver is not the topic's own supervisor the approval is a governance
+     * override and {@code reason} is mandatory.
      */
     public record GroupApprovalRequest(Boolean allowSizeException, String reason) {
     }
@@ -166,6 +172,14 @@ public final class ThesisMutationDtos {
      * requires the governance reason, like cancel and retract.
      */
     public record RoundDeleteRequest(String reason) {
+    }
+
+    /**
+     * Governance reason for closing a published round (archive) or reopening
+     * a closed one. The UI collects the typed round name for close separately
+     * as its own confirmation gate; the API only requires the reason.
+     */
+    public record RoundClosureRequest(String reason) {
     }
 
     /**

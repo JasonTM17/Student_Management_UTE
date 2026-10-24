@@ -29,7 +29,7 @@ import {
 import { useAuth } from '@/context/AuthContext';
 import { toast } from 'sonner';
 import { classifyThesisScore } from '@/lib/grade-scale';
-import { pickPreferredThesisRound } from '@/lib/thesis-round';
+import { pickPreferredThesisRound, roundsForPicker } from '@/lib/thesis-round';
 import { Button } from '@/components/ui/button';
 import { LinkButton } from '@/components/ui/link-button';
 import { Input } from '@/components/ui/input';
@@ -193,6 +193,14 @@ export default function ThesisPage() {
   const [approveExceptionGroupId, setApproveExceptionGroupId] = useState('');
   const [approveExceptionReason, setApproveExceptionReason] = useState('');
   const [approveExceptionError, setApproveExceptionError] = useState('');
+  const [isApproveOverrideModalOpen, setIsApproveOverrideModalOpen] = useState(false);
+  const [approveOverrideGroupId, setApproveOverrideGroupId] = useState('');
+  const [approveOverrideReason, setApproveOverrideReason] = useState('');
+  const [approveOverrideError, setApproveOverrideError] = useState('');
+  const [isWithdrawModalOpen, setIsWithdrawModalOpen] = useState(false);
+  const [withdrawGroupId, setWithdrawGroupId] = useState('');
+  const [withdrawReason, setWithdrawReason] = useState('');
+  const [withdrawError, setWithdrawError] = useState('');
   const [rejectGroupId, setRejectGroupId] = useState('');
   const [rejectReason, setRejectReason] = useState('');
   const [rejectError, setRejectError] = useState('');
@@ -566,7 +574,13 @@ export default function ThesisPage() {
     setIsLoading(true);
     setError('');
     try {
-      const nextRounds = await thesisApi.listRounds();
+      // Archived rounds stay resolvable so a closed membership or supervised
+      // round still serves its read-only results; the picker filters them out.
+      const [liveRounds, closedRounds] = await Promise.all([
+        thesisApi.listRounds(),
+        thesisApi.listRounds('CLOSED').catch(() => [] as ThesisRound[]),
+      ]);
+      const nextRounds = [...liveRounds, ...closedRounds];
       if (signal.cancelled) return;
       const sortedRounds = [...nextRounds].sort((a, b) => {
         const isOpenA = a.status === 'REGISTRATION_OPEN' ? 0 : 1;
@@ -586,7 +600,7 @@ export default function ThesisPage() {
         const preferred =
           sortedRounds.find((r) => r.status === 'REGISTRATION_OPEN' && r.thesisType === 'KLTN') ||
           sortedRounds.find((r) => r.status === 'REGISTRATION_OPEN') ||
-          sortedRounds[0];
+          sortedRounds.find((r) => r.status !== 'CLOSED');
         return preferred?.id || '';
       });
     } catch {
@@ -914,14 +928,14 @@ export default function ThesisPage() {
   const selectedRound = rounds.find((round) => round.id === selectedRoundId);
   const roundGroups = useMemo(() => {
     const map = new Map<string, { value: string; label: string }[]>();
-    for (const r of rounds) {
+    for (const r of roundsForPicker(rounds, selectedRoundId)) {
       const match = r.name.match(/Ni\u00ean kh\u00f3a\s+\d{4}\s*[-–]\s*\d{4}/i);
       const cohort = match ? match[0] : (r.thesisType === 'KLTN' ? 'Khóa luận Tốt nghiệp' : 'Học phần Tốt nghiệp / Chuyên ngành');
       if (!map.has(cohort)) map.set(cohort, []);
       map.get(cohort)!.push({ value: r.id, label: r.name });
     }
     return Array.from(map.entries()).map(([label, opts]) => ({ label, options: opts }));
-  }, [rounds]);
+  }, [rounds, selectedRoundId]);
   const studentId = user?.studentId ?? '';
   const ownGroups = groups.filter(
     (group) =>
@@ -1011,7 +1025,11 @@ export default function ThesisPage() {
   }, [reportGroupId, reportApprovalStatus, groupReportReloadToken, messages.thesis.report.loadFailed]);
 
   useEffect(() => {
-    if (!isStudent || !selectedRoundId || selectedRound?.status !== 'RESULTS_PUBLISHED') {
+    // CLOSED still serves the published result set — closing archives the
+    // round, it does not unpublish.
+    const resultsPublished =
+      selectedRound?.status === 'RESULTS_PUBLISHED' || selectedRound?.status === 'CLOSED';
+    if (!isStudent || !selectedRoundId || !resultsPublished) {
       setRoundResults([]);
       setResultsState('hidden');
       return;
@@ -1488,10 +1506,14 @@ export default function ThesisPage() {
       if (code === 'GROUP_TOO_SMALL' && isAdmin) {
         // Governance may still approve an under-size roster — but only via
         // the documented size exception, not a dead-end error message.
-        setApproveExceptionGroupId(groupId);
-        setApproveExceptionReason('');
-        setApproveExceptionError('');
-        setIsApproveExceptionModalOpen(true);
+        openApproveExceptionModal(groupId);
+      } else if (code === 'GROUP_APPROVAL_OVERRIDE_REASON_REQUIRED') {
+        // A non-supervisor approval is a governance override: the documented
+        // reason is collected in the same modal pattern and resubmitted.
+        setApproveOverrideGroupId(groupId);
+        setApproveOverrideReason('');
+        setApproveOverrideError('');
+        setIsApproveOverrideModalOpen(true);
       } else if (code === 'GROUP_TOO_SMALL') {
         setActionError(messages.thesis.groupTooSmall);
       } else if (code === 'GROUP_APPROVAL_STATE_CONFLICT') {
@@ -1502,6 +1524,14 @@ export default function ThesisPage() {
     } finally {
       setIsActionPending(false);
     }
+  };
+
+  /** Opens the size-exception dialog directly (proactive governance action). */
+  const openApproveExceptionModal = (groupId: string) => {
+    setApproveExceptionGroupId(groupId);
+    setApproveExceptionReason('');
+    setApproveExceptionError('');
+    setIsApproveExceptionModalOpen(true);
   };
 
   const confirmApproveException = async () => {
@@ -1527,6 +1557,63 @@ export default function ThesisPage() {
       setActionSuccess(messages.thesis.approveSuccess);
     } catch (caught) {
       setApproveExceptionError(thesisActionError(caught));
+    } finally {
+      setIsActionPending(false);
+    }
+  };
+
+  const confirmApproveOverride = async () => {
+    const trimmed = approveOverrideReason.trim();
+    if (!trimmed) {
+      setApproveOverrideError(messages.thesis.rejectionReasonPlaceholder);
+      return;
+    }
+    if (trimmed.length > 500) {
+      setApproveOverrideError(messages.thesis.reasonTooLong);
+      return;
+    }
+    setIsActionPending(true);
+    setApproveOverrideError('');
+    setActionSuccess('');
+    try {
+      await thesisApi.approveGroup(approveOverrideGroupId, { reason: trimmed });
+      await refreshGroups();
+      setIsApproveOverrideModalOpen(false);
+      setActionSuccess(messages.thesis.approveSuccess);
+    } catch (caught) {
+      setApproveOverrideError(thesisActionError(caught));
+    } finally {
+      setIsActionPending(false);
+    }
+  };
+
+  const openWithdrawModal = (groupId: string) => {
+    setWithdrawGroupId(groupId);
+    setWithdrawReason('');
+    setWithdrawError('');
+    setIsWithdrawModalOpen(true);
+  };
+
+  const confirmWithdrawApproval = async () => {
+    const trimmed = withdrawReason.trim();
+    if (!trimmed) {
+      setWithdrawError(messages.thesis.withdrawApprovalReasonPlaceholder);
+      return;
+    }
+    if (trimmed.length > 500) {
+      setWithdrawError(messages.thesis.reasonTooLong);
+      return;
+    }
+    setIsActionPending(true);
+    setWithdrawError('');
+    setActionSuccess('');
+    try {
+      await thesisApi.withdrawGroupApproval(withdrawGroupId, trimmed);
+      await refreshGroups();
+      setIsWithdrawModalOpen(false);
+      setActionSuccess(messages.thesis.withdrawApprovalSuccess);
+    } catch (caught) {
+      setWithdrawError(thesisActionError(caught));
     } finally {
       setIsActionPending(false);
     }
@@ -2592,7 +2679,7 @@ export default function ThesisPage() {
                 }}
                 aria-label={messages.thesis.selectRound}
                 groups={roundGroups}
-                options={rounds.map((round) => ({
+                options={roundsForPicker(rounds, selectedRoundId).map((round) => ({
                   value: round.id,
                   label: round.name,
                 }))}
@@ -2893,6 +2980,10 @@ export default function ThesisPage() {
                     }
                     onApprove={approveGroup}
                     onReject={openRejectModal}
+                    minGroupSize={selectedRound?.minGroupSize ?? null}
+                    canSizeException={isAdmin}
+                    onApproveWithException={isAdmin ? openApproveExceptionModal : undefined}
+                    onWithdrawApproval={openWithdrawModal}
                     onDownloadReport={downloadReportArtifact}
                   />
                   ) : null}
@@ -3501,6 +3592,110 @@ export default function ThesisPage() {
               disabled={isActionPending}
             >
               {isActionPending ? messages.common.states.loading : messages.thesis.approveWithException}
+            </Button>
+          </div>
+        </div>
+      </Modal>
+
+      {/* Governance Override Approval Modal (non-supervisor approver) */}
+      <Modal
+        isOpen={isApproveOverrideModalOpen}
+        onClose={() => {
+          if (!isActionPending) setIsApproveOverrideModalOpen(false);
+        }}
+        title={messages.thesis.approveOverrideModalTitle}
+      >
+        <div className="space-y-4">
+          <p className="text-sm text-muted-foreground">
+            {messages.thesis.approveOverrideModalDescription}
+          </p>
+          {approveOverrideError ? (
+            <div className="rounded-md border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive">
+              {approveOverrideError}
+            </div>
+          ) : null}
+          <div>
+            <label htmlFor="thesis-override-reason" className="mb-1 block text-sm font-medium text-foreground">
+              {messages.thesis.rejectionReason}
+            </label>
+            <Textarea
+              id="thesis-override-reason"
+              value={approveOverrideReason}
+              onChange={(e) => setApproveOverrideReason(e.target.value)}
+              placeholder={messages.thesis.rejectionReasonPlaceholder}
+              maxLength={500}
+              rows={4}
+              disabled={isActionPending}
+            />
+          </div>
+          <div className="flex justify-end gap-2 pt-2">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setIsApproveOverrideModalOpen(false)}
+              disabled={isActionPending}
+            >
+              {messages.common.actions.cancel}
+            </Button>
+            <Button
+              type="button"
+              className="bg-emerald-700 text-white hover:bg-emerald-800"
+              onClick={() => void confirmApproveOverride()}
+              disabled={isActionPending}
+            >
+              {isActionPending ? messages.common.states.loading : messages.thesis.approve}
+            </Button>
+          </div>
+        </div>
+      </Modal>
+
+      {/* Withdraw Approval Modal */}
+      <Modal
+        isOpen={isWithdrawModalOpen}
+        onClose={() => {
+          if (!isActionPending) setIsWithdrawModalOpen(false);
+        }}
+        title={messages.thesis.withdrawApprovalModalTitle}
+      >
+        <div className="space-y-4">
+          <p className="text-sm text-muted-foreground">
+            {messages.thesis.withdrawApprovalModalDescription}
+          </p>
+          {withdrawError ? (
+            <div className="rounded-md border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive">
+              {withdrawError}
+            </div>
+          ) : null}
+          <div>
+            <label htmlFor="thesis-withdraw-reason" className="mb-1 block text-sm font-medium text-foreground">
+              {messages.thesis.withdrawApprovalReason}
+            </label>
+            <Textarea
+              id="thesis-withdraw-reason"
+              value={withdrawReason}
+              onChange={(e) => setWithdrawReason(e.target.value)}
+              placeholder={messages.thesis.withdrawApprovalReasonPlaceholder}
+              maxLength={500}
+              rows={4}
+              disabled={isActionPending}
+            />
+          </div>
+          <div className="flex justify-end gap-2 pt-2">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setIsWithdrawModalOpen(false)}
+              disabled={isActionPending}
+            >
+              {messages.common.actions.cancel}
+            </Button>
+            <Button
+              type="button"
+              variant="destructive"
+              onClick={() => void confirmWithdrawApproval()}
+              disabled={isActionPending}
+            >
+              {isActionPending ? messages.common.states.loading : messages.thesis.withdrawApproval}
             </Button>
           </div>
         </div>

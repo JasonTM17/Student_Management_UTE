@@ -73,6 +73,19 @@ export function planThesisRoundRestore(
   return { implicitTarget: null, explicitTargets: targets, requiresChoice: true };
 }
 
+/**
+ * Interactive round pickers stay on live rounds: a CLOSED (archived) round is
+ * resolvable data — results and history still render for it — but it is not
+ * something a user picks to work in. The already-selected id is kept so the
+ * picker still names the archived round being viewed instead of going blank.
+ */
+export function roundsForPicker(
+  rounds: ReadonlyArray<ThesisRound>,
+  selectedId?: string,
+): ThesisRound[] {
+  return rounds.filter((round) => round.status !== 'CLOSED' || round.id === selectedId);
+}
+
 const ROUND_STATUS_PRIORITY: Readonly<Record<string, number>> = {
   REGISTRATION_OPEN: 0,
   REGISTRATION_CLOSED: 1,
