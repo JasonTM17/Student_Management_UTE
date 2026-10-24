@@ -66,6 +66,7 @@ class MailRecipientScopePersistenceTest {
                     "studentId" VARCHAR(120) NOT NULL,
                     "sectionId" VARCHAR(120) NOT NULL,
                     "status" VARCHAR(40) NOT NULL,
+                    "registrationSource" VARCHAR(40),
                     "enrolledAt" TIMESTAMP NOT NULL
                 )
                 """);

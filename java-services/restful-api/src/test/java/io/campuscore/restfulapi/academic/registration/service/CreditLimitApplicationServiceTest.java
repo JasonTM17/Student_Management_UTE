@@ -91,6 +91,30 @@ class CreditLimitApplicationServiceTest {
         assertThat(approved.status()).isEqualTo("APPROVED");
     }
 
+    @Test
+    void summerRoundLimitUsesConfiguredValueAndCannotBeRaisedByApprovedException() {
+        seedStudent();
+        seedOpenRound("cl-summer-round", 8);
+        Map<String, Object> round = openRoundRow("cl-summer-round");
+        round.put("semester_type", "SUMMER");
+        assertThat(service.effectiveLimit(STUDENT, round)).isEqualTo(8);
+
+        CreditLimitApplicationDtos.Response application = service.submit(
+                STUDENT, "cl-summer-round", "Summer credit request for required course substitution.");
+        service.review(application.id(), "APPROVED", "admin-user-1", null);
+        assertThat(service.effectiveLimit(STUDENT, round)).isEqualTo(8);
+
+        jdbc.update("UPDATE academic.\"RegistrationRound\" SET \"creditLimit\" = 10 WHERE \"id\" = ?",
+                "cl-summer-round");
+        round.put("credit_limit", 10);
+        assertThat(service.effectiveLimit(STUDENT, round)).isEqualTo(10);
+
+        jdbc.update("UPDATE academic.\"RegistrationRound\" SET \"creditLimit\" = 28 WHERE \"id\" = ?",
+                "cl-summer-round");
+        round.put("credit_limit", 28);
+        assertThat(service.effectiveLimit(STUDENT, round)).isEqualTo(10);
+    }
+
     private void seedStudent() {
         // The service resolves the student in academic."Student" and joins the
         // campuscore_auth."User" account for display fields; the H2 harness

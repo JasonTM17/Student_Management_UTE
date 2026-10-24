@@ -96,6 +96,297 @@ class AcademicEnrollmentMutationPersistenceTest {
     }
 
     @Test
+    void studentCanReadCurriculumPlanForOwnSemester() throws Exception {
+        seedLecturerAndCurriculumCourses();
+        prepareSecondYearCurriculumTerm();
+        mvc.perform(get("/api/v1/me/registration/curriculum-plan")
+                        .param("semesterId", "semester-1")
+                        .with(studentJwt("student-user-1", "student-1")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.semesterId").value("semester-1"))
+                .andExpect(jsonPath("$.term.status").value("RESOLVED"))
+                .andExpect(jsonPath("$.term.curriculumYear").value(2))
+                .andExpect(jsonPath("$.term.curriculumSemester").value(1))
+                .andExpect(jsonPath("$.courses[0].courseCode").value("SE402"))
+                .andExpect(jsonPath("$.courses[0].state").value("REGISTERABLE"))
+                .andExpect(jsonPath("$.courses[0].proposedSection.id").value("section-open"));
+    }
+
+    @Test
+    void curriculumTermUnknownCanBeManuallySelectedAndSummerMappingIsExplicit() throws Exception {
+        seedLecturerAndCurriculumCourses();
+        prepareSecondYearCurriculumTerm();
+        jdbc.update("UPDATE \"academic\".\"Student\" SET \"admissionDate\"=? WHERE \"id\"=?",
+                localDateTime(Instant.parse("2024-09-01T00:00:00Z")), "student-1");
+
+        mvc.perform(get("/api/v1/me/registration/curriculum-plan").param("semesterId", "semester-1")
+                        .with(studentJwt("student-user-1", "student-1")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.term.status").value("UNKNOWN"))
+                .andExpect(jsonPath("$.term.reasonCode").value("ADMISSION_YEAR_UNRESOLVED"))
+                .andExpect(jsonPath("$.courses").isEmpty());
+
+        mvc.perform(get("/api/v1/me/registration/curriculum-plan").param("semesterId", "semester-1")
+                        .param("curriculumYear", "2").param("curriculumSemester", "1")
+                        .with(studentJwt("student-user-1", "student-1")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.term.status").value("MANUAL"))
+                .andExpect(jsonPath("$.courses[0].courseCode").value("SE402"));
+
+        jdbc.update("UPDATE \"academic\".\"Student\" SET \"admissionDate\"=? WHERE \"id\"=?",
+                localDateTime(Instant.parse("2025-09-01T00:00:00Z")), "student-1");
+        LocalDateTime overlapStart = LocalDateTime.of(2025, 1, 1, 0, 0);
+        LocalDateTime overlapEnd = LocalDateTime.of(2027, 1, 1, 0, 0);
+        jdbc.update("INSERT INTO \"academic\".\"AcademicYear\""
+                        + " (\"id\",\"year\",\"startDate\",\"endDate\",\"isCurrent\",\"createdAt\",\"updatedAt\")"
+                        + " VALUES (?,?,?,?,?,?,?)",
+                "ay-overlap", 2025, overlapStart, overlapEnd, false, overlapStart, overlapStart);
+        mvc.perform(get("/api/v1/me/registration/curriculum-plan").param("semesterId", "semester-1")
+                        .with(studentJwt("student-user-1", "student-1")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.term.status").value("UNKNOWN"))
+                .andExpect(jsonPath("$.term.reasonCode").value("ADMISSION_YEAR_UNRESOLVED"));
+        jdbc.update("DELETE FROM \"academic\".\"AcademicYear\" WHERE \"id\"=?", "ay-overlap");
+
+        jdbc.update("UPDATE \"academic\".\"Semester\" SET \"type\"='SUMMER' WHERE \"id\"=?", "semester-1");
+        mvc.perform(get("/api/v1/me/registration/curriculum-plan").param("semesterId", "semester-1")
+                        .with(studentJwt("student-user-1", "student-1")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.term.status").value("RESOLVED"))
+                .andExpect(jsonPath("$.term.curriculumYear").value(2))
+                .andExpect(jsonPath("$.term.curriculumSemester").value(3))
+                .andExpect(jsonPath("$.courses").isEmpty());
+
+        jdbc.update("UPDATE \"academic\".\"Semester\" SET \"type\"='MYSTERY' WHERE \"id\"=?", "semester-1");
+        mvc.perform(get("/api/v1/me/registration/curriculum-plan").param("semesterId", "semester-1")
+                        .with(studentJwt("student-user-1", "student-1")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.term.status").value("UNKNOWN"))
+                .andExpect(jsonPath("$.term.reasonCode").value("SEMESTER_TYPE_UNKNOWN"));
+
+        jdbc.update("UPDATE \"academic\".\"Semester\" SET \"type\"='SPRING' WHERE \"id\"=?", "semester-1");
+        mvc.perform(get("/api/v1/me/registration/curriculum-plan").param("semesterId", "semester-1")
+                        .with(studentJwt("student-user-1", "student-1")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.term.status").value("RESOLVED"))
+                .andExpect(jsonPath("$.term.curriculumSemester").value(2));
+    }
+
+    @Test
+    void curriculumPlanReportsAvailabilityPrerequisitesScheduleConflictsAndPassingGrades() throws Exception {
+        seedLecturerAndCurriculumCourses();
+        prepareSecondYearCurriculumTerm();
+
+        jdbc.update("UPDATE \"academic\".\"Section\" SET \"capacity\"=1, \"enrolledCount\"=1 WHERE \"id\"=?",
+                "section-open");
+        planCourse().andExpect(jsonPath("$.courses[0].state").value("FULL"))
+                .andExpect(jsonPath("$.courses[0].reasonCode").value("SECTION_FULL"));
+
+        jdbc.update("UPDATE \"academic\".\"Section\" SET \"status\"='CLOSED' WHERE \"id\"=?", "section-open");
+        planCourse().andExpect(jsonPath("$.courses[0].state").value("NO_OPEN_SECTION"));
+
+        jdbc.update("UPDATE \"academic\".\"Section\" SET \"status\"='OPEN', \"capacity\"=35, \"enrolledCount\"=0"
+                + " WHERE \"id\"=?", "section-open");
+        insertPlanEnrollment("active-overlap", "course-overlap", "section-overlap", "ENROLLED", "NOT_GRADED", null);
+        planCourse().andExpect(jsonPath("$.courses[0].state").value("CONFLICT"))
+                .andExpect(jsonPath("$.courses[0].reasonCode").value("SCHEDULE_CONFLICT"))
+                .andExpect(jsonPath("$.courses[0].sections[0].scheduleConflict").value(true));
+        jdbc.update("DELETE FROM \"academic\".\"Enrollment\" WHERE \"id\"=?", "active-overlap");
+
+        jdbc.update("INSERT INTO \"academic\".\"CourseRequirement\""
+                + " (\"id\",\"courseId\",\"requiredCourseId\",\"kind\",\"minLetterGrade\") VALUES (?,?,?,?,?)",
+                "required-course-open", "course-open", "course-two", "PREREQ", null);
+        planCourse().andExpect(jsonPath("$.courses[0].state").value("BLOCKED_PREREQUISITE"))
+                .andExpect(jsonPath("$.courses[0].reasonCode").value("PREREQUISITE_UNMET"));
+        jdbc.update("DELETE FROM \"academic\".\"CourseRequirement\" WHERE \"id\"=?", "required-course-open");
+
+        insertPlanEnrollment("passed-course", "course-open", "section-open", "COMPLETED", "PUBLISHED", "C");
+        mvc.perform(get("/api/v1/me/registration/curriculum-plan").param("semesterId", "semester-1")
+                        .with(studentJwt("student-user-1", "student-1")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.courses").isEmpty());
+        jdbc.update("UPDATE \"academic\".\"Enrollment\" SET \"letterGrade\"='F' WHERE \"id\"=?", "passed-course");
+        planCourse().andExpect(jsonPath("$.courses[0].state").value("REGISTERABLE"));
+        jdbc.update("UPDATE \"academic\".\"Enrollment\" SET \"letterGrade\"='W' WHERE \"id\"=?", "passed-course");
+        planCourse().andExpect(jsonPath("$.courses[0].state").value("REGISTERABLE"));
+    }
+
+    @Test
+    void curriculumRegistrationPartiallySucceedsWhenTheExistingCreditCapBlocksAnotherCourse() throws Exception {
+        seedLecturerAndCurriculumCourses();
+        prepareSecondYearCurriculumTerm();
+        insertCurriculumCourse("curriculum-course-second-mandatory", "curriculum-1", "course-overlap", true);
+        jdbc.update("UPDATE \"academic\".\"SectionSchedule\" SET \"dayOfWeek\"=4 WHERE \"id\"=?", "sched-overlap");
+        jdbc.update("UPDATE \"academic\".\"RegistrationRound\" SET \"creditLimit\"=3 WHERE \"id\"=?", "round-open");
+
+        mvc.perform(post("/api/v1/me/registration/curriculum-plan/register")
+                        .with(studentJwt("student-user-1", "student-1"))
+                        .contentType(MediaType.APPLICATION_JSON).content("{\"semesterId\":\"semester-1\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.registeredCount").value(1))
+                .andExpect(jsonPath("$.skippedCount").value(1))
+                .andExpect(jsonPath("$.courses[0].state").value("ALREADY_REGISTERED"))
+                .andExpect(jsonPath("$.courses[1].state").value("CONFLICT"))
+                .andExpect(jsonPath("$.courses[1].reasonCode").value("CREDIT_CAP_EXCEEDED"));
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM \"academic\".\"Enrollment\""
+                + " WHERE \"studentId\"=? AND \"status\"='ENROLLED'", Integer.class, "student-1")).isEqualTo(1);
+    }
+
+    @Test
+    void curriculumEndpointsEnforceStudentAndAcademicAffairsRoles() throws Exception {
+        mvc.perform(get("/api/v1/me/registration/curriculum-plan")
+                        .param("semesterId", "semester-1").with(adminJwt()))
+                .andExpect(status().isForbidden());
+        AccountAuthorityFixture.ensureUser(jdbc, "lecturer-user-curriculum");
+        AccountAuthorityFixture.replaceRoles(jdbc, "lecturer-user-curriculum", "LECTURER");
+        mvc.perform(get("/api/v1/me/registration/curriculum-plan")
+                        .param("semesterId", "semester-1")
+                        .with(CurrentAccountJwt.currentJwt(jdbc, "lecturer-user-curriculum")))
+                .andExpect(status().isForbidden());
+        mvc.perform(post("/api/v1/admin/registration/curriculum-defaults/dry-run")
+                        .with(studentJwt("student-user-1", "student-1"))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"roundId\":\"round-open\"}"))
+                .andExpect(status().isForbidden());
+        mvc.perform(get("/api/v1/admin/registration/curriculum-defaults/runs")
+                        .with(CurrentAccountJwt.currentJwt(jdbc, "lecturer-user-curriculum")))
+                .andExpect(status().isForbidden());
+        mvc.perform(post("/api/v1/admin/registration/curriculum-defaults/apply")
+                        .with(CurrentAccountJwt.currentJwt(jdbc, "lecturer-user-curriculum"))
+                        .contentType(MediaType.APPLICATION_JSON).content("{\"roundId\":\"round-open\"}"))
+                .andExpect(status().isForbidden());
+
+        AccountAuthorityFixture.ensureUser(jdbc, "other-user-curriculum");
+        AccountAuthorityFixture.replaceRoles(jdbc, "other-user-curriculum", "USER");
+        var otherUser = CurrentAccountJwt.currentJwt(jdbc, "other-user-curriculum");
+        mvc.perform(get("/api/v1/me/registration/curriculum-plan").param("semesterId", "semester-1").with(otherUser))
+                .andExpect(status().isForbidden());
+        mvc.perform(get("/api/v1/admin/registration/curriculum-defaults/runs").with(otherUser))
+                .andExpect(status().isForbidden());
+
+        AccountAuthorityFixture.ensureUser(jdbc, "superadmin-user-curriculum");
+        AccountAuthorityFixture.replaceRoles(jdbc, "superadmin-user-curriculum", "SUPER_ADMIN");
+        mvc.perform(get("/api/v1/admin/registration/curriculum-defaults/runs")
+                        .with(CurrentAccountJwt.currentJwt(jdbc, "superadmin-user-curriculum")))
+                .andExpect(status().isOk());
+    }
+
+    private org.springframework.test.web.servlet.ResultActions planCourse() throws Exception {
+        return mvc.perform(get("/api/v1/me/registration/curriculum-plan").param("semesterId", "semester-1")
+                .with(studentJwt("student-user-1", "student-1"))).andExpect(status().isOk());
+    }
+
+    private void insertPlanEnrollment(String id, String courseId, String sectionId, String status,
+            String gradeStatus, String letterGrade) {
+        jdbc.update("INSERT INTO \"academic\".\"Enrollment\""
+                        + " (\"id\",\"studentId\",\"sectionId\",\"semesterId\",\"status\",\"enrolledAt\","
+                        + " \"gradeStatus\",\"letterGrade\",\"courseId\",\"roundId\",\"creditsSnapshot\","
+                        + " \"registrationSource\",\"version\") VALUES (?,?,?,?,?,CURRENT_TIMESTAMP,?,?,?,?,?,?,0)",
+                id, "student-1", sectionId, "semester-1", status, gradeStatus, letterGrade, courseId,
+                "round-open", 3, null);
+    }
+
+    @Test
+    void studentCurriculumRegistrationIsIdempotentAndDroppedDefaultStaysDismissed() throws Exception {
+        seedLecturerAndCurriculumCourses();
+        prepareSecondYearCurriculumTerm();
+        String body = "{\"semesterId\":\"semester-1\"}";
+
+        MvcResult first = mvc.perform(post("/api/v1/me/registration/curriculum-plan/register")
+                        .with(studentJwt("student-user-1", "student-1"))
+                        .contentType(MediaType.APPLICATION_JSON).content(body))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.registeredCount").value(1))
+                .andExpect(jsonPath("$.skippedCount").value(0))
+                .andExpect(jsonPath("$.courses[0].courseCode").value("SE402"))
+                .andReturn();
+        String enrollmentId = objectMapper.readTree(first.getResponse().getContentAsString())
+                .path("courses").get(0).path("enrollmentId").asText();
+        assertThat(jdbc.queryForObject("SELECT \"registrationSource\" FROM \"academic\".\"Enrollment\" WHERE \"id\"=?",
+                String.class, enrollmentId)).isEqualTo("CURRICULUM_DEFAULT");
+
+        mvc.perform(post("/api/v1/me/registration/curriculum-plan/register")
+                        .with(studentJwt("student-user-1", "student-1"))
+                        .contentType(MediaType.APPLICATION_JSON).content(body))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.registeredCount").value(0))
+                .andExpect(jsonPath("$.skippedCount").value(1))
+                .andExpect(jsonPath("$.courses[0].state").value("ALREADY_REGISTERED"));
+
+        mvc.perform(post("/api/v1/me/enrollments/" + enrollmentId + "/drop")
+                        .with(studentJwt("student-user-1", "student-1"))
+                        .header("Idempotency-Key", "drop-curriculum-default-1"))
+                .andExpect(status().isOk());
+        mvc.perform(get("/api/v1/me/registration/curriculum-plan").param("semesterId", "semester-1")
+                        .with(studentJwt("student-user-1", "student-1")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.courses[0].state").value("DISMISSED"));
+        mvc.perform(post("/api/v1/me/registration/curriculum-plan/register")
+                        .with(studentJwt("student-user-1", "student-1"))
+                        .contentType(MediaType.APPLICATION_JSON).content(body))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.registeredCount").value(0))
+                .andExpect(jsonPath("$.courses[0].state").value("DISMISSED"));
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM \"academic\".\"Enrollment\" WHERE \"studentId\"=?",
+                Integer.class, "student-1")).isEqualTo(1);
+    }
+
+    @Test
+    void adminCurriculumDryRunDoesNotWriteAndApplyAuditsAnIdempotentRun() throws Exception {
+        seedLecturerAndCurriculumCourses();
+        prepareSecondYearCurriculumTerm();
+        insertUnknownActiveStudentForAdmin();
+        String body = "{\"roundId\":\"round-open\",\"semesterId\":\"semester-1\",\"batchSize\":50}";
+
+        mvc.perform(post("/api/v1/admin/registration/curriculum-defaults/dry-run")
+                        .with(adminJwt()).contentType(MediaType.APPLICATION_JSON).content(body))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.dryRun").value(true))
+                .andExpect(jsonPath("$.students").value(2))
+                .andExpect(jsonPath("$.courses").value(1))
+                .andExpect(jsonPath("$.wouldRegister").value(1))
+                .andExpect(jsonPath("$.registered").value(0))
+                .andExpect(jsonPath("$.failedStudents").value(1));
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM \"academic\".\"Enrollment\"", Integer.class)).isZero();
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM campuscore_audit.\"AdminAudit\""
+                + " WHERE \"action\"='CURRICULUM_DEFAULT_REGISTRATION_APPLY'", Integer.class)).isZero();
+
+        mvc.perform(post("/api/v1/admin/registration/curriculum-defaults/apply")
+                        .with(adminJwt()).contentType(MediaType.APPLICATION_JSON).content(body))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.dryRun").value(false))
+                .andExpect(jsonPath("$.registered").value(1))
+                .andExpect(jsonPath("$.skipped").value(0));
+        mvc.perform(post("/api/v1/admin/registration/curriculum-defaults/apply")
+                        .with(adminJwt()).contentType(MediaType.APPLICATION_JSON).content(body))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.registered").value(0))
+                .andExpect(jsonPath("$.skipped").value(1));
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM \"academic\".\"Enrollment\"", Integer.class)).isEqualTo(1);
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM campuscore_audit.\"AdminAudit\""
+                + " WHERE \"action\"='CURRICULUM_DEFAULT_REGISTRATION_APPLY'", Integer.class)).isEqualTo(2);
+    }
+
+    private void prepareSecondYearCurriculumTerm() {
+        LocalDateTime start = LocalDateTime.of(2025, 1, 1, 0, 0);
+        jdbc.update("INSERT INTO \"academic\".\"AcademicYear\""
+                        + " (\"id\",\"year\",\"startDate\",\"endDate\",\"isCurrent\",\"createdAt\",\"updatedAt\")"
+                        + " VALUES (?,?,?,?,?,?,?)",
+                "ay-2025", 2025, start, localDateTime(BASE_TIME), false, start, start);
+        jdbc.update("UPDATE \"academic\".\"Student\" SET \"admissionDate\"=? WHERE \"id\"=?",
+                LocalDateTime.of(2025, 9, 1, 0, 0), "student-1");
+    }
+
+    private void insertUnknownActiveStudentForAdmin() {
+        LocalDateTime admissionDate = LocalDateTime.of(2024, 9, 1, 0, 0);
+        jdbc.update("INSERT INTO \"academic\".\"Student\""
+                        + " (\"id\",\"userId\",\"studentId\",\"curriculumId\",\"year\",\"status\","
+                        + " \"admissionDate\",\"createdAt\",\"updatedAt\") VALUES (?,?,?,?,?,'ACTIVE',?,?,?)",
+                "student-0-unknown", "student-user-unknown", "S000", "curriculum-1", 2,
+                admissionDate, admissionDate, admissionDate);
+    }
+
+    @Test
     void studentEnrollThenDropPersistsRegisteredThenDroppedState() throws Exception {
         MvcResult enrolled = mvc.perform(post("/api/v1/enrollments/enroll")
                         .with(studentJwt("student-user-1", "student-1"))
@@ -1395,6 +1686,7 @@ class AcademicEnrollmentMutationPersistenceTest {
                     "courseId" VARCHAR(120) NOT NULL,
                     "roundId" VARCHAR(120),
                     "creditsSnapshot" INTEGER NOT NULL,
+                    "registrationSource" VARCHAR(40),
                     "version" INTEGER NOT NULL DEFAULT 0,
                     "createdAt" TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
                     "updatedAt" TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
@@ -1493,6 +1785,7 @@ class AcademicEnrollmentMutationPersistenceTest {
     }
 
     private void clearTables() {
+        jdbc.update("DELETE FROM campuscore_audit.\"AdminAudit\"");
         jdbc.update("DELETE FROM \"academic\".\"CreditLimitApplication\"");
         jdbc.update("DELETE FROM \"academic\".\"RegistrationSlip\"");
         jdbc.update("DELETE FROM \"academic\".\"EnrollmentEvent\"");

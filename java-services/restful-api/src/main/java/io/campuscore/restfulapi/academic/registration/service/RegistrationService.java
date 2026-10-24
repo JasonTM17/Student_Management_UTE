@@ -37,6 +37,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionTemplate;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 import io.campuscore.restfulapi.academic.registration.dto.RegistrationDtos;
 import io.campuscore.restfulapi.academic.registration.renderer.RegistrationPdfRenderer;
 
@@ -328,7 +329,7 @@ public class RegistrationService {
         String hash = sha256("ENROLL|" + sectionId);
         EnrollmentResponse response = transactions.execute(status -> {
             EnrollmentResponse enrolled =
-                    enrollLocked(studentId, sectionId, roles, idempotencyKey, hash);
+                    enrollLocked(studentId, sectionId, roles, idempotencyKey, hash, null, null);
             if (enrolled == null) {
                 throw problem(HttpStatus.INTERNAL_SERVER_ERROR, "ENROLLMENT_FAILED",
                         "Enrollment transaction returned no result");
@@ -340,6 +341,76 @@ public class RegistrationService {
             throw problem(HttpStatus.INTERNAL_SERVER_ERROR, "ENROLLMENT_FAILED", "Enrollment transaction returned no result");
         }
         return response;
+    }
+
+    /** Package-level bridge: curriculum registration still uses the normal locked insert path. */
+    EnrollmentResponse enrollCurriculumDefault(
+            String studentId, String sectionId, String roundId, String idempotencyKey) {
+        requireKey(idempotencyKey);
+        String hash = sha256("ENROLL|" + sectionId);
+        EnrollmentResponse response = transactions.execute(status -> {
+            EnrollmentResponse enrolled = enrollLocked(studentId, sectionId, List.of("STUDENT"),
+                    idempotencyKey, hash, roundId, "CURRICULUM_DEFAULT");
+            if (enrolled == null) {
+                throw problem(HttpStatus.INTERNAL_SERVER_ERROR, "ENROLLMENT_FAILED",
+                        "Enrollment transaction returned no result");
+            }
+            persistSlip(studentId, enrolled);
+            return enrolled;
+        });
+        if (response == null) {
+            throw problem(HttpStatus.INTERNAL_SERVER_ERROR, "ENROLLMENT_FAILED",
+                    "Enrollment transaction returned no result");
+        }
+        return response;
+    }
+
+    /** Package-level bridge for the admin's one-transaction-per-student batch. */
+    EnrollmentResponse enrollCurriculumDefaultInCurrentTransaction(
+            String studentId, String sectionId, String roundId, String idempotencyKey) {
+        if (!TransactionSynchronizationManager.isActualTransactionActive()) {
+            throw new IllegalStateException("Curriculum enrollment requires an active student transaction");
+        }
+        requireKey(idempotencyKey);
+        EnrollmentResponse enrolled = enrollLocked(studentId, sectionId, List.of("STUDENT"), idempotencyKey,
+                sha256("ENROLL|" + sectionId), roundId, "CURRICULUM_DEFAULT");
+        if (enrolled == null) {
+            throw problem(HttpStatus.INTERNAL_SERVER_ERROR, "ENROLLMENT_FAILED",
+                    "Enrollment transaction returned no result");
+        }
+        persistSlip(studentId, enrolled);
+        return enrolled;
+    }
+
+    void assertCurriculumRequirements(
+            String studentId, String courseId, String semesterId, String sectionId, List<String> proposedSections) {
+        List<String> requested = new ArrayList<>(proposedSections == null ? List.of() : proposedSections);
+        if (!requested.contains(sectionId)) {
+            requested.add(sectionId);
+        }
+        assertPrereqAndCoreq(studentId, courseId, semesterId, requested);
+    }
+
+    boolean hasCurriculumScheduleConflict(List<String> chosenSectionIds, String candidateSectionId) {
+        return overlaps(schedulesForSections(chosenSectionIds == null ? List.of() : chosenSectionIds),
+                schedulesForSection(candidateSectionId));
+    }
+
+    io.campuscore.restfulapi.academic.registration.model.CurriculumDefaultRegistrationRows.RegistrationAvailability
+            curriculumAvailability(String studentId, String roundId) {
+        Map<String, Object> student = requireStudent(studentId);
+        Map<String, Object> round = round(roundId);
+        String semesterId = String.valueOf(round.get("semester_id"));
+        int used = creditsUsed(studentId, semesterId);
+        int limit = creditLimitApplications.effectiveLimit(studentId, round);
+        String reason = null;
+        try {
+            assertEligible(student, round, Instant.now());
+        } catch (DomainException exception) {
+            reason = exception.code();
+        }
+        return new io.campuscore.restfulapi.academic.registration.model.CurriculumDefaultRegistrationRows.RegistrationAvailability(
+                reason == null, reason, limit, used, Math.max(0, limit - used));
     }
 
     public void drop(String enrollmentId, String studentId, List<String> roles, String idempotencyKey) {
@@ -541,7 +612,9 @@ public class RegistrationService {
             String sectionId,
             List<String> roles,
             String idempotencyKey,
-            String hash) {
+            String hash,
+            String requiredRoundId,
+            String registrationSource) {
         Map<String, Object> replay = claimIdempotency(studentId, idempotencyKey, hash);
         if (replay != null) {
             return reads.findEnrollment(String.valueOf(replay.get("enrollment_id")), roles, studentId);
@@ -558,7 +631,12 @@ public class RegistrationService {
         // rows: a CLOSED semester must refuse enroll even if a round is still
         // flagged OPEN, and reopening the semester restores it unchanged.
         requireOpenSemester(semesterId);
-        Map<String, Object> round = openRoundReadOnly(semesterId, "REGISTRATION");
+        Map<String, Object> round = requiredRoundId == null || requiredRoundId.isBlank()
+                ? openRoundReadOnly(semesterId, "REGISTRATION")
+                : round(requiredRoundId);
+        if (!semesterId.equals(String.valueOf(round.get("semester_id")))) {
+            throw problem(HttpStatus.CONFLICT, "ROUND_SEMESTER_MISMATCH", "Registration round does not match the section semester");
+        }
         assertEligible(student, round, Instant.now());
         List<Map<String, Object>> active = lockActiveEnrollments(studentId, semesterId);
         if (active.stream().anyMatch(row -> sectionId.equals(String.valueOf(row.get("section_id"))))) {
@@ -599,9 +677,9 @@ public class RegistrationService {
         jdbc.update(
                 "INSERT INTO " + ENROLLMENT
                         + " (\"id\", \"studentId\", \"sectionId\", \"semesterId\", \"status\", \"enrolledAt\","
-                        + " \"gradeStatus\", \"courseId\", \"roundId\", \"creditsSnapshot\", \"version\")"
+                        + " \"gradeStatus\", \"courseId\", \"roundId\", \"creditsSnapshot\", \"registrationSource\", \"version\")"
                         + " VALUES (:id, :studentId, :sectionId, :semesterId, 'ENROLLED', :now, 'NOT_GRADED',"
-                        + " :courseId, :roundId, :credits, 0)",
+                        + " :courseId, :roundId, :credits, :registrationSource, 0)",
                 new MapSqlParameterSource()
                         .addValue("id", enrollmentId)
                         .addValue("studentId", studentId)
@@ -610,7 +688,8 @@ public class RegistrationService {
                         .addValue("now", Timestamp.from(now))
                         .addValue("courseId", courseId)
                         .addValue("roundId", round.get("id"))
-                        .addValue("credits", credits));
+                        .addValue("credits", credits)
+                        .addValue("registrationSource", registrationSource));
         jdbc.update(
                 "INSERT INTO " + EVENT
                         + " (\"id\", \"enrollmentId\", \"studentId\", \"sectionId\", \"action\", \"actorId\", \"requestHash\")"
@@ -973,14 +1052,16 @@ public class RegistrationService {
 
     private Map<String, Object> openRound(String semesterId, String preferredKind, boolean forUpdate) {
         MapSqlParameterSource parameters = new MapSqlParameterSource();
-        String sql = "SELECT \"id\", \"semesterId\" AS semester_id, \"kind\", \"status\", \"windowStart\" AS window_start,"
-                + " \"windowEnd\" AS window_end, \"creditLimit\" AS credit_limit FROM " + ROUND
-                + " WHERE \"status\" = 'OPEN'";
+        String sql = "SELECT round.\"id\", round.\"semesterId\" AS semester_id, round.\"kind\", round.\"status\","
+                + " round.\"windowStart\" AS window_start, round.\"windowEnd\" AS window_end,"
+                + " round.\"creditLimit\" AS credit_limit, semester.\"type\" AS semester_type FROM " + ROUND + " round"
+                + " JOIN " + SEMESTER + " semester ON semester.\"id\" = round.\"semesterId\""
+                + " WHERE round.\"status\" = 'OPEN'";
         if (semesterId != null && !semesterId.isBlank()) {
-            sql += " AND \"semesterId\" = :semesterId";
+            sql += " AND round.\"semesterId\" = :semesterId";
             parameters.addValue("semesterId", semesterId);
         }
-        sql += " ORDER BY \"windowStart\"" + (forUpdate ? " FOR UPDATE" : "");
+        sql += " ORDER BY round.\"windowStart\"" + (forUpdate ? " FOR UPDATE OF round" : "");
         List<Map<String, Object>> rounds = jdbc.queryForList(sql, parameters);
         Instant now = Instant.now();
         Map<String, Object> preferred = rounds.stream()
@@ -1013,9 +1094,11 @@ public class RegistrationService {
     private Map<String, Object> round(String roundId) {
         try {
             return jdbc.queryForMap(
-                    "SELECT \"id\", \"semesterId\" AS semester_id, \"kind\", \"status\", \"windowStart\" AS window_start,"
-                            + " \"windowEnd\" AS window_end, \"creditLimit\" AS credit_limit FROM " + ROUND
-                            + " WHERE \"id\" = :id",
+                    "SELECT round.\"id\", round.\"semesterId\" AS semester_id, round.\"kind\", round.\"status\","
+                            + " round.\"windowStart\" AS window_start, round.\"windowEnd\" AS window_end,"
+                            + " round.\"creditLimit\" AS credit_limit, semester.\"type\" AS semester_type FROM " + ROUND + " round"
+                            + " JOIN " + SEMESTER + " semester ON semester.\"id\" = round.\"semesterId\""
+                            + " WHERE round.\"id\" = :id",
                     new MapSqlParameterSource("id", roundId));
         } catch (EmptyResultDataAccessException exception) {
             throw problem(HttpStatus.NOT_FOUND, "ROUND_NOT_FOUND", "Registration round not found");
