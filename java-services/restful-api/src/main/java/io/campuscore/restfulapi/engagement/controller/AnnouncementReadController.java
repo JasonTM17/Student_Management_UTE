@@ -1,9 +1,9 @@
-package io.campuscore.restfulapi.engagement.web;
+package io.campuscore.restfulapi.engagement.controller;
 
 import io.campuscore.restfulapi.engagement.service.AnnouncementReadService;
-import io.campuscore.restfulapi.engagement.web.AnnouncementReadDtos.AnnouncementListResponse;
-import io.campuscore.restfulapi.engagement.web.AnnouncementReadDtos.AnnouncementResponse;
-import io.campuscore.restfulapi.engagement.web.AnnouncementReadDtos.PublicAnnouncementListResponse;
+import io.campuscore.restfulapi.engagement.dto.AnnouncementReadDtos.AnnouncementListResponse;
+import io.campuscore.restfulapi.engagement.dto.AnnouncementReadDtos.AnnouncementResponse;
+import io.campuscore.restfulapi.engagement.dto.AnnouncementReadDtos.PublicAnnouncementListResponse;
 import java.math.BigInteger;
 import java.util.Collection;
 import java.util.List;
@@ -26,6 +26,7 @@ import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import io.campuscore.restfulapi.engagement.dto.AnnouncementReadDtos;
 
 /** Role-aware announcement query routes for the course portal. */
 @Tag(name = "Announcements & Campus News", description = "Truy vấn thông báo học vụ, bản tin trường HCM-UTE, quản lý vòng đời bài viết (soạn thảo, cập nhật, lưu trữ, lịch sử chỉnh sửa)")

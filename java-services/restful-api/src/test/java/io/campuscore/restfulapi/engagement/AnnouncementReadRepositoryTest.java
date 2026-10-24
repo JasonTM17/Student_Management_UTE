@@ -10,7 +10,7 @@ import static org.mockito.Mockito.when;
 
 import io.campuscore.restfulapi.engagement.repository.AnnouncementReadRepository;
 import io.campuscore.restfulapi.engagement.repository.AnnouncementReadRepository.UserVisibility;
-import io.campuscore.restfulapi.engagement.web.AnnouncementReadDtos.AnnouncementResponse;
+import io.campuscore.restfulapi.engagement.dto.AnnouncementReadDtos.AnnouncementResponse;
 import java.sql.ResultSet;
 import java.sql.Types;
 import java.time.Instant;

@@ -1,14 +1,14 @@
-package io.campuscore.restfulapi.engagement.web;
+package io.campuscore.restfulapi.engagement.controller;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import io.campuscore.restfulapi.engagement.service.AnnouncementWriteService;
-import io.campuscore.restfulapi.engagement.web.AnnouncementReadDtos.AnnouncementHistoryListResponse;
-import io.campuscore.restfulapi.engagement.web.AnnouncementReadDtos.AnnouncementResponse;
-import io.campuscore.restfulapi.engagement.web.AnnouncementWriteDtos.CreateAnnouncementRequest;
-import io.campuscore.restfulapi.engagement.web.AnnouncementWriteDtos.DeleteAnnouncementResponse;
-import io.campuscore.restfulapi.engagement.web.AnnouncementWriteDtos.LifecycleRequest;
-import io.campuscore.restfulapi.engagement.web.AnnouncementWriteDtos.UpdateAnnouncementRequest;
-import io.campuscore.restfulapi.engagement.web.AnnouncementWriteDtos.UpdateDisplayOrderRequest;
+import io.campuscore.restfulapi.engagement.dto.AnnouncementReadDtos.AnnouncementHistoryListResponse;
+import io.campuscore.restfulapi.engagement.dto.AnnouncementReadDtos.AnnouncementResponse;
+import io.campuscore.restfulapi.engagement.dto.AnnouncementWriteDtos.CreateAnnouncementRequest;
+import io.campuscore.restfulapi.engagement.dto.AnnouncementWriteDtos.DeleteAnnouncementResponse;
+import io.campuscore.restfulapi.engagement.dto.AnnouncementWriteDtos.LifecycleRequest;
+import io.campuscore.restfulapi.engagement.dto.AnnouncementWriteDtos.UpdateAnnouncementRequest;
+import io.campuscore.restfulapi.engagement.dto.AnnouncementWriteDtos.UpdateDisplayOrderRequest;
 import jakarta.validation.Valid;
 import java.util.List;
 import java.util.Map;
@@ -35,6 +35,8 @@ import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import io.campuscore.restfulapi.engagement.dto.AnnouncementReadDtos;
+import io.campuscore.restfulapi.engagement.dto.AnnouncementWriteDtos;
 
 /** Role-protected announcement mutation and governance routes. */
 @Tag(name = "Announcements & Campus News", description = "Truy vấn thông báo học vụ, bản tin trường HCM-UTE, quản lý vòng đời bài viết (soạn thảo, cập nhật, lưu trữ, lịch sử chỉnh sửa)")

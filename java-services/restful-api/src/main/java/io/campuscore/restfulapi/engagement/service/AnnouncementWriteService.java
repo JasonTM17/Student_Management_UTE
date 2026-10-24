@@ -9,14 +9,14 @@ import io.campuscore.restfulapi.engagement.repository.AnnouncementWriteRepositor
 import io.campuscore.restfulapi.engagement.repository.AnnouncementWriteRepository.PatchValue;
 import io.campuscore.restfulapi.engagement.repository.AnnouncementWriteRepository.TransitionCommand;
 import io.campuscore.restfulapi.engagement.repository.AnnouncementWriteRepository.UpdateAnnouncementCommand;
-import io.campuscore.restfulapi.engagement.web.AnnouncementReadDtos.AnnouncementHistoryListResponse;
-import io.campuscore.restfulapi.engagement.web.AnnouncementReadDtos.AnnouncementHistoryResponse;
-import io.campuscore.restfulapi.engagement.web.AnnouncementReadDtos.AnnouncementResponse;
-import io.campuscore.restfulapi.engagement.web.AnnouncementReadDtos.PageMeta;
-import io.campuscore.restfulapi.engagement.web.AnnouncementWriteDtos.CreateAnnouncementRequest;
-import io.campuscore.restfulapi.engagement.web.AnnouncementWriteDtos.DeleteAnnouncementResponse;
-import io.campuscore.restfulapi.engagement.web.AnnouncementWriteDtos.LifecycleRequest;
-import io.campuscore.restfulapi.engagement.web.AnnouncementWriteDtos.UpdateAnnouncementRequest;
+import io.campuscore.restfulapi.engagement.dto.AnnouncementReadDtos.AnnouncementHistoryListResponse;
+import io.campuscore.restfulapi.engagement.dto.AnnouncementReadDtos.AnnouncementHistoryResponse;
+import io.campuscore.restfulapi.engagement.dto.AnnouncementReadDtos.AnnouncementResponse;
+import io.campuscore.restfulapi.engagement.dto.AnnouncementReadDtos.PageMeta;
+import io.campuscore.restfulapi.engagement.dto.AnnouncementWriteDtos.CreateAnnouncementRequest;
+import io.campuscore.restfulapi.engagement.dto.AnnouncementWriteDtos.DeleteAnnouncementResponse;
+import io.campuscore.restfulapi.engagement.dto.AnnouncementWriteDtos.LifecycleRequest;
+import io.campuscore.restfulapi.engagement.dto.AnnouncementWriteDtos.UpdateAnnouncementRequest;
 import io.campuscore.restfulapi.web.DomainException;
 import java.time.Clock;
 import java.time.Instant;
@@ -30,6 +30,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
+import io.campuscore.restfulapi.engagement.job.ScheduledAnnouncementNotifyJob;
 
 /** Transactional announcement mutation and audit service. */
 @Service

@@ -1,4 +1,4 @@
-package io.campuscore.restfulapi.engagement.web;
+package io.campuscore.restfulapi.engagement.dto;
 
 import io.campuscore.restfulapi.engagement.domain.ArticleAttachment;
 import io.campuscore.restfulapi.engagement.domain.ArticleCategory;

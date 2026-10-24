@@ -1,4 +1,4 @@
-package io.campuscore.restfulapi.engagement.web;
+package io.campuscore.restfulapi.engagement.controller;
 
 import io.campuscore.restfulapi.engagement.domain.ArticleAttachment;
 import io.campuscore.restfulapi.engagement.domain.ArticleCategory;
@@ -8,13 +8,13 @@ import io.campuscore.restfulapi.engagement.repository.ArticleAttachmentRepositor
 import io.campuscore.restfulapi.engagement.repository.ArticleCategoryRepository;
 import io.campuscore.restfulapi.engagement.repository.ArticleMediaGalleryRepository;
 import io.campuscore.restfulapi.engagement.repository.ArticleTagRepository;
-import io.campuscore.restfulapi.engagement.web.ArticleTaxonomyDtos.AttachmentDto;
-import io.campuscore.restfulapi.engagement.web.ArticleTaxonomyDtos.AttachmentListResponse;
-import io.campuscore.restfulapi.engagement.web.ArticleTaxonomyDtos.CategoryDto;
-import io.campuscore.restfulapi.engagement.web.ArticleTaxonomyDtos.MediaGalleryDto;
-import io.campuscore.restfulapi.engagement.web.ArticleTaxonomyDtos.MediaGalleryListResponse;
-import io.campuscore.restfulapi.engagement.web.ArticleTaxonomyDtos.PageMeta;
-import io.campuscore.restfulapi.engagement.web.ArticleTaxonomyDtos.TagDto;
+import io.campuscore.restfulapi.engagement.dto.ArticleTaxonomyDtos.AttachmentDto;
+import io.campuscore.restfulapi.engagement.dto.ArticleTaxonomyDtos.AttachmentListResponse;
+import io.campuscore.restfulapi.engagement.dto.ArticleTaxonomyDtos.CategoryDto;
+import io.campuscore.restfulapi.engagement.dto.ArticleTaxonomyDtos.MediaGalleryDto;
+import io.campuscore.restfulapi.engagement.dto.ArticleTaxonomyDtos.MediaGalleryListResponse;
+import io.campuscore.restfulapi.engagement.dto.ArticleTaxonomyDtos.PageMeta;
+import io.campuscore.restfulapi.engagement.dto.ArticleTaxonomyDtos.TagDto;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
@@ -32,6 +32,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.server.ResponseStatusException;
+import io.campuscore.restfulapi.engagement.dto.ArticleTaxonomyDtos;
 
 /**
  * Spring Data JPA ORM REST Controller for Article Taxonomy, Media Gallery, and Attachments.
