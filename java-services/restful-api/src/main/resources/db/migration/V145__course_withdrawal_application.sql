@@ -2,8 +2,9 @@
 -- an enrollment of an open regular semester inside the first
 -- registration.withdrawal.window.days days; Academic Affairs approves or
 -- rejects. The Enrollment status/letterGrade columns are unconstrained
--- VARCHARs, so 'WITHDRAWN'/'W' need no ALTER here. Forward-only; V143 is
--- reserved for a parallel release and this file must not depend on it.
+-- VARCHARs, so 'WITHDRAWN'/'W' need no ALTER here. Forward-only; V143
+-- (eligibility seed) and the H2-only V144 test mirror belong to release 2,
+-- so this file must not depend on either.
 
 CREATE TABLE IF NOT EXISTS academic."WithdrawalApplication" (
     "id" VARCHAR(120) PRIMARY KEY,

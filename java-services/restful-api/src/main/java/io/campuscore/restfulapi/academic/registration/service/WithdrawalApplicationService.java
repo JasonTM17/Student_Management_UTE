@@ -31,7 +31,8 @@ import org.springframework.transaction.annotation.Transactional;
  * records the enrollment as WITHDRAWN with letter W: visible on the transcript
  * but excluded from attempted/earned credits, GPA and best-attempt selection.
  *
- * <p>Window rule (pinned): a regular semester ({@code FALL}/{@code SPRING})
+ * <p>Window rule (pinned): a regular semester ({@code FIRST}/{@code SECOND},
+ * with {@code FALL}/{@code SPRING} accepted as legacy type aliases)
  * accepts applications from its start date for
  * {@code registration.withdrawal.window.days} days (default 14, env
  * {@code REGISTRATION_WITHDRAWAL_WINDOW_DAYS}); the day-14 boundary is
@@ -189,20 +190,31 @@ public class WithdrawalApplicationService {
                     "Reviewer note must be at most 1000 characters");
         }
 
+        // Lock order is Student -> Application -> Enrollment -> Section, the
+        // same convention as submit/cancel/drop: cancel and drop take the
+        // Student row first, so an approve that held the application row while
+        // waiting for Student would close a deadlock cycle (Postgres kills one
+        // side with 40P01). studentId is immutable after insert, so the
+        // unlocked read below only picks which Student row to lock — the
+        // PENDING check is re-done under the application lock.
+        Map<String, Object> head;
+        try {
+            head = repository.findById(id);
+        } catch (EmptyResultDataAccessException exception) {
+            throw problem(HttpStatus.NOT_FOUND, "WITHDRAWAL_APPLICATION_NOT_FOUND",
+                    "Withdrawal application was not found");
+        }
+        String studentId = String.valueOf(head.get("student_id"));
+        repository.lockStudent(studentId);
         Map<String, Object> application = lockApplication(id);
         if (!"PENDING".equals(String.valueOf(application.get("status")))) {
             throw problem(HttpStatus.CONFLICT, "WITHDRAWAL_APPLICATION_NOT_PENDING",
                     "Only a pending withdrawal application can be reviewed");
         }
         String enrollmentId = String.valueOf(application.get("enrollment_id"));
-        String studentId = String.valueOf(application.get("student_id"));
         String courseLabel;
 
         if ("APPROVED".equals(cleanDecision)) {
-            // Same lock order as a drop: Student -> Enrollment -> Section. A
-            // racing drop serializes on the Student row first, so whoever
-            // commits second sees the already-final enrollment status.
-            repository.lockStudent(studentId);
             Map<String, Object> enrollment = repository.lockEnrollment(enrollmentId);
             if (!WithdrawalStatuses.WITHDRAWABLE_ENROLLMENTS.contains(String.valueOf(enrollment.get("status")))) {
                 throw problem(HttpStatus.CONFLICT, "ENROLLMENT_NOT_ACTIVE",
@@ -350,23 +362,23 @@ public class WithdrawalApplicationService {
     private Response map(Map<String, Object> row) {
         return new Response(
                 text(row.get("id")),
-                text(row.get("studentId")),
+                text(row.get("student_id")),
                 text(row.get("student_code")),
                 text(row.get("student_name")),
                 text(row.get("student_email")),
-                text(row.get("enrollmentId")),
-                text(row.get("semesterId")),
+                text(row.get("enrollment_id")),
+                text(row.get("semester_id")),
                 text(row.get("semester_name")),
                 text(row.get("course_code")),
                 text(row.get("course_name")),
                 text(row.get("section_number")),
                 text(row.get("reason")),
                 text(row.get("status")),
-                text(row.get("reviewedBy")),
-                instant(row.get("reviewedAt")),
-                text(row.get("reviewerNote")),
-                instant(row.get("createdAt")),
-                instant(row.get("updatedAt")));
+                text(row.get("reviewed_by")),
+                instant(row.get("reviewed_at")),
+                text(row.get("reviewer_note")),
+                instant(row.get("created_at")),
+                instant(row.get("updated_at")));
     }
 
     private static String text(Object value) {

@@ -30,14 +30,15 @@ public class WithdrawalApplicationRepository {
     }
 
     static String select() {
-        return "SELECT application.\"id\", application.\"studentId\", student.\"studentId\" AS student_code,"
+        return "SELECT application.\"id\", application.\"studentId\" AS student_id, student.\"studentId\" AS student_code,"
                 + " TRIM(COALESCE(account.\"lastName\", '') || ' ' || COALESCE(account.\"firstName\", '')) AS student_name,"
-                + " account.\"email\" AS student_email, application.\"enrollmentId\", application.\"semesterId\","
+                + " account.\"email\" AS student_email, application.\"enrollmentId\" AS enrollment_id,"
+                + " application.\"semesterId\" AS semester_id,"
                 + " semester.\"name\" AS semester_name, course.\"code\" AS course_code,"
                 + " course.\"name\" AS course_name, section.\"sectionNumber\" AS section_number,"
-                + " application.\"reason\", application.\"status\", application.\"reviewedBy\","
-                + " application.\"reviewedAt\", application.\"reviewerNote\","
-                + " application.\"createdAt\", application.\"updatedAt\""
+                + " application.\"reason\", application.\"status\", application.\"reviewedBy\" AS reviewed_by,"
+                + " application.\"reviewedAt\" AS reviewed_at, application.\"reviewerNote\" AS reviewer_note,"
+                + " application.\"createdAt\" AS created_at, application.\"updatedAt\" AS updated_at"
                 + " FROM " + APPLICATION + " application"
                 + " JOIN " + STUDENT + " student ON student.\"id\" = application.\"studentId\""
                 + " JOIN " + USER + " account ON account.\"id\" = student.\"userId\""

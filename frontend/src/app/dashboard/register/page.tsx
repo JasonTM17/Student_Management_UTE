@@ -603,6 +603,7 @@ export default function RegisterPage() {
   const cancelWithdraw = async (application: WithdrawalApplication) => {
     const ok = await confirm({
       title: copy.withdrawCancelTitle,
+      message: copy.withdrawCancelMessage,
       confirmText: copy.withdrawCancel,
       variant: 'destructive',
     });
