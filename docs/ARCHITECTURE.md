@@ -281,9 +281,27 @@ Backend `java-services/restful-api` (góc `io.campuscore.restfulapi`) được t
 
 `thesis.assistant` được chia thành các subpackage theo vai trò thật của từng lớp: `controller`, `dto`, `service`, `repository`, `client` (DeepSeek/RAG/knowledge-authority gateways), `guard` (input/output guards), `rls` (`AssistantRls*` boundary/context/aspect/transaction), `config`, `properties`, `job`.
 
-Quy ước top-level: `exception/` chứa exception types (`DomainException`, `AppException`, `ErrorCode`, ...); `web/` chứa exception handlers/writers (`GlobalExceptionHandler`, `ApiErrorWriter`, `ApiExceptionHandler` legacy DTO container); `controller/` chứa controller dùng chung (`Contract`, `Health`, `Identity`); `job/` chứa scheduler dùng chung (`DatabaseKeepAliveScheduler`); `common/` chứa response envelope dùng chung; `security/` giữ nguyên các filter/config bảo mật; `config/` giữ bootstrap config được tham chiếu bởi `application.yml`/`META-INF/spring.factories`.
+Quy ước top-level: `exception/` chứa toàn bộ quan tâm về lỗi dùng chung (xem mục Error handling bên dưới); `controller/` chứa controller dùng chung (`Contract`, `Health`, `Identity`); `job/` chứa scheduler dùng chung (`DatabaseKeepAliveScheduler`); `common/` chứa response envelope dùng chung; `security/` giữ nguyên các filter/config bảo mật; `config/` giữ bootstrap config được tham chiếu bởi `application.yml`/`META-INF/spring.factories`. Package `web/` cũ đã bị xóa hoàn toàn: controller chuyển sang `controller/`, handler/writer/DTO lỗi chuyển sang `exception/`.
 
-Quy tắc được bảo đảm bởi `ArchitectureGuardTest` (quét `.class` trên classpath, không cần dependency mới): controller chỉ nằm trong package `controller` và phải mang `@RestController`/`@Controller`; package `controller` không phụ thuộc `repository`; `repository` không phụ thuộc `controller`/`service`; các lớp `*Dtos` nằm trong package `dto`. Một số cạnh phụ thuộc có sẵn trước refactor được liệt kê tường minh trong test như documented exceptions.
+Quy tắc được bảo đảm bởi `ArchitectureGuardTest` (quét `.class` trên classpath, không cần dependency mới): controller chỉ nằm trong package `controller` và phải mang `@RestController`/`@Controller`; package `controller` không phụ thuộc `repository`; `repository` không phụ thuộc `controller`/`service`; các lớp `*Dtos` nằm trong package `dto`; lớp `*Exception` top-level chỉ nằm trong package `..exception..` và phải kế thừa `RuntimeException`/họ `AppException`; exception handler (`*ExceptionHandler`, `@ControllerAdvice`) chỉ nằm trong `..exception.handler..`; package ngoài `exception` không được phụ thuộc `exception.handler`; lớp `*Filter` không được tự serialize body lỗi (không tham chiếu `ObjectMapper`/`PrintWriter` — mọi body lỗi của filter đi qua `ApiErrorWriter`). Một số cạnh phụ thuộc có sẵn trước refactor được liệt kê tường minh trong test như documented exceptions.
+
+### Xử lý lỗi (Error handling)
+
+Mọi quan tâm về exception nằm trong các package riêng theo vai trò:
+
+| Package | Chứa gì |
+| --- | --- |
+| `exception/` | Exception types dùng chung cho mọi module: `AppException` (base), `DomainException`, `BadRequestException`, `ConflictException`, `ForbiddenException`, `ResourceNotFoundException`, `UnauthorizedException`, `ValidationException`. |
+| `exception/code/` | `ErrorCode` — catalog mã lỗi chuẩn kèm HTTP status + message mặc định. |
+| `exception/handler/` | `GlobalExceptionHandler` (`@RestControllerAdvice`) — mapper exception → response duy nhất; không chứa gì khác. |
+| `exception/response/` | `ErrorResponse` (envelope JSON chuẩn), `ApiErrorWriter` (writer JSON ở tầng filter), `ApiError`/`FieldError` (record đọc error payload upstream của assistant gateways). |
+| `<module>/exception/` | Exception riêng của module: `thesis.exception.ThesisReportStorageException`, `thesis.assistant.exception.Provider{Cancelled,Unavailable}Exception`. |
+
+**Nên throw loại nào?** Hai style song song được giữ nguyên (không gộp): `new AppException(ErrorCode.X[, customMessage])` dùng khi lỗi đã có sẵn trong catalog `ErrorCode` — code/status/message đi kèm enum; `new DomainException(status, code, message[, details])` dùng khi cần mã lỗi ad-hoc ngoài catalog hoặc payload `details` cho client xử lý được (ví dụ danh sách conflict ở reopen section). Với các trường hợp phổ biến hơn, dùng typed subclass (`BadRequestException`, `ConflictException`, `ForbiddenException`, `ResourceNotFoundException`, `UnauthorizedException`, `ValidationException` kèm `fieldErrors`). Exception riêng của module (storage/provider) đặt trong `<module>/exception/` — chúng là lỗi kỹ thuật nội bộ, được handler catch-all quy về 500 nếu lọt ra ngoài.
+
+**Hai đường lỗi dùng chung một hình dáng response:** exception từ controller/service đi qua `GlobalExceptionHandler` → record `ErrorResponse` (`timestamp, status, code, message, path, requestId, fieldErrors, fields, details` — field `null` bị ẩn). Lỗi bị chặn ở filter (rate limit, CSRF, body-cap, account-state) đi qua `ApiErrorWriter` và serialize cùng các khóa envelope để client chỉ cần một parser.
+
+**Thêm exception mới cho một module:** tạo lớp `XxxException extends RuntimeException` (hoặc `AppException` nếu cần status/code riêng cho client) trong `<module>/exception/`; nếu cần mã lỗi dùng chung nhiều nơi thì bổ sung hằng vào `exception/code/ErrorCode`; không đặt exception type ngoài package `..exception..` và không thêm handler mới ngoài `exception/handler/` — `ArchitectureGuardTest` sẽ chặn.
 
 ---
 
