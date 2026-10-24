@@ -3131,8 +3131,8 @@ export const en = {
     emptyTitle: 'No attendance records yet',
     emptyDescription:
       'Once lecturers start marking attendance for your classes, the per-course totals and session history will appear here.',
-    statsPresentRate: 'Present rate',
-    statsPresentRateHint: 'present sessions ÷ recorded sessions',
+    statsPresentRate: 'Attendance rate',
+    statsPresentRateHint: 'present or late ÷ present, late, or absent sessions; excused excluded',
     statsTotalSessions: 'Recorded sessions',
     statsPresent: 'Present',
     statsAbsentLate: 'Absent + late',
@@ -3193,7 +3193,7 @@ export const en = {
     notesPlaceholder: 'Reason or notes (optional)',
     statsTotalStudents: 'Enrolled students',
     statsMarked: 'Marked today',
-    statsPresentRate: 'Class present rate',
+    statsPresentRate: 'Class attendance rate',
     statuses: {
       PRESENT: 'Present',
       ABSENT: 'Absent',
@@ -6352,8 +6352,8 @@ export const vi: I18nMessages = {
     emptyTitle: 'Chưa có bản ghi điểm danh',
     emptyDescription:
       'Khi giảng viên bắt đầu điểm danh cho các lớp của bạn, bảng tổng hợp theo môn và lịch sử phiên học sẽ xuất hiện tại đây.',
-    statsPresentRate: 'Tỷ lệ có mặt',
-    statsPresentRateHint: 'số phiên có mặt ÷ số phiên đã ghi',
+    statsPresentRate: 'Tỷ lệ tham dự',
+    statsPresentRateHint: 'phiên có mặt hoặc đi muộn ÷ phiên có mặt, đi muộn hoặc vắng; không tính vắng có phép',
     statsTotalSessions: 'Tổng số phiên đã ghi',
     statsPresent: 'Số phiên có mặt',
     statsAbsentLate: 'Vắng + đi muộn',
@@ -6414,7 +6414,7 @@ export const vi: I18nMessages = {
     notesPlaceholder: 'Lý do vắng hoặc ghi chú thêm (không bắt buộc)',
     statsTotalStudents: 'Tổng số sinh viên',
     statsMarked: 'Đã điểm danh hôm nay',
-    statsPresentRate: 'Tỷ lệ chuyên cần',
+    statsPresentRate: 'Tỷ lệ tham dự lớp học',
     statuses: {
       PRESENT: 'Có mặt',
       ABSENT: 'Vắng',

@@ -131,7 +131,7 @@ public class AcademicAttendanceReadService {
                 row.absent(),
                 row.late(),
                 row.excused(),
-                rate(row.present() + row.late(), row.totalRecords()));
+                AttendanceRateCalculator.percentage(row.present(), row.late(), row.absent()));
     }
 
     @Transactional(readOnly = true)
@@ -205,7 +205,7 @@ public class AcademicAttendanceReadService {
                 row.absent(),
                 row.late(),
                 row.excused(),
-                rate(row.present(), row.total()));
+                AttendanceRateCalculator.percentage(row.present(), row.late(), row.absent()));
     }
 
     private static String requireProfileId(String name, String value) {
@@ -269,10 +269,6 @@ public class AcademicAttendanceReadService {
 
     private static long offset(int page, int limit) {
         return (long) (page - 1) * limit;
-    }
-
-    private static int rate(long numerator, long denominator) {
-        return denominator > 0 ? Math.round((numerator * 100.0f) / denominator) : 0;
     }
 
     private static String coalesce(String value, String fallback) {
