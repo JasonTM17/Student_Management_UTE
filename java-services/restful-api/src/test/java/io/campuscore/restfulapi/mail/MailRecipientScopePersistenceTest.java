@@ -3,7 +3,7 @@ package io.campuscore.restfulapi.mail;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import io.campuscore.restfulapi.mail.repository.MailRecipientScopeRepository;
-import io.campuscore.restfulapi.mail.repository.MailRecipientScopeRepository.ScopedRecipient;
+import io.campuscore.restfulapi.mail.model.ScopedRecipient;
 import java.sql.Timestamp;
 import java.time.Instant;
 import org.junit.jupiter.api.BeforeEach;
