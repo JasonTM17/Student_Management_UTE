@@ -161,6 +161,14 @@ public final class ThesisMutationDtos {
     }
 
     /**
+     * Reason for deleting an empty round (audit trail). The UI collects the
+     * typed round name separately as its own confirmation gate; the API only
+     * requires the governance reason, like cancel and retract.
+     */
+    public record RoundDeleteRequest(String reason) {
+    }
+
+    /**
      * Consequence preview the admin reviews before confirming
      * close-registration: non-cancelled group counts by approval state, the
      * number of report rows already submitted in the round, and the effective
