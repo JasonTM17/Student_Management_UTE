@@ -792,6 +792,26 @@ class AdminCatalogMutationPersistenceTest {
     }
 
     @Test
+    void sectionDeleteWithEnrollmentIsRejectedAndCapacityCannotShrinkBelowSeats() throws Exception {
+        jdbc.update("INSERT INTO \"academic\".\"Enrollment\""
+                        + " (\"id\", \"studentId\", \"sectionId\", \"courseId\", \"gradeStatus\")"
+                        + " VALUES (?, ?, ?, ?, ?)",
+                "enrollment-section-reference", "student-1", "section-existing", "course-old", "DRAFT");
+
+        mvc.perform(delete("/api/v1/sections/section-existing").with(adminJwt()))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("RESOURCE_IN_USE"));
+
+        jdbc.update("UPDATE \"academic\".\"Section\" SET \"enrolledCount\" = 5 WHERE \"id\" = 'section-existing'");
+        mvc.perform(put("/api/v1/sections/section-existing")
+                        .with(adminJwt())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"capacity\":4}"))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("CAPACITY_BELOW_ENROLLED"));
+    }
+
+    @Test
     void classroomCreateAndMutationsPersistProperly() throws Exception {
         mvc.perform(post("/api/v1/classrooms")
                         .with(adminJwt())

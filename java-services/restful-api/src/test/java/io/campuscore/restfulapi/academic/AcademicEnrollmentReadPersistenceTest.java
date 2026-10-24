@@ -197,6 +197,114 @@ class AcademicEnrollmentReadPersistenceTest {
                 .andExpect(jsonPath("$.totalWeight").value(0));
     }
 
+    @Test
+    void inactiveCourseDoesNotHidePublishedGradesOrTranscript() throws Exception {
+        jdbc.update("UPDATE academic.\"Course\" SET \"isActive\" = FALSE WHERE \"id\" = 'course-1'");
+
+        mvc.perform(get("/api/v1/enrollments/my/grades").with(studentJwt("student-user-1", "student-1")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(1))
+                .andExpect(jsonPath("$[0].id").value("enrollment-1"))
+                .andExpect(jsonPath("$[0].letterGrade").value("A"));
+
+        mvc.perform(get("/api/v1/enrollments/my/transcript").with(studentJwt("student-user-1", "student-1")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.summary.cumulativeGpa").value(4.0))
+                .andExpect(jsonPath("$.summary.totalCreditsEarned").value(4))
+                .andExpect(jsonPath("$.semesters[0].records[0].id").value("enrollment-1"));
+    }
+
+    @Test
+    void transcriptUsesBestAttemptWhenLaterAttemptIsLowerOrHigher() throws Exception {
+        // CS101's existing A is the best attempt; a later D must not replace it.
+        insertSection("section-cs101-later-lower", "R1", "course-1");
+        insertEnrollment("enrollment-cs101-later-lower", "student-1", "section-cs101-later-lower",
+                "COMPLETED", "PUBLISHED", "60.00", "D", 20);
+
+        // CS102's latest A is better than its earlier C.
+        insertCourse("course-cs102-retake", "CS102", "Data Structures", "Data Structures", "Cau truc du lieu", 3);
+        insertSection("section-cs102-earlier", "R1", "course-cs102-retake");
+        insertSection("section-cs102-later", "R2", "course-cs102-retake");
+        insertEnrollment("enrollment-cs102-earlier", "student-1", "section-cs102-earlier",
+                "COMPLETED", "PUBLISHED", "65.00", "C", 21);
+        insertEnrollment("enrollment-cs102-later", "student-1", "section-cs102-later",
+                "COMPLETED", "PUBLISHED", "90.00", "A", 22);
+
+        mvc.perform(get("/api/v1/enrollments/my/transcript").with(studentJwt("student-user-1", "student-1")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.summary.cumulativeGpa").value(4.0))
+                .andExpect(jsonPath("$.summary.totalCreditsEarned").value(7))
+                .andExpect(jsonPath("$.summary.totalCreditsAttempted").value(7));
+    }
+
+    @Test
+    void transcriptEndpointIsStudentOnlyAndNeverAcceptsAnotherStudentId() throws Exception {
+        mvc.perform(get("/api/v1/enrollments/my/transcript")
+                        .with(studentJwt("student-user-1", "student-1")))
+                .andExpect(status().isOk());
+
+        mvc.perform(get("/api/v1/enrollments/my/transcript")
+                        .queryParam("studentId", "student-2")
+                        .with(studentJwt("student-user-1", "student-1")))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("INVALID_REQUEST"));
+
+        for (String role : List.of("ADMIN", "SUPER_ADMIN", "LECTURER", "TRUONG_BO_MON", "TRUONG_KHOA")) {
+            mvc.perform(get("/api/v1/enrollments/my/transcript")
+                            .with(roleJwt("transcript-role-" + role.toLowerCase(), role)))
+                    .andExpect(status().isForbidden())
+                    .andExpect(jsonPath("$.code").value("ACCESS_DENIED"));
+        }
+    }
+
+    @Test
+    void studentCannotTargetAnotherStudentThroughEnrollmentOrSectionGradeGets() throws Exception {
+        RequestPostProcessor student = studentJwt("student-user-1", "student-1");
+
+        mvc.perform(get("/api/v1/enrollments/my").queryParam("studentId", "student-2").with(student))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("INVALID_REQUEST"));
+        mvc.perform(get("/api/v1/enrollments/my/grades").queryParam("studentId", "student-2").with(student))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("INVALID_REQUEST"));
+
+        mvc.perform(get("/api/v1/enrollments/student/student-2").with(student))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("ACCESS_DENIED"));
+        mvc.perform(get("/api/v1/enrollments").queryParam("studentId", "student-2").with(student))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("ACCESS_DENIED"));
+        mvc.perform(get("/api/v1/enrollments/export/csv")
+                        .queryParam("studentId", "student-2")
+                        .with(student))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("ACCESS_DENIED"));
+        mvc.perform(get("/api/v1/conduct/student/student-2").with(student))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("ACCESS_DENIED"));
+
+        mvc.perform(get("/api/v1/grades/items/section/section-1").with(student))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("ACCESS_DENIED"));
+        mvc.perform(get("/api/v1/grades/student-grades/section/section-1").with(student))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("ACCESS_DENIED"));
+        mvc.perform(get("/api/v1/grades/student-grades/enrollment/enrollment-3").with(student))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.code").value("NOT_FOUND"));
+    }
+
+    @Test
+    void studentCannotReadAnotherStudentsPublishedGradeComponents() throws Exception {
+        jdbc.update("UPDATE academic.\"Enrollment\" SET \"gradeStatus\" = 'PUBLISHED', \"finalGrade\" = 82.00, \"letterGrade\" = 'B'"
+                + " WHERE \"id\" = 'enrollment-3'");
+
+        mvc.perform(get("/api/v1/grades/student-grades/enrollment/enrollment-3")
+                        .with(studentJwt("student-user-1", "student-1")))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.code").value("NOT_FOUND"));
+    }
+
     /**
      * L-P1-2: draft component scores are the lecturer's working record. A
      * student who knows their own enrollment id must not be able to poll the
@@ -380,6 +488,15 @@ class AcademicEnrollmentReadPersistenceTest {
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.code").value("NOT_FOUND"));
 
+        mvc.perform(get("/api/v1/grades/items/lecturer/my").with(lecturerJwt("lecturer-other")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(0));
+        mvc.perform(get("/api/v1/grades/student-grades/lecturer/my")
+                        .queryParam("sectionId", "section-1")
+                        .with(lecturerJwt("lecturer-other")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(0));
+
         mvc.perform(get("/api/v1/grades/items/lecturer/my")
                         .with(jwt().jwt(token -> token
                                 .subject("lecturer-user-1")
@@ -463,6 +580,12 @@ class AcademicEnrollmentReadPersistenceTest {
     }
 
     private RequestPostProcessor studentJwt(String subject, String studentId) {
+        return CurrentAccountJwt.currentJwt(jdbc, subject);
+    }
+
+    private RequestPostProcessor roleJwt(String subject, String role) {
+        AccountAuthorityFixture.ensureUser(jdbc, subject);
+        AccountAuthorityFixture.replaceRoles(jdbc, subject, role);
         return CurrentAccountJwt.currentJwt(jdbc, subject);
     }
 
