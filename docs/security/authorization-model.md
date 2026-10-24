@@ -153,13 +153,13 @@ retroactively identify password changes made before the revision existed.
   annotation. Its allowlist belongs to `SecurityConfig`; internal service-token
   routes in that allowlist are not anonymous user features.
 - **Shared reference data** supports cross-role navigation, such as course and
-  semester lookup. [AcademicReadController](../../java-services/restful-api/src/main/java/io/campuscore/restfulapi/academic/web/AcademicReadController.java)
+  semester lookup. [AcademicReadController](../../java-services/restful-api/src/main/java/io/campuscore/restfulapi/academic/controller/AcademicReadController.java)
   owns those reads and distinguishes the student's personal curriculum route.
 - **Private academic and inbox data** needs subject/profile ownership as well as
-  authentication. Start at [AcademicEnrollmentReadController](../../java-services/restful-api/src/main/java/io/campuscore/restfulapi/academic/web/AcademicEnrollmentReadController.java),
+  authentication. Start at [AcademicEnrollmentReadController](../../java-services/restful-api/src/main/java/io/campuscore/restfulapi/academic/controller/AcademicEnrollmentReadController.java),
   [AcademicAttendanceReadService](../../java-services/restful-api/src/main/java/io/campuscore/restfulapi/academic/service/AcademicAttendanceReadService.java),
-  [ThesisGroupReadController](../../java-services/restful-api/src/main/java/io/campuscore/restfulapi/thesis/web/ThesisGroupReadController.java),
-  and [NotificationReadController](../../java-services/restful-api/src/main/java/io/campuscore/restfulapi/notification/web/NotificationReadController.java).
+  [ThesisGroupReadController](../../java-services/restful-api/src/main/java/io/campuscore/restfulapi/thesis/controller/ThesisGroupReadController.java),
+  and [NotificationReadController](../../java-services/restful-api/src/main/java/io/campuscore/restfulapi/notification/controller/NotificationReadController.java).
   A supplied record ID is a locator, never proof of access.
 - **Student directory data** is relationship-scoped, not role-scoped. Admins
   keep the full directory; students still read only their own record.
@@ -175,8 +175,8 @@ retroactively identify password changes made before the revision existed.
   The owners are [AnnouncementReadService](../../java-services/restful-api/src/main/java/io/campuscore/restfulapi/engagement/service/AnnouncementReadService.java)
   and [AnnouncementStudentNotifier](../../java-services/restful-api/src/main/java/io/campuscore/restfulapi/engagement/service/AnnouncementStudentNotifier.java).
 - **Internal AI calls** use a distinct service credential and owner boundary.
-  See [ThesisAssistantInternalController](../../java-services/restful-api/src/main/java/io/campuscore/restfulapi/thesis/assistant/ThesisAssistantInternalController.java)
-  and [SupabaseKnowledgeInternalController](../../java-services/restful-api/src/main/java/io/campuscore/restfulapi/thesis/assistant/SupabaseKnowledgeInternalController.java).
+  See [ThesisAssistantInternalController](../../java-services/restful-api/src/main/java/io/campuscore/restfulapi/thesis/assistant/controller/ThesisAssistantInternalController.java)
+  and [SupabaseKnowledgeInternalController](../../java-services/restful-api/src/main/java/io/campuscore/restfulapi/thesis/assistant/controller/SupabaseKnowledgeInternalController.java).
 
 ## Signing configuration
 

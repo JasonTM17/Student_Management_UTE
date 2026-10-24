@@ -260,7 +260,34 @@ Trên màn hình hẹp, truy cập trợ lý phải giữ chỗ cho thao tác h�
 
 ---
 
-## 7. Ranh giới ngoài phạm vi (Non-goals)
+## 7. Cấu trúc Package Backend (Layered Package Layout)
+
+Backend `java-services/restful-api` (góc `io.campuscore.restfulapi`) được tổ chức theo **module → vai trò (role)** để người đọc tìm code theo chức năng thay vì theo một thư mục phẳng. Mỗi module (`academic`, `auth`, `audit`, `engagement`, `mail`, `notification`, `people`, `site`, `thesis`) dùng cùng một bộ package con:
+
+| Package | Vai trò |
+| --- | --- |
+| `controller/` | Chỉ REST controller (`@RestController`/`@Controller`). |
+| `dto/` | Các lớp holder request/response (`*Dtos`, record lồng nhau). |
+| `service/` | Business services. |
+| `repository/` | Data access (JDBC repositories, read ports). |
+| `entity/` hoặc `domain/` | JPA entities + enum/value types (`domain` giữ tên hiện có ở `thesis`/`engagement`, `entity` ở `academic.registration`). |
+| `config/` | `@Configuration` / `@ConfigurationProperties` của module. |
+| `job/` | Scheduled jobs, retention/reconcile jobs. |
+| `scope/` | Authorization/scope helpers (`thesis.scope.ThesisDeanScope`, `ThesisDepartmentScope`). |
+| `storage/` | Report-storage implementations (`thesis.storage.*ThesisReportStorage`). |
+| `renderer/` | Renderer rõ vai trò (`academic.registration.renderer.RegistrationPdfRenderer`). |
+
+`academic.registration` là một subpackage của `academic` và tự nó cũng được chia theo vai trò (`controller`, `dto`, `entity`, `repository`, `service`, `renderer`).
+
+`thesis.assistant` được chia thành các subpackage theo vai trò thật của từng lớp: `controller`, `dto`, `service`, `repository`, `client` (DeepSeek/RAG/knowledge-authority gateways), `guard` (input/output guards), `rls` (`AssistantRls*` boundary/context/aspect/transaction), `config`, `properties`, `job`.
+
+Quy ước top-level: `exception/` chứa exception types (`DomainException`, `AppException`, `ErrorCode`, ...); `web/` chứa exception handlers/writers (`GlobalExceptionHandler`, `ApiErrorWriter`, `ApiExceptionHandler` legacy DTO container); `controller/` chứa controller dùng chung (`Contract`, `Health`, `Identity`); `job/` chứa scheduler dùng chung (`DatabaseKeepAliveScheduler`); `common/` chứa response envelope dùng chung; `security/` giữ nguyên các filter/config bảo mật; `config/` giữ bootstrap config được tham chiếu bởi `application.yml`/`META-INF/spring.factories`.
+
+Quy tắc được bảo đảm bởi `ArchitectureGuardTest` (quét `.class` trên classpath, không cần dependency mới): controller chỉ nằm trong package `controller` và phải mang `@RestController`/`@Controller`; package `controller` không phụ thuộc `repository`; `repository` không phụ thuộc `controller`/`service`; các lớp `*Dtos` nằm trong package `dto`. Một số cạnh phụ thuộc có sẵn trước refactor được liệt kê tường minh trong test như documented exceptions.
+
+---
+
+## 8. Ranh giới ngoài phạm vi (Non-goals)
 
 Các thành phần sau đây được xác định rõ ràng là **nằm ngoài phạm vi của đồ án môn học** để giữ cho hệ thống tập trung vào bài toán cốt lõi:
 - **Tài chính & Cổng thanh toán trực tuyến** (Finance, Payment gateways).
