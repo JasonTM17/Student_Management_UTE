@@ -4,6 +4,7 @@ import io.campuscore.restfulapi.audit.service.AdminAuditRecorder;
 import io.campuscore.restfulapi.thesis.domain.RoundStatus;
 import io.campuscore.restfulapi.thesis.domain.ThesisTopic;
 import io.campuscore.restfulapi.thesis.domain.TopicStatus;
+import io.campuscore.restfulapi.thesis.dto.SupervisorRow;
 import io.campuscore.restfulapi.thesis.repository.ThesisTopicRepository;
 import io.campuscore.restfulapi.exception.DomainException;
 import java.util.List;
@@ -384,11 +385,4 @@ public class ThesisSupervisorService {
         return new DomainException(HttpStatus.NOT_FOUND, code, message);
     }
 
-    /** `firstName`/`lastName`/`email` are null when the lecturer has no directory row. */
-    public record SupervisorRow(
-            String lecturerId,
-            int supervisorOrder,
-            String firstName,
-            String lastName,
-            String email) { }
 }

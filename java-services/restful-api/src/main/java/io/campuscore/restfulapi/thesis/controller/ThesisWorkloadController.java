@@ -1,7 +1,7 @@
 package io.campuscore.restfulapi.thesis.controller;
 
 import io.campuscore.restfulapi.thesis.service.ThesisLecturerWorkloadService;
-import io.campuscore.restfulapi.thesis.service.ThesisLecturerWorkloadService.LecturerWorkload;
+import io.campuscore.restfulapi.thesis.dto.LecturerWorkload;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;

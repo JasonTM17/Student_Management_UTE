@@ -5,6 +5,12 @@ import io.campuscore.restfulapi.thesis.domain.RoundStatus;
 import io.campuscore.restfulapi.thesis.domain.RoundType;
 import io.campuscore.restfulapi.thesis.domain.TopicStatus;
 import io.campuscore.restfulapi.exception.DomainException;
+import io.campuscore.restfulapi.thesis.dto.CouncilMember;
+import io.campuscore.restfulapi.thesis.dto.CouncilResponse;
+import io.campuscore.restfulapi.thesis.dto.ScoreComment;
+import io.campuscore.restfulapi.thesis.dto.ScoreResponse;
+import io.campuscore.restfulapi.thesis.dto.StudentResultRow;
+import io.campuscore.restfulapi.thesis.dto.TopicResult;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.Instant;
@@ -1809,29 +1815,4 @@ public class ThesisCouncilService {
         return new DomainException(HttpStatus.NOT_FOUND, code, message);
     }
 
-    public record CouncilMember(String lecturerId, String memberRole) { }
-
-    public record CouncilResponse(
-            UUID id,
-            UUID roundId,
-            String name,
-            String status,
-            List<CouncilMember> members,
-            List<UUID> topicIds) { }
-
-    public record ScoreResponse(UUID topicId, String lecturerId, String component, BigDecimal score, String comment) { }
-
-    public record TopicResult(UUID topicId, BigDecimal finalScore, String finalizedBy, Instant finalizedAt, String status) { }
-
-    public record StudentResultRow(
-            UUID groupId,
-            String topicTitle,
-            BigDecimal finalScore,
-            String councilName,
-            String leaderStudentId,
-            String resultStatus,
-            String resultReason,
-            List<ScoreComment> comments) { }
-
-    public record ScoreComment(String component, String comment) { }
 }

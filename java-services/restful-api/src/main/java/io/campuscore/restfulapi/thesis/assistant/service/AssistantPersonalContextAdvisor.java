@@ -21,6 +21,7 @@ import io.campuscore.restfulapi.academic.dto.AcademicSectionReadDtos.LecturerGra
 import io.campuscore.restfulapi.academic.dto.AcademicSectionReadDtos.LecturerScheduleResponse;
 import io.campuscore.restfulapi.thesis.assistant.dto.ThesisAssistantDtos.ChatRequest;
 import io.campuscore.restfulapi.thesis.assistant.dto.ThesisAssistantDtos.ChatResponse;
+import io.campuscore.restfulapi.thesis.dto.SupervisedTopic;
 import io.campuscore.restfulapi.thesis.service.ThesisLecturerWorkloadService;
 import io.campuscore.restfulapi.exception.DomainException;
 import java.math.BigDecimal;
@@ -2757,9 +2758,9 @@ public class AssistantPersonalContextAdvisor {
             // aggregates), so the wording says "nhóm sinh viên", never a bare
             // student headcount.
             int totalGroups = workload.topics().stream()
-                    .mapToInt(ThesisLecturerWorkloadService.SupervisedTopic::groupCount).sum();
+                    .mapToInt(SupervisedTopic::groupCount).sum();
             int pendingGroups = workload.topics().stream()
-                    .mapToInt(ThesisLecturerWorkloadService.SupervisedTopic::pendingGroupCount).sum();
+                    .mapToInt(SupervisedTopic::pendingGroupCount).sum();
             answer.append(vi
                     ? "Bạn đang hướng dẫn tổng cộng " + totalGroups + " nhóm sinh viên trên "
                             + workload.topics().size() + " đề tài, trong đó " + pendingGroups

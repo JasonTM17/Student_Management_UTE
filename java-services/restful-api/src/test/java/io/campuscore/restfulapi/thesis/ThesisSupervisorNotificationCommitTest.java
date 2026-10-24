@@ -12,7 +12,7 @@ import static org.mockito.Mockito.verify;
 
 import io.campuscore.restfulapi.thesis.service.ThesisNotificationService;
 import io.campuscore.restfulapi.thesis.service.ThesisSupervisorService;
-import io.campuscore.restfulapi.thesis.service.ThesisSupervisorService.SupervisorRow;
+import io.campuscore.restfulapi.thesis.dto.SupervisorRow;
 import java.sql.Timestamp;
 import java.time.Instant;
 import java.util.List;

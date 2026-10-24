@@ -6,6 +6,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.doAnswer;
 
+import io.campuscore.restfulapi.thesis.dto.TopicResult;
 import io.campuscore.restfulapi.thesis.service.ThesisCouncilService;
 import io.campuscore.restfulapi.thesis.service.ThesisMutationService;
 import io.campuscore.restfulapi.exception.DomainException;
@@ -181,7 +182,7 @@ class ThesisCouncilRoundPostgresIT {
         insertDefenseScore(fx, fx.member(), new BigDecimal("10"));
         insertCounterReviewScore(fx, fx.reviewer(), new BigDecimal("8.5"));
 
-        ThesisCouncilService.TopicResult result = councils.finalizeScores(fx.councilId(), fx.topicId(), chairJwt(fx.chair()));
+        TopicResult result = councils.finalizeScores(fx.councilId(), fx.topicId(), chairJwt(fx.chair()));
         assertThat(result.finalScore()).isEqualByComparingTo(new BigDecimal("9.00"));
         assertThat(result.status()).isEqualTo("GRADED");
         assertThat(jdbc.queryForObject("SELECT result_status FROM thesis.thesis_topic WHERE id = ?",

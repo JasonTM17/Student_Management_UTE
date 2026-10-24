@@ -3,6 +3,7 @@ package io.campuscore.restfulapi.thesis.service;
 import io.campuscore.restfulapi.audit.service.AdminAuditRecorder;
 import io.campuscore.restfulapi.thesis.domain.ApprovalStatus;
 import io.campuscore.restfulapi.thesis.domain.GroupStatus;
+import io.campuscore.restfulapi.thesis.domain.LecturerScope;
 import io.campuscore.restfulapi.thesis.domain.RoundStatus;
 import io.campuscore.restfulapi.thesis.domain.RoundType;
 import io.campuscore.restfulapi.thesis.domain.ThesisTopic;
@@ -2381,15 +2382,15 @@ public class ThesisMutationService {
     private boolean isGroupAdmin(GroupRow group, Jwt actor) {
         if (isGlobalAdmin(actor)) return true;
         if (!hasRole(actor, "TRUONG_KHOA")) return false;
-        ThesisGroupReadRepository.LecturerScope scope = requireDeanScope(actor);
+        LecturerScope scope = requireDeanScope(actor);
         if (groups.groupInFaculty(group.id(), scope.facultyId()) || isDeanSupervisor(group.topicId(), actor)) {
             return true;
         }
         throw notFound("THESIS_GROUP_NOT_FOUND", "Thesis group not found");
     }
 
-    private ThesisGroupReadRepository.LecturerScope requireDeanScope(Jwt actor) {
-        ThesisGroupReadRepository.LecturerScope scope = groups.findLecturerScope(
+    private LecturerScope requireDeanScope(Jwt actor) {
+        LecturerScope scope = groups.findLecturerScope(
                 normalize(actor.getClaimAsString("lecturerId")), subject(actor));
         if (scope == null) {
             throw new DomainException(HttpStatus.FORBIDDEN, "FACULTY_PROFILE_REQUIRED",
@@ -2665,7 +2666,7 @@ public class ThesisMutationService {
     }
 
     private void requireDeanTopicDepartment(Jwt actor, String departmentId) {
-        ThesisGroupReadRepository.LecturerScope scope = requireDeanScope(actor);
+        LecturerScope scope = requireDeanScope(actor);
         Integer matches = jdbc.queryForObject(
                 "SELECT COUNT(*) FROM academic.\"Department\" "
                         + "WHERE \"id\" = :departmentId AND \"facultyId\" = :facultyId AND \"isActive\" = TRUE",

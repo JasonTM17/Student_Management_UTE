@@ -10,6 +10,7 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 import io.campuscore.restfulapi.thesis.domain.ThesisTopic;
+import io.campuscore.restfulapi.thesis.dto.SupervisorRow;
 import io.campuscore.restfulapi.thesis.repository.ThesisTopicRepository;
 import io.campuscore.restfulapi.thesis.service.ThesisSupervisorService;
 import java.sql.ResultSet;
@@ -60,7 +61,7 @@ class ThesisSupervisorVisibilityTest {
 
         when(jdbc.query(anyString(), any(SqlParameterSource.class), any(RowMapper.class)))
                 .thenAnswer(invocation -> {
-                    RowMapper<ThesisSupervisorService.SupervisorRow> mapper = invocation.getArgument(2);
+                    RowMapper<SupervisorRow> mapper = invocation.getArgument(2);
                     return List.of(mapper.mapRow(rows, 0));
                 });
     }
@@ -83,7 +84,7 @@ class ThesisSupervisorVisibilityTest {
         published.publish();
         when(repository.findById(published.getId())).thenReturn(Optional.of(published));
 
-        List<ThesisSupervisorService.SupervisorRow> rows =
+        List<SupervisorRow> rows =
                 service.list(published.getId(), jwt("student-user-101", "STUDENT"));
 
         assertEquals(1, rows.size());
