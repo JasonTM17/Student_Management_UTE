@@ -1,4 +1,4 @@
-package io.campuscore.restfulapi.site;
+package io.campuscore.restfulapi.site.service;
 
 import static io.campuscore.restfulapi.testsupport.CurrentAccountJwt.fixtureJwt;
 

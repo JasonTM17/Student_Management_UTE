@@ -1,4 +1,4 @@
-package io.campuscore.restfulapi.site;
+package io.campuscore.restfulapi.site.service;
 
 import com.fasterxml.jackson.core.JacksonException;
 import com.fasterxml.jackson.databind.JsonNode;
@@ -22,7 +22,7 @@ public class SiteAppearanceStore {
     public static final String ROW_ID = "default";
 
     /** Matches the payload CHECK constraint in V73. */
-    static final int MAX_PAYLOAD_CHARS = 131_072;
+    public static final int MAX_PAYLOAD_CHARS = 131_072;
 
     /** Matches the "updatedBy" column width in V73. */
     static final int MAX_UPDATED_BY_CHARS = 255;
