@@ -26,6 +26,18 @@ council lifecycle authority remains a separate contract. Report submission
 and upload remain group-leader-only; report read authority is documented in
 [report storage and recovery](thesis-report-storage.md#artifact-integrity-and-concurrent-changes).
 
+The counter-review waiver ("Miễn phản biện") remains implemented but is
+disabled for every shipped round type: undergraduate rounds always require a
+counter-reviewer, so the waive endpoint answers
+`409 COUNTER_REVIEW_WAIVER_NOT_SUPPORTED` and the admin UI hides the action.
+Stored waivers still work — revoke, scoring, and publication treat them as
+before. A future postgraduate round type opts in by returning `true` from
+`RoundType.allowsCounterReviewWaiver()`; an operator override also exists via
+`thesis.governance.counter-review-waiver.enabled`
+(`THESIS_GOVERNANCE_COUNTER_REVIEW_WAIVER_ENABLED`, default `false`). The
+single owner is `ThesisGovernanceCapabilities`, which feeds both the write
+path and the round read model (`counterReviewWaiverAllowed`).
+
 ## Executable owners
 
 - [Group mutations](../../java-services/restful-api/src/main/java/io/campuscore/restfulapi/thesis/service/ThesisMutationService.java):

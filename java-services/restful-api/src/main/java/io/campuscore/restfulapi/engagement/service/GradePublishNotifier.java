@@ -1,7 +1,7 @@
 package io.campuscore.restfulapi.engagement.service;
 
 import io.campuscore.restfulapi.notification.repository.NotificationWriteRepository;
-import io.campuscore.restfulapi.notification.repository.NotificationWriteRepository.CreateNotificationCommand;
+import io.campuscore.restfulapi.notification.model.CreateNotificationCommand;
 import java.time.Clock;
 import java.time.Instant;
 import java.util.ArrayList;

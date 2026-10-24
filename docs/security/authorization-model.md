@@ -6,11 +6,11 @@ class-level annotations, the filter chain, and service/repository scope all matt
 
 ## Executable owners
 
-- [SecurityConfig](../../java-services/restful-api/src/main/java/io/campuscore/restfulapi/security/SecurityConfig.java)
+- [SecurityConfig](../../java-services/restful-api/src/main/java/io/campuscore/restfulapi/security/config/SecurityConfig.java)
   owns the public route and HTTP-method allowlist, authenticated fallback, token
   validation, and role conversion. Use it instead of maintaining a second route
   list here. Accounts are office-issued; there is no public self-registration.
-- [AccountStateFilter](../../java-services/restful-api/src/main/java/io/campuscore/restfulapi/security/AccountStateFilter.java)
+- [AccountStateFilter](../../java-services/restful-api/src/main/java/io/campuscore/restfulapi/security/filter/AccountStateFilter.java)
   and [AuthUserRepository.findAccountAuthorization](../../java-services/restful-api/src/main/java/io/campuscore/restfulapi/auth/repository/AuthUserRepository.java)
   own the current-account gate. A valid signature proves who issued a token; it
   does not make an earlier role or academic profile authoritative forever.
@@ -153,13 +153,13 @@ retroactively identify password changes made before the revision existed.
   annotation. Its allowlist belongs to `SecurityConfig`; internal service-token
   routes in that allowlist are not anonymous user features.
 - **Shared reference data** supports cross-role navigation, such as course and
-  semester lookup. [AcademicReadController](../../java-services/restful-api/src/main/java/io/campuscore/restfulapi/academic/web/AcademicReadController.java)
+  semester lookup. [AcademicReadController](../../java-services/restful-api/src/main/java/io/campuscore/restfulapi/academic/controller/AcademicReadController.java)
   owns those reads and distinguishes the student's personal curriculum route.
 - **Private academic and inbox data** needs subject/profile ownership as well as
-  authentication. Start at [AcademicEnrollmentReadController](../../java-services/restful-api/src/main/java/io/campuscore/restfulapi/academic/web/AcademicEnrollmentReadController.java),
+  authentication. Start at [AcademicEnrollmentReadController](../../java-services/restful-api/src/main/java/io/campuscore/restfulapi/academic/controller/AcademicEnrollmentReadController.java),
   [AcademicAttendanceReadService](../../java-services/restful-api/src/main/java/io/campuscore/restfulapi/academic/service/AcademicAttendanceReadService.java),
-  [ThesisGroupReadController](../../java-services/restful-api/src/main/java/io/campuscore/restfulapi/thesis/web/ThesisGroupReadController.java),
-  and [NotificationReadController](../../java-services/restful-api/src/main/java/io/campuscore/restfulapi/notification/web/NotificationReadController.java).
+  [ThesisGroupReadController](../../java-services/restful-api/src/main/java/io/campuscore/restfulapi/thesis/controller/ThesisGroupReadController.java),
+  and [NotificationReadController](../../java-services/restful-api/src/main/java/io/campuscore/restfulapi/notification/controller/NotificationReadController.java).
   A supplied record ID is a locator, never proof of access.
 - **Student directory data** is relationship-scoped, not role-scoped. Admins
   keep the full directory; students still read only their own record.
@@ -169,19 +169,28 @@ retroactively identify password changes made before the revision existed.
   supervise, review, or sit on a council for. List totals and the status
   filter apply to the scoped set, and an out-of-scope detail id answers the
   same 404 as a missing id. The owner is
-  [PeopleReadRepository.LecturerDirectoryScope](../../java-services/restful-api/src/main/java/io/campuscore/restfulapi/people/repository/PeopleReadRepository.java).
+  [LecturerDirectoryScope](../../java-services/restful-api/src/main/java/io/campuscore/restfulapi/people/model/LecturerDirectoryScope.java).
 - **Announcement audiences** must protect detail access and inbox previews as
   well as feeds; a preview can disclose the same private content as the full row.
   The owners are [AnnouncementReadService](../../java-services/restful-api/src/main/java/io/campuscore/restfulapi/engagement/service/AnnouncementReadService.java)
   and [AnnouncementStudentNotifier](../../java-services/restful-api/src/main/java/io/campuscore/restfulapi/engagement/service/AnnouncementStudentNotifier.java).
 - **Internal AI calls** use a distinct service credential and owner boundary.
-  See [ThesisAssistantInternalController](../../java-services/restful-api/src/main/java/io/campuscore/restfulapi/thesis/assistant/ThesisAssistantInternalController.java)
-  and [SupabaseKnowledgeInternalController](../../java-services/restful-api/src/main/java/io/campuscore/restfulapi/thesis/assistant/SupabaseKnowledgeInternalController.java).
+  See [ThesisAssistantInternalController](../../java-services/restful-api/src/main/java/io/campuscore/restfulapi/thesis/assistant/controller/ThesisAssistantInternalController.java)
+  and [SupabaseKnowledgeInternalController](../../java-services/restful-api/src/main/java/io/campuscore/restfulapi/thesis/assistant/controller/SupabaseKnowledgeInternalController.java).
+- **Thesis governance actions** run after the dean-scope check
+  (`ThesisDeanScope`), so capability gates never leak topic existence or bypass
+  faculty ownership. The counter-review waiver is one such action: it stays
+  implemented but is off for every shipped undergraduate round type
+  (`409 COUNTER_REVIEW_WAIVER_NOT_SUPPORTED`), because those rounds always
+  require a counter-reviewer. `ThesisGovernanceCapabilities` owns the decision
+  (`RoundType.allowsCounterReviewWaiver()` plus the
+  `thesis.governance.counter-review-waiver.enabled` override, default `false`);
+  revoke stays ungated so stored waivers can always be cleared.
 
 ## Signing configuration
 
 Published development secrets are unsuitable for deployment, and access and
 refresh credentials must remain separate token families. The startup policy is
-owned by [JwtSecretPolicy](../../java-services/restful-api/src/main/java/io/campuscore/restfulapi/security/JwtSecretPolicy.java)
+owned by [JwtSecretPolicy](../../java-services/restful-api/src/main/java/io/campuscore/restfulapi/security/token/JwtSecretPolicy.java)
 and `SecurityConfig`; deployment configuration is in
 [docker-compose.prod.yml](../../docker-compose.prod.yml).

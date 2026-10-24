@@ -5,9 +5,9 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.Mockito.mock;
 
-import io.campuscore.restfulapi.academic.registration.RegistrationService;
-import io.campuscore.restfulapi.academic.web.AcademicMutationDtos.GradeUpdate;
-import io.campuscore.restfulapi.web.DomainException;
+import io.campuscore.restfulapi.academic.registration.service.RegistrationService;
+import io.campuscore.restfulapi.academic.dto.AcademicMutationDtos.GradeUpdate;
+import io.campuscore.restfulapi.exception.DomainException;
 import java.math.BigDecimal;
 import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
@@ -85,7 +85,7 @@ class AcademicMutationServiceBatchGradeTest {
                 namedJdbc,
                 mock(AcademicEnrollmentReadService.class),
                 mock(RegistrationService.class),
-                mock(io.campuscore.restfulapi.audit.AdminAuditRecorder.class));
+                mock(io.campuscore.restfulapi.audit.service.AdminAuditRecorder.class));
     }
 
     @Test

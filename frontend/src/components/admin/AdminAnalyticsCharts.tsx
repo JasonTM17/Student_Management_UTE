@@ -316,7 +316,7 @@ export function AdminAnalyticsCharts({ stats, className }: AdminAnalyticsChartsP
               </div>
             ) : (
               <div className="rounded-xl border border-border/70 bg-card/60 p-4">
-                <svg viewBox="0 0 800 250" className="h-auto w-full" role="img" aria-label={copy.chartAria}>
+                <svg viewBox="0 0 800 250" className="h-auto w-full" role="group" aria-label={copy.chartAria}>
                   <defs>
                     <linearGradient id="deptMonoGradient" x1="0" y1="0" x2="0" y2="1">
                       <stop offset="0%" stopColor="#2563eb" stopOpacity="0.95" />

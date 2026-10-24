@@ -1,12 +1,12 @@
 package io.campuscore.restfulapi.academic.service;
 
-import io.campuscore.restfulapi.academic.registration.RegistrationService;
-import io.campuscore.restfulapi.academic.web.AcademicEnrollmentReadDtos.EnrollmentResponse;
-import io.campuscore.restfulapi.academic.web.AcademicMutationDtos.GradeUpdate;
-import io.campuscore.restfulapi.audit.AdminAuditRecorder;
-import io.campuscore.restfulapi.common.LikePattern;
+import io.campuscore.restfulapi.academic.registration.service.RegistrationService;
+import io.campuscore.restfulapi.academic.dto.AcademicEnrollmentReadDtos.EnrollmentResponse;
+import io.campuscore.restfulapi.academic.dto.AcademicMutationDtos.GradeUpdate;
+import io.campuscore.restfulapi.audit.service.AdminAuditRecorder;
+import io.campuscore.restfulapi.common.util.LikePattern;
 import io.campuscore.restfulapi.engagement.service.GradePublishNotifier;
-import io.campuscore.restfulapi.web.DomainException;
+import io.campuscore.restfulapi.exception.DomainException;
 import java.sql.Timestamp;
 import java.math.BigDecimal;
 import java.math.RoundingMode;

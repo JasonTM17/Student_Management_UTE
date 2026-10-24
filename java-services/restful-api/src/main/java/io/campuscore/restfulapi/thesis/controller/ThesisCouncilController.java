@@ -1,0 +1,332 @@
+package io.campuscore.restfulapi.thesis.controller;
+
+import io.campuscore.restfulapi.thesis.service.ThesisCouncilService;
+import io.campuscore.restfulapi.thesis.dto.CouncilResponse;
+import io.campuscore.restfulapi.thesis.dto.ScoreResponse;
+import io.campuscore.restfulapi.thesis.dto.StudentResultRow;
+import io.campuscore.restfulapi.thesis.dto.TopicResult;
+import io.campuscore.restfulapi.thesis.dto.ThesisCouncilRequestDtos.AddCouncilMemberRequest;
+import io.campuscore.restfulapi.thesis.dto.ThesisCouncilRequestDtos.AssignReviewerRequest;
+import io.campuscore.restfulapi.thesis.dto.ThesisCouncilRequestDtos.AssignTopicRequest;
+import io.campuscore.restfulapi.thesis.dto.ThesisCouncilRequestDtos.CreateCouncilRequest;
+import io.campuscore.restfulapi.thesis.dto.ThesisCouncilRequestDtos.ReasonRequest;
+import io.campuscore.restfulapi.thesis.dto.ThesisCouncilRequestDtos.ReplaceCouncilMemberRequest;
+import io.campuscore.restfulapi.thesis.dto.ThesisCouncilRequestDtos.ReviewerScoreRequest;
+import io.campuscore.restfulapi.thesis.dto.ThesisCouncilRequestDtos.SubmitScoreRequest;
+import jakarta.validation.Valid;
+import java.math.BigDecimal;
+import java.util.List;
+import java.util.UUID;
+import org.springframework.context.annotation.Profile;
+import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.security.oauth2.jwt.Jwt;
+import org.springframework.web.bind.annotation.DeleteMapping;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
+
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.responses.ApiResponses;
+import io.swagger.v3.oas.annotations.tags.Tag;
+import io.campuscore.restfulapi.thesis.dto.ThesisCouncilRequestDtos;
+
+/** Brief R6–R9: council management, component scoring, and student results. */
+@Tag(name = "Thesis Defense Councils & Grading", description = "Quản lý hội đồng bảo vệ khóa luận, cơ cấu thành viên hội đồng, phân công đề tài phản biện và nhập điểm thành phần")
+@RestController
+@Profile("persistence")
+@RequestMapping("/api/v1/thesis")
+public class ThesisCouncilController {
+
+    private final ThesisCouncilService councils;
+
+    public ThesisCouncilController(ThesisCouncilService councils) {
+        this.councils = councils;
+    }
+
+    @Operation(summary = "Tạo hội đồng đánh giá khóa luận", description = "Khởi tạo hội đồng đánh giá/chấm điểm khóa luận cho một đợt cụ thể")
+    @PostMapping("/councils")
+    @PreAuthorize("hasAnyRole('ADMIN','TRUONG_KHOA','SUPER_ADMIN')")
+    public CouncilResponse createCouncil(
+            @Valid @RequestBody CreateCouncilRequest request,
+            @AuthenticationPrincipal Jwt actor) {
+        return councils.createCouncil(parseUuid(request.roundId(), "roundId"), request.name(), actor);
+    }
+
+    @Operation(summary = "Danh sách hội đồng theo đợt khóa luận", description = "Truy xuất danh sách tất cả các hội đồng bảo vệ trong một đợt khóa luận (giảng viên chỉ thấy hội đồng mình là thành viên)")
+    @GetMapping("/councils")
+    @PreAuthorize("hasAnyRole('ADMIN','TRUONG_KHOA','TRUONG_BO_MON','SUPER_ADMIN','LECTURER')")
+    public List<CouncilResponse> listCouncils(@Parameter(description = "Mã UUID của đợt", required = true) @RequestParam UUID roundId,
+            @AuthenticationPrincipal Jwt actor) {
+        return councils.listByRoundForActor(roundId, actor);
+    }
+
+    @Operation(summary = "Xem chi tiết một hội đồng", description = "Truy xuất thông tin chi tiết một hội đồng: danh sách giảng viên thành viên và đề tài được phân công (chỉ thành viên hội đồng hoặc cán bộ quản lý)")
+    @GetMapping("/councils/{id}")
+    @PreAuthorize("hasAnyRole('ADMIN','TRUONG_KHOA','TRUONG_BO_MON','SUPER_ADMIN','LECTURER')")
+    public CouncilResponse getCouncil(@Parameter(description = "Mã UUID của hội đồng", required = true) @PathVariable UUID id,
+            @AuthenticationPrincipal Jwt actor) {
+        return councils.readCouncil(id, actor);
+    }
+
+    @Operation(summary = "Thêm thành viên vào hội đồng đánh giá", description = "Bổ sung giảng viên vào hội đồng với vai trò cụ thể (Chủ tịch, Thư ký, Phản biện, v.v.)")
+    @ApiResponses({
+        @ApiResponse(responseCode = "200", description = "Thêm thành viên thành công"),
+        @ApiResponse(responseCode = "400", description = "Dữ liệu không hợp lệ"),
+        @ApiResponse(responseCode = "401", description = "Chưa xác thực"),
+        @ApiResponse(responseCode = "403", description = "Không có quyền thực hiện")
+    })
+    @PostMapping("/councils/{id}/members")
+    @PreAuthorize("hasAnyRole('ADMIN','TRUONG_KHOA','SUPER_ADMIN')")
+    public CouncilResponse addMember(
+            @Parameter(description = "Mã UUID của hội đồng", required = true) @PathVariable UUID id,
+            @Valid @RequestBody AddCouncilMemberRequest request,
+            @AuthenticationPrincipal Jwt actor) {
+        return councils.addMember(id, request.lecturerId(), request.memberRole(), actor);
+    }
+
+    @Operation(summary = "Xóa thành viên khỏi hội đồng đánh giá", description = "Loại bỏ một giảng viên khỏi hội đồng khóa luận")
+    @ApiResponses({
+        @ApiResponse(responseCode = "200", description = "Xóa thành viên thành công"),
+        @ApiResponse(responseCode = "401", description = "Chưa xác thực"),
+        @ApiResponse(responseCode = "403", description = "Không có quyền thực hiện")
+    })
+    @DeleteMapping("/councils/{id}/members/{lecturerId}")
+    @PreAuthorize("hasAnyRole('ADMIN','TRUONG_KHOA','SUPER_ADMIN')")
+    public CouncilResponse removeMember(
+            @Parameter(description = "Mã UUID của hội đồng", required = true) @PathVariable UUID id,
+            @Parameter(description = "Mã giảng viên", required = true) @PathVariable String lecturerId,
+            @AuthenticationPrincipal Jwt actor) {
+        return councils.removeMember(id, lecturerId, actor);
+    }
+
+    @Operation(summary = "Thay thế thành viên hội đồng tại chỗ", description = "Đổi giảng viên ngồi một ghế hội đồng (giữ nguyên vai trò ghế) — dùng khi thành viên bị vô hiệu hóa hoặc không thể chấm điểm; ghi audit kèm lý do")
+    @ApiResponses({
+        @ApiResponse(responseCode = "200", description = "Thay thế thành viên thành công"),
+        @ApiResponse(responseCode = "400", description = "Dữ liệu không hợp lệ"),
+        @ApiResponse(responseCode = "401", description = "Chưa xác thực"),
+        @ApiResponse(responseCode = "403", description = "Không có quyền thực hiện"),
+        @ApiResponse(responseCode = "409", description = "Xung đột trạng thái hội đồng")
+    })
+    @PutMapping("/councils/{id}/members/{lecturerId}")
+    @PreAuthorize("hasAnyRole('ADMIN','TRUONG_KHOA','SUPER_ADMIN')")
+    public CouncilResponse replaceMember(
+            @Parameter(description = "Mã UUID của hội đồng", required = true) @PathVariable UUID id,
+            @Parameter(description = "Mã giảng viên rời ghế", required = true) @PathVariable String lecturerId,
+            @Valid @RequestBody ReplaceCouncilMemberRequest request,
+            @AuthenticationPrincipal Jwt actor) {
+        return councils.replaceMember(id, lecturerId, request.lecturerId(), request.reason(), actor);
+    }
+
+    @Operation(summary = "Phân công đề tài cho hội đồng", description = "Chỉ định một đề tài khóa luận được bảo vệ/đánh giá trước hội đồng này")
+    @ApiResponses({
+        @ApiResponse(responseCode = "200", description = "Phân công đề tài thành công"),
+        @ApiResponse(responseCode = "400", description = "Dữ liệu không hợp lệ"),
+        @ApiResponse(responseCode = "401", description = "Chưa xác thực"),
+        @ApiResponse(responseCode = "403", description = "Không có quyền thực hiện")
+    })
+    @PostMapping("/councils/{id}/topics")
+    @PreAuthorize("hasAnyRole('ADMIN','TRUONG_KHOA','SUPER_ADMIN')")
+    public CouncilResponse assignTopic(
+            @Parameter(description = "Mã UUID của hội đồng", required = true) @PathVariable UUID id,
+            @Valid @RequestBody AssignTopicRequest request,
+            @AuthenticationPrincipal Jwt actor) {
+        return councils.assignTopic(id, parseUuid(request.topicId(), "topicId"), actor);
+    }
+
+    @Operation(summary = "Gỡ đề tài khỏi hội đồng", description = "Hủy phân công đề tài khỏi hội đồng để phân công lại cho hội đồng khác — chỉ khi đề tài chưa có điểm bảo vệ; ghi audit kèm lý do")
+    @ApiResponses({
+        @ApiResponse(responseCode = "200", description = "Gỡ phân công thành công"),
+        @ApiResponse(responseCode = "400", description = "Dữ liệu không hợp lệ"),
+        @ApiResponse(responseCode = "401", description = "Chưa xác thực"),
+        @ApiResponse(responseCode = "403", description = "Không có quyền thực hiện"),
+        @ApiResponse(responseCode = "409", description = "Đề tài đã có điểm hoặc chưa được phân công")
+    })
+    @PostMapping("/councils/{id}/topics/{topicId}/unassign")
+    @PreAuthorize("hasAnyRole('ADMIN','TRUONG_KHOA','SUPER_ADMIN')")
+    public CouncilResponse unassignTopic(
+            @Parameter(description = "Mã UUID của hội đồng", required = true) @PathVariable UUID id,
+            @Parameter(description = "Mã UUID của đề tài", required = true) @PathVariable UUID topicId,
+            @Valid @RequestBody ReasonRequest request,
+            @AuthenticationPrincipal Jwt actor) {
+        return councils.unassignTopic(id, topicId, request == null ? null : request.reason(), actor);
+    }
+
+    @Operation(summary = "Nhập điểm thành phần hội đồng cho đề tài", description = "Ghi nhận điểm số thành phần (điểm chủ tịch, thư ký, phản biện) cho đề tài khóa luận")
+    @ApiResponses({
+        @ApiResponse(responseCode = "200", description = "Ghi nhận điểm thành công"),
+        @ApiResponse(responseCode = "400", description = "Điểm số không hợp lệ"),
+        @ApiResponse(responseCode = "401", description = "Chưa xác thực"),
+        @ApiResponse(responseCode = "403", description = "Không có quyền chấm điểm")
+    })
+    @PostMapping("/councils/{councilId}/topics/{topicId}/scores")
+    @PreAuthorize("hasAnyRole('ADMIN','TRUONG_KHOA','LECTURER','SUPER_ADMIN')")
+    public ScoreResponse submitScore(
+            @Parameter(description = "Mã UUID của hội đồng", required = true) @PathVariable UUID councilId,
+            @Parameter(description = "Mã UUID của đề tài", required = true) @PathVariable UUID topicId,
+            @Valid @RequestBody SubmitScoreRequest request,
+            @AuthenticationPrincipal Jwt actor) {
+        return councils.submitScore(councilId, topicId, request.component(), parseScore(request.score()),
+                request.comment(), actor);
+    }
+
+    @Operation(summary = "Danh sách điểm đánh giá của đề tài trong hội đồng", description = "Truy xuất danh sách các điểm thành phần đã chấm cho đề tài")
+    @ApiResponses({
+        @ApiResponse(responseCode = "200", description = "Lấy danh sách điểm thành công"),
+        @ApiResponse(responseCode = "401", description = "Chưa xác thực"),
+        @ApiResponse(responseCode = "403", description = "Không có quyền truy cập")
+    })
+    @GetMapping("/councils/{councilId}/topics/{topicId}/scores")
+    @PreAuthorize("hasAnyRole('ADMIN','TRUONG_KHOA','TRUONG_BO_MON','LECTURER','SUPER_ADMIN')")
+    public List<ScoreResponse> listScores(
+            @Parameter(description = "Mã UUID của hội đồng", required = true) @PathVariable UUID councilId,
+            @Parameter(description = "Mã UUID của đề tài", required = true) @PathVariable UUID topicId,
+            @AuthenticationPrincipal Jwt actor) {
+        return councils.listScores(councilId, topicId, actor);
+    }
+
+    @Operation(summary = "Chốt và tổng kết điểm hội đồng cho đề tài", description = "Tính toán điểm tổng kết cuối cùng của hội đồng và công bố kết quả đề tài")
+    @ApiResponses({
+        @ApiResponse(responseCode = "200", description = "Chốt điểm thành công"),
+        @ApiResponse(responseCode = "400", description = "Chưa đủ điều kiện chốt điểm"),
+        @ApiResponse(responseCode = "401", description = "Chưa xác thực"),
+        @ApiResponse(responseCode = "403", description = "Không có quyền chốt điểm")
+    })
+    @PostMapping("/councils/{councilId}/topics/{topicId}/finalize")
+    @PreAuthorize("hasAnyRole('ADMIN','TRUONG_KHOA','LECTURER','SUPER_ADMIN')")
+    public TopicResult finalizeScores(
+            @Parameter(description = "Mã UUID của hội đồng", required = true) @PathVariable UUID councilId,
+            @Parameter(description = "Mã UUID của đề tài", required = true) @PathVariable UUID topicId,
+            @AuthenticationPrincipal Jwt actor) {
+        return councils.finalizeScores(councilId, topicId, actor);
+    }
+
+    @Operation(summary = "Phân công giảng viên phản biện (GVPB) cho đề tài", description = "Chỉ định một giảng viên phản biện độc lập chấm điểm đề tài; không được là người hướng dẫn")
+    @ApiResponses({
+        @ApiResponse(responseCode = "200", description = "Phân công phản biện thành công"),
+        @ApiResponse(responseCode = "400", description = "Dữ liệu không hợp lệ"),
+        @ApiResponse(responseCode = "401", description = "Chưa xác thực"),
+        @ApiResponse(responseCode = "403", description = "Không có quyền thực hiện")
+    })
+    @PostMapping("/topics/{id}/reviewer")
+    @PreAuthorize("hasAnyRole('ADMIN','TRUONG_KHOA','SUPER_ADMIN')")
+    public java.util.Map<String, Object> assignReviewer(
+            @Parameter(description = "Mã UUID của đề tài", required = true) @PathVariable UUID id,
+            @Valid @RequestBody AssignReviewerRequest request,
+            @AuthenticationPrincipal Jwt actor) {
+        return councils.assignReviewer(id, request.lecturerId(), actor);
+    }
+
+    @Operation(summary = "Nộp điểm phản biện (GVPB)", description = "Giảng viên phản biện được phân công nộp điểm GVPB trước hạn gvpbDeadline của đợt")
+    @ApiResponses({
+        @ApiResponse(responseCode = "200", description = "Ghi nhận điểm phản biện thành công"),
+        @ApiResponse(responseCode = "400", description = "Điểm số không hợp lệ"),
+        @ApiResponse(responseCode = "401", description = "Chưa xác thực"),
+        @ApiResponse(responseCode = "403", description = "Không phải giảng viên phản biện được phân công")
+    })
+    @PostMapping("/topics/{id}/reviewer-score")
+    @PreAuthorize("hasAnyRole('LECTURER','ADMIN','TRUONG_KHOA','SUPER_ADMIN')")
+    public ScoreResponse submitReviewerScore(
+            @Parameter(description = "Mã UUID của đề tài", required = true) @PathVariable UUID id,
+            @Valid @RequestBody ReviewerScoreRequest request,
+            @AuthenticationPrincipal Jwt actor) {
+        return councils.submitReviewerScore(id, parseScore(request.score()), request.comment(), actor);
+    }
+
+    @Operation(summary = "Miễn yêu cầu phản biện (GVPB) cho đề tài", description = "Bỏ qua yêu cầu điểm phản biện cho một đề tài (ví dụ khi hết hạn mà chưa có phản biện); ghi audit kèm lý do, có thể hoàn tác khi chưa chốt điểm. Chỉ áp dụng cho loại đợt cho phép miễn phản biện — các đợt đại học hiện có luôn yêu cầu phản biện")
+    @ApiResponses({
+        @ApiResponse(responseCode = "200", description = "Miễn phản biện thành công"),
+        @ApiResponse(responseCode = "400", description = "Dữ liệu không hợp lệ"),
+        @ApiResponse(responseCode = "403", description = "Không có quyền thực hiện"),
+        @ApiResponse(responseCode = "409", description = "Đề tài đã chốt điểm, đã được miễn, hoặc loại đợt luôn yêu cầu phản biện")
+    })
+    @PostMapping("/topics/{id}/gvpb-waiver")
+    @PreAuthorize("hasAnyRole('ADMIN','TRUONG_KHOA','SUPER_ADMIN')")
+    public java.util.Map<String, Object> waiveCounterReview(
+            @Parameter(description = "Mã UUID của đề tài", required = true) @PathVariable UUID id,
+            @Valid @RequestBody ReasonRequest request,
+            @AuthenticationPrincipal Jwt actor) {
+        return councils.waiveCounterReview(id, request == null ? null : request.reason(), actor);
+    }
+
+    @Operation(summary = "Khôi phục yêu cầu phản biện (GVPB)", description = "Hoàn tác miễn phản biện cho một đề tài chưa chốt điểm; ghi audit kèm lý do")
+    @ApiResponses({
+        @ApiResponse(responseCode = "200", description = "Khôi phục yêu cầu thành công"),
+        @ApiResponse(responseCode = "400", description = "Dữ liệu không hợp lệ"),
+        @ApiResponse(responseCode = "403", description = "Không có quyền thực hiện"),
+        @ApiResponse(responseCode = "409", description = "Đề tài đã chốt điểm hoặc chưa được miễn")
+    })
+    @PostMapping("/topics/{id}/gvpb-waiver/revoke")
+    @PreAuthorize("hasAnyRole('ADMIN','TRUONG_KHOA','SUPER_ADMIN')")
+    public java.util.Map<String, Object> revokeCounterReviewWaiver(
+            @Parameter(description = "Mã UUID của đề tài", required = true) @PathVariable UUID id,
+            @Valid @RequestBody ReasonRequest request,
+            @AuthenticationPrincipal Jwt actor) {
+        return councils.revokeCounterReviewWaiver(id, request == null ? null : request.reason(), actor);
+    }
+
+    @Operation(summary = "Điểm phản biện (GVPB) của chính giảng viên", description = "Giảng viên phản biện đọc lại điểm đã nộp cho đề tài; nhân sự quản trị đọc được điểm của phản biện hiện tại")
+    @ApiResponses({
+        @ApiResponse(responseCode = "200", description = "Trả về điểm phản biện đã nộp"),
+        @ApiResponse(responseCode = "401", description = "Chưa xác thực"),
+        @ApiResponse(responseCode = "403", description = "Không phải giảng viên phản biện được phân công"),
+        @ApiResponse(responseCode = "404", description = "Chưa có điểm phản biện")
+    })
+    @GetMapping("/topics/{id}/reviewer-score")
+    @PreAuthorize("hasAnyRole('LECTURER','ADMIN','TRUONG_KHOA','SUPER_ADMIN')")
+    public ScoreResponse reviewerScore(
+            @Parameter(description = "Mã UUID của đề tài", required = true) @PathVariable UUID id,
+            @AuthenticationPrincipal Jwt actor) {
+        return councils.reviewerScore(id, actor);
+    }
+
+    /** Brief R9: students read their own graded result after publication. */
+    @Operation(summary = "Xem kết quả đánh giá khóa luận của sinh viên", description = "Sinh viên tra cứu kết quả điểm hội đồng và đề tài khóa luận của chính mình")
+    @ApiResponses({
+        @ApiResponse(responseCode = "200", description = "Lấy kết quả đánh giá thành công"),
+        @ApiResponse(responseCode = "401", description = "Chưa xác thực")
+    })
+    @GetMapping("/me/results")
+    @PreAuthorize("hasAnyRole('STUDENT','LECTURER','ADMIN','TRUONG_KHOA','SUPER_ADMIN')")
+    public List<StudentResultRow> studentResults(
+            @Parameter(description = "Mã UUID của đợt khóa luận", required = true) @RequestParam UUID roundId,
+            @AuthenticationPrincipal Jwt actor) {
+        String studentId = actor == null ? null : actor.getClaimAsString("studentId");
+        if (studentId == null || studentId.isBlank()) {
+            return java.util.Collections.emptyList();
+        }
+        return councils.studentResults(roundId, studentId);
+    }
+
+    private static UUID parseUuid(String value, String field) {
+        if (value == null || value.isBlank()) {
+            throw new io.campuscore.restfulapi.exception.DomainException(
+                    org.springframework.http.HttpStatus.BAD_REQUEST, "VALIDATION_ERROR", field + " is required");
+        }
+        try {
+            return UUID.fromString(value.trim());
+        } catch (IllegalArgumentException exception) {
+            throw new io.campuscore.restfulapi.exception.DomainException(
+                    org.springframework.http.HttpStatus.BAD_REQUEST, "VALIDATION_ERROR", field + " must be a UUID");
+        }
+    }
+
+    private static BigDecimal parseScore(String value) {
+        if (value == null) {
+            return null;
+        }
+        try {
+            return new BigDecimal(value.trim());
+        } catch (NumberFormatException exception) {
+            throw new io.campuscore.restfulapi.exception.DomainException(
+                    org.springframework.http.HttpStatus.BAD_REQUEST, "VALIDATION_ERROR", "score must be numeric");
+        }
+    }
+}

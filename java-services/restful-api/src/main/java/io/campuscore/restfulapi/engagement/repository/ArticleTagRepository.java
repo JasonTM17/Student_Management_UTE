@@ -1,6 +1,6 @@
 package io.campuscore.restfulapi.engagement.repository;
 
-import io.campuscore.restfulapi.engagement.domain.ArticleTag;
+import io.campuscore.restfulapi.engagement.entity.ArticleTag;
 import java.util.List;
 import java.util.Optional;
 import org.springframework.data.jpa.repository.JpaRepository;

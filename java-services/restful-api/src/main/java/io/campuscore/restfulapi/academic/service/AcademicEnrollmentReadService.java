@@ -1,32 +1,32 @@
 package io.campuscore.restfulapi.academic.service;
 
 import io.campuscore.restfulapi.academic.repository.AcademicEnrollmentReadRepository;
-import io.campuscore.restfulapi.academic.repository.AcademicEnrollmentReadRepository.EnrollmentRow;
-import io.campuscore.restfulapi.academic.repository.AcademicEnrollmentReadRepository.GradeItemRow;
-import io.campuscore.restfulapi.academic.repository.AcademicEnrollmentReadRepository.GradeSummaryRow;
-import io.campuscore.restfulapi.academic.repository.AcademicEnrollmentReadRepository.ScheduleRow;
-import io.campuscore.restfulapi.academic.repository.AcademicEnrollmentReadRepository.StudentGradeRow;
-import io.campuscore.restfulapi.academic.web.AcademicEnrollmentReadDtos.ClassroomSummary;
-import io.campuscore.restfulapi.academic.web.AcademicEnrollmentReadDtos.CourseSummary;
-import io.campuscore.restfulapi.academic.web.AcademicEnrollmentReadDtos.EnrollmentGradeDetail;
-import io.campuscore.restfulapi.academic.web.AcademicEnrollmentReadDtos.EnrollmentListResponse;
-import io.campuscore.restfulapi.academic.web.AcademicEnrollmentReadDtos.EnrollmentResponse;
-import io.campuscore.restfulapi.academic.web.AcademicEnrollmentReadDtos.GradeItemResponse;
-import io.campuscore.restfulapi.academic.web.AcademicEnrollmentReadDtos.GradeSummary;
-import io.campuscore.restfulapi.academic.web.AcademicEnrollmentReadDtos.LecturerSummary;
-import io.campuscore.restfulapi.academic.web.AcademicEnrollmentReadDtos.PageMeta;
-import io.campuscore.restfulapi.academic.web.AcademicEnrollmentReadDtos.SectionScheduleResponse;
-import io.campuscore.restfulapi.academic.web.AcademicEnrollmentReadDtos.SectionSummary;
-import io.campuscore.restfulapi.academic.web.AcademicEnrollmentReadDtos.SemesterSummary;
-import io.campuscore.restfulapi.academic.web.AcademicEnrollmentReadDtos.StudentGradeLine;
-import io.campuscore.restfulapi.academic.web.AcademicEnrollmentReadDtos.StudentGradeSectionRow;
-import io.campuscore.restfulapi.academic.web.AcademicEnrollmentReadDtos.StudentGradesByEnrollmentResponse;
-import io.campuscore.restfulapi.academic.web.AcademicEnrollmentReadDtos.StudentSummary;
-import io.campuscore.restfulapi.academic.web.AcademicEnrollmentReadDtos.TranscriptBasisNote;
-import io.campuscore.restfulapi.academic.web.AcademicEnrollmentReadDtos.TranscriptResponse;
-import io.campuscore.restfulapi.academic.web.AcademicEnrollmentReadDtos.TranscriptSemester;
-import io.campuscore.restfulapi.academic.web.AcademicEnrollmentReadDtos.TranscriptSummary;
-import io.campuscore.restfulapi.academic.web.AcademicEnrollmentReadDtos.UserSummary;
+import io.campuscore.restfulapi.academic.model.EnrollmentRow;
+import io.campuscore.restfulapi.academic.model.GradeItemRow;
+import io.campuscore.restfulapi.academic.model.GradeSummaryRow;
+import io.campuscore.restfulapi.academic.model.ScheduleRow;
+import io.campuscore.restfulapi.academic.model.StudentGradeRow;
+import io.campuscore.restfulapi.academic.dto.AcademicEnrollmentReadDtos.ClassroomSummary;
+import io.campuscore.restfulapi.academic.dto.AcademicEnrollmentReadDtos.CourseSummary;
+import io.campuscore.restfulapi.academic.dto.AcademicEnrollmentReadDtos.EnrollmentGradeDetail;
+import io.campuscore.restfulapi.academic.dto.AcademicEnrollmentReadDtos.EnrollmentListResponse;
+import io.campuscore.restfulapi.academic.dto.AcademicEnrollmentReadDtos.EnrollmentResponse;
+import io.campuscore.restfulapi.academic.dto.AcademicEnrollmentReadDtos.GradeItemResponse;
+import io.campuscore.restfulapi.academic.dto.AcademicEnrollmentReadDtos.GradeSummary;
+import io.campuscore.restfulapi.academic.dto.AcademicEnrollmentReadDtos.LecturerSummary;
+import io.campuscore.restfulapi.academic.dto.AcademicEnrollmentReadDtos.PageMeta;
+import io.campuscore.restfulapi.academic.dto.AcademicEnrollmentReadDtos.SectionScheduleResponse;
+import io.campuscore.restfulapi.academic.dto.AcademicEnrollmentReadDtos.SectionSummary;
+import io.campuscore.restfulapi.academic.dto.AcademicEnrollmentReadDtos.SemesterSummary;
+import io.campuscore.restfulapi.academic.dto.AcademicEnrollmentReadDtos.StudentGradeLine;
+import io.campuscore.restfulapi.academic.dto.AcademicEnrollmentReadDtos.StudentGradeSectionRow;
+import io.campuscore.restfulapi.academic.dto.AcademicEnrollmentReadDtos.StudentGradesByEnrollmentResponse;
+import io.campuscore.restfulapi.academic.dto.AcademicEnrollmentReadDtos.StudentSummary;
+import io.campuscore.restfulapi.academic.dto.AcademicEnrollmentReadDtos.TranscriptBasisNote;
+import io.campuscore.restfulapi.academic.dto.AcademicEnrollmentReadDtos.TranscriptResponse;
+import io.campuscore.restfulapi.academic.dto.AcademicEnrollmentReadDtos.TranscriptSemester;
+import io.campuscore.restfulapi.academic.dto.AcademicEnrollmentReadDtos.TranscriptSummary;
+import io.campuscore.restfulapi.academic.dto.AcademicEnrollmentReadDtos.UserSummary;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.util.ArrayList;
@@ -262,7 +262,7 @@ public class AcademicEnrollmentReadService {
         String normalizedSectionId = normalizeRequired("sectionId", sectionId);
         String profileId = normalizeOptional("lecturerId", lecturerId);
         if (!academic.hasSectionAccess(normalizedSectionId, roles, profileId)) {
-            throw new io.campuscore.restfulapi.web.DomainException(
+            throw new io.campuscore.restfulapi.exception.DomainException(
                     HttpStatus.FORBIDDEN, "SECTION_FORBIDDEN", "Section is not assigned to the current lecturer");
         }
         return academic.findGradeItemsBySection(normalizedSectionId).stream()
@@ -282,7 +282,7 @@ public class AcademicEnrollmentReadService {
         String normalizedSectionId = normalizeRequired("sectionId", sectionId);
         String profileId = normalizeOptional("lecturerId", lecturerId);
         if (!academic.hasSectionAccess(normalizedSectionId, roles, profileId)) {
-            throw new io.campuscore.restfulapi.web.DomainException(
+            throw new io.campuscore.restfulapi.exception.DomainException(
                     HttpStatus.FORBIDDEN, "SECTION_FORBIDDEN", "Section is not assigned to the current lecturer");
         }
         return studentGradeRows(academic.findStudentGradesBySection(normalizedSectionId));
@@ -316,7 +316,7 @@ public class AcademicEnrollmentReadService {
             var enrollment = academic.findEnrollmentById(normalizedEnrollmentId)
                     .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Enrollment not found"));
             if (!academic.hasSectionAccess(enrollment.sectionId(), roles, profileId)) {
-                throw new io.campuscore.restfulapi.web.DomainException(
+                throw new io.campuscore.restfulapi.exception.DomainException(
                         HttpStatus.FORBIDDEN, "SECTION_FORBIDDEN", "Section is not assigned to the current lecturer");
             }
             rows = studentGradeRows(academic.findStudentGradesByEnrollment(normalizedEnrollmentId));

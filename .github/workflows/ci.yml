@@ -34,6 +34,158 @@ jobs:
       - name: Verify Java API
         run: mvn -q -f java-services/pom.xml verify
 
+  postgres-it:
+    name: PostgreSQL race and RLS integration tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    env:
+      # Provider tests are stubbed/no-network; a runtime key is never required in CI.
+      DEEPSEEK_ENABLED: 'false'
+      DEEPSEEK_API_KEY: ''
+      # Throwaway credentials for the ephemeral service container below; they
+      # never leave this job and are not repository secrets. The assistant
+      # runtime role password must be >= 16 chars (provision script contract).
+      # Each *PostgresIT family documents its own env contract; every family
+      # gets a dedicated scratch database on the service container, because the
+      # suites gate on distinct variables and several assert absolute state or
+      # a fresh schema. Database names are part of the contract: the council
+      # suite requires campuscore_council_race_*, the policy/certificate/
+      # notification suites require policy_migration_test_*, and the report
+      # surefire suite requires a name ending in _regression — all on loopback.
+      CAMPUSCORE_E2E_POSTGRES_URL: 'jdbc:postgresql://localhost:5432/campuscore_it_e2e'
+      CAMPUSCORE_E2E_POSTGRES_USER: 'postgres'
+      CAMPUSCORE_E2E_POSTGRES_PASSWORD: 'ci-postgres-it-ephemeral-01'
+      CAMPUSCORE_COUNCIL_POSTGRES_URL: 'jdbc:postgresql://localhost:5432/campuscore_council_race_ci'
+      CAMPUSCORE_COUNCIL_POSTGRES_USER: 'postgres'
+      CAMPUSCORE_COUNCIL_POSTGRES_PASSWORD: 'ci-postgres-it-ephemeral-01'
+      CAMPUSCORE_E2E_POSTGRES_UPGRADE_URL: 'jdbc:postgresql://localhost:5432/campuscore_it_upgrade'
+      CAMPUSCORE_E2E_POSTGRES_UPGRADE_USER: 'postgres'
+      CAMPUSCORE_E2E_POSTGRES_UPGRADE_PASSWORD: 'ci-postgres-it-ephemeral-01'
+      CAMPUSCORE_REPORT_POSTGRES_URL: 'jdbc:postgresql://localhost:5432/campuscore_it_report_regression'
+      CAMPUSCORE_REPORT_POSTGRES_USER: 'postgres'
+      CAMPUSCORE_REPORT_POSTGRES_PASSWORD: 'ci-postgres-it-ephemeral-01'
+      ASSISTANT_RLS_POSTGRES_URL: 'jdbc:postgresql://localhost:5432/campuscore_it_assistant_rls'
+      ASSISTANT_RLS_PRIMARY_USER: 'postgres'
+      ASSISTANT_RLS_PRIMARY_PASSWORD: 'ci-postgres-it-ephemeral-01'
+      ASSISTANT_RLS_RUNTIME_PASSWORD: 'ci-assistant-rls-ephemeral-01'
+      ASSISTANT_RLS_JWT_SECRET: 'ci-assistant-rls-jwt-secret-ephemeral-012'
+      ASSISTANT_RLS_JWT_REFRESH_SECRET: 'ci-assistant-rls-refresh-secret-ephemeral'
+      ASSISTANT_MIGRATION_POSTGRES_URL: 'jdbc:postgresql://localhost:5432/campuscore_it_assistant_migration'
+      ASSISTANT_MIGRATION_POSTGRES_USER: 'postgres'
+      ASSISTANT_MIGRATION_POSTGRES_PASSWORD: 'ci-postgres-it-ephemeral-01'
+      CAMPUSCORE_NOTIFICATION_AUDIT_ENABLED: 'true'
+      CAMPUSCORE_NOTIFICATION_AUDIT_URL: 'jdbc:postgresql://localhost:5432/policy_migration_test_notification_audit'
+      CAMPUSCORE_NOTIFICATION_AUDIT_USER: 'postgres'
+      CAMPUSCORE_NOTIFICATION_AUDIT_PASSWORD: 'ci-postgres-it-ephemeral-01'
+      CAMPUSCORE_POLICY_MIGRATION_ENABLED: 'true'
+      CAMPUSCORE_POLICY_MIGRATION_LOCAL_URL: 'jdbc:postgresql://localhost:5432/policy_migration_test_policy_local'
+      CAMPUSCORE_POLICY_MIGRATION_PREVIOUS_SUPABASE_URL: 'jdbc:postgresql://localhost:5432/policy_migration_test_policy_previous_supabase'
+      CAMPUSCORE_POLICY_MIGRATION_CURRENT_SUPABASE_URL: 'jdbc:postgresql://localhost:5432/policy_migration_test_policy_current_supabase'
+      CAMPUSCORE_POLICY_MIGRATION_HUMAN_URL: 'jdbc:postgresql://localhost:5432/policy_migration_test_policy_human'
+      CAMPUSCORE_POLICY_MIGRATION_USER: 'postgres'
+      CAMPUSCORE_POLICY_MIGRATION_PASSWORD: 'ci-postgres-it-ephemeral-01'
+      CAMPUSCORE_CERTIFICATE_MIGRATION_ENABLED: 'true'
+      CAMPUSCORE_CERTIFICATE_MIGRATION_CLEAN_URL: 'jdbc:postgresql://localhost:5432/policy_migration_test_cert_clean'
+      CAMPUSCORE_CERTIFICATE_MIGRATION_LOCAL_URL: 'jdbc:postgresql://localhost:5432/policy_migration_test_cert_local'
+      CAMPUSCORE_CERTIFICATE_MIGRATION_DRIFT_CONTENT_URL: 'jdbc:postgresql://localhost:5432/policy_migration_test_cert_drift_content'
+      CAMPUSCORE_CERTIFICATE_MIGRATION_DRIFT_REVISION_CONTENT_URL: 'jdbc:postgresql://localhost:5432/policy_migration_test_cert_drift_revision_content'
+      CAMPUSCORE_CERTIFICATE_MIGRATION_DRIFT_DOCUMENT_METADATA_URL: 'jdbc:postgresql://localhost:5432/policy_migration_test_cert_drift_document_metadata'
+      CAMPUSCORE_CERTIFICATE_MIGRATION_DRIFT_REVISION_METADATA_URL: 'jdbc:postgresql://localhost:5432/policy_migration_test_cert_drift_revision_metadata'
+      CAMPUSCORE_CERTIFICATE_MIGRATION_DRIFT_STATUS_URL: 'jdbc:postgresql://localhost:5432/policy_migration_test_cert_drift_status'
+      CAMPUSCORE_CERTIFICATE_MIGRATION_DRIFT_DRAFT_URL: 'jdbc:postgresql://localhost:5432/policy_migration_test_cert_drift_draft'
+      CAMPUSCORE_CERTIFICATE_MIGRATION_DRIFT_PUBLISHED_URL: 'jdbc:postgresql://localhost:5432/policy_migration_test_cert_drift_published'
+      CAMPUSCORE_CERTIFICATE_MIGRATION_CONCURRENT_URL: 'jdbc:postgresql://localhost:5432/policy_migration_test_cert_concurrent'
+      CAMPUSCORE_CERTIFICATE_MIGRATION_FOREIGN_URL: 'jdbc:postgresql://localhost:5432/policy_migration_test_cert_foreign'
+      CAMPUSCORE_CERTIFICATE_MIGRATION_NEWER_URL: 'jdbc:postgresql://localhost:5432/policy_migration_test_cert_newer'
+      CAMPUSCORE_CERTIFICATE_MIGRATION_BASE_DRIFT_URL: 'jdbc:postgresql://localhost:5432/policy_migration_test_cert_base_drift'
+      CAMPUSCORE_CERTIFICATE_MIGRATION_USER: 'postgres'
+      CAMPUSCORE_CERTIFICATE_MIGRATION_PASSWORD: 'ci-postgres-it-ephemeral-01'
+      CAMPUSCORE_DEMO_TEAM_PG_ENABLED: 'true'
+      CAMPUSCORE_DEMO_TEAM_PG_ADMIN_URL: 'jdbc:postgresql://localhost:5432/postgres'
+      CAMPUSCORE_DEMO_TEAM_PG_USER: 'postgres'
+      CAMPUSCORE_DEMO_TEAM_PG_PASSWORD: 'ci-postgres-it-ephemeral-01'
+      CAMPUSCORE_SPRING_FOCUS_PG_ENABLED: 'true'
+      CAMPUSCORE_SPRING_FOCUS_PG_ADMIN_URL: 'jdbc:postgresql://localhost:5432/postgres'
+      CAMPUSCORE_SPRING_FOCUS_PG_USER: 'postgres'
+      CAMPUSCORE_SPRING_FOCUS_PG_PASSWORD: 'ci-postgres-it-ephemeral-01'
+    services:
+      postgres:
+        # Same major version as production (database/Dockerfile pins postgres:15).
+        image: postgres:15-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: ci-postgres-it-ephemeral-01
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: maven
+          cache-dependency-path: java-services/pom.xml
+      - name: Create the dedicated IT databases
+        env:
+          PGPASSWORD: ci-postgres-it-ephemeral-01
+        run: |
+          psql -h 127.0.0.1 -U postgres -d postgres -v ON_ERROR_STOP=1 <<'SQL'
+          CREATE DATABASE campuscore_it_e2e;
+          CREATE DATABASE campuscore_council_race_ci;
+          CREATE DATABASE campuscore_it_upgrade;
+          CREATE DATABASE campuscore_it_assistant_rls;
+          CREATE DATABASE campuscore_it_assistant_migration;
+          CREATE DATABASE campuscore_it_turn_ledger;
+          CREATE DATABASE campuscore_it_report_regression;
+          CREATE DATABASE policy_migration_test_notification_audit;
+          CREATE DATABASE policy_migration_test_policy_local;
+          CREATE DATABASE policy_migration_test_policy_previous_supabase;
+          CREATE DATABASE policy_migration_test_policy_current_supabase;
+          CREATE DATABASE policy_migration_test_policy_human;
+          CREATE DATABASE policy_migration_test_cert_clean;
+          CREATE DATABASE policy_migration_test_cert_local;
+          CREATE DATABASE policy_migration_test_cert_drift_content;
+          CREATE DATABASE policy_migration_test_cert_drift_revision_content;
+          CREATE DATABASE policy_migration_test_cert_drift_document_metadata;
+          CREATE DATABASE policy_migration_test_cert_drift_revision_metadata;
+          CREATE DATABASE policy_migration_test_cert_drift_status;
+          CREATE DATABASE policy_migration_test_cert_drift_draft;
+          CREATE DATABASE policy_migration_test_cert_drift_published;
+          CREATE DATABASE policy_migration_test_cert_concurrent;
+          CREATE DATABASE policy_migration_test_cert_foreign;
+          CREATE DATABASE policy_migration_test_cert_newer;
+          CREATE DATABASE policy_migration_test_cert_base_drift;
+          SQL
+      - name: Provision the assistant RLS runtime role
+        env:
+          ASSISTANT_DB_PASSWORD: ci-assistant-rls-ephemeral-01
+          SPRING_DATASOURCE_URL: 'jdbc:postgresql://localhost:5432/postgres'
+          SPRING_DATASOURCE_USERNAME: postgres
+          SPRING_DATASOURCE_PASSWORD: ci-postgres-it-ephemeral-01
+        # Flyway V84 creates the runtime role NOLOGIN and never sets a password;
+        # this idempotent script grants LOGIN + password exactly as Compose does.
+        run: node scripts/provision-assistant-runtime.mjs
+      - name: Run the Postgres-gated report concurrency test
+        run: mvn -q -f java-services/pom.xml test -Dtest=ThesisReportConcurrencyTest
+      - name: Run the Postgres integration suite
+        env:
+          # Scoped to this step on purpose: SqlKnowledgeReleasePromoterTest in
+          # the surefire suite fails hard when ASSISTANT_POSTGRES_URL points
+          # anywhere but the fixed e2e-stack URL. This step invokes failsafe
+          # goals only, so surefire never runs with the variable visible.
+          ASSISTANT_POSTGRES_URL: 'jdbc:postgresql://localhost:5432/campuscore_it_turn_ledger'
+          ASSISTANT_POSTGRES_USER: 'postgres'
+          ASSISTANT_POSTGRES_PASSWORD: 'ci-postgres-it-ephemeral-01'
+        run: mvn -q -f java-services/pom.xml -P assistant-postgres-it test-compile failsafe:integration-test failsafe:verify
+      - name: Fail if any Postgres IT silently skipped
+        if: always()
+        run: node scripts/check-postgres-its.mjs
+
   frontend:
     name: Next.js web
     runs-on: ubuntu-latest

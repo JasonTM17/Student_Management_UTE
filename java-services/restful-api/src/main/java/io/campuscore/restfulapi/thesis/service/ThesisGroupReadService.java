@@ -1,9 +1,10 @@
 package io.campuscore.restfulapi.thesis.service;
 
+import io.campuscore.restfulapi.thesis.model.LecturerScope;
 import io.campuscore.restfulapi.thesis.repository.ThesisGroupReadRepository;
 import io.campuscore.restfulapi.thesis.repository.ThesisRoundReadPort;
-import io.campuscore.restfulapi.thesis.web.ThesisGroupReadDtos.GroupResponse;
-import io.campuscore.restfulapi.web.DomainException;
+import io.campuscore.restfulapi.thesis.dto.ThesisGroupReadDtos.GroupResponse;
+import io.campuscore.restfulapi.exception.DomainException;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -44,7 +45,7 @@ public class ThesisGroupReadService {
         // supervises keeps full visibility on their own supervised groups,
         // including groups outside the governance scope.
         if (roles.contains("TRUONG_KHOA") || roles.contains("TRUONG_BO_MON")) {
-            ThesisGroupReadRepository.LecturerScope scope = lecturerScope(roles, lecturerId, subject);
+            LecturerScope scope = lecturerScope(roles, lecturerId, subject);
             if (scope == null) {
                 return List.of();
             }
@@ -99,7 +100,7 @@ public class ThesisGroupReadService {
         } else if (roles.contains("TRUONG_KHOA") || roles.contains("TRUONG_BO_MON")) {
             GroupResponse found = groups.findById(id);
             boolean supervised = isSupervisedGroup(found, lecturerId);
-            ThesisGroupReadRepository.LecturerScope scope = lecturerScope(roles, lecturerId, subject);
+            LecturerScope scope = lecturerScope(roles, lecturerId, subject);
             boolean inScope = scope != null && found != null && (roles.contains("TRUONG_KHOA")
                     ? groups.groupInFaculty(id, scope.facultyId())
                     : groups.groupInDepartment(id, scope.departmentId()));
@@ -140,7 +141,7 @@ public class ThesisGroupReadService {
     }
 
     /** A governance scope requires a lecturer profile bound to the caller. */
-    private ThesisGroupReadRepository.LecturerScope lecturerScope(
+    private LecturerScope lecturerScope(
             List<String> roles, String lecturerId, String subject) {
         if (subject == null || subject.isBlank()) {
             return null;
@@ -164,7 +165,7 @@ public class ThesisGroupReadService {
                 group.rejectionReason(),
                 group.memberStudentIds(),
                 group.members().stream()
-                        .map(m -> new io.campuscore.restfulapi.thesis.web.ThesisGroupReadDtos.GroupMemberResponse(
+                        .map(m -> new io.campuscore.restfulapi.thesis.dto.ThesisGroupReadDtos.GroupMemberResponse(
                                 m.studentId(), m.studentNumber(), m.displayName(), null,
                                 m.isExternal(), m.isLeader(), m.memberOrder()))
                         .toList());

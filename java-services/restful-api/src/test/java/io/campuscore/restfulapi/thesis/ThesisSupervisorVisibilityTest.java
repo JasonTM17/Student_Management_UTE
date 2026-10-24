@@ -9,7 +9,8 @@ import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
-import io.campuscore.restfulapi.thesis.domain.ThesisTopic;
+import io.campuscore.restfulapi.thesis.entity.ThesisTopic;
+import io.campuscore.restfulapi.thesis.dto.SupervisorRow;
 import io.campuscore.restfulapi.thesis.repository.ThesisTopicRepository;
 import io.campuscore.restfulapi.thesis.service.ThesisSupervisorService;
 import java.sql.ResultSet;
@@ -24,7 +25,7 @@ import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
 import org.springframework.jdbc.core.namedparam.SqlParameterSource;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.server.ResponseStatusException;
-import io.campuscore.restfulapi.web.DomainException;
+import io.campuscore.restfulapi.exception.DomainException;
 
 /**
  * The supervisor list is readable by students so their group view can show the
@@ -48,7 +49,7 @@ class ThesisSupervisorVisibilityTest {
     void setUp() throws Exception {
         jdbc = mock(NamedParameterJdbcTemplate.class);
         repository = mock(ThesisTopicRepository.class);
-        service = new ThesisSupervisorService(jdbc, repository, mock(io.campuscore.restfulapi.audit.AdminAuditRecorder.class));
+        service = new ThesisSupervisorService(jdbc, repository, mock(io.campuscore.restfulapi.audit.service.AdminAuditRecorder.class));
 
         ResultSet rows = mock(ResultSet.class);
         when(rows.getString("lecturer_id")).thenReturn(LECTURER_DIRECTORY_ID);
@@ -60,7 +61,7 @@ class ThesisSupervisorVisibilityTest {
 
         when(jdbc.query(anyString(), any(SqlParameterSource.class), any(RowMapper.class)))
                 .thenAnswer(invocation -> {
-                    RowMapper<ThesisSupervisorService.SupervisorRow> mapper = invocation.getArgument(2);
+                    RowMapper<SupervisorRow> mapper = invocation.getArgument(2);
                     return List.of(mapper.mapRow(rows, 0));
                 });
     }
@@ -83,7 +84,7 @@ class ThesisSupervisorVisibilityTest {
         published.publish();
         when(repository.findById(published.getId())).thenReturn(Optional.of(published));
 
-        List<ThesisSupervisorService.SupervisorRow> rows =
+        List<SupervisorRow> rows =
                 service.list(published.getId(), jwt("student-user-101", "STUDENT"));
 
         assertEquals(1, rows.size());

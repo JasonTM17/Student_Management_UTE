@@ -11,11 +11,11 @@ import static org.mockito.Mockito.when;
 
 import io.campuscore.restfulapi.mail.config.MailConfig;
 import io.campuscore.restfulapi.mail.service.EmailServiceImpl;
-import io.campuscore.restfulapi.mail.web.MailDtos.AcademicNoticeRequest;
-import io.campuscore.restfulapi.mail.web.MailDtos.CourseItem;
-import io.campuscore.restfulapi.mail.web.MailDtos.CourseRegistrationRequest;
-import io.campuscore.restfulapi.mail.web.MailDtos.GradeAlertRequest;
-import io.campuscore.restfulapi.mail.web.MailDtos.GradeItem;
+import io.campuscore.restfulapi.mail.dto.MailDtos.AcademicNoticeRequest;
+import io.campuscore.restfulapi.mail.dto.MailDtos.CourseItem;
+import io.campuscore.restfulapi.mail.dto.MailDtos.CourseRegistrationRequest;
+import io.campuscore.restfulapi.mail.dto.MailDtos.GradeAlertRequest;
+import io.campuscore.restfulapi.mail.dto.MailDtos.GradeItem;
 import jakarta.mail.Session;
 import jakarta.mail.internet.MimeMessage;
 import java.util.List;

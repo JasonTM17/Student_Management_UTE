@@ -1,6 +1,10 @@
 package io.campuscore.restfulapi.academic.repository;
 
-import io.campuscore.restfulapi.common.LikePattern;
+import io.campuscore.restfulapi.academic.model.GradingSectionRow;
+import io.campuscore.restfulapi.academic.model.SectionGradeEnrollmentRow;
+import io.campuscore.restfulapi.academic.model.SectionRow;
+import io.campuscore.restfulapi.academic.model.SectionScheduleRow;
+import io.campuscore.restfulapi.common.util.LikePattern;
 import java.math.BigDecimal;
 import java.sql.ResultSet;
 import java.sql.SQLException;
@@ -380,83 +384,5 @@ public class AcademicSectionReadRepository {
     private static String displayName(String firstName, String lastName) {
         // Vietnamese order: lastName carries the surname + title, firstName the given name.
         return ((lastName == null ? "" : lastName.trim()) + " " + (firstName == null ? "" : firstName.trim())).trim();
-    }
-
-    public record SectionRow(
-            String id,
-            String sectionNumber,
-            String courseId,
-            String semesterId,
-            String lecturerId,
-            String classroomId,
-            int capacity,
-            int enrolledCount,
-            String sectionStatus,
-            String courseCode,
-            String courseName,
-            String courseNameEn,
-            String courseNameVi,
-            int credits,
-            String departmentId,
-            String departmentCode,
-            String departmentName,
-            String departmentNameEn,
-            String departmentNameVi,
-            String semesterName,
-            String semesterNameEn,
-            String semesterNameVi,
-            Instant semesterStartDate,
-            String employeeId,
-            String lecturerUserId,
-            String lecturerEmail,
-            String lecturerFirstName,
-            String lecturerLastName,
-            String building,
-            String roomNumber,
-            long activeEnrollmentCount) {
-    }
-
-    public record GradingSectionRow(
-            String id,
-            String sectionNumber,
-            String courseCode,
-            String courseName,
-            String courseNameEn,
-            String courseNameVi,
-            int credits,
-            String departmentName,
-            String departmentNameEn,
-            String departmentNameVi,
-            String semesterName,
-            String semesterNameEn,
-            String semesterNameVi,
-            long enrolledCount,
-            long gradedCount,
-            long publishedCount) {
-    }
-
-    public record SectionScheduleRow(
-            String id,
-            String sectionId,
-            int dayOfWeek,
-            String startTime,
-            String endTime,
-            String classroomId,
-            String building,
-            String roomNumber) {
-    }
-
-    public record SectionGradeEnrollmentRow(
-            String id,
-            String studentId,
-            String studentName,
-            String studentCode,
-            String email,
-            BigDecimal processScore,
-            BigDecimal finalExamScore,
-            BigDecimal finalGrade,
-            String letterGrade,
-            String gradeStatus,
-            String enrollmentStatus) {
     }
 }

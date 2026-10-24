@@ -95,7 +95,7 @@ class DemoAccountGateRoleScopeTest {
     }
 
     private DemoAccountGate gate(boolean enabled, String roles) {
-        return new DemoAccountGate(new org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate(jdbc.getDataSource()), enabled, roles);
+        return new DemoAccountGate(new io.campuscore.restfulapi.auth.repository.DemoAccountRepository(new org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate(jdbc.getDataSource())), enabled, roles);
     }
 
     private String statusOf(String email) {

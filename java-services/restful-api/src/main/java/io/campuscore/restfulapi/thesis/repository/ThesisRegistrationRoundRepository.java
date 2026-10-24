@@ -1,7 +1,7 @@
 package io.campuscore.restfulapi.thesis.repository;
 
-import io.campuscore.restfulapi.thesis.domain.RoundStatus;
-import io.campuscore.restfulapi.thesis.domain.ThesisRegistrationRound;
+import io.campuscore.restfulapi.thesis.model.RoundStatus;
+import io.campuscore.restfulapi.thesis.entity.ThesisRegistrationRound;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;

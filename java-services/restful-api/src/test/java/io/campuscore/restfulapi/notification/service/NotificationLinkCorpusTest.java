@@ -2,7 +2,7 @@ package io.campuscore.restfulapi.notification.service;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import io.campuscore.restfulapi.web.DomainException;
+import io.campuscore.restfulapi.exception.DomainException;
 import java.io.InputStream;
 import org.junit.jupiter.api.Test;
 

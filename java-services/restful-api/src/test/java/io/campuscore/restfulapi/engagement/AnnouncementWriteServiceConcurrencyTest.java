@@ -9,13 +9,13 @@ import static org.mockito.Mockito.when;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.campuscore.restfulapi.engagement.repository.AnnouncementAuditRepository;
-import io.campuscore.restfulapi.engagement.repository.AnnouncementAuditRepository.AuditCommand;
+import io.campuscore.restfulapi.engagement.model.AuditCommand;
 import io.campuscore.restfulapi.engagement.repository.AnnouncementWriteRepository;
 import io.campuscore.restfulapi.engagement.service.AnnouncementStudentNotifier;
 import io.campuscore.restfulapi.engagement.service.AnnouncementWriteService;
-import io.campuscore.restfulapi.engagement.web.AnnouncementReadDtos.AnnouncementResponse;
-import io.campuscore.restfulapi.engagement.web.AnnouncementWriteDtos.LifecycleRequest;
-import io.campuscore.restfulapi.engagement.web.AnnouncementWriteDtos.UpdateAnnouncementRequest;
+import io.campuscore.restfulapi.engagement.dto.AnnouncementReadDtos.AnnouncementResponse;
+import io.campuscore.restfulapi.engagement.dto.AnnouncementWriteDtos.LifecycleRequest;
+import io.campuscore.restfulapi.engagement.dto.AnnouncementWriteDtos.UpdateAnnouncementRequest;
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;

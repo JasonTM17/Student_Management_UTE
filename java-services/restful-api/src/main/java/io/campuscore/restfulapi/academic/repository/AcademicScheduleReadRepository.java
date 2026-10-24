@@ -1,8 +1,8 @@
 package io.campuscore.restfulapi.academic.repository;
 
-import io.campuscore.restfulapi.academic.web.AcademicScheduleReadDtos.ClassroomResponse;
-import io.campuscore.restfulapi.academic.web.AcademicScheduleReadDtos.ScheduleResponse;
-import io.campuscore.restfulapi.academic.web.AcademicScheduleReadDtos.SectionResponse;
+import io.campuscore.restfulapi.academic.dto.AcademicScheduleReadDtos.ClassroomResponse;
+import io.campuscore.restfulapi.academic.dto.AcademicScheduleReadDtos.ScheduleResponse;
+import io.campuscore.restfulapi.academic.dto.AcademicScheduleReadDtos.SectionResponse;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.List;

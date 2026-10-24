@@ -2,22 +2,23 @@ package io.campuscore.restfulapi.engagement.service;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import io.campuscore.restfulapi.engagement.model.SanitizationResult;
 import io.campuscore.restfulapi.engagement.repository.AnnouncementAuditRepository;
-import io.campuscore.restfulapi.engagement.repository.AnnouncementAuditRepository.AuditCommand;
+import io.campuscore.restfulapi.engagement.model.AuditCommand;
 import io.campuscore.restfulapi.engagement.repository.AnnouncementWriteRepository;
-import io.campuscore.restfulapi.engagement.repository.AnnouncementWriteRepository.CreateAnnouncementCommand;
-import io.campuscore.restfulapi.engagement.repository.AnnouncementWriteRepository.PatchValue;
-import io.campuscore.restfulapi.engagement.repository.AnnouncementWriteRepository.TransitionCommand;
-import io.campuscore.restfulapi.engagement.repository.AnnouncementWriteRepository.UpdateAnnouncementCommand;
-import io.campuscore.restfulapi.engagement.web.AnnouncementReadDtos.AnnouncementHistoryListResponse;
-import io.campuscore.restfulapi.engagement.web.AnnouncementReadDtos.AnnouncementHistoryResponse;
-import io.campuscore.restfulapi.engagement.web.AnnouncementReadDtos.AnnouncementResponse;
-import io.campuscore.restfulapi.engagement.web.AnnouncementReadDtos.PageMeta;
-import io.campuscore.restfulapi.engagement.web.AnnouncementWriteDtos.CreateAnnouncementRequest;
-import io.campuscore.restfulapi.engagement.web.AnnouncementWriteDtos.DeleteAnnouncementResponse;
-import io.campuscore.restfulapi.engagement.web.AnnouncementWriteDtos.LifecycleRequest;
-import io.campuscore.restfulapi.engagement.web.AnnouncementWriteDtos.UpdateAnnouncementRequest;
-import io.campuscore.restfulapi.web.DomainException;
+import io.campuscore.restfulapi.engagement.model.CreateAnnouncementCommand;
+import io.campuscore.restfulapi.engagement.model.PatchValue;
+import io.campuscore.restfulapi.engagement.model.TransitionCommand;
+import io.campuscore.restfulapi.engagement.model.UpdateAnnouncementCommand;
+import io.campuscore.restfulapi.engagement.dto.AnnouncementReadDtos.AnnouncementHistoryListResponse;
+import io.campuscore.restfulapi.engagement.dto.AnnouncementReadDtos.AnnouncementHistoryResponse;
+import io.campuscore.restfulapi.engagement.dto.AnnouncementReadDtos.AnnouncementResponse;
+import io.campuscore.restfulapi.engagement.dto.AnnouncementReadDtos.PageMeta;
+import io.campuscore.restfulapi.engagement.dto.AnnouncementWriteDtos.CreateAnnouncementRequest;
+import io.campuscore.restfulapi.engagement.dto.AnnouncementWriteDtos.DeleteAnnouncementResponse;
+import io.campuscore.restfulapi.engagement.dto.AnnouncementWriteDtos.LifecycleRequest;
+import io.campuscore.restfulapi.engagement.dto.AnnouncementWriteDtos.UpdateAnnouncementRequest;
+import io.campuscore.restfulapi.exception.DomainException;
 import java.time.Clock;
 import java.time.Instant;
 import java.util.List;
@@ -30,6 +31,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
+import io.campuscore.restfulapi.engagement.job.ScheduledAnnouncementNotifyJob;
 
 /** Transactional announcement mutation and audit service. */
 @Service
@@ -660,7 +662,7 @@ public class AnnouncementWriteService {
             throw new DomainException(HttpStatus.BAD_REQUEST, "UNSAFE_ANNOUNCEMENT_CONTENT",
                     "Announcement content must not contain scripts, embedded frames, or event handlers");
         }
-        AnnouncementHtmlSanitizer.SanitizationResult sanitized =
+        SanitizationResult sanitized =
                 AnnouncementHtmlSanitizer.sanitize(content);
         return new SanitizedContent(sanitized.html(), sanitized.removedElements());
     }

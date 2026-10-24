@@ -3,6 +3,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 const ts = require('typescript');
+const { readJavaSource } = require('./helpers/java-source');
 
 const root = path.resolve(__dirname, '..');
 
@@ -68,9 +69,7 @@ test('the thesis page classifies scores through the shared scale', () => {
 });
 
 test('the backend transcript map adopts the same 4.0 convention', () => {
-  const source = readSource(
-    '../java-services/restful-api/src/main/java/io/campuscore/restfulapi/academic/service/AcademicEnrollmentReadService.java',
-  );
+  const source = readJavaSource('AcademicEnrollmentReadService');
   assert.ok(source.includes('Map.entry("B+", BigDecimal.valueOf(3.5))'), 'backend B+ must convert to 3.5');
   assert.ok(source.includes('Map.entry("C+", BigDecimal.valueOf(2.5))'), 'backend C+ must convert to 2.5');
   assert.ok(source.includes('Map.entry("D+", BigDecimal.valueOf(1.5))'), 'backend D+ must convert to 1.5');
@@ -111,9 +110,7 @@ test('the report form offers a Word/PDF upload alongside the link', () => {
   assert.ok(page.includes('fileTooLarge'), 'oversize documents need a client-side message');
   const client = readSource('src/lib/thesis-api.ts');
   assert.ok(client.includes("'/thesis/groups/' + groupId + '/report/file'"), 'the API client must target the file endpoint');
-  const policy = readSource(
-    '../java-services/restful-api/src/main/java/io/campuscore/restfulapi/thesis/service/ReportFilePolicy.java',
-  );
+  const policy = readJavaSource('ReportFilePolicy');
   // Content validation: the magic bytes must agree with the extension.
   assert.ok(policy.includes("'%', 'P', 'D', 'F'"), 'PDF signature check');
   assert.ok(policy.includes('0x4B, 0x03, 0x04'), 'DOCX (ZIP) signature check');
@@ -172,13 +169,9 @@ test('the course registration page surfaces failures inline, not only as toasts'
 // ---------- Finding A: mail endpoints are no longer anonymous ----------
 
 test('mail send endpoints require staff roles', () => {
-  const security = readSource(
-    '../java-services/restful-api/src/main/java/io/campuscore/restfulapi/security/SecurityConfig.java',
-  );
+  const security = readJavaSource('SecurityConfig');
   assert.ok(!security.includes('"/api/v1/mail/**"'), 'the blanket mail permitAll must be gone');
-  const controller = readSource(
-    '../java-services/restful-api/src/main/java/io/campuscore/restfulapi/mail/web/MailController.java',
-  );
+  const controller = readJavaSource('MailController');
   assert.ok(
     /@PreAuthorize\("hasAnyRole\('(?:ADMIN|LECTURER|SUPER_ADMIN)',\s*'(?:ADMIN|LECTURER|SUPER_ADMIN)',\s*'(?:ADMIN|LECTURER|SUPER_ADMIN)'\)"\)/.test(controller) ||
     controller.includes("@PreAuthorize(\"hasAnyRole('ADMIN','LECTURER')\")"),
@@ -228,9 +221,7 @@ test('the thesis topic catalog is search-first and loads no topics before a quer
 // ---------- Server-side business invariants for grades, results, mail ----------
 
 test('published grades and thesis results are locked server-side', () => {
-  const academic = readSource(
-    '../java-services/restful-api/src/main/java/io/campuscore/restfulapi/academic/service/AcademicMutationService.java',
-  );
+  const academic = readJavaSource('AcademicMutationService');
   const lockIndex = academic.indexOf('GRADES_PUBLISHED_LOCKED');
   const legacyWrite = academic.indexOf('saveComponent(grade.enrollmentId(), processItemId');
   const batchWrite = academic.indexOf('INSERT INTO " + STUDENT_GRADE');
@@ -242,9 +233,7 @@ test('published grades and thesis results are locked server-side', () => {
     'the published-grade lock must run before any component write',
   );
 
-  const thesis = readSource(
-    '../java-services/restful-api/src/main/java/io/campuscore/restfulapi/thesis/service/ThesisMutationService.java',
-  );
+  const thesis = readJavaSource('ThesisMutationService');
   assert.ok(thesis.includes('SCORES_INCOMPLETE'), 'results publish must require every approved group graded');
   assert.ok(
     thesis.includes('KLTN rounds require a gvpbDeadline'),
