@@ -169,7 +169,7 @@ retroactively identify password changes made before the revision existed.
   supervise, review, or sit on a council for. List totals and the status
   filter apply to the scoped set, and an out-of-scope detail id answers the
   same 404 as a missing id. The owner is
-  [PeopleReadRepository.LecturerDirectoryScope](../../java-services/restful-api/src/main/java/io/campuscore/restfulapi/people/repository/PeopleReadRepository.java).
+  [LecturerDirectoryScope](../../java-services/restful-api/src/main/java/io/campuscore/restfulapi/people/model/LecturerDirectoryScope.java).
 - **Announcement audiences** must protect detail access and inbox previews as
   well as feeds; a preview can disclose the same private content as the full row.
   The owners are [AnnouncementReadService](../../java-services/restful-api/src/main/java/io/campuscore/restfulapi/engagement/service/AnnouncementReadService.java)
