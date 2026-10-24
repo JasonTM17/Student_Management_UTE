@@ -173,6 +173,7 @@ public class RegistrationService {
                         + " LEFT JOIN " + LECTURER + " lecturer ON lecturer.\"id\" = section.\"lecturerId\""
                         + " LEFT JOIN " + AUTH_USER + " lecturer_user ON lecturer_user.\"id\" = lecturer.\"userId\""
                         + " WHERE section.\"semesterId\" = :semesterId"
+                        + " AND course.\"isActive\" = TRUE"
                         + " ORDER BY course.\"code\", section.\"id\", schedule.\"dayOfWeek\", schedule.\"startTime\", schedule.\"id\"",
                 new MapSqlParameterSource()
                         .addValue("curriculumId", student.get("curriculum_id"))
@@ -551,6 +552,9 @@ public class RegistrationService {
         String semesterId = String.valueOf(section.get("semester_id"));
         String courseId = String.valueOf(section.get("course_id"));
         int credits = ((Number) section.get("credits")).intValue();
+        if (!Boolean.TRUE.equals(section.get("course_active"))) {
+            throw problem(HttpStatus.CONFLICT, "COURSE_INACTIVE", "Course is not active for registration");
+        }
         if (!"OPEN".equals(String.valueOf(section.get("status")))) {
             throw problem(HttpStatus.CONFLICT, "SECTION_CLOSED", "Section is not open for registration");
         }
@@ -926,7 +930,8 @@ public class RegistrationService {
         try {
             return jdbc.queryForMap(
                     "SELECT section.\"id\", section.\"status\", section.\"capacity\", section.\"enrolledCount\" AS enrolled_count,"
-                            + " section.\"semesterId\" AS semester_id, section.\"courseId\" AS course_id, course.\"credits\" AS credits"
+                            + " section.\"semesterId\" AS semester_id, section.\"courseId\" AS course_id, course.\"credits\" AS credits,"
+                            + " course.\"isActive\" AS course_active"
                             + " FROM " + SECTION + " section JOIN " + COURSE + " course ON course.\"id\" = section.\"courseId\""
                             + " WHERE section.\"id\" = :id FOR UPDATE",
                     new MapSqlParameterSource("id", sectionId));
