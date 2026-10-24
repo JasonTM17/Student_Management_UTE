@@ -17,7 +17,7 @@ import io.campuscore.restfulapi.engagement.dto.AnnouncementWriteDtos.CreateAnnou
 import io.campuscore.restfulapi.engagement.dto.AnnouncementWriteDtos.DeleteAnnouncementResponse;
 import io.campuscore.restfulapi.engagement.dto.AnnouncementWriteDtos.LifecycleRequest;
 import io.campuscore.restfulapi.engagement.dto.AnnouncementWriteDtos.UpdateAnnouncementRequest;
-import io.campuscore.restfulapi.web.DomainException;
+import io.campuscore.restfulapi.exception.DomainException;
 import java.time.Clock;
 import java.time.Instant;
 import java.util.List;

@@ -4,7 +4,7 @@ import io.campuscore.restfulapi.audit.service.AdminAuditRecorder;
 import io.campuscore.restfulapi.thesis.domain.RoundStatus;
 import io.campuscore.restfulapi.thesis.domain.RoundType;
 import io.campuscore.restfulapi.thesis.domain.TopicStatus;
-import io.campuscore.restfulapi.web.DomainException;
+import io.campuscore.restfulapi.exception.DomainException;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.Instant;

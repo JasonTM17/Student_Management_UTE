@@ -1,4 +1,4 @@
-package io.campuscore.restfulapi.exception;
+package io.campuscore.restfulapi.web;
 
 import jakarta.servlet.http.HttpServletRequest;
 import java.time.Instant;
@@ -23,6 +23,10 @@ import org.springframework.web.method.annotation.MethodArgumentTypeMismatchExcep
 import org.springframework.web.multipart.MaxUploadSizeExceededException;
 import org.springframework.web.server.ResponseStatusException;
 import org.springframework.web.servlet.resource.NoResourceFoundException;
+import io.campuscore.restfulapi.exception.AppException;
+import io.campuscore.restfulapi.exception.ErrorCode;
+import io.campuscore.restfulapi.exception.ErrorResponse;
+import io.campuscore.restfulapi.exception.ValidationException;
 
 /**
  * Global Exception Handler for CampusUTE REST API.
@@ -36,7 +40,7 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(AppException.class)
     public ResponseEntity<ErrorResponse> handleAppException(AppException exception, HttpServletRequest request) {
         Map<String, String> fields = exception instanceof ValidationException ve ? ve.getFieldErrors() : Map.of();
-        Map<String, Object> details = exception instanceof io.campuscore.restfulapi.web.DomainException domain
+        Map<String, Object> details = exception instanceof io.campuscore.restfulapi.exception.DomainException domain
                 ? domain.getDetails()
                 : null;
         return buildErrorResponse(

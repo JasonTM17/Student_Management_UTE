@@ -1,6 +1,6 @@
 package io.campuscore.restfulapi.thesis.assistant;
 
-import io.campuscore.restfulapi.web.DomainException;
+import io.campuscore.restfulapi.exception.DomainException;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;

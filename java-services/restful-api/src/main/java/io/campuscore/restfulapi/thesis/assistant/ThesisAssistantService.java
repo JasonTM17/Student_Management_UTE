@@ -4,7 +4,7 @@ import io.campuscore.restfulapi.thesis.assistant.AssistantCompletionProvider.Com
 import io.campuscore.restfulapi.thesis.assistant.AssistantCompletionProvider.ProviderSegment;
 import io.campuscore.restfulapi.thesis.assistant.ThesisAssistantDtos.ChatResponse;
 import io.campuscore.restfulapi.thesis.assistant.ThesisAssistantDtos.Citation;
-import io.campuscore.restfulapi.web.DomainException;
+import io.campuscore.restfulapi.exception.DomainException;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;

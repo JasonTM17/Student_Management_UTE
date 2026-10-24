@@ -306,13 +306,13 @@ public class ThesisCouncilController {
 
     private static UUID parseUuid(String value, String field) {
         if (value == null || value.isBlank()) {
-            throw new io.campuscore.restfulapi.web.DomainException(
+            throw new io.campuscore.restfulapi.exception.DomainException(
                     org.springframework.http.HttpStatus.BAD_REQUEST, "VALIDATION_ERROR", field + " is required");
         }
         try {
             return UUID.fromString(value.trim());
         } catch (IllegalArgumentException exception) {
-            throw new io.campuscore.restfulapi.web.DomainException(
+            throw new io.campuscore.restfulapi.exception.DomainException(
                     org.springframework.http.HttpStatus.BAD_REQUEST, "VALIDATION_ERROR", field + " must be a UUID");
         }
     }
@@ -324,7 +324,7 @@ public class ThesisCouncilController {
         try {
             return new BigDecimal(value.trim());
         } catch (NumberFormatException exception) {
-            throw new io.campuscore.restfulapi.web.DomainException(
+            throw new io.campuscore.restfulapi.exception.DomainException(
                     org.springframework.http.HttpStatus.BAD_REQUEST, "VALIDATION_ERROR", "score must be numeric");
         }
     }

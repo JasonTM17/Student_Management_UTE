@@ -3,7 +3,7 @@ package io.campuscore.restfulapi.thesis.service;
 import io.campuscore.restfulapi.thesis.repository.ThesisGroupReadRepository;
 import io.campuscore.restfulapi.thesis.repository.ThesisRoundReadPort;
 import io.campuscore.restfulapi.thesis.web.ThesisGroupReadDtos.GroupResponse;
-import io.campuscore.restfulapi.web.DomainException;
+import io.campuscore.restfulapi.exception.DomainException;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;

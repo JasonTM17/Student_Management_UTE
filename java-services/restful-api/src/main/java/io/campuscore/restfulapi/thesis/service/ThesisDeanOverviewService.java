@@ -9,7 +9,7 @@ import io.campuscore.restfulapi.thesis.web.ThesisDeanOverviewDtos.FacultyScope;
 import io.campuscore.restfulapi.thesis.web.ThesisDeanOverviewDtos.OverviewStats;
 import io.campuscore.restfulapi.thesis.web.ThesisDeanOverviewDtos.RoundInfo;
 import io.campuscore.restfulapi.thesis.web.ThesisDeanOverviewDtos.SupervisorWorkload;
-import io.campuscore.restfulapi.web.DomainException;
+import io.campuscore.restfulapi.exception.DomainException;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;

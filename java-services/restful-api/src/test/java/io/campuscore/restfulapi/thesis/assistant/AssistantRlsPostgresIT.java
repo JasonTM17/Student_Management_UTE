@@ -7,7 +7,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import io.campuscore.restfulapi.thesis.assistant.AssistantRlsBoundary.Access;
-import io.campuscore.restfulapi.web.DomainException;
+import io.campuscore.restfulapi.exception.DomainException;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;

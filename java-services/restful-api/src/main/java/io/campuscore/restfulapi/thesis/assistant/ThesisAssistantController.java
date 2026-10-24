@@ -3,7 +3,7 @@ package io.campuscore.restfulapi.thesis.assistant;
 import io.campuscore.restfulapi.thesis.assistant.ThesisAssistantDtos.ChatRequest;
 import io.campuscore.restfulapi.thesis.assistant.ThesisAssistantDtos.ChatResponse;
 import io.campuscore.restfulapi.thesis.assistant.ThesisAssistantDtos.FeedbackRequest;
-import io.campuscore.restfulapi.web.DomainException;
+import io.campuscore.restfulapi.exception.DomainException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import io.campuscore.restfulapi.security.DatabaseAvailabilityTracker;

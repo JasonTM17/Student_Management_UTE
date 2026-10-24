@@ -5,7 +5,7 @@ import io.campuscore.restfulapi.academic.repository.AcademicAttendanceWriteRepos
 import io.campuscore.restfulapi.academic.dto.AcademicAttendanceMutationDtos.AttendanceMutationResponse;
 import io.campuscore.restfulapi.academic.dto.AcademicAttendanceMutationDtos.SectionAttendanceUpdateRequest;
 import io.campuscore.restfulapi.academic.dto.AcademicAttendanceMutationDtos.StudentAttendanceEntry;
-import io.campuscore.restfulapi.web.DomainException;
+import io.campuscore.restfulapi.exception.DomainException;
 import java.time.Instant;
 import java.time.format.DateTimeParseException;
 import java.util.ArrayList;

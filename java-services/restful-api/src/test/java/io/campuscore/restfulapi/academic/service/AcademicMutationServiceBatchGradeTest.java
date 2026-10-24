@@ -7,7 +7,7 @@ import static org.mockito.Mockito.mock;
 
 import io.campuscore.restfulapi.academic.registration.service.RegistrationService;
 import io.campuscore.restfulapi.academic.dto.AcademicMutationDtos.GradeUpdate;
-import io.campuscore.restfulapi.web.DomainException;
+import io.campuscore.restfulapi.exception.DomainException;
 import java.math.BigDecimal;
 import java.util.List;
 import org.junit.jupiter.api.BeforeEach;

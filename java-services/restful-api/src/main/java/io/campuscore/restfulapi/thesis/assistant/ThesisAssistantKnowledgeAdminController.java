@@ -1,6 +1,6 @@
 package io.campuscore.restfulapi.thesis.assistant;
 
-import io.campuscore.restfulapi.web.DomainException;
+import io.campuscore.restfulapi.exception.DomainException;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.time.Instant;

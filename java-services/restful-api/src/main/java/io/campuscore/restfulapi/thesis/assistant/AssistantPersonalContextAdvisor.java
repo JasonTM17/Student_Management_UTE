@@ -22,7 +22,7 @@ import io.campuscore.restfulapi.academic.dto.AcademicSectionReadDtos.LecturerSch
 import io.campuscore.restfulapi.thesis.assistant.ThesisAssistantDtos.ChatRequest;
 import io.campuscore.restfulapi.thesis.assistant.ThesisAssistantDtos.ChatResponse;
 import io.campuscore.restfulapi.thesis.service.ThesisLecturerWorkloadService;
-import io.campuscore.restfulapi.web.DomainException;
+import io.campuscore.restfulapi.exception.DomainException;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.text.Normalizer;

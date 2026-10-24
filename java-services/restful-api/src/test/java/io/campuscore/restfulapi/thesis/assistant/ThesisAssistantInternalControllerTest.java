@@ -11,7 +11,7 @@ import static org.mockito.Mockito.when;
 
 import io.campuscore.restfulapi.thesis.assistant.ThesisAssistantDtos.ChatRequest;
 import io.campuscore.restfulapi.thesis.assistant.ThesisAssistantDtos.ChatResponse;
-import io.campuscore.restfulapi.web.DomainException;
+import io.campuscore.restfulapi.exception.DomainException;
 import java.util.List;
 import java.util.ArrayList;
 import java.util.concurrent.Executor;

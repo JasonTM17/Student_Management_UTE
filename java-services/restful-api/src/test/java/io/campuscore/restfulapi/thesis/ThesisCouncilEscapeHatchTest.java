@@ -11,7 +11,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import io.campuscore.restfulapi.thesis.service.ThesisCouncilService;
 import io.campuscore.restfulapi.thesis.service.ThesisMutationService;
 import io.campuscore.restfulapi.thesis.web.ThesisMutationDtos.PublishResultsPreviewResponse;
-import io.campuscore.restfulapi.web.DomainException;
+import io.campuscore.restfulapi.exception.DomainException;
 import java.math.BigDecimal;
 import java.sql.Timestamp;
 import java.time.Instant;

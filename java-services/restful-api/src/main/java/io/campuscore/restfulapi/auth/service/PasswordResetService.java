@@ -6,7 +6,7 @@ import io.campuscore.restfulapi.auth.repository.AuthUserRepository.AuthUserRecor
 import io.campuscore.restfulapi.auth.repository.PasswordResetTokenRepository;
 import io.campuscore.restfulapi.auth.repository.PasswordResetTokenRepository.TokenRecord;
 import io.campuscore.restfulapi.mail.service.EmailService;
-import io.campuscore.restfulapi.web.DomainException;
+import io.campuscore.restfulapi.exception.DomainException;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.security.SecureRandom;

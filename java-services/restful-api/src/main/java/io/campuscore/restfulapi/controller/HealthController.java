@@ -1,4 +1,4 @@
-package io.campuscore.restfulapi.web;
+package io.campuscore.restfulapi.controller;
 
 import io.campuscore.restfulapi.thesis.assistant.AssistantRlsState;
 import io.swagger.v3.oas.annotations.Operation;

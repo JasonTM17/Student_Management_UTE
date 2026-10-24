@@ -97,7 +97,7 @@ public class AcademicSectionReadService {
         SectionRow section = sections.findSectionById(normalizeRequired("sectionId", sectionId))
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Section not found"));
         if (!sections.hasSectionAccess(section.id(), roles, normalizeOptional("lecturerId", lecturerId))) {
-            throw new io.campuscore.restfulapi.web.DomainException(
+            throw new io.campuscore.restfulapi.exception.DomainException(
                     HttpStatus.FORBIDDEN, "SECTION_FORBIDDEN", "Section is not assigned to the current lecturer");
         }
         return new SectionGradesResponse(

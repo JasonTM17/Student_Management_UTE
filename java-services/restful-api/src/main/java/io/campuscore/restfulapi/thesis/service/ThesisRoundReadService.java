@@ -33,7 +33,7 @@ public class ThesisRoundReadService {
     public RoundResponse get(UUID id) {
         return rounds.findById(id)
                 .map(RoundResponse::from)
-                .orElseThrow(() -> new io.campuscore.restfulapi.web.DomainException(
+                .orElseThrow(() -> new io.campuscore.restfulapi.exception.DomainException(
                         org.springframework.http.HttpStatus.NOT_FOUND,
                         "ROUND_NOT_FOUND",
                         "Thesis registration round not found"));

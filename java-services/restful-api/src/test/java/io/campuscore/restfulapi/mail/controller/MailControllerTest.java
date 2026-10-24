@@ -22,7 +22,7 @@ import io.campuscore.restfulapi.mail.dto.MailDtos.GradeAlertRequest;
 import io.campuscore.restfulapi.mail.dto.MailDtos.GradeItem;
 import io.campuscore.restfulapi.mail.dto.MailDtos.MailDispatchResponse;
 import io.campuscore.restfulapi.mail.dto.MailDtos.TestEmailRequest;
-import io.campuscore.restfulapi.web.DomainException;
+import io.campuscore.restfulapi.exception.DomainException;
 import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;

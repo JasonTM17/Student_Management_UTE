@@ -12,7 +12,7 @@ import io.campuscore.restfulapi.academic.dto.AcademicConductDtos.ConductActivity
 import io.campuscore.restfulapi.academic.dto.AcademicConductDtos.ConductSemesterScoreDto;
 import io.campuscore.restfulapi.academic.dto.AcademicConductDtos.StudentConductSummaryDto;
 import io.campuscore.restfulapi.academic.dto.AcademicMutationDtos.GradeUpdate;
-import io.campuscore.restfulapi.web.DomainException;
+import io.campuscore.restfulapi.exception.DomainException;
 import java.math.BigDecimal;
 import java.sql.Date;
 import java.time.LocalDate;

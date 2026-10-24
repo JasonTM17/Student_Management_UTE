@@ -2,7 +2,7 @@ package io.campuscore.restfulapi.academic.service;
 
 import io.campuscore.restfulapi.academic.registration.service.CreditLimitApplicationService;
 import io.campuscore.restfulapi.audit.service.AdminAuditRecorder;
-import io.campuscore.restfulapi.web.DomainException;
+import io.campuscore.restfulapi.exception.DomainException;
 import java.time.Instant;
 import java.util.LinkedHashMap;
 import java.util.List;

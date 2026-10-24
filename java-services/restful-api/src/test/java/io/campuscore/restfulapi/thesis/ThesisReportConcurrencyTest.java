@@ -12,7 +12,7 @@ import io.campuscore.restfulapi.thesis.service.ThesisReportStorage;
 import io.campuscore.restfulapi.thesis.service.ThesisMutationService;
 import io.campuscore.restfulapi.thesis.service.ThesisNotificationService;
 import io.campuscore.restfulapi.thesis.web.ThesisMutationDtos.ReportUpdateRequest;
-import io.campuscore.restfulapi.web.DomainException;
+import io.campuscore.restfulapi.exception.DomainException;
 import java.sql.Timestamp;
 import java.time.Instant;
 import java.util.Arrays;

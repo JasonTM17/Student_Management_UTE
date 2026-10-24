@@ -31,7 +31,7 @@ import io.campuscore.restfulapi.thesis.web.ThesisMutationDtos.RosterOverrideRequ
 import io.campuscore.restfulapi.thesis.web.ThesisMutationDtos.TopicReassignRequest;
 import io.campuscore.restfulapi.thesis.web.ThesisRoundDtos.RoundResponse;
 import io.campuscore.restfulapi.thesis.web.ThesisTopicDtos.TopicResponse;
-import io.campuscore.restfulapi.web.DomainException;
+import io.campuscore.restfulapi.exception.DomainException;
 import java.time.Instant;
 import java.util.LinkedHashMap;
 import java.util.List;

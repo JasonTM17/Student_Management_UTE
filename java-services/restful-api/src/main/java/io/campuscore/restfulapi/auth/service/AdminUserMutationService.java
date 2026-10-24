@@ -3,7 +3,7 @@ package io.campuscore.restfulapi.auth.service;
 import io.campuscore.restfulapi.audit.service.AdminAuditRecorder;
 import io.campuscore.restfulapi.auth.repository.AuthUserRepository;
 import io.campuscore.restfulapi.common.LikePattern;
-import io.campuscore.restfulapi.web.DomainException;
+import io.campuscore.restfulapi.exception.DomainException;
 import java.security.SecureRandom;
 import java.sql.Types;
 import java.util.LinkedHashMap;

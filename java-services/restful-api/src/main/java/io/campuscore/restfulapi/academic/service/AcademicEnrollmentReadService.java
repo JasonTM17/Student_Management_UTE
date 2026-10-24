@@ -262,7 +262,7 @@ public class AcademicEnrollmentReadService {
         String normalizedSectionId = normalizeRequired("sectionId", sectionId);
         String profileId = normalizeOptional("lecturerId", lecturerId);
         if (!academic.hasSectionAccess(normalizedSectionId, roles, profileId)) {
-            throw new io.campuscore.restfulapi.web.DomainException(
+            throw new io.campuscore.restfulapi.exception.DomainException(
                     HttpStatus.FORBIDDEN, "SECTION_FORBIDDEN", "Section is not assigned to the current lecturer");
         }
         return academic.findGradeItemsBySection(normalizedSectionId).stream()
@@ -282,7 +282,7 @@ public class AcademicEnrollmentReadService {
         String normalizedSectionId = normalizeRequired("sectionId", sectionId);
         String profileId = normalizeOptional("lecturerId", lecturerId);
         if (!academic.hasSectionAccess(normalizedSectionId, roles, profileId)) {
-            throw new io.campuscore.restfulapi.web.DomainException(
+            throw new io.campuscore.restfulapi.exception.DomainException(
                     HttpStatus.FORBIDDEN, "SECTION_FORBIDDEN", "Section is not assigned to the current lecturer");
         }
         return studentGradeRows(academic.findStudentGradesBySection(normalizedSectionId));
@@ -316,7 +316,7 @@ public class AcademicEnrollmentReadService {
             var enrollment = academic.findEnrollmentById(normalizedEnrollmentId)
                     .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Enrollment not found"));
             if (!academic.hasSectionAccess(enrollment.sectionId(), roles, profileId)) {
-                throw new io.campuscore.restfulapi.web.DomainException(
+                throw new io.campuscore.restfulapi.exception.DomainException(
                         HttpStatus.FORBIDDEN, "SECTION_FORBIDDEN", "Section is not assigned to the current lecturer");
             }
             rows = studentGradeRows(academic.findStudentGradesByEnrollment(normalizedEnrollmentId));

@@ -15,7 +15,7 @@ import io.campuscore.restfulapi.thesis.web.ThesisMutationDtos.GroupRejectionRequ
 import io.campuscore.restfulapi.thesis.web.ThesisMutationDtos.ProgressRequest;
 import io.campuscore.restfulapi.thesis.web.ThesisMutationDtos.RosterOverrideRequest;
 import io.campuscore.restfulapi.thesis.web.ThesisMutationDtos.TopicReassignRequest;
-import io.campuscore.restfulapi.web.DomainException;
+import io.campuscore.restfulapi.exception.DomainException;
 import java.sql.Timestamp;
 import java.time.Instant;
 import java.util.List;

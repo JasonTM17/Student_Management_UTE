@@ -1,6 +1,6 @@
 package io.campuscore.restfulapi.thesis.service;
 
-import io.campuscore.restfulapi.web.DomainException;
+import io.campuscore.restfulapi.exception.DomainException;
 import java.util.List;
 import java.util.UUID;
 import org.springframework.http.HttpStatus;
