@@ -262,7 +262,7 @@ Trên màn hình hẹp, truy cập trợ lý phải giữ chỗ cho thao tác h�
 
 ## 7. Cấu trúc Package Backend (Layered Package Layout)
 
-Backend `java-services/restful-api` (góc `io.campuscore.restfulapi`) được tổ chức theo **module → vai trò (role)** để người đọc tìm code theo chức năng thay vì theo một thư mục phẳng. Mỗi module (`academic`, `auth`, `audit`, `engagement`, `mail`, `notification`, `people`, `site`, `thesis`) dùng cùng một bộ package con:
+Backend `java-services/restful-api` (góc `io.campuscore.restfulapi`) được tổ chức theo **module → vai trò (role)** để người đọc tìm code theo chức năng thay vì theo một thư mục phẳng. Mọi lớp nằm trong một package vai trò; chỉ `RestfulApiApplication` ở package gốc. Mỗi module dùng cùng một bộ package con:
 
 | Package | Vai trò |
 | --- | --- |
@@ -270,23 +270,41 @@ Backend `java-services/restful-api` (góc `io.campuscore.restfulapi`) được t
 | `dto/` | Các lớp holder request/response (`*Dtos`, record lồng nhau). |
 | `service/` | Business services. |
 | `repository/` | Data access (JDBC repositories, read ports). |
-| `entity/` hoặc `domain/` | JPA entities + enum/value types (`domain` giữ tên hiện có ở `thesis`/`engagement`, `entity` ở `academic.registration`). |
-| `model/` | Kiểu dữ liệu nội bộ dùng chung giữa các tầng: row/projection của repository, command/result của service. Plain data — không phụ thuộc `repository`/`service`/`controller`; tái dùng `domain`/`entity` nếu module đã có sẵn package tương đương. |
+| `entity/` | JPA `@Entity`/`@Table` types (`thesis.entity.ThesisTopic`, `engagement.entity.Article*`, `academic.registration.entity.*`). |
+| `model/` | Tên duy nhất cho kiểu dữ liệu plain (record/enum/value) dùng chung giữa các tầng: row/projection của repository, command/filter/result của service, status enums. Không phụ thuộc `repository`/`service`/`controller`. Không còn package `domain/` — plain data cũ ở `domain` đã gộp vào `model`, JPA entities đã tách sang `entity`. |
 | `config/` | `@Configuration` / `@ConfigurationProperties` của module. |
 | `job/` | Scheduled jobs, retention/reconcile jobs. |
+| `filter/` | Servlet filters (`security.filter.*`). |
 | `scope/` | Authorization/scope helpers (`thesis.scope.ThesisDeanScope`, `ThesisDepartmentScope`). |
 | `storage/` | Report-storage implementations (`thesis.storage.*ThesisReportStorage`). |
 | `renderer/` | Renderer rõ vai trò (`academic.registration.renderer.RegistrationPdfRenderer`). |
 
-`academic.registration` là một subpackage của `academic` và tự nó cũng được chia theo vai trò (`controller`, `dto`, `entity`, `repository`, `service`, `renderer`).
+Bản đồ module → subpackage hiện tại:
 
-`thesis.assistant` được chia thành các subpackage theo vai trò thật của từng lớp: `controller`, `dto`, `service`, `repository`, `client` (DeepSeek/RAG/knowledge-authority gateways), `guard` (input/output guards), `rls` (`AssistantRls*` boundary/context/aspect/transaction), `config`, `properties`, `job`.
+| Top-level package | Loại | Subpackages |
+| --- | --- | --- |
+| `academic` | module | `controller`, `dto`, `job`, `model`, `repository`, `service`, `registration/{controller,dto,entity,model,renderer,repository,service}` |
+| `audit` | module | `controller`, `model`, `repository`, `service` |
+| `auth` | module | `controller`, `dto`, `job`, `model`, `repository`, `service` |
+| `engagement` | module | `controller`, `dto`, `entity`, `job`, `model`, `repository`, `service` |
+| `mail` | module | `config`, `controller`, `dto`, `model`, `repository`, `service` |
+| `notification` | module | `controller`, `dto`, `model`, `repository`, `service` |
+| `people` | module | `controller`, `dto`, `model`, `repository`, `service` |
+| `site` | module | `controller`, `dto`, `repository`, `service` |
+| `thesis` | module | `config`, `controller`, `dto`, `entity`, `exception`, `model`, `repository`, `scope`, `service`, `storage`, `assistant/{client,config,controller,dto,exception,guard,job,model,properties,repository,rls,service}` |
+| `common` | cross-cutting | `dto` (response envelopes), `util` (`LikePattern`) |
+| `config` | cross-cutting | `env` (`EnvironmentPostProcessor` đăng ký trong `META-INF/spring.factories`), `jpa` (naming strategy trong `application.yml`), `openapi` |
+| `exception` | cross-cutting | `code`, `handler`, `response` (+ các exception base types dùng chung ở package root `exception/` — xem mục Error handling) |
+| `security` | cross-cutting | `availability`, `config`, `filter`, `model`, `token`, `ratelimit/{annotation,filter,model,properties,service}` |
+| `system` | cross-cutting | `controller` (`Contract`, `Health`), `dto`, `job` (`DatabaseKeepAliveScheduler`) |
 
-Quy ước top-level: `exception/` chứa toàn bộ quan tâm về lỗi dùng chung (xem mục Error handling bên dưới); `controller/` chứa controller dùng chung (`Contract`, `Health`, `Identity`); `job/` chứa scheduler dùng chung (`DatabaseKeepAliveScheduler`); `common/` chứa response envelope dùng chung; `security/` giữ nguyên các filter/config bảo mật; `config/` giữ bootstrap config được tham chiếu bởi `application.yml`/`META-INF/spring.factories`. Package `web/` cũ đã bị xóa hoàn toàn: controller chuyển sang `controller/`, handler/writer/DTO lỗi chuyển sang `exception/`.
+`academic.registration` là sub-module của `academic` và tự nó cũng được chia đủ vai trò (`controller`, `dto`, `entity`, `model`, `repository`, `service`, `renderer`); `thesis.assistant` tương tự với các vai trò riêng (`client` gateways, `guard` input/output, `rls` boundary/context/aspect, `properties`, `job`). Các package `controller/`, `dto/`, `job/` ở root cũ đã bị xóa: `Identity` vào `auth`, `Contract`/`Health`/keep-alive vào `system`; `web/` cũ cũng đã bị xóa hoàn toàn từ vòng refactor trước.
 
-**Kiểu dữ liệu lồng nhau:** `record`/`enum`/`interface`/`class` public hoặc protected xuất hiện trong signature không được khai báo bên trong `repository`/`service`/`controller` (kể cả `job`/`client`). Payload request/response serialize ra client đi vào `<module>/dto/`; carrier nội bộ/persistence đi vào `<module>/model/` (hoặc `domain`/`entity` đã có sẵn). Chỉ helper `private`/package-private dùng nội bộ mới được ở lồng. Thêm kiểu mới: tạo file `<module>/model` hoặc `dto/<Tên>.java` (một kiểu top-level mỗi file, tên file trùng tên kiểu, visibility tối thiểu) rồi tham chiếu trực tiếp — `ArchitectureGuardTest` chặn nested type sót lại, cạnh `model→repository|service|controller`, và `dto→model|domain` ngoài danh sách ngoại lệ đã ghi.
+**Thêm module hoặc lớp mới:** tạo `<module>/<role>/TênLớp.java` (một kiểu top-level mỗi file, tên file trùng tên kiểu, visibility tối thiểu). Module business mới bắt đầu bằng `controller`/`service`/`repository` (+`dto`/`model` khi có payload/carrier); không đặt lớp trực tiếp trong package root của module. Plain data (record/enum/value type) luôn vào `model/`; chỉ JPA entity vào `entity/`; tên `domain` không còn được dùng.
 
-Quy tắc được bảo đảm bởi `ArchitectureGuardTest` (quét `.class` trên classpath, không cần dependency mới): controller chỉ nằm trong package `controller` và phải mang `@RestController`/`@Controller`; package `controller` không phụ thuộc `repository`; `repository` không phụ thuộc `controller`/`service`; các lớp `*Dtos` nằm trong package `dto`; lớp `*Exception` top-level chỉ nằm trong package `..exception..` và phải kế thừa `RuntimeException`/họ `AppException`; exception handler (`*ExceptionHandler`, `@ControllerAdvice`) chỉ nằm trong `..exception.handler..`; package ngoài `exception` không được phụ thuộc `exception.handler`; lớp `*Filter` không được tự serialize body lỗi (không tham chiếu `ObjectMapper`/`PrintWriter` — mọi body lỗi của filter đi qua `ApiErrorWriter`). Một số cạnh phụ thuộc có sẵn trước refactor được liệt kê tường minh trong test như documented exceptions.
+**Kiểu dữ liệu lồng nhau:** `record`/`enum`/`interface`/`class` public hoặc protected xuất hiện trong signature không được khai báo bên trong `repository`/`service`/`controller` (kể cả `job`/`client`). Payload request/response serialize ra client đi vào `<module>/dto/`; carrier nội bộ/persistence đi vào `<module>/model/`. Chỉ helper `private`/package-private dùng nội bộ mới được ở lồng.
+
+Quy tắc được bảo đảm bởi `ArchitectureGuardTest` (quét `.class` trên classpath, không cần dependency mới): mọi lớp nằm trong role subpackage (root của mỗi module và các nested root `academic/registration`, `security/ratelimit`, `thesis/assistant` không chứa lớp trực tiếp; chỉ `RestfulApiApplication` ở package gốc); package cross-cutting (`common`, `config`, `exception`, `security`, `system`) không phụ thuộc module business ngoài các cạnh được liệt kê tường minh kèm lý do trong test; `security`/`security.ratelimit` giữ chiều phụ thuộc đã có (filter → service → model/properties; annotation chỉ tham chiếu model); controller chỉ nằm trong package `controller` và phải mang `@RestController`/`@Controller`; package `controller` không phụ thuộc `repository`; `repository` không phụ thuộc `controller`/`service`; các lớp `*Dtos` nằm trong package `dto`; lớp `*Exception` top-level chỉ nằm trong package `..exception..` và phải kế thừa `RuntimeException`/họ `AppException`; exception handler (`*ExceptionHandler`, `@ControllerAdvice`) chỉ nằm trong `..exception.handler..`; package ngoài `exception` không được phụ thuộc `exception.handler`; lớp `*Filter` không được tự serialize body lỗi (không tham chiếu `ObjectMapper`/`PrintWriter` — mọi body lỗi của filter đi qua `ApiErrorWriter`).
 
 ### Xử lý lỗi (Error handling)
 
