@@ -40,5 +40,4 @@ public class ContractController {
                 "echo", request.message(),
                 "writer", "restful-api"));
     }
-
 }

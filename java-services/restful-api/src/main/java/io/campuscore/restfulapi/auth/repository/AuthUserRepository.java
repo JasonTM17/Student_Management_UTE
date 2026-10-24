@@ -699,5 +699,4 @@ public class AuthUserRepository {
     private static LocalDateTime localDateTime(Instant instant) {
         return instant == null ? null : LocalDateTime.ofInstant(instant, ZoneOffset.UTC);
     }
-
 }

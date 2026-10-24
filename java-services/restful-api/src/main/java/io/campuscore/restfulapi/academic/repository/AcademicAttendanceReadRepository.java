@@ -350,5 +350,4 @@ public class AcademicAttendanceReadRepository {
         Instant start = date.truncatedTo(java.time.temporal.ChronoUnit.DAYS);
         parameters.addValue("dayStart", utcTimestamp(start)).addValue("dayEnd", utcTimestamp(start.plusSeconds(86400)));
     }
-
 }

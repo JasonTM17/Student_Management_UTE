@@ -108,5 +108,4 @@ public class ThesisLecturerWorkloadService {
         java.sql.Timestamp value = rs.getTimestamp(column);
         return value == null ? null : value.toInstant();
     }
-
 }

@@ -56,5 +56,4 @@ public class ThesisAssistantCatalogRepository {
         return new CatalogDocument(rs.getString("entity_type"), rs.getString("entity_id"), rs.getString("title"),
                 rs.getString("public_text"), rs.getTimestamp("updated_at"));
     }
-
 }

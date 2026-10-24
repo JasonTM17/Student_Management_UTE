@@ -103,5 +103,4 @@ public class AssistantFeedbackAdminService {
         }
         return value.substring(0, value.offsetByCodePoints(0, MAX_PREVIEW_CODE_POINTS));
     }
-
 }

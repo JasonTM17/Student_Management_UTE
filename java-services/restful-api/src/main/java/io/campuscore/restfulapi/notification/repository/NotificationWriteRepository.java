@@ -270,5 +270,4 @@ public class NotificationWriteRepository {
     private static java.time.Instant instant(Timestamp timestamp) {
         return timestamp == null ? null : timestamp.toInstant();
     }
-
 }

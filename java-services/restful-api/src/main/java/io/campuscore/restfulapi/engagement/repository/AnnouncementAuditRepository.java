@@ -115,5 +115,4 @@ public class AnnouncementAuditRepository {
                 Calendar.getInstance(TimeZone.getTimeZone("UTC")));
         return timestamp == null ? null : timestamp.toInstant();
     }
-
 }

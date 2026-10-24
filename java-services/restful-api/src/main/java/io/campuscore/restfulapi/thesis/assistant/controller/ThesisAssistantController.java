@@ -931,5 +931,4 @@ public class ThesisAssistantController {
         if (subject == null || subject.isBlank()) throw new DomainException(HttpStatus.UNAUTHORIZED, "UNAUTHENTICATED", "Authentication is required");
         return subject;
     }
-
 }
