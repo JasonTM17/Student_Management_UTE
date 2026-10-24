@@ -1,8 +1,8 @@
 package io.campuscore.restfulapi.thesis.service;
 
-import io.campuscore.restfulapi.thesis.domain.LecturerScope;
-import io.campuscore.restfulapi.thesis.domain.RoundStatus;
-import io.campuscore.restfulapi.thesis.domain.StoredReport;
+import io.campuscore.restfulapi.thesis.model.LecturerScope;
+import io.campuscore.restfulapi.thesis.model.RoundStatus;
+import io.campuscore.restfulapi.thesis.model.StoredReport;
 import io.campuscore.restfulapi.thesis.dto.ReportResponse;
 import io.campuscore.restfulapi.thesis.dto.RepositoryMemberResponse;
 import io.campuscore.restfulapi.thesis.dto.RepositoryReportResponse;
@@ -741,7 +741,7 @@ public class ThesisReportService {
      *
      * <ul>
      *   <li>TLCN/KLTN author a GVPB grading deadline ({@link
-     *       io.campuscore.restfulapi.thesis.domain.RoundType#requiresGvpbDeadline()}).
+     *       io.campuscore.restfulapi.thesis.model.RoundType#requiresGvpbDeadline()}).
      *       Reports freeze the moment that date passes, because the grading
      *       committee reads the artifact from then on.</li>
      *   <li>MON_HOC/NCKH deliberately author no grading, council or defense

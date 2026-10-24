@@ -1,6 +1,6 @@
 package io.campuscore.restfulapi.thesis.controller;
 
-import io.campuscore.restfulapi.thesis.domain.RoundStatus;
+import io.campuscore.restfulapi.thesis.model.RoundStatus;
 import io.campuscore.restfulapi.thesis.service.ThesisRoundReadService;
 import io.campuscore.restfulapi.thesis.dto.ThesisRoundDtos.RoundResponse;
 import io.swagger.v3.oas.annotations.Operation;

@@ -1,8 +1,8 @@
 package io.campuscore.restfulapi.thesis.repository;
 
-import io.campuscore.restfulapi.thesis.domain.ApprovalStatus;
-import io.campuscore.restfulapi.thesis.domain.GroupStatus;
-import io.campuscore.restfulapi.thesis.domain.LecturerScope;
+import io.campuscore.restfulapi.thesis.model.ApprovalStatus;
+import io.campuscore.restfulapi.thesis.model.GroupStatus;
+import io.campuscore.restfulapi.thesis.model.LecturerScope;
 import io.campuscore.restfulapi.thesis.dto.ThesisGroupReadDtos.GroupMemberResponse;
 import io.campuscore.restfulapi.thesis.dto.ThesisGroupReadDtos.GroupResponse;
 import java.sql.ResultSet;

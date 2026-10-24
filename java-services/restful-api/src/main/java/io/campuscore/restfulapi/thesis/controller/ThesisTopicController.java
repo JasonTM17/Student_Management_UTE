@@ -1,6 +1,6 @@
 package io.campuscore.restfulapi.thesis.controller;
 
-import io.campuscore.restfulapi.thesis.domain.TopicStatus;
+import io.campuscore.restfulapi.thesis.model.TopicStatus;
 import io.campuscore.restfulapi.thesis.service.ThesisTopicService;
 import io.campuscore.restfulapi.thesis.dto.ThesisTopicDtos.TopicResponse;
 import io.swagger.v3.oas.annotations.Operation;

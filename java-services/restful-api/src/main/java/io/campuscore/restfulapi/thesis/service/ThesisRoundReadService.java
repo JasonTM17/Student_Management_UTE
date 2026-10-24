@@ -1,6 +1,6 @@
 package io.campuscore.restfulapi.thesis.service;
 
-import io.campuscore.restfulapi.thesis.domain.RoundStatus;
+import io.campuscore.restfulapi.thesis.model.RoundStatus;
 import io.campuscore.restfulapi.thesis.repository.ThesisRegistrationRoundRepository;
 import io.campuscore.restfulapi.thesis.dto.ThesisRoundDtos.RoundResponse;
 import java.util.List;

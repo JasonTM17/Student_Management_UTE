@@ -1,7 +1,7 @@
 package io.campuscore.restfulapi.thesis.dto;
 
-import io.campuscore.restfulapi.thesis.domain.ThesisTopic;
-import io.campuscore.restfulapi.thesis.domain.TopicStatus;
+import io.campuscore.restfulapi.thesis.entity.ThesisTopic;
+import io.campuscore.restfulapi.thesis.model.TopicStatus;
 import java.math.BigDecimal;
 import java.util.UUID;
 
