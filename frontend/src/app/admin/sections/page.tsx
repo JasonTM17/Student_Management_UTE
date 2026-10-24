@@ -35,7 +35,7 @@ import {
 } from '@/components/ui/state-block';
 import { useConfirmationDialog } from '@/components/ui/use-confirmation-dialog';
 import { useI18n } from '@/i18n';
-import { campusCodeMessage, campusErrorCode, campusErrorMessage } from '@/lib/campus-error';
+import { campusCodeMessage, campusErrorCode } from '@/lib/campus-error';
 import {
   getLocalizedCourseLabel,
   getLocalizedName,
@@ -671,7 +671,7 @@ export default function AdminSectionsPage() {
         const conflictRows = extractReopenConflicts(requestError);
         if (conflictRows.length === 0) {
           toast.error(
-            campusErrorMessage(requestError, messages.common.campusErrors, copy.saveFailed),
+            campusCodeMessage(requestError, messages.common.campusErrors, copy.saveFailed),
           );
         } else {
           setReopenConflicts(conflictRows);
@@ -689,7 +689,7 @@ export default function AdminSectionsPage() {
         await fetchSections();
       } else {
         toast.error(
-          campusErrorMessage(
+          campusCodeMessage(
             requestError,
             messages.common.campusErrors,
             copy.saveFailed,
