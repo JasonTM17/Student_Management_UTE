@@ -41,11 +41,15 @@ class PeopleReadPersistenceTest {
     @Autowired
     private MockMvc mvc;
 
+    @Autowired
+    private io.campuscore.restfulapi.people.service.PeopleReadService peopleService;
+
     @BeforeEach
     void preparePeopleFixture() {
         jdbc.execute("CREATE SCHEMA IF NOT EXISTS \"campuscore_auth\"");
         jdbc.execute("CREATE SCHEMA IF NOT EXISTS \"academic\"");
         createTables();
+        jdbc.update("DELETE FROM \"academic\".\"Enrollment\"");
         jdbc.update("DELETE FROM \"academic\".\"Student\"");
         jdbc.update("DELETE FROM \"academic\".\"Lecturer\"");
         jdbc.update("DELETE FROM \"academic\".\"Curriculum\"");
@@ -320,6 +324,29 @@ class PeopleReadPersistenceTest {
                 .andExpect(jsonPath("$.data[0].status").value("ACTIVE"));
     }
 
+    @Test
+    void withdrawnEnrollmentDoesNotMakeAStudentASectionNoticeRecipient() {
+        // A section-targeted notice must only reach students currently enrolled
+        // in it. WITHDRAWN is transcript history — like DROPPED it grants no
+        // seat in the audience.
+        insertStudent("student-active", "S010", "ACTIVE", 2, BASE_TIME, "department-se");
+        insertStudent("student-withdrawn", "S011", "ACTIVE", 2, BASE_TIME, "department-se");
+        insertStudent("student-dropped", "S012", "ACTIVE", 2, BASE_TIME, "department-se");
+        insertEnrollment("enr-active", "student-active", "section-1", "ENROLLED");
+        insertEnrollment("enr-withdrawn", "student-withdrawn", "section-1", "WITHDRAWN");
+        insertEnrollment("enr-dropped", "student-dropped", "section-1", "DROPPED");
+
+        assertThat(peopleService.findAnnouncementStudentUserIds(null, "section-1", null, null))
+                .containsExactly("user-student-active");
+    }
+
+    private void insertEnrollment(String id, String studentId, String sectionId, String status) {
+        jdbc.update("INSERT INTO \"academic\".\"Enrollment\""
+                        + " (\"id\", \"studentId\", \"sectionId\", \"semesterId\", \"status\")"
+                        + " VALUES (?, ?, ?, 'semester-1', ?)",
+                id, studentId, sectionId, status);
+    }
+
     private void createTables() {
         jdbc.execute("""
                 CREATE TABLE IF NOT EXISTS "campuscore_auth"."User" (
@@ -372,6 +399,15 @@ class PeopleReadPersistenceTest {
                     "isActive" BOOLEAN NOT NULL,
                     "createdAt" TIMESTAMP NOT NULL,
                     "updatedAt" TIMESTAMP NOT NULL
+                )
+                """);
+        jdbc.execute("""
+                CREATE TABLE IF NOT EXISTS "academic"."Enrollment" (
+                    "id" VARCHAR(120) PRIMARY KEY,
+                    "studentId" VARCHAR(120) NOT NULL,
+                    "sectionId" VARCHAR(120) NOT NULL,
+                    "semesterId" VARCHAR(120) NOT NULL,
+                    "status" VARCHAR(40) NOT NULL
                 )
                 """);
     }

@@ -5,6 +5,7 @@ import io.campuscore.restfulapi.academic.dto.AdminAnalyticsDtos.FacultyRank;
 import io.campuscore.restfulapi.academic.dto.AdminAnalyticsDtos.GradeDistributionEntry;
 import io.campuscore.restfulapi.academic.dto.AdminAnalyticsDtos.SemesterTrend;
 import io.campuscore.restfulapi.academic.dto.AdminAnalyticsDtos.Totals;
+import io.campuscore.restfulapi.academic.model.EnrollmentStatuses;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.util.List;
@@ -99,7 +100,7 @@ public class AdminAnalyticsRepository {
                        COUNT(DISTINCT e."studentId") AS activeStudents
                 FROM academic."Semester" s
                 JOIN academic."Enrollment" e ON e."semesterId" = s."id"
-                    AND e."status" NOT IN ('DROPPED', 'CANCELLED')
+                    AND e."status" IN """ + EnrollmentStatuses.ACTIVE_STATUS_PREDICATE + """
                 GROUP BY s."id", s."name", s."startDate"
                 ORDER BY s."startDate" DESC
                 LIMIT :limit
@@ -124,7 +125,7 @@ public class AdminAnalyticsRepository {
         List<GradeDistributionEntry> rows = jdbc.query("""
                 SELECT "letterGrade" AS grade, COUNT(*) AS count
                 FROM academic."Enrollment"
-                WHERE "letterGrade" IS NOT NULL
+                WHERE "letterGrade" IS NOT NULL AND "letterGrade" <> 'W'
                 GROUP BY "letterGrade"
                 """, GRADE_MAPPER);
         return rows.stream()
@@ -150,7 +151,7 @@ public class AdminAnalyticsRepository {
         long courses = requireCount("SELECT COUNT(*) FROM academic.\"Course\"");
         long enrollments = requireCount(
                 "SELECT COUNT(*) FROM academic.\"Enrollment\" "
-                        + "WHERE \"status\" NOT IN ('DROPPED', 'CANCELLED')");
+                        + "WHERE \"status\" IN " + EnrollmentStatuses.ACTIVE_STATUS_PREDICATE);
         return new Totals(students, lecturers, courses, enrollments);
     }
 

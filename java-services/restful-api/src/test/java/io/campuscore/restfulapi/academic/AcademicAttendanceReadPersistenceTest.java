@@ -187,6 +187,27 @@ class AcademicAttendanceReadPersistenceTest {
     }
 
     @Test
+    void withdrawnEnrollmentsAreExcludedFromTheAttendanceRoster() throws Exception {
+        // An approved withdrawal leaves the enrollment WITHDRAWN (letter W):
+        // transcript history, never a markable seat. A withdrawn-only student
+        // must vanish from roll call, while a student who re-enrolled after
+        // withdrawing keeps the newest eligible (ENROLLED) row.
+        insertUser("student-user-withdrawn", "withdrawn@example.test", "Withdrawn", "Student");
+        insertStudent("student-withdrawn", "student-user-withdrawn", "S900");
+        insertEnrollment("enrollment-withdrawn", "student-withdrawn", "section-1", "semester-1", "WITHDRAWN");
+        insertEnrollment("enrollment-withdrawn-old", "student-1", "section-1", "semester-1", "WITHDRAWN");
+
+        for (var identity : List.of(lecturerJwt("lecturer-1"), adminJwt())) {
+            mvc.perform(get("/api/v1/attendance/section/section-1/roster").with(identity))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.length()").value(2))
+                    .andExpect(jsonPath("$[?(@.studentId == 'student-withdrawn')]").isEmpty())
+                    .andExpect(jsonPath("$[?(@.studentId == 'student-1')].enrollmentStatus")
+                            .value(org.hamcrest.Matchers.contains("ENROLLED")));
+        }
+    }
+
+    @Test
     void detailNotFoundAndReadBoundaryFailuresStayExplicit() throws Exception {
         mvc.perform(get("/api/v1/attendance/attendance-1").with(adminJwt()))
                 .andExpect(status().isOk())

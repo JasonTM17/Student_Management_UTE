@@ -431,7 +431,7 @@ public class AcademicMutationService {
         if (incomplete != null && incomplete > 0) {
             Long blockers = jdbc.queryForObject(
                     "SELECT COUNT(*) FROM " + ENROLLMENT + " e WHERE e.\"sectionId\" = :sectionId"
-                            + " AND e.\"status\" NOT IN ('ENROLLED', 'CONFIRMED', 'COMPLETED', 'DROPPED', 'CANCELLED')",
+                            + " AND e.\"status\" NOT IN ('ENROLLED', 'CONFIRMED', 'COMPLETED', 'DROPPED', 'CANCELLED', 'WITHDRAWN')",
                     new MapSqlParameterSource("sectionId", sectionId), Long.class);
             String detail = blockers != null && blockers > 0
                     ? "All gradeable students require process and final exam scores before publishing"

@@ -138,6 +138,81 @@ class GradePublicationLockTest {
     }
 
     @Test
+    void gradesAreRejectedForAWithdrawnEnrollment() throws Exception {
+        // An approved withdrawal records WITHDRAWN + published letter W. It is
+        // transcript history: the grade-save path must refuse to touch it.
+        withdrawEnrollment("enrollment-1");
+
+        mvc.perform(put("/api/v1/sections/section-1/grades")
+                        .with(lecturerJwt("lecturer-1"))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"grades":[{"enrollmentId":"enrollment-1","processScore":8.0,"finalExamScore":9.0}]}
+                                """))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("ENROLLMENT_NOT_GRADEABLE"));
+
+        Map<String, Object> row = jdbc.queryForMap(
+                "SELECT \"status\", \"letterGrade\", \"gradeStatus\" FROM \"academic\".\"Enrollment\" WHERE \"id\" = 'enrollment-1'");
+        org.assertj.core.api.Assertions.assertThat(row)
+                .containsEntry("status", "WITHDRAWN")
+                .containsEntry("letterGrade", "W")
+                .containsEntry("gradeStatus", "PUBLISHED");
+    }
+
+    @Test
+    void publishLeavesWithdrawnRowsUntouched() throws Exception {
+        insertEnrollment("enrollment-2-withdrawn", "ENROLLED");
+        withdrawEnrollment("enrollment-2-withdrawn");
+
+        mvc.perform(put("/api/v1/sections/section-1/grades")
+                        .with(lecturerJwt("lecturer-1"))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"grades":[{"enrollmentId":"enrollment-1","processScore":8.0,"finalExamScore":9.0}]}
+                                """))
+                .andExpect(status().isOk());
+
+        mvc.perform(post("/api/v1/sections/section-1/grades/publish")
+                        .with(lecturerJwt("lecturer-1")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.message").value("Grades published successfully"));
+
+        assertEnrollmentStatus("enrollment-1", "COMPLETED", "PUBLISHED");
+        // The withdrawn row is already the official W record: publish must
+        // leave it exactly as the withdrawal wrote it.
+        assertEnrollmentStatus("enrollment-2-withdrawn", "WITHDRAWN", "PUBLISHED");
+    }
+
+    @Test
+    void publishReportsEmptyWhenOnlyWithdrawnRowsRemain() throws Exception {
+        withdrawEnrollment("enrollment-1");
+
+        mvc.perform(post("/api/v1/sections/section-1/grades/publish")
+                        .with(lecturerJwt("lecturer-1")))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("GRADES_EMPTY"));
+
+        assertEnrollmentStatus("enrollment-1", "WITHDRAWN", "PUBLISHED");
+    }
+
+    @Test
+    void incompleteGradesDiagnosticDoesNotCountWithdrawnRows() throws Exception {
+        // enrollment-1 is still ungraded, so publication is incomplete; the
+        // withdrawn row is terminal W history, not an enrollment "in a
+        // non-gradeable state" that needs attention.
+        insertEnrollment("enrollment-2-withdrawn", "ENROLLED");
+        withdrawEnrollment("enrollment-2-withdrawn");
+
+        mvc.perform(post("/api/v1/sections/section-1/grades/publish")
+                        .with(lecturerJwt("lecturer-1")))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("GRADE_COMPONENTS_INCOMPLETE"))
+                .andExpect(jsonPath("$.message").value(
+                        "All students require process and final exam scores before publishing"));
+    }
+
+    @Test
     void clearingBothScoresResetsADraftGradeToNotGraded() throws Exception {
         mvc.perform(put("/api/v1/sections/section-1/grades")
                         .with(lecturerJwt("lecturer-1"))
@@ -289,6 +364,13 @@ class GradePublicationLockTest {
         assertEnrollmentStatus("enrollment-1", "COMPLETED", "PUBLISHED");
         // The dropped row was fully graded, yet publish must leave it alone.
         assertEnrollmentStatus("enrollment-2-dropped", "DROPPED", "DRAFT");
+    }
+
+    /** Stamps the same state an approved withdrawal leaves: WITHDRAWN, letter W, published. */
+    private void withdrawEnrollment(String enrollmentId) {
+        jdbc.update("UPDATE \"academic\".\"Enrollment\" SET \"status\" = 'WITHDRAWN',"
+                        + " \"gradeStatus\" = 'PUBLISHED', \"letterGrade\" = 'W' WHERE \"id\" = ?",
+                enrollmentId);
     }
 
     private void dropEnrollment1() {
