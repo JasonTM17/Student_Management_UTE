@@ -25,6 +25,7 @@ import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import io.campuscore.restfulapi.thesis.assistant.rls.AssistantRlsBoundary;
 import io.campuscore.restfulapi.thesis.assistant.service.AssistantKnowledgeAdminService;
 
 /** Admin-only CRUD and Draft -> review -> publish workflow for public campus knowledge. */
@@ -33,6 +34,7 @@ import io.campuscore.restfulapi.thesis.assistant.service.AssistantKnowledgeAdmin
 @Profile("persistence")
 @ConditionalOnProperty(prefix = "assistant.knowledge", name = "authority-mode", havingValue = "sql", matchIfMissing = true)
 @RequestMapping({"/api/v1/admin/assistant/knowledge", "/api/v1/admin/thesis/assistant/knowledge"})
+@AssistantRlsBoundary(access = AssistantRlsBoundary.Access.ADMIN_GOVERNANCE)
 public class ThesisAssistantKnowledgeAdminController {
     private final AssistantKnowledgeAdminService service;
 
