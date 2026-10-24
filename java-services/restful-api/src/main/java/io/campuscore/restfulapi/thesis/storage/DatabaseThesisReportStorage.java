@@ -1,4 +1,5 @@
 package io.campuscore.restfulapi.thesis.storage;
+import io.campuscore.restfulapi.thesis.exception.ThesisReportStorageException;
 import io.campuscore.restfulapi.thesis.config.ThesisReportStorageProperties;
 
 

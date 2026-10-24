@@ -28,7 +28,7 @@ import io.campuscore.restfulapi.thesis.config.ThesisReportStorageProperties;
 import io.campuscore.restfulapi.thesis.storage.LocalThesisReportStorage;
 import io.campuscore.restfulapi.thesis.storage.ReportFilePolicy;
 import io.campuscore.restfulapi.thesis.storage.ThesisReportStorage;
-import io.campuscore.restfulapi.thesis.storage.ThesisReportStorageException;
+import io.campuscore.restfulapi.thesis.exception.ThesisReportStorageException;
 
 /**
  * Brief R5: only the group leader submits the topic report. The report

@@ -1,4 +1,4 @@
-package io.campuscore.restfulapi.thesis.storage;
+package io.campuscore.restfulapi.thesis.exception;
 
 /** Safe, provider-neutral error for report object storage failures. */
 public final class ThesisReportStorageException extends RuntimeException {

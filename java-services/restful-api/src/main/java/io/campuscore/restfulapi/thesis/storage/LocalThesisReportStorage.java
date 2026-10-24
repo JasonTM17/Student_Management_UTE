@@ -1,5 +1,6 @@
 package io.campuscore.restfulapi.thesis.storage;
 
+import io.campuscore.restfulapi.thesis.exception.ThesisReportStorageException;
 import java.io.IOException;
 import java.nio.file.AtomicMoveNotSupportedException;
 import java.nio.file.Files;

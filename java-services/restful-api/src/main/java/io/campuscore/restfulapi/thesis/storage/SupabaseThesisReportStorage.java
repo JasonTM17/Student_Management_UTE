@@ -1,5 +1,6 @@
 package io.campuscore.restfulapi.thesis.storage;
 
+import io.campuscore.restfulapi.thesis.exception.ThesisReportStorageException;
 import java.io.IOException;
 import java.net.URI;
 import java.net.URLEncoder;
