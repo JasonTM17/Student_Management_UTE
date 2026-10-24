@@ -14,7 +14,10 @@ import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.ZoneOffset;
 import java.util.ArrayList;
+import java.util.Collection;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import org.springframework.context.annotation.Profile;
@@ -128,6 +131,43 @@ public class AcademicEnrollmentReadRepository {
                         + " ORDER BY ay.\"year\" DESC, semester.\"startDate\" DESC, course.\"code\" ASC",
                 optionalParameter(new MapSqlParameterSource("studentId", studentId), "semesterId", semesterId),
                 AcademicEnrollmentReadRepository::mapGradeSummary);
+    }
+
+    /**
+     * Batch twin of {@link #findStudentGradeSummaries}: one published-grade
+     * query for many students, rows grouped by student id. Consumers that
+     * need a credit/CPA figure for a whole roster (thesis eligibility) share
+     * this instead of looping the per-student read.
+     */
+    public Map<String, List<GradeSummaryRow>> findStudentGradeSummariesForStudents(Collection<String> studentIds) {
+        if (studentIds == null || studentIds.isEmpty()) {
+            return Map.of();
+        }
+        Map<String, List<GradeSummaryRow>> byStudent = new LinkedHashMap<>();
+        for (String studentId : studentIds) {
+            byStudent.put(studentId, new ArrayList<>());
+        }
+        jdbc.query(
+                "SELECT e.\"studentId\" AS student_id, e.\"id\", e.\"semesterId\", e.\"status\", e.\"gradeStatus\", e.\"finalGrade\", e.\"letterGrade\","
+                        + " (SELECT MAX(sg.\"score\") FROM \"academic\".\"StudentGrade\" sg JOIN \"academic\".\"GradeItem\" gi ON gi.\"id\" = sg.\"gradeItemId\" WHERE sg.\"enrollmentId\" = e.\"id\" AND gi.\"type\" = 'PROCESS') AS process_score,"
+                        + " (SELECT MAX(sg.\"score\") FROM \"academic\".\"StudentGrade\" sg JOIN \"academic\".\"GradeItem\" gi ON gi.\"id\" = sg.\"gradeItemId\" WHERE sg.\"enrollmentId\" = e.\"id\" AND gi.\"type\" = 'FINAL') AS final_exam_score,"
+                        + " section.\"sectionNumber\", course.\"code\", course.\"name\", course.\"nameEn\", course.\"nameVi\","
+                        + " course.\"credits\", semester.\"name\" AS semester_name, semester.\"nameEn\" AS semester_name_en,"
+                        + " semester.\"nameVi\" AS semester_name_vi, lecturer_user.\"firstName\" AS lecturer_first_name,"
+                        + " lecturer_user.\"lastName\" AS lecturer_last_name"
+                        + " FROM " + ENROLLMENT + " e" + commonJoins()
+                        + " LEFT JOIN " + ACADEMIC_YEAR + " ay ON ay.\"id\" = semester.\"academicYearId\""
+                        + " WHERE e.\"studentId\" IN (:studentIds)"
+                        + " AND e.\"gradeStatus\" IN ('PUBLISHED', 'APPEALED')"
+                        + " ORDER BY e.\"studentId\", ay.\"year\" DESC, semester.\"startDate\" DESC, course.\"code\" ASC",
+                new MapSqlParameterSource("studentIds", studentIds),
+                (org.springframework.jdbc.core.RowCallbackHandler) rs -> {
+                    List<GradeSummaryRow> rows = byStudent.get(rs.getString("student_id"));
+                    if (rows != null) {
+                        rows.add(mapGradeSummary(rs, 0));
+                    }
+                });
+        return byStudent;
     }
 
     public List<GradeItemRow> findGradeItemsByLecturer(String lecturerId) {

@@ -3,8 +3,10 @@ package io.campuscore.restfulapi.thesis.service;
 import io.campuscore.restfulapi.thesis.model.LecturerScope;
 import io.campuscore.restfulapi.thesis.repository.ThesisGroupReadRepository;
 import io.campuscore.restfulapi.thesis.repository.ThesisRoundReadPort;
+import io.campuscore.restfulapi.thesis.dto.ThesisGroupReadDtos.GroupMemberResponse;
 import io.campuscore.restfulapi.thesis.dto.ThesisGroupReadDtos.GroupResponse;
 import io.campuscore.restfulapi.exception.DomainException;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -20,14 +22,17 @@ public class ThesisGroupReadService {
     private final ThesisGroupReadRepository groups;
     private final ThesisRoundReadPort rounds;
     private final ThesisGroupWithdrawalPolicy withdrawalPolicy;
+    private final ThesisEligibilityService eligibility;
 
     public ThesisGroupReadService(
             ThesisGroupReadRepository groups,
             ThesisRoundReadPort rounds,
-            ThesisGroupWithdrawalPolicy withdrawalPolicy) {
+            ThesisGroupWithdrawalPolicy withdrawalPolicy,
+            ThesisEligibilityService eligibility) {
         this.groups = groups;
         this.rounds = rounds;
         this.withdrawalPolicy = withdrawalPolicy;
+        this.eligibility = eligibility;
     }
 
     @Transactional(readOnly = true)
@@ -39,8 +44,8 @@ public class ThesisGroupReadService {
             String subject) {
         rounds.requireExisting(roundId);
         if (isFacultyAdmin(roles)) {
-            return withdrawalPolicy.attachAll(
-                    groups.findByRoundId(roundId), roles, lecturerId, subject);
+            return withEligibility(withdrawalPolicy.attachAll(
+                    groups.findByRoundId(roundId), roles, lecturerId, subject));
         }
         // Governance readers are scoped like the dean overview: a faculty
         // head sees only their faculty, a department head only their
@@ -59,18 +64,19 @@ public class ThesisGroupReadService {
             List<GroupResponse> supervised = lecturerId == null || lecturerId.isBlank()
                     ? List.of()
                     : groups.findByRoundIdAndSupervisorId(roundId, lecturerId);
-            return withdrawalPolicy.attachAll(
-                    mergeScopedWithSupervised(scoped, supervised, lecturerId), roles, lecturerId, subject);
+            return withEligibility(withdrawalPolicy.attachAll(
+                    mergeScopedWithSupervised(scoped, supervised, lecturerId), roles, lecturerId, subject));
         }
         if (roles.contains("LECTURER")) {
             // External members declare an email/phone in `contact`, so a
             // lecturer only sees the groups whose topic they supervise — the
             // same supervisor rule the report-read path applies.
-            return withdrawalPolicy.attachAll(
+            return withEligibility(withdrawalPolicy.attachAll(
                     groups.findByRoundIdAndSupervisorId(roundId, requireLecturerId(lecturerId)),
-                    roles, lecturerId, subject);
+                    roles, lecturerId, subject));
         }
-        return groups.findByRoundIdAndStudentId(roundId, requireStudentId(roles, studentId));
+        return withEligibility(
+                groups.findByRoundIdAndStudentId(roundId, requireStudentId(roles, studentId)));
     }
 
     /**
@@ -86,11 +92,11 @@ public class ThesisGroupReadService {
             String studentId,
             String lecturerId) {
         if (roles.contains("STUDENT")) {
-            return groups.findByStudentId(requireStudentId(roles, studentId));
+            return withEligibility(groups.findByStudentId(requireStudentId(roles, studentId)));
         }
         if (roles.contains("LECTURER")) {
-            return withdrawalPolicy.attachAll(
-                    groups.findBySupervisorId(requireLecturerId(lecturerId)), roles, lecturerId, null);
+            return withEligibility(withdrawalPolicy.attachAll(
+                    groups.findBySupervisorId(requireLecturerId(lecturerId)), roles, lecturerId, null));
         }
         return List.of();
     }
@@ -124,7 +130,7 @@ public class ThesisGroupReadService {
                     "THESIS_GROUP_NOT_FOUND",
                     "Thesis group not found");
         }
-        return withdrawalPolicy.attach(group, roles, lecturerId, subject);
+        return withEligibility(withdrawalPolicy.attach(group, roles, lecturerId, subject));
     }
 
     /** Merge the governance-scoped groups with any group the caller supervises. */
@@ -175,9 +181,68 @@ public class ThesisGroupReadService {
                 group.members().stream()
                         .map(m -> new io.campuscore.restfulapi.thesis.dto.ThesisGroupReadDtos.GroupMemberResponse(
                                 m.studentId(), m.studentNumber(), m.displayName(), null,
-                                m.isExternal(), m.isLeader(), m.memberOrder()))
+                                m.isExternal(), m.isLeader(), m.memberOrder(), m.eligible()))
                         .toList(),
                 group.approvalWithdrawal());
+    }
+
+    /**
+     * Member eligibility annotation: every hydrated roster carries the
+     * accumulated-credit flag so the UI can mark ineligible members without a
+     * second request. External members stay {@code null}.
+     */
+    private List<GroupResponse> withEligibility(List<GroupResponse> found) {
+        if (found == null || found.isEmpty()) {
+            return found;
+        }
+        List<String> memberIds = found.stream()
+                .flatMap(group -> group.members().stream())
+                .filter(member -> !member.isExternal())
+                .map(GroupMemberResponse::studentId)
+                .distinct()
+                .toList();
+        if (memberIds.isEmpty()) {
+            return found;
+        }
+        Map<String, Boolean> eligibleByStudent = new LinkedHashMap<>();
+        eligibility.evaluateAll(memberIds)
+                .forEach((id, view) -> eligibleByStudent.put(id, view.eligible()));
+        return found.stream()
+                .map(group -> annotate(group, eligibleByStudent))
+                .toList();
+    }
+
+    private GroupResponse withEligibility(GroupResponse group) {
+        if (group == null) {
+            return null;
+        }
+        List<String> memberIds = group.members().stream()
+                .filter(member -> !member.isExternal())
+                .map(GroupMemberResponse::studentId)
+                .distinct()
+                .toList();
+        if (memberIds.isEmpty()) {
+            return group;
+        }
+        Map<String, Boolean> eligibleByStudent = new LinkedHashMap<>();
+        eligibility.evaluateAll(memberIds)
+                .forEach((id, view) -> eligibleByStudent.put(id, view.eligible()));
+        return annotate(group, eligibleByStudent);
+    }
+
+    private static GroupResponse annotate(
+            GroupResponse group, Map<String, Boolean> eligibleByStudent) {
+        List<GroupMemberResponse> members = group.members().stream()
+                .map(member -> member.isExternal() ? member : new GroupMemberResponse(
+                        member.studentId(), member.studentNumber(), member.displayName(),
+                        member.contact(), member.isExternal(), member.isLeader(),
+                        member.memberOrder(),
+                        eligibleByStudent.getOrDefault(member.studentId(), Boolean.FALSE)))
+                .toList();
+        return new GroupResponse(
+                group.id(), group.roundId(), group.leaderStudentId(), group.topicId(),
+                group.status(), group.approvalStatus(), group.rejectionReason(),
+                group.memberStudentIds(), members, group.approvalWithdrawal());
     }
 
     private GroupResponse supervisedGroup(UUID id, String lecturerId) {

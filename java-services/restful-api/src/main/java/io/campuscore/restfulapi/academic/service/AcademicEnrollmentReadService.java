@@ -30,9 +30,11 @@ import io.campuscore.restfulapi.academic.dto.AcademicEnrollmentReadDtos.UserSumm
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.stream.Collectors;
 import org.springframework.context.annotation.Profile;
 import org.springframework.http.HttpStatus;
@@ -196,9 +198,74 @@ public class AcademicEnrollmentReadService {
         return buildTranscript(prefetched == null ? List.of() : prefetched);
     }
 
+    /**
+     * Cumulative earned credits + weighted 4.0 GPA over the best attempt per
+     * course (retake policy) — the single source of truth other read models
+     * (thesis eligibility, assistant answers) must reuse rather than
+     * re-implement.
+     */
+    private static TranscriptSummary summarizeBestAttempts(List<GradeSummary> grades) {
+        Map<String, GradeSummary> bestAttemptByCourse = new LinkedHashMap<>();
+        for (GradeSummary grade : grades) {
+            String courseKey = grade.courseCode() != null && !grade.courseCode().isBlank()
+                    ? grade.courseCode() : grade.id();
+            GradeSummary existing = bestAttemptByCourse.get(courseKey);
+            if (existing == null || isBetterAttempt(grade, existing)) {
+                bestAttemptByCourse.put(courseKey, grade);
+            }
+        }
+
+        int totalAttempted = 0;
+        int gpaAttempted = 0;
+        int totalEarned = 0;
+        BigDecimal totalPoints = BigDecimal.ZERO;
+        for (GradeSummary best : bestAttemptByCourse.values()) {
+            BigDecimal point = gradePoint(best.letterGrade());
+            if (point != null) {
+                BigDecimal weighted = point.multiply(BigDecimal.valueOf(best.credits()));
+                totalAttempted += best.credits();
+                gpaAttempted += best.credits();
+                totalPoints = totalPoints.add(weighted);
+                if (!"F".equals(best.letterGrade())) {
+                    totalEarned += best.credits();
+                }
+            } else if ("COMPLETED".equals(best.enrollmentStatus())) {
+                totalAttempted += best.credits();
+                totalEarned += best.credits();
+            }
+        }
+        return new TranscriptSummary(
+                gpa(totalPoints, gpaAttempted), totalEarned, totalAttempted, TRANSCRIPT_BASIS_NOTE);
+    }
+
+    /**
+     * Transcript summaries for a roster in ONE published-grade query — the
+     * batch twin of {@link #findStudentTranscript(String)} used by the thesis
+     * eligibility read model so a group roster costs a single round trip.
+     */
+    @Transactional(readOnly = true)
+    public Map<String, TranscriptSummary> findTranscriptSummaries(Collection<String> studentIds) {
+        List<String> ids = studentIds == null ? List.of() : studentIds.stream()
+                .filter(Objects::nonNull)
+                .map(String::trim)
+                .filter(id -> !id.isEmpty())
+                .distinct()
+                .toList();
+        if (ids.isEmpty()) {
+            return Map.of();
+        }
+        Map<String, List<GradeSummaryRow>> rows = academic.findStudentGradeSummariesForStudents(ids);
+        Map<String, TranscriptSummary> summaries = new LinkedHashMap<>();
+        for (String studentId : ids) {
+            List<GradeSummaryRow> studentRows = rows.getOrDefault(studentId, List.of());
+            summaries.put(studentId, summarizeBestAttempts(
+                    studentRows.stream().map(AcademicEnrollmentReadService::gradeSummary).toList()));
+        }
+        return summaries;
+    }
+
     private TranscriptResponse buildTranscript(List<GradeSummary> grades) {
         Map<String, TranscriptAccumulator> bySemester = new LinkedHashMap<>();
-        Map<String, GradeSummary> bestAttemptByCourse = new LinkedHashMap<>();
 
         for (GradeSummary grade : grades) {
             TranscriptAccumulator semester = bySemester.computeIfAbsent(
@@ -222,38 +289,10 @@ public class AcademicEnrollmentReadService {
                 semester.attempted += grade.credits();
                 semester.earned += grade.credits();
             }
-
-            String courseKey = grade.courseCode() != null && !grade.courseCode().isBlank() ? grade.courseCode() : grade.id();
-            GradeSummary existing = bestAttemptByCourse.get(courseKey);
-            if (existing == null || isBetterAttempt(grade, existing)) {
-                bestAttemptByCourse.put(courseKey, grade);
-            }
-        }
-
-        int totalAttempted = 0;
-        int gpaAttempted = 0;
-        int totalEarned = 0;
-        BigDecimal totalPoints = BigDecimal.ZERO;
-
-        for (GradeSummary best : bestAttemptByCourse.values()) {
-            BigDecimal point = gradePoint(best.letterGrade());
-            if (point != null) {
-                BigDecimal weighted = point.multiply(BigDecimal.valueOf(best.credits()));
-                totalAttempted += best.credits();
-                gpaAttempted += best.credits();
-                totalPoints = totalPoints.add(weighted);
-                if (!"F".equals(best.letterGrade())) {
-                    totalEarned += best.credits();
-                }
-            } else if ("COMPLETED".equals(best.enrollmentStatus())) {
-                totalAttempted += best.credits();
-                totalEarned += best.credits();
-            }
         }
 
         return new TranscriptResponse(
-                new TranscriptSummary(
-                        gpa(totalPoints, gpaAttempted), totalEarned, totalAttempted, TRANSCRIPT_BASIS_NOTE),
+                summarizeBestAttempts(grades),
                 bySemester.values().stream().map(TranscriptAccumulator::response).toList());
     }
 

@@ -1,7 +1,8 @@
 package io.campuscore.restfulapi.thesis.dto;
 
-import io.campuscore.restfulapi.thesis.model.RoundStatus;
 import io.campuscore.restfulapi.thesis.entity.ThesisRegistrationRound;
+import io.campuscore.restfulapi.thesis.model.EligibilityView;
+import io.campuscore.restfulapi.thesis.model.RoundStatus;
 import java.time.Instant;
 import java.util.UUID;
 
@@ -100,15 +101,29 @@ public final class ThesisRoundDtos {
              * missing-member state without a client-side constant.
              */
             int minGroupSize,
-            int maxGroupSize) {
+            int maxGroupSize,
+            /**
+             * Caller-scoped registration eligibility: populated only for
+             * student callers so the thesis page can render the eligibility
+             * card without a second request. Null for staff/governance callers.
+             */
+            EligibilityView eligibility) {
 
         public static RoundResponse from(ThesisRegistrationRound round) {
-            return from(round, null, null, false, 0, 0);
+            return from(round, null, null, false, 0, 0, null);
         }
 
         public static RoundResponse from(ThesisRegistrationRound round, RoundDeletionInfo deletion,
                 RoundClosureInfo closure,
                 boolean counterReviewWaiverAllowed, int minGroupSize, int maxGroupSize) {
+            return from(round, deletion, closure, counterReviewWaiverAllowed,
+                    minGroupSize, maxGroupSize, null);
+        }
+
+        public static RoundResponse from(ThesisRegistrationRound round, RoundDeletionInfo deletion,
+                RoundClosureInfo closure,
+                boolean counterReviewWaiverAllowed, int minGroupSize, int maxGroupSize,
+                EligibilityView eligibility) {
             return new RoundResponse(
                     round.getId(), round.getName(), round.getThesisType(),
                     round.getLecturerSubmitStart(), round.getLecturerSubmitEnd(),
@@ -116,7 +131,7 @@ public final class ThesisRoundDtos {
                     round.getGvpbDeadline(), round.getReportDeadline(), round.getProposalPublishAt(),
                     round.getReportDate(), round.getDefenseDate(), round.getStatus(),
                     round.getCancelledFromStatus(), deletion, closure, counterReviewWaiverAllowed,
-                    minGroupSize, maxGroupSize);
+                    minGroupSize, maxGroupSize, eligibility);
         }
     }
 }

@@ -27,6 +27,22 @@ export type ThesisGroupStatus =
   'DRAFT' | 'ASSIGNED' | 'SUBMITTED' | 'APPROVED' | 'REJECTED' | 'COMPLETED' | 'CANCELLED';
 export type ThesisApprovalStatus = 'PENDING' | 'APPROVED' | 'REJECTED';
 
+/**
+ * The regulation's registration condition evaluated against the caller's
+ * published transcript: accumulated credits and cumulative GPA (4.0 scale),
+ * plus machine-readable blocking reasons (INSUFFICIENT_CREDITS, LOW_GPA,
+ * ACADEMIC_DATA_UNAVAILABLE). Populated on round responses for student
+ * callers only.
+ */
+export interface ThesisEligibility {
+  eligible: boolean;
+  earnedCredits: number;
+  requiredCredits: number;
+  cpa?: number | null;
+  requiredCpa: number;
+  reasons: string[];
+}
+
 export interface ThesisRound {
   id: string;
   name: string;
@@ -65,6 +81,9 @@ export interface ThesisRound {
    * the missing-member hint rather than guessing a number. */
   minGroupSize?: number;
   maxGroupSize?: number;
+  /** Caller-scoped registration eligibility; present only for student
+   * callers. */
+  eligibility?: ThesisEligibility | null;
 }
 
 export interface ThesisRoundDeletionInfo {
@@ -455,6 +474,9 @@ export interface ThesisGroupMember {
   isExternal?: boolean;
   isLeader?: boolean;
   memberOrder?: number;
+  /** Credit/CPA eligibility flag; false renders a warning chip, null/absent
+   * means external member or a backend without the eligibility service. */
+  eligible?: boolean | null;
 }
 
 export interface ThesisGroup {

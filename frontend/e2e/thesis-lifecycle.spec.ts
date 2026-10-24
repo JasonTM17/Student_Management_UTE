@@ -647,3 +647,59 @@ test('stages 2-9: proposal through published results and reporting', async ({ pa
     expect(actions2, `audit contains ${expected}`).toContain(expected);
   }
 });
+
+test('credit ineligibility shows the warning card and blocks registration', async ({ page }) => {
+  const stamp = Date.now().toString(36);
+  const name = `Eligibility ${stamp}`;
+
+  // A live REGISTRATION_OPEN round for the probes below.
+  await login(page, ADMIN.email, ADMIN.password);
+  const createRes = await api(page, 'POST', '/thesis/rounds', roundPayload(name, 14));
+  expect(createRes.status(), 'round creation').toBe(200);
+  const round = await createRes.json();
+  for (const step of ['open-proposals', 'publish-proposals']) {
+    const res = await api(page, 'POST', `/thesis/rounds/${round.id}/${step}`);
+    expect(res.status(), `transition ${step}`).toBe(200);
+  }
+  const amendRes = await api(page, 'PUT', `/thesis/rounds/${round.id}`,
+    compressWindows(roundPayload(name, 14), 'registration'));
+  expect(amendRes.status(), 'schedule amendment').toBe(200);
+  const openRes = await api(page, 'POST', `/thesis/rounds/${round.id}/open-registration`);
+  expect(openRes.status(), 'open registration').toBe(200);
+
+  // V143 leaves student-profile below the accumulated-credit bar; the seeded
+  // trio (058/059/team-004) is eligible, so the refusal is credit-driven.
+  // The API refuses login-while-authenticated, so the admin session leaves
+  // first — the same clear-cookie dance tokenFor does for bearer mints.
+  await page.context().clearCookies();
+  await login(page, STUDENT.email, STUDENT.password);
+  const roundsRes = await api(page, 'GET', '/thesis/rounds');
+  expect(roundsRes.status(), 'student reads rounds').toBe(200);
+  const rounds = await roundsRes.json() as Array<{ id: string; eligibility?: { eligible: boolean; earnedCredits: number; requiredCredits: number } }>;
+  const mine = rounds.find((r) => r.id === round.id);
+  expect(mine?.eligibility, 'round carries the caller eligibility').toBeTruthy();
+  expect(mine?.eligibility?.eligible, 'seeded student is ineligible').toBe(false);
+  expect(mine?.eligibility?.earnedCredits).toBeLessThan(mine?.eligibility?.requiredCredits ?? 0);
+
+  const refused = await api(page, 'POST', '/thesis/groups', { roundId: round.id });
+  expect(refused.status(), 'ineligible create refused').toBe(409);
+  const refusedBody = await refused.json();
+  expect(refusedBody.code).toBe('THESIS_ELIGIBILITY_NOT_MET');
+  expect(refusedBody.details?.reasons).toContain('INSUFFICIENT_CREDITS');
+
+  // The page surfaces the same state as a warning card for the round.
+  await page.goto(`/en/dashboard/thesis?roundId=${round.id}`);
+  await expect(
+    page.getByText(/not eligible yet|chưa đủ điều kiện/i).first(),
+  ).toBeVisible({ timeout: 30_000 });
+  await expect(
+    page.getByRole('button', { name: /create a thesis group|tạo nhóm đề tài/i }),
+  ).toHaveCount(0);
+
+  // An eligible demo student still registers (the seeded trio carries 110+).
+  const leaderToken = await tokenFor(page, LEADER.email, LEADER.password);
+  const leaderRounds = await apiAs(page, leaderToken, 'GET', '/thesis/rounds');
+  const leaderView = ((await leaderRounds.json()) as typeof rounds)
+    .find((r) => r.id === round.id);
+  expect(leaderView?.eligibility?.eligible, 'seeded trio stays eligible').toBe(true);
+});

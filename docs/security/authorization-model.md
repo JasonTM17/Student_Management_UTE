@@ -201,6 +201,13 @@ retroactively identify password changes made before the revision existed.
   round row lock; closing while the results-retract grace window is still
   open is refused (`409 RETRACT_WINDOW_OPEN`) so a lawful retract is never
   silently blocked.
+- **Thesis registration eligibility** is an academic precondition, not an
+  authorization rule: any authenticated student caller may register only when
+  their published transcript meets `thesis.eligibility.min-credits` (110) and
+  `thesis.eligibility.min-cpa` (2.0). Refusals answer
+  `409 THESIS_ELIGIBILITY_NOT_MET` with numeric `details`; governance roster
+  overrides stay reachable to the same privileged roles and audit the
+  ineligibility. `ADVISORY` mode reports without blocking.
 
 ## Signing configuration
 
