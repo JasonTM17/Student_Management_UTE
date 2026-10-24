@@ -152,6 +152,140 @@ class ArchitectureGuardTest {
                 () -> "filters constructing error bodies outside the error writer: " + violations);
     }
 
+    /** Public/protected nested types in layered classes that may legitimately stay (reason required). */
+    private static final Map<String, List<String>> SIGNATURE_NESTED_TYPE_EXCEPTIONS = Map.of();
+
+    /** dto classes that legitimately referenced a domain type before model/ packages existed. */
+    private static final Map<String, List<String>> DTO_TO_DOMAIN_EXCEPTIONS = Map.of(
+            "thesis/dto/ThesisDeanOverviewDtos", List.of("uses thesis.domain status enums"),
+            "thesis/dto/ThesisGroupReadDtos", List.of("uses thesis.domain status enums"),
+            "thesis/dto/ThesisMutationDtos", List.of("uses thesis.domain status enums"),
+            "thesis/dto/ThesisRoundDtos", List.of("uses thesis.domain round vocabulary"),
+            "thesis/dto/ThesisTopicDtos", List.of("uses thesis.domain topic vocabulary"),
+            "engagement/dto/ArticleTaxonomyDtos", List.of("uses engagement.domain article entities"));
+
+    @Test
+    void layeredClassesDoNotDeclarePublicNestedDataTypesInSignatures() throws Exception {
+        List<String> violations = new java.util.ArrayList<>();
+        for (ScannedClass c : scan()) {
+            if (!inLayer(c, "repository") && !inLayer(c, "service")
+                    && !inLayer(c, "controller") && !inLayer(c, "job") && !inLayer(c, "client")) {
+                continue;
+            }
+            Class<?> owner;
+            try {
+                owner = Class.forName(ROOT.replace('/', '.') + "." + c.binaryName().replace('/', '.'),
+                        false, ArchitectureGuardTest.class.getClassLoader());
+            } catch (ClassNotFoundException | NoClassDefFoundError e) {
+                violations.add(c.binaryName() + " could not be loaded for nested-type inspection");
+                continue;
+            }
+            for (Class<?> nested : owner.getDeclaredClasses()) {
+                int mod = nested.getModifiers();
+                if (!java.lang.reflect.Modifier.isPublic(mod) && !java.lang.reflect.Modifier.isProtected(mod)) {
+                    continue;
+                }
+                if (!appearsInSignature(owner, nested)) {
+                    continue;
+                }
+                String key = c.binaryName() + "$" + nested.getSimpleName();
+                if (!SIGNATURE_NESTED_TYPE_EXCEPTIONS.containsKey(key)) {
+                    violations.add(key + " (declared inside " + c.binaryName() + ")");
+                }
+            }
+        }
+        assertTrue(violations.isEmpty(),
+                () -> "public/protected nested types in layered classes: " + violations);
+    }
+
+    @Test
+    void modelAndDomainPackagesDoNotDependOnLayerPackages() throws Exception {
+        List<String> violations = scan().stream()
+                .filter(c -> inLayer(c, "model") || inLayer(c, "domain") || inLayer(c, "entity"))
+                .filter(c -> references(c, "/repository/") || references(c, "/service/")
+                        || references(c, "/controller/"))
+                .map(ScannedClass::binaryName)
+                .toList();
+        assertTrue(violations.isEmpty(),
+                () -> "model/domain/entity classes depending on layered packages: " + violations);
+    }
+
+    @Test
+    void dtoPackagesDoNotDependOnModelPackages() throws Exception {
+        List<String> violations = scan().stream()
+                .filter(c -> inLayer(c, "dto"))
+                .filter(c -> !DTO_TO_DOMAIN_EXCEPTIONS.containsKey(c.binaryName()))
+                .filter(c -> references(c, "/model/") || references(c, "/domain/") || references(c, "/entity/"))
+                .map(ScannedClass::binaryName)
+                .toList();
+        assertTrue(violations.isEmpty(),
+                () -> "dto classes depending on model/domain packages: " + violations);
+    }
+
+    private static boolean appearsInSignature(Class<?> owner, Class<?> nested) {
+        for (java.lang.reflect.Method m : owner.getDeclaredMethods()) {
+            if (mentions(m.getGenericReturnType(), nested)) {
+                return true;
+            }
+            for (java.lang.reflect.Type p : m.getGenericParameterTypes()) {
+                if (mentions(p, nested)) {
+                    return true;
+                }
+            }
+        }
+        for (java.lang.reflect.Constructor<?> c : owner.getDeclaredConstructors()) {
+            for (java.lang.reflect.Type p : c.getGenericParameterTypes()) {
+                if (mentions(p, nested)) {
+                    return true;
+                }
+            }
+        }
+        for (java.lang.reflect.Field f : owner.getDeclaredFields()) {
+            if (mentions(f.getGenericType(), nested)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static boolean mentions(java.lang.reflect.Type type, Class<?> target) {
+        if (type == null) {
+            return false;
+        }
+        if (type.equals(target)) {
+            return true;
+        }
+        if (type instanceof java.lang.reflect.ParameterizedType pt) {
+            if (mentions(pt.getRawType(), target)) {
+                return true;
+            }
+            for (java.lang.reflect.Type arg : pt.getActualTypeArguments()) {
+                if (mentions(arg, target)) {
+                    return true;
+                }
+            }
+        }
+        if (type instanceof java.lang.reflect.GenericArrayType at) {
+            return mentions(at.getGenericComponentType(), target);
+        }
+        if (type instanceof java.lang.reflect.WildcardType wt) {
+            for (java.lang.reflect.Type b : wt.getUpperBounds()) {
+                if (mentions(b, target)) {
+                    return true;
+                }
+            }
+            for (java.lang.reflect.Type b : wt.getLowerBounds()) {
+                if (mentions(b, target)) {
+                    return true;
+                }
+            }
+        }
+        if (type instanceof Class<?> cls && cls.isArray()) {
+            return mentions(cls.getComponentType(), target);
+        }
+        return false;
+    }
+
     private static boolean inExceptionHandlerPackage(ScannedClass c) {
         String pkg = c.packagePath();
         return pkg.endsWith("exception/handler") || pkg.contains("exception/handler/");
