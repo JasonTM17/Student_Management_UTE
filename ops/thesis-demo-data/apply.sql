@@ -34,16 +34,25 @@
 -- writes its audit row last). SHARE ROW EXCLUSIVE is the weakest level that
 -- blocks application INSERT/UPDATE/DELETE (ROW EXCLUSIVE) and serializes two
 -- concurrent package runs, while plain reads stay untouched. That removes
--- every check-then-act window between the guard and the writes. The locks are
--- held until COMMIT; the script is short (sub-second on a local connection, a
--- few seconds over a remote one), so that is also the longest an application
--- write can ever wait behind it. Every lock is requested with NOWAIT: the
--- package never queues behind an application write or an autovacuum/ANALYZE
--- worker, so it can never be half a wait-for cycle — no deadlock can form and
--- the application transaction is never killed. The package aborts cleanly
--- instead; run.mjs retries the whole script a bounded number of times with
--- jitter, each attempt a fresh transaction, so no lock is ever held while the
--- runner waits. Run it in a quiet maintenance window, exactly like rollback.
+-- every check-then-act window between the guard and the writes. Right after
+-- the table locks the script takes the ROW locks its writes need — FOR UPDATE
+-- NOWAIT on the baseline rounds/topics/councils it updates or key-shares and
+-- on the out-of-package FK parents its inserts touch — so a locked row fails
+-- fast instead of queueing behind an application write (a queued row wait is
+-- what once let the application transaction become the deadlock victim). The
+-- locks are held until COMMIT; the script is short (sub-second on a local
+-- connection, a few seconds over a remote one), so that is also the longest an
+-- application write can ever wait behind it. EVERY lock — table and row — is
+-- requested with NOWAIT, so the whole lock phase waits 0 ms, strictly below
+-- the application's 1 s deadlock_timeout; lock_timeout stays pinned at 300 ms
+-- as the backstop for any implicit wait elsewhere, and the script verifies
+-- that pin itself below. A conflicting lock aborts the package cleanly with a
+-- retryable error; run.mjs retries the whole script a bounded number of times
+-- with jitter, each attempt a fresh transaction, so no lock is ever held
+-- while the runner waits. The package never queues on a lock, so it is never
+-- half of a wait-for cycle — it is always the transaction that loses. The
+-- application can still lose only if its writes are left running against the
+-- apply window: keep them paused for the few seconds the script takes.
 
 BEGIN;
 
@@ -77,6 +86,20 @@ BEGIN
   END IF;
 END $$;
 
+-- verify the lock_timeout pin actually held: the lock phase below is
+-- NOWAIT-only, so its total wait is 0 ms — strictly below the application's
+-- 1 s deadlock_timeout; this 300 ms setting is the backstop for any implicit
+-- wait elsewhere. If a startup setting (psqlrc, PGOPTIONS, ALTER ROLE or
+-- ALTER DATABASE) overrode it, refuse rather than run with a longer wait.
+DO $$
+BEGIN
+  IF current_setting('lock_timeout') <> '300ms' THEN
+    RAISE EXCEPTION 'apply aborted: lock_timeout is %, expected 300ms — the script pins it strictly below the application deadlock_timeout; nothing was changed',
+      current_setting('lock_timeout')
+      USING ERRCODE = '22000', CONSTRAINT = 'thesis_demo_apply_lock_timeout';
+  END IF;
+END $$;
+
 -- locks in the application's own write order: thesis business tables first,
 -- the hot app-wide notification and audit tables last. NOWAIT: the package
 -- never waits for a lock, so it can never be one edge of a deadlock cycle —
@@ -91,6 +114,78 @@ BEGIN
          || ' campuscore_audit."AdminAudit" IN SHARE ROW EXCLUSIVE MODE NOWAIT';
   EXCEPTION WHEN lock_not_available THEN
     RAISE EXCEPTION 'apply aborted: a package table is locked (an application write or an autovacuum/analyze worker holds it) — nothing was changed, retry when the database is idle'
+      USING ERRCODE = '55P03', CONSTRAINT = 'thesis_demo_apply_lock';
+  END;
+END $$;
+
+-- row locks up front, NOWAIT like the table locks — one statement per table,
+-- in the application's write order (thesis parents first, the out-of-package
+-- FK parents last): the five baseline rounds the inserts key-share (three of
+-- them are also the guarded results_published_at UPDATEs), the six baseline
+-- topics (four written by the gvpb UPDATEs, all six key-shared), the two
+-- reused councils, then the 65 notification recipients and the 12 council
+-- lecturers the inserts key-share in campuscore_auth/academic. A row held by
+-- an application transaction fails instantly with the same retryable lock
+-- error — without these, the first writes below would queue on row locks one
+-- statement at a time and a queued wait can outlive the application's
+-- deadlock_timeout, which is exactly how the application was once chosen as
+-- the deadlock victim.
+DO $$
+BEGIN
+  BEGIN
+    PERFORM 1 FROM thesis.thesis_registration_round
+     WHERE id IN ('22d65ee6-f485-40ae-a66b-528d35007745',
+                  'b35e9ff1-1eb8-4e73-812e-04e1a66041f1',
+                  'bad8eba0-2d12-4414-8aab-7424174b3b97',
+                  'be1aa853-f153-4f2e-a5cb-ed1b6c3c1bf1',
+                  'c8f1a234-9b7e-412d-8301-1b2c3d4e5f60')
+     ORDER BY id FOR UPDATE NOWAIT;
+    PERFORM 1 FROM thesis.thesis_topic
+     WHERE id IN ('018f4a7c-3b12-4d90-a5e1-7c82b9045001',
+                  '33622854-38c4-4c3f-a7eb-bab11d2ff421',
+                  '67c74df5-5c7f-4e74-aa02-d51af7207fe9',
+                  '6f64670b-cd6b-4e1b-ae9d-0b497f2472a8',
+                  'd1f6f12b-62c7-4f60-a9c9-49a3e122c765',
+                  'f580eadf-fffb-4db2-a7d8-423e83934dc2')
+     ORDER BY id FOR UPDATE NOWAIT;
+    PERFORM 1 FROM thesis.thesis_council
+     WHERE id IN ('274ce36d-b5b0-4afa-bd33-19eb6b0095ca',
+                  '7ea8f499-949e-42c2-b11e-02be39b8ec52')
+     ORDER BY id FOR UPDATE NOWAIT;
+    PERFORM 1 FROM campuscore_auth."User"
+     WHERE id IN ('lecturer-user-014','lecturer-user-026','lecturer-user-027',
+                  'lecturer-user-028','lecturer-user-029','lecturer-user-030',
+                  'student-user-021','student-user-022','student-user-023',
+                  'student-user-024','student-user-025','student-user-026',
+                  'student-user-027','student-user-028','student-user-029',
+                  'student-user-030','student-user-109','student-user-110',
+                  'student-user-120','student-user-136','student-user-137',
+                  'student-user-138','student-user-139','student-user-140',
+                  'student-user-153','student-user-154','student-user-155',
+                  'student-user-157','student-user-158','student-user-159',
+                  'student-user-160','student-user-161','student-user-162',
+                  'student-user-163','student-user-164','student-user-165',
+                  'student-user-166','student-user-167','student-user-168',
+                  'student-user-169','student-user-170','student-user-171',
+                  'student-user-172','student-user-175','student-user-176',
+                  'student-user-177','student-user-178','student-user-179',
+                  'student-user-180','student-user-181','student-user-182',
+                  'student-user-183','student-user-184','student-user-185',
+                  'student-user-186','student-user-187','student-user-189',
+                  'student-user-190','student-user-191','student-user-192',
+                  'student-user-196','student-user-197','student-user-198',
+                  'student-user-199','truongkhoa-user-001')
+     ORDER BY id FOR UPDATE NOWAIT;
+    PERFORM 1 FROM academic."Lecturer"
+     WHERE id IN ('lecturer-profile-002','lecturer-profile-003',
+                  'lecturer-profile-004','lecturer-profile-005',
+                  'lecturer-profile-011','lecturer-profile-023',
+                  'lecturer-profile-024','lecturer-profile-026',
+                  'lecturer-profile-027','lecturer-profile-028',
+                  'lecturer-profile-029','lecturer-profile-030')
+     ORDER BY id FOR UPDATE NOWAIT;
+  EXCEPTION WHEN lock_not_available THEN
+    RAISE EXCEPTION 'apply aborted: a row the package must write is locked by another transaction — nothing was changed, retry when the database is idle'
       USING ERRCODE = '55P03', CONSTRAINT = 'thesis_demo_apply_lock';
   END;
 END $$;

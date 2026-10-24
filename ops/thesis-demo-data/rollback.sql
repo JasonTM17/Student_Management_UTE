@@ -13,22 +13,36 @@
 --      first (the app writes them first), then any FK-referencing tables the
 --      preflight discovers, and only then — LAST — the hot app-wide tables
 --      notifications.notification and campuscore_audit."AdminAudit" (the app
---      writes its notification/audit rows last). Every lock is requested
---      with NOWAIT: the package never queues on a lock, so it can never be
---      half of a wait-for cycle — no deadlock can form, the package is always
---      the transaction that loses (instantly), and the application
---      transaction is never killed. run.mjs retries the whole script a
---      bounded number of times with jitter; each retry is a fresh transaction
---      and no lock is held while the runner waits. The locks are held only
---      until COMMIT — sub-second on a local connection, a few seconds
---      worst-case over a remote one.
+--      writes its notification/audit rows last). Right after the table locks
+--      the script takes the ROW locks its writes need — FOR UPDATE NOWAIT on
+--      the seven guarded baseline rows the restore UPDATEs touch and on every
+--      marker row it deletes — so a locked row fails fast instead of queueing
+--      behind an application write (a queued row wait is what once let the
+--      application transaction become the deadlock victim). Every lock —
+--      table and row — is requested with NOWAIT: the whole lock phase waits
+--      0 ms, strictly below the application's 1 s deadlock_timeout; the
+--      package never queues on a lock, so it can never be half of a wait-for
+--      cycle — no deadlock can form and the package is always the
+--      transaction that loses (instantly). lock_timeout stays pinned at
+--      300 ms as the backstop for any implicit wait, and the script verifies
+--      that pin itself below. run.mjs retries the whole script a bounded
+--      number of times with jitter; each retry is a fresh transaction and no
+--      lock is held while the runner waits. The locks are held only until
+--      COMMIT — sub-second on a local connection, a few seconds worst-case
+--      over a remote one. The application can still lose only if its writes
+--      are left running against the window: keep them paused.
 --   2) PREFLIGHT (re-checked only after the locks are held, so a committed
 --      write is always seen and an in-flight write can never slip under us):
 --      enumerate every foreign key into ALL eleven package tables straight
 --      from pg_constraint, recursively following ON DELETE CASCADE edges so
 --      a future grandchild table is covered too, and compare the result with
---      the reviewed inventory — the known nine-key set printed below; any
---      drift aborts the run. Then lock any referencing table not already
+--      the reviewed inventory — the known nine-key set printed below, matched
+--      as a multiset of full child/parent column lists plus the delete rule
+--      (a duplicated or composite-column FK counts as drift, not a set
+--      match); any drift aborts the run. DELETE-capable triggers on the
+--      package tables are checked against the reviewed set of four the same
+--      way — an unreviewed AFTER DELETE could remove application rows while
+--      the marker deletes run. Then lock any referencing table not already
 --      covered and count the rows the delete would cascade through plus the
 --      rows that pin a doomed parent (matched by ctid, never by an assumed
 --      id column) — plus non-marker counter-review scores on the guarded
@@ -86,6 +100,20 @@ BEGIN
     RAISE EXCEPTION 'rollback aborted: client_encoding=% server_encoding=% — UTF8 is required end-to-end; nothing was changed',
       current_setting('client_encoding'), current_setting('server_encoding')
       USING ERRCODE = '22000', CONSTRAINT = 'thesis_demo_rollback_encoding';
+  END IF;
+END $$;
+
+-- verify the lock_timeout pin actually held: the lock phase below is
+-- NOWAIT-only, so its total wait is 0 ms — strictly below the application's
+-- 1 s deadlock_timeout; this 300 ms setting is the backstop for any implicit
+-- wait elsewhere. If a startup setting (psqlrc, PGOPTIONS, ALTER ROLE or
+-- ALTER DATABASE) overrode it, refuse rather than run with a longer wait.
+DO $$
+BEGIN
+  IF current_setting('lock_timeout') <> '300ms' THEN
+    RAISE EXCEPTION 'rollback aborted: lock_timeout is %, expected 300ms — the script pins it strictly below the application deadlock_timeout; nothing was changed',
+      current_setting('lock_timeout')
+      USING ERRCODE = '22000', CONSTRAINT = 'thesis_demo_rollback_lock_timeout';
   END IF;
 END $$;
 
@@ -154,8 +182,9 @@ uniq AS (SELECT conoid, min(depth) AS depth FROM reach GROUP BY conoid)
 SELECT con.conname, cn.nspname AS sch, cls.relname AS tbl,
        att.attname AS col, pn.nspname AS psch, pcl.relname AS ptbl,
        patt.attname AS pcol, con.confdeltype AS del, uniq.depth,
-       cn.nspname || '.' || cls.relname || '.' || att.attname || '>'
-       || pn.nspname || '.' || pcl.relname || '(' || con.confdeltype::text || ')' AS key
+       cn.nspname || '.' || cls.relname || '.(' || cols.list || ')>'
+       || pn.nspname || '.' || pcl.relname || '.(' || pcols.list || ')'
+       || '[' || con.confdeltype::text || ']' AS key
   FROM uniq
   JOIN pg_constraint con ON con.oid = uniq.conoid
   JOIN pg_class cls ON cls.oid = con.conrelid
@@ -163,23 +192,31 @@ SELECT con.conname, cn.nspname AS sch, cls.relname AS tbl,
   JOIN pg_class pcl ON pcl.oid = con.confrelid
   JOIN pg_namespace pn ON pn.oid = pcl.relnamespace
   JOIN pg_attribute att ON att.attrelid = con.conrelid AND att.attnum = con.conkey[1]
-  JOIN pg_attribute patt ON patt.attrelid = con.confrelid AND patt.attnum = con.confkey[1];
+  JOIN pg_attribute patt ON patt.attrelid = con.confrelid AND patt.attnum = con.confkey[1]
+  CROSS JOIN LATERAL (SELECT string_agg(a.attname, ',' ORDER BY u.ord) AS list
+                        FROM unnest(con.conkey) WITH ORDINALITY u(attnum, ord)
+                        JOIN pg_attribute a ON a.attrelid = con.conrelid AND a.attnum = u.attnum) cols
+  CROSS JOIN LATERAL (SELECT string_agg(a.attname, ',' ORDER BY u.ord) AS list
+                        FROM unnest(con.confkey) WITH ORDINALITY u(attnum, ord)
+                        JOIN pg_attribute a ON a.attrelid = con.confrelid AND a.attnum = u.attnum) pcols;
 
 -- the reviewed inventory (flyway-142 fixture): exactly these nine
--- single-column foreign keys reference the package tables. Any drift — a new
--- referencing table, a composite key, a changed delete action — means the
--- schema moved since this script was reviewed; refuse rather than count.
+-- single-column foreign keys reference the package tables. The comparison is
+-- a multiset over full child/parent column lists plus the delete rule: a
+-- duplicated constraint, a composite replacement, or a changed delete action
+-- all mean the schema moved since this script was reviewed — refuse rather
+-- than count.
 CREATE TEMP TABLE _fk_expected (key text) ON COMMIT DROP;
 INSERT INTO _fk_expected VALUES
-  ('thesis.thesis_council_member.council_id>thesis.thesis_council(c)'),
-  ('thesis.thesis_council_topic.council_id>thesis.thesis_council(c)'),
-  ('thesis.thesis_council_topic.topic_id>thesis.thesis_topic(c)'),
-  ('thesis.thesis_group_member.group_id>thesis.thesis_group(c)'),
-  ('thesis.thesis_group_report.group_id>thesis.thesis_group(r)'),
-  ('thesis.thesis_group.topic_id>thesis.thesis_topic(a)'),
-  ('thesis.thesis_topic_score.council_id>thesis.thesis_council(c)'),
-  ('thesis.thesis_topic_score.topic_id>thesis.thesis_topic(c)'),
-  ('thesis.thesis_topic_supervisor.topic_id>thesis.thesis_topic(c)');
+  ('thesis.thesis_council_member.(council_id)>thesis.thesis_council.(id)[c]'),
+  ('thesis.thesis_council_topic.(council_id)>thesis.thesis_council.(id)[c]'),
+  ('thesis.thesis_council_topic.(topic_id)>thesis.thesis_topic.(id)[c]'),
+  ('thesis.thesis_group_member.(group_id)>thesis.thesis_group.(id)[c]'),
+  ('thesis.thesis_group_report.(group_id)>thesis.thesis_group.(id)[r]'),
+  ('thesis.thesis_group.(topic_id)>thesis.thesis_topic.(id)[a]'),
+  ('thesis.thesis_topic_score.(council_id)>thesis.thesis_council.(id)[c]'),
+  ('thesis.thesis_topic_score.(topic_id)>thesis.thesis_topic.(id)[c]'),
+  ('thesis.thesis_topic_supervisor.(topic_id)>thesis.thesis_topic.(id)[c]');
 
 DO $$
 DECLARE
@@ -189,12 +226,48 @@ BEGIN
   RAISE NOTICE 'fk inventory into the package tables: %',
     coalesce((SELECT string_agg(key, ', ' ORDER BY key) FROM _fk_refs), '-');
   SELECT string_agg(key, ', ' ORDER BY key) INTO v_missing
-    FROM (SELECT key FROM _fk_expected EXCEPT SELECT key FROM _fk_refs) d(key);
+    FROM (SELECT key FROM _fk_expected EXCEPT ALL SELECT key FROM _fk_refs) d(key);
   SELECT string_agg(key, ', ' ORDER BY key) INTO v_extra
-    FROM (SELECT key FROM _fk_refs EXCEPT SELECT key FROM _fk_expected) d(key);
+    FROM (SELECT key FROM _fk_refs EXCEPT ALL SELECT key FROM _fk_expected) d(key);
   IF v_missing IS NOT NULL OR v_extra IS NOT NULL THEN
     RAISE EXCEPTION 'rollback aborted: the foreign-key inventory into the package tables changed since this script was reviewed (expected % keys; missing: %; unexpected: %) — re-run the FK inventory preflight from the README and re-review the package before rolling back; nothing was changed',
       (SELECT count(*) FROM _fk_expected), coalesce(v_missing, '-'), coalesce(v_extra, '-')
+      USING ERRCODE = '23503', CONSTRAINT = 'thesis_demo_rollback_preflight';
+  END IF;
+END $$;
+
+-- delete-capable triggers on the package tables, checked against the
+-- reviewed set — the FK inventory alone says nothing about what a delete
+-- fires. The reviewed schema has exactly four DELETE-capable triggers, and
+-- none of them deletes rows: three AFTER-row triggers — the
+-- guard_legacy_group_size_exception on thesis.thesis_group (raises on
+-- deleting a flagged legacy group) and derive_group_member_active_
+-- participation plus guard_legacy_group_size_roster on thesis_group_member
+-- (both maintain/validate roster state) — and the BEFORE-row
+-- enforce_group_membership_state on thesis_group_member. Anything beyond
+-- them — an AFTER DELETE that removes application rows mid-rollback, or a
+-- BEFORE DELETE that swallows a marker delete — changes what step 6 does;
+-- refuse rather than discover it halfway through.
+DO $$
+BEGIN
+  IF EXISTS (
+    SELECT 1
+      FROM pg_trigger t
+      JOIN pg_class c ON c.oid = t.tgrelid
+      JOIN pg_namespace n ON n.oid = c.relnamespace
+     WHERE NOT t.tgisinternal
+       AND (t.tgtype & 8) <> 0
+       AND n.nspname || '.' || c.relname IN (
+         'thesis.thesis_council','thesis.thesis_council_member','thesis.thesis_council_topic',
+         'thesis.thesis_group','thesis.thesis_group_member','thesis.thesis_group_report',
+         'thesis.thesis_registration_round','thesis.thesis_topic','thesis.thesis_topic_score',
+         'thesis.thesis_topic_supervisor','notifications.notification','campuscore_audit.AdminAudit')
+       AND (n.nspname, c.relname, t.tgname) NOT IN (
+         ('thesis','thesis_group','thesis_legacy_group_size_marker'),
+         ('thesis','thesis_group_member','thesis_group_member_active_participation'),
+         ('thesis','thesis_group_member','thesis_group_member_legacy_size_read_only'),
+         ('thesis','thesis_group_member','thesis_group_membership_state_member'))) THEN
+    RAISE EXCEPTION 'rollback aborted: a DELETE-capable trigger exists on a package table beyond the reviewed set (thesis.thesis_group/thesis_legacy_group_size_marker, thesis.thesis_group_member/thesis_group_member_active_participation, thesis.thesis_group_member/thesis_group_member_legacy_size_read_only, thesis.thesis_group_member/thesis_group_membership_state_member) — the schema moved since this script was reviewed; nothing was deleted'
       USING ERRCODE = '23503', CONSTRAINT = 'thesis_demo_rollback_preflight';
   END IF;
 END $$;
@@ -345,6 +418,42 @@ BEGIN
     EXECUTE 'LOCK TABLE notifications.notification, campuscore_audit."AdminAudit" IN SHARE ROW EXCLUSIVE MODE NOWAIT';
   EXCEPTION WHEN lock_not_available THEN
     RAISE EXCEPTION 'rollback aborted: an audit/notification table is locked (an application write or an autovacuum/analyze worker holds it) — nothing was changed, retry when the database is idle'
+      USING ERRCODE = '55P03', CONSTRAINT = 'thesis_demo_rollback_lock';
+  END;
+END $$;
+
+-- row locks up front, NOWAIT like the table locks — one statement per table:
+-- the seven guarded baseline rows the restore UPDATEs touch (three rounds,
+-- four topics), then every marker row the delete removes, in the same
+-- write-order table sequence as apply (the audit image row demo-th-audit-000
+-- included — it is deleted unconditionally). A row held by an application
+-- transaction fails instantly with the same retryable lock error — without
+-- these, the restore UPDATEs and marker deletes below would queue on row
+-- locks a statement at a time, and a queued wait can outlive the
+-- application's deadlock_timeout, which is exactly how the application was
+-- once chosen as the deadlock victim.
+DO $$
+DECLARE r record;
+BEGIN
+  BEGIN
+    PERFORM 1 FROM thesis.thesis_registration_round
+     WHERE id IN ('b35e9ff1-1eb8-4e73-812e-04e1a66041f1',
+                  'bad8eba0-2d12-4414-8aab-7424174b3b97',
+                  'be1aa853-f153-4f2e-a5cb-ed1b6c3c1bf1')
+     ORDER BY id FOR UPDATE NOWAIT;
+    PERFORM 1 FROM thesis.thesis_topic
+     WHERE id IN ('018f4a7c-3b12-4d90-a5e1-7c82b9045001',
+                  '67c74df5-5c7f-4e74-aa02-d51af7207fe9',
+                  '6f64670b-cd6b-4e1b-ae9d-0b497f2472a8',
+                  'f580eadf-fffb-4db2-a7d8-423e83934dc2')
+     ORDER BY id FOR UPDATE NOWAIT;
+    FOR r IN SELECT tbl, pred FROM _tables LOOP
+      EXECUTE format('SELECT ctid FROM %s t WHERE %s ORDER BY ctid FOR UPDATE NOWAIT',
+                     r.tbl, r.pred);
+    END LOOP;
+    EXECUTE 'SELECT ctid FROM campuscore_audit."AdminAudit" t WHERE id = ''demo-th-audit-000'' FOR UPDATE NOWAIT';
+  EXCEPTION WHEN lock_not_available THEN
+    RAISE EXCEPTION 'rollback aborted: a row the package must write is locked by another transaction — nothing was changed, retry when the database is idle'
       USING ERRCODE = '55P03', CONSTRAINT = 'thesis_demo_rollback_lock';
   END;
 END $$;

@@ -16,14 +16,17 @@
 // scripts additionally pin and verify the session encoding themselves).
 //
 // Locking policy: the mutating scripts (apply/dry-run/rollback/recover)
-// acquire every table lock with NOWAIT — the package never queues on a lock,
-// so it can never be one edge of a wait-for cycle: no deadlock can form and
-// the application transaction is never the victim. When a run fails that
-// way (55P03 lock_not_available or a lock_timeout error), this runner
-// retries the whole script up to THESIS_DEMO_MAX_ATTEMPTS times (default 8)
-// with jitter between attempts, reporting whether the blocker looked like
-// autovacuum/ANALYZE. Each retry is a FRESH transaction — psql is a new
-// process — so no lock is ever held while the runner waits.
+// acquire every table lock with NOWAIT and take the row locks their writes
+// need up front with FOR UPDATE NOWAIT — the package never queues on a lock,
+// so it can never be one edge of a wait-for cycle: no deadlock can form
+// around it and the package is always the transaction that loses, instantly.
+// When a run fails that way (55P03 lock_not_available or a lock_timeout
+// error), this runner retries the whole script up to THESIS_DEMO_MAX_ATTEMPTS
+// times (default 8) with jitter between attempts, reporting who is holding
+// the conflicting locks — real autovacuum/ANALYZE workers vs other sessions.
+// Each retry is a FRESH transaction — psql is a new process — so no lock is
+// ever held while the runner waits. The application can still lose only if
+// writes are left running against the window: pause them for the run.
 
 import { spawnSync } from 'node:child_process';
 import { dirname, join } from 'node:path';
@@ -46,7 +49,7 @@ const FILES = {
 };
 
 // lock-window failures the runner may retry; anything else fails once.
-const RETRYABLE = /could not lock|lock_not_available|55P03|deadlock detected|40P01|canceling statement due to lock timeout|table is locked/i;
+const RETRYABLE = /could not lock|could not obtain lock|lock_not_available|55P03|deadlock detected|40P01|canceling statement due to lock timeout|table is locked|a row the package must write is locked/i;
 
 function connectionArgs() {
   if (process.env.THESIS_DEMO_DB_URL) return [process.env.THESIS_DEMO_DB_URL];
@@ -68,20 +71,32 @@ function sleepMs(ms) {
 }
 
 // counts-only diagnosis of who is holding the conflicting side of a failed
-// lock attempt: autovacuum/ANALYZE workers vs other lock holders on the
-// eleven package tables. Never prints query text, usernames or row data.
+// lock attempt. The first count is REAL autovacuum/ANALYZE workers only —
+// proven by a lock (granted or pending) on one of the eleven package tables;
+// the permanent autovacuum launcher never holds one, so it can never be
+// counted. The second count is other sessions with a granted write-class or
+// conflicting lock on those tables (application writes included). Never
+// prints query text, usernames or row data.
 function lockBlockerCounts() {
   const sql = `SELECT
-  coalesce((SELECT count(*) FROM pg_stat_activity a
-     WHERE a.backend_type LIKE 'autovacuum%'
-        OR (a.query ~* '^\\s*(vacuum|analyze)\\b' AND a.pid <> pg_backend_pid())), 0)
+  coalesce((SELECT count(DISTINCT a.pid) FROM pg_locks l
+     JOIN pg_class c ON c.oid = l.relation
+     JOIN pg_namespace n ON n.oid = c.relnamespace
+     JOIN pg_stat_activity a ON a.pid = l.pid
+     WHERE (a.backend_type = 'autovacuum worker'
+            OR (a.query ~* '\\m(vacuum|analyze)\\M' AND a.pid <> pg_backend_pid()))
+       AND n.nspname || '.' || c.relname IN
+         ('thesis.thesis_council','thesis.thesis_council_member','thesis.thesis_council_topic',
+          'thesis.thesis_group','thesis.thesis_group_member','thesis.thesis_group_report',
+          'thesis.thesis_registration_round','thesis.thesis_topic','thesis.thesis_topic_score',
+          'thesis.thesis_topic_supervisor','notifications.notification','campuscore_audit.AdminAudit')), 0)
   || '|' ||
   coalesce((SELECT count(DISTINCT l.pid) FROM pg_locks l
      JOIN pg_class c ON c.oid = l.relation
      JOIN pg_namespace n ON n.oid = c.relnamespace
      WHERE l.granted AND l.pid <> pg_backend_pid()
-       AND l.mode IN ('ShareUpdateExclusiveLock','ShareLock','ShareRowExclusiveLock',
-                      'ExclusiveLock','AccessExclusiveLock')
+       AND l.mode IN ('RowExclusiveLock','ShareUpdateExclusiveLock','ShareLock',
+                      'ShareRowExclusiveLock','ExclusiveLock','AccessExclusiveLock')
        AND n.nspname || '.' || c.relname IN
          ('thesis.thesis_council','thesis.thesis_council_member','thesis.thesis_council_topic',
           'thesis.thesis_group','thesis.thesis_group_member','thesis.thesis_group_report',
@@ -111,15 +126,15 @@ function runPsql(file, vars, retryable) {
     const retry = retryable && status !== 0 && attempt < attempts && RETRYABLE.test(out);
     if (!retry) {
       if (retryable && status !== 0 && attempt >= attempts && RETRYABLE.test(out)) {
-        console.error(`run.mjs: all ${attempts} attempts lost the lock window — before retrying, check pg_stat_activity for autovacuum/ANALYZE workers (or other lock holders) on the package tables`);
+        console.error(`run.mjs: all ${attempts} attempts lost the lock window — before retrying, check pg_stat_activity and pg_locks for autovacuum workers (or other sessions) holding the package tables`);
       }
       return status;
     }
     const wait = 250 + Math.floor(Math.random() * 500);
     let reason = 'lost the lock window';
     const b = lockBlockerCounts();
-    if (b && b.av > 0) reason = `blocked by autovacuum/analyze`;
-    else if (b && b.holders > 0) reason = `blocked by ${b.holders} lock holder(s) on the package tables`;
+    if (b && b.av > 0) reason = `blocked by autovacuum/analyze worker(s) (counts: ${b.av})`;
+    else if (b && b.holders > 0) reason = `blocked by another session (counts: ${b.holders})`;
     console.error(`run.mjs: attempt ${attempt}/${attempts} ${reason}, retrying in ${wait}ms (fresh transaction, no locks held)`);
     sleepMs(wait);
   }

@@ -59,6 +59,34 @@ function runFile(file, vars = {}, env = {}) {
   if (res.status !== 0) console.log(`  !! ${file} exit=${res.status} :: ${lastErr || res.err.trim().split('\n')[0] || 'no-error-text'}`);
   return res;
 }
+// maintenance-db connection for CREATE/DROP DATABASE (the SQL_ASCII check
+// builds a scratch clone with a flipped server_encoding).
+function adminSql(script) {
+  const { PGHOST, PGPORT, PGUSER } = process.env;
+  const a = [];
+  if (PGHOST) a.push('-h', PGHOST);
+  if (PGPORT) a.push('-p', PGPORT);
+  if (PGUSER) a.push('-U', PGUSER);
+  a.push('-d', 'postgres');
+  const r = spawnSync(psql, [...a, '-X', '-v', 'ON_ERROR_STOP=1', '-A', '-t', '-c', script],
+    { encoding: 'utf8', env: { ...process.env, PGCLIENTENCODING: 'UTF8' }, windowsHide: true });
+  return { status: r.status ?? 1, out: r.stdout || '', err: r.stderr || '' };
+}
+// runFile variant that runs the script on a DIFFERENT database (for the
+// SQL_ASCII clone) — same -v/-f mechanics as runFile.
+function runFileOn(db, file, vars = {}) {
+  const { PGHOST, PGPORT, PGUSER } = process.env;
+  const a = [];
+  if (PGHOST) a.push('-h', PGHOST);
+  if (PGPORT) a.push('-p', PGPORT);
+  if (PGUSER) a.push('-U', PGUSER);
+  a.push('-d', db);
+  const args = [...a, '-X', '-v', 'ON_ERROR_STOP=1', '-P', 'pager=off'];
+  for (const [k, v] of Object.entries(vars)) args.push('-v', `${k}=${v}`);
+  args.push('-f', join(here, file));
+  const r = spawnSync(psql, args, { encoding: 'utf8', env: { ...process.env, PGCLIENTENCODING: 'UTF8' }, windowsHide: true });
+  return { status: r.status ?? 1, out: r.stdout || '', err: r.stderr || '' };
+}
 function record(name, ok, detail = '') {
   results.push([name, ok]);
   console.log(`${ok ? 'PASS' : 'FAIL'} ${name}${detail ? ' — ' + detail : ''}${!ok && lastErr ? '  <<' + lastErr + '>>' : ''}`);
@@ -125,6 +153,29 @@ async function main() {
   let r = runFile('apply.sql', { dry_run: '1' });
   record('dry_run.exit0', r.status === 0, `exit=${r.status}`);
   record('dry_run.zero_residue', sameHashes(tableHashes(), base));
+
+  // ---- non-UTF-8 SERVER must abort apply (mutant ap.encoding_abort_removed):
+  // a scratch clone with pg_database.encoding flipped to SQL_ASCII — the
+  // script's own client_encoding pin cannot change server_encoding, so only
+  // the encoding guard stands between UTF-8 literals and garbled storage. ----
+  const selfDb = process.env.PGDATABASE
+    || (() => { try { return decodeURIComponent(new URL(process.env.THESIS_DEMO_DB_URL).pathname.split('/').pop()); } catch { return ''; } })();
+  const saDb = `${selfDb}_sa`;
+  adminSql(`DROP DATABASE IF EXISTS ${saDb}`);
+  const mkSa = selfDb ? adminSql(`CREATE DATABASE ${saDb} TEMPLATE ${selfDb}`) : { status: -1 };
+  adminSql(`UPDATE pg_database SET encoding = 0 WHERE datname = '${saDb}'`);
+  const saEnc = spawnSync(psql, [...(process.env.PGHOST ? ['-h', process.env.PGHOST] : []),
+    ...(process.env.PGUSER ? ['-U', process.env.PGUSER] : []), '-d', saDb,
+    '-X', '-A', '-t', '-c', 'SHOW server_encoding'],
+    { encoding: 'utf8', env: { ...process.env, PGCLIENTENCODING: 'UTF8' }, windowsHide: true });
+  const saEncoding = (saEnc.stdout || '').trim();
+  const saRes = mkSa.status === 0 && saEncoding === 'SQL_ASCII'
+    ? runFileOn(saDb, 'apply.sql', { dry_run: '0' })
+    : { status: -1, out: '', err: 'setup' };
+  adminSql(`DROP DATABASE IF EXISTS ${saDb}`);
+  record('f3.sqlascii_apply_refused',
+         saRes.status !== 0 && /encoding|UTF8/i.test(saRes.out + saRes.err),
+         `exit=${saRes.status} server_encoding=${saEncoding || '?'}`);
 
   // ---- apply under hostile session formats (N5) ----
   r = runFile('apply.sql', { dry_run: '0' }, { PGOPTIONS: '-c DateStyle=German -c TimeZone=Asia/Tokyo' });
@@ -491,6 +542,7 @@ async function main() {
   // Part 1: a bare rollback.sql (no runner retry) must fail cleanly while the
   // app transaction completes. ----
   const p4AppSql = (tag) => `BEGIN;
+    SET application_name='enr6_p4';
     UPDATE thesis.thesis_registration_round SET updated_at=now() WHERE id='b35e9ff1-1eb8-4e73-812e-04e1a66041f1';
     SELECT pg_sleep(1.6);
     INSERT INTO campuscore_audit."AdminAudit"(id,"actorId","actorLabel",action,"entityType","entityId",summary,"beforeState","afterState","createdAt")
@@ -503,10 +555,11 @@ async function main() {
     { env: process.env, windowsHide: true });
   const p4done = once(p4app, 'exit');
   await delay(300);
-  r = runFile('rollback.sql');
+  const e2rb = await spawnWatch('rollback.sql', {});
   const [p4code] = await p4done;
-  record('e2.package_is_lock_victim_not_app', r.status !== 0 && p4code === 0 && markerTotal() === MARKER_EXPECTED,
-         `rollback_exit=${r.status} app_exit=${p4code}`);
+  record('e2.package_is_lock_victim_not_app',
+         e2rb.status !== 0 && p4code === 0 && !e2rb.sawPending && markerTotal() === MARKER_EXPECTED,
+         `rollback_exit=${e2rb.status} app_exit=${p4code} queued=${e2rb.sawPending}`);
 
   // Part 1b: the same schedule against apply — the package must be the lock
   // victim on the apply side too, not only on rollback (kills the mutant
@@ -515,10 +568,11 @@ async function main() {
     { env: process.env, windowsHide: true });
   const p4doneA = once(p4appA, 'exit');
   await delay(300);
-  r = runFile('apply.sql', { dry_run: '0' });
+  const e2ap = await spawnWatch('apply.sql', { dry_run: '0' });
   const [p4codeA] = await p4doneA;
-  record('e2.apply_side_lock_victim', r.status !== 0 && p4codeA === 0 && markerTotal() === MARKER_EXPECTED,
-         `apply_exit=${r.status} app_exit=${p4codeA}`);
+  record('e2.apply_side_lock_victim',
+         e2ap.status !== 0 && p4codeA === 0 && !e2ap.sawPending && markerTotal() === MARKER_EXPECTED,
+         `apply_exit=${e2ap.status} app_exit=${p4codeA} queued=${e2ap.sawPending}`);
 
   // Part 2: same schedule again, this time through run.mjs — the runner's
   // bounded retry (fresh transaction per attempt) must ride out the app's
@@ -545,7 +599,7 @@ async function main() {
   r = runFile('apply.sql', { dry_run: '0' });
   const dl1Snap = sql(`SELECT version||'|'||(to_jsonb(updated_at)#>>'{}')||'|'||status
                        FROM thesis.thesis_registration_round WHERE id='b35e9ff1-1eb8-4e73-812e-04e1a66041f1'`).out.trim();
-  let dl1AppLost = 0;
+  let dl1AppLost = 0, dl1Pending = 0;
   const dl1PkgExit = [];
   for (let i = 0; i < 3; i++) {
     const holders = ['thesis.thesis_council_member|0.15', 'thesis.thesis_council_topic|0.42',
@@ -553,12 +607,12 @@ async function main() {
       .map(spec => {
         const [t, s] = spec.split('|');
         const p = spawn(psql, [...connArgs(), '-X', '-v', 'ON_ERROR_STOP=1', '-P', 'pager=off', '-c',
-          `BEGIN; LOCK TABLE ${t} IN ROW EXCLUSIVE MODE; SELECT pg_sleep(${s}); COMMIT;`],
+          `BEGIN; SET application_name='enr6_dl1'; LOCK TABLE ${t} IN ROW EXCLUSIVE MODE; SELECT pg_sleep(${s}); COMMIT;`],
           { env: process.env, windowsHide: true });
         return once(p, 'exit');
       });
     const appA = spawn(psql, [...connArgs(), '-X', '-v', 'ON_ERROR_STOP=1', '-P', 'pager=off', '-c',
-      `BEGIN;
+      `BEGIN; SET application_name='enr6_dl1';
        UPDATE thesis.thesis_registration_round SET updated_at=now() WHERE id='b35e9ff1-1eb8-4e73-812e-04e1a66041f1';
        SELECT pg_sleep(0.10);
        LOCK TABLE thesis.thesis_council IN ROW EXCLUSIVE MODE;
@@ -566,18 +620,244 @@ async function main() {
       { env: process.env, windowsHide: true });
     const appADone = once(appA, 'exit');
     await delay(60);
-    const rb3 = runFile('rollback.sql');
+    const rb3 = await spawnWatch('rollback.sql', {});
     const [aCode] = await appADone;
     await Promise.all(holders);
     dl1PkgExit.push(rb3.status);
+    if (rb3.sawPending) dl1Pending++;
     if (aCode !== 0) dl1AppLost++;
     if (markerTotal() === 0) runFile('apply.sql', { dry_run: '0' });
   }
   const [dv, du, ds] = dl1Snap.split('|');
   sql(`UPDATE thesis.thesis_registration_round SET version=${dv}, updated_at='${du}'::timestamptz, status='${ds}'
        WHERE id='b35e9ff1-1eb8-4e73-812e-04e1a66041f1'`);
-  record('f3.dl1_app_never_deadlock_victim', dl1AppLost === 0,
-         `runs=3 app_lost=${dl1AppLost} pkg_exits=${dl1PkgExit.join(',')}`);
+  record('f3.dl1_app_never_deadlock_victim', dl1AppLost === 0 && dl1PkgExit.every(s => s !== 0) && dl1Pending === 0,
+         `runs=3 app_lost=${dl1AppLost} pkg_exits=${dl1PkgExit.join(',')} queued=${dl1Pending}`);
+
+  // ---- F3 (DL2): the retest's row-level deadlock schedule, permanent check.
+  // Helper transactions hold FOR UPDATE row locks on three rounds and two
+  // baseline topics (released ~0.6 s in); app transaction A holds FOR UPDATE
+  // on a fourth baseline topic, sleeps, then writes a thesis_topic_score.
+  // Under the retested build A was chosen as the deadlock victim while the
+  // package committed. With every lock NOWAIT the package must exit retryably
+  // (a 'locked' error) on all 5 runs, A must survive 5/5, and the package
+  // must write nothing. ----
+  const dl2Spawn = (stmts) => {
+    const p = spawn(psql, [...connArgs(), '-X', '-v', 'ON_ERROR_STOP=1', '-P', 'pager=off', '-c', stmts],
+      { env: process.env, windowsHide: true });
+    return { p, done: once(p, 'exit') };
+  };
+  const dl2Holders = () => [
+    ...['b35e9ff1-1eb8-4e73-812e-04e1a66041f1','be1aa853-f153-4f2e-a5cb-ed1b6c3c1bf1','bad8eba0-2d12-4414-8aab-7424174b3b97']
+      .map(id => `SELECT 1 FROM thesis.thesis_registration_round WHERE id='${id}' FOR UPDATE`),
+    ...['018f4a7c-3b12-4d90-a5e1-7c82b9045001','33622854-38c4-4c3f-a7eb-bab11d2ff421']
+      .map(id => `SELECT 1 FROM thesis.thesis_topic WHERE id='${id}' FOR UPDATE`)]
+    .map(s => dl2Spawn(`BEGIN; SET application_name='enr6_dl2'; ${s}; SELECT pg_sleep(0.6); COMMIT;`));
+  const dl2AppA = () => dl2Spawn(`BEGIN; SET application_name='enr6_dl2';
+     SELECT 1 FROM thesis.thesis_topic WHERE id='67c74df5-5c7f-4e74-aa02-d51af7207fe9' FOR UPDATE;
+     SELECT pg_sleep(0.5);
+     INSERT INTO thesis.thesis_topic_score (id, topic_id, council_id, lecturer_id, component, score, graded_at, created_at)
+       VALUES (gen_random_uuid(),'67c74df5-5c7f-4e74-aa02-d51af7207fe9','7ea8f499-949e-42c2-b11e-02be39b8ec52',
+               'lecturer-profile-002','DEFENSE',9.00,now(),now());
+     COMMIT;`);
+  const dl2Cleanup = () => sql(`DELETE FROM thesis.thesis_topic_score
+    WHERE topic_id='67c74df5-5c7f-4e74-aa02-d51af7207fe9' AND council_id='7ea8f499-949e-42c2-b11e-02be39b8ec52'
+      AND id::text NOT LIKE 'ed1a0000-%'`);
+  // poll pg_locks until `want` sessions tagged `appName` each hold a granted
+  // lock matching `where` — a fixed sleep would race psql startup on a loaded
+  // box. Row locks (FOR UPDATE/KEY SHARE) show up as locktype='transactionid'
+  // (the holder's own xid); a LOCK TABLE … ROW EXCLUSIVE shows as a granted
+  // relation lock in mode RowExclusiveLock.
+  async function waitForLocks(appName, want, where, ms = 3000) {
+    for (let t = 0; t < ms; t += 40) {
+      const n = parseInt(sql(`SELECT count(DISTINCT l.pid) FROM pg_locks l
+        JOIN pg_stat_activity a ON a.pid = l.pid
+        WHERE a.application_name='${appName}' AND l.granted AND ${where}`).out.trim() || '0', 10);
+      if (n >= want) return true;
+      await delay(40);
+    }
+    return false;
+  }
+  // run a package script via spawn while a dedicated BACKEND polls pg_locks
+  // at ~100 Hz and RAISE NOTICEs every ungranted lock it sees (stderr is
+  // unbuffered — sightings stream out live and survive a kill; a table
+  // insert would roll back when we terminate the watcher). NOWAIT never
+  // queues, so the real scripts never register a pending lock; a mutant
+  // that drops NOWAIT must queue for the full lock_timeout (300 ms ≈ 30
+  // samples), which cannot be missed. That is the deterministic
+  // discriminator: a lock_timeout-canceled wait raises the same 55P03
+  // 'locked' error text as NOWAIT, so exit code and message alone cannot
+  // tell a queuing mutant from the real thing — an observed queue can.
+  // Sessions tagged enr6_* (holders/app A/the watcher itself) are excluded
+  // so only the package's own queue counts.
+  async function spawnWatch(file, vars = {}) {
+    // The poll loop is UNBOUNDED — coverage must last as long as the package
+    // runs; the loop is exited either by a seen queue or by the terminate/
+    // SIGKILL below once the package exits clean. backend_type pins the
+    // observation to client sessions so e.g. an autovacuum worker's queue in
+    // this database cannot masquerade as the package's.
+    const watcher = spawn(psql, [...connArgs(), '-X', '-v', 'ON_ERROR_STOP=1', '-P', 'pager=off', '-c',
+      `SET application_name='enr6_pw';
+       DO $$ BEGIN
+         RAISE NOTICE 'watcher_ready';
+         LOOP
+           IF EXISTS (SELECT 1 FROM pg_locks l JOIN pg_stat_activity a ON a.pid = l.pid
+                      WHERE NOT l.granted AND a.datname = current_database()
+                        AND a.backend_type = 'client backend'
+                        AND (a.application_name IS NULL OR a.application_name NOT LIKE 'enr6\\_%')) THEN
+             RAISE NOTICE 'pending_lock_seen'; EXIT;
+           END IF;
+           PERFORM pg_sleep(0.01);
+         END LOOP; END $$;`],
+      { env: process.env, windowsHide: true });
+    const wDone = once(watcher, 'exit');
+    let wErr = '';
+    watcher.stderr.on('data', d => { wErr += d; });
+    // the watcher announces itself before its first poll — wait for that so
+    // the package can never queue in the startup gap. If it never arrives the
+    // run is UNVERIFIABLE: report sawPending so no lock check can pass on a
+    // blind observation (honest failure, not a silent pass).
+    let ready = /watcher_ready/.test(wErr);
+    for (let t = 0; t < 3000 && !ready; t++) { await delay(10); ready = /watcher_ready/.test(wErr); }
+    if (!ready) {
+      sql(`SELECT pg_terminate_backend(pid) FROM pg_stat_activity
+           WHERE application_name='enr6_pw' AND pid<>pg_backend_pid()`);
+      watcher.kill('SIGKILL');
+      await wDone;
+      return { status: 1, out: '', err: 'pending-lock watcher never became ready', sawPending: true };
+    }
+    const args = [...connArgs(), '-X', '-v', 'ON_ERROR_STOP=1', '-P', 'pager=off'];
+    for (const [k, v] of Object.entries(vars)) args.push('-v', `${k}=${v}`);
+    args.push('-f', join(here, file));
+    const pkg = spawn(psql, args, { env: process.env, windowsHide: true });
+    const done = once(pkg, 'exit');
+    let out = '', err = '';
+    pkg.stdout.on('data', d => { out += d; });
+    pkg.stderr.on('data', d => { err += d; });
+    const [code] = await done;
+    if (!/pending_lock_seen/.test(wErr)) {
+      sql(`SELECT pg_terminate_backend(pid) FROM pg_stat_activity
+           WHERE application_name='enr6_pw' AND pid<>pg_backend_pid()`);
+      watcher.kill('SIGKILL');
+    }
+    // read wErr only AFTER the watcher exits — its stderr stream is then
+    // closed, so a just-delivered 'pending_lock_seen' can never be missed.
+    await wDone;
+    return { status: code ?? 1, out, err, sawPending: /pending_lock_seen/.test(wErr) };
+  }
+  async function dl2Schedule(file, vars) {
+    const holders = dl2Holders();
+    const appA = dl2AppA();
+    await waitForLocks('enr6_dl2', 6, `l.locktype='transactionid'`); // 5 holders + app A
+    const res = await spawnWatch(file, vars);
+    const [aCode] = await appA.done;
+    await Promise.all(holders.map(h => h.done));
+    return { res, aCode };
+  }
+
+  if (markerTotal() !== MARKER_EXPECTED) runFile('apply.sql', { dry_run: '0' });
+  let dl2rAppLost = 0, dl2rPkgBad = 0, dl2rWrote = 0, dl2rPending = 0;
+  for (let i = 0; i < 5; i++) {
+    const { res, aCode } = await dl2Schedule('rollback.sql');
+    if (aCode !== 0) dl2rAppLost++;
+    if (res.status === 0 || !/locked/i.test(res.out + res.err) || res.sawPending) dl2rPkgBad++;
+    if (res.sawPending) dl2rPending++;
+    if (markerTotal() !== MARKER_EXPECTED) dl2rWrote++;
+    dl2Cleanup();
+  }
+  record('f3.dl2_rollback_app_survives_pkg_retryable',
+         dl2rAppLost === 0 && dl2rPkgBad === 0 && dl2rWrote === 0 && markerTotal() === MARKER_EXPECTED,
+         `runs=5 app_lost=${dl2rAppLost} pkg_bad=${dl2rPkgBad} writes=${dl2rWrote} queued=${dl2rPending}`);
+
+  // ---- heldThenRelease: deterministically kills NOWAIT-removal mutants.
+  // The holder keeps its lock for the whole run (30 s); the package runs
+  // under spawnWatch, which reports whether any lock request ever queued.
+  // NOWAIT real code aborts instantly and NEVER registers a pending lock —
+  // a mutant that queues sees its pending lock in pg_locks (up to the 300 ms
+  // lock_timeout) no matter how the wait ends, so sawPending alone kills it.
+  // The holder is released by pg_terminate_backend on its application_name
+  // tag — killing the psql client alone would leave the backend asleep for
+  // the rest of pg_sleep and leak a lock holder into the next check. ----
+  async function heldThenRelease(file, vars, holdStmt, readyWhere) {
+    const holder = spawn(psql, [...connArgs(), '-X', '-v', 'ON_ERROR_STOP=1', '-P', 'pager=off', '-c',
+      `BEGIN; SET application_name='enr6_htr'; ${holdStmt}; SELECT pg_sleep(30); COMMIT;`],
+      { env: process.env, windowsHide: true });
+    const hDone = once(holder, 'exit');
+    await waitForLocks('enr6_htr', 1, readyWhere); // run only once the lock is held
+    const res = await spawnWatch(file, vars);
+    // terminate the holder's BACKEND by its application_name tag — parsing a
+    // pid out of psql stdout races with chunking, and killing only the psql
+    // client leaves the backend asleep for the rest of pg_sleep holding locks
+    sql(`SELECT pg_terminate_backend(pid) FROM pg_stat_activity
+         WHERE application_name='enr6_htr' AND pid<>pg_backend_pid()`);
+    holder.kill('SIGKILL');
+    await hDone;
+    await delay(50); // let the terminated backend release its locks
+    return res;
+  }
+
+  // rollback row-phase NOWAIT: FOR KEY SHARE on a marker topic (ROW SHARE
+  // table lock is compatible, so the script reaches its row-lock phase)
+  let rbRowBad = 0;
+  for (let i = 0; i < 2; i++) {
+    const res = await heldThenRelease('rollback.sql', {},
+      `SELECT 1 FROM thesis.thesis_topic WHERE id='ed1a0000-0000-4000-8000-000100000001' FOR KEY SHARE`,
+      `l.locktype='transactionid'`);
+    if (res.status === 0 || !/locked/i.test(res.out + res.err) || res.sawPending) rbRowBad++;
+  }
+  record('f3.dl2_rowphase_rollback_nowait', rbRowBad === 0 && markerTotal() === MARKER_EXPECTED,
+         `bad=${rbRowBad} markers=${markerTotal()}`);
+
+  // rollback table-phase NOWAIT: an application write's table lock
+  // (ROW EXCLUSIVE — what INSERT/UPDATE/DELETE take) conflicts with the
+  // script's SHARE ROW EXCLUSIVE NOWAIT lock
+  let rbTabBad = 0;
+  for (let i = 0; i < 2; i++) {
+    const res = await heldThenRelease('rollback.sql', {},
+      `LOCK TABLE thesis.thesis_topic IN ROW EXCLUSIVE MODE`,
+      `l.locktype='relation' AND l.mode='RowExclusiveLock'`);
+    if (res.status === 0 || !/locked/i.test(res.out + res.err) || res.sawPending) rbTabBad++;
+  }
+  record('f3.short_hold_rollback_nowait', rbTabBad === 0 && markerTotal() === MARKER_EXPECTED,
+         `bad=${rbTabBad} markers=${markerTotal()}`);
+
+  r = runFile('rollback.sql'); // back to baseline for the apply-side schedule
+  let dl2aAppLost = 0, dl2aPkgBad = 0, dl2aWrote = 0, dl2aPending = 0;
+  for (let i = 0; i < 5; i++) {
+    const { res, aCode } = await dl2Schedule('apply.sql', { dry_run: '0' });
+    if (aCode !== 0) dl2aAppLost++;
+    if (res.status === 0 || !/locked/i.test(res.out + res.err) || res.sawPending) dl2aPkgBad++;
+    if (res.sawPending) dl2aPending++;
+    if (markerTotal() !== 0) dl2aWrote++;
+    dl2Cleanup();
+  }
+  record('f3.dl2_apply_app_survives_pkg_retryable',
+         dl2aAppLost === 0 && dl2aPkgBad === 0 && dl2aWrote === 0 && markerTotal() === 0,
+         `runs=5 app_lost=${dl2aAppLost} pkg_bad=${dl2aPkgBad} writes=${dl2aWrote} queued=${dl2aPending}`);
+
+  // apply row-phase NOWAIT: FOR KEY SHARE on a baseline topic the apply
+  // pre-locks — compatible table mode, conflicts only at the row lock
+  let apRowBad = 0;
+  for (let i = 0; i < 2; i++) {
+    const res = await heldThenRelease('apply.sql', { dry_run: '0' },
+      `SELECT 1 FROM thesis.thesis_topic WHERE id='67c74df5-5c7f-4e74-aa02-d51af7207fe9' FOR KEY SHARE`,
+      `l.locktype='transactionid'`);
+    if (res.status === 0 || !/locked/i.test(res.out + res.err) || res.sawPending) apRowBad++;
+  }
+  record('f3.dl2_rowphase_apply_nowait', apRowBad === 0 && markerTotal() === 0,
+         `bad=${apRowBad} markers=${markerTotal()}`);
+
+  // apply table-phase NOWAIT: an application write's table lock
+  // (ROW EXCLUSIVE) meets the table lock NOWAIT
+  let apTabBad = 0;
+  for (let i = 0; i < 2; i++) {
+    const res = await heldThenRelease('apply.sql', { dry_run: '0' },
+      `LOCK TABLE thesis.thesis_topic IN ROW EXCLUSIVE MODE`,
+      `l.locktype='relation' AND l.mode='RowExclusiveLock'`);
+    if (res.status === 0 || !/locked/i.test(res.out + res.err) || res.sawPending) apTabBad++;
+  }
+  record('f3.short_hold_apply_nowait', apTabBad === 0 && markerTotal() === 0,
+         `bad=${apTabBad} markers=${markerTotal()}`);
 
   // ---- statement-wait cap pinned at 300 ms (mutant
   // ap.lock_timeout_300ms_to_5s): every mutating script must pin
@@ -635,6 +915,35 @@ async function main() {
   r = runFile('rollback.sql');
   record('f4.rollback_after_probe_dropped', r.status === 0 && markerTotal() === 0, `exit=${r.status}`);
 
+  // ---- F4b: an empty NON-cascade FK into a package table is inventory drift
+  // only — zero rows means the cascade/blocking counts can never catch it.
+  // This is the dedicated killer for rb.fk_inventory_abort_removed. ----
+  r = runFile('apply.sql', { dry_run: '0' });
+  sql(`CREATE TABLE thesis.enr6_fk_probe (id uuid PRIMARY KEY,
+        report_id uuid REFERENCES thesis.thesis_group_report(id) ON DELETE SET NULL)`);
+  r = runFile('rollback.sql');
+  record('f4.inventory_only_drift_refused',
+         r.status !== 0 && /foreign-key inventory/.test(r.out + r.err) && markerTotal() === MARKER_EXPECTED,
+         `exit=${r.status} markers=${markerTotal()}`);
+  sql(`DROP TABLE thesis.enr6_fk_probe`);
+  r = runFile('rollback.sql');
+  record('f4.rollback_after_probe2_dropped', r.status === 0 && markerTotal() === 0, `exit=${r.status}`);
+
+  // ---- F4c: an unreviewed DELETE trigger on a package table must refuse —
+  // a trigger-based cascade sits outside the FK inventory. ----
+  r = runFile('apply.sql', { dry_run: '0' });
+  sql(`CREATE OR REPLACE FUNCTION thesis.enr6_probe_trigger_fn() RETURNS trigger LANGUAGE plpgsql AS 'BEGIN RETURN NULL; END';
+       CREATE TRIGGER enr6_probe_after_delete AFTER DELETE ON thesis.thesis_topic_score
+         FOR EACH ROW EXECUTE FUNCTION thesis.enr6_probe_trigger_fn()`);
+  r = runFile('rollback.sql');
+  record('f4.unreviewed_delete_trigger_refused',
+         r.status !== 0 && /DELETE-capable trigger|trigger.*beyond the reviewed set/.test(r.out + r.err) && markerTotal() === MARKER_EXPECTED,
+         `exit=${r.status} markers=${markerTotal()}`);
+  sql(`DROP TRIGGER enr6_probe_after_delete ON thesis.thesis_topic_score;
+       DROP FUNCTION thesis.enr6_probe_trigger_fn()`);
+  r = runFile('rollback.sql');
+  record('f4.rollback_after_trigger_dropped', r.status === 0 && markerTotal() === 0, `exit=${r.status}`);
+
   // ---- F2: a LATIN1 client session must never produce mojibake — the
   // script's pinned client_encoding either aborts the run or writes correct
   // UTF-8 that the byte-level verify check confirms. ----
@@ -651,7 +960,10 @@ async function main() {
 
   // ---- F5: a lock holder at SHARE UPDATE EXCLUSIVE level (the lock mode
   // autovacuum/ANALYZE holds) must be reported by the runner's blocked-by
-  // diagnosis while it retries, then the run completes once it releases. ----
+  // diagnosis while it retries, then the run completes once it releases.
+  // The holder is a plain client backend — with no real autovacuum WORKER
+  // holding a package-table lock the diagnosis must say 'another session',
+  // never autovacuum (the old classifier matched the permanent launcher). ----
   r = runFile('apply.sql', { dry_run: '0' });
   const avHolder = spawn(psql, [...connArgs(), '-X', '-v', 'ON_ERROR_STOP=1', '-P', 'pager=off', '-c',
     `BEGIN; LOCK TABLE thesis.thesis_topic IN SHARE UPDATE EXCLUSIVE MODE; SELECT pg_sleep(3); COMMIT;`],
@@ -664,6 +976,31 @@ async function main() {
   record('f5.lock_holder_reported_and_retried',
          avm.status === 0 && avCode === 0 && /blocked by/i.test(avm.stderr || '') && markerTotal() === 0,
          `runner_exit=${avm.status} blocked_msg=${/blocked by/i.test(avm.stderr || '')}`);
+  record('f5.sue_holder_not_autovacuum_attributed',
+         !/blocked by autovacuum/.test(avm.stderr || '') && /blocked by another session \(counts: [1-9]/.test(avm.stderr || ''),
+         `stderr_says=${(avm.stderr || '').match(/blocked by[^\n]*/)?.[0] || '(none)'}`);
+
+  // ---- F5b (N2): a plain application write (UPDATE -> ROW EXCLUSIVE) and no
+  // vacuum anywhere must be reported as 'another session' — never autovacuum.
+  // (The script's own error text mentions autovacuum, so the assertion targets
+  // the 'blocked by …' line only. The probe's updated_at bump is restored.) ----
+  r = runFile('apply.sql', { dry_run: '0' });
+  const appWTopic = '005e2c8b-ee97-42ae-ae7f-91b74d482072';
+  const appWSave = sql(`SELECT updated_at::text FROM thesis.thesis_topic WHERE id='${appWTopic}'`).out.trim();
+  const appW = spawn(psql, [...connArgs(), '-X', '-v', 'ON_ERROR_STOP=1', '-P', 'pager=off', '-c',
+    `BEGIN; UPDATE thesis.thesis_topic SET updated_at=now() WHERE id='${appWTopic}'; SELECT pg_sleep(3); COMMIT;`],
+    { env: process.env, windowsHide: true });
+  const appWDone = once(appW, 'exit');
+  await delay(300);
+  const awm = spawnSync('node', [join(here, 'run.mjs'), 'rollback'],
+    { encoding: 'utf8', env: { ...process.env, THESIS_DEMO_MAX_ATTEMPTS: '16' }, windowsHide: true });
+  const [awCode] = await appWDone;
+  sql(`UPDATE thesis.thesis_topic SET updated_at='${appWSave}'::timestamptz WHERE id='${appWTopic}'`);
+  record('f5.app_write_reported_as_other_session',
+         awm.status === 0 && awCode === 0
+           && /blocked by another session \(counts: [1-9]/.test(awm.stderr || '')
+           && !/blocked by autovacuum/.test(awm.stderr || '') && markerTotal() === 0,
+         `runner_exit=${awm.status} stderr_says=${(awm.stderr || '').match(/blocked by[^\n]*/)?.[0] || '(none)'}`);
 
   // ---- final clean cycle under default session + end state ----
   r = runFile('apply.sql', { dry_run: '0' });

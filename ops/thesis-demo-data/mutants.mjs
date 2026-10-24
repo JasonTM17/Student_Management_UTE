@@ -10,14 +10,17 @@
 // mutant to a scratch COPY of this package, runs selftest.mjs inside the copy
 // against the clone, then drops the clone.
 //
-// Kill detection is STRUCTURED, not text-sniffing: a mutant is 'killed' when
-// the selftest exits non-zero AND reports at least one real `FAIL ` detail
-// line (or the parsed totals line reports FAIL > 0). Summary text such as
-// '66/66 checks PASS, 0 FAIL' or 'FAIL=0' can never count as a kill.
+// Kill detection is STRUCTURED, not text-sniffing: a mutant is 'killed' ONLY
+// when the selftest exits non-zero AND reports at least one real `FAIL `
+// detail line (or the parsed totals line reports FAIL > 0) — the printed
+// kill reason is the first failing check. A run that dies before reporting —
+// a startup crash, a timeout, or output with no parsable totals line — is
+// INCONCLUSIVE, never a kill: it proves nothing about the guard.
 // 'SURVIVED' means the suite passed on mutated code — a test gap, printed
 // for fixing. 'control.identity_noop' replaces a line by itself and MUST
 // survive; if the harness 'kills' it, the oracle is broken and this script
-// exits non-zero. Counts-only output.
+// exits non-zero. 'control.selftest_startcrash' MUST come back INCONCLUSIVE:
+// it proves a dead suite is not mistaken for a kill. Counts-only output.
 //
 // Verdicts: killed | SURVIVED | EQUIVALENT | PATCH-MISS | INCONCLUSIVE.
 // The harness exits non-zero when the control is killed, any non-equivalent
@@ -39,6 +42,11 @@ const MUTANTS = [
   // SURVIVED — if the oracle reports this as killed, the oracle is broken.
   { name: 'control.identity_noop', file: 'apply.sql', control: true, patches: [
     ['-- topics (17)', '-- topics (17)']] },
+  // dead-suite control: a selftest that crashes at module load can emit no
+  // totals line — the oracle must call it INCONCLUSIVE, never 'killed'.
+  { name: 'control.selftest_startcrash', file: 'selftest.mjs', expectInconclusive: true, patches: [
+    ['import { once } from \'node:events\';',
+     'throw new Error(\'mutant control: selftest startup crash\');']] },
   { name: 'rb.disagree_abort_removed', file: 'rollback.sql', patches: [
     ['IF v_img IS NOT NULL AND v_copy IS NOT NULL AND v_img::text <> v_copy::text THEN', 'IF false THEN']] },
   { name: 'rb.checksum_removed', file: 'rollback.sql', patches: [
@@ -106,6 +114,38 @@ const MUTANTS = [
     ['IF v_has_img THEN', 'IF false THEN']] },
   { name: 'rv.no_markers_refuse_removed', file: 'recover-before-image.sql', patches: [
     ['IF v_markers = 0 THEN', 'IF false THEN']] },
+  // N1 reviewer mutants: dropping NOWAIT turns the package into a queuing
+  // waiter — the f3 short-hold / row-phase checks must catch each one.
+  { name: 'ap.table_nowait_removed', file: 'apply.sql', patches: [
+    [' IN SHARE ROW EXCLUSIVE MODE NOWAIT', ' IN SHARE ROW EXCLUSIVE MODE']] },
+  { name: 'ap.row_nowait_removed', file: 'apply.sql', patches: [
+    ['FOR UPDATE NOWAIT', 'FOR UPDATE'], ['FOR UPDATE NOWAIT', 'FOR UPDATE'],
+    ['FOR UPDATE NOWAIT', 'FOR UPDATE'], ['FOR UPDATE NOWAIT', 'FOR UPDATE'],
+    ['FOR UPDATE NOWAIT', 'FOR UPDATE']] },
+  { name: 'rb.table_nowait_removed', file: 'rollback.sql', patches: [
+    [' IN SHARE ROW EXCLUSIVE MODE NOWAIT', ' IN SHARE ROW EXCLUSIVE MODE'],
+    [' IN SHARE ROW EXCLUSIVE MODE NOWAIT', ' IN SHARE ROW EXCLUSIVE MODE'],
+    [' IN SHARE ROW EXCLUSIVE MODE NOWAIT', ' IN SHARE ROW EXCLUSIVE MODE']] },
+  { name: 'rb.row_nowait_removed', file: 'rollback.sql', patches: [
+    ['FOR UPDATE NOWAIT', 'FOR UPDATE'], ['FOR UPDATE NOWAIT', 'FOR UPDATE'],
+    ['FOR UPDATE NOWAIT', 'FOR UPDATE'], ['FOR UPDATE NOWAIT', 'FOR UPDATE'],
+    ['FOR UPDATE NOWAIT', 'FOR UPDATE']] },
+  // N3 reviewer mutants: the three guard removals that survived the retest.
+  { name: 'rb.fk_inventory_abort_removed', file: 'rollback.sql', patches: [
+    ['IF v_missing IS NOT NULL OR v_extra IS NOT NULL THEN', 'IF false THEN']] },
+  { name: 'ap.encoding_abort_removed', file: 'apply.sql',
+    equivalent: 'the client_encoding arm is unreachable: the script pins ' +
+      'SET LOCAL client_encoding=UTF8 BEFORE the guard, so current_setting ' +
+      'always reads UTF8 there — only the server_encoding arm can fire, and ' +
+      'the patch leaves it intact, so SQL_ASCII still aborts identically.',
+    patches: [
+    ["IF current_setting('client_encoding') <> 'UTF8'", "IF false AND current_setting('client_encoding') <> 'UTF8'"]] },
+  // stronger variant of the reviewer's scenario: remove the WHOLE encoding
+  // guard — the SQL_ASCII clone must then be caught by
+  // f3.sqlascii_apply_refused.
+  { name: 'ap.encoding_guard_removed_entirely', file: 'apply.sql', patches: [
+    ["  IF current_setting('client_encoding') <> 'UTF8'\n     OR current_setting('server_encoding') <> 'UTF8' THEN",
+     '  IF false THEN']] },
 ];
 
 const PACKAGE_FILES = ['apply.sql', 'rollback.sql', 'recover-before-image.sql',
@@ -128,24 +168,50 @@ function adminSql(db, script) {
 const templateDb = process.env.PGDATABASE;
 if (!templateDb) { console.error('set PGDATABASE to the scratch baseline template'); process.exit(2); }
 const filter = process.env.MUTANT_FILTER;
-const mutants = filter ? MUTANTS.filter(m => m.name.includes(filter)) : MUTANTS;
+const mutants = filter ? MUTANTS.filter(m => filter.split(',').some(f => m.name.includes(f))) : MUTANTS;
+
+// a mutant's selftest dies mid-suite often enough (STOP_ON_FAIL) that its
+// spawned lock-holder psql sessions can still be inside pg_sleep when we get
+// here — orphaned backends would refuse the drop and then the next CREATE.
+// Terminate whatever is left on the clone, drop FORCE, and retry the clone
+// once for transient template connections.
+function resetClone(db) {
+  adminSql('postgres', `SELECT pg_terminate_backend(pid) FROM pg_stat_activity
+                        WHERE datname='${db}' AND pid <> pg_backend_pid()`);
+  const mk = adminSql('postgres', `DROP DATABASE IF EXISTS ${db} WITH (FORCE)`);
+  let ct = adminSql('postgres', `CREATE DATABASE ${db} TEMPLATE ${templateDb}`);
+  if (mk.status === 0 && ct.status !== 0) {
+    Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 800);
+    ct = adminSql('postgres', `CREATE DATABASE ${db} TEMPLATE ${templateDb}`);
+  }
+  return { mk, ct };
+}
 
 // structured verdict: a kill needs a non-zero exit AND at least one real
-// 'FAIL ' detail line or a parsed totals line with FAIL > 0. Summary text
-// ('0 FAIL', 'FAIL=0') is never evidence on its own.
+// 'FAIL ' detail line or a parsed totals line with FAIL > 0 — the printed
+// reason is the first failing check. A run that dies before reporting (a
+// startup crash, a timeout/kill signal, or output with no parsable totals
+// line) is INCONCLUSIVE, never a kill: it proves nothing about the guard.
+// Summary text ('0 FAIL', 'FAIL=0') is never evidence on its own.
 function judge(res) {
   const out = `${res.stdout || ''}\n${res.stderr || ''}`;
-  const failLines = (out.match(/^FAIL /gm) || []).length;
+  const failLines = out.match(/^FAIL .*/gm) || [];
   const totals = out.match(/(\d+)\/(\d+) checks PASS, (\d+) FAIL/);
   const failTotal = totals ? parseInt(totals[3], 10) : null;
-  if (res.status === 0) {
-    if (failLines > 0 || (failTotal !== null && failTotal > 0) || failTotal === null) return 'INCONCLUSIVE';
-    return 'SURVIVED';
+  // spawnSync timeout => res.error ETIMEDOUT / res.status null / res.signal set
+  if (res.status === null || res.error || res.signal) {
+    return { verdict: 'INCONCLUSIVE', reason: `suite did not finish (${res.error ? res.error.message : res.signal || 'no exit status'})` };
   }
-  if (failLines > 0 || (failTotal !== null && failTotal > 0)) return 'killed';
-  // the suite died before reporting (e.g. psql missing, package raised a
-  // hard error in setup) — the mutant visibly broke the run: still a kill.
-  return 'killed';
+  if (res.status === 0) {
+    if (failLines.length > 0 || (failTotal !== null && failTotal > 0) || totals === null)
+      return { verdict: 'INCONCLUSIVE', reason: 'exit 0 but output is inconsistent or lacks a totals line' };
+    return { verdict: 'SURVIVED', reason: 'suite passed on mutated code' };
+  }
+  if (failLines.length > 0)
+    return { verdict: 'killed', reason: failLines[0].replace(/^FAIL +/, '').split(' — ')[0].trim() };
+  if (failTotal !== null && failTotal > 0)
+    return { verdict: 'killed', reason: `${failTotal} failing check(s) per totals` };
+  return { verdict: 'INCONCLUSIVE', reason: `exit ${res.status} with no parsable FAIL line — suite died before reporting` };
 }
 
 const results = [];
@@ -164,8 +230,7 @@ for (const m of mutants) {
       writeFileSync(path, src.replace(find, p[1].replace(/\n/g, nl)));
     }
     if (!ok) { results.push([m, 'PATCH-MISS']); continue; }
-    const mk = adminSql('postgres', `DROP DATABASE IF EXISTS ${db}`);
-    const ct = adminSql('postgres', `CREATE DATABASE ${db} TEMPLATE ${templateDb}`);
+    const { mk, ct } = resetClone(db);
     if (mk.status !== 0 || ct.status !== 0) { results.push([m, 'DB-SETUP-FAIL']); continue; }
     const r = spawnSync('node', [join(tmp, 'selftest.mjs')],
       { encoding: 'utf8', timeout: 600000,
@@ -173,22 +238,26 @@ for (const m of mutants) {
         windowsHide: true });
     results.push([m, judge(r)]);
   } finally {
-    adminSql('postgres', `DROP DATABASE IF EXISTS ${db}`);
+    adminSql('postgres', `SELECT pg_terminate_backend(pid) FROM pg_stat_activity
+                          WHERE datname='${db}' AND pid <> pg_backend_pid()`);
+    adminSql('postgres', `DROP DATABASE IF EXISTS ${db} WITH (FORCE)`);
     rmSync(tmp, { recursive: true, force: true });
   }
 }
-let bad = 0, killed = 0, survived = 0, equivalent = 0;
-for (const [m, verdict] of results) {
-  let v = verdict;
-  if (verdict === 'SURVIVED' && m.equivalent) { v = 'EQUIVALENT'; equivalent++; }
-  else if (verdict === 'killed') killed++;
-  else if (verdict === 'SURVIVED') survived++;
-  const expectSurvive = m.control || m.equivalent;
-  const ok = v === 'killed' ? !expectSurvive
-           : v === 'SURVIVED' || v === 'EQUIVALENT' ? !!expectSurvive
-           : false; // PATCH-MISS / DB-SETUP-FAIL / INCONCLUSIVE never ok
+let bad = 0, killed = 0, survived = 0, equivalent = 0, inconclusive = 0;
+for (const [m, jr] of results) {
+  const j = typeof jr === 'string' ? { verdict: jr, reason: '' } : jr;
+  let v = j.verdict;
+  const reason = j.reason || '';
+  if (v === 'SURVIVED' && m.equivalent) { v = 'EQUIVALENT'; equivalent++; }
+  else if (v === 'killed') killed++;
+  else if (v === 'SURVIVED') survived++;
+  else if (v === 'INCONCLUSIVE') inconclusive++;
+  const ok = m.expectInconclusive ? v === 'INCONCLUSIVE'
+           : (m.control || m.equivalent) ? (v === 'SURVIVED' || v === 'EQUIVALENT')
+           : v === 'killed';
   if (!ok) bad++;
-  console.log(`${v} ${m.name}${ok ? '' : '   <<< unexpected'}${m.equivalent ? `\n    equivalent: ${m.equivalent}` : ''}`);
+  console.log(`${v} ${m.name}${reason ? ` — ${reason}` : ''}${ok ? '' : '   <<< unexpected'}${m.equivalent ? `\n    equivalent: ${m.equivalent}` : ''}`);
 }
-console.log(`---\n${killed} killed, ${survived} survived, ${equivalent} equivalent, ${bad} unexpected verdict(s)`);
+console.log(`---\n${killed} killed, ${survived} survived, ${equivalent} equivalent, ${inconclusive} inconclusive, ${bad} unexpected verdict(s)`);
 process.exit(bad === 0 ? 0 : 1);
