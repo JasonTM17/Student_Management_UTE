@@ -370,7 +370,7 @@ export default function GradesPage() {
                 <div>
                   <div className="text-sm text-muted-foreground">
                     {copy.currentGpa}{' '}
-                    <span className="text-xs font-normal text-muted-foreground/70">
+                    <span className="text-xs font-normal text-muted-foreground">
                       · {selectedSemester ? copy.scopeTerm : copy.scopeAll}
                     </span>
                   </div>
@@ -388,7 +388,7 @@ export default function GradesPage() {
                 <div>
                   <div className="text-sm text-muted-foreground">
                     {copy.completedCredits}{' '}
-                    <span className="text-xs font-normal text-muted-foreground/70">
+                    <span className="text-xs font-normal text-muted-foreground">
                       · {selectedSemester ? copy.scopeTerm : copy.scopeAll}
                     </span>
                   </div>
@@ -406,7 +406,7 @@ export default function GradesPage() {
                 <div>
                   <div className="text-sm text-muted-foreground">
                     {copy.gradedCourses}{' '}
-                    <span className="text-xs font-normal text-muted-foreground/70">
+                    <span className="text-xs font-normal text-muted-foreground">
                       · {selectedSemester ? copy.scopeTerm : copy.scopeAll}
                     </span>
                   </div>

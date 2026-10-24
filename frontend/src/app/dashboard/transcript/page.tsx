@@ -614,7 +614,7 @@ export default function TranscriptPage() {
                 <div>
                   <div className="text-sm text-muted-foreground">
                     {copy.completedCourses}{' '}
-                    <span className="text-xs font-normal text-muted-foreground/70">
+                    <span className="text-xs font-normal text-muted-foreground">
                       · {copy.scopeCurriculum}
                     </span>
                   </div>
@@ -632,7 +632,7 @@ export default function TranscriptPage() {
                 <div>
                   <div className="text-sm text-muted-foreground">
                     {copy.inProgressCourses}{' '}
-                    <span className="text-xs font-normal text-muted-foreground/70">
+                    <span className="text-xs font-normal text-muted-foreground">
                       · {copy.scopeCurriculum}
                     </span>
                   </div>
