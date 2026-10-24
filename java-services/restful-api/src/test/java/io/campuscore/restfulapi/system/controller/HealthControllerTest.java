@@ -1,4 +1,4 @@
-package io.campuscore.restfulapi.controller;
+package io.campuscore.restfulapi.system.controller;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;

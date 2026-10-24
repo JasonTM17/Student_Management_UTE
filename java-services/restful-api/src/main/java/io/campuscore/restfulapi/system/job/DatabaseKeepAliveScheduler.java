@@ -1,4 +1,4 @@
-package io.campuscore.restfulapi.job;
+package io.campuscore.restfulapi.system.job;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
