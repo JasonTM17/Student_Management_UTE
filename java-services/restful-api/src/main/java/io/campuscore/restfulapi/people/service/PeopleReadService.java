@@ -2,7 +2,7 @@ package io.campuscore.restfulapi.people.service;
 
 import io.campuscore.restfulapi.common.LikePattern;
 import io.campuscore.restfulapi.people.repository.PeopleReadRepository;
-import io.campuscore.restfulapi.people.repository.PeopleReadRepository.LecturerDirectoryScope;
+import io.campuscore.restfulapi.people.model.LecturerDirectoryScope;
 import io.campuscore.restfulapi.people.dto.PeopleReadDtos.LecturerListResponse;
 import io.campuscore.restfulapi.people.dto.PeopleReadDtos.LecturerResponse;
 import io.campuscore.restfulapi.people.dto.PeopleReadDtos.PageMeta;
