@@ -5,6 +5,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import io.campuscore.restfulapi.academic.dto.AdminAnalyticsDtos;
 import io.campuscore.restfulapi.academic.service.AdminAnalyticsService;
 import io.campuscore.restfulapi.testsupport.AccountAuthorityFixture;
 import io.campuscore.restfulapi.testsupport.CurrentAccountJwt;
@@ -176,6 +177,24 @@ class AdminAnalyticsOverviewTest {
         enrollment("enr-4", "student-3", "section-1", "sem-2", "DROPPED", "DRAFT", null);
         // Past semester: one completed enrollment for student-1.
         enrollment("enr-5", "student-1", "section-2", "sem-1", "COMPLETED", "PUBLISHED", "A+");
+    }
+
+    @Test
+    void withdrawnEnrollmentsAreNotCountedAsLive() {
+        seedCampus();
+        // An approved withdrawal leaves status WITHDRAWN with published letter W:
+        // transcript history only, so every live aggregate and the grade bands
+        // must look exactly as if the row were not enrolled.
+        enrollment("enr-w", "student-4", "section-1", "sem-2", "WITHDRAWN", "PUBLISHED", "W");
+
+        var overview = service.overview();
+
+        assertThat(overview.semesterTrends().get(1).count()).isEqualTo(3);
+        assertThat(overview.semesterTrends().get(1).activeStudents()).isEqualTo(2);
+        assertThat(overview.totals().enrollments()).isEqualTo(4);
+        assertThat(overview.gradeDistribution())
+                .extracting(AdminAnalyticsDtos.GradeDistributionEntry::grade)
+                .doesNotContain("W");
     }
 
     private void enrollment(

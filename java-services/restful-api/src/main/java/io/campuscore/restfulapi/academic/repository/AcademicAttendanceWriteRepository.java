@@ -1,6 +1,7 @@
 package io.campuscore.restfulapi.academic.repository;
 
 import io.campuscore.restfulapi.academic.model.AttendanceInsertRow;
+import io.campuscore.restfulapi.academic.model.EnrollmentStatuses;
 import java.sql.Timestamp;
 import java.time.Instant;
 import java.util.List;
@@ -47,7 +48,8 @@ public class AcademicAttendanceWriteRepository {
     public Set<String> findActiveEnrolledStudentIds(String sectionId) {
         List<String> ids = jdbc.queryForList(
                 "SELECT \"studentId\" FROM " + ENROLLMENT
-                        + " WHERE \"sectionId\" = :sectionId AND \"status\" NOT IN ('DROPPED', 'CANCELLED')",
+                        + " WHERE \"sectionId\" = :sectionId AND \"status\" IN "
+                        + EnrollmentStatuses.ACTIVE_STATUS_PREDICATE,
                 new MapSqlParameterSource("sectionId", sectionId),
                 String.class);
         return Set.copyOf(ids);

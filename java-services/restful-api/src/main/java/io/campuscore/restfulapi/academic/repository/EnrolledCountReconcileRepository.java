@@ -1,6 +1,7 @@
 package io.campuscore.restfulapi.academic.repository;
 
 import io.campuscore.restfulapi.academic.model.DriftedSection;
+import io.campuscore.restfulapi.academic.model.EnrollmentStatuses;
 import java.util.List;
 import java.util.Map;
 import org.springframework.context.annotation.Profile;
@@ -17,7 +18,7 @@ import org.springframework.stereotype.Repository;
 public class EnrolledCountReconcileRepository {
 
     /** Same active-enrollment definition as RegistrationService seat accounting. */
-    static final String ACTIVE_STATUS_PREDICATE = "('ENROLLED', 'PENDING', 'CONFIRMED', 'COMPLETED')";
+    static final String ACTIVE_STATUS_PREDICATE = EnrollmentStatuses.ACTIVE_STATUS_PREDICATE;
 
     private final NamedParameterJdbcTemplate jdbc;
 
