@@ -63,8 +63,11 @@ function nextEnabled(
   direction: 1 | -1,
 ): number {
   if (options.length === 0) return -1;
+  // -1 means "before the first" going down and "after the last" going up.
+  const start = from < 0 ? (direction === 1 ? -1 : options.length) : from;
   for (let step = 1; step <= options.length; step += 1) {
-    const index = (from + direction * step + options.length * step) % options.length;
+    const index =
+      ((start + direction * step) % options.length + options.length) % options.length;
     if (!options[index]?.disabled) return index;
   }
   return -1;
@@ -205,7 +208,15 @@ const Combobox = React.forwardRef<HTMLInputElement, ComboboxProps>(
     const listRef = React.useRef<HTMLUListElement>(null);
 
     const selected = options.find((option) => option.value === value && option.value !== '');
-    const filtered = React.useMemo(() => filterSearchOptions(options, query), [options, query]);
+    // Opening seeds the input with the current label so the assigned person
+    // stays visible; while the query still equals that label the list shows
+    // every option, and typing (the text is select-all'd on focus) filters.
+    const effectiveQuery =
+      open && selected?.label !== undefined && query === selected.label ? '' : query;
+    const filtered = React.useMemo(
+      () => filterSearchOptions(options, effectiveQuery),
+      [options, effectiveQuery],
+    );
     // The clear row pins to the top whenever a selection exists; isEmpty keeps
     // it keyboard-reachable but out of Enter/arrow auto-activation.
     const renderedOptions = React.useMemo<(ComboboxOption & NavigableOption)[]>(
@@ -230,8 +241,16 @@ const Combobox = React.forwardRef<HTMLInputElement, ComboboxProps>(
 
     const openList = React.useCallback(() => {
       setOpen(true);
-      setQuery('');
     }, []);
+
+    // Seed the input with the committed label on every open transition.
+    const prevOpenRef = React.useRef(false);
+    React.useEffect(() => {
+      if (open && !prevOpenRef.current) {
+        setQuery(selected?.label ?? '');
+      }
+      prevOpenRef.current = open;
+    }, [open, selected?.label]);
 
     // When the popup opens (or the option set changes under it), put the active
     // descendant on the selected option, else the first enabled match.
@@ -278,7 +297,8 @@ const Combobox = React.forwardRef<HTMLInputElement, ComboboxProps>(
       const nextQuery = event.target.value;
       setQuery(nextQuery);
       if (!open) setOpen(true);
-      const nextFiltered = filterSearchOptions(options, nextQuery);
+      const nextEffective = nextQuery === selected?.label ? '' : nextQuery;
+      const nextFiltered = filterSearchOptions(options, nextEffective);
       const nextRendered =
         allowClear && value !== ''
           ? [{ ...EMPTY_OPTION, label: emptyLabel ?? placeholder ?? '—' }, ...nextFiltered]
@@ -436,11 +456,18 @@ const Combobox = React.forwardRef<HTMLInputElement, ComboboxProps>(
             required={required}
             placeholder={placeholder}
             value={open ? query : selected?.label ?? ''}
-            onFocus={() => {
+            onFocus={(event) => {
               if (!disabled && !open) openList();
+              // Select-all the seeded label so typing replaces it wholesale.
+              event.currentTarget.select();
             }}
-            onClick={() => {
-              if (!disabled && !open) openList();
+            onClick={(event) => {
+              if (!disabled && !open) {
+                openList();
+                // Runs after the browser positions the caret, keeping the
+                // seeded label fully selected so typing replaces it.
+                event.currentTarget.select();
+              }
             }}
             onBlur={closeList}
             onChange={handleInputChange}
