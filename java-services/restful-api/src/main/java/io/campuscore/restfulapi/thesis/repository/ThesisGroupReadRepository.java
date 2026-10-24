@@ -259,7 +259,7 @@ public class ThesisGroupReadRepository {
                     rs.getBoolean("is_leader"),
                     rs.getInt("member_order")));
         });
-        return rows.stream().map(row -> new GroupResponse(row.id(), row.roundId(), row.leaderStudentId(), row.topicId(), row.status(), row.approvalStatus(), row.rejectionReason(), List.copyOf(members.get(row.id())), List.copyOf(memberDetails.get(row.id())))).toList();
+        return rows.stream().map(row -> new GroupResponse(row.id(), row.roundId(), row.leaderStudentId(), row.topicId(), row.status(), row.approvalStatus(), row.rejectionReason(), List.copyOf(members.get(row.id())), List.copyOf(memberDetails.get(row.id())), null)).toList();
     }
 
     private static String joinName(String firstName, String lastName) {

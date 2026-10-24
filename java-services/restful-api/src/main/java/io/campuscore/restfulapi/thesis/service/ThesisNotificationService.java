@@ -73,6 +73,19 @@ public class ThesisNotificationService {
         return fanOut(userIds, title, message, approved ? "SUCCESS" : "WARNING", STUDENT_LINK);
     }
 
+    /** Notifies every group member when a mistaken approval is withdrawn. */
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public int notifyGroupApprovalWithdrawn(UUID groupId, String reason) {
+        List<String> userIds = memberUserIds(groupId);
+        if (userIds.isEmpty()) {
+            return 0;
+        }
+        String message = "Nhóm của bạn đã bị rút lại quyết định duyệt"
+                + (reason == null || reason.isBlank() ? "" : ". Lý do: " + reason)
+                + ". Nhóm quay lại trạng thái chờ duyệt.";
+        return fanOut(userIds, "Nhóm khóa luận bị rút duyệt", message, "WARNING", STUDENT_LINK);
+    }
+
     /** Notifies group members when the leader binds a topic. */
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public int notifyTopicAssigned(UUID groupId, UUID topicId) {

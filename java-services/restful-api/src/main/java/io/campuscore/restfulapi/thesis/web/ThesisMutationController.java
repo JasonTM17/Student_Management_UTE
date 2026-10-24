@@ -7,6 +7,7 @@ import io.campuscore.restfulapi.thesis.service.ThesisSupervisorService;
 import io.campuscore.restfulapi.thesis.web.ThesisGroupReadDtos.GroupResponse;
 import io.campuscore.restfulapi.thesis.web.ThesisMutationDtos.CloseRegistrationPreviewResponse;
 import io.campuscore.restfulapi.thesis.web.ThesisMutationDtos.GroupApprovalRequest;
+import io.campuscore.restfulapi.thesis.web.ThesisMutationDtos.GroupApprovalWithdrawalRequest;
 import io.campuscore.restfulapi.thesis.web.ThesisMutationDtos.GroupCreateRequest;
 import io.campuscore.restfulapi.thesis.web.ThesisMutationDtos.GroupRejectionRequest;
 import io.campuscore.restfulapi.thesis.web.ThesisMutationDtos.GvpbDeadlineUpdateRequest;
@@ -577,5 +578,21 @@ public class ThesisMutationController {
             @RequestBody GroupRejectionRequest request,
             @AuthenticationPrincipal Jwt actor) {
         return mutations.rejectGroup(id, request, actor);
+    }
+
+    /**
+     * Withdraws a mistaken approval while the round still reviews
+     * registrations; the group returns to PENDING with its roster and topic
+     * pick intact. Governance roles act only inside their faculty/department
+     * scope — no supervisor escape — and downstream work (report, scores,
+     * council, reviewer, result) blocks the withdrawal.
+     */
+    @PostMapping("/groups/{id}/withdraw-approval")
+    @PreAuthorize("hasAnyRole('ADMIN','TRUONG_KHOA','TRUONG_BO_MON','LECTURER','SUPER_ADMIN')")
+    public GroupResponse withdrawGroupApproval(
+            @PathVariable UUID id,
+            @RequestBody GroupApprovalWithdrawalRequest request,
+            @AuthenticationPrincipal Jwt actor) {
+        return mutations.withdrawGroupApproval(id, request, actor);
     }
 }

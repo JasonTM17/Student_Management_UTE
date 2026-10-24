@@ -12,7 +12,34 @@ public final class ThesisGroupReadDtos {
     public record GroupResponse(UUID id, UUID roundId, String leaderStudentId, UUID topicId,
             GroupStatus status, ApprovalStatus approvalStatus, String rejectionReason,
             List<String> memberStudentIds,
-            List<GroupMemberResponse> members) { }
+            List<GroupMemberResponse> members,
+            /**
+             * Withdraw-approval affordance for the requesting actor, computed
+             * like the round deletion guard: {@code withdrawable} only when the
+             * actor may withdraw now (approved state, live round, no downstream
+             * work, in scope); the counts name the blocker kinds so an admin
+             * knows to reach for the roster override instead.
+             */
+            GroupWithdrawalInfo approvalWithdrawal) {
+
+        public GroupResponse withApprovalWithdrawal(GroupWithdrawalInfo info) {
+            return new GroupResponse(id, roundId, leaderStudentId, topicId, status,
+                    approvalStatus, rejectionReason, memberStudentIds, members, info);
+        }
+    }
+
+    /**
+     * Per-kind downstream-work counts behind {@code withdrawable}: group
+     * reports, topic scores, council-topic assignments, reviewer assignment
+     * (0/1) and topic results (0/1).
+     */
+    public record GroupWithdrawalInfo(
+            boolean withdrawable,
+            long reports,
+            long scores,
+            long councilTopics,
+            long reviewers,
+            long results) { }
 
     /**
      * One group member. studentId is the internal profile id used by mutation

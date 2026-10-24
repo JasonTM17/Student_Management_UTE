@@ -69,7 +69,8 @@ public class ThesisRoundReadService {
                 list.stream().map(ThesisRegistrationRound::getId).toList());
         return list.stream()
                 .map(round -> RoundResponse.from(round, deletionInfo(round, counts),
-                        capabilities.counterReviewWaiverAllowed(round.getThesisType())))
+                        capabilities.counterReviewWaiverAllowed(round.getThesisType()),
+                        ThesisMutationService.MIN_GROUP_MEMBERS, ThesisMutationService.MAX_GROUP_MEMBERS))
                 .toList();
     }
 
@@ -81,7 +82,8 @@ public class ThesisRoundReadService {
                         "ROUND_NOT_FOUND",
                         "Thesis registration round not found"));
         return RoundResponse.from(round, deletionInfo(round, dependentCounts(List.of(id))),
-                capabilities.counterReviewWaiverAllowed(round.getThesisType()));
+                capabilities.counterReviewWaiverAllowed(round.getThesisType()),
+                ThesisMutationService.MIN_GROUP_MEMBERS, ThesisMutationService.MAX_GROUP_MEMBERS);
     }
 
     /**

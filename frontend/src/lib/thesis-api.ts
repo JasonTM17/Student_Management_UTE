@@ -55,6 +55,11 @@ export interface ThesisRound {
    * counter-review waiver return true (none of the shipped undergraduate
    * types do). Absent on older backends — treat as not allowed. */
   counterReviewWaiverAllowed?: boolean;
+  /** Roster policy bounds enforced on supervisor approval (advisory while
+   * joining). Absent on older backends — the UI then falls back to hiding
+   * the missing-member hint rather than guessing a number. */
+  minGroupSize?: number;
+  maxGroupSize?: number;
 }
 
 export interface ThesisRoundDeletionInfo {
@@ -448,6 +453,20 @@ export interface ThesisGroup {
   rejectionReason?: string | null;
   memberStudentIds: string[];
   members?: ThesisGroupMember[];
+  /** Actor-scoped withdraw-approval view: `withdrawable` only when the
+   * caller may pull this APPROVED group back to PENDING; the per-kind counts
+   * name the downstream work that blocks it. Absent for students and older
+   * backends — treat as not withdrawable. */
+  approvalWithdrawal?: ThesisGroupWithdrawalInfo | null;
+}
+
+export interface ThesisGroupWithdrawalInfo {
+  withdrawable: boolean;
+  reports: number;
+  scores: number;
+  councilTopics: number;
+  reviewers: number;
+  results: number;
 }
 
 /**
@@ -1360,7 +1379,7 @@ export const thesisApi = {
 
   approveGroup: async (
     groupId: string,
-    exception?: { allowSizeException: boolean; reason: string },
+    exception?: { allowSizeException?: boolean; reason?: string },
   ): Promise<ThesisGroup> => {
     const response = await api.post<ThesisGroup>(
       `/thesis/groups/${groupId}/approve`,
@@ -1375,6 +1394,19 @@ export const thesisApi = {
   ): Promise<ThesisGroup> => {
     const response = await api.post<ThesisGroup>(
       `/thesis/groups/${groupId}/reject`,
+      { reason },
+    );
+    return response.data;
+  },
+
+  /** Pulls a mistaken approval back to PENDING; the group keeps roster and
+   * topic pick. Requires the mandatory reason the audited endpoint demands. */
+  withdrawGroupApproval: async (
+    groupId: string,
+    reason: string,
+  ): Promise<ThesisGroup> => {
+    const response = await api.post<ThesisGroup>(
+      `/thesis/groups/${groupId}/withdraw-approval`,
       { reason },
     );
     return response.data;
