@@ -2,6 +2,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
+const { readJavaSource } = require('./helpers/java-source');
 
 const root = path.resolve(__dirname, '..');
 const repoRoot = path.resolve(root, '..');
@@ -249,9 +250,7 @@ test('forced password rotation gate uses the shared non-dismissible dialog', () 
 // ---------------------------------------------------------------------------
 
 test('conduct controller no longer aliases literal demo ids to a real student', () => {
-  const controller = readFromRepo(
-    'java-services/restful-api/src/main/java/io/campuscore/restfulapi/academic/web/AcademicConductController.java',
-  );
+  const controller = readJavaSource('AcademicConductController');
   assert.doesNotMatch(controller, /"student-profile"\.equals/);
   assert.doesNotMatch(controller, /"student-user"\.equals/);
   assert.doesNotMatch(controller, /24110054/);
