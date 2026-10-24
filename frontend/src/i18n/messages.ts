@@ -55,6 +55,10 @@ export const en = {
       loadingAnnouncements: 'Loading campus announcements',
       loadingThesisTopics: 'Loading thesis topics',
     },
+    combobox: {
+      noResults: 'No matching options',
+      clearSelection: 'Clear selection',
+    },
     statuses: {
       OPEN: 'Open',
       CLOSED: 'Closed',
@@ -3131,6 +3135,10 @@ export const vi: I18nMessages = {
       loadingMetrics: 'Đang tải số liệu',
       loadingAnnouncements: 'Đang tải thông báo trường',
       loadingThesisTopics: 'Đang tải đề tài',
+    },
+    combobox: {
+      noResults: 'Không có kết quả phù hợp',
+      clearSelection: 'Xóa lựa chọn',
     },
     statuses: {
       OPEN: 'Đang mở',
