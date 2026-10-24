@@ -1,6 +1,8 @@
 package io.campuscore.restfulapi.security;
 
 import com.nimbusds.jose.jwk.source.ImmutableSecret;
+import io.campuscore.restfulapi.auth.model.IssuedAccessToken;
+import io.campuscore.restfulapi.auth.model.IssuedRefreshToken;
 import java.nio.charset.StandardCharsets;
 import java.time.Clock;
 import java.time.Duration;
@@ -198,9 +200,4 @@ public class AuthTokenService {
                 .build();
     }
 
-    public record IssuedAccessToken(String accessToken, Instant expiresAt) {
-    }
-
-    public record IssuedRefreshToken(String refreshToken, Instant expiresAt) {
-    }
 }

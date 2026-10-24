@@ -1,5 +1,6 @@
 package io.campuscore.restfulapi.auth.repository;
 
+import io.campuscore.restfulapi.auth.model.TokenRecord;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Timestamp;
@@ -131,13 +132,4 @@ public class PasswordResetTokenRepository {
         return instant == null ? null : OffsetDateTime.ofInstant(instant, ZoneOffset.UTC);
     }
 
-    public record TokenRecord(
-            String id,
-            String userId,
-            String tokenHash,
-            Instant expiresAt,
-            Instant usedAt,
-            Instant createdAt,
-            String requestIp) {
-    }
 }

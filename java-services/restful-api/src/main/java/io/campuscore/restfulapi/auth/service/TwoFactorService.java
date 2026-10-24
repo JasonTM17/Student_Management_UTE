@@ -1,9 +1,9 @@
 package io.campuscore.restfulapi.auth.service;
 
 import io.campuscore.restfulapi.auth.repository.AuthUserRepository;
-import io.campuscore.restfulapi.auth.repository.AuthUserRepository.AuthUserRecord;
+import io.campuscore.restfulapi.auth.model.AuthUserRecord;
 import io.campuscore.restfulapi.auth.repository.TwoFactorChallengeRepository;
-import io.campuscore.restfulapi.auth.repository.TwoFactorChallengeRepository.ChallengeRecord;
+import io.campuscore.restfulapi.auth.model.ChallengeRecord;
 import io.campuscore.restfulapi.auth.service.SessionCookieService;
 import io.campuscore.restfulapi.exception.AppException;
 import io.campuscore.restfulapi.mail.config.MailConfig;

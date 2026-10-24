@@ -1,7 +1,10 @@
 package io.campuscore.restfulapi.auth.service;
 
+import io.campuscore.restfulapi.auth.model.ActiveRefreshSession;
+import io.campuscore.restfulapi.auth.model.LoginResult;
+import io.campuscore.restfulapi.auth.model.RacedRotation;
 import io.campuscore.restfulapi.auth.repository.AuthUserRepository;
-import io.campuscore.restfulapi.auth.repository.AuthUserRepository.AuthUserRecord;
+import io.campuscore.restfulapi.auth.model.AuthUserRecord;
 import io.campuscore.restfulapi.auth.dto.AuthDtos.AuthUserResponse;
 import io.campuscore.restfulapi.auth.dto.AuthDtos.LoginResponse;
 import io.campuscore.restfulapi.auth.dto.AuthDtos.UpdateProfileRequest;
@@ -9,8 +12,8 @@ import io.campuscore.restfulapi.exception.AppException;
 import io.campuscore.restfulapi.exception.DomainException;
 import io.campuscore.restfulapi.security.AuthPrincipal;
 import io.campuscore.restfulapi.security.AuthTokenService;
-import io.campuscore.restfulapi.security.AuthTokenService.IssuedAccessToken;
-import io.campuscore.restfulapi.security.AuthTokenService.IssuedRefreshToken;
+import io.campuscore.restfulapi.auth.model.IssuedAccessToken;
+import io.campuscore.restfulapi.auth.model.IssuedRefreshToken;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
@@ -202,7 +205,7 @@ public class AuthLoginService {
         users.lockUserRow(decoded.getSubject());
         Instant now = clock.instant();
         String refreshTokenHash = hash(refreshTokenValue);
-        Optional<AuthUserRepository.ActiveRefreshSession> sessionRow =
+        Optional<ActiveRefreshSession> sessionRow =
                 users.findByActiveRefreshSession(refreshTokenHash, now);
         if (sessionRow.isEmpty()) {
             return recoverRacedRefresh(decoded, refreshTokenHash, now, ipAddress, userAgent);
@@ -243,7 +246,7 @@ public class AuthLoginService {
     private LoginResult recoverRacedRefresh(
             Jwt decoded, String refreshTokenHash, Instant now, String ipAddress, String userAgent) {
         String subject = decoded.getSubject();
-        Optional<AuthUserRepository.RacedRotation> raced =
+        Optional<RacedRotation> raced =
                 users.findByPreviousRefreshSession(refreshTokenHash, now)
                         .filter(candidate -> withinRotationOverlap(candidate.rotatedAt(), now));
         if (raced.isEmpty()) {
@@ -271,7 +274,7 @@ public class AuthLoginService {
             throw new BadCredentialsException("Invalid refresh token");
         }
 
-        AuthUserRepository.RacedRotation candidate = raced.get();
+        RacedRotation candidate = raced.get();
         AuthUserRecord user = candidate.user();
         if (!user.id().equals(subject) || !"ACTIVE".equals(user.status())) {
             throw new BadCredentialsException("Invalid refresh token");
@@ -561,27 +564,4 @@ public class AuthLoginService {
         }
     }
 
-    /**
-     * A full session (response + expiry instants, challenge fields null) or a
-     * second-factor challenge (response null, challenge fields set). The
-     * controller branches on {@code response == null}.
-     */
-    public record LoginResult(
-            LoginResponse response,
-            Instant accessTokenExpiresAt,
-            Instant refreshTokenExpiresAt,
-            String challengeId,
-            String email) {
-
-        public static LoginResult session(
-                LoginResponse response,
-                Instant accessTokenExpiresAt,
-                Instant refreshTokenExpiresAt) {
-            return new LoginResult(response, accessTokenExpiresAt, refreshTokenExpiresAt, null, null);
-        }
-
-        public static LoginResult challenge(String challengeId, String email) {
-            return new LoginResult(null, null, null, challengeId, email);
-        }
-    }
 }

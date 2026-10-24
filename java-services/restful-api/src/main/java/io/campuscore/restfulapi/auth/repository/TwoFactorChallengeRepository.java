@@ -1,5 +1,6 @@
 package io.campuscore.restfulapi.auth.repository;
 
+import io.campuscore.restfulapi.auth.model.ChallengeRecord;
 import java.sql.Timestamp;
 import java.time.Instant;
 import java.time.OffsetDateTime;
@@ -146,14 +147,4 @@ public class TwoFactorChallengeRepository {
         return instant == null ? null : OffsetDateTime.ofInstant(instant, ZoneOffset.UTC);
     }
 
-    public record ChallengeRecord(
-            String id,
-            String userId,
-            String purpose,
-            String codeHash,
-            Instant expiresAt,
-            Instant consumedAt,
-            int attempts,
-            Instant createdAt) {
-    }
 }
