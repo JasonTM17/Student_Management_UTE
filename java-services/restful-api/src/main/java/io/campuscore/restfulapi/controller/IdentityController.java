@@ -1,5 +1,6 @@
 package io.campuscore.restfulapi.controller;
 
+import io.campuscore.restfulapi.dto.IdentityResponse;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -44,11 +45,4 @@ public class IdentityController {
         return value == null ? null : value.toString();
     }
 
-    public record IdentityResponse(
-            String subject,
-            List<String> roles,
-            List<String> permissions,
-            String studentId,
-            String lecturerId) {
-    }
 }
