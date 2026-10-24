@@ -2,9 +2,9 @@ package io.campuscore.restfulapi.auth.service;
 
 import io.campuscore.restfulapi.auth.repository.AuthUserRepository;
 import io.campuscore.restfulapi.auth.repository.AuthUserRepository.AuthUserRecord;
-import io.campuscore.restfulapi.auth.web.AuthDtos.AuthUserResponse;
-import io.campuscore.restfulapi.auth.web.AuthDtos.LoginResponse;
-import io.campuscore.restfulapi.auth.web.AuthDtos.UpdateProfileRequest;
+import io.campuscore.restfulapi.auth.dto.AuthDtos.AuthUserResponse;
+import io.campuscore.restfulapi.auth.dto.AuthDtos.LoginResponse;
+import io.campuscore.restfulapi.auth.dto.AuthDtos.UpdateProfileRequest;
 import io.campuscore.restfulapi.exception.AppException;
 import io.campuscore.restfulapi.web.DomainException;
 import io.campuscore.restfulapi.security.AuthPrincipal;

@@ -1,15 +1,15 @@
-package io.campuscore.restfulapi.auth.web;
+package io.campuscore.restfulapi.auth.controller;
 
 import io.campuscore.restfulapi.auth.service.AuthLoginService;
 import io.campuscore.restfulapi.auth.service.AuthLoginService.LoginResult;
 import io.campuscore.restfulapi.auth.service.TwoFactorService;
-import io.campuscore.restfulapi.auth.web.AuthDtos.LoginResponse;
-import io.campuscore.restfulapi.auth.web.TwoFactorDtos.ChallengeResponse;
-import io.campuscore.restfulapi.auth.web.TwoFactorDtos.ConfirmTwoFactorRequest;
-import io.campuscore.restfulapi.auth.web.TwoFactorDtos.DisableTwoFactorRequest;
-import io.campuscore.restfulapi.auth.web.TwoFactorDtos.EnableTwoFactorRequest;
-import io.campuscore.restfulapi.auth.web.TwoFactorDtos.TwoFactorStatusResponse;
-import io.campuscore.restfulapi.auth.web.TwoFactorDtos.VerifyTwoFactorLoginRequest;
+import io.campuscore.restfulapi.auth.dto.AuthDtos.LoginResponse;
+import io.campuscore.restfulapi.auth.dto.TwoFactorDtos.ChallengeResponse;
+import io.campuscore.restfulapi.auth.dto.TwoFactorDtos.ConfirmTwoFactorRequest;
+import io.campuscore.restfulapi.auth.dto.TwoFactorDtos.DisableTwoFactorRequest;
+import io.campuscore.restfulapi.auth.dto.TwoFactorDtos.EnableTwoFactorRequest;
+import io.campuscore.restfulapi.auth.dto.TwoFactorDtos.TwoFactorStatusResponse;
+import io.campuscore.restfulapi.auth.dto.TwoFactorDtos.VerifyTwoFactorLoginRequest;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
@@ -25,6 +25,9 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+import io.campuscore.restfulapi.auth.dto.AuthDtos;
+import io.campuscore.restfulapi.auth.dto.TwoFactorDtos;
+import io.campuscore.restfulapi.auth.service.SessionCookieService;
 
 /**
  * Opt-in email OTP two-factor authentication: manage the per-account switch

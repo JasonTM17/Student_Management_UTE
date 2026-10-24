@@ -1,4 +1,4 @@
-package io.campuscore.restfulapi.auth;
+package io.campuscore.restfulapi.auth.job;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -16,7 +16,7 @@ import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.TestPropertySource;
 
 import io.campuscore.restfulapi.auth.repository.TwoFactorChallengeRepository;
-import io.campuscore.restfulapi.auth.service.TwoFactorChallengeRetentionJob;
+import io.campuscore.restfulapi.auth.job.TwoFactorChallengeRetentionJob;
 
 /**
  * Contract of the challenge retention sweep on H2: a consumed challenge or an

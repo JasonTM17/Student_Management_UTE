@@ -1,11 +1,11 @@
-package io.campuscore.restfulapi.auth;
+package io.campuscore.restfulapi.auth.job;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import io.campuscore.restfulapi.auth.repository.PasswordResetTokenRepository;
-import io.campuscore.restfulapi.auth.service.PasswordResetTokenRetentionJob;
+import io.campuscore.restfulapi.auth.job.PasswordResetTokenRetentionJob;
 import java.time.Duration;
 import java.time.Instant;
 import org.junit.jupiter.api.BeforeEach;

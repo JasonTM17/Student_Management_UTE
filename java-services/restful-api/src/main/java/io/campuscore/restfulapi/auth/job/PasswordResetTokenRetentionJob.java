@@ -1,4 +1,4 @@
-package io.campuscore.restfulapi.auth.service;
+package io.campuscore.restfulapi.auth.job;
 
 import io.campuscore.restfulapi.auth.repository.PasswordResetTokenRepository;
 import java.time.Clock;

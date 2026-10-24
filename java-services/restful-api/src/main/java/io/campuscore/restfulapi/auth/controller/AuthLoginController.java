@@ -1,21 +1,21 @@
-package io.campuscore.restfulapi.auth.web;
+package io.campuscore.restfulapi.auth.controller;
 
 import io.campuscore.restfulapi.auth.service.AuthLoginService;
 import io.campuscore.restfulapi.auth.service.AuthLoginService.LoginResult;
 import io.campuscore.restfulapi.auth.service.PasswordResetRequestDispatcher;
 import io.campuscore.restfulapi.auth.service.PasswordResetService;
 import io.campuscore.restfulapi.security.ratelimit.ClientIpResolver;
-import io.campuscore.restfulapi.auth.web.AuthDtos.AuthUserResponse;
-import io.campuscore.restfulapi.auth.web.AuthDtos.ChangePasswordRequest;
-import io.campuscore.restfulapi.auth.web.AuthDtos.ChangePasswordResponse;
-import io.campuscore.restfulapi.auth.web.AuthDtos.ForgotPasswordRequest;
-import io.campuscore.restfulapi.auth.web.AuthDtos.LoginRequest;
-import io.campuscore.restfulapi.auth.web.AuthDtos.LoginResponse;
-import io.campuscore.restfulapi.auth.web.AuthDtos.LogoutRequest;
-import io.campuscore.restfulapi.auth.web.AuthDtos.MessageResponse;
-import io.campuscore.restfulapi.auth.web.AuthDtos.RefreshRequest;
-import io.campuscore.restfulapi.auth.web.AuthDtos.ResetPasswordRequest;
-import io.campuscore.restfulapi.auth.web.AuthDtos.UpdateProfileRequest;
+import io.campuscore.restfulapi.auth.dto.AuthDtos.AuthUserResponse;
+import io.campuscore.restfulapi.auth.dto.AuthDtos.ChangePasswordRequest;
+import io.campuscore.restfulapi.auth.dto.AuthDtos.ChangePasswordResponse;
+import io.campuscore.restfulapi.auth.dto.AuthDtos.ForgotPasswordRequest;
+import io.campuscore.restfulapi.auth.dto.AuthDtos.LoginRequest;
+import io.campuscore.restfulapi.auth.dto.AuthDtos.LoginResponse;
+import io.campuscore.restfulapi.auth.dto.AuthDtos.LogoutRequest;
+import io.campuscore.restfulapi.auth.dto.AuthDtos.MessageResponse;
+import io.campuscore.restfulapi.auth.dto.AuthDtos.RefreshRequest;
+import io.campuscore.restfulapi.auth.dto.AuthDtos.ResetPasswordRequest;
+import io.campuscore.restfulapi.auth.dto.AuthDtos.UpdateProfileRequest;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
@@ -34,6 +34,8 @@ import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+import io.campuscore.restfulapi.auth.dto.AuthDtos;
+import io.campuscore.restfulapi.auth.service.SessionCookieService;
 
 /** Java auth session endpoints owned by the course REST API. */
 @RestController
