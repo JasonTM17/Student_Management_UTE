@@ -13,6 +13,9 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
 import org.springframework.jdbc.datasource.DriverManagerDataSource;
+import io.campuscore.restfulapi.thesis.assistant.properties.AssistantProperties;
+import io.campuscore.restfulapi.thesis.assistant.repository.ThesisAssistantKnowledgeRepository;
+import io.campuscore.restfulapi.thesis.assistant.service.ThesisAssistantService;
 
 /** New disposable local databases only; no clean/reset/drop or shared target. */
 @EnabledIfEnvironmentVariable(named = "CAMPUSCORE_SPRING_FOCUS_PG_ENABLED", matches = "true")
