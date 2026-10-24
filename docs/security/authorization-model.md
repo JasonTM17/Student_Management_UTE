@@ -186,6 +186,13 @@ retroactively identify password changes made before the revision existed.
   (`RoundType.allowsCounterReviewWaiver()` plus the
   `thesis.governance.counter-review-waiver.enabled` override, default `false`);
   revoke stays ungated so stored waivers can always be cleared.
+- **Thesis registration eligibility** is an academic precondition, not an
+  authorization rule: any authenticated student caller may register only when
+  their published transcript meets `thesis.eligibility.min-credits` (110) and
+  `thesis.eligibility.min-cpa` (2.0). Refusals answer
+  `409 THESIS_ELIGIBILITY_NOT_MET` with numeric `details`; governance roster
+  overrides stay reachable to the same privileged roles and audit the
+  ineligibility. `ADVISORY` mode reports without blocking.
 
 ## Signing configuration
 
