@@ -1,11 +1,11 @@
 package io.campuscore.restfulapi.academic.service;
 
 import io.campuscore.restfulapi.academic.repository.AcademicEnrollmentReadRepository;
-import io.campuscore.restfulapi.academic.repository.AcademicEnrollmentReadRepository.EnrollmentRow;
-import io.campuscore.restfulapi.academic.repository.AcademicEnrollmentReadRepository.GradeItemRow;
-import io.campuscore.restfulapi.academic.repository.AcademicEnrollmentReadRepository.GradeSummaryRow;
-import io.campuscore.restfulapi.academic.repository.AcademicEnrollmentReadRepository.ScheduleRow;
-import io.campuscore.restfulapi.academic.repository.AcademicEnrollmentReadRepository.StudentGradeRow;
+import io.campuscore.restfulapi.academic.model.EnrollmentRow;
+import io.campuscore.restfulapi.academic.model.GradeItemRow;
+import io.campuscore.restfulapi.academic.model.GradeSummaryRow;
+import io.campuscore.restfulapi.academic.model.ScheduleRow;
+import io.campuscore.restfulapi.academic.model.StudentGradeRow;
 import io.campuscore.restfulapi.academic.dto.AcademicEnrollmentReadDtos.ClassroomSummary;
 import io.campuscore.restfulapi.academic.dto.AcademicEnrollmentReadDtos.CourseSummary;
 import io.campuscore.restfulapi.academic.dto.AcademicEnrollmentReadDtos.EnrollmentGradeDetail;

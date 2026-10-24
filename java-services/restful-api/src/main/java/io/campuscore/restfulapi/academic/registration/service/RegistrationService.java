@@ -6,6 +6,7 @@ import io.campuscore.restfulapi.academic.registration.dto.RegistrationDtos.Eligi
 import io.campuscore.restfulapi.academic.registration.dto.RegistrationDtos.RoundResponse;
 import io.campuscore.restfulapi.academic.registration.dto.RegistrationDtos.SectionScheduleView;
 import io.campuscore.restfulapi.academic.registration.dto.RegistrationDtos.SummaryResponse;
+import io.campuscore.restfulapi.academic.registration.model.SlipPayload;
 import io.campuscore.restfulapi.academic.service.AcademicEnrollmentReadService;
 import io.campuscore.restfulapi.academic.service.SemesterStatuses;
 import io.campuscore.restfulapi.academic.dto.AcademicEnrollmentReadDtos.EnrollmentResponse;
@@ -475,9 +476,6 @@ public class RegistrationService {
         if (data == null || data.length < 50) return false;
         String s = new String(data, StandardCharsets.US_ASCII);
         return s.startsWith("%PDF-") && s.contains("startxref") && s.contains("%%EOF");
-    }
-
-    public record SlipPayload(String sha256, byte[] payload) {
     }
 
     /**

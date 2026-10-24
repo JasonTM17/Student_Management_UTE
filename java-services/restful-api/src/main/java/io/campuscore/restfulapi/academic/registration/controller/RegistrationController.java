@@ -7,7 +7,7 @@ import io.campuscore.restfulapi.academic.registration.dto.RegistrationDtos.Eligi
 import io.campuscore.restfulapi.academic.registration.dto.RegistrationDtos.RoundResponse;
 import io.campuscore.restfulapi.academic.registration.dto.RegistrationDtos.SectionScheduleView;
 import io.campuscore.restfulapi.academic.registration.dto.RegistrationDtos.SummaryResponse;
-import io.campuscore.restfulapi.academic.registration.service.RegistrationService.SlipPayload;
+import io.campuscore.restfulapi.academic.registration.model.SlipPayload;
 import io.campuscore.restfulapi.academic.registration.dto.CreditLimitApplicationDtos.CreateRequest;
 import io.campuscore.restfulapi.academic.registration.dto.CreditLimitApplicationDtos.Response;
 import io.campuscore.restfulapi.academic.registration.dto.CreditLimitApplicationDtos.ReviewRequest;

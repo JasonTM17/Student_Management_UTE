@@ -3,7 +3,7 @@ package io.campuscore.restfulapi.academic;
 import static org.assertj.core.api.Assertions.assertThat;
 import io.campuscore.restfulapi.academic.repository.AcademicAttendanceReadRepository;
 import io.campuscore.restfulapi.academic.repository.AcademicAttendanceWriteRepository;
-import io.campuscore.restfulapi.academic.repository.AcademicAttendanceWriteRepository.AttendanceInsertRow;
+import io.campuscore.restfulapi.academic.model.AttendanceInsertRow;
 import java.time.Instant;
 import java.time.OffsetDateTime;
 import java.util.List;

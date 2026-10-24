@@ -1,7 +1,7 @@
 package io.campuscore.restfulapi.academic.service;
 
 import io.campuscore.restfulapi.academic.repository.AcademicAttendanceWriteRepository;
-import io.campuscore.restfulapi.academic.repository.AcademicAttendanceWriteRepository.AttendanceInsertRow;
+import io.campuscore.restfulapi.academic.model.AttendanceInsertRow;
 import io.campuscore.restfulapi.academic.dto.AcademicAttendanceMutationDtos.AttendanceMutationResponse;
 import io.campuscore.restfulapi.academic.dto.AcademicAttendanceMutationDtos.SectionAttendanceUpdateRequest;
 import io.campuscore.restfulapi.academic.dto.AcademicAttendanceMutationDtos.StudentAttendanceEntry;
