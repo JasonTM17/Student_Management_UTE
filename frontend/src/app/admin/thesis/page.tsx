@@ -32,7 +32,7 @@ import { useConfirmationDialog } from '@/components/ui/use-confirmation-dialog';
 import { metricToneClass, statusToneClass } from '@/components/ui/status';
 import { cn } from '@/lib/utils';
 import { toThesisLocalInput as toLocalInput } from '@/lib/thesis-datetime';
-import { planThesisRoundRestore, sortThesisRoundsForOverview } from '@/lib/thesis-round';
+import { mergeThesisRounds, planThesisRoundRestore, sortThesisRoundsForOverview } from '@/lib/thesis-round';
 import {
   assignTopicConflict,
   councilMemberConflict,
@@ -211,7 +211,7 @@ export default function AdminThesisPage() {
         thesisApi.listRounds(),
         showClosed ? thesisApi.listRounds('CLOSED') : Promise.resolve([]),
       ]);
-      setRounds(sortThesisRoundsForOverview([...data, ...closed]));
+      setRounds(sortThesisRoundsForOverview(mergeThesisRounds(data, closed)));
     } catch {
       setError(messages.thesis.loadFailed);
     } finally {

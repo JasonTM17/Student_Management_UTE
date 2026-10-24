@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type SetStateAction } from 'react';
 import { useAuth } from '@/context/AuthContext';
 import { useI18n } from '@/i18n';
-import { pickPreferredThesisRound, roundsForPicker } from '@/lib/thesis-round';
+import { mergeThesisRounds, pickPreferredThesisRound, roundsForPicker } from '@/lib/thesis-round';
 import {
   thesisApi,
   type ThesisGroup,
@@ -65,7 +65,7 @@ export function useThesisWorkspace(
         thesisApi.listRounds(),
         thesisApi.listRounds('CLOSED').catch(() => [] as ThesisRound[]),
       ]);
-      const nextRounds = [...liveRounds, ...closedRounds];
+      const nextRounds = mergeThesisRounds(liveRounds, closedRounds);
       if (requestId !== roundsRequestRef.current) return;
       const sortedRounds = [...nextRounds].sort((a, b) => {
         // Academic rule priority: OPEN registration > KLTN thesis type > newest start date

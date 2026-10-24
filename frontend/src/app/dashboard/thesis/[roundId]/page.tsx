@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import { useParams } from 'next/navigation';
+import { mergeThesisRounds } from '@/lib/thesis-round';
 import {
   ArrowLeft,
   CalendarDays,
@@ -55,7 +56,7 @@ export default function ThesisRoundDetailPage() {
         thesisApi.listGroups(roundId),
       ]);
       if (signal.cancelled) return;
-      setRound([...roundsData, ...closedData].find((r) => r.id === roundId) ?? null);
+      setRound(mergeThesisRounds(roundsData, closedData).find((r) => r.id === roundId) ?? null);
       setTopics(topicsData);
       setGroups(groupsData);
     } catch {
