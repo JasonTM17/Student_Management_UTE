@@ -6,7 +6,7 @@ import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.doAnswer;
 
 import io.campuscore.restfulapi.thesis.service.ThesisMutationService;
-import io.campuscore.restfulapi.thesis.web.ThesisMutationDtos.RosterOverrideRequest;
+import io.campuscore.restfulapi.thesis.dto.ThesisMutationDtos.RosterOverrideRequest;
 import io.campuscore.restfulapi.exception.DomainException;
 import java.sql.Timestamp;
 import java.time.Instant;

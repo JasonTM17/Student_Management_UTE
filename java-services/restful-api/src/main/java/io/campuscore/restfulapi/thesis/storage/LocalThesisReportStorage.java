@@ -1,4 +1,4 @@
-package io.campuscore.restfulapi.thesis.service;
+package io.campuscore.restfulapi.thesis.storage;
 
 import java.io.IOException;
 import java.nio.file.AtomicMoveNotSupportedException;
@@ -8,6 +8,7 @@ import java.nio.file.Paths;
 import java.nio.file.StandardCopyOption;
 import java.nio.file.StandardOpenOption;
 import org.springframework.util.StringUtils;
+import io.campuscore.restfulapi.thesis.config.ThesisReportStorageProperties;
 
 /**
  * Local object storage used by the Docker preview. The compose volume keeps

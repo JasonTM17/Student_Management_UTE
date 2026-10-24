@@ -8,7 +8,7 @@ import static org.mockito.Mockito.doAnswer;
 import io.campuscore.restfulapi.testsupport.AccountAuthorityFixture;
 import io.campuscore.restfulapi.thesis.service.ThesisMutationService;
 import io.campuscore.restfulapi.thesis.service.ThesisSupervisorService;
-import io.campuscore.restfulapi.thesis.web.ThesisMutationDtos.TopicUpdateRequest;
+import io.campuscore.restfulapi.thesis.dto.ThesisMutationDtos.TopicUpdateRequest;
 import io.campuscore.restfulapi.exception.DomainException;
 import java.sql.Timestamp;
 import java.time.Instant;

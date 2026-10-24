@@ -1,4 +1,4 @@
-package io.campuscore.restfulapi.thesis.service;
+package io.campuscore.restfulapi.thesis.storage;
 
 import java.util.Locale;
 import java.util.Set;

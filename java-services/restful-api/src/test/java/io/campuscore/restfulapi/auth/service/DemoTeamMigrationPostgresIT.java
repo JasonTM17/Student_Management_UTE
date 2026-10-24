@@ -3,7 +3,7 @@ package io.campuscore.restfulapi.auth.service;
 import static org.junit.jupiter.api.Assertions.*;
 
 import io.campuscore.restfulapi.thesis.repository.ThesisGroupReadRepository;
-import io.campuscore.restfulapi.thesis.web.ThesisGroupReadDtos.GroupResponse;
+import io.campuscore.restfulapi.thesis.dto.ThesisGroupReadDtos.GroupResponse;
 import java.net.URI;
 import java.nio.file.Files;
 import java.nio.file.Path;

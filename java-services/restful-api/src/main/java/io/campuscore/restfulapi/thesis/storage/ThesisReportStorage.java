@@ -1,4 +1,4 @@
-package io.campuscore.restfulapi.thesis.service;
+package io.campuscore.restfulapi.thesis.storage;
 
 /**
  * Provider-neutral object storage boundary for thesis report artifacts.

@@ -23,6 +23,7 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 import org.springframework.util.StringUtils;
+import io.campuscore.restfulapi.thesis.scope.ThesisDeanScope;
 
 /**
  * Defense councils and component scoring (brief R6–R9): councils of three to

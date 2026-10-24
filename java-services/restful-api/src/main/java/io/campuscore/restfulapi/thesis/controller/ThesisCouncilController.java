@@ -1,18 +1,18 @@
-package io.campuscore.restfulapi.thesis.web;
+package io.campuscore.restfulapi.thesis.controller;
 
 import io.campuscore.restfulapi.thesis.service.ThesisCouncilService;
 import io.campuscore.restfulapi.thesis.service.ThesisCouncilService.CouncilResponse;
 import io.campuscore.restfulapi.thesis.service.ThesisCouncilService.ScoreResponse;
 import io.campuscore.restfulapi.thesis.service.ThesisCouncilService.StudentResultRow;
 import io.campuscore.restfulapi.thesis.service.ThesisCouncilService.TopicResult;
-import io.campuscore.restfulapi.thesis.web.ThesisCouncilRequestDtos.AddCouncilMemberRequest;
-import io.campuscore.restfulapi.thesis.web.ThesisCouncilRequestDtos.AssignReviewerRequest;
-import io.campuscore.restfulapi.thesis.web.ThesisCouncilRequestDtos.AssignTopicRequest;
-import io.campuscore.restfulapi.thesis.web.ThesisCouncilRequestDtos.CreateCouncilRequest;
-import io.campuscore.restfulapi.thesis.web.ThesisCouncilRequestDtos.ReasonRequest;
-import io.campuscore.restfulapi.thesis.web.ThesisCouncilRequestDtos.ReplaceCouncilMemberRequest;
-import io.campuscore.restfulapi.thesis.web.ThesisCouncilRequestDtos.ReviewerScoreRequest;
-import io.campuscore.restfulapi.thesis.web.ThesisCouncilRequestDtos.SubmitScoreRequest;
+import io.campuscore.restfulapi.thesis.dto.ThesisCouncilRequestDtos.AddCouncilMemberRequest;
+import io.campuscore.restfulapi.thesis.dto.ThesisCouncilRequestDtos.AssignReviewerRequest;
+import io.campuscore.restfulapi.thesis.dto.ThesisCouncilRequestDtos.AssignTopicRequest;
+import io.campuscore.restfulapi.thesis.dto.ThesisCouncilRequestDtos.CreateCouncilRequest;
+import io.campuscore.restfulapi.thesis.dto.ThesisCouncilRequestDtos.ReasonRequest;
+import io.campuscore.restfulapi.thesis.dto.ThesisCouncilRequestDtos.ReplaceCouncilMemberRequest;
+import io.campuscore.restfulapi.thesis.dto.ThesisCouncilRequestDtos.ReviewerScoreRequest;
+import io.campuscore.restfulapi.thesis.dto.ThesisCouncilRequestDtos.SubmitScoreRequest;
 import jakarta.validation.Valid;
 import java.math.BigDecimal;
 import java.util.List;
@@ -36,6 +36,7 @@ import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import io.campuscore.restfulapi.thesis.dto.ThesisCouncilRequestDtos;
 
 /** Brief R6–R9: council management, component scoring, and student results. */
 @Tag(name = "Thesis Defense Councils & Grading", description = "Quản lý hội đồng bảo vệ khóa luận, cơ cấu thành viên hội đồng, phân công đề tài phản biện và nhập điểm thành phần")

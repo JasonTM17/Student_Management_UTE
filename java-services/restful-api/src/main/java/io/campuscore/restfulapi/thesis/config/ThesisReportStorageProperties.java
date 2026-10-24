@@ -1,4 +1,4 @@
-package io.campuscore.restfulapi.thesis.service;
+package io.campuscore.restfulapi.thesis.config;
 
 import org.springframework.boot.context.properties.ConfigurationProperties;
 

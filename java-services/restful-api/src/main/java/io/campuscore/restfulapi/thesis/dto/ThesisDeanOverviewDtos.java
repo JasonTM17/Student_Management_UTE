@@ -1,4 +1,4 @@
-package io.campuscore.restfulapi.thesis.web;
+package io.campuscore.restfulapi.thesis.dto;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
 import io.campuscore.restfulapi.thesis.domain.ApprovalStatus;

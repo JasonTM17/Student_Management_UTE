@@ -2,7 +2,7 @@ package io.campuscore.restfulapi.thesis;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import io.campuscore.restfulapi.thesis.web.ThesisMutationController;
+import io.campuscore.restfulapi.thesis.controller.ThesisMutationController;
 import java.util.Map;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;

@@ -1,4 +1,4 @@
-package io.campuscore.restfulapi.thesis.service;
+package io.campuscore.restfulapi.thesis.scope;
 
 import io.campuscore.restfulapi.exception.DomainException;
 import java.util.List;
@@ -14,16 +14,16 @@ import org.springframework.security.oauth2.jwt.Jwt;
  * performs must stay inside their bound, active faculty — global admins
  * (ADMIN/SUPER_ADMIN) and non-dean actors pass through untouched.
  */
-final class ThesisDeanScope {
+public final class ThesisDeanScope {
 
     private ThesisDeanScope() { }
 
-    static boolean isFacultyHead(Jwt actor) {
+    public static boolean isFacultyHead(Jwt actor) {
         List<String> roles = actor == null ? null : actor.getClaimAsStringList("roles");
         return roles != null && roles.contains("TRUONG_KHOA");
     }
 
-    static boolean isGlobalAdmin(Jwt actor) {
+    public static boolean isGlobalAdmin(Jwt actor) {
         List<String> roles = actor == null ? null : actor.getClaimAsStringList("roles");
         return roles != null && (roles.contains("ADMIN") || roles.contains("SUPER_ADMIN"));
     }
@@ -33,7 +33,7 @@ final class ThesisDeanScope {
      * profile. Mirrors ThesisGroupReadRepository.findLecturerScope without a
      * repository dependency so every governance service can share it.
      */
-    static String facultyId(NamedParameterJdbcTemplate jdbc, Jwt actor) {
+    public static String facultyId(NamedParameterJdbcTemplate jdbc, Jwt actor) {
         if (!isFacultyHead(actor) || actor.getSubject() == null) {
             return null;
         }
@@ -59,7 +59,7 @@ final class ThesisDeanScope {
      * whose department sits inside their faculty — unless they personally
      * supervise it — and gets the same 404 the unscoped read path would return.
      */
-    static void requireTopicAccess(NamedParameterJdbcTemplate jdbc, Jwt actor, UUID topicId) {
+    public static void requireTopicAccess(NamedParameterJdbcTemplate jdbc, Jwt actor, UUID topicId) {
         if (isGlobalAdmin(actor) || !isFacultyHead(actor) || topicId == null) {
             return;
         }
@@ -97,7 +97,7 @@ final class ThesisDeanScope {
      * the head of the faculty that owns the topic. Supervising it — even as
      * a dean — is never a waiver.
      */
-    static void requireTopicGovernanceScope(NamedParameterJdbcTemplate jdbc, Jwt actor, UUID topicId) {
+    public static void requireTopicGovernanceScope(NamedParameterJdbcTemplate jdbc, Jwt actor, UUID topicId) {
         if (isGlobalAdmin(actor) || !isFacultyHead(actor) || topicId == null) {
             return;
         }
@@ -141,7 +141,7 @@ final class ThesisDeanScope {
      * Read-side counterpart to {@link #requireTopicAccess}: true when the topic
      * belongs to the dean's active faculty or the dean personally supervises it.
      */
-    static boolean canAccessTopic(NamedParameterJdbcTemplate jdbc, Jwt actor, UUID topicId, String departmentId) {
+    public static boolean canAccessTopic(NamedParameterJdbcTemplate jdbc, Jwt actor, UUID topicId, String departmentId) {
         if (isGlobalAdmin(actor)) {
             return true;
         }

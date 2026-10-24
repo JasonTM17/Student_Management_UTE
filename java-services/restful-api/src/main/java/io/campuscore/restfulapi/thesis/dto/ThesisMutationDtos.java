@@ -1,4 +1,4 @@
-package io.campuscore.restfulapi.thesis.web;
+package io.campuscore.restfulapi.thesis.dto;
 
 import io.campuscore.restfulapi.thesis.domain.GroupStatus;
 import java.time.Instant;

@@ -1,4 +1,4 @@
-package io.campuscore.restfulapi.thesis.service;
+package io.campuscore.restfulapi.thesis.scope;
 
 import java.util.List;
 import org.springframework.jdbc.core.namedparam.MapSqlParameterSource;
@@ -6,16 +6,16 @@ import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
 import org.springframework.security.oauth2.jwt.Jwt;
 
 /** Resolves a department head's scope from their live, subject-bound profile. */
-final class ThesisDepartmentScope {
+public final class ThesisDepartmentScope {
 
     private ThesisDepartmentScope() { }
 
-    static boolean isDepartmentHead(Jwt actor) {
+    public static boolean isDepartmentHead(Jwt actor) {
         List<String> roles = actor == null ? null : actor.getClaimAsStringList("roles");
         return roles != null && roles.contains("TRUONG_BO_MON");
     }
 
-    static String departmentId(NamedParameterJdbcTemplate jdbc, Jwt actor) {
+    public static String departmentId(NamedParameterJdbcTemplate jdbc, Jwt actor) {
         if (!isDepartmentHead(actor) || actor.getSubject() == null) {
             return "";
         }
@@ -34,7 +34,7 @@ final class ThesisDepartmentScope {
         return departments.isEmpty() ? "" : departments.getFirst();
     }
 
-    static boolean owns(NamedParameterJdbcTemplate jdbc, Jwt actor, String departmentId) {
+    public static boolean owns(NamedParameterJdbcTemplate jdbc, Jwt actor, String departmentId) {
         String scope = departmentId(jdbc, actor);
         return !scope.isEmpty() && scope.equals(departmentId);
     }

@@ -1,4 +1,4 @@
-package io.campuscore.restfulapi.thesis.web;
+package io.campuscore.restfulapi.thesis.dto;
 
 import java.math.BigDecimal;
 import java.time.Instant;
