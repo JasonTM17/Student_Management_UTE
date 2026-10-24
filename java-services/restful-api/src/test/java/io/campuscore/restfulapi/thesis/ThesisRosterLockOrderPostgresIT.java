@@ -301,7 +301,8 @@ class ThesisRosterLockOrderPostgresIT {
 
         // The flag still binds where the minimum does: an APPROVED roster.
         UUID approvedGroup = insertGroup(topicId, "rlo-ap", 3);
-        mutations.approveGroup(approvedGroup, admin());
+        mutations.approveGroup(approvedGroup,
+                new GroupApprovalRequest(null, "governance approval"), admin());
         assertThatThrownBy(() -> mutations.overrideGroupRoster(approvedGroup,
                 new RosterOverrideRequest("rlo-ap-student-3", "REMOVE", "stepped back", null, null),
                 admin()))
@@ -353,7 +354,8 @@ class ThesisRosterLockOrderPostgresIT {
             var approver = pool.submit(() -> {
                 Thread.currentThread().setName(APPROVER_NAME);
                 try {
-                    mutations.approveGroup(groupId, admin);
+                    mutations.approveGroup(groupId,
+                            new GroupApprovalRequest(null, "governance approval"), admin);
                     return "OK";
                 } catch (RuntimeException failure) {
                     return failure;
@@ -408,7 +410,8 @@ class ThesisRosterLockOrderPostgresIT {
 
         // REMOVE on an approved roster: refused before the waiver lands.
         UUID approvedGroup = insertGroup(topicId, "rlo-apx", 3);
-        mutations.approveGroup(approvedGroup, admin());
+        mutations.approveGroup(approvedGroup,
+                new GroupApprovalRequest(null, "governance approval"), admin());
         assertThatThrownBy(() -> mutations.overrideGroupRoster(approvedGroup,
                 new RosterOverrideRequest("rlo-apx-student-3", "REMOVE", "stepped back", true, null),
                 foreignDean))
@@ -736,7 +739,8 @@ class ThesisRosterLockOrderPostgresIT {
         supervise(topicId, "rlo-plainsup", 2);
         UUID pending = insertGroup(topicId, "rlo-pg", 3);
         UUID approved = insertGroup(topicId, "rlo-ag", 3);
-        mutations.approveGroup(approved, admin());
+        mutations.approveGroup(approved,
+                new GroupApprovalRequest(null, "governance approval"), admin());
         ProgressRequest cancel = new ProgressRequest(GroupStatus.CANCELLED);
         ProgressRequest complete = new ProgressRequest(GroupStatus.COMPLETED);
 
@@ -805,7 +809,8 @@ class ThesisRosterLockOrderPostgresIT {
 
         UUID adminPending = insertGroup(topicId, "rlo-apg", 3);
         UUID adminApproved = insertGroup(topicId, "rlo-aag", 3);
-        mutations.approveGroup(adminApproved, admin());
+        mutations.approveGroup(adminApproved,
+                new GroupApprovalRequest(null, "governance approval"), admin());
         mutations.updateProgress(adminPending, cancel, admin());
         mutations.updateProgress(adminApproved, complete, admin());
         assertThat(jdbc.queryForObject(
