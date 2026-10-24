@@ -1,7 +1,7 @@
 package io.campuscore.restfulapi.academic.service;
 
 import io.campuscore.restfulapi.auth.service.AdminUserMutationService;
-import io.campuscore.restfulapi.web.DomainException;
+import io.campuscore.restfulapi.exception.DomainException;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.UUID;

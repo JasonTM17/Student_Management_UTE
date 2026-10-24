@@ -289,7 +289,7 @@ class ThesisReportApprovalConsistencyPostgresIT {
 
     private static String attention(String url, String user, String password, String studentId) {
         var dataSource = new DriverManagerDataSource(url, user, password);
-        var service = new ThesisProgressService(new NamedParameterJdbcTemplate(dataSource));
+        var service = new ThesisProgressService(new io.campuscore.restfulapi.thesis.repository.ThesisProgressRepository(new NamedParameterJdbcTemplate(dataSource)));
         Jwt actor = Jwt.withTokenValue("it").header("alg", "none").claim("studentId", studentId).build();
         return service.get(UUID.fromString(ROUND), actor).attentionState();
     }

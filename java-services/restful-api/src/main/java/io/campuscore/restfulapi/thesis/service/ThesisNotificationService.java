@@ -3,7 +3,7 @@ package io.campuscore.restfulapi.thesis.service;
 import io.campuscore.restfulapi.mail.config.MailConfig;
 import io.campuscore.restfulapi.mail.service.EmailService;
 import io.campuscore.restfulapi.notification.repository.NotificationWriteRepository;
-import io.campuscore.restfulapi.notification.repository.NotificationWriteRepository.CreateNotificationCommand;
+import io.campuscore.restfulapi.notification.model.CreateNotificationCommand;
 import java.time.Clock;
 import java.time.Instant;
 import java.util.ArrayList;

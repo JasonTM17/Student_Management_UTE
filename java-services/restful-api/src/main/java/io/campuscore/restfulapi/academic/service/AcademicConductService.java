@@ -1,9 +1,9 @@
 package io.campuscore.restfulapi.academic.service;
 
-import io.campuscore.restfulapi.academic.web.AcademicConductDtos.ConductActivityDto;
-import io.campuscore.restfulapi.academic.web.AcademicConductDtos.ConductCriteriaScoreDto;
-import io.campuscore.restfulapi.academic.web.AcademicConductDtos.ConductSemesterScoreDto;
-import io.campuscore.restfulapi.academic.web.AcademicConductDtos.StudentConductSummaryDto;
+import io.campuscore.restfulapi.academic.dto.AcademicConductDtos.ConductActivityDto;
+import io.campuscore.restfulapi.academic.dto.AcademicConductDtos.ConductCriteriaScoreDto;
+import io.campuscore.restfulapi.academic.dto.AcademicConductDtos.ConductSemesterScoreDto;
+import io.campuscore.restfulapi.academic.dto.AcademicConductDtos.StudentConductSummaryDto;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.sql.Date;

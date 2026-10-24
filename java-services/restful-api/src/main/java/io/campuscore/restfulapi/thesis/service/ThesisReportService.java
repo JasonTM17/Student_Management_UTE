@@ -1,9 +1,15 @@
 package io.campuscore.restfulapi.thesis.service;
 
-import io.campuscore.restfulapi.thesis.domain.RoundStatus;
+import io.campuscore.restfulapi.thesis.model.LecturerScope;
+import io.campuscore.restfulapi.thesis.model.RoundStatus;
+import io.campuscore.restfulapi.thesis.model.StoredReport;
+import io.campuscore.restfulapi.thesis.dto.ReportResponse;
+import io.campuscore.restfulapi.thesis.dto.RepositoryMemberResponse;
+import io.campuscore.restfulapi.thesis.dto.RepositoryReportResponse;
+import io.campuscore.restfulapi.thesis.dto.RepositorySupervisorResponse;
 import io.campuscore.restfulapi.thesis.repository.ThesisGroupReadRepository;
-import io.campuscore.restfulapi.thesis.web.ThesisMutationDtos.ReportUpdateRequest;
-import io.campuscore.restfulapi.web.DomainException;
+import io.campuscore.restfulapi.thesis.dto.ThesisMutationDtos.ReportUpdateRequest;
+import io.campuscore.restfulapi.exception.DomainException;
 import java.time.Instant;
 import java.util.LinkedHashMap;
 import java.util.HexFormat;
@@ -24,6 +30,11 @@ import org.springframework.util.StringUtils;
 import org.springframework.web.multipart.MultipartFile;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import io.campuscore.restfulapi.thesis.config.ThesisReportStorageProperties;
+import io.campuscore.restfulapi.thesis.storage.LocalThesisReportStorage;
+import io.campuscore.restfulapi.thesis.storage.ReportFilePolicy;
+import io.campuscore.restfulapi.thesis.storage.ThesisReportStorage;
+import io.campuscore.restfulapi.thesis.exception.ThesisReportStorageException;
 
 /**
  * Brief R5: only the group leader submits the topic report. The report
@@ -564,7 +575,7 @@ public class ThesisReportService {
     }
 
     private String requireDeanFaculty(Jwt actor) {
-        ThesisGroupReadRepository.LecturerScope scope = groups.findLecturerScope(lecturerId(actor), actor.getSubject());
+        LecturerScope scope = groups.findLecturerScope(lecturerId(actor), actor.getSubject());
         if (scope == null) {
             throw new DomainException(HttpStatus.FORBIDDEN, "LECTURER_PROFILE_REQUIRED",
                     "An active lecturer profile bound to the faculty head is required");
@@ -665,46 +676,6 @@ public class ThesisReportService {
 
     private record StoredObjectRef(String provider, String bucket, String key) { }
 
-    public record ReportResponse(
-            UUID groupId,
-            String title,
-            String url,
-            String note,
-            String submittedBy,
-            Instant submittedAt,
-            Instant updatedAt,
-            String fileName,
-            String fileType,
-            Long fileSize) { }
-
-    public record RepositoryReportResponse(
-            UUID reportId,
-            String title,
-            String url,
-            String note,
-            Instant submittedAt,
-            Instant updatedAt,
-            String fileName,
-            String fileType,
-            Long fileSize,
-            String topicTitle,
-            String topicDescription,
-            String departmentName,
-            String groupStatus,
-            String approvalStatus,
-            String submittedByDisplayName,
-            String submittedByStudentNumber,
-            List<RepositorySupervisorResponse> supervisors,
-            List<RepositoryMemberResponse> members) { }
-
-    public record RepositorySupervisorResponse(String displayName, int supervisorOrder) { }
-
-    public record RepositoryMemberResponse(
-            String displayName,
-            String studentNumber,
-            boolean isExternal,
-            boolean isLeader) { }
-
     private static final class RepositoryBuilder {
         private final UUID reportId;
         private final String title;
@@ -756,9 +727,6 @@ public class ThesisReportService {
         }
     }
 
-    /** The attached document bytes, served only through the authorized download path. */
-    public record StoredReport(String fileName, String contentType, byte[] data) { }
-
     private void requireWriteAccess(GroupContext group, Jwt actor) {
         if (!group.leaderStudentId().equals(studentId(actor))) {
             throw new DomainException(HttpStatus.FORBIDDEN, "GROUP_OWNER_REQUIRED",
@@ -773,7 +741,7 @@ public class ThesisReportService {
      *
      * <ul>
      *   <li>TLCN/KLTN author a GVPB grading deadline ({@link
-     *       io.campuscore.restfulapi.thesis.domain.RoundType#requiresGvpbDeadline()}).
+     *       io.campuscore.restfulapi.thesis.model.RoundType#requiresGvpbDeadline()}).
      *       Reports freeze the moment that date passes, because the grading
      *       committee reads the artifact from then on.</li>
      *   <li>MON_HOC/NCKH deliberately author no grading, council or defense

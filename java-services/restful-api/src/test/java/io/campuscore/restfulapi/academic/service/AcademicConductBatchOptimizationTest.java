@@ -3,7 +3,7 @@ package io.campuscore.restfulapi.academic.service;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 
-import io.campuscore.restfulapi.academic.web.AcademicConductDtos.StudentConductSummaryDto;
+import io.campuscore.restfulapi.academic.dto.AcademicConductDtos.StudentConductSummaryDto;
 import java.math.BigDecimal;
 import java.sql.Date;
 import java.time.LocalDate;

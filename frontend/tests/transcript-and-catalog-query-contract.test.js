@@ -3,6 +3,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 const ts = require('typescript');
+const { readJavaSource } = require('./helpers/java-source');
 
 const root = path.resolve(__dirname, '..');
 
@@ -11,9 +12,8 @@ function read(relativePath) {
 }
 
 const API_SOURCE = read('src/lib/api.ts');
-const BACKEND = '../java-services/restful-api/src/main/java/io/campuscore/restfulapi';
-const ENROLLMENT_CONTROLLER = read(`${BACKEND}/academic/web/AcademicEnrollmentReadController.java`);
-const ACADEMIC_CONTROLLER = read(`${BACKEND}/academic/web/AcademicReadController.java`);
+const ENROLLMENT_CONTROLLER = readJavaSource('AcademicEnrollmentReadController');
+const ACADEMIC_CONTROLLER = readJavaSource('AcademicReadController');
 
 /**
  * Reads the query parameters a client member can put on the wire.

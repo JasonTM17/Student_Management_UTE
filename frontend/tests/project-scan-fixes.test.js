@@ -3,6 +3,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 const ts = require('typescript');
+const { readJavaSource } = require('./helpers/java-source');
 
 const root = path.resolve(__dirname, '..');
 
@@ -260,10 +261,7 @@ test('feedback polish: transcript semester selector is singular and chart contro
 });
 
 test('registration idempotency keeps PostgreSQL duplicate claims inside the transaction', () => {
-  const service = fs.readFileSync(
-    path.join(root, '../java-services/restful-api/src/main/java/io/campuscore/restfulapi/academic/registration/RegistrationService.java'),
-    'utf8',
-  );
+  const service = readJavaSource('RegistrationService');
 
   assert.match(service, /private final boolean postgres/);
   assert.ok(service.includes('ON CONFLICT (\\"ownerId\\", \\"idempotencyKey\\") DO NOTHING'));

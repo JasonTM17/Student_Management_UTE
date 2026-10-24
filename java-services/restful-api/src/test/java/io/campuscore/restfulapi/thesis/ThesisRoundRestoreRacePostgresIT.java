@@ -6,8 +6,8 @@ import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.doAnswer;
 
 import io.campuscore.restfulapi.thesis.service.ThesisMutationService;
-import io.campuscore.restfulapi.thesis.web.ThesisMutationDtos.GroupCreateRequest;
-import io.campuscore.restfulapi.web.DomainException;
+import io.campuscore.restfulapi.thesis.dto.ThesisMutationDtos.GroupCreateRequest;
+import io.campuscore.restfulapi.exception.DomainException;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;

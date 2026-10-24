@@ -1,21 +1,24 @@
 package io.campuscore.restfulapi.academic.repository;
 
-import io.campuscore.restfulapi.academic.web.AcademicReadDtos.AcademicYearSummary;
-import io.campuscore.restfulapi.common.LikePattern;
-import io.campuscore.restfulapi.academic.web.AcademicReadDtos.AcademicYearResponse;import io.campuscore.restfulapi.academic.web.AcademicReadDtos.ClassroomResponse;
-import io.campuscore.restfulapi.academic.web.AcademicReadDtos.ClassroomSectionSummary;
-import io.campuscore.restfulapi.academic.web.AcademicReadDtos.CourseResponse;
-import io.campuscore.restfulapi.academic.web.AcademicReadDtos.CourseRequirementSummary;
-import io.campuscore.restfulapi.academic.web.AcademicReadDtos.CurriculumCourseSummary;
-import io.campuscore.restfulapi.academic.web.AcademicReadDtos.CurriculumResponse;
-import io.campuscore.restfulapi.academic.web.AcademicReadDtos.DepartmentLecturerSummary;
-import io.campuscore.restfulapi.academic.web.AcademicReadDtos.DepartmentResponse;
-import io.campuscore.restfulapi.academic.web.AcademicReadDtos.DepartmentSummary;
-import io.campuscore.restfulapi.academic.web.AcademicReadDtos.FacultyDepartmentSummary;
-import io.campuscore.restfulapi.academic.web.AcademicReadDtos.FacultyResponse;
-import io.campuscore.restfulapi.academic.web.AcademicReadDtos.FacultySummary;
-import io.campuscore.restfulapi.academic.web.AcademicReadDtos.SemesterCatalogSummary;
-import io.campuscore.restfulapi.academic.web.AcademicReadDtos.SemesterResponse;
+import io.campuscore.restfulapi.academic.dto.AcademicReadDtos.AcademicYearSummary;
+import io.campuscore.restfulapi.academic.model.CourseBriefRow;
+import io.campuscore.restfulapi.academic.model.CourseProgressRow;
+import io.campuscore.restfulapi.academic.model.PrerequisiteCodeRow;
+import io.campuscore.restfulapi.common.util.LikePattern;
+import io.campuscore.restfulapi.academic.dto.AcademicReadDtos.AcademicYearResponse;import io.campuscore.restfulapi.academic.dto.AcademicReadDtos.ClassroomResponse;
+import io.campuscore.restfulapi.academic.dto.AcademicReadDtos.ClassroomSectionSummary;
+import io.campuscore.restfulapi.academic.dto.AcademicReadDtos.CourseResponse;
+import io.campuscore.restfulapi.academic.dto.AcademicReadDtos.CourseRequirementSummary;
+import io.campuscore.restfulapi.academic.dto.AcademicReadDtos.CurriculumCourseSummary;
+import io.campuscore.restfulapi.academic.dto.AcademicReadDtos.CurriculumResponse;
+import io.campuscore.restfulapi.academic.dto.AcademicReadDtos.DepartmentLecturerSummary;
+import io.campuscore.restfulapi.academic.dto.AcademicReadDtos.DepartmentResponse;
+import io.campuscore.restfulapi.academic.dto.AcademicReadDtos.DepartmentSummary;
+import io.campuscore.restfulapi.academic.dto.AcademicReadDtos.FacultyDepartmentSummary;
+import io.campuscore.restfulapi.academic.dto.AcademicReadDtos.FacultyResponse;
+import io.campuscore.restfulapi.academic.dto.AcademicReadDtos.FacultySummary;
+import io.campuscore.restfulapi.academic.dto.AcademicReadDtos.SemesterCatalogSummary;
+import io.campuscore.restfulapi.academic.dto.AcademicReadDtos.SemesterResponse;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Timestamp;
@@ -920,27 +923,6 @@ public class AcademicReadRepository {
                         rs.getInt("progress_level"),
                         rs.getBigDecimal("passed_grade"),
                         rs.getString("passed_letter")));
-    }
-
-    public record CourseBriefRow(
-            String id,
-            String code,
-            String name,
-            String nameEn,
-            String nameVi,
-            int credits) {
-    }
-
-    public record CourseProgressRow(
-            String courseId,
-            int progressLevel,
-            java.math.BigDecimal finalGrade,
-            String letterGrade) {
-    }
-
-    public record PrerequisiteCodeRow(
-            String courseId,
-            String requiredCode) {
     }
 
     private static Instant instant(Timestamp timestamp) {

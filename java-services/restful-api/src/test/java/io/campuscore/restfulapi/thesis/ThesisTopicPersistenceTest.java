@@ -8,7 +8,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-import io.campuscore.restfulapi.thesis.domain.ThesisTopic;
+import io.campuscore.restfulapi.thesis.entity.ThesisTopic;
 import io.campuscore.restfulapi.thesis.repository.ThesisTopicRepository;
 import java.sql.Timestamp;
 import java.time.Instant;

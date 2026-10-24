@@ -1,8 +1,8 @@
 package io.campuscore.restfulapi.thesis.service;
 
-import io.campuscore.restfulapi.thesis.domain.RoundStatus;
+import io.campuscore.restfulapi.thesis.model.RoundStatus;
 import io.campuscore.restfulapi.thesis.repository.ThesisRegistrationRoundRepository;
-import io.campuscore.restfulapi.thesis.web.ThesisRoundDtos.RoundResponse;
+import io.campuscore.restfulapi.thesis.dto.ThesisRoundDtos.RoundResponse;
 import java.util.List;
 import java.util.UUID;
 import org.springframework.context.annotation.Profile;
@@ -33,7 +33,7 @@ public class ThesisRoundReadService {
     public RoundResponse get(UUID id) {
         return rounds.findById(id)
                 .map(RoundResponse::from)
-                .orElseThrow(() -> new io.campuscore.restfulapi.web.DomainException(
+                .orElseThrow(() -> new io.campuscore.restfulapi.exception.DomainException(
                         org.springframework.http.HttpStatus.NOT_FOUND,
                         "ROUND_NOT_FOUND",
                         "Thesis registration round not found"));

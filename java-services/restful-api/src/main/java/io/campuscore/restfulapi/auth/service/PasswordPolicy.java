@@ -1,6 +1,6 @@
 package io.campuscore.restfulapi.auth.service;
 
-import io.campuscore.restfulapi.web.DomainException;
+import io.campuscore.restfulapi.exception.DomainException;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.Locale;

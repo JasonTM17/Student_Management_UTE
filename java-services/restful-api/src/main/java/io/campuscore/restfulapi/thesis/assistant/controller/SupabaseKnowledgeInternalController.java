@@ -1,0 +1,176 @@
+package io.campuscore.restfulapi.thesis.assistant.controller;
+
+import io.campuscore.restfulapi.thesis.assistant.dto.KnowledgeDocumentView;
+import io.campuscore.restfulapi.thesis.assistant.dto.KnowledgeRequest;
+import io.campuscore.restfulapi.thesis.assistant.dto.KnowledgeRevision;
+import io.campuscore.restfulapi.exception.DomainException;
+import io.campuscore.restfulapi.thesis.assistant.dto.SyncResult;
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.util.List;
+import java.util.UUID;
+import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import org.springframework.context.annotation.Profile;
+import org.springframework.http.HttpStatus;
+import org.springframework.web.bind.annotation.DeleteMapping;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestHeader;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
+import io.swagger.v3.oas.annotations.tags.Tag;
+import io.campuscore.restfulapi.thesis.assistant.client.SupabaseKnowledgeAuthorityService;
+import io.campuscore.restfulapi.thesis.assistant.properties.AssistantRagProperties;
+import io.campuscore.restfulapi.thesis.assistant.service.AssistantKnowledgeAdminService;
+import io.campuscore.restfulapi.thesis.assistant.service.SupabaseKnowledgeSyncService;
+
+/** Private RAG-side authority boundary.  Never expose this route through Caddy. */
+@Tag(name = "Internal Service Mesh (Supabase Authority)", description = "Private service-to-service endpoints for internal Supabase RAG authority sync")
+@RestController
+@Profile("persistence")
+@ConditionalOnProperty(prefix = "assistant.knowledge", name = "authority-mode", havingValue = "supabase")
+@RequestMapping({"/internal/rag/assistant/knowledge", "/internal/rag/thesis/assistant/knowledge"})
+public class SupabaseKnowledgeInternalController {
+    private static final String TOKEN_HEADER = "X-Rag-Service-Token";
+
+    private final SupabaseKnowledgeAuthorityService authority;
+    private final SupabaseKnowledgeSyncService sync;
+    private final AssistantRagProperties ragProperties;
+    private final boolean rejectKnownDefaults;
+
+    public SupabaseKnowledgeInternalController(SupabaseKnowledgeAuthorityService authority,
+            SupabaseKnowledgeSyncService sync, AssistantRagProperties ragProperties,
+            @Value("${security.jwt.reject-known-defaults:false}") boolean rejectKnownDefaults) {
+        this.authority = authority;
+        this.sync = sync;
+        this.ragProperties = ragProperties;
+        this.rejectKnownDefaults = rejectKnownDefaults;
+        if (!rejectKnownDefaults && ragProperties.tokenIsDevComposeDefault()) {
+            LoggerFactory.getLogger(SupabaseKnowledgeInternalController.class).warn(
+                    "ASSISTANT_RAG_SERVICE_TOKEN is set to the docker-compose development default;"
+                            + " rotate it before exposing this deployment"
+                            + " (security.jwt.reject-known-defaults=true rejects it)");
+        }
+    }
+
+    @GetMapping
+    public List<KnowledgeDocumentView> list(@RequestHeader(name = TOKEN_HEADER, required = false) String token,
+            @RequestHeader(name = "X-Assistant-Owner", required = false) String actor,
+            @RequestParam(required = false) String domain, @RequestParam(required = false) String state) {
+        verify(token);
+        return authority.list(owner(actor), domain, state);
+    }
+
+    @GetMapping("/{id}")
+    public KnowledgeDocumentView get(@PathVariable UUID id,
+            @RequestHeader(name = TOKEN_HEADER, required = false) String token,
+            @RequestHeader(name = "X-Assistant-Owner", required = false) String actor) {
+        verify(token);
+        return authority.get(id, owner(actor));
+    }
+
+    @PostMapping
+    public KnowledgeRevision create(@RequestBody KnowledgeRequest request,
+            @RequestHeader(name = TOKEN_HEADER, required = false) String token,
+            @RequestHeader(name = "X-Assistant-Owner", required = false) String actor) {
+        verify(token);
+        AssistantKnowledgeAdminService.validate(request);
+        return authority.create(request, owner(actor));
+    }
+
+    @PutMapping("/{id}")
+    public KnowledgeRevision update(@PathVariable UUID id, @RequestBody KnowledgeRequest request,
+            @RequestHeader(name = TOKEN_HEADER, required = false) String token,
+            @RequestHeader(name = "X-Assistant-Owner", required = false) String actor) {
+        verify(token);
+        AssistantKnowledgeAdminService.validate(request);
+        return authority.update(id, request, owner(actor));
+    }
+
+    @PostMapping("/{id}/submit")
+    public KnowledgeRevision submit(@PathVariable UUID id,
+            @RequestHeader(name = TOKEN_HEADER, required = false) String token,
+            @RequestHeader(name = "X-Assistant-Owner", required = false) String actor) {
+        verify(token);
+        return authority.submit(id, owner(actor));
+    }
+
+    @PostMapping("/{id}/publish")
+    public KnowledgeRevision publish(@PathVariable UUID id,
+            @RequestHeader(name = TOKEN_HEADER, required = false) String token,
+            @RequestHeader(name = "X-Assistant-Owner", required = false) String actor) {
+        verify(token);
+        String owner = owner(actor);
+        KnowledgeRevision published = authority.publish(id, owner);
+        SyncResult projection = sync.syncNow();
+        return new KnowledgeRevision(published.documentId(), published.revisionId(), published.version(), published.state(),
+                published.releaseId(), published.corpusVersion(), published.corpusHash(), published.rowCount(), projection);
+    }
+
+    @DeleteMapping("/{id}")
+    public SyncResult archive(@PathVariable UUID id,
+            @RequestHeader(name = TOKEN_HEADER, required = false) String token,
+            @RequestHeader(name = "X-Assistant-Owner", required = false) String actor) {
+        verify(token);
+        authority.archive(id, owner(actor));
+        // Supabase published the tombstone release in the archive transaction.
+        // Return the cross-database projection state to the admin edge.
+        return sync.syncNow();
+    }
+
+    @PostMapping("/sync")
+    public SyncResult sync(
+            @RequestHeader(name = TOKEN_HEADER, required = false) String token,
+            @RequestHeader(name = "X-Assistant-Owner", required = false) String actor) {
+        verify(token);
+        owner(actor);
+        return sync.syncNow();
+    }
+
+    @GetMapping("/sync-status")
+    public SyncResult status(
+            @RequestHeader(name = TOKEN_HEADER, required = false) String token,
+            @RequestHeader(name = "X-Assistant-Owner", required = false) String actor) {
+        verify(token);
+        owner(actor);
+        return sync.status();
+    }
+
+    private void verify(String token) {
+        if (!ragProperties.serviceMode()) {
+            throw new DomainException(HttpStatus.SERVICE_UNAVAILABLE, "RAG_SERVICE_DISABLED", "RAG service is not configured");
+        }
+        // Placeholder tokens fail inside tokenConfigured(); the compose dev
+        // default fails closed only under strict secrets mode (same flag and
+        // stance as JwtSecretPolicy for JWT secrets).
+        if (!ragProperties.tokenConfigured()
+                || (rejectKnownDefaults && ragProperties.tokenIsDevComposeDefault())) {
+            throw new DomainException(HttpStatus.SERVICE_UNAVAILABLE, "RAG_SERVICE_TOKEN_MISSING",
+                    "RAG service token is not configured (a committed default is rejected)");
+        }
+        if (token == null || token.isBlank()) {
+            throw new DomainException(HttpStatus.FORBIDDEN, "RAG_SERVICE_UNAUTHORIZED", "RAG service token is required");
+        }
+        byte[] expected = ragProperties.serviceToken().getBytes(StandardCharsets.UTF_8);
+        byte[] presented = token.getBytes(StandardCharsets.UTF_8);
+        if (!MessageDigest.isEqual(expected, presented)) {
+            throw new DomainException(HttpStatus.FORBIDDEN, "RAG_SERVICE_UNAUTHORIZED", "RAG service token is invalid");
+        }
+    }
+
+    private static String owner(String actor) {
+        // Opaque identifier bound to VARCHAR(120) owner columns; reject values
+        // that would silently break the RLS match or fail late inside the
+        // transaction.
+        if (actor == null || actor.isBlank() || actor.length() > 120) {
+            throw new DomainException(HttpStatus.UNAUTHORIZED, "UNAUTHENTICATED", "Assistant owner is required");
+        }
+        return actor;
+    }
+}

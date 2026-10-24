@@ -44,7 +44,7 @@ class AnnouncementReadPersistenceTest {
 
     @BeforeEach
     void prepareReadOnlyFixture() {
-        io.campuscore.restfulapi.security.DatabaseAvailabilityTracker.recordSuccess();
+        io.campuscore.restfulapi.security.availability.DatabaseAvailabilityTracker.recordSuccess();
         jdbc.execute("CREATE SCHEMA IF NOT EXISTS \"engagement\"");
         // The account-state gate consults the issuing table on every business
         // request and fails closed when the store is unreadable, so this

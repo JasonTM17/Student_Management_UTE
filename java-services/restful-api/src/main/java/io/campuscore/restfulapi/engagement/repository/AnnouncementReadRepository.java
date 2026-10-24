@@ -1,12 +1,14 @@
 package io.campuscore.restfulapi.engagement.repository;
 
-import io.campuscore.restfulapi.common.LikePattern;
-import io.campuscore.restfulapi.engagement.web.AnnouncementReadDtos.AnnouncementResponse;
-import io.campuscore.restfulapi.engagement.web.AnnouncementReadDtos.CourseSummary;
-import io.campuscore.restfulapi.engagement.web.AnnouncementReadDtos.LecturerSummary;
-import io.campuscore.restfulapi.engagement.web.AnnouncementReadDtos.PublicAnnouncementResponse;
-import io.campuscore.restfulapi.engagement.web.AnnouncementReadDtos.SectionSummary;
-import io.campuscore.restfulapi.engagement.web.AnnouncementReadDtos.SemesterSummary;
+import io.campuscore.restfulapi.common.util.LikePattern;
+import io.campuscore.restfulapi.engagement.model.AnnouncementFilter;
+import io.campuscore.restfulapi.engagement.model.UserVisibility;
+import io.campuscore.restfulapi.engagement.dto.AnnouncementReadDtos.AnnouncementResponse;
+import io.campuscore.restfulapi.engagement.dto.AnnouncementReadDtos.CourseSummary;
+import io.campuscore.restfulapi.engagement.dto.AnnouncementReadDtos.LecturerSummary;
+import io.campuscore.restfulapi.engagement.dto.AnnouncementReadDtos.PublicAnnouncementResponse;
+import io.campuscore.restfulapi.engagement.dto.AnnouncementReadDtos.SectionSummary;
+import io.campuscore.restfulapi.engagement.dto.AnnouncementReadDtos.SemesterSummary;
 import java.sql.Array;
 import java.sql.ResultSet;
 import java.sql.SQLException;
@@ -394,17 +396,6 @@ public class AnnouncementReadRepository {
 
     private static boolean present(String value) {
         return value != null && !value.isEmpty();
-    }
-
-    public record AnnouncementFilter(String semesterId, String sectionId, String priority, String status, String search) {
-    }
-
-    public record UserVisibility(
-            List<String> roles,
-            String studentId,
-            Integer studentYear,
-            String lecturerId,
-            Instant now) {
     }
 
     private record SqlWhere(String sql, MapSqlParameterSource parameters) {

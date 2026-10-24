@@ -9,6 +9,7 @@ import static org.mockito.Mockito.reset;
 
 import static org.mockito.ArgumentMatchers.eq;
 
+import io.campuscore.restfulapi.auth.model.LoginResult;
 import io.campuscore.restfulapi.auth.repository.AuthUserRepository;
 import io.campuscore.restfulapi.auth.service.AuthLoginService;
 import io.campuscore.restfulapi.auth.service.PasswordResetService;
@@ -274,7 +275,7 @@ class CredentialSessionLockOrderPostgresIT {
         try (Connection holder = connection()) {
             holder.setAutoCommit(false);
             lockRow(holder, "User", "id", f.id());
-            Future<AuthLoginService.LoginResult> waiter;
+            Future<LoginResult> waiter;
             try {
                 waiter = pool.submit(() -> {
                     Thread.currentThread().setName(waiterName);
@@ -287,7 +288,7 @@ class CredentialSessionLockOrderPostgresIT {
                 assertChildRowFree("Session", f.id());
             } finally { holder.rollback(); }
 
-            AuthLoginService.LoginResult recovered = waiter.get(WAIT_SECONDS, TimeUnit.SECONDS);
+            LoginResult recovered = waiter.get(WAIT_SECONDS, TimeUnit.SECONDS);
             assertThat(recovered.response().refreshToken()).isNotEqualTo(refresh0).isNotEqualTo(refresh1);
             String keptId = jdbc.queryForObject(
                     "SELECT \"id\" FROM campuscore_auth.\"Session\" WHERE \"userId\"=?",
@@ -416,7 +417,7 @@ class CredentialSessionLockOrderPostgresIT {
                 return null;
             });
             await(writerHoldsUser);
-            Future<AuthLoginService.LoginResult> waiter = pool.submit(() -> {
+            Future<LoginResult> waiter = pool.submit(() -> {
                 Thread.currentThread().setName(waiterName);
                 return auth.refresh(refresh0, "127.0.0.1", "race-it");
             });

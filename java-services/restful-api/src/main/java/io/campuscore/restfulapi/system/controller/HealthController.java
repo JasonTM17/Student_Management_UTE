@@ -1,0 +1,93 @@
+package io.campuscore.restfulapi.system.controller;
+
+import io.campuscore.restfulapi.system.service.DatabaseReadinessService;
+import io.campuscore.restfulapi.thesis.assistant.rls.AssistantRlsState;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.tags.Tag;
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.time.Instant;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.dao.DataAccessException;
+import org.springframework.http.HttpStatus;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.RequestHeader;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.server.ResponseStatusException;
+
+@RestController
+@RequestMapping("/api/v1/health")
+@Tag(name = "Health & Probes", description = "Kiểm tra trạng thái sẵn sàng (Readiness) và khả năng hoạt động (Liveness) của dịch vụ")
+public class HealthController {
+
+    private final String readinessKey;
+    private final DatabaseReadinessService readiness;
+    private final ObjectProvider<AssistantRlsState> assistantRlsState;
+
+    public HealthController(
+            @Value("${health.readiness-key:}") String readinessKey,
+            DatabaseReadinessService readiness,
+            ObjectProvider<AssistantRlsState> assistantRlsState) {
+        this.readinessKey = readinessKey;
+        this.readiness = readiness;
+        this.assistantRlsState = assistantRlsState;
+    }
+
+    @GetMapping("/liveness")
+    @Operation(summary = "Kiểm tra Liveness Probe", description = "Xác nhận container RESTful API đang chạy bình thường.")
+    @ApiResponse(responseCode = "200", description = "Dịch vụ đang hoạt động bình thường")
+    public Map<String, Object> liveness() {
+        return Map.of(
+                "status", "ok",
+                "service", "restful-api",
+                "timestamp", Instant.now());
+    }
+
+    @GetMapping("/readiness")
+    @Operation(summary = "Kiểm tra Readiness Probe", description = "Kiểm tra kết nối tới cơ sở dữ liệu PostgreSQL trước khi tiếp nhận lưu lượng truy cập.")
+    @ApiResponse(responseCode = "200", description = "Cơ sở dữ liệu sẵn sàng")
+    public Map<String, Object> readiness(
+            @Parameter(description = "Mã khóa bảo vệ probe kiểm tra trạng thái sẵn sàng")
+            @RequestHeader(value = "X-Health-Key", required = false) String suppliedKey) {
+        if (readinessKey.isBlank()
+                || suppliedKey == null
+                || !MessageDigest.isEqual(
+                        readinessKey.getBytes(StandardCharsets.UTF_8),
+                        suppliedKey.getBytes(StandardCharsets.UTF_8))) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Readiness key required");
+        }
+
+        try {
+            readiness.checkReady();
+        } catch (DataAccessException exception) {
+            throw new ResponseStatusException(
+                    HttpStatus.SERVICE_UNAVAILABLE,
+                    "Database unavailable",
+                    exception);
+        }
+
+        Map<String, Object> payload = new LinkedHashMap<>();
+        payload.put("status", "ready");
+        payload.put("service", "restful-api");
+        // Wave 1.2: the assistant RLS runtime degrades without killing the boot,
+        // so readiness surfaces its verdict without failing the primary probe.
+        // The bean only exists in persistence (non-test) deployments.
+        AssistantRlsState rls = assistantRlsState.getIfAvailable();
+        if (rls != null) {
+            payload.put("assistantRls", rls.verified() ? "verified" : "degraded");
+            if (!rls.verified()) {
+                payload.put("assistantRlsReason", rls.reason());
+            }
+        }
+        payload.put("dependencies", List.of("postgresql"));
+        payload.put("timestamp", Instant.now());
+        return payload;
+    }
+}

@@ -1,9 +1,9 @@
 package io.campuscore.restfulapi.academic.service;
 
 import io.campuscore.restfulapi.academic.repository.AcademicScheduleReadRepository;
-import io.campuscore.restfulapi.academic.web.AcademicScheduleReadDtos.PageMeta;
-import io.campuscore.restfulapi.academic.web.AcademicScheduleReadDtos.ScheduleListResponse;
-import io.campuscore.restfulapi.academic.web.AcademicScheduleReadDtos.ScheduleResponse;
+import io.campuscore.restfulapi.academic.dto.AcademicScheduleReadDtos.PageMeta;
+import io.campuscore.restfulapi.academic.dto.AcademicScheduleReadDtos.ScheduleListResponse;
+import io.campuscore.restfulapi.academic.dto.AcademicScheduleReadDtos.ScheduleResponse;
 import java.util.List;
 import org.springframework.context.annotation.Profile;
 import org.springframework.http.HttpStatus;
