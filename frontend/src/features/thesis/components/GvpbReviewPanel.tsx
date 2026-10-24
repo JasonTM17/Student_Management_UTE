@@ -104,7 +104,6 @@ export default function GvpbReviewPanel({
                       min="0"
                       max="10"
                       step="0.1"
-                      placeholder="8.5"
                       value={draftScores[topic.id] ?? ''}
                       onChange={(e) => onScoreDraftChange(topic.id, e.target.value)}
                       className="h-8 w-24 text-xs font-semibold"
