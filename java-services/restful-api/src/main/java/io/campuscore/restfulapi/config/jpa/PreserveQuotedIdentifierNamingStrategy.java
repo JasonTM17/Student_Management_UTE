@@ -1,4 +1,4 @@
-package io.campuscore.restfulapi.config;
+package io.campuscore.restfulapi.config.jpa;
 
 import org.hibernate.boot.model.naming.CamelCaseToUnderscoresNamingStrategy;
 import org.hibernate.boot.model.naming.Identifier;
