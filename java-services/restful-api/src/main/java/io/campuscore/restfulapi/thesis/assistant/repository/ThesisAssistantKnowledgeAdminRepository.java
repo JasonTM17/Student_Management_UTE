@@ -83,12 +83,14 @@ public class ThesisAssistantKnowledgeAdminRepository {
         return jdbc.queryForObject("SELECT COUNT(*) FROM assistant.knowledge_document WHERE id=:id", p().addValue("id", id), Integer.class);
     }
 
-    @Transactional(propagation = Propagation.MANDATORY)
+    @Transactional(transactionManager = AssistantDatabaseConfiguration.TRANSACTION_MANAGER,
+            propagation = Propagation.MANDATORY)
     public List<UUID> lockDocumentForUpdate(UUID id) {
         return jdbc.query("SELECT id FROM assistant.knowledge_document WHERE id=:id FOR UPDATE", p().addValue("id", id), (rs, row) -> rs.getObject("id", UUID.class));
     }
 
-    @Transactional(propagation = Propagation.MANDATORY)
+    @Transactional(transactionManager = AssistantDatabaseConfiguration.TRANSACTION_MANAGER,
+            propagation = Propagation.MANDATORY)
     public List<KnowledgeRevisionRow> findLatestDraftForUpdate(UUID documentId) {
         return jdbc.query(
                 "SELECT id,version,created_by FROM assistant.knowledge_document_revision WHERE document_id=:document AND state='DRAFT' ORDER BY version DESC LIMIT 1 FOR UPDATE",
@@ -96,7 +98,8 @@ public class ThesisAssistantKnowledgeAdminRepository {
                 (rs, row) -> new KnowledgeRevisionRow(rs.getObject("id", UUID.class), rs.getInt("version"), rs.getString("created_by")));
     }
 
-    @Transactional(propagation = Propagation.MANDATORY)
+    @Transactional(transactionManager = AssistantDatabaseConfiguration.TRANSACTION_MANAGER,
+            propagation = Propagation.MANDATORY)
     public List<KnowledgeRevisionRow> findOwnedDraftForUpdate(UUID documentId, String actor) {
         return jdbc.query(
                 "SELECT id,version,created_by FROM assistant.knowledge_document_revision WHERE document_id=:id AND state='DRAFT' AND created_by=:actor ORDER BY version DESC LIMIT 1 FOR UPDATE",
@@ -104,7 +107,8 @@ public class ThesisAssistantKnowledgeAdminRepository {
                 (rs, row) -> new KnowledgeRevisionRow(rs.getObject("id", UUID.class), rs.getInt("version"), rs.getString("created_by")));
     }
 
-    @Transactional(propagation = Propagation.MANDATORY)
+    @Transactional(transactionManager = AssistantDatabaseConfiguration.TRANSACTION_MANAGER,
+            propagation = Propagation.MANDATORY)
     public List<KnowledgeRevisionRow> findLatestPendingForUpdate(UUID documentId, String actor) {
         return jdbc.query(
                 "SELECT id,version,created_by FROM assistant.knowledge_document_revision WHERE document_id=:id AND state='PENDING_REVIEW' AND created_by<>:actor ORDER BY version DESC LIMIT 1 FOR UPDATE",
