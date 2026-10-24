@@ -19,7 +19,8 @@ import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
-import io.campuscore.restfulapi.site.service.SiteAppearanceStore;
+import io.campuscore.restfulapi.site.dto.SiteAppearancePayload;
+import io.campuscore.restfulapi.site.service.SiteAppearanceService;
 
 /**
  * Site-wide appearance (accent theme, homepage hero copy, homepage post order).
@@ -30,7 +31,7 @@ import io.campuscore.restfulapi.site.service.SiteAppearanceStore;
  * object the frontend editor produces; the frontend re-sanitizes on every read,
  * and this controller only enforces that it is a JSON object within the size
  * bound. The write stamp ({@code version}, {@code updatedAt}) is applied by
- * {@link SiteAppearanceStore}, so both the PUT response and every later GET
+ * {@link SiteAppearanceService}, so both the PUT response and every later GET
  * carry the same change marker a polling browser compares against.
  */
 @Tag(name = "Site Appearance", description = "Quản lý cấu hình giao diện, màu sắc chủ đề và nội dung trang chủ toàn hệ thống")
@@ -38,10 +39,10 @@ import io.campuscore.restfulapi.site.service.SiteAppearanceStore;
 @RequestMapping(path = "/api/v1/site-appearance", produces = MediaType.APPLICATION_JSON_VALUE)
 public class SiteAppearanceController {
 
-    private final SiteAppearanceStore store;
+    private final SiteAppearanceService service;
 
-    public SiteAppearanceController(SiteAppearanceStore store) {
-        this.store = store;
+    public SiteAppearanceController(SiteAppearanceService service) {
+        this.service = service;
     }
 
     @Operation(summary = "Lấy cấu hình giao diện hệ thống", description = "Truy xuất cấu hình giao diện công khai: bảng màu, khẩu hiệu trang chủ, thứ tự bài viết")
@@ -50,12 +51,12 @@ public class SiteAppearanceController {
     })
     @GetMapping
     public ResponseEntity<String> read() {
-        String payload = store.read();
+        SiteAppearancePayload payload = service.read();
         return ResponseEntity.ok()
                 .cacheControl(CacheControl.maxAge(Duration.ofMinutes(5))
                         .cachePublic()
                         .staleWhileRevalidate(Duration.ofMinutes(10)))
-                .body(payload == null ? "{}" : payload);
+                .body(payload == null ? "{}" : payload.json());
     }
 
     @Operation(summary = "Cập nhật cấu hình giao diện hệ thống", description = "Lưu cấu hình giao diện mới dành cho người quản trị (ADMIN, SUPER_ADMIN)")
@@ -72,7 +73,7 @@ public class SiteAppearanceController {
             throw new DomainException(HttpStatus.BAD_REQUEST, "appearance_payload_invalid",
                     "Appearance payload must be a JSON object");
         }
-        if (body.toString().length() > SiteAppearanceStore.MAX_PAYLOAD_CHARS) {
+        if (body.toString().length() > SiteAppearanceService.MAX_PAYLOAD_CHARS) {
             throw new DomainException(HttpStatus.BAD_REQUEST, "appearance_payload_too_large",
                     "Appearance payload exceeds the size limit");
         }
@@ -80,6 +81,6 @@ public class SiteAppearanceController {
             throw new DomainException(HttpStatus.UNAUTHORIZED, "appearance_not_authenticated",
                     "Not authenticated");
         }
-        return store.write(body.toString(), jwt.getSubject());
+        return service.write(new SiteAppearancePayload(body.toString()), jwt.getSubject()).json();
     }
 }
