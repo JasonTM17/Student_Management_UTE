@@ -179,7 +179,6 @@ export default function ProfilePage() {
   const [twoFactorEnabled, setTwoFactorEnabled] = useState<boolean | null>(null);
   const [twoFactorStatusError, setTwoFactorStatusError] = useState('');
   const [twoFactorStage, setTwoFactorStage] = useState<'idle' | 'confirm'>('idle');
-  const [twoFactorPassword, setTwoFactorPassword] = useState('');
   const [twoFactorCode, setTwoFactorCode] = useState('');
   const [twoFactorChallengeId, setTwoFactorChallengeId] = useState('');
   // Which flow the shared confirm-code form completes (round-4: disable is two-step too).
@@ -257,23 +256,24 @@ export default function ProfilePage() {
 
   const resetTwoFactorFlow = () => {
     setTwoFactorStage('idle');
-    setTwoFactorPassword('');
     setTwoFactorCode('');
     setTwoFactorChallengeId('');
     setTwoFactorPendingAction('enable');
   };
 
-  const handleEnableTwoFactor = async (e: React.FormEvent) => {
+  const handleEnableTwoFactor = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setTwoFactorError('');
-    if (!twoFactorPassword) {
+    const form = e.currentTarget;
+    const password = (form.elements.namedItem('twoFactorPassword') as HTMLInputElement).value;
+    if (!password) {
       setTwoFactorError(messages.profile.twoFactor.errors.passwordRequired);
       return;
     }
 
     setIsTwoFactorBusy(true);
     try {
-      const { challengeId } = await authApi.beginTwoFactorEnable(twoFactorPassword);
+      const { challengeId } = await authApi.beginTwoFactorEnable(password);
       setTwoFactorChallengeId(challengeId);
       setTwoFactorCode('');
       setTwoFactorStage('confirm');
@@ -287,7 +287,7 @@ export default function ProfilePage() {
       );
     } finally {
       // The password is needed only for the request itself; drop it either way.
-      setTwoFactorPassword('');
+      form.reset();
       setIsTwoFactorBusy(false);
     }
   };
@@ -335,10 +335,12 @@ export default function ProfilePage() {
     }
   };
 
-  const handleDisableTwoFactor = async (e: React.FormEvent) => {
+  const handleDisableTwoFactor = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setTwoFactorError('');
-    if (!twoFactorPassword) {
+    const form = e.currentTarget;
+    const password = (form.elements.namedItem('twoFactorPassword') as HTMLInputElement).value;
+    if (!password) {
       setTwoFactorError(messages.profile.twoFactor.errors.passwordRequired);
       return;
     }
@@ -347,11 +349,10 @@ export default function ProfilePage() {
     try {
       // Round-4 verified fix: the password now only STARTS the disable
       // challenge; the emailed code confirms it (mirrors the enable flow).
-      const { challengeId } = await authApi.startDisableTwoFactor(twoFactorPassword);
+      const { challengeId } = await authApi.startDisableTwoFactor(password);
       setTwoFactorChallengeId(challengeId);
       setTwoFactorPendingAction('disable');
       setTwoFactorStage('confirm');
-      setTwoFactorPassword('');
       setTwoFactorCode('');
       setTwoFactorError('');
     } catch (error: unknown) {
@@ -363,7 +364,7 @@ export default function ProfilePage() {
         ),
       );
     } finally {
-      setTwoFactorPassword('');
+      form.reset();
       setIsTwoFactorBusy(false);
     }
   };
