@@ -7,7 +7,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import io.campuscore.restfulapi.engagement.domain.SanitizationResult;
+import io.campuscore.restfulapi.engagement.model.SanitizationResult;
 import io.campuscore.restfulapi.engagement.service.AnnouncementHtmlSanitizer;
 import java.io.IOException;
 import java.nio.file.Files;

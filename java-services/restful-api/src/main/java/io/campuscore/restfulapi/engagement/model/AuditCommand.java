@@ -1,4 +1,4 @@
-package io.campuscore.restfulapi.engagement.domain;
+package io.campuscore.restfulapi.engagement.model;
 
 import java.time.Instant;
 

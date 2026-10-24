@@ -1,6 +1,6 @@
 package io.campuscore.restfulapi.engagement.service;
 
-import io.campuscore.restfulapi.engagement.domain.SanitizationResult;
+import io.campuscore.restfulapi.engagement.model.SanitizationResult;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;

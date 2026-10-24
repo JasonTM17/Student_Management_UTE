@@ -1,4 +1,4 @@
-package io.campuscore.restfulapi.engagement.domain;
+package io.campuscore.restfulapi.engagement.entity;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
