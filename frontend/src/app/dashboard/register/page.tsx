@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
+import Link from 'next/link';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import {
   AlertCircle,
@@ -28,9 +29,12 @@ import {
   type CreditLimitApplication,
   type RegistrationCurriculumRelevance,
   type RegistrationSection,
+  type CurriculumPlanCourseState,
+  type CurriculumDefaultRegistrationResult,
 } from '@/lib/api';
 import type { Enrollment } from '@/types/api';
 import { useApiQuery } from '@/lib/query';
+import { getLocalizedName } from '@/lib/academic-content';
 import { hasCsrfSessionHint } from '@/lib/session-hint';
 import { isCancelledSection } from '@/lib/enrollment-status';
 import {
@@ -71,6 +75,17 @@ const ACTIVE_ENROLLMENT_STATUSES = new Set(['ENROLLED', 'CONFIRMED', 'PENDING'])
 const CURRICULUM_FILTERS: CurriculumFilter[] = ['ALL', 'MANDATORY', 'ELECTIVE', 'OUTSIDE'];
 
 const SORT_MODES: SectionSortMode[] = ['code', 'credits', 'seats'];
+
+const CURRICULUM_STATE_LABELS: Record<CurriculumPlanCourseState,
+  'registeredState' | 'registerable' | 'prerequisiteBlocked' | 'noOpenSection' | 'full' | 'conflict' | 'dismissed'> = {
+  ALREADY_REGISTERED: 'registeredState',
+  REGISTERABLE: 'registerable',
+  BLOCKED_PREREQUISITE: 'prerequisiteBlocked',
+  NO_OPEN_SECTION: 'noOpenSection',
+  FULL: 'full',
+  CONFLICT: 'conflict',
+  DISMISSED: 'dismissed',
+};
 
 /** URL keys for the persisted browse filters (Advisor #8). */
 function parseFilterParams(params: URLSearchParams) {
@@ -131,6 +146,7 @@ export default function RegisterPage() {
   const { confirm, confirmationDialog } = useConfirmationDialog();
   const { locale, messages, formatNumber, formatDate } = useI18n();
   const copy = messages.courseRegistration;
+  const campusErrorCodes = messages.common.campusErrors.codes as Readonly<Record<string, string>>;
   const queryClient = useQueryClient();
   const router = useRouter();
   const pathname = usePathname();
@@ -155,6 +171,11 @@ export default function RegisterPage() {
   const [previewSectionId, setPreviewSectionId] = useState('');
   const [collapsedCourseIds, setCollapsedCourseIds] = useState<Set<string>>(new Set());
   const [policyOpen, setPolicyOpen] = useState(false);
+  const [manualCurriculumYear, setManualCurriculumYear] = useState<number | undefined>();
+  const [manualCurriculumSemester, setManualCurriculumSemester] = useState<number | undefined>();
+  const [curriculumRegistrationResult, setCurriculumRegistrationResult] =
+    useState<CurriculumDefaultRegistrationResult | null>(null);
+  const [curriculumRegistrationError, setCurriculumRegistrationError] = useState('');
   // The registered-list + weekly preview take a full screen before the
   // catalog on mobile — collapsed by default there, always shown on lg.
   const [railDetailsOpen, setRailDetailsOpen] = useState(false);
@@ -175,6 +196,7 @@ export default function RegisterPage() {
   // reproduces the same filtered view after a reload. ----
   const [filtersHydrated, setFiltersHydrated] = useState(false);
   const hydratedRef = useRef(false);
+  const lastSearchParamRef = useRef(searchParams.get('q') ?? '');
 
   useEffect(() => {
     if (hydratedRef.current) {
@@ -199,6 +221,30 @@ export default function RegisterPage() {
     }
     setFiltersHydrated(true);
   }, [searchParams]);
+
+  // Curriculum plan links soft-navigate to this route with a course query.
+  // Keep the controlled search input in sync when Next preserves this page.
+  useEffect(() => {
+    const routeSearchQuery = searchParams.get('q') ?? '';
+    if (routeSearchQuery === lastSearchParamRef.current) {
+      return;
+    }
+    lastSearchParamRef.current = routeSearchQuery;
+    if (routeSearchQuery === searchText.trim()) {
+      return;
+    }
+
+    setSearchText(routeSearchQuery);
+    if (routeSearchQuery) {
+      window.requestAnimationFrame(() => {
+        const searchInput = document.getElementById('registration-catalog-search');
+        if (searchInput instanceof HTMLInputElement) {
+          searchInput.focus({ preventScroll: true });
+          searchInput.scrollIntoView({ block: 'center', behavior: 'smooth' });
+        }
+      });
+    }
+  }, [searchParams, searchText]);
 
   useEffect(() => {
     if (!filtersHydrated) {
@@ -306,6 +352,52 @@ export default function RegisterPage() {
     () => registrationApi.creditLimitApplication(roundId ?? ''),
     { enabled: canLoad && Boolean(roundId), staleTime: 5 * 60_000 },
   );
+  const curriculumPlanQuery = useApiQuery(
+    [
+      'registration',
+      'curriculum-plan',
+      semesterId ?? 'current',
+      manualCurriculumYear ?? '',
+      manualCurriculumSemester ?? '',
+    ],
+    () => registrationApi.curriculumPlan({
+      ...(semesterId ? { semesterId } : {}),
+      ...(manualCurriculumYear !== undefined && manualCurriculumSemester !== undefined
+        ? { curriculumYear: manualCurriculumYear, curriculumSemester: manualCurriculumSemester }
+        : {}),
+    }),
+    { enabled: canLoad, staleTime: 60_000 },
+  );
+  const curriculumRegistrationMutation = useMutation({
+    mutationFn: () => {
+      const plan = curriculumPlanQuery.data;
+      if (!plan) throw new Error('Curriculum plan is unavailable');
+      return registrationApi.registerCurriculumDefaults({
+        semesterId: plan.semesterId,
+        ...(manualCurriculumYear !== undefined && manualCurriculumSemester !== undefined
+          ? { curriculumYear: manualCurriculumYear, curriculumSemester: manualCurriculumSemester }
+          : {}),
+      });
+    },
+    onSuccess: async (result) => {
+      setCurriculumRegistrationError('');
+      setCurriculumRegistrationResult(result);
+      void queryClient.invalidateQueries({ queryKey: ['registration', 'curriculum-plan'] });
+      void queryClient.invalidateQueries({ queryKey: ['registration', 'sections'] });
+      void queryClient.invalidateQueries({ queryKey: ['registration', 'enrollments'] });
+      void queryClient.invalidateQueries({ queryKey: ['registration', 'summary'] });
+      await curriculumPlanQuery.refetch();
+    },
+    onError: (cause: unknown) => {
+      const message = campusCodeMessage(
+        cause,
+        messages.common.campusErrors,
+        copy.curriculumPlan.errorFallback,
+      );
+      setCurriculumRegistrationError(message);
+      toast.error(message);
+    },
+  });
 
   const eligibilityErrorCode = eligibilityQuery.error ? campusErrorCode(eligibilityQuery.error) : undefined;
   const roundOpen =
@@ -958,6 +1050,187 @@ export default function RegisterPage() {
     </Card>
   );
 
+  const curriculumPlan = curriculumPlanQuery.data;
+  const curriculumPlanCopy = copy.curriculumPlan;
+  const curriculumPlanTitle = (state: CurriculumPlanCourseState) =>
+    curriculumPlanCopy[CURRICULUM_STATE_LABELS[state]];
+  const curriculumStateTone = (state: CurriculumPlanCourseState) => {
+    if (state === 'REGISTERABLE' || state === 'ALREADY_REGISTERED') {
+      return 'border-status-success/40 bg-status-success/10 text-status-success-foreground';
+    }
+    if (state === 'FULL' || state === 'BLOCKED_PREREQUISITE') {
+      return 'border-status-warning/40 bg-status-warning/10 text-status-warning-foreground';
+    }
+    return 'border-border bg-secondary text-foreground';
+  };
+  const curriculumPlanPanel = (
+    <Card role="region" className="overflow-hidden border-primary/20 bg-card shadow-sm" aria-labelledby="curriculum-plan-title" data-testid="curriculum-plan-panel">
+      <CardHeader className="flex flex-col gap-3 border-b border-border/70 bg-primary/[0.035] p-4 sm:flex-row sm:items-center sm:justify-between sm:p-5">
+        <div className="min-w-0">
+          <div className="flex flex-wrap items-center gap-2">
+            <CardTitle as="h2" id="curriculum-plan-title" className="text-base font-bold sm:text-lg">
+              {curriculumPlanCopy.title}
+            </CardTitle>
+            {curriculumPlan?.term.status === 'RESOLVED' || curriculumPlan?.term.status === 'MANUAL' ? (
+              <span className="rounded-md border border-primary/25 bg-primary/10 px-2 py-1 text-xs font-semibold text-primary">
+                {curriculumPlanCopy.termLabel
+                  .replace('{year}', String(curriculumPlan.term.curriculumYear))
+                  .replace('{semester}', String(curriculumPlan.term.curriculumSemester))}
+              </span>
+            ) : null}
+          </div>
+          <p className="mt-1 text-sm leading-5 text-muted-foreground">{curriculumPlanCopy.description}</p>
+          {curriculumPlan ? (
+            <p className="mt-1 text-xs text-muted-foreground">
+              {getLocalizedName(locale, {
+                name: curriculumPlan.semesterName,
+                nameEn: curriculumPlan.semesterNameEn,
+                nameVi: curriculumPlan.semesterNameVi,
+              })}
+            </p>
+          ) : null}
+        </div>
+        <Button
+          type="button"
+          className="min-h-11 w-full shrink-0 sm:w-auto"
+          onClick={() => curriculumRegistrationMutation.mutate()}
+          disabled={
+            curriculumPlanQuery.isLoading
+            || curriculumRegistrationMutation.isPending
+            || !curriculumPlan?.registrationOpen
+            || !curriculumPlan.courses.some((course) => course.state === 'REGISTERABLE')
+          }
+        >
+          {curriculumRegistrationMutation.isPending ? curriculumPlanCopy.registering : curriculumPlanCopy.registerAll}
+        </Button>
+      </CardHeader>
+      <CardContent className="space-y-4 p-4 sm:p-5">
+        {curriculumPlanQuery.isLoading ? (
+          <p role="status" className="text-sm text-muted-foreground">{curriculumPlanCopy.loading}</p>
+        ) : curriculumPlanQuery.isError ? (
+          <div role="alert" className="flex flex-col gap-3 rounded-lg border border-destructive/30 bg-destructive/5 p-3 text-sm sm:flex-row sm:items-center sm:justify-between">
+            <span>{campusCodeMessage(curriculumPlanQuery.error, messages.common.campusErrors, curriculumPlanCopy.loadFailed)}</span>
+            <Button type="button" variant="outline" size="sm" className="min-h-11" onClick={() => void curriculumPlanQuery.refetch()}>
+              {curriculumPlanCopy.retry}
+            </Button>
+          </div>
+        ) : curriculumPlan ? (
+          <>
+            {curriculumPlan.term.status === 'UNKNOWN' ? (
+              <div className="rounded-lg border border-status-warning/40 bg-status-warning/10 p-3">
+                <p className="text-sm font-medium text-foreground">{curriculumPlanCopy.unknownTerm}</p>
+                <div className="mt-3 grid gap-3 sm:grid-cols-2">
+                  <label className="space-y-1.5 text-sm font-medium text-foreground">
+                    <span>{curriculumPlanCopy.chooseYear}</span>
+                    <select
+                      aria-label={curriculumPlanCopy.chooseYear}
+                      value={manualCurriculumYear ?? ''}
+                      onChange={(event) => setManualCurriculumYear(event.target.value ? Number(event.target.value) : undefined)}
+                      className="min-h-11 w-full rounded-md border border-input bg-background px-3 text-sm text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                    >
+                      <option value="">{curriculumPlanCopy.choosePlaceholder}</option>
+                      {Array.from({ length: 20 }, (_, index) => index + 1).map((year) => (
+                        <option key={year} value={year}>{year}</option>
+                      ))}
+                    </select>
+                  </label>
+                  <label className="space-y-1.5 text-sm font-medium text-foreground">
+                    <span>{curriculumPlanCopy.chooseSemester}</span>
+                    <select
+                      aria-label={curriculumPlanCopy.chooseSemester}
+                      value={manualCurriculumSemester ?? ''}
+                      onChange={(event) => setManualCurriculumSemester(event.target.value ? Number(event.target.value) : undefined)}
+                      className="min-h-11 w-full rounded-md border border-input bg-background px-3 text-sm text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                    >
+                      <option value="">{curriculumPlanCopy.choosePlaceholder}</option>
+                      {[1, 2, 3].map((term) => <option key={term} value={term}>{term}</option>)}
+                    </select>
+                  </label>
+                </div>
+              </div>
+            ) : null}
+            {!curriculumPlan.registrationOpen ? (
+              <p className="rounded-lg border border-border bg-secondary/50 px-3 py-2 text-sm text-muted-foreground">
+                {curriculumPlanCopy.registrationClosed}
+              </p>
+            ) : null}
+            {curriculumRegistrationError ? (
+              <p role="alert" className="rounded-lg border border-destructive/30 bg-destructive/5 px-3 py-2 text-sm text-destructive">
+                {curriculumRegistrationError}
+              </p>
+            ) : null}
+            {curriculumRegistrationResult ? (
+              <div role="status" aria-label={curriculumPlanCopy.resultLabel} aria-live="polite" className="rounded-lg border border-primary/20 bg-primary/[0.04] p-3">
+                <p className="text-sm font-semibold text-foreground">
+                  {curriculumPlanCopy.registeredCount.replace('{count}', formatNumber(curriculumRegistrationResult.registeredCount))}
+                  {' '}
+                  {curriculumPlanCopy.skippedCount.replace('{count}', formatNumber(curriculumRegistrationResult.skippedCount))}
+                </p>
+                {curriculumRegistrationResult.courses.length > 0 ? (
+                  <ul className="mt-2 flex flex-wrap gap-2" aria-label={curriculumPlanCopy.resultLabel}>
+                    {curriculumRegistrationResult.courses.map((course) => (
+                      <li key={course.courseId} className="inline-flex items-center gap-1.5 rounded-md border border-border bg-background px-2 py-1 text-xs">
+                        <span className="font-mono font-semibold">{course.courseCode}</span>
+                        <span>{curriculumPlanTitle(course.state)}</span>
+                      </li>
+                    ))}
+                  </ul>
+                ) : null}
+              </div>
+            ) : null}
+            {curriculumPlan.courses.length === 0 ? (
+              curriculumPlan.term.status === 'UNKNOWN' ? null : (
+                <p className="text-sm text-muted-foreground">{curriculumPlanCopy.noCourses}</p>
+              )
+            ) : (
+              <ul className="divide-y divide-border/70" aria-label={curriculumPlanCopy.title}>
+                {curriculumPlan.courses.map((course) => {
+                  const courseName = getLocalizedName(locale, course, course.courseCode);
+                  const actionLabel = course.state === 'ALREADY_REGISTERED'
+                    ? curriculumPlanCopy.replaceSection
+                    : curriculumPlanCopy.chooseSection;
+                  const planSearchHref = `/${locale}/dashboard/register?q=${encodeURIComponent(course.courseCode)}`;
+                  return (
+                    <li key={course.courseId} className="flex min-w-0 flex-col gap-2 py-3 first:pt-0 last:pb-0 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
+                      <div className="min-w-0">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <span className="font-mono text-xs font-bold text-primary">{course.courseCode}</span>
+                          <span className="text-xs text-muted-foreground">{formatNumber(course.credits)} {copy.creditsUnit}</span>
+                          <span className={`inline-flex min-h-6 items-center rounded-md border px-2 py-0.5 text-xs font-semibold ${curriculumStateTone(course.state)}`}>
+                            {curriculumPlanTitle(course.state)}
+                          </span>
+                        </div>
+                        <p className="mt-1 text-sm font-medium leading-5 text-foreground">{courseName}</p>
+                        {course.proposedSection ? (
+                          <p className="mt-1 text-xs text-muted-foreground">
+                            {curriculumPlanCopy.proposedSection}: {course.proposedSection.sectionNumber}
+                            {' · '}
+                            {curriculumPlanCopy.seats.replace('{count}', formatNumber(course.proposedSection.seatsAvailable))}
+                          </p>
+                        ) : course.reasonCode ? (
+                          <p className="mt-1 text-xs text-muted-foreground">
+                            {campusErrorCodes[course.reasonCode] ?? curriculumPlanCopy.conflict}
+                          </p>
+                        ) : null}
+                      </div>
+                      <Link
+                        href={planSearchHref}
+                        className="inline-flex min-h-11 shrink-0 items-center justify-center rounded-md border border-border bg-background px-3 text-sm font-semibold text-foreground transition hover:bg-secondary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                        aria-label={`${actionLabel}: ${course.courseCode} ${courseName}`}
+                      >
+                        {actionLabel}
+                      </Link>
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
+          </>
+        ) : null}
+      </CardContent>
+    </Card>
+  );
+
   return (
     <div className="registration-workspace space-y-6">
       <PageHeader
@@ -1050,6 +1323,7 @@ export default function RegisterPage() {
       </div>
       <div role="tabpanel" id="registration-panel-catalog" aria-labelledby="registration-tab-catalog"
         hidden={activeTab !== 'catalog'} tabIndex={0} className="space-y-6">
+      {curriculumPlanPanel}
       {roundsQuery.isLoading ? (
         <LoadingState label={messages.common.states.loadingContent} />
       ) : roundsQuery.isError ? (
@@ -1140,6 +1414,7 @@ export default function RegisterPage() {
                   <label className="block min-w-0 space-y-2">
                     <span className="text-sm font-medium text-foreground">{copy.searchLabel}</span>
                     <Input
+                      id="registration-catalog-search"
                       value={searchText}
                       onChange={(event) => setSearchText(event.target.value)}
                       placeholder={copy.searchPlaceholder}

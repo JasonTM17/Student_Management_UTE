@@ -874,6 +874,101 @@ export interface RegistrationRound {
   creditLimit: number;
 }
 
+export type CurriculumPlanCourseState =
+  | 'ALREADY_REGISTERED'
+  | 'REGISTERABLE'
+  | 'BLOCKED_PREREQUISITE'
+  | 'NO_OPEN_SECTION'
+  | 'FULL'
+  | 'CONFLICT'
+  | 'DISMISSED';
+
+export interface CurriculumPlanSection {
+  id: string;
+  sectionNumber: string;
+  capacity: number;
+  enrolledCount: number;
+  seatsAvailable: number;
+  status: string;
+  scheduleConflict: boolean;
+  schedules: Array<Pick<RegistrationSectionSchedule, 'dayOfWeek' | 'startTime' | 'endTime'>>;
+}
+
+export interface CurriculumPlanCourse {
+  courseId: string;
+  courseCode: string;
+  name: string;
+  nameEn?: string | null;
+  nameVi?: string | null;
+  credits: number;
+  state: CurriculumPlanCourseState;
+  reasonCode?: string | null;
+  sections: CurriculumPlanSection[];
+  proposedSection?: CurriculumPlanSection | null;
+}
+
+export interface CurriculumPlanResponse {
+  semesterId: string;
+  semesterName: string;
+  semesterNameEn?: string | null;
+  semesterNameVi?: string | null;
+  registrationRoundId?: string | null;
+  registrationOpen: boolean;
+  term: {
+    status: 'RESOLVED' | 'MANUAL' | 'UNKNOWN' | string;
+    curriculumYear?: number | null;
+    curriculumSemester?: number | null;
+    reasonCode?: string | null;
+  };
+  courses: CurriculumPlanCourse[];
+}
+
+export interface CurriculumDefaultRegistrationResult {
+  semesterId: string;
+  registeredCount: number;
+  skippedCount: number;
+  courses: Array<{
+    courseId: string;
+    courseCode: string;
+    state: CurriculumPlanCourseState;
+    reasonCode?: string | null;
+    enrollmentId?: string | null;
+  }>;
+}
+
+export interface CurriculumDefaultAdminRunRequest {
+  roundId?: string;
+  semesterId?: string;
+  batchSize?: number;
+  cursor?: string;
+}
+
+export interface CurriculumDefaultAdminRunResponse {
+  runId?: string | null;
+  roundId: string;
+  semesterId: string;
+  dryRun: boolean;
+  students: number;
+  courses: number;
+  wouldRegister: number;
+  registered: number;
+  skipped: number;
+  failedStudents: number;
+  skippedByReason: Array<{ reasonCode: string; count: number }>;
+  hasMore: boolean;
+  nextCursor?: string | null;
+}
+
+export interface CurriculumDefaultAdminRunList {
+  runs: Array<{
+    id: string;
+    actorLabel?: string | null;
+    summary?: string | null;
+    afterState?: string | null;
+    createdAt: string;
+  }>;
+}
+
 export const registrationApi = {
   rounds: async (semesterId?: string): Promise<RegistrationRound[]> => {
     const response = await api.get<RegistrationRound[]>('/registration/rounds', { params: { semesterId } });
@@ -895,6 +990,28 @@ export const registrationApi = {
   },
   sections: async (params?: { semesterId?: string; roundId?: string }): Promise<RegistrationSection[]> => {
     const response = await api.get<RegistrationSection[]>('/me/registration/sections', { params });
+    return response.data;
+  },
+  curriculumPlan: async (params?: {
+    semesterId?: string;
+    curriculumYear?: number;
+    curriculumSemester?: number;
+  }): Promise<CurriculumPlanResponse> => {
+    const response = await api.get<CurriculumPlanResponse>(
+      '/me/registration/curriculum-plan',
+      { params },
+    );
+    return response.data;
+  },
+  registerCurriculumDefaults: async (payload: {
+    semesterId?: string;
+    curriculumYear?: number;
+    curriculumSemester?: number;
+  }): Promise<CurriculumDefaultRegistrationResult> => {
+    const response = await api.post<CurriculumDefaultRegistrationResult>(
+      '/me/registration/curriculum-plan/register',
+      payload,
+    );
     return response.data;
   },
   summary: async (semesterId?: string) => {
@@ -975,6 +1092,30 @@ export const adminRegistrationApi = {
     const response = await api.post<CreditLimitApplication>(
       `/admin/registration/credit-limit-applications/${id}/review`,
       { decision, note },
+    );
+    return response.data;
+  },
+  dryRunCurriculumDefaults: async (
+    payload: CurriculumDefaultAdminRunRequest,
+  ): Promise<CurriculumDefaultAdminRunResponse> => {
+    const response = await api.post<CurriculumDefaultAdminRunResponse>(
+      '/admin/registration/curriculum-defaults/dry-run',
+      payload,
+    );
+    return response.data;
+  },
+  applyCurriculumDefaults: async (
+    payload: CurriculumDefaultAdminRunRequest,
+  ): Promise<CurriculumDefaultAdminRunResponse> => {
+    const response = await api.post<CurriculumDefaultAdminRunResponse>(
+      '/admin/registration/curriculum-defaults/apply',
+      payload,
+    );
+    return response.data;
+  },
+  curriculumDefaultRuns: async (): Promise<CurriculumDefaultAdminRunList> => {
+    const response = await api.get<CurriculumDefaultAdminRunList>(
+      '/admin/registration/curriculum-defaults/runs',
     );
     return response.data;
   },
