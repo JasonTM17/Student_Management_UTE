@@ -1159,10 +1159,10 @@ export default function AdminAnnouncementsPage() {
                         placeholder={vi ? 'Soạn thảo nội dung thông báo... (Hỗ trợ tiêu đề, in đậm, bảng biểu, ghi chú khẩn)' : 'Compose announcement body... (Supports headings, bold, tables, alert callouts)'}
                       />
                     </div>
-                  </div>
                     {touched.content && !draft.content.trim() ? (
                       <p className="mt-1 text-xs text-destructive" role="alert">{copy.required}</p>
                     ) : null}
+                  </div>
                   </AdminFormField>
                 </AdminFormSection>
 
