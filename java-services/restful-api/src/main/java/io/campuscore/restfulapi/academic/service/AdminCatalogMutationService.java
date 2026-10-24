@@ -241,7 +241,15 @@ public class AdminCatalogMutationService {
         // could gain 999 credits or a section a five-digit capacity through a
         // plain edit. One validator per invariant serves both paths.
         if (COURSE.equals(table) && input.containsKey("credits")) {
-            requireCreditsInRange(number(input, "credits", 3));
+            int requestedCredits = number(input, "credits", 3);
+            requireCreditsInRange(requestedCredits);
+            Object currentCredits = before == null ? null : before.get("credits");
+            if (currentCredits instanceof Number current
+                    && current.intValue() != requestedCredits
+                    && Boolean.TRUE.equals(before.get("has_official_grades"))) {
+                throw problem(HttpStatus.CONFLICT, "COURSE_CREDITS_LOCKED_BY_GRADES",
+                        "Course credits cannot change after grades have been published");
+            }
         }
         if (SEMESTER.equals(table) && input.containsKey("status")) {
             String requestedStatus = text(input, "status", null);
@@ -468,7 +476,13 @@ public class AdminCatalogMutationService {
     }
 
     private Map<String, Object> get(String table, String id) {
-        return jdbc.queryForMap("SELECT * FROM " + table + " WHERE \"id\" = :id", new MapSqlParameterSource("id", id));
+        String sql = COURSE.equals(table)
+                ? "SELECT course.*, EXISTS (SELECT 1 FROM " + ENROLLMENT
+                        + " enrollment WHERE enrollment.\"courseId\" = course.\"id\""
+                        + " AND enrollment.\"gradeStatus\" IN ('PUBLISHED', 'APPEALED')) AS has_official_grades"
+                        + " FROM " + COURSE + " course WHERE course.\"id\" = :id"
+                : "SELECT * FROM " + table + " WHERE \"id\" = :id";
+        return jdbc.queryForMap(sql, new MapSqlParameterSource("id", id));
     }
 
     private static Map<String, String> allowedColumns(String table) {

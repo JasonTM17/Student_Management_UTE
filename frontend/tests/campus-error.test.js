@@ -151,6 +151,7 @@ test('academic registration and catalog failures have bilingual code copy', () =
     'CAPACITY_BELOW_ENROLLED',
     'CAPACITY_EXCEEDS_ROOM',
     'CLASSROOM_INACTIVE',
+    'COURSE_CREDITS_LOCKED_BY_GRADES',
     'COURSE_INACTIVE',
     'CREDIT_LIMIT_APPLICATION_DECISION_INVALID',
     'CREDIT_LIMIT_APPLICATION_NOT_FOUND',

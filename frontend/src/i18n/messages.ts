@@ -140,6 +140,8 @@ export const en = {
         CAPACITY_BELOW_ENROLLED: 'Section capacity cannot be lower than the number of enrolled students.',
         CAPACITY_EXCEEDS_ROOM: 'Section capacity exceeds the room capacity.',
         CLASSROOM_INACTIVE: 'This room is inactive and cannot be scheduled.',
+        COURSE_CREDITS_LOCKED_BY_GRADES:
+          'Course credits cannot change after grades have been published.',
         ENROLLMENT_FORBIDDEN: 'You do not have access to this enrollment.',
         ENROLLMENT_NOT_ACTIVE: 'This enrollment is no longer active and cannot be changed.',
         IDEMPOTENCY_CONFLICT: 'This request key was used for a different action. Reload and try again.',
@@ -3244,6 +3246,8 @@ export const vi: I18nMessages = {
         CAPACITY_BELOW_ENROLLED: 'Sĩ số lớp không thể thấp hơn số sinh viên đã đăng ký.',
         CAPACITY_EXCEEDS_ROOM: 'Sĩ số lớp học phần vượt quá sức chứa của phòng.',
         CLASSROOM_INACTIVE: 'Phòng học này đã ngừng hoạt động và không thể xếp lịch.',
+        COURSE_CREDITS_LOCKED_BY_GRADES:
+          'Không thể đổi số tín chỉ của học phần sau khi đã công bố điểm.',
         ENROLLMENT_FORBIDDEN: 'Bạn không có quyền thao tác với hồ sơ đăng ký này.',
         ENROLLMENT_NOT_ACTIVE: 'Hồ sơ đăng ký này không còn hiệu lực nên không thể thay đổi.',
         IDEMPOTENCY_CONFLICT: 'Mã yêu cầu này đã được dùng cho thao tác khác. Hãy tải lại rồi thử lại.',
