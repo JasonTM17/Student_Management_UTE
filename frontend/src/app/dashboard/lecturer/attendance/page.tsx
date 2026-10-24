@@ -28,6 +28,7 @@ import {
   type StudentAttendanceEntry,
 } from '@/lib/api';
 import { getLocalizedFlatLabel, getLocalizedName } from '@/lib/academic-content';
+import { calculateAttendanceRate } from '@/lib/attendance-rate';
 import { GradingSection, Semester } from '@/types/api';
 import { PageHeader, SectionEyebrow } from '@/components/ui/page-header';
 import { Select } from '@/components/ui/select';
@@ -322,7 +323,6 @@ export default function LecturerAttendancePage() {
     [sections, selectedSectionId],
   );
 
-  const markedCount = roster.filter((r) => r.status !== null).length;
   const presentCount = roster.filter((r) => r.status === 'PRESENT').length;
   const absentCount = roster.filter((r) => r.status === 'ABSENT').length;
   const lateCount = roster.filter((r) => r.status === 'LATE').length;
@@ -346,7 +346,7 @@ export default function LecturerAttendancePage() {
         absent: absentCount,
         late: lateCount,
         excused: excusedCount,
-        rate: roster.length > 0 ? ((presentCount + lateCount) / roster.length) * 100 : 0,
+        rate: calculateAttendanceRate({ present: presentCount, late: lateCount, absent: absentCount }, 1) ?? 0,
       },
       students: roster.map((r) => ({
         studentId: r.studentId,
@@ -499,7 +499,6 @@ export default function LecturerAttendancePage() {
           <WorkspaceMetricCard
             label={copy.statuses.PRESENT}
             value={formatNumber(presentCount)}
-            detail={markedCount > 0 ? `${Math.round((presentCount / markedCount) * 100)}${copy.statPresentTodaySuffix}` : undefined}
             icon={<CheckCircle2 className="h-5 w-5" aria-hidden="true" />}
             toneClassName={metricToneClass('success')}
           />
@@ -575,7 +574,7 @@ export default function LecturerAttendancePage() {
               <span><strong>{locale === 'vi' ? 'Học phần:' : 'Course:'}</strong> {selectedSection?.courseName} ({selectedSection?.courseCode})</span>
               <span><strong>{copy.dateLabel}:</strong> {selectedDate}</span>
               <span><strong>{copy.statsTotalStudents}:</strong> {roster.length}</span>
-              <span><strong>{copy.statsPresentRate}:</strong> {((presentCount + lateCount) / (roster.length || 1) * 100).toFixed(1)}%</span>
+              <span><strong>{copy.statsPresentRate}:</strong> {(calculateAttendanceRate({ present: presentCount, late: lateCount, absent: absentCount }, 1) ?? 0).toFixed(1)}%</span>
             </div>
           </div>
 
