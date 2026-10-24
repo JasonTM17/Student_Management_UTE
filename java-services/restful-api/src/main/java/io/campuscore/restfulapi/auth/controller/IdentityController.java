@@ -1,6 +1,6 @@
-package io.campuscore.restfulapi.controller;
+package io.campuscore.restfulapi.auth.controller;
 
-import io.campuscore.restfulapi.dto.IdentityResponse;
+import io.campuscore.restfulapi.auth.dto.IdentityResponse;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.tags.Tag;
