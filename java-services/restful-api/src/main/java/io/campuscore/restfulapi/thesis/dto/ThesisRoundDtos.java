@@ -1,4 +1,4 @@
-package io.campuscore.restfulapi.thesis.web;
+package io.campuscore.restfulapi.thesis.dto;
 
 import io.campuscore.restfulapi.thesis.domain.RoundStatus;
 import io.campuscore.restfulapi.thesis.domain.ThesisRegistrationRound;

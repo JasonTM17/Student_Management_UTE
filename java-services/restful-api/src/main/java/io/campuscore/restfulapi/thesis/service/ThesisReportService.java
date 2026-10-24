@@ -2,7 +2,7 @@ package io.campuscore.restfulapi.thesis.service;
 
 import io.campuscore.restfulapi.thesis.domain.RoundStatus;
 import io.campuscore.restfulapi.thesis.repository.ThesisGroupReadRepository;
-import io.campuscore.restfulapi.thesis.web.ThesisMutationDtos.ReportUpdateRequest;
+import io.campuscore.restfulapi.thesis.dto.ThesisMutationDtos.ReportUpdateRequest;
 import io.campuscore.restfulapi.exception.DomainException;
 import java.time.Instant;
 import java.util.LinkedHashMap;
@@ -24,6 +24,11 @@ import org.springframework.util.StringUtils;
 import org.springframework.web.multipart.MultipartFile;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import io.campuscore.restfulapi.thesis.config.ThesisReportStorageProperties;
+import io.campuscore.restfulapi.thesis.storage.LocalThesisReportStorage;
+import io.campuscore.restfulapi.thesis.storage.ReportFilePolicy;
+import io.campuscore.restfulapi.thesis.storage.ThesisReportStorage;
+import io.campuscore.restfulapi.thesis.storage.ThesisReportStorageException;
 
 /**
  * Brief R5: only the group leader submits the topic report. The report

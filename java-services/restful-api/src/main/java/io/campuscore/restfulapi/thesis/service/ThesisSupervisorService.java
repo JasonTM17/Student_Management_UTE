@@ -20,6 +20,8 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 import org.springframework.util.StringUtils;
+import io.campuscore.restfulapi.thesis.scope.ThesisDeanScope;
+import io.campuscore.restfulapi.thesis.scope.ThesisDepartmentScope;
 
 /**
  * Brief R3: every topic is supervised by one or two lecturers. The creator is

@@ -2,7 +2,7 @@ package io.campuscore.restfulapi.thesis.service;
 
 import io.campuscore.restfulapi.thesis.repository.ThesisGroupReadRepository;
 import io.campuscore.restfulapi.thesis.repository.ThesisRoundReadPort;
-import io.campuscore.restfulapi.thesis.web.ThesisGroupReadDtos.GroupResponse;
+import io.campuscore.restfulapi.thesis.dto.ThesisGroupReadDtos.GroupResponse;
 import io.campuscore.restfulapi.exception.DomainException;
 import java.util.List;
 import java.util.Map;
@@ -164,7 +164,7 @@ public class ThesisGroupReadService {
                 group.rejectionReason(),
                 group.memberStudentIds(),
                 group.members().stream()
-                        .map(m -> new io.campuscore.restfulapi.thesis.web.ThesisGroupReadDtos.GroupMemberResponse(
+                        .map(m -> new io.campuscore.restfulapi.thesis.dto.ThesisGroupReadDtos.GroupMemberResponse(
                                 m.studentId(), m.studentNumber(), m.displayName(), null,
                                 m.isExternal(), m.isLeader(), m.memberOrder()))
                         .toList());

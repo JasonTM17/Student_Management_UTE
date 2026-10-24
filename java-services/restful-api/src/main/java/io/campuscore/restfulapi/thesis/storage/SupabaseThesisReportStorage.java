@@ -1,4 +1,4 @@
-package io.campuscore.restfulapi.thesis.service;
+package io.campuscore.restfulapi.thesis.storage;
 
 import java.io.IOException;
 import java.net.URI;
@@ -10,6 +10,7 @@ import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.Arrays;
 import org.springframework.util.StringUtils;
+import io.campuscore.restfulapi.thesis.config.ThesisReportStorageProperties;
 
 /**
  * Server-side Supabase Storage adapter. The service-role key is read only from

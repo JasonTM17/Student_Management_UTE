@@ -1,8 +1,12 @@
-package io.campuscore.restfulapi.thesis.service;
+package io.campuscore.restfulapi.thesis.config;
 
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import io.campuscore.restfulapi.thesis.storage.DatabaseThesisReportStorage;
+import io.campuscore.restfulapi.thesis.storage.LocalThesisReportStorage;
+import io.campuscore.restfulapi.thesis.storage.SupabaseThesisReportStorage;
+import io.campuscore.restfulapi.thesis.storage.ThesisReportStorage;
 
 /** Selects local preview storage or the explicitly configured Supabase adapter. */
 @Configuration

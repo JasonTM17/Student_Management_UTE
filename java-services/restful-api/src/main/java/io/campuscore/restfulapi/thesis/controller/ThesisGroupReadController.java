@@ -1,7 +1,7 @@
-package io.campuscore.restfulapi.thesis.web;
+package io.campuscore.restfulapi.thesis.controller;
 
 import io.campuscore.restfulapi.thesis.service.ThesisGroupReadService;
-import io.campuscore.restfulapi.thesis.web.ThesisGroupReadDtos.GroupResponse;
+import io.campuscore.restfulapi.thesis.dto.ThesisGroupReadDtos.GroupResponse;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
@@ -18,6 +18,7 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import io.campuscore.restfulapi.thesis.dto.ThesisGroupReadDtos;
 
 @Tag(name = "Thesis Groups & Members", description = "Quản lý và tra cứu nhóm sinh viên thực hiện khóa luận, thành viên nhóm và phân công đề tài")
 @RestController

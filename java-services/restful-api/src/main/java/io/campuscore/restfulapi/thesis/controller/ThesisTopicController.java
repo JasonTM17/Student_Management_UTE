@@ -1,8 +1,8 @@
-package io.campuscore.restfulapi.thesis.web;
+package io.campuscore.restfulapi.thesis.controller;
 
 import io.campuscore.restfulapi.thesis.domain.TopicStatus;
 import io.campuscore.restfulapi.thesis.service.ThesisTopicService;
-import io.campuscore.restfulapi.thesis.web.ThesisTopicDtos.TopicResponse;
+import io.campuscore.restfulapi.thesis.dto.ThesisTopicDtos.TopicResponse;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
@@ -18,6 +18,7 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import io.campuscore.restfulapi.thesis.dto.ThesisTopicDtos;
 
 @Tag(name = "Thesis Topics Catalog", description = "Quản lý và tra cứu kho đề tài Khóa luận & Đồ án tốt nghiệp theo đợt và bộ môn")
 @RestController

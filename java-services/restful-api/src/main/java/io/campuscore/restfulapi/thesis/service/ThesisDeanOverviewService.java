@@ -1,14 +1,14 @@
 package io.campuscore.restfulapi.thesis.service;
 
 import io.campuscore.restfulapi.thesis.repository.ThesisDeanOverviewRepository;
-import io.campuscore.restfulapi.thesis.web.ThesisDeanOverviewDtos.DeanGroup;
-import io.campuscore.restfulapi.thesis.web.ThesisDeanOverviewDtos.DeanOverviewResponse;
-import io.campuscore.restfulapi.thesis.web.ThesisDeanOverviewDtos.DeanSupervisor;
-import io.campuscore.restfulapi.thesis.web.ThesisDeanOverviewDtos.DepartmentCount;
-import io.campuscore.restfulapi.thesis.web.ThesisDeanOverviewDtos.FacultyScope;
-import io.campuscore.restfulapi.thesis.web.ThesisDeanOverviewDtos.OverviewStats;
-import io.campuscore.restfulapi.thesis.web.ThesisDeanOverviewDtos.RoundInfo;
-import io.campuscore.restfulapi.thesis.web.ThesisDeanOverviewDtos.SupervisorWorkload;
+import io.campuscore.restfulapi.thesis.dto.ThesisDeanOverviewDtos.DeanGroup;
+import io.campuscore.restfulapi.thesis.dto.ThesisDeanOverviewDtos.DeanOverviewResponse;
+import io.campuscore.restfulapi.thesis.dto.ThesisDeanOverviewDtos.DeanSupervisor;
+import io.campuscore.restfulapi.thesis.dto.ThesisDeanOverviewDtos.DepartmentCount;
+import io.campuscore.restfulapi.thesis.dto.ThesisDeanOverviewDtos.FacultyScope;
+import io.campuscore.restfulapi.thesis.dto.ThesisDeanOverviewDtos.OverviewStats;
+import io.campuscore.restfulapi.thesis.dto.ThesisDeanOverviewDtos.RoundInfo;
+import io.campuscore.restfulapi.thesis.dto.ThesisDeanOverviewDtos.SupervisorWorkload;
 import io.campuscore.restfulapi.exception.DomainException;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;

@@ -2,12 +2,12 @@ package io.campuscore.restfulapi.thesis.repository;
 
 import io.campuscore.restfulapi.thesis.domain.ApprovalStatus;
 import io.campuscore.restfulapi.thesis.domain.GroupStatus;
-import io.campuscore.restfulapi.thesis.web.ThesisDeanOverviewDtos.DeanGroup;
-import io.campuscore.restfulapi.thesis.web.ThesisDeanOverviewDtos.DeanMember;
-import io.campuscore.restfulapi.thesis.web.ThesisDeanOverviewDtos.DeanSupervisor;
-import io.campuscore.restfulapi.thesis.web.ThesisDeanOverviewDtos.DepartmentCount;
-import io.campuscore.restfulapi.thesis.web.ThesisDeanOverviewDtos.FacultyScope;
-import io.campuscore.restfulapi.thesis.web.ThesisDeanOverviewDtos.RoundInfo;
+import io.campuscore.restfulapi.thesis.dto.ThesisDeanOverviewDtos.DeanGroup;
+import io.campuscore.restfulapi.thesis.dto.ThesisDeanOverviewDtos.DeanMember;
+import io.campuscore.restfulapi.thesis.dto.ThesisDeanOverviewDtos.DeanSupervisor;
+import io.campuscore.restfulapi.thesis.dto.ThesisDeanOverviewDtos.DepartmentCount;
+import io.campuscore.restfulapi.thesis.dto.ThesisDeanOverviewDtos.FacultyScope;
+import io.campuscore.restfulapi.thesis.dto.ThesisDeanOverviewDtos.RoundInfo;
 import java.sql.Timestamp;
 import java.time.Instant;
 import java.util.ArrayList;

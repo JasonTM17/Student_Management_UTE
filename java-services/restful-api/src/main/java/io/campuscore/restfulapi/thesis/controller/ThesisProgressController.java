@@ -1,7 +1,7 @@
-package io.campuscore.restfulapi.thesis.web;
+package io.campuscore.restfulapi.thesis.controller;
 
 import io.campuscore.restfulapi.thesis.service.ThesisProgressService;
-import io.campuscore.restfulapi.thesis.web.ThesisProgressDtos.ProgressResponse;
+import io.campuscore.restfulapi.thesis.dto.ThesisProgressDtos.ProgressResponse;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
@@ -16,6 +16,7 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import io.campuscore.restfulapi.thesis.dto.ThesisProgressDtos;
 
 @Tag(name = "Thesis Student Progress", description = "Theo dõi tiến độ thực hiện khóa luận của sinh viên và nhóm theo các mốc học thuật")
 @RestController

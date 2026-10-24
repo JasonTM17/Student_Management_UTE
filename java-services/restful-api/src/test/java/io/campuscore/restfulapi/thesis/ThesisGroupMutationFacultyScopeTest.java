@@ -6,7 +6,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import io.campuscore.restfulapi.thesis.service.ThesisMutationService;
-import io.campuscore.restfulapi.thesis.web.ThesisMutationDtos.ProgressRequest;
+import io.campuscore.restfulapi.thesis.dto.ThesisMutationDtos.ProgressRequest;
 import io.campuscore.restfulapi.thesis.domain.GroupStatus;
 import io.campuscore.restfulapi.exception.DomainException;
 import java.sql.Timestamp;

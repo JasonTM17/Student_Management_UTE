@@ -1,4 +1,6 @@
-package io.campuscore.restfulapi.thesis.service;
+package io.campuscore.restfulapi.thesis.storage;
+import io.campuscore.restfulapi.thesis.config.ThesisReportStorageProperties;
+
 
 /**
  * Database-backed report storage marker. With this provider the document bytes

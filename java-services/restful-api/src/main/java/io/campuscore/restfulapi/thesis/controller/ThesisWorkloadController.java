@@ -1,4 +1,4 @@
-package io.campuscore.restfulapi.thesis.web;
+package io.campuscore.restfulapi.thesis.controller;
 
 import io.campuscore.restfulapi.thesis.service.ThesisLecturerWorkloadService;
 import io.campuscore.restfulapi.thesis.service.ThesisLecturerWorkloadService.LecturerWorkload;
