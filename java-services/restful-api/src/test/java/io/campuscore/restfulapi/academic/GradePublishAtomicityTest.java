@@ -4,10 +4,10 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.mock;
 
-import io.campuscore.restfulapi.academic.registration.RegistrationService;
+import io.campuscore.restfulapi.academic.registration.service.RegistrationService;
 import io.campuscore.restfulapi.academic.service.AcademicEnrollmentReadService;
 import io.campuscore.restfulapi.academic.service.AcademicMutationService;
-import io.campuscore.restfulapi.academic.web.AcademicMutationDtos.GradeUpdate;
+import io.campuscore.restfulapi.academic.dto.AcademicMutationDtos.GradeUpdate;
 import io.campuscore.restfulapi.audit.AdminAuditRecorder;
 import io.campuscore.restfulapi.engagement.service.GradePublishNotifier;
 import io.campuscore.restfulapi.notification.repository.NotificationWriteRepository;

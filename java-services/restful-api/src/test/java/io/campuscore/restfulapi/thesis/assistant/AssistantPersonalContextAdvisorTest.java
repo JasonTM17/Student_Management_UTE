@@ -14,21 +14,21 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-import io.campuscore.restfulapi.academic.registration.RegistrationService;
+import io.campuscore.restfulapi.academic.registration.service.RegistrationService;
 import io.campuscore.restfulapi.academic.service.AcademicAttendanceReadService;
 import io.campuscore.restfulapi.academic.service.AcademicConductService;
 import io.campuscore.restfulapi.academic.service.AcademicEnrollmentReadService;
 import io.campuscore.restfulapi.academic.service.AcademicSectionReadService;
-import io.campuscore.restfulapi.academic.web.AcademicAttendanceReadDtos;
-import io.campuscore.restfulapi.academic.web.AcademicEnrollmentReadDtos;
-import io.campuscore.restfulapi.academic.web.AcademicEnrollmentReadDtos.ClassroomSummary;
-import io.campuscore.restfulapi.academic.web.AcademicEnrollmentReadDtos.CourseSummary;
-import io.campuscore.restfulapi.academic.web.AcademicEnrollmentReadDtos.EnrollmentResponse;
-import io.campuscore.restfulapi.academic.web.AcademicEnrollmentReadDtos.SectionScheduleResponse;
-import io.campuscore.restfulapi.academic.web.AcademicEnrollmentReadDtos.SectionSummary;
-import io.campuscore.restfulapi.academic.web.AcademicEnrollmentReadDtos.SemesterSummary;
-import io.campuscore.restfulapi.academic.web.AcademicSectionReadDtos.LecturerGradingSectionResponse;
-import io.campuscore.restfulapi.academic.web.AcademicSectionReadDtos.LecturerScheduleResponse;
+import io.campuscore.restfulapi.academic.dto.AcademicAttendanceReadDtos;
+import io.campuscore.restfulapi.academic.dto.AcademicEnrollmentReadDtos;
+import io.campuscore.restfulapi.academic.dto.AcademicEnrollmentReadDtos.ClassroomSummary;
+import io.campuscore.restfulapi.academic.dto.AcademicEnrollmentReadDtos.CourseSummary;
+import io.campuscore.restfulapi.academic.dto.AcademicEnrollmentReadDtos.EnrollmentResponse;
+import io.campuscore.restfulapi.academic.dto.AcademicEnrollmentReadDtos.SectionScheduleResponse;
+import io.campuscore.restfulapi.academic.dto.AcademicEnrollmentReadDtos.SectionSummary;
+import io.campuscore.restfulapi.academic.dto.AcademicEnrollmentReadDtos.SemesterSummary;
+import io.campuscore.restfulapi.academic.dto.AcademicSectionReadDtos.LecturerGradingSectionResponse;
+import io.campuscore.restfulapi.academic.dto.AcademicSectionReadDtos.LecturerScheduleResponse;
 import io.campuscore.restfulapi.thesis.assistant.ThesisAssistantDtos.ChatRequest;
 import io.campuscore.restfulapi.thesis.assistant.ThesisAssistantDtos.ChatResponse;
 import io.campuscore.restfulapi.thesis.service.ThesisLecturerWorkloadService;
@@ -945,7 +945,7 @@ class AssistantPersonalContextAdvisorTest {
         AcademicConductService conductService = mock(AcademicConductService.class);
         AssistantPersonalContextAdvisor conductAdvisor =
                 new AssistantPersonalContextAdvisor(enrollmentService, sectionService, null, null, conductService);
-        var semesterScore = new io.campuscore.restfulapi.academic.web.AcademicConductDtos.ConductSemesterScoreDto(
+        var semesterScore = new io.campuscore.restfulapi.academic.dto.AcademicConductDtos.ConductSemesterScoreDto(
                 "cs1", "sem-2026a", "Học kỳ A",
                 new java.math.BigDecimal("20"), new java.math.BigDecimal("25"),
                 new java.math.BigDecimal("8"), new java.math.BigDecimal("22"),
@@ -953,7 +953,7 @@ class AssistantPersonalContextAdvisorTest {
                 "Tốt", "Tốt", "FINALIZED", null,
                 List.of(), List.of());
         when(conductService.studentSummary("student-profile")).thenReturn(
-                new io.campuscore.restfulapi.academic.web.AcademicConductDtos.StudentConductSummaryDto(
+                new io.campuscore.restfulapi.academic.dto.AcademicConductDtos.StudentConductSummaryDto(
                         "student-profile", "SV001", "Nguyễn Văn A",
                         new java.math.BigDecimal("85.0"), "Tốt",
                         semesterScore,
@@ -1025,9 +1025,9 @@ class AssistantPersonalContextAdvisorTest {
         when(sectionService.findLecturerSchedule("lecturer-profile", null)).thenReturn(List.of(
                 new LecturerScheduleResponse("id1", "sec1", "SE402-01", "SE402", "Phát triển ứng dụng web",
                         "Web Application Development", "Phát triển ứng dụng web", 3, 35, 13, "CNTT", "CNTT", "CNTT",
-                        "OPEN", "sem-hk2", "Học kỳ 2 năm học 2025-2026", "Semester 2, 2025-2026", "Học kỳ 2 năm học 2025-2026", CURRENT_TERM_START, List.of(new io.campuscore.restfulapi.academic.web.AcademicSectionReadDtos
+                        "OPEN", "sem-hk2", "Học kỳ 2 năm học 2025-2026", "Semester 2, 2025-2026", "Học kỳ 2 năm học 2025-2026", CURRENT_TERM_START, List.of(new io.campuscore.restfulapi.academic.dto.AcademicSectionReadDtos
                                 .SectionScheduleResponse("s1", 5, "13:00", "15:30", "A", "102",
-                                new io.campuscore.restfulapi.academic.web.AcademicSectionReadDtos
+                                new io.campuscore.restfulapi.academic.dto.AcademicSectionReadDtos
                                         .ClassroomSummary("c1", "A", "102"))))));
 
         ChatResponse response = advisor.answer(chatRequest("vi", "thứ 5 tôi dạy môn nào?"), jwtLecturer());
@@ -1154,9 +1154,9 @@ class AssistantPersonalContextAdvisorTest {
         when(sectionService.findLecturerSchedule("lecturer-profile", null)).thenReturn(List.of(
                 new LecturerScheduleResponse("id1", "sec1", "SE402-01", "SE402", "Phát triển ứng dụng web",
                         "Web Application Development", "Phát triển ứng dụng web", 3, 35, 13, "CNTT", "CNTT", "CNTT",
-                        "OPEN", "sem-hk2", "Học kỳ 2 năm học 2025-2026", "Semester 2, 2025-2026", "Học kỳ 2 năm học 2025-2026", CURRENT_TERM_START, List.of(new io.campuscore.restfulapi.academic.web.AcademicSectionReadDtos
+                        "OPEN", "sem-hk2", "Học kỳ 2 năm học 2025-2026", "Semester 2, 2025-2026", "Học kỳ 2 năm học 2025-2026", CURRENT_TERM_START, List.of(new io.campuscore.restfulapi.academic.dto.AcademicSectionReadDtos
                                 .SectionScheduleResponse("s1", 5, "13:00", "15:30", "A", "102",
-                                new io.campuscore.restfulapi.academic.web.AcademicSectionReadDtos
+                                new io.campuscore.restfulapi.academic.dto.AcademicSectionReadDtos
                                         .ClassroomSummary("c1", "A", "102"))))));
 
         ChatResponse response = advisor.answer(chatRequest("vi", "lịch dạy của tôi tuần này?"), jwtLecturer());
@@ -1197,7 +1197,7 @@ class AssistantPersonalContextAdvisorTest {
         AssistantPersonalContextAdvisor summaryAdvisor = new AssistantPersonalContextAdvisor(
                 enrollmentService, sectionService, null, jdbc, null, registrationService);
         when(registrationService.summary("student-profile", null)).thenReturn(
-                new io.campuscore.restfulapi.academic.registration.RegistrationDtos.SummaryResponse(
+                new io.campuscore.restfulapi.academic.registration.dto.RegistrationDtos.SummaryResponse(
                         "round-1", 30, 15, 15, List.of("e1", "e2", "e3", "e4", "e5")));
         // The approval provenance is asserted only when an APPROVED
         // application exists; the ledger is queried before the wording.
@@ -1226,7 +1226,7 @@ class AssistantPersonalContextAdvisorTest {
         AssistantPersonalContextAdvisor summaryAdvisor = new AssistantPersonalContextAdvisor(
                 enrollmentService, sectionService, null, null, null, registrationService);
         when(registrationService.summary("student-profile", null)).thenReturn(
-                new io.campuscore.restfulapi.academic.registration.RegistrationDtos.SummaryResponse(
+                new io.campuscore.restfulapi.academic.registration.dto.RegistrationDtos.SummaryResponse(
                         "round-1", 28, 15, 13, List.of("e1")));
 
         ChatResponse response = summaryAdvisor.answer(
@@ -1272,7 +1272,7 @@ class AssistantPersonalContextAdvisorTest {
         AssistantPersonalContextAdvisor summaryAdvisor = new AssistantPersonalContextAdvisor(
                 enrollmentService, sectionService, null, null, null, registrationService);
         when(registrationService.summary("student-profile", null)).thenReturn(
-                new io.campuscore.restfulapi.academic.registration.RegistrationDtos.SummaryResponse(
+                new io.campuscore.restfulapi.academic.registration.dto.RegistrationDtos.SummaryResponse(
                         "round-1", 28, 25, 3, List.of("e1")));
 
         ChatResponse response = summaryAdvisor.answer(
@@ -1510,9 +1510,9 @@ class AssistantPersonalContextAdvisorTest {
         when(sectionService.findLecturerSchedule("lecturer-profile", null)).thenReturn(List.of(
                 new LecturerScheduleResponse("id1", "sec1", "SE402-01", "SE402", "Phát triển ứng dụng web",
                         "Web Application Development", "Phát triển ứng dụng web", 3, 35, 13, "CNTT", "CNTT", "CNTT",
-                        "OPEN", "sem-hk2", "Học kỳ 2 năm học 2025-2026", "Semester 2, 2025-2026", "Học kỳ 2 năm học 2025-2026", CURRENT_TERM_START, List.of(new io.campuscore.restfulapi.academic.web.AcademicSectionReadDtos
+                        "OPEN", "sem-hk2", "Học kỳ 2 năm học 2025-2026", "Semester 2, 2025-2026", "Học kỳ 2 năm học 2025-2026", CURRENT_TERM_START, List.of(new io.campuscore.restfulapi.academic.dto.AcademicSectionReadDtos
                                 .SectionScheduleResponse("s1", 5, "13:00", "15:30", "A", "102",
-                                new io.campuscore.restfulapi.academic.web.AcademicSectionReadDtos
+                                new io.campuscore.restfulapi.academic.dto.AcademicSectionReadDtos
                                         .ClassroomSummary("c1", "A", "102"))))));
 
         ChatResponse response = advisor.answer(
@@ -1838,9 +1838,9 @@ class AssistantPersonalContextAdvisorTest {
         when(sectionService.findLecturerSchedule("lecturer-profile", null)).thenReturn(List.of(
                 new LecturerScheduleResponse("id1", "sec1", "SE402-01", "SE402", "Phát triển ứng dụng web",
                         "Web Application Development", "Phát triển ứng dụng web", 3, 35, 13, "CNTT", "CNTT", "CNTT",
-                        "OPEN", "sem-hk2", "Học kỳ 2 năm học 2025-2026", "Semester 2, 2025-2026", "Học kỳ 2 năm học 2025-2026", CURRENT_TERM_START, List.of(new io.campuscore.restfulapi.academic.web.AcademicSectionReadDtos
+                        "OPEN", "sem-hk2", "Học kỳ 2 năm học 2025-2026", "Semester 2, 2025-2026", "Học kỳ 2 năm học 2025-2026", CURRENT_TERM_START, List.of(new io.campuscore.restfulapi.academic.dto.AcademicSectionReadDtos
                                 .SectionScheduleResponse("s1", 5, "13:00", "15:30", "A", "102",
-                                new io.campuscore.restfulapi.academic.web.AcademicSectionReadDtos
+                                new io.campuscore.restfulapi.academic.dto.AcademicSectionReadDtos
                                         .ClassroomSummary("c1", "A", "102"))))));
 
         ChatResponse response = advisor.answer(
@@ -2281,7 +2281,7 @@ class AssistantPersonalContextAdvisorTest {
         AssistantPersonalContextAdvisor creditsAdvisor = new AssistantPersonalContextAdvisor(
                 enrollmentService, sectionService, null, jdbc, null, registrationService);
         when(registrationService.summary("student-profile", null)).thenReturn(
-                new io.campuscore.restfulapi.academic.registration.RegistrationDtos.SummaryResponse(
+                new io.campuscore.restfulapi.academic.registration.dto.RegistrationDtos.SummaryResponse(
                         "round-1", 30, 16, 14, List.of()));
         when(jdbc.queryForObject(anyString(), any(MapSqlParameterSource.class), eq(Integer.class)))
                 .thenReturn(0);
@@ -2303,7 +2303,7 @@ class AssistantPersonalContextAdvisorTest {
                 enrollment("SE013", "Nhập môn lập trình", "Introduction to Programming",
                         CURRENT_TERM_START,
                         List.of(new SectionScheduleResponse("sch-1", 3, "07:00", "09:30",
-                                new io.campuscore.restfulapi.academic.web.AcademicEnrollmentReadDtos
+                                new io.campuscore.restfulapi.academic.dto.AcademicEnrollmentReadDtos
                                         .ClassroomSummary("room-1", "A", "103"))))));
         when(enrollmentService.findStudentTranscript("student-profile")).thenReturn(null);
 
@@ -2381,9 +2381,9 @@ class AssistantPersonalContextAdvisorTest {
         return new LecturerScheduleResponse("id-" + sectionId, sectionId, sectionId + "-01", courseCode,
                 title, title, title, credits, 40, 12, "CNTT", "ICT", "CNTT", "OPEN",
                 semesterId, semesterName, semesterName, semesterName, semesterStart,
-                List.of(new io.campuscore.restfulapi.academic.web.AcademicSectionReadDtos
+                List.of(new io.campuscore.restfulapi.academic.dto.AcademicSectionReadDtos
                         .SectionScheduleResponse("sch-" + sectionId, 2, "07:00", "09:30", "A", "101",
-                        new io.campuscore.restfulapi.academic.web.AcademicSectionReadDtos
+                        new io.campuscore.restfulapi.academic.dto.AcademicSectionReadDtos
                                 .ClassroomSummary("room-" + sectionId, "A", "101"))));
     }
 

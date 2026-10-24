@@ -2,9 +2,9 @@ package io.campuscore.restfulapi.academic.service;
 
 import io.campuscore.restfulapi.academic.repository.AcademicAttendanceWriteRepository;
 import io.campuscore.restfulapi.academic.repository.AcademicAttendanceWriteRepository.AttendanceInsertRow;
-import io.campuscore.restfulapi.academic.web.AcademicAttendanceMutationDtos.AttendanceMutationResponse;
-import io.campuscore.restfulapi.academic.web.AcademicAttendanceMutationDtos.SectionAttendanceUpdateRequest;
-import io.campuscore.restfulapi.academic.web.AcademicAttendanceMutationDtos.StudentAttendanceEntry;
+import io.campuscore.restfulapi.academic.dto.AcademicAttendanceMutationDtos.AttendanceMutationResponse;
+import io.campuscore.restfulapi.academic.dto.AcademicAttendanceMutationDtos.SectionAttendanceUpdateRequest;
+import io.campuscore.restfulapi.academic.dto.AcademicAttendanceMutationDtos.StudentAttendanceEntry;
 import io.campuscore.restfulapi.web.DomainException;
 import java.time.Instant;
 import java.time.format.DateTimeParseException;
