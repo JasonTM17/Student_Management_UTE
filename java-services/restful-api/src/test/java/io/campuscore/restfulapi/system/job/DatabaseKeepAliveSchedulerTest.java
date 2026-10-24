@@ -20,7 +20,7 @@ class DatabaseKeepAliveSchedulerTest {
         JdbcOperations jdbc = mock(JdbcOperations.class);
         when(jdbc.queryForObject(eq("SELECT 1"), eq(Integer.class))).thenReturn(1);
 
-        DatabaseKeepAliveScheduler scheduler = new DatabaseKeepAliveScheduler(jdbc);
+        DatabaseKeepAliveScheduler scheduler = new DatabaseKeepAliveScheduler(new io.campuscore.restfulapi.system.repository.DatabaseProbeRepository(jdbc));
         scheduler.pingDatabase();
 
         verify(jdbc).queryForObject("SELECT 1", Integer.class);
@@ -33,7 +33,7 @@ class DatabaseKeepAliveSchedulerTest {
         when(jdbc.queryForObject(any(String.class), eq(Integer.class)))
                 .thenThrow(new DataAccessResourceFailureException("Connection refused"));
 
-        DatabaseKeepAliveScheduler scheduler = new DatabaseKeepAliveScheduler(jdbc);
+        DatabaseKeepAliveScheduler scheduler = new DatabaseKeepAliveScheduler(new io.campuscore.restfulapi.system.repository.DatabaseProbeRepository(jdbc));
         assertThatCode(scheduler::pingDatabase).doesNotThrowAnyException();
     }
 }

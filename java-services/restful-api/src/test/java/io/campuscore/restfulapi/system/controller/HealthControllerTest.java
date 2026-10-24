@@ -22,7 +22,7 @@ class HealthControllerTest {
 
     private final JdbcOperations jdbc = org.mockito.Mockito.mock(JdbcOperations.class);
     private final HealthController controller =
-            new HealthController("health-key", jdbc, absentProvider());
+            new HealthController("health-key", new io.campuscore.restfulapi.system.service.DatabaseReadinessService(new io.campuscore.restfulapi.system.repository.DatabaseProbeRepository(jdbc)), absentProvider());
 
     @Test
     void readinessReportsPostgresqlOnlyAfterTheProbeSucceeds() {
@@ -53,7 +53,7 @@ class HealthControllerTest {
         when(jdbc.queryForObject("SELECT 1", Integer.class)).thenReturn(1);
         AssistantRlsState state = new AssistantRlsState();
         state.markVerified("role and policies verified");
-        HealthController withState = new HealthController("health-key", jdbc, provider(state));
+        HealthController withState = new HealthController("health-key", new io.campuscore.restfulapi.system.service.DatabaseReadinessService(new io.campuscore.restfulapi.system.repository.DatabaseProbeRepository(jdbc)), provider(state));
 
         Map<String, Object> response = withState.readiness("health-key");
 
@@ -67,7 +67,7 @@ class HealthControllerTest {
         when(jdbc.queryForObject("SELECT 1", Integer.class)).thenReturn(1);
         AssistantRlsState state = new AssistantRlsState();
         state.markDegraded("Assistant runtime login credentials are required");
-        HealthController withState = new HealthController("health-key", jdbc, provider(state));
+        HealthController withState = new HealthController("health-key", new io.campuscore.restfulapi.system.service.DatabaseReadinessService(new io.campuscore.restfulapi.system.repository.DatabaseProbeRepository(jdbc)), provider(state));
 
         Map<String, Object> response = withState.readiness("health-key");
 
