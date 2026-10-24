@@ -7,7 +7,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.when;
 
-import io.campuscore.restfulapi.thesis.assistant.AssistantRlsState;
+import io.campuscore.restfulapi.thesis.assistant.rls.AssistantRlsState;
 import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.Test;
