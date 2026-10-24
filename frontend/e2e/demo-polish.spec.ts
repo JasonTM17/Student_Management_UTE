@@ -327,6 +327,14 @@ async function mockStudent(page: Page, singleTerm = false, overrides: Record<str
         enrollmentIds: ['meeting-0'],
       },
       '/api/v1/me/registration/credit-limit-application': null,
+      // The register page polls the withdrawal window and the caller's
+      // applications on mount; a closed window keeps the Withdraw action
+      // absent so the registration surface stays unchanged under this mock.
+      '/api/v1/me/registration/withdrawal-window': {
+        semesterId: 'term-2', semesterName: 'Current term', regularSemester: true,
+        semesterOpen: false, windowStart: null, windowEnd: null, open: false,
+      },
+      '/api/v1/me/registration/withdrawal-applications': [],
       '/api/v1/me/registration/sections': [
         {
           id: 'section-se101-01', sectionNumber: '01', courseId: 'course-se101',
