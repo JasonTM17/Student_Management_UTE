@@ -30,6 +30,8 @@ import io.campuscore.restfulapi.thesis.assistant.client.AssistantCompletionProvi
 import io.campuscore.restfulapi.thesis.assistant.client.DeepSeekClient;
 import io.campuscore.restfulapi.thesis.assistant.config.AssistantDatabaseConfiguration;
 import io.campuscore.restfulapi.thesis.assistant.dto.ThesisAssistantDtos;
+import io.campuscore.restfulapi.thesis.assistant.exception.ProviderCancelledException;
+import io.campuscore.restfulapi.thesis.assistant.exception.ProviderUnavailableException;
 import io.campuscore.restfulapi.thesis.assistant.guard.AssistantInputGuard;
 import io.campuscore.restfulapi.thesis.assistant.guard.AssistantOutputGuard;
 import io.campuscore.restfulapi.thesis.assistant.properties.AssistantProperties;
@@ -1075,7 +1077,7 @@ public class ThesisAssistantService {
             generated = provider.complete(new DeepSeekClient.CompletionRequest(
                     normalized, normalizedLocale, "", List.of(), DeepSeekClient.generalPrompt(normalizedLocale)),
                     ignored -> { }).answer();
-        } catch (DeepSeekClient.ProviderUnavailableException | DeepSeekClient.ProviderCancelledException
+        } catch (ProviderUnavailableException | ProviderCancelledException
                 | InvalidSegmentException | ProviderOutputRejectedException exception) {
             // The caller falls through to the ledgered RAG path, which charges
             // its own quota unit — refund the standalone charge so one user
@@ -1783,7 +1785,7 @@ public class ThesisAssistantService {
                                 acceptedEmission.run();
                             }
                         }, cancelToken::get);
-                        if (result == null) throw new DeepSeekClient.ProviderUnavailableException("provider returned no result");
+                        if (result == null) throw new ProviderUnavailableException("provider returned no result");
                         // Only text that passed the segment/source gate may be
                         // committed. Do not trust a collector's separate answer
                         // field if it diverges from streamed segments.
@@ -1814,9 +1816,9 @@ public class ThesisAssistantService {
                             reason = "ANSWERED";
                             degraded = false;
                         }
-                    } catch (CancellationException | DeepSeekClient.ProviderCancelledException cancelled) {
+                    } catch (CancellationException | ProviderCancelledException cancelled) {
                         throw problem(409, "TURN_CANCELLED", "Turn was cancelled");
-                    } catch (DeepSeekClient.ProviderUnavailableException | InvalidSegmentException
+                    } catch (ProviderUnavailableException | InvalidSegmentException
                             | ProviderOutputRejectedException providerFailure) {
                         reason = providerFailure instanceof ProviderOutputRejectedException
                                 ? "PROVIDER_UNSAFE_OUTPUT" : "PROVIDER_UNAVAILABLE";
@@ -1926,7 +1928,7 @@ public class ThesisAssistantService {
                         response = new ChatResponse(technicalOutputMessage(requestedLocale), MODEL, true,
                                 "PROVIDER_UNSAFE_OUTPUT", requestedLocale, fallbackCitations);
                     }
-                } catch (DeepSeekClient.ProviderUnavailableException exception) {
+                } catch (ProviderUnavailableException exception) {
                     response = new ChatResponse(lexical.answer(), MODEL, true, "PROVIDER_UNAVAILABLE", requestedLocale, fallbackCitations);
                 }
             } else if (!lexical.citations().isEmpty()) {

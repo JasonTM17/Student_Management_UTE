@@ -9,6 +9,8 @@ import java.time.Instant;
 import java.util.List;
 import java.util.ArrayList;
 import org.junit.jupiter.api.Test;
+import io.campuscore.restfulapi.thesis.assistant.exception.ProviderCancelledException;
+import io.campuscore.restfulapi.thesis.assistant.exception.ProviderUnavailableException;
 import io.campuscore.restfulapi.thesis.assistant.properties.DeepSeekProperties;
 
 class DeepSeekClientTest {
@@ -67,7 +69,7 @@ class DeepSeekClientTest {
     void disabledProviderFailsBeforeAnyNetworkCall() {
         DeepSeekProperties properties = new DeepSeekProperties(false, "", "https://api.deepseek.com", "deepseek-v4-flash", 8000, 800);
         DeepSeekClient client = new DeepSeekClient(properties, new ObjectMapper());
-        assertThrows(DeepSeekClient.ProviderUnavailableException.class,
+        assertThrows(ProviderUnavailableException.class,
                 () -> client.complete("question", "context", "vi"));
     }
 
@@ -75,7 +77,7 @@ class DeepSeekClientTest {
     void hostileBaseUrlIsRejected() {
         DeepSeekProperties properties = new DeepSeekProperties(true, "fixture", "https://api.deepseek.com.evil", "deepseek-v4-flash", 8000, 800);
         DeepSeekClient client = new DeepSeekClient(properties, new ObjectMapper());
-        assertThrows(DeepSeekClient.ProviderUnavailableException.class,
+        assertThrows(ProviderUnavailableException.class,
                 () -> client.complete("question", "context", "vi"));
     }
 
@@ -85,7 +87,7 @@ class DeepSeekClientTest {
         DeepSeekClient client = new DeepSeekClient(properties, new ObjectMapper());
         var request = new AssistantCompletionProvider.CompletionRequest("question", "en", "context", List.of("source-1"));
         String missingDone = "data: {\"choices\":[{\"delta\":{\"content\":\"answer\"},\"finish_reason\":\"stop\"}]}\n\n";
-        DeepSeekClient.ProviderUnavailableException exception = assertThrows(DeepSeekClient.ProviderUnavailableException.class,
+        ProviderUnavailableException exception = assertThrows(ProviderUnavailableException.class,
                 () -> client.parseBody(new ByteArrayInputStream(missingDone.getBytes(StandardCharsets.UTF_8)), request,
                         ignored -> { }, () -> false, Instant.now().plusSeconds(2)));
         org.junit.jupiter.api.Assertions.assertTrue(exception.malformed());
