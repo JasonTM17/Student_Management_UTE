@@ -88,7 +88,6 @@ class ArchitectureGuardTest {
             "thesis/service/ThesisLecturerWorkloadService",
             "thesis/service/ThesisMutationService",
             "thesis/service/ThesisNotificationService",
-            "thesis/service/ThesisProgressService",
             "thesis/service/ThesisReportService",
             "thesis/service/ThesisSupervisorService");
 
