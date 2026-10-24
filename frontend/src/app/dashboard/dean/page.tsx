@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { useSearchParams } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { Building2, ChevronDown, Crown, Users } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import { useI18n } from '@/i18n';
@@ -11,7 +11,7 @@ import { cn } from '@/lib/utils';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { PageHeader } from '@/components/ui/page-header';
 import { Select } from '@/components/ui/select';
-import { EmptyState, ErrorState, ForbiddenState, LoadingState } from '@/components/ui/state-block';
+import { EmptyState, ErrorState, LoadingState } from '@/components/ui/state-block';
 import { LocalizedLink } from '@/components/LocalizedLink';
 import { StatusPill } from '@/components/ui/status-pill';
 import type { StatusTone } from '@/components/ui/status';
@@ -167,7 +167,8 @@ function GroupRow({ group, copy }: { group: DeanGroup; copy: Record<string, stri
 
 export default function DeanOverviewPage() {
   const { isFacultyHead, isLoading: authLoading, user } = useAuth();
-  const { messages } = useI18n();
+  const { href, messages } = useI18n();
+  const router = useRouter();
   const copy = messages.deanOverview;
   const statusCopy = copy.status as unknown as Record<string, string>;
   const tableCopy = copy.table as unknown as Record<string, string>;
@@ -254,13 +255,21 @@ export default function DeanOverviewPage() {
     [copy.supervisorsSubtitle],
   );
 
-  if (authLoading) {
+  useEffect(() => {
+    if (authLoading) {
+      return;
+    }
+    if (!user) {
+      router.replace(`${href('/login')}?portal=dean&reason=session-expired`);
+      return;
+    }
+    if (!isFacultyHead) {
+      router.replace(href('/dashboard'));
+    }
+  }, [authLoading, href, isFacultyHead, router, user]);
+
+  if (authLoading || !user || !isFacultyHead) {
     return <LoadingState label={copy.loading} />;
-  }
-  if (!isFacultyHead) {
-    return (
-      <ForbiddenState title={copy.title} description={copy.forbidden} />
-    );
   }
 
   return (
