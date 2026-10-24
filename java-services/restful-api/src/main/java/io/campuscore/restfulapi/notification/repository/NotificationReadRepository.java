@@ -1,6 +1,6 @@
 package io.campuscore.restfulapi.notification.repository;
 
-import io.campuscore.restfulapi.notification.web.NotificationReadDtos.NotificationResponse;
+import io.campuscore.restfulapi.notification.dto.NotificationReadDtos.NotificationResponse;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Timestamp;

@@ -1,4 +1,4 @@
-package io.campuscore.restfulapi.notification.web;
+package io.campuscore.restfulapi.notification.dto;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;

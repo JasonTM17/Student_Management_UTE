@@ -1,4 +1,4 @@
-package io.campuscore.restfulapi.notification.web;
+package io.campuscore.restfulapi.notification.dto;
 
 import java.time.Instant;
 import java.util.List;
