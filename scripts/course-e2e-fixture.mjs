@@ -63,6 +63,63 @@ BEGIN
 END $$;
 `;
 
+// Only enabled by the withdrawal browser journey. Re-opens the demo
+// semester's withdrawal window ([startDate, startDate + 14d], Bangkok civil
+// time) and adds one OPEN-but-stale semester with a seeded enrollment so the
+// closed-window refusal can be asserted on a real row. Idempotent.
+export const withdrawalWindowSql = `
+DO $$
+BEGIN
+  UPDATE academic."Semester"
+     SET "startDate" = CURRENT_TIMESTAMP - INTERVAL '3 days'
+   WHERE "id" = 'semester-demo' AND "status" = 'OPEN';
+  IF NOT FOUND THEN
+    RAISE EXCEPTION 'Expected an open semester-demo for the withdrawal journey';
+  END IF;
+
+  INSERT INTO academic."Semester"
+      ("id", "name", "nameEn", "nameVi", "type", "academicYearId",
+       "startDate", "endDate", "status")
+  VALUES ('wd2-sem-late', 'Học kỳ bổ sung 2026', 'Supplementary Term 2026',
+          'Học kỳ bổ sung 2026', 'FIRST', 'academic-year-demo',
+          CURRENT_TIMESTAMP - INTERVAL '30 days',
+          CURRENT_TIMESTAMP + INTERVAL '60 days', 'OPEN')
+  ON CONFLICT ("id") DO NOTHING;
+
+  INSERT INTO academic."Course"
+      ("id", "code", "name", "nameEn", "nameVi", "credits", "departmentId", "semesterId")
+  VALUES ('wd2-course-late', 'WD101', 'Học phần kỳ trễ', 'Late Term Course',
+          'Học phần kỳ trễ', 3, 'department-demo', 'wd2-sem-late')
+  ON CONFLICT ("id") DO NOTHING;
+
+  INSERT INTO academic."Section"
+      ("id", "sectionNumber", "courseId", "semesterId", "lecturerId",
+       "classroomId", "capacity", "enrolledCount", "status")
+  VALUES ('wd2-sec-late', 'WD101-01', 'wd2-course-late', 'wd2-sem-late',
+          'lecturer-profile', 'classroom-a101', 40, 1, 'OPEN')
+  ON CONFLICT ("id") DO NOTHING;
+
+  INSERT INTO academic."Enrollment"
+      ("id", "studentId", "sectionId", "semesterId", "status", "enrolledAt",
+       "gradeStatus", "courseId", "roundId", "creditsSnapshot", "version")
+  VALUES ('wd2-enr-late', 'student-profile', 'wd2-sec-late', 'wd2-sem-late',
+          'ENROLLED', CURRENT_TIMESTAMP, 'NOT_GRADED', 'wd2-course-late',
+          NULL, 3, 0)
+  ON CONFLICT ("id") DO NOTHING;
+END $$;
+`;
+
+export async function seedWithdrawalE2e(projectName, compose) {
+  if (!/^campuscore-course-e2e-[a-z0-9-]+$/i.test(projectName)) {
+    throw new Error('Refusing withdrawal fixture outside a disposable E2E project');
+  }
+  await compose([
+    'exec', '-T', 'postgres', 'sh', '-c',
+    'exec psql --no-psqlrc --set ON_ERROR_STOP=1 --username "$POSTGRES_USER" --dbname "$POSTGRES_DB" --command "$1"',
+    'course-e2e-withdrawal-fixture', withdrawalWindowSql,
+  ]);
+}
+
 export async function seedCourseE2e(projectName, compose) {
   if (!/^campuscore-course-e2e-[a-z0-9-]+$/i.test(projectName)) {
     throw new Error('Refusing registration fixture outside a disposable E2E project');
