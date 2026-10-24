@@ -97,7 +97,8 @@ class EnrolledCountReconcileJobTest {
     void driftIsDetectedAndLoggedWithoutRepair() {
         io.campuscore.restfulapi.academic.job.EnrolledCountReconcileJob job =
                 new io.campuscore.restfulapi.academic.job.EnrolledCountReconcileJob(
-                        new NamedParameterJdbcTemplate(jdbc), false);
+                        new io.campuscore.restfulapi.academic.repository.EnrolledCountReconcileRepository(
+                                new NamedParameterJdbcTemplate(jdbc)), false);
 
         job.reconcile();
 
@@ -120,7 +121,8 @@ class EnrolledCountReconcileJobTest {
     void repairModeCorrectsCountersToTrueActiveCounts() {
         io.campuscore.restfulapi.academic.job.EnrolledCountReconcileJob job =
                 new io.campuscore.restfulapi.academic.job.EnrolledCountReconcileJob(
-                        new NamedParameterJdbcTemplate(jdbc), true);
+                        new io.campuscore.restfulapi.academic.repository.EnrolledCountReconcileRepository(
+                                new NamedParameterJdbcTemplate(jdbc)), true);
 
         job.reconcile();
 
@@ -146,7 +148,8 @@ class EnrolledCountReconcileJobTest {
 
         io.campuscore.restfulapi.academic.job.EnrolledCountReconcileJob job =
                 new io.campuscore.restfulapi.academic.job.EnrolledCountReconcileJob(
-                        new NamedParameterJdbcTemplate(jdbc), false);
+                        new io.campuscore.restfulapi.academic.repository.EnrolledCountReconcileRepository(
+                                new NamedParameterJdbcTemplate(jdbc)), false);
 
         job.reconcile();
 

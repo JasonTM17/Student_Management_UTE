@@ -1,14 +1,13 @@
 package io.campuscore.restfulapi.academic.job;
 
+import io.campuscore.restfulapi.academic.model.DriftedSection;
+import io.campuscore.restfulapi.academic.repository.EnrolledCountReconcileRepository;
 import java.util.List;
-import java.util.Map;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Profile;
-import org.springframework.jdbc.core.namedparam.MapSqlParameterSource;
-import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
@@ -36,17 +35,15 @@ import org.springframework.stereotype.Component;
 public class EnrolledCountReconcileJob {
     private static final Logger log = LoggerFactory.getLogger(EnrolledCountReconcileJob.class);
 
-    /** Same active-enrollment definition as RegistrationService seat accounting. */
-    static final String ACTIVE_STATUS_PREDICATE = "('ENROLLED', 'PENDING', 'CONFIRMED', 'COMPLETED')";
     private static final int LOGGED_SECTION_LIMIT = 20;
 
-    private final NamedParameterJdbcTemplate jdbc;
+    private final EnrolledCountReconcileRepository repository;
     private final boolean repair;
 
     @Autowired
-    public EnrolledCountReconcileJob(NamedParameterJdbcTemplate jdbc,
+    public EnrolledCountReconcileJob(EnrolledCountReconcileRepository repository,
             @Value("${academic.enrolled-count.repair:false}") boolean repair) {
-        this.jdbc = jdbc;
+        this.repository = repository;
         this.repair = repair;
     }
 
@@ -58,16 +55,7 @@ public class EnrolledCountReconcileJob {
             initialDelayString = "${academic.enrolled-count.reconcile-initial-delay-ms:120000}")
     public void reconcile() {
         try {
-            List<DriftedSection> drifted = jdbc.query(
-                    "SELECT section.\"id\", section.\"enrolledCount\" AS stored_count, COUNT(enrollment.\"id\") AS true_count "
-                            + "FROM academic.\"Section\" section "
-                            + "LEFT JOIN academic.\"Enrollment\" enrollment "
-                            + "  ON enrollment.\"sectionId\" = section.\"id\" "
-                            + " AND enrollment.\"status\" IN " + ACTIVE_STATUS_PREDICATE + " "
-                            + "GROUP BY section.\"id\", section.\"enrolledCount\" "
-                            + "HAVING section.\"enrolledCount\" <> COUNT(enrollment.\"id\")",
-                    Map.of(), (rs, row) -> new DriftedSection(
-                            rs.getString("id"), rs.getInt("stored_count"), rs.getLong("true_count")));
+            List<DriftedSection> drifted = repository.findDriftedSections();
             if (drifted.isEmpty()) {
                 return;
             }
@@ -82,21 +70,11 @@ public class EnrolledCountReconcileJob {
                     repair ? "auto-repairing" : "disabled");
             if (repair) {
                 List<String> driftedIds = drifted.stream().map(DriftedSection::sectionId).toList();
-                int repaired = jdbc.update(
-                        "UPDATE academic.\"Section\" section "
-                                + "SET \"enrolledCount\" = ("
-                                + "  SELECT COUNT(*) FROM academic.\"Enrollment\" enrollment "
-                                + "  WHERE enrollment.\"sectionId\" = section.\"id\" "
-                                + "    AND enrollment.\"status\" IN " + ACTIVE_STATUS_PREDICATE + "), "
-                                + "\"updatedAt\" = CURRENT_TIMESTAMP "
-                                + "WHERE section.\"id\" IN (:ids)",
-                        new MapSqlParameterSource("ids", driftedIds));
+                int repaired = repository.repairEnrolledCounts(driftedIds);
                 log.warn("enrolledCount repair corrected {} section counter(s)", repaired);
             }
         } catch (Exception failure) {
             log.warn("Failed to reconcile section enrolledCount: {}", failure.getMessage(), failure);
         }
     }
-
-    record DriftedSection(String sectionId, int storedCount, long trueCount) { }
 }
