@@ -1,4 +1,4 @@
-package io.campuscore.restfulapi.config;
+package io.campuscore.restfulapi.config.env;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
