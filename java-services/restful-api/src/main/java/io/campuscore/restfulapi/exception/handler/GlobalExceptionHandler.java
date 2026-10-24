@@ -25,7 +25,7 @@ import org.springframework.web.server.ResponseStatusException;
 import org.springframework.web.servlet.resource.NoResourceFoundException;
 import io.campuscore.restfulapi.exception.AppException;
 import io.campuscore.restfulapi.exception.ErrorCode;
-import io.campuscore.restfulapi.exception.ErrorResponse;
+import io.campuscore.restfulapi.exception.response.ErrorResponse;
 import io.campuscore.restfulapi.exception.ValidationException;
 
 /**

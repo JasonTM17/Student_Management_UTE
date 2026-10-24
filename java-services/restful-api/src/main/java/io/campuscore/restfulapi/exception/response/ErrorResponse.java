@@ -1,4 +1,4 @@
-package io.campuscore.restfulapi.exception;
+package io.campuscore.restfulapi.exception.response;
 
 import com.fasterxml.jackson.annotation.JsonFormat;
 import com.fasterxml.jackson.annotation.JsonInclude;

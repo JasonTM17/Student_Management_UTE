@@ -8,7 +8,7 @@ import java.io.IOException;
 import java.util.List;
 import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
-import io.campuscore.restfulapi.web.ApiErrorWriter;
+import io.campuscore.restfulapi.exception.response.ApiErrorWriter;
 
 /**
  * Caps the declared size of JSON bodies before Jackson materialises them.

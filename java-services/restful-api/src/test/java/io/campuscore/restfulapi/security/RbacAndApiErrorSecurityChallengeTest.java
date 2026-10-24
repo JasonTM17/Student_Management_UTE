@@ -35,7 +35,7 @@ import io.campuscore.restfulapi.thesis.repository.ThesisTopicRepository;
 import io.campuscore.restfulapi.thesis.service.ThesisGroupReadService;
 import io.campuscore.restfulapi.thesis.service.ThesisTopicService;
 import io.campuscore.restfulapi.thesis.dto.ThesisGroupReadDtos.GroupResponse;
-import io.campuscore.restfulapi.web.ApiErrorWriter;
+import io.campuscore.restfulapi.exception.response.ApiErrorWriter;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;

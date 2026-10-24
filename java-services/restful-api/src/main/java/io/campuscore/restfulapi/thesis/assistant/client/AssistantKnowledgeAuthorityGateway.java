@@ -5,7 +5,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import io.campuscore.restfulapi.thesis.assistant.controller.ThesisAssistantKnowledgeAdminController.KnowledgeDocumentView;
 import io.campuscore.restfulapi.thesis.assistant.controller.ThesisAssistantKnowledgeAdminController.KnowledgeRequest;
 import io.campuscore.restfulapi.thesis.assistant.controller.ThesisAssistantKnowledgeAdminController.KnowledgeRevision;
-import io.campuscore.restfulapi.web.ApiExceptionHandler.ApiError;
+import io.campuscore.restfulapi.exception.response.ApiError;
 import io.campuscore.restfulapi.exception.DomainException;
 import java.io.IOException;
 import java.net.URI;

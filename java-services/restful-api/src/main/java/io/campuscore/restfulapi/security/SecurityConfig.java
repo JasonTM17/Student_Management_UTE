@@ -1,7 +1,7 @@
 package io.campuscore.restfulapi.security;
 
 import com.nimbusds.jose.jwk.source.ImmutableSecret;
-import io.campuscore.restfulapi.web.ApiErrorWriter;
+import io.campuscore.restfulapi.exception.response.ApiErrorWriter;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Collection;
