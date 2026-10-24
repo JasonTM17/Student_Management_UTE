@@ -7,6 +7,7 @@ import { authApi } from '@/lib/api';
 import { campusCodeMessage } from '@/lib/campus-error';
 import { loginHref, portalFromUser } from '@/lib/login-portal';
 import { checkPasswordPolicy } from '@/lib/password-policy';
+import { getBrowserQueryClient } from '@/lib/query';
 import { useI18n } from '@/i18n';
 import { Modal } from '@/components/ui/modal';
 import { Button } from '@/components/ui/button';
@@ -77,6 +78,11 @@ export function ForcedPasswordRotationGate() {
         // the fresh cookies are already in the jar — re-read the identity and
         // the flag-cleared user opens the portal without a sign-out.
         await refreshUser();
+        // Business queries fired while mustChangePassword was true were
+        // rejected by the server and sit in the cache in error state; the id
+        // did not change so the identity transition cannot clear them. Drop
+        // them here or every surface keeps its gated error card.
+        getBrowserQueryClient().clear();
       } else {
         // No refresh credential reached the pin, so every session was
         // revoked. Land on the rotated-credential notice rather than a bare
