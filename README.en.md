@@ -549,6 +549,7 @@ mvn test -f java-services/pom.xml -Dtest=AcademicEnrollmentMutationPersistenceTe
 - **Race Condition Concurrency Test**: `AcademicEnrollmentMutationPersistenceTest` spawns independent threads competing for a section's last seat. Exactly one thread succeeds, the rest receive HTTP 409, and capacity is never oversold.
 - **Bilingual Injection Test**: The `AssistantInputGuard` test suite covers prompt-injection variants in English and Vietnamese; malicious inputs are rejected at the gateway layer.
 - **Two-Admin Governance Test**: A self-approval attempt (creator approving their own pending draft) is rejected with `409 Conflict` (`KNOWLEDGE_SECOND_REVIEW_REQUIRED`) as designed.
+- **PostgreSQL Integration Tests**: The `*PostgresIT` classes (seat races, lock ordering, assistant RLS, council/publication races) only execute against a real PostgreSQL — each disables itself when its JDBC env var is absent, so a plain `mvn verify` skips them silently. The `postgres-it` CI job starts a disposable `postgres:15` service, pre-creates the dedicated database each env family requires (the `CAMPUSCORE_*`/`ASSISTANT_*` variables and database-name conventions live in `.github/workflows/ci.yml`), then runs `mvn -f java-services/pom.xml -P assistant-postgres-it verify`; `scripts/check-postgres-its.mjs` guards the end of the job and fails it if any IT class skipped. To run locally, create the matching empty databases on your own PostgreSQL, export the same variables, and run the same Maven command.
 
 ---
 
