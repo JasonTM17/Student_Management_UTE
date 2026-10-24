@@ -29,7 +29,7 @@ import {
 import { useAuth } from '@/context/AuthContext';
 import { toast } from 'sonner';
 import { classifyThesisScore } from '@/lib/grade-scale';
-import { pickPreferredThesisRound, roundsForPicker } from '@/lib/thesis-round';
+import { mergeThesisRounds, pickPreferredThesisRound, roundsForPicker } from '@/lib/thesis-round';
 import { Button } from '@/components/ui/button';
 import { LinkButton } from '@/components/ui/link-button';
 import { Input } from '@/components/ui/input';
@@ -581,7 +581,7 @@ export default function ThesisPage() {
         thesisApi.listRounds(),
         thesisApi.listRounds('CLOSED').catch(() => [] as ThesisRound[]),
       ]);
-      const nextRounds = [...liveRounds, ...closedRounds];
+      const nextRounds = mergeThesisRounds(liveRounds, closedRounds);
       if (signal.cancelled) return;
       const sortedRounds = [...nextRounds].sort((a, b) => {
         const isOpenA = a.status === 'REGISTRATION_OPEN' ? 0 : 1;
