@@ -616,6 +616,40 @@ class SectionCancellationPersistenceTest {
     }
 
     @Test
+    void reopeningSummerSectionUsesTheSummerCreditCap() throws Exception {
+        jdbc.update("UPDATE \"academic\".\"Semester\" SET \"type\" = 'SUMMER' WHERE \"id\" = 'semester-1'");
+        jdbc.update("UPDATE \"academic\".\"SectionSchedule\" SET \"dayOfWeek\" = 4"
+                + " WHERE \"sectionId\" = 'section-open'");
+        mvc.perform(post("/api/v1/enrollments/enroll")
+                        .with(studentJwt())
+                        .header("Idempotency-Key", "summer-reopen-enroll")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"sectionId\":\"section-open\"}"))
+                .andExpect(status().isOk());
+        cancelSection("section-open");
+        mvc.perform(post("/api/v1/enrollments/enroll")
+                        .with(studentJwt())
+                        .header("Idempotency-Key", "summer-reopen-other-course")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"sectionId\":\"section-overlap\"}"))
+                .andExpect(status().isOk());
+
+        // Existing enrollments predate this catalog correction, so their combined
+        // current credits now exceed the 10-credit summer cap.
+        jdbc.update("UPDATE \"academic\".\"Course\" SET \"credits\" = 6"
+                + " WHERE \"id\" IN ('course-open', 'course-overlap')");
+
+        mvc.perform(put("/api/v1/sections/section-open")
+                        .with(adminJwt())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"status\":\"OPEN\"}"))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("REOPEN_CONFLICTS"))
+                .andExpect(jsonPath("$.details.conflicts[0].reasons")
+                        .value(org.hamcrest.Matchers.contains("CREDIT_CAP")));
+    }
+
+    @Test
     void enrollIsRejectedWhileSemesterIsClosed() throws Exception {
         // The semester lifecycle, not only the round row, gates registration:
         // a CLOSED semester must refuse enroll even while a round stays OPEN.

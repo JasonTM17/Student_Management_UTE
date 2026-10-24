@@ -38,6 +38,7 @@ import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMock
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.core.env.Environment;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.TestPropertySource;
@@ -68,6 +69,9 @@ class AcademicEnrollmentMutationPersistenceTest {
 
     @Autowired
     private ObjectMapper objectMapper;
+
+    @Autowired
+    private Environment environment;
 
     @Autowired
     private RegistrationService registrationService;
@@ -131,7 +135,9 @@ class AcademicEnrollmentMutationPersistenceTest {
         mvc.perform(get("/api/v1/me/registration/summary")
                         .with(studentJwt("student-user-1", "student-1")))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.creditsUsed").value(3));
+                .andExpect(jsonPath("$.creditsUsed").value(3))
+                .andExpect(jsonPath("$.minCredits").value(14))
+                .andExpect(jsonPath("$.belowMinimum").value(true));
 
         mvc.perform(get("/api/v1/enrollments/my").with(studentJwt("student-user-1", "student-1")))
                 .andExpect(status().isOk())
@@ -715,6 +721,97 @@ class AcademicEnrollmentMutationPersistenceTest {
                         .param("roundId", "round-open"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.creditLimit").value(10));
+    }
+
+    @Test
+    void summerConfiguredCapAllowsTenCreditsAndRefusesEleven() throws Exception {
+        jdbc.update("UPDATE \"academic\".\"Semester\" SET \"type\" = 'SUMMER' WHERE \"id\" = 'semester-1'");
+        jdbc.update("UPDATE \"academic\".\"RegistrationRound\" SET \"creditLimit\" = 28 WHERE \"id\" = 'round-open'");
+        jdbc.update("UPDATE \"academic\".\"Course\" SET \"credits\" = 10 WHERE \"id\" = 'course-open'");
+        jdbc.update("UPDATE \"academic\".\"Course\" SET \"credits\" = 1 WHERE \"id\" = 'course-two'");
+
+        mvc.perform(post("/api/v1/me/enrollments")
+                        .with(studentJwt("student-user-1", "student-1"))
+                        .header("Idempotency-Key", "summer-ten-credits")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"sectionId\":\"section-open\"}"))
+                .andExpect(status().isOk());
+
+        mvc.perform(get("/api/v1/me/registration/summary")
+                        .with(studentJwt("student-user-1", "student-1")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.creditLimit").value(10))
+                .andExpect(jsonPath("$.creditsUsed").value(10));
+
+        mvc.perform(post("/api/v1/me/enrollments")
+                        .with(studentJwt("student-user-1", "student-1"))
+                        .header("Idempotency-Key", "summer-eleven-credits")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"sectionId\":\"section-two\"}"))
+                .andExpect(status().isUnprocessableEntity())
+                .andExpect(jsonPath("$.code").value("CREDIT_CAP_EXCEEDED"));
+    }
+
+    @Test
+    void summerCapUsesRegistrationSummerMaxCreditsProperty() throws Exception {
+        jdbc.update("UPDATE \"academic\".\"Semester\" SET \"type\" = 'SUMMER' WHERE \"id\" = 'semester-1'");
+        jdbc.update("UPDATE \"academic\".\"RegistrationRound\" SET \"creditLimit\" = 28 WHERE \"id\" = 'round-open'");
+        int configuredMaximum = environment.getProperty("registration.summer-max-credits", Integer.class, 10);
+
+        mvc.perform(get("/api/v1/me/registration/eligibility")
+                        .with(studentJwt("student-user-1", "student-1"))
+                        .param("roundId", "round-open"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.creditLimit").value(configuredMaximum));
+    }
+
+    @Test
+    void approvedCreditLimitExceptionRetainsItsExistingSummerBehavior() throws Exception {
+        jdbc.update("UPDATE \"academic\".\"Semester\" SET \"type\" = 'SUMMER' WHERE \"id\" = 'semester-1'");
+        jdbc.update(
+                "INSERT INTO \"academic\".\"CreditLimitApplication\""
+                        + " (\"id\", \"studentId\", \"semesterId\", \"roundId\", \"requestedLimit\","
+                        + " \"reason\", \"status\", \"reviewedBy\", \"reviewedAt\")"
+                        + " VALUES (?, ?, ?, ?, ?, ?, 'APPROVED', ?, ?)",
+                "summer-approved-limit",
+                "student-1",
+                "semester-1",
+                "round-open",
+                30,
+                "Approved exception retained for summer behavior",
+                "admin-user",
+                localDateTime(BASE_TIME));
+
+        mvc.perform(get("/api/v1/me/registration/eligibility")
+                        .with(studentJwt("student-user-1", "student-1"))
+                        .param("roundId", "round-open"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.creditLimit").value(30));
+    }
+
+    @Test
+    void registrationSummaryAdvisesBelowMinimumOnlyBelowFourteenCredits() throws Exception {
+        mvc.perform(get("/api/v1/me/registration/summary")
+                        .with(studentJwt("student-user-1", "student-1")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.minCredits").value(14))
+                .andExpect(jsonPath("$.creditsUsed").value(0))
+                .andExpect(jsonPath("$.belowMinimum").value(true));
+
+        jdbc.update("UPDATE \"academic\".\"Course\" SET \"credits\" = 14 WHERE \"id\" = 'course-open'");
+        seedActiveEnrollment("enrollment-minimum-exact", "section-open", "course-open");
+        mvc.perform(get("/api/v1/me/registration/summary")
+                        .with(studentJwt("student-user-1", "student-1")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.creditsUsed").value(14))
+                .andExpect(jsonPath("$.belowMinimum").value(false));
+
+        jdbc.update("UPDATE \"academic\".\"Course\" SET \"credits\" = 15 WHERE \"id\" = 'course-open'");
+        mvc.perform(get("/api/v1/me/registration/summary")
+                        .with(studentJwt("student-user-1", "student-1")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.creditsUsed").value(15))
+                .andExpect(jsonPath("$.belowMinimum").value(false));
     }
 
     @Test

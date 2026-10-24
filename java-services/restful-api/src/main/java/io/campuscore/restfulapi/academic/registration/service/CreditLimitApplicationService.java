@@ -33,6 +33,7 @@ public class CreditLimitApplicationService {
 
     public static final int STANDARD_LIMIT = 28;
     public static final int APPROVED_LIMIT = 30;
+    private static final int DEFAULT_SUMMER_MAX_CREDITS = 10;
     /** Upper bound for the admin console listing; the feed is newest-first. */
     static final int MAX_LIST_RESULTS = 500;
 
@@ -51,24 +52,37 @@ public class CreditLimitApplicationService {
      * (2026-09-30). 0 (default) keeps the standard/approved behaviour.
      */
     private final int limitOverride;
+    private final int summerMaxCredits;
     private final AdminAuditRecorder audit;
 
     public CreditLimitApplicationService(NamedParameterJdbcTemplate jdbc) {
-        this(jdbc, 0, new AdminAuditRecorder(new io.campuscore.restfulapi.audit.repository.AdminAuditWriteRepository(jdbc)));
+        this(jdbc, 0, DEFAULT_SUMMER_MAX_CREDITS,
+                new AdminAuditRecorder(new io.campuscore.restfulapi.audit.repository.AdminAuditWriteRepository(jdbc)));
     }
 
     /** Compatibility constructor for callers that only exercise limit math; review() still audits through a recorder over the same template. */
     public CreditLimitApplicationService(NamedParameterJdbcTemplate jdbc, int limitOverride) {
-        this(jdbc, limitOverride, new AdminAuditRecorder(new io.campuscore.restfulapi.audit.repository.AdminAuditWriteRepository(jdbc)));
+        this(jdbc, limitOverride, DEFAULT_SUMMER_MAX_CREDITS,
+                new AdminAuditRecorder(new io.campuscore.restfulapi.audit.repository.AdminAuditWriteRepository(jdbc)));
+    }
+
+    /** Compatibility constructor for tests and callers supplying their own audit recorder. */
+    public CreditLimitApplicationService(
+            NamedParameterJdbcTemplate jdbc,
+            int limitOverride,
+            AdminAuditRecorder audit) {
+        this(jdbc, limitOverride, DEFAULT_SUMMER_MAX_CREDITS, audit);
     }
 
     @org.springframework.beans.factory.annotation.Autowired
     public CreditLimitApplicationService(
             NamedParameterJdbcTemplate jdbc,
             @org.springframework.beans.factory.annotation.Value("${app.demo.credit-limit-override:0}") int limitOverride,
+            @org.springframework.beans.factory.annotation.Value("${registration.summer-max-credits:10}") int summerMaxCredits,
             AdminAuditRecorder audit) {
         this.jdbc = jdbc;
         this.limitOverride = Math.max(0, limitOverride);
+        this.summerMaxCredits = Math.max(1, summerMaxCredits);
         this.audit = audit;
     }
 
@@ -212,10 +226,14 @@ public class CreditLimitApplicationService {
     /** Returns the standard round limit, raised only by a matching approved row. */
     @Transactional(readOnly = true)
     public int effectiveLimit(String studentId, Map<String, Object> round) {
+        boolean summerSemester = isSummerSemester(round);
         if (limitOverride > 0) {
-            return limitOverride;
+            return summerSemester ? Math.min(limitOverride, summerMaxCredits) : limitOverride;
         }
         int standard = standardLimit(round);
+        if (summerSemester) {
+            standard = Math.min(standard, summerMaxCredits);
+        }
         Integer requested;
         try {
             requested = jdbc.queryForObject(
@@ -230,6 +248,11 @@ public class CreditLimitApplicationService {
             requested = null;
         }
         return requested == null ? standard : Math.min(APPROVED_LIMIT, Math.max(standard, requested));
+    }
+
+    private boolean isSummerSemester(Map<String, Object> round) {
+        Object semesterType = round.get("semester_type");
+        return semesterType != null && "SUMMER".equalsIgnoreCase(semesterType.toString().trim());
     }
 
     public int standardLimit(Map<String, Object> round) {

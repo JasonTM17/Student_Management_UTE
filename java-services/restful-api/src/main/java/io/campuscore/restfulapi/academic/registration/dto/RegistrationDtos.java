@@ -92,7 +92,20 @@ public final class RegistrationDtos {
             int creditLimit,
             int creditsUsed,
             int creditsRemaining,
-            List<String> enrollmentIds) {
+            List<String> enrollmentIds,
+            @Schema(description = "Mức tín chỉ tối thiểu mang tính tư vấn trong học kỳ chính", example = "14")
+            int minCredits,
+            @Schema(description = "True khi số tín chỉ đang hoạt động thấp hơn minCredits; không chặn đăng ký", example = "true")
+            boolean belowMinimum) {
+
+        public SummaryResponse(
+                String roundId,
+                int creditLimit,
+                int creditsUsed,
+                int creditsRemaining,
+                List<String> enrollmentIds) {
+            this(roundId, creditLimit, creditsUsed, creditsRemaining, enrollmentIds, 14, creditsUsed < 14);
+        }
     }
 
     @Schema(description = "Kết quả hủy đăng ký lớp học phần")
