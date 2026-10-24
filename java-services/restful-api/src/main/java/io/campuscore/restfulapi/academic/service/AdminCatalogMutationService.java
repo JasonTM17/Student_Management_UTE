@@ -244,7 +244,16 @@ public class AdminCatalogMutationService {
             requireCreditsInRange(number(input, "credits", 3));
         }
         if (SEMESTER.equals(table) && input.containsKey("status")) {
-            requireSemesterStatus(text(input, "status", null));
+            String requestedStatus = text(input, "status", null);
+            requireSemesterStatus(requestedStatus);
+            if (before != null) {
+                String currentStatus = SemesterStatuses.normalize(String.valueOf(before.get("status")));
+                if (SemesterStatuses.TERMINAL.contains(currentStatus)
+                        && !currentStatus.equals(SemesterStatuses.normalize(requestedStatus))) {
+                    throw problem(HttpStatus.CONFLICT, "SEMESTER_CLOSED",
+                            "A terminal semester cannot transition to another status");
+                }
+            }
         }
         if (SEMESTER.equals(table)) {
             validateSemesterUpdate(id, input);
