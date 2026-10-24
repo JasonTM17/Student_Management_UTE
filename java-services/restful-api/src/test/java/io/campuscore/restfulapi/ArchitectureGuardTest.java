@@ -81,7 +81,6 @@ class ArchitectureGuardTest {
             "auth/service/DemoAccountGate",
             "system/controller/HealthController",
             "system/job/DatabaseKeepAliveScheduler",
-            "thesis/assistant/controller/ThesisAssistantKnowledgeAdminController",
             "thesis/assistant/job/PrerequisiteMapSyncJob",
             "thesis/assistant/service/AssistantFeedbackAdminService",
             "thesis/assistant/service/AssistantPersonalContextAdvisor",
