@@ -5,9 +5,9 @@ import org.slf4j.LoggerFactory;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Profile;
 import org.springframework.dao.DataAccessException;
-import org.springframework.jdbc.core.JdbcOperations;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
+import io.campuscore.restfulapi.system.repository.DatabaseProbeRepository;
 
 /**
  * Scheduled database keep-alive heartbeat.
@@ -23,10 +23,10 @@ public class DatabaseKeepAliveScheduler {
 
     private static final Logger log = LoggerFactory.getLogger(DatabaseKeepAliveScheduler.class);
 
-    private final JdbcOperations jdbc;
+    private final DatabaseProbeRepository probe;
 
-    public DatabaseKeepAliveScheduler(JdbcOperations jdbc) {
-        this.jdbc = jdbc;
+    public DatabaseKeepAliveScheduler(DatabaseProbeRepository probe) {
+        this.probe = probe;
     }
 
     /**
@@ -37,8 +37,8 @@ public class DatabaseKeepAliveScheduler {
             initialDelayString = "${app.keepalive.db-initial-delay-ms:120000}")
     public void pingDatabase() {
         try {
-            Integer probe = jdbc.queryForObject("SELECT 1", Integer.class);
-            log.info("Database keep-alive ping succeeded (probe: {})", probe);
+            Integer result = probe.probe();
+            log.info("Database keep-alive ping succeeded (probe: {})", result);
         } catch (DataAccessException ex) {
             log.warn("Database keep-alive ping encountered non-fatal error: {}", ex.getMessage());
         }

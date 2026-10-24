@@ -1,5 +1,6 @@
 package io.campuscore.restfulapi.system.controller;
 
+import io.campuscore.restfulapi.system.service.DatabaseReadinessService;
 import io.campuscore.restfulapi.thesis.assistant.rls.AssistantRlsState;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -15,7 +16,6 @@ import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.dao.DataAccessException;
 import org.springframework.http.HttpStatus;
-import org.springframework.jdbc.core.JdbcOperations;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -28,15 +28,15 @@ import org.springframework.web.server.ResponseStatusException;
 public class HealthController {
 
     private final String readinessKey;
-    private final JdbcOperations jdbc;
+    private final DatabaseReadinessService readiness;
     private final ObjectProvider<AssistantRlsState> assistantRlsState;
 
     public HealthController(
             @Value("${health.readiness-key:}") String readinessKey,
-            JdbcOperations jdbc,
+            DatabaseReadinessService readiness,
             ObjectProvider<AssistantRlsState> assistantRlsState) {
         this.readinessKey = readinessKey;
-        this.jdbc = jdbc;
+        this.readiness = readiness;
         this.assistantRlsState = assistantRlsState;
     }
 
@@ -65,7 +65,7 @@ public class HealthController {
         }
 
         try {
-            jdbc.queryForObject("SELECT 1", Integer.class);
+            readiness.checkReady();
         } catch (DataAccessException exception) {
             throw new ResponseStatusException(
                     HttpStatus.SERVICE_UNAVAILABLE,
