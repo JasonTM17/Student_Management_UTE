@@ -32,3 +32,20 @@ test('submit fires once per click because the control is disabled while busy', (
   const saveCalls = page.match(/void save\(\)/g) ?? [];
   assert.ok(saveCalls.length >= 1, 'form submit still reaches save()');
 });
+
+test('the content required hint stays inside the editor wrapper div', () => {
+  // AdminFormField keeps its rendered subtree stable only while it receives
+  // exactly one child. When the hint was a second sibling it flipped the
+  // field from one child to two on first touch, remounted the whole editor
+  // subtree (TinyMCE/Markdown included) and dropped whatever had just been
+  // typed — the Playwright fill() landed on the detached textarea and the
+  // publish gate never unlocked (CI: announcement-governance.spec.ts).
+  const start = page.indexOf("Nội dung' : 'Content'");
+  const end = page.indexOf('</AdminFormField>', start);
+  assert.ok(start !== -1 && end !== -1, 'content AdminFormField block found');
+  const block = page.slice(start, end);
+  const alertIndex = block.indexOf('touched.content && !draft.content.trim()');
+  const wrapperClose = block.lastIndexOf('</div>');
+  assert.ok(alertIndex !== -1, 'required hint still rendered');
+  assert.ok(alertIndex < wrapperClose, 'required hint must render inside the onBlur wrapper div, not as a sibling child of AdminFormField');
+});
