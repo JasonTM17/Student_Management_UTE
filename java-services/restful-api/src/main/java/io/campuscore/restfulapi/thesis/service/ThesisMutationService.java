@@ -1997,13 +1997,16 @@ public class ThesisMutationService {
         if (!isProgressStatus(status)) {
             throw invalid("Progress accepts only DRAFT, SUBMITTED, COMPLETED or CANCELLED");
         }
-        // Cancelling or completing a group is governance on the group's
-        // faculty, not review: the supervisor escape in isGroupAdmin would
-        // otherwise let a foreign dean who merely supervises the topic free
-        // the members' seats or seal the outcome — a right a plain
-        // supervisor never had.
-        if ((status == GroupStatus.CANCELLED || status == GroupStatus.COMPLETED)
-                && hasRole(actor, "TRUONG_KHOA") && !canGovernGroupScope(group, actor)) {
+        // Every lifecycle write a dean-role actor performs is governance on
+        // the group's faculty, not review: DRAFT and SUBMITTED move the
+        // roster the leader owns exactly like CANCELLED and COMPLETED do, so
+        // the supervisor escape in isGroupAdmin must not reach them. Only
+        // the group's own leader, the owning faculty head and a global
+        // admin drive these transitions — a dean who merely supervises the
+        // topic keeps the review verbs, never the lifecycle.
+        if (hasRole(actor, "TRUONG_KHOA")
+                && !group.leaderStudentId().equals(studentId(actor))
+                && !canGovernGroupScope(group, actor)) {
             throw notFound("THESIS_GROUP_NOT_FOUND", "Thesis group not found");
         }
         if (group.status() == GroupStatus.CANCELLED && status != GroupStatus.CANCELLED) {
