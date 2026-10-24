@@ -36,12 +36,16 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(AppException.class)
     public ResponseEntity<ErrorResponse> handleAppException(AppException exception, HttpServletRequest request) {
         Map<String, String> fields = exception instanceof ValidationException ve ? ve.getFieldErrors() : Map.of();
+        Map<String, Object> details = exception instanceof io.campuscore.restfulapi.web.DomainException domain
+                ? domain.getDetails()
+                : null;
         return buildErrorResponse(
                 exception.getStatus(),
                 exception.getCode(),
                 exception.getMessage(),
                 request,
-                fields);
+                fields,
+                details);
     }
 
     @ExceptionHandler(AuthenticationException.class)
@@ -232,6 +236,16 @@ public class GlobalExceptionHandler {
             String message,
             HttpServletRequest request,
             Map<String, String> fields) {
+        return buildErrorResponse(status, code, message, request, fields, null);
+    }
+
+    private static ResponseEntity<ErrorResponse> buildErrorResponse(
+            HttpStatus status,
+            String code,
+            String message,
+            HttpServletRequest request,
+            Map<String, String> fields,
+            Map<String, Object> details) {
         Object requestId = request.getAttribute(io.campuscore.restfulapi.security.RequestIdFilter.ATTRIBUTE);
         ErrorResponse body = new ErrorResponse(
                 Instant.now(),
@@ -240,7 +254,8 @@ public class GlobalExceptionHandler {
                 message,
                 request.getRequestURI(),
                 requestId == null ? null : requestId.toString(),
-                fields);
+                fields,
+                details);
         return ResponseEntity.status(status).body(body);
     }
 }

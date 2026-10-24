@@ -414,11 +414,11 @@ export default function ProfilePage() {
     setIsLoading(true);
 
     try {
-      // The full name is school-managed (see the update endpoint), so it is
-      // deliberately not part of the self-service payload.
+      // Names and date of birth are school-managed (the update endpoint keeps
+      // the stored values), so they are deliberately not part of the
+      // self-service payload.
       await authApi.updateProfile({
         phone: formData.phone.trim(),
-        dateOfBirth: formData.dateOfBirth || undefined,
         address: formData.address.trim(),
         avatar: avatarPreview,
       });
@@ -457,7 +457,7 @@ export default function ProfilePage() {
     }
 
     try {
-      await authApi.changePassword(oldPassword, newPassword);
+      const result = await authApi.changePassword(oldPassword, newPassword);
       toast.success(messages.profile.passwordUpdated);
       form.reset();
       setVisiblePasswordFields({
@@ -466,7 +466,16 @@ export default function ProfilePage() {
         confirmPassword: false,
         twoFactorPassword: false,
       });
-      await logout({ redirect: loginHref(href, portalFromUser(user), 'password-rotated') });
+      if (result.sessionPreserved) {
+        // The server re-issued this device's session inside the rotation;
+        // the fresh cookies are already in the jar, so re-read the identity
+        // instead of signing the user out.
+        await refreshUser();
+      } else {
+        // No refresh credential reached the pin and every session was
+        // revoked — land on the rotated-credential login notice.
+        await logout({ redirect: loginHref(href, portalFromUser(user), 'password-rotated') });
+      }
     } catch (error: any) {
       // The inline error sits directly under the form, so a toast with the
       // same copy read as a duplicated message.
@@ -647,9 +656,7 @@ export default function ProfilePage() {
                     id="profile-date-of-birth"
                     type="date"
                     value={formData.dateOfBirth}
-                    onChange={(e) =>
-                      setFormData((current) => ({ ...current, dateOfBirth: e.target.value }))
-                    }
+                    disabled
                     icon={<Calendar className="h-4 w-4" />}
                   />
                 </div>

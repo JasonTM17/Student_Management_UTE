@@ -48,7 +48,7 @@ class NotificationAuditConcurrencyPostgresIT {
         jdbc.execute("""
                 CREATE TABLE notifications.notification (
                   id text PRIMARY KEY,user_id text NOT NULL,title text NOT NULL,message text NOT NULL,
-                  type text NOT NULL,link text,is_read boolean NOT NULL DEFAULT FALSE,read_at timestamptz,
+                  type text NOT NULL,link text,announcement_id text,is_read boolean NOT NULL DEFAULT FALSE,read_at timestamptz,
                   created_at timestamptz NOT NULL DEFAULT CURRENT_TIMESTAMP,updated_at timestamptz NOT NULL DEFAULT CURRENT_TIMESTAMP)
                 """);
         jdbc.execute("CREATE SCHEMA campuscore_audit");

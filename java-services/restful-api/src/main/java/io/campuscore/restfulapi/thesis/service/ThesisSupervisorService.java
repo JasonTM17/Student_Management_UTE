@@ -290,11 +290,26 @@ public class ThesisSupervisorService {
         if (hasRole(actor, "ADMIN") || hasRole(actor, "SUPER_ADMIN")) {
             return;
         }
+        DomainException deanRefusal = null;
         if (ThesisDeanScope.isFacultyHead(actor)) {
-            ThesisDeanScope.requireTopicAccess(jdbc, actor, topicId);
-            return;
+            // Rewriting who supervises a topic is governance on the topic's
+            // faculty: the supervisor escape requireTopicAccess keeps for
+            // ordinary topic work would let a foreign dean who co-supervises
+            // replace the home supervisor after registration closed.
+            try {
+                ThesisDeanScope.requireTopicGovernanceScope(jdbc, actor, topicId);
+                return;
+            } catch (DomainException refusal) {
+                // Ownership is an ordinary right, not a governance grant:
+                // the dean who created the topic keeps it after a transfer
+                // took the topic out of their faculty, the same way the
+                // identical account would pass as a plain lecturer. The
+                // concealed refusal is rethrown when ownership is absent,
+                // so a dean who merely co-supervises keeps the same answer.
+                deanRefusal = refusal;
+            }
         }
-        if (ThesisDepartmentScope.isDepartmentHead(actor)
+        if (deanRefusal == null && ThesisDepartmentScope.isDepartmentHead(actor)
                 && ThesisDepartmentScope.owns(jdbc, actor, departmentId)) {
             return;
         }
@@ -303,7 +318,8 @@ public class ThesisSupervisorService {
         boolean owner = StringUtils.hasText(createdBy)
                 && (createdBy.equals(actorId) || (StringUtils.hasText(lecturerId) && createdBy.equals(lecturerId)));
         if (!owner) {
-            throw new DomainException(HttpStatus.FORBIDDEN, "TOPIC_OWNER_REQUIRED", "Only the topic owner can change supervisors");
+            throw deanRefusal != null ? deanRefusal
+                    : new DomainException(HttpStatus.FORBIDDEN, "TOPIC_OWNER_REQUIRED", "Only the topic owner can change supervisors");
         }
     }
 

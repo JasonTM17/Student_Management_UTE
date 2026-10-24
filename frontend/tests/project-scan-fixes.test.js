@@ -332,8 +332,8 @@ test('thesis lecturer-student multi-role flow provides group approval, rejection
   const messagesSource = read('src/i18n/messages.ts');
 
   // API surface
-  assert.match(thesisApiSource, /approveGroup:\s*async\s*\(\s*groupId:\s*string\s*\)/);
-  assert.match(thesisApiSource, /post<ThesisGroup>\(\s*`\/thesis\/groups\/\$\{groupId\}\/approve`,?\s*\)/);
+  assert.match(thesisApiSource, /approveGroup:\s*async\s*\(\s*groupId:\s*string,\s*exception\?:/);
+  assert.match(thesisApiSource, /post<ThesisGroup>\(\s*`\/thesis\/groups\/\$\{groupId\}\/approve`,\s*exception\s*,?\s*\)/);
   assert.match(thesisApiSource, /rejectGroup:\s*async\s*\(\s*groupId:\s*string,\s*reason:\s*string,?\s*\)/);
   assert.match(thesisApiSource, /post<ThesisGroup>\(\s*`\/thesis\/groups\/\$\{groupId\}\/reject`,\s*\{\s*reason\s*\},?\s*\)/);
 

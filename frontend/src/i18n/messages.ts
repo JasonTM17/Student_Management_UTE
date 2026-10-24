@@ -109,6 +109,8 @@ export const en = {
           'This class overlaps your current timetable. Pick a section at a different time.',
         SECTION_FULL: 'This section has just filled up. Choose another section and try again.',
         SECTION_CLOSED: 'This section is closed for registration.',
+        SECTION_CANCELLED: 'This section was cancelled.',
+        SEMESTER_CLOSED: 'This semester is closed for registration.',
         ENROLLMENT_DUPLICATE: 'You are already registered in this section.',
         DUPLICATE_COURSE: 'You are already registered in another section of this course.',
         CREDIT_CAP_EXCEEDED: 'Registering this course would exceed your term credit limit.',
@@ -155,6 +157,14 @@ export const en = {
           'A report needs a link or an attached document — add one before removing the other.',
         GROUP_STATE_CONFLICT: 'This group is not in a state that allows that action.',
         ROUND_STATE_CONFLICT: 'This round is not in a state that allows that action.',
+        ROUND_RESTORE_MEMBER_CONFLICT:
+          'Some students already hold an active seat in another live round; restoring this round would give them two active groups.',
+        ROUND_RESTORE_FROZEN_HISTORY:
+          'This round contains frozen historical groups and cannot be reopened.',
+        ROUND_RESTORE_TARGET_REQUIRED:
+          'This round was cancelled before its previous status was recorded — pick the status it returns to.',
+        ROUND_RESTORE_TARGET_INVALID:
+          'That status is not a reachable restore target for this round.',
         VALIDATION_ERROR: 'Some submitted values are invalid. Review them and try again.',
         // Thesis results and council
         RESULTS_NOT_READY: 'No topic has been graded yet; the chair must finalize scores first.',
@@ -182,6 +192,8 @@ export const en = {
           'The council roster is incomplete or the seat order does not match.',
         COUNCIL_STATE_CONFLICT: 'This council is not in a state that allows that action.',
         TOPIC_NOT_FOUND: 'Thesis topic not found.',
+        TOPIC_SCOPE_UNRESOLVABLE:
+          'This topic has no resolvable faculty; only a global admin can act on it.',
         TOPIC_NOT_PUBLISHED: 'Only published topics can be used for this action.',
         TOPIC_ROUND_MISMATCH: 'The topic belongs to a different round.',
         TOPIC_ALREADY_ASSIGNED: 'This topic is already assigned to a council.',
@@ -225,6 +237,36 @@ export const en = {
         THESIS_GROUP_NOT_FOUND: 'The thesis group could not be found.',
         TOPIC_DEPARTMENT_FORBIDDEN: 'This topic belongs to another department.',
         TOPIC_OWNER_REQUIRED: 'Only the topic owner or an approver can do this.',
+        // Thesis governance, roster overrides & reviews
+        COUNCIL_MEMBER_SCORED:
+          'A member who already submitted a defense score cannot be replaced.',
+        GOVERNANCE_ROLE_REQUIRED: 'This action requires an admin or faculty head role.',
+        GROUP_EMPTY: 'The group cannot be left with no members; cancel the group instead.',
+        GROUP_SCORES_EXIST:
+          'The roster cannot change once scoring has started for the topic.',
+        GROUP_SIZE_EXCEPTION_REQUIRED:
+          'This roster change leaves an approved group below the minimum size.',
+        GROUP_TOPIC_NOT_ORPHANED:
+          'The group has no withdrawn topic to re-point away from.',
+        GVPB_ALREADY_WAIVED: 'The counter-review requirement is already waived.',
+        GVPB_NOT_WAIVED: 'The counter-review requirement is not waived.',
+        GVPB_SCORE_EXISTS:
+          'A counter-review score already exists; it can only change through re-review.',
+        INVALID_NOTIFICATION_LINK: 'The notification link is not a safe internal path.',
+        LEADER_SUCCESSOR_REQUIRED: 'Removing the leader requires naming a successor member.',
+        REOPEN_CONFLICTS: 'Reopening this section would create student conflicts.',
+        RESULTS_ALL_EXCLUDED: 'Every approved topic is excluded from publication.',
+        RETRACT_ADMIN_REQUIRED: 'Only an administrator can retract published results.',
+        RETRACT_WINDOW_CLOSED: 'The retraction grace period has passed.',
+        REVIEW_WINDOW_OPEN: 'The counter-review window is still open for some topics.',
+        SECTION_STATUS_CHANGED:
+          'This section changed while the edit was open. Review the latest version and try again.',
+        STUDENT_NOT_IN_GROUP: 'The student is not a member of this group.',
+        TOPIC_ALREADY_SCORED:
+          'A topic with submitted defense scores cannot leave its council.',
+        TOPIC_ALREADY_WITHDRAWN: 'This topic is already withdrawn from the round.',
+        TOPIC_NOT_WITHDRAWN: 'Only a withdrawn topic can be reinstated.',
+        TOPIC_WITHDRAWN: 'This topic has been withdrawn from the round.',
         // Grades
         GRADES_PUBLISHED_LOCKED: 'Published grades are locked and can no longer be edited.',
         GRADE_COMPONENTS_INCOMPLETE:
@@ -2317,6 +2359,13 @@ export const en = {
       'Please provide a clear reason to help students understand what needs revision.',
     approveSuccess: 'Group approved successfully.',
     rejectSuccess: 'Group rejected.',
+    approveExceptionModalTitle: 'Approve under minimum size',
+    approveExceptionModalDescription:
+      'This group has fewer than 3 members. Approving anyway records a documented size exception on the group.',
+    sizeExceptionReason: 'Size exception reason',
+    sizeExceptionReasonPlaceholder:
+      'Document why the under-size roster is approved (required)...',
+    approveWithException: 'Approve with exception',
     groupTooSmall:
       'A thesis group needs 3 to 5 members, with exactly one group leader, before it can be approved. A draft with 1 or 2 members can be completed before approval.',
     groupStateConflict:
@@ -2334,6 +2383,8 @@ export const en = {
     noGroupDescription: 'Create a group when registration opens.',
     groupCancelledNotice:
       'Your previous group was cancelled. You can create a new group while registration is open.',
+    roundCancelledNotice:
+      'This round was cancelled. Your group is kept as history but no longer counts as participation — you can join another open round.',
     membershipRoundHint:
       'Your group belongs to “{round}” — switch to that round to see its details and report.',
     membershipRoundOpen: 'Open my group’s round',
@@ -2360,6 +2411,7 @@ export const en = {
     progressInconsistent: 'Some later records exist without their required prerequisite. The official progress stops at the last verified milestone; thesis staff should review the record.',
     progressGroupRejected: 'Your group was rejected. Review the reason with the thesis office.',
     progressGroupCancelled: 'Your group was cancelled and no longer advances this round.',
+    progressRoundCancelled: 'This round was cancelled. Your seat no longer counts — you can join another round while registration is open.',
     progressReportedStatus: 'Self-reported status',
     progressSteps: [
       'Round selected',
@@ -2436,6 +2488,8 @@ export const en = {
       noResults: 'You have no results in this round yet.',
       finalScore: 'Final score',
       council: 'Council',
+      notEligible: 'Not eligible to defend in this round',
+      withdrawn: 'Topic withdrawn from this round',
     },
     councils: {
       title: 'Defense councils',
@@ -2471,6 +2525,12 @@ export const en = {
       councilIncompleteBadge: 'Needs members ({count}/3-5)',
       nextSeatRequired: 'Next seat (required):',
       finalScorePoints: '{score} points',
+      unassignTopic: 'Unassign',
+      unassignTopicTitle: 'Unassign topic from council',
+      replaceMember: 'Replace',
+      replaceMemberTitle: 'Replace council member',
+      memberReplacedSuccess: 'Council member replaced.',
+      topicUnassignedSuccess: 'Topic unassigned from council.',
     },
     grading: {
       title: 'Defense council grading',
@@ -2491,6 +2551,7 @@ export const en = {
       commentInputLabel: 'Comment',
       commentPlaceholder: 'Optional evaluation shown to students after results are published',
       scoresLoadFailed: 'Could not load the score list — retry from the round selector before grading.',
+      roundCancelled: 'This round was cancelled — grading is closed.',
     },
     review: {
       title: 'Counter-review (GVPB)',
@@ -2502,6 +2563,7 @@ export const en = {
       finalizedLocked: 'The council already finalized this topic — the counter-review is locked.',
       deadlinePassed: 'The counter-review deadline for this round has passed.',
       roundClosed: 'This round has ended — reviews are read-only.',
+      roundCancelled: 'This round was cancelled — reviews are closed.',
     },
     supervisorAssignFailed: 'The topic was created, but the supervisor assignment failed — retry it from the topic page.',
     supervisorInvalid: 'The topic was created, but one supervisor id is not a valid lecturer.',
@@ -2589,8 +2651,20 @@ export const en = {
       cancelRound: 'Cancel round',
       cancelRoundTitle: 'Cancel this round?',
       cancelRoundConfirm:
-        'Cancelling releases every group of this round and is only possible before results are published. The round keeps its history but cannot be reopened.',
+        'Cancelling freezes grading and releases students so they can join another round. Groups, topics and reports are kept, and the round can be restored afterwards.',
       roundCancelled: 'Round cancelled.',
+      restoreRound: 'Restore round',
+      restoreRoundTitle: 'Restore this round?',
+      restoreRoundConfirm:
+        'The round returns to the status it had before cancellation.',
+      restoreRoundConfirmLegacy:
+        'This round was cancelled before restore tracking existed, so it will return to Draft.',
+      restoreTargetLabel: 'Status to restore',
+      restoreRoundPickTargetRequired:
+        'This round was cancelled before its previous status was recorded and it still has groups — pick the status it returns to.',
+      restoreRoundWindowPassed:
+        'This round was cancelled while registration was open, but that window has passed — it can only return as registration closed.',
+      roundRestored: 'Round restored.',
       assignReviewer: 'Assign reviewer (GVPB)',
       reassignReviewer: 'Reassign',
       currentReviewer: 'Counter-reviewer',
@@ -2610,6 +2684,56 @@ export const en = {
         'Groups can submit or update their report until this time. This does not change the GVPB counter-review deadline of the round.',
       reportDeadlineInvalid: 'Choose a deadline in the future.',
       reportDeadlineSuccess: 'Report deadline extended.',
+      gvpbDeadlineExtend: 'Extend counter-review deadline',
+      gvpbDeadlineModalTitle: 'Extend counter-review deadline',
+      gvpbDeadlineModalDescription:
+        'Counter-reviewers can submit scores until this time. The change is recorded in the audit trail.',
+      gvpbDeadlineSuccess: 'Counter-review deadline extended.',
+      publishPreviewExcluded: 'Excluded from publication: {titles}.',
+      waiveGvpb: 'Waive counter-review',
+      waiveGvpbTitle: 'Waive the counter-review requirement',
+      revokeGvpbWaiver: 'Restore counter-review',
+      revokeGvpbWaiverTitle: 'Restore the counter-review requirement',
+      withdrawTopic: 'Withdraw topic',
+      withdrawTopicTitle: 'Withdraw topic from the round',
+      reinstateTopic: 'Reinstate',
+      reinstateTopicTitle: 'Reinstate topic into the round',
+      governanceReasonLabel: 'Reason',
+      governanceReasonRequired: 'A reason is required.',
+      governanceActionSuccess: 'Change applied and recorded.',
+      resultReviewFailed: 'Counter-review failed',
+      resultWithdrawn: 'Withdrawn',
+      gvpbWaivedBadge: 'Counter-review waived',
+      lateTopic: 'Add late topic',
+      lateTopicTitle: 'Add a late topic',
+      lateTopicDepartment: 'Department ID',
+      lateTopicSupervisor: 'Supervisor lecturer ID',
+      lateTopicTitleField: 'Topic title',
+      lateTopicDescription: 'Description',
+      lateTopicMaxGroups: 'Max groups',
+      lateTopicSuccess: 'Late topic published.',
+      rosterOverride: 'Roster override',
+      rosterOverrideTitle: 'Roster override after registration closed',
+      rosterOverrideAction: 'Action',
+      rosterOverrideActionAdd: 'Add a member',
+      rosterOverrideActionRemove: 'Remove a member',
+      rosterOverrideGroup: 'Group ID',
+      rosterOverrideStudent: 'Student ID',
+      rosterOverrideSuccessor: 'Successor student ID (required when removing the leader)',
+      rosterOverrideSizeException: 'Allow a below-minimum roster',
+      rosterOverrideSuccess: 'Roster override recorded.',
+      topicReassign: 'Reassign orphaned group',
+      topicReassignTitle: 'Re-point an orphaned group',
+      topicReassignGroup: 'Group ID',
+      topicReassignTopic: 'New topic ID',
+      topicReassignSuccess: 'Group moved to the new topic.',
+      retractResults: 'Retract results',
+      retractResultsTitle: 'Retract published results',
+      retractResultsConfirmLabel: 'Type RETRACT to confirm',
+      retractResultsSuccess: 'Publication retracted; students were notified.',
+      retractResultsHint: 'Sent e-mails cannot be recalled.',
+      publishReviewOpen: 'Counter-review still open: {titles}.',
+      publishAllExcluded: 'Every approved group is excluded; publishing will show no results.',
     },
   },
   assistant: {
@@ -3047,6 +3171,8 @@ export const vi: I18nMessages = {
           'Lớp này trùng lịch với các học phần bạn đã đăng ký. Hãy chọn lớp khác có thời gian phù hợp.',
         SECTION_FULL: 'Lớp vừa hết chỗ. Hãy chọn lớp khác rồi thử lại.',
         SECTION_CLOSED: 'Lớp này đã đóng đăng ký.',
+        SECTION_CANCELLED: 'Lớp này đã bị hủy.',
+        SEMESTER_CLOSED: 'Học kỳ này đã đóng đăng ký.',
         ENROLLMENT_DUPLICATE: 'Bạn đã đăng ký lớp học phần này rồi.',
         DUPLICATE_COURSE: 'Bạn đã đăng ký một lớp khác của học phần này.',
         CREDIT_CAP_EXCEEDED: 'Đăng ký học phần này sẽ vượt giới hạn tín chỉ tối đa của học kỳ.',
@@ -3093,6 +3219,14 @@ export const vi: I18nMessages = {
           'Bài nộp cần một liên kết hoặc tài liệu đính kèm — hãy thêm một phần trước khi gỡ phần còn lại.',
         GROUP_STATE_CONFLICT: 'Nhóm hiện không ở trạng thái cho phép thao tác này.',
         ROUND_STATE_CONFLICT: 'Đợt hiện không ở trạng thái cho phép thao tác này.',
+        ROUND_RESTORE_MEMBER_CONFLICT:
+          'Một số sinh viên đã có suất tham gia ở đợt khác còn hiệu lực; khôi phục đợt này sẽ khiến họ có hai nhóm đang hoạt động.',
+        ROUND_RESTORE_FROZEN_HISTORY:
+          'Đợt này chứa nhóm lịch sử đã đóng băng nên không thể mở lại.',
+        ROUND_RESTORE_TARGET_REQUIRED:
+          'Đợt này bị hủy trước khi hệ thống ghi lại trạng thái trước đó — hãy chọn trạng thái khôi phục.',
+        ROUND_RESTORE_TARGET_INVALID:
+          'Trạng thái đó không phải đích khôi phục hợp lệ của đợt này.',
         VALIDATION_ERROR: 'Một số giá trị đã nhập chưa hợp lệ. Hãy kiểm tra rồi thử lại.',
         // Kết quả và hội đồng
         RESULTS_NOT_READY: 'Chưa có đề tài nào được chấm điểm; hội đồng cần chốt điểm trước.',
@@ -3120,6 +3254,8 @@ export const vi: I18nMessages = {
           'Danh sách hội đồng chưa đầy đủ hoặc thứ tự ghế không đúng.',
         COUNCIL_STATE_CONFLICT: 'Hội đồng hiện không ở trạng thái cho phép thao tác này.',
         TOPIC_NOT_FOUND: 'Không tìm thấy đề tài.',
+        TOPIC_SCOPE_UNRESOLVABLE:
+          'Đề tài này không xác định được khoa; chỉ quản trị viên toàn hệ thống mới được thao tác.',
         TOPIC_NOT_PUBLISHED: 'Chỉ đề tài đã công bố mới được dùng cho thao tác này.',
         TOPIC_ROUND_MISMATCH: 'Đề tài thuộc một đợt đăng ký khác.',
         TOPIC_ALREADY_ASSIGNED: 'Đề tài này đã được phân cho một hội đồng.',
@@ -3163,6 +3299,36 @@ export const vi: I18nMessages = {
         THESIS_GROUP_NOT_FOUND: 'Không tìm thấy nhóm đồ án.',
         TOPIC_DEPARTMENT_FORBIDDEN: 'Đề tài này thuộc một bộ môn khác.',
         TOPIC_OWNER_REQUIRED: 'Chỉ chủ sở hữu đề tài hoặc người có thẩm quyền mới được thực hiện thao tác này.',
+        // Quản trị đề tài, điều chỉnh thành viên & phản biện
+        COUNCIL_MEMBER_SCORED:
+          'Không thể thay thế thành viên hội đồng đã chấm điểm bảo vệ.',
+        GOVERNANCE_ROLE_REQUIRED: 'Thao tác này yêu cầu quyền quản trị viên hoặc trưởng khoa.',
+        GROUP_EMPTY: 'Nhóm không thể trống thành viên; hãy hủy nhóm thay vì xóa hết.',
+        GROUP_SCORES_EXIST:
+          'Không thể thay đổi thành viên khi đề tài của nhóm đã bắt đầu chấm điểm.',
+        GROUP_SIZE_EXCEPTION_REQUIRED:
+          'Thay đổi này khiến nhóm đã duyệt xuống dưới sĩ số tối thiểu.',
+        GROUP_TOPIC_NOT_ORPHANED:
+          'Nhóm không có đề tài bị rút để chuyển sang đề tài khác.',
+        GVPB_ALREADY_WAIVED: 'Yêu cầu phản biện (GVPB) đã được miễn trước đó.',
+        GVPB_NOT_WAIVED: 'Yêu cầu phản biện (GVPB) chưa được miễn.',
+        GVPB_SCORE_EXISTS:
+          'Đã có điểm phản biện; chỉ có thể thay đổi qua phản biện lại.',
+        INVALID_NOTIFICATION_LINK: 'Liên kết thông báo không phải là đường dẫn nội bộ hợp lệ.',
+        LEADER_SUCCESSOR_REQUIRED: 'Xóa nhóm trưởng cần chỉ định thành viên kế nhiệm.',
+        REOPEN_CONFLICTS: 'Mở lại học phần này sẽ tạo xung đột cho sinh viên.',
+        RESULTS_ALL_EXCLUDED: 'Tất cả đề tài đã duyệt đều bị loại khỏi công bố.',
+        RETRACT_ADMIN_REQUIRED: 'Chỉ quản trị viên mới có thể thu hồi kết quả đã công bố.',
+        RETRACT_WINDOW_CLOSED: 'Đã hết thời hạn thu hồi kết quả.',
+        REVIEW_WINDOW_OPEN: 'Cửa sổ phản biện vẫn đang mở cho một số đề tài.',
+        SECTION_STATUS_CHANGED:
+          'Lớp học phần đã thay đổi trong lúc chỉnh sửa. Hãy xem lại phiên bản mới nhất rồi thử lại.',
+        STUDENT_NOT_IN_GROUP: 'Sinh viên không thuộc nhóm này.',
+        TOPIC_ALREADY_SCORED:
+          'Đề tài đã có điểm bảo vệ nên không thể rời hội đồng.',
+        TOPIC_ALREADY_WITHDRAWN: 'Đề tài đã được rút khỏi đợt này.',
+        TOPIC_NOT_WITHDRAWN: 'Chỉ đề tài đã rút mới có thể khôi phục.',
+        TOPIC_WITHDRAWN: 'Đề tài đã bị rút khỏi đợt.',
         // Điểm số
         GRADES_PUBLISHED_LOCKED: 'Điểm đã công bố được khóa và không thể sửa tiếp.',
         GRADE_COMPONENTS_INCOMPLETE:
@@ -5249,6 +5415,13 @@ export const vi: I18nMessages = {
       'Vui lòng cung cấp lý do cụ thể để sinh viên chỉnh sửa đề xuất.',
     approveSuccess: 'Đã duyệt nhóm đề tài.',
     rejectSuccess: 'Đã từ chối nhóm đề tài.',
+    approveExceptionModalTitle: 'Duyệt nhóm thiếu sĩ số',
+    approveExceptionModalDescription:
+      'Nhóm này có ít hơn 3 thành viên. Duyệt sẽ ghi nhận ngoại lệ sĩ số có lý do trên nhóm.',
+    sizeExceptionReason: 'Lý do ngoại lệ sĩ số',
+    sizeExceptionReasonPlaceholder:
+      'Ghi rõ lý do duyệt nhóm dưới sĩ số tối thiểu (bắt buộc)...',
+    approveWithException: 'Duyệt kèm ngoại lệ',
     groupTooSmall:
       'Nhóm khóa luận cần từ 3 đến 5 thành viên, với đúng một nhóm trưởng, trước khi được xét duyệt. Nhóm nháp có 1 hoặc 2 thành viên có thể tiếp tục bổ sung trước khi duyệt.',
     groupStateConflict:
@@ -5266,6 +5439,8 @@ export const vi: I18nMessages = {
     noGroupDescription: 'Tạo nhóm khi đợt đăng ký mở.',
     groupCancelledNotice:
       'Nhóm trước đây của bạn đã bị hủy. Bạn có thể tạo nhóm mới khi đợt đăng ký đang mở.',
+    roundCancelledNotice:
+      'Đợt này đã bị hủy. Nhóm của bạn được giữ làm lịch sử nhưng không còn tính là tham gia — bạn có thể tham gia đợt khác đang mở.',
     membershipRoundHint:
       'Nhóm của bạn thuộc đợt “{round}” — hãy chuyển sang đợt đó để xem thông tin và báo cáo.',
     membershipRoundOpen: 'Mở đợt của nhóm tôi',
@@ -5292,6 +5467,7 @@ export const vi: I18nMessages = {
     progressInconsistent: 'Có dữ liệu mốc sau nhưng thiếu điều kiện trước đó. Tiến độ chính thức dừng ở mốc đã xác minh cuối cùng; bộ phận luận văn cần kiểm tra hồ sơ.',
     progressGroupRejected: 'Nhóm của bạn bị từ chối. Hãy trao đổi với bộ phận luận văn để biết lý do.',
     progressGroupCancelled: 'Nhóm của bạn đã bị hủy và không tiếp tục trong đợt này.',
+    progressRoundCancelled: 'Đợt này đã bị hủy. Suất tham gia của bạn không còn hiệu lực — bạn có thể tham gia đợt khác khi còn mở đăng ký.',
     progressReportedStatus: 'Trạng thái tự báo cáo',
     progressSteps: [
       'Đã chọn đợt',
@@ -5368,6 +5544,8 @@ export const vi: I18nMessages = {
       noResults: 'Bạn chưa có kết quả nào trong đợt này.',
       finalScore: 'Điểm bảo vệ',
       council: 'Hội đồng',
+      notEligible: 'Không đủ điều kiện bảo vệ trong đợt này',
+      withdrawn: 'Đề tài đã được rút khỏi đợt này',
     },
     councils: {
       title: 'Hội đồng đánh giá',
@@ -5403,6 +5581,12 @@ export const vi: I18nMessages = {
       councilIncompleteBadge: 'Chưa đủ ghế ({count}/3-5)',
       nextSeatRequired: 'Ghế tiếp theo (Bắt buộc):',
       finalScorePoints: '{score} điểm',
+      unassignTopic: 'Gỡ gán',
+      unassignTopicTitle: 'Gỡ đề tài khỏi hội đồng',
+      replaceMember: 'Thay thế',
+      replaceMemberTitle: 'Thay thế thành viên hội đồng',
+      memberReplacedSuccess: 'Đã thay thế thành viên hội đồng.',
+      topicUnassignedSuccess: 'Đã gỡ đề tài khỏi hội đồng.',
     },
     grading: {
       title: 'Chấm điểm bảo vệ hội đồng',
@@ -5423,6 +5607,7 @@ export const vi: I18nMessages = {
       commentInputLabel: 'Nhận xét',
       commentPlaceholder: 'Nhận xét đánh giá — sinh viên chỉ thấy sau khi công bố kết quả',
       scoresLoadFailed: 'Không tải được danh sách điểm — hãy tải lại đợt trước khi chấm.',
+      roundCancelled: 'Đợt này đã bị hủy — việc chấm điểm đã đóng.',
     },
     review: {
       title: 'Phản biện (GVPB)',
@@ -5434,6 +5619,7 @@ export const vi: I18nMessages = {
       finalizedLocked: 'Hội đồng đã chốt điểm đề tài này — phản biện đã khóa.',
       deadlinePassed: 'Đã quá hạn phản biện của đợt này.',
       roundClosed: 'Đợt này đã kết thúc — phản biện chỉ còn ở chế độ xem.',
+      roundCancelled: 'Đợt này đã bị hủy — phản biện đã đóng.',
     },
     supervisorAssignFailed: 'Đề tài đã được tạo nhưng phân công hướng dẫn thất bại — hãy thử lại từ trang đề tài.',
     supervisorInvalid: 'Đề tài đã được tạo nhưng một mã giảng viên hướng dẫn không hợp lệ.',
@@ -5521,8 +5707,20 @@ export const vi: I18nMessages = {
       cancelRound: 'Hủy đợt',
       cancelRoundTitle: 'Hủy đợt này?',
       cancelRoundConfirm:
-        'Hủy đợt sẽ giải phóng toàn bộ nhóm trong đợt và chỉ khả dụng trước khi công bố kết quả. Đợt giữ lại lịch sử nhưng không thể mở lại.',
+        'Hủy đợt sẽ đóng việc chấm điểm và giải phóng sinh viên để họ tham gia đợt khác. Nhóm, đề tài và báo cáo được giữ lại, và đợt có thể được khôi phục sau đó.',
       roundCancelled: 'Đã hủy đợt.',
+      restoreRound: 'Khôi phục đợt',
+      restoreRoundTitle: 'Khôi phục đợt này?',
+      restoreRoundConfirm:
+        'Đợt sẽ trở về trạng thái trước khi bị hủy.',
+      restoreTargetLabel: 'Trạng thái khôi phục',
+      restoreRoundPickTargetRequired:
+        'Đợt này bị hủy trước khi hệ thống ghi lại trạng thái trước đó và vẫn còn nhóm — hãy chọn trạng thái khôi phục.',
+      restoreRoundWindowPassed:
+        'Đợt bị hủy khi đang mở đăng ký nhưng khung thời gian đó đã qua — đợt chỉ có thể trở về trạng thái đã đóng đăng ký.',
+      restoreRoundConfirmLegacy:
+        'Đợt này bị hủy trước khi có theo dõi khôi phục, nên sẽ trở về trạng thái Bản nháp.',
+      roundRestored: 'Đã khôi phục đợt.',
       assignReviewer: 'Phân công phản biện (GVPB)',
       reassignReviewer: 'Đổi phản biện',
       currentReviewer: 'Phản biện',
@@ -5542,6 +5740,56 @@ export const vi: I18nMessages = {
         'Nhóm có thể nộp hoặc cập nhật báo cáo đến thời điểm này. Gia hạn không thay đổi hạn chấm phản biện (GVPB) của đợt.',
       reportDeadlineInvalid: 'Hãy chọn thời điểm trong tương lai.',
       reportDeadlineSuccess: 'Đã gia hạn hạn nộp báo cáo.',
+      gvpbDeadlineExtend: 'Gia hạn chấm phản biện',
+      gvpbDeadlineModalTitle: 'Gia hạn hạn chấm phản biện',
+      gvpbDeadlineModalDescription:
+        'Giảng viên phản biện có thể nộp điểm đến thời điểm này. Thay đổi được ghi vào nhật ký kiểm toán.',
+      gvpbDeadlineSuccess: 'Đã gia hạn hạn chấm phản biện.',
+      publishPreviewExcluded: 'Không công bố: {titles}.',
+      waiveGvpb: 'Miễn phản biện',
+      waiveGvpbTitle: 'Miễn yêu cầu phản biện',
+      revokeGvpbWaiver: 'Khôi phục phản biện',
+      revokeGvpbWaiverTitle: 'Khôi phục yêu cầu phản biện',
+      withdrawTopic: 'Rút đề tài',
+      withdrawTopicTitle: 'Rút đề tài khỏi đợt',
+      reinstateTopic: 'Khôi phục',
+      reinstateTopicTitle: 'Khôi phục đề tài vào đợt',
+      governanceReasonLabel: 'Lý do',
+      governanceReasonRequired: 'Bắt buộc nhập lý do.',
+      governanceActionSuccess: 'Đã áp dụng và ghi nhận thay đổi.',
+      resultReviewFailed: 'Phản biện không đạt',
+      resultWithdrawn: 'Đã rút',
+      gvpbWaivedBadge: 'Đã miễn phản biện',
+      lateTopic: 'Thêm đề tài muộn',
+      lateTopicTitle: 'Thêm đề tài muộn',
+      lateTopicDepartment: 'Mã khoa/bộ môn',
+      lateTopicSupervisor: 'Mã giảng viên hướng dẫn',
+      lateTopicTitleField: 'Tên đề tài',
+      lateTopicDescription: 'Mô tả',
+      lateTopicMaxGroups: 'Số nhóm tối đa',
+      lateTopicSuccess: 'Đã công bố đề tài muộn.',
+      rosterOverride: 'Điều chỉnh thành viên',
+      rosterOverrideTitle: 'Điều chỉnh thành viên sau đóng đăng ký',
+      rosterOverrideAction: 'Thao tác',
+      rosterOverrideActionAdd: 'Thêm thành viên',
+      rosterOverrideActionRemove: 'Gỡ thành viên',
+      rosterOverrideGroup: 'Mã nhóm',
+      rosterOverrideStudent: 'Mã sinh viên',
+      rosterOverrideSuccessor: 'Mã sinh viên kế nhiệm (bắt buộc khi gỡ nhóm trưởng)',
+      rosterOverrideSizeException: 'Cho phép nhóm dưới số thành viên tối thiểu',
+      rosterOverrideSuccess: 'Đã ghi nhận điều chỉnh thành viên.',
+      topicReassign: 'Chuyển nhóm mất đề tài',
+      topicReassignTitle: 'Chuyển nhóm sang đề tài khác',
+      topicReassignGroup: 'Mã nhóm',
+      topicReassignTopic: 'Mã đề tài mới',
+      topicReassignSuccess: 'Đã chuyển nhóm sang đề tài mới.',
+      retractResults: 'Thu hồi kết quả',
+      retractResultsTitle: 'Thu hồi công bố kết quả',
+      retractResultsConfirmLabel: 'Nhập RETRACT để xác nhận',
+      retractResultsSuccess: 'Đã thu hồi công bố và thông báo cho sinh viên.',
+      retractResultsHint: 'Email đã gửi không thể thu hồi.',
+      publishReviewOpen: 'Phản biện còn mở: {titles}.',
+      publishAllExcluded: 'Mọi nhóm đã duyệt đều bị loại; công bố sẽ không có kết quả.',
     },
   },
   assistant: {

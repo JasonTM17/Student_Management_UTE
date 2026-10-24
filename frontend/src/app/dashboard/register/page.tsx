@@ -32,6 +32,7 @@ import {
 import type { Enrollment } from '@/types/api';
 import { useApiQuery } from '@/lib/query';
 import { hasCsrfSessionHint } from '@/lib/session-hint';
+import { isCancelledSection } from '@/lib/enrollment-status';
 import {
   countdownParts,
   formatCountdownClock,
@@ -331,7 +332,7 @@ export default function RegisterPage() {
   const enrolledCourseIds = useMemo(() => {
     const set = new Set<string>();
     for (const enrollment of enrollments) {
-      if (!ACTIVE_ENROLLMENT_STATUSES.has(enrollment.status)) continue;
+      if (!ACTIVE_ENROLLMENT_STATUSES.has(enrollment.status) || isCancelledSection(enrollment)) continue;
       const courseId = enrollment.section?.course?.id ?? enrollment.section?.courseId;
       if (courseId) {
         set.add(courseId);
@@ -340,7 +341,9 @@ export default function RegisterPage() {
     return set;
   }, [enrollments]);
 
-  const registered = enrollments.filter((item) => ACTIVE_ENROLLMENT_STATUSES.has(item.status));
+  const registered = enrollments.filter(
+    (item) => ACTIVE_ENROLLMENT_STATUSES.has(item.status) && !isCancelledSection(item),
+  );
   const totalRegisteredCredits = registered.reduce(
     (sum, item) => sum + (item.section?.course?.credits ?? 0),
     0,
@@ -1316,6 +1319,11 @@ export default function RegisterPage() {
                                       {isRegistered ? (
                                         <span className="rounded-md border border-primary/30 bg-primary/10 px-2 py-0.5 text-xs font-medium text-primary">
                                           {copy.registered}
+                                        </span>
+                                      ) : null}
+                                      {section.status === 'CANCELLED' ? (
+                                        <span className="rounded-md border border-destructive/30 bg-destructive/10 px-2 py-0.5 text-xs font-medium text-destructive">
+                                          {messages.common.statuses.CANCELLED}
                                         </span>
                                       ) : null}
                                       {section.scheduleConflict ? (

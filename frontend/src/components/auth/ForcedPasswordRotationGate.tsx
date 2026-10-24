@@ -19,8 +19,8 @@ import { Input } from '@/components/ui/input';
  * APIs with PASSWORD_CHANGE_REQUIRED, so the overlay is UX, not the gate.
  */
 export function ForcedPasswordRotationGate() {
-  const { user, logout } = useAuth();
-  const { href, locale, messages } = useI18n();
+  const { user, refreshUser, logout } = useAuth();
+  const { locale, messages, href } = useI18n();
   const [oldPassword, setOldPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -40,9 +40,8 @@ export function ForcedPasswordRotationGate() {
         newLabel: 'Mật khẩu mới',
         confirmLabel: 'Nhập lại mật khẩu mới',
         hint: 'Từ 8 đến 128 ký tự, có ít nhất một chữ cái và một chữ số; không được chứa địa chỉ email của bạn.',
-        submit: 'Đổi mật khẩu và đăng nhập lại',
+        submit: 'Đổi mật khẩu',
         saving: 'Đang cập nhật...',
-        success: 'Đã đổi mật khẩu. Vui lòng đăng nhập lại bằng mật khẩu mới.',
         failed: 'Không thể đổi mật khẩu. Hãy kiểm tra mật khẩu tạm thời và thử lại.',
       }
     : {
@@ -53,9 +52,8 @@ export function ForcedPasswordRotationGate() {
         newLabel: 'New password',
         confirmLabel: 'Confirm new password',
         hint: 'Between 8 and 128 characters with at least one letter and one digit; it must not contain your email address.',
-        submit: 'Rotate and sign in again',
+        submit: 'Set new password',
         saving: 'Updating...',
-        success: 'Password rotated. Please sign in again with the new one.',
         failed: 'Could not rotate the password. Check the temporary credential and retry.',
       };
 
@@ -73,8 +71,18 @@ export function ForcedPasswordRotationGate() {
     }
     setIsSaving(true);
     try {
-      await authApi.changePassword(oldPassword, newPassword);
-      await logout({ redirect: loginHref(href, portalFromUser(user), 'password-rotated') });
+      const result = await authApi.changePassword(oldPassword, newPassword);
+      if (result.sessionPreserved) {
+        // The server re-issued this device's session inside the rotation and
+        // the fresh cookies are already in the jar — re-read the identity and
+        // the flag-cleared user opens the portal without a sign-out.
+        await refreshUser();
+      } else {
+        // No refresh credential reached the pin, so every session was
+        // revoked. Land on the rotated-credential notice rather than a bare
+        // session-expired redirect.
+        await logout({ redirect: loginHref(href, portalFromUser(user), 'password-rotated') });
+      }
     } catch (error: unknown) {
       setError(campusCodeMessage(error, messages.common.campusErrors, copy.failed));
     } finally {

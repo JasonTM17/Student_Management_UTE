@@ -11,6 +11,7 @@ import {
   FileStack,
   ExternalLink,
   Plus,
+  RefreshCw,
   Trash2,
   UserPlus,
   Users,
@@ -30,7 +31,7 @@ import { useConfirmationDialog } from '@/components/ui/use-confirmation-dialog';
 import { metricToneClass, statusToneClass } from '@/components/ui/status';
 import { cn } from '@/lib/utils';
 import { toThesisLocalInput as toLocalInput } from '@/lib/thesis-datetime';
-import { sortThesisRoundsForOverview } from '@/lib/thesis-round';
+import { planThesisRoundRestore, sortThesisRoundsForOverview } from '@/lib/thesis-round';
 import {
   EmptyState,
   ForbiddenState,
@@ -44,10 +45,12 @@ import type { Lecturer } from '@/types/api';
 import {
   thesisApi,
   type ThesisCloseRegistrationPreview,
+  type ThesisPublishResultsPreview,
   type ThesisCouncil,
   type ThesisCouncilMemberRole,
   type ThesisGroup,
   type ThesisRound,
+  type ThesisRoundStatus,
   type ThesisTopic,
 } from '@/lib/thesis-api';
 
@@ -137,8 +140,40 @@ export default function AdminThesisPage() {
   // REGISTRATION_CLOSED round whose gvpbDeadline already passed).
   const [showExtendDeadlineModal, setShowExtendDeadlineModal] = useState(false);
   const [extendDeadlineRoundId, setExtendDeadlineRoundId] = useState('');
+  const [extendDeadlineKind, setExtendDeadlineKind] = useState<'report' | 'gvpb'>('report');
   const [extendDeadlineValue, setExtendDeadlineValue] = useState('');
   const [extendDeadlineError, setExtendDeadlineError] = useState('');
+
+  // Reason-bearing governance actions share one modal: unassign a topic,
+  // replace a council seat, waive/restore a counter-review, withdraw or
+  // reinstate a topic. Each call is audited server-side with the reason.
+  const [reasonAction, setReasonAction] = useState<{
+    kind: 'unassignTopic' | 'replaceMember' | 'waiveGvpb' | 'revokeGvpbWaiver' | 'withdrawTopic' | 'reinstateTopic'
+        | 'lateTopic' | 'rosterOverride' | 'topicReassign' | 'retractResults';
+    roundId: string;
+    councilId?: string;
+    topicId?: string;
+    lecturerId?: string;
+  } | null>(null);
+  const [reasonText, setReasonText] = useState('');
+  const [replacementLecturerId, setReplacementLecturerId] = useState('');
+  const [reasonActionError, setReasonActionError] = useState('');
+  const [extendDeadlineReason, setExtendDeadlineReason] = useState('');
+  const [lateTopicForm, setLateTopicForm] = useState({
+    departmentId: '', title: '', description: '', supervisorId: '', maxGroups: '1',
+  });
+  const [overrideForm, setOverrideForm] = useState({
+    groupId: '', studentId: '', action: 'ADD' as 'ADD' | 'REMOVE', successorId: '', allowSize: false,
+  });
+  const [reassignForm, setReassignForm] = useState({ groupId: '', topicId: '' });
+  const [retractConfirmation, setRetractConfirmation] = useState('');
+
+  // Restore-with-target modal: shown only when no implicit restore exists —
+  // a legacy cancellation that still holds groups, or a REGISTRATION_OPEN
+  // marker whose window already passed.
+  const [restoreTargetRound, setRestoreTargetRound] = useState<ThesisRound | null>(null);
+  const [restoreTargets, setRestoreTargets] = useState<ThesisRoundStatus[]>([]);
+  const [restoreStatusDraft, setRestoreStatusDraft] = useState<ThesisRoundStatus | ''>('');
 
   // GVPB counter-reviewer assignment drafts, keyed by topic id
   const [reviewerDrafts, setReviewerDrafts] = useState<Record<string, string>>({});
@@ -397,8 +432,38 @@ export default function AdminThesisPage() {
     if (action === 'close') {
       closePreview = await thesisApi.closeRegistrationPreview(roundId).catch(() => null);
     }
+    // Publishing must name its exclusions: preview which topics sit outside
+    // the completeness requirement so the confirm is never blind. A preview
+    // read failure falls back to the generic copy like the close preview.
+    let publishPreview: ThesisPublishResultsPreview | null = null;
+    if (action === 'publish-results') {
+      publishPreview = await thesisApi.publishResultsPreview(roundId).catch(() => null);
+    }
     let message = transitionConfirmCopy(action);
     let warning: string | undefined;
+    if (publishPreview && publishPreview.excludedTopics.length > 0) {
+      message = [
+        message,
+        messages.thesis.admin.publishPreviewExcluded.replace(
+          '{titles}',
+          publishPreview.excludedTopics.map((t) => t.title).join(', '),
+        ),
+      ].join(' ');
+    }
+    if (publishPreview && publishPreview.openReviewTopics.length > 0) {
+      message = [
+        message,
+        messages.thesis.admin.publishReviewOpen.replace(
+          '{titles}',
+          publishPreview.openReviewTopics.map((t) => t.title).join(', '),
+        ),
+      ].join(' ');
+    }
+    // A publication where every approved group is excluded needs the explicit
+    // server-side flag — gated behind its own confirmation below.
+    const allExcluded = publishPreview != null
+      && publishPreview.approvedGroupCount > 0
+      && publishPreview.includedGroupCount === 0;
     if (closePreview) {
       const adminCopy = messages.thesis.admin;
       message = [
@@ -421,6 +486,19 @@ export default function AdminThesisPage() {
       warning,
     });
     if (!confirmed) return;
+    // The server-side flag only goes out when the user explicitly confirms the
+    // all-excluded consequence — never inferred silently from preview data.
+    let confirmAllExcluded: boolean | undefined;
+    if (allExcluded) {
+      confirmAllExcluded = await confirm({
+        title: messages.thesis.admin.transitionConfirmTitle,
+        message: messages.thesis.admin.publishAllExcluded,
+        confirmText: messages.common.actions.confirm,
+        cancelText: messages.common.actions.cancel,
+        variant: 'destructive',
+      });
+      if (!confirmAllExcluded) return;
+    }
     setIsSaving(true);
     setError('');
     setSuccess('');
@@ -438,7 +516,7 @@ export default function AdminThesisPage() {
         await thesisApi.publishProposals(roundId);
         setSuccess(messages.thesis.admin.proposalsPublished);
       } else {
-        await thesisApi.publishResults(roundId);
+        await thesisApi.publishResults(roundId, confirmAllExcluded);
         setSuccess(messages.thesis.admin.resultsPublished);
       }
       await loadData();
@@ -462,9 +540,11 @@ export default function AdminThesisPage() {
 
 
   /** Opens the deadline-extension modal prefilled with the current deadline. */
-  const openExtendDeadlineModal = (round: ThesisRound) => {
+  const openExtendDeadlineModal = (round: ThesisRound, kind: 'report' | 'gvpb' = 'report') => {
     setExtendDeadlineRoundId(round.id);
-    setExtendDeadlineValue(toLocalInput(round.reportDeadline ?? round.gvpbDeadline));
+    setExtendDeadlineKind(kind);
+    setExtendDeadlineValue(toLocalInput(kind === 'gvpb' ? round.gvpbDeadline : round.reportDeadline ?? round.gvpbDeadline));
+    setExtendDeadlineReason('');
     setExtendDeadlineError('');
     setShowExtendDeadlineModal(true);
   };
@@ -485,8 +565,17 @@ export default function AdminThesisPage() {
     setSuccess('');
     setExtendDeadlineError('');
     try {
-      await thesisApi.extendReportDeadline(extendDeadlineRoundId, parsed.toISOString());
-      setSuccess(messages.thesis.admin.reportDeadlineSuccess);
+      if (extendDeadlineKind === 'gvpb') {
+        if (!extendDeadlineReason.trim()) {
+          setExtendDeadlineError(messages.thesis.admin.governanceReasonRequired);
+          return;
+        }
+        await thesisApi.extendGvpbDeadline(extendDeadlineRoundId, parsed.toISOString(), extendDeadlineReason.trim());
+        setSuccess(messages.thesis.admin.gvpbDeadlineSuccess);
+      } else {
+        await thesisApi.extendReportDeadline(extendDeadlineRoundId, parsed.toISOString());
+        setSuccess(messages.thesis.admin.reportDeadlineSuccess);
+      }
       setShowExtendDeadlineModal(false);
       setExtendDeadlineRoundId('');
       await loadData();
@@ -577,6 +666,55 @@ export default function AdminThesisPage() {
     }
   };
 
+  const performRestore = async (roundId: string, targetStatus?: ThesisRoundStatus) => {
+    setIsSaving(true);
+    setError('');
+    setSuccess('');
+    try {
+      await thesisApi.restoreRound(roundId, targetStatus);
+      setSuccess(messages.thesis.admin.roundRestored);
+      setRestoreTargetRound(null);
+      await loadData();
+      if (expandedRoundId === roundId) {
+        await loadRoundDetail(roundId);
+      }
+    } catch (err: unknown) {
+      setError(transitionErrorMessage(err));
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const restoreRound = async (round: ThesisRound) => {
+    // Whether a choice is required depends on the live groups still attached,
+    // so fetch them fresh — the roster can change while the row sits cancelled.
+    let hasLiveGroups = false;
+    try {
+      hasLiveGroups = (await thesisApi.listGroups(round.id))
+        .some((group) => group.status !== 'CANCELLED');
+    } catch {
+      setError(messages.thesis.loadFailed);
+      return;
+    }
+    const plan = planThesisRoundRestore(round, hasLiveGroups);
+    if (plan.requiresChoice) {
+      setRestoreTargetRound(round);
+      setRestoreTargets(plan.explicitTargets);
+      setRestoreStatusDraft(plan.explicitTargets[0]);
+      return;
+    }
+    const confirmed = await confirm({
+      title: messages.thesis.admin.restoreRoundTitle,
+      message: round.cancelledFromStatus
+        ? messages.thesis.admin.restoreRoundConfirm
+        : messages.thesis.admin.restoreRoundConfirmLegacy,
+      confirmText: messages.thesis.admin.restoreRound,
+      cancelText: messages.common.actions.cancel,
+    });
+    if (!confirmed) return;
+    await performRestore(round.id);
+  };
+
   const handleAssignReviewer = async (topicId: string, roundId: string) => {
     const lecturerId = reviewerDrafts[topicId];
     if (!lecturerId) return;
@@ -600,6 +738,129 @@ export default function AdminThesisPage() {
       setIsSaving(false);
     }
   };
+
+  const openReasonAction = (action: NonNullable<typeof reasonAction>) => {
+    setReasonAction(action);
+    setReasonText('');
+    setReplacementLecturerId('');
+    setLateTopicForm({ departmentId: '', title: '', description: '', supervisorId: '', maxGroups: '1' });
+    setOverrideForm({ groupId: '', studentId: '', action: 'ADD', successorId: '', allowSize: false });
+    setReassignForm({ groupId: '', topicId: '' });
+    setRetractConfirmation('');
+    setReasonActionError('');
+  };
+
+  const submitReasonAction = async () => {
+    const action = reasonAction;
+    if (!action) return;
+    const reason = reasonText.trim();
+    if (!reason || reason.length > 500) {
+      setReasonActionError(messages.thesis.admin.governanceReasonRequired);
+      return;
+    }
+    if (action.kind === 'replaceMember' && !replacementLecturerId) {
+      setReasonActionError(messages.thesis.councils.selectLecturer);
+      return;
+    }
+    setIsSaving(true);
+    setError('');
+    setSuccess('');
+    setReasonActionError('');
+    try {
+      if (action.kind === 'unassignTopic' && action.councilId && action.topicId) {
+        await thesisApi.unassignCouncilTopic(action.councilId, action.topicId, reason);
+        setSuccess(messages.thesis.councils.topicUnassignedSuccess);
+      } else if (action.kind === 'replaceMember' && action.councilId && action.lecturerId) {
+        await thesisApi.replaceCouncilMember(action.councilId, action.lecturerId, replacementLecturerId, reason);
+        setSuccess(messages.thesis.councils.memberReplacedSuccess);
+      } else if (action.kind === 'waiveGvpb' && action.topicId) {
+        await thesisApi.waiveCounterReview(action.topicId, reason);
+        setSuccess(messages.thesis.admin.governanceActionSuccess);
+      } else if (action.kind === 'revokeGvpbWaiver' && action.topicId) {
+        await thesisApi.revokeCounterReviewWaiver(action.topicId, reason);
+        setSuccess(messages.thesis.admin.governanceActionSuccess);
+      } else if (action.kind === 'withdrawTopic' && action.topicId) {
+        await thesisApi.withdrawTopic(action.topicId, reason);
+        setSuccess(messages.thesis.admin.governanceActionSuccess);
+      } else if (action.kind === 'reinstateTopic' && action.topicId) {
+        await thesisApi.reinstateTopic(action.topicId, reason);
+        setSuccess(messages.thesis.admin.governanceActionSuccess);
+      } else if (action.kind === 'lateTopic') {
+        const maxGroups = Number.parseInt(lateTopicForm.maxGroups, 10);
+        if (!lateTopicForm.departmentId.trim() || !lateTopicForm.title.trim()
+            || !lateTopicForm.description.trim() || !lateTopicForm.supervisorId.trim()
+            || !Number.isFinite(maxGroups) || maxGroups < 1 || maxGroups > 20) {
+          setReasonActionError(messages.thesis.admin.governanceReasonRequired);
+          return;
+        }
+        await thesisApi.createLateTopic(action.roundId, {
+          departmentId: lateTopicForm.departmentId.trim(),
+          title: lateTopicForm.title.trim(),
+          description: lateTopicForm.description.trim(),
+          maxGroups,
+          supervisorId: lateTopicForm.supervisorId.trim(),
+          reason,
+        });
+        setSuccess(messages.thesis.admin.lateTopicSuccess);
+      } else if (action.kind === 'rosterOverride') {
+        if (!overrideForm.groupId.trim() || !overrideForm.studentId.trim()) {
+          setReasonActionError(messages.thesis.admin.governanceReasonRequired);
+          return;
+        }
+        await thesisApi.overrideGroupRoster(overrideForm.groupId.trim(), {
+          studentId: overrideForm.studentId.trim(),
+          action: overrideForm.action,
+          reason,
+          allowSizeException: overrideForm.allowSize,
+          ...(overrideForm.action === 'REMOVE' && overrideForm.successorId.trim()
+            ? { successorStudentId: overrideForm.successorId.trim() }
+            : {}),
+        });
+        setSuccess(messages.thesis.admin.rosterOverrideSuccess);
+      } else if (action.kind === 'topicReassign') {
+        if (!reassignForm.groupId.trim() || !reassignForm.topicId.trim()) {
+          setReasonActionError(messages.thesis.admin.governanceReasonRequired);
+          return;
+        }
+        await thesisApi.reassignOrphanedTopic(reassignForm.groupId.trim(), {
+          topicId: reassignForm.topicId.trim(),
+          reason,
+        });
+        setSuccess(messages.thesis.admin.topicReassignSuccess);
+      } else if (action.kind === 'retractResults') {
+        if (retractConfirmation.trim() !== 'RETRACT') {
+          setReasonActionError(messages.thesis.admin.retractResultsConfirmLabel);
+          return;
+        }
+        await thesisApi.retractResults(action.roundId, reason, 'RETRACT');
+        setSuccess(messages.thesis.admin.retractResultsSuccess);
+      } else {
+        return;
+      }
+      setReasonAction(null);
+      await loadData();
+      await loadRoundDetail(action.roundId);
+    } catch (err: unknown) {
+      setReasonActionError(transitionErrorMessage(err));
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const reasonActionTitle = reasonAction
+    ? {
+        unassignTopic: messages.thesis.councils.unassignTopicTitle,
+        replaceMember: messages.thesis.councils.replaceMemberTitle,
+        waiveGvpb: messages.thesis.admin.waiveGvpbTitle,
+        revokeGvpbWaiver: messages.thesis.admin.revokeGvpbWaiverTitle,
+        withdrawTopic: messages.thesis.admin.withdrawTopicTitle,
+        reinstateTopic: messages.thesis.admin.reinstateTopicTitle,
+        lateTopic: messages.thesis.admin.lateTopicTitle,
+        rosterOverride: messages.thesis.admin.rosterOverrideTitle,
+        topicReassign: messages.thesis.admin.topicReassignTitle,
+        retractResults: messages.thesis.admin.retractResultsTitle,
+      }[reasonAction.kind]
+    : '';
 
   if (isAuthLoading || isLoggingOut) {
     return (
@@ -809,6 +1070,74 @@ export default function AdminThesisPage() {
                               {messages.thesis.admin.reportDeadlineExtend}
                             </Button>
                           ) : null}
+                          {/* Missed counter-review (GVPB) deadline wedge: a live
+                              round gets an audited forward-only extension so a
+                              lapsed reviewer deadline cannot strand grading. */}
+                          {(round.status === 'PROPOSALS_PUBLISHED' ||
+                            round.status === 'REGISTRATION_OPEN' ||
+                            round.status === 'REGISTRATION_CLOSED') &&
+                          round.gvpbDeadline ? (
+                            <Button
+                              type="button"
+                              size="sm"
+                              variant="outline"
+                              onClick={() => openExtendDeadlineModal(round, 'gvpb')}
+                              disabled={isSaving}
+                            >
+                              {messages.thesis.admin.gvpbDeadlineExtend}
+                            </Button>
+                          ) : null}
+                          {/* Late-topic escape: a supervisor who missed the
+                              proposal window still gets a publishable topic
+                              while students can register (audited). */}
+                          {(round.status === 'PROPOSALS_PUBLISHED' ||
+                            round.status === 'REGISTRATION_OPEN') ? (
+                            <Button
+                              type="button"
+                              size="sm"
+                              variant="outline"
+                              onClick={() => openReasonAction({ kind: 'lateTopic', roundId: round.id })}
+                              disabled={isSaving}
+                            >
+                              {messages.thesis.admin.lateTopic}
+                            </Button>
+                          ) : null}
+                          {/* Roster override: a group still below size after
+                              registration closed gets an audited admin add. */}
+                          {round.status === 'REGISTRATION_CLOSED' ? (
+                            <Button
+                              type="button"
+                              size="sm"
+                              variant="outline"
+                              onClick={() => openReasonAction({ kind: 'rosterOverride', roundId: round.id })}
+                              disabled={isSaving}
+                            >
+                              {messages.thesis.admin.rosterOverride}
+                            </Button>
+                          ) : null}
+                          {round.status === 'REGISTRATION_CLOSED' ? (
+                            <Button
+                              type="button"
+                              size="sm"
+                              variant="outline"
+                              onClick={() => openReasonAction({ kind: 'topicReassign', roundId: round.id })}
+                              disabled={isSaving}
+                            >
+                              {messages.thesis.admin.topicReassign}
+                            </Button>
+                          ) : null}
+                          {round.status === 'RESULTS_PUBLISHED' ? (
+                            <Button
+                              type="button"
+                              size="sm"
+                              variant="ghost"
+                              className="text-destructive hover:text-destructive"
+                              onClick={() => openReasonAction({ kind: 'retractResults', roundId: round.id })}
+                              disabled={isSaving}
+                            >
+                              {messages.thesis.admin.retractResults}
+                            </Button>
+                          ) : null}
                           {(round.status === 'DRAFT' || round.status === 'PROPOSAL_OPEN' || round.status === 'PROPOSALS_PUBLISHED') ? (
                             <Button
                               type="button"
@@ -818,6 +1147,17 @@ export default function AdminThesisPage() {
                               disabled={isSaving}
                             >
                               {messages.thesis.admin.editRound}
+                            </Button>
+                          ) : null}
+                          {round.status === 'CANCELLED' ? (
+                            <Button
+                              type="button"
+                              size="sm"
+                              variant="outline"
+                              onClick={() => void restoreRound(round)}
+                              disabled={isSaving}
+                            >
+                              {messages.thesis.admin.restoreRound}
                             </Button>
                           ) : null}
                           {round.status !== 'RESULTS_PUBLISHED'
@@ -985,16 +1325,35 @@ export default function AdminThesisPage() {
                                                   <span className="text-muted-foreground">({lect.employeeId})</span>
                                                 )}
                                               </div>
-                                              <button
-                                                type="button"
-                                                className="text-muted-foreground hover:text-destructive p-1 transition-colors"
-                                                title={messages.thesis.councils.removeMember}
-                                                aria-label={messages.thesis.councils.removeMember}
-                                                onClick={() => void handleRemoveMember(council.id, m.lecturerId, round.id)}
-                                                disabled={isSaving}
-                                              >
-                                                <Trash2 className="h-3.5 w-3.5" />
-                                              </button>
+                                              <div className="flex items-center gap-1">
+                                                <button
+                                                  type="button"
+                                                  className="text-muted-foreground hover:text-primary p-1 transition-colors"
+                                                  title={messages.thesis.councils.replaceMember}
+                                                  aria-label={messages.thesis.councils.replaceMember}
+                                                  onClick={() =>
+                                                    openReasonAction({
+                                                      kind: 'replaceMember',
+                                                      roundId: round.id,
+                                                      councilId: council.id,
+                                                      lecturerId: m.lecturerId,
+                                                    })
+                                                  }
+                                                  disabled={isSaving}
+                                                >
+                                                  <RefreshCw className="h-3.5 w-3.5" />
+                                                </button>
+                                                <button
+                                                  type="button"
+                                                  className="text-muted-foreground hover:text-destructive p-1 transition-colors"
+                                                  title={messages.thesis.councils.removeMember}
+                                                  aria-label={messages.thesis.councils.removeMember}
+                                                  onClick={() => void handleRemoveMember(council.id, m.lecturerId, round.id)}
+                                                  disabled={isSaving}
+                                                >
+                                                  <Trash2 className="h-3.5 w-3.5" />
+                                                </button>
+                                              </div>
                                             </div>
                                           );
                                         })}
@@ -1102,6 +1461,119 @@ export default function AdminThesisPage() {
                                                 <p className="text-[11px] text-muted-foreground">
                                                   {messages.thesis.admin.currentReviewer}: {reviewerName}
                                                 </p>
+                                              ) : null}
+                                              {top?.resultStatus === 'REVIEW_FAILED' ? (
+                                                <span className="inline-block rounded bg-destructive/10 px-1.5 py-0.5 text-[11px] font-semibold text-destructive">
+                                                  {messages.thesis.admin.resultReviewFailed}
+                                                </span>
+                                              ) : null}
+                                              {top?.resultStatus === 'WITHDRAWN' ? (
+                                                <span className="inline-block rounded bg-muted px-1.5 py-0.5 text-[11px] font-semibold text-muted-foreground">
+                                                  {messages.thesis.admin.resultWithdrawn}
+                                                </span>
+                                              ) : null}
+                                              {top?.gvpbWaivedReason ? (
+                                                <span className="inline-block rounded bg-status-info/20 px-1.5 py-0.5 text-[11px] font-semibold text-status-info-foreground">
+                                                  {messages.thesis.admin.gvpbWaivedBadge}
+                                                </span>
+                                              ) : null}
+                                              {top ? (
+                                                <div className="flex flex-wrap gap-1">
+                                                  {top.finalScore == null ? (
+                                                    <Button
+                                                      type="button"
+                                                      variant="ghost"
+                                                      size="sm"
+                                                      className="h-7 px-2 text-xs text-muted-foreground"
+                                                      disabled={isSaving}
+                                                      onClick={() =>
+                                                        openReasonAction({
+                                                          kind: 'unassignTopic',
+                                                          roundId: round.id,
+                                                          councilId: council.id,
+                                                          topicId: tid,
+                                                        })
+                                                      }
+                                                    >
+                                                      {messages.thesis.councils.unassignTopic}
+                                                    </Button>
+                                                  ) : null}
+                                                  {top.finalScore == null &&
+                                                  (round.thesisType === 'TLCN' || round.thesisType === 'KLTN') ? (
+                                                    top.gvpbWaivedReason ? (
+                                                      <Button
+                                                        type="button"
+                                                        variant="ghost"
+                                                        size="sm"
+                                                        className="h-7 px-2 text-xs text-muted-foreground"
+                                                        disabled={isSaving}
+                                                        onClick={() =>
+                                                          openReasonAction({
+                                                            kind: 'revokeGvpbWaiver',
+                                                            roundId: round.id,
+                                                            topicId: tid,
+                                                          })
+                                                        }
+                                                      >
+                                                        {messages.thesis.admin.revokeGvpbWaiver}
+                                                      </Button>
+                                                    ) : (
+                                                      <Button
+                                                        type="button"
+                                                        variant="ghost"
+                                                        size="sm"
+                                                        className="h-7 px-2 text-xs text-muted-foreground"
+                                                        disabled={isSaving}
+                                                        onClick={() =>
+                                                          openReasonAction({
+                                                            kind: 'waiveGvpb',
+                                                            roundId: round.id,
+                                                            topicId: tid,
+                                                          })
+                                                        }
+                                                      >
+                                                        {messages.thesis.admin.waiveGvpb}
+                                                      </Button>
+                                                    )
+                                                  ) : null}
+                                                  {top.finalScore == null ? (
+                                                    top.resultStatus === 'WITHDRAWN' ? (
+                                                      <Button
+                                                        type="button"
+                                                        variant="ghost"
+                                                        size="sm"
+                                                        className="h-7 px-2 text-xs text-primary"
+                                                        disabled={isSaving}
+                                                        onClick={() =>
+                                                          openReasonAction({
+                                                            kind: 'reinstateTopic',
+                                                            roundId: round.id,
+                                                            topicId: tid,
+                                                          })
+                                                        }
+                                                      >
+                                                        {messages.thesis.admin.reinstateTopic}
+                                                      </Button>
+                                                    ) : (
+                                                      <Button
+                                                        type="button"
+                                                        variant="ghost"
+                                                        size="sm"
+                                                        className="h-7 px-2 text-xs text-destructive"
+                                                        disabled={isSaving}
+                                                        onClick={() =>
+                                                          openReasonAction({
+                                                            kind: 'withdrawTopic',
+                                                            roundId: round.id,
+                                                            topicId: tid,
+                                                          })
+                                                        }
+                                                      >
+                                                        {messages.thesis.admin.withdrawTopic}
+                                                      </Button>
+                                                    )
+                                                  ) : null}
+                                                </div>
                                               ) : null}
                                             </div>
                                           );
@@ -1488,11 +1960,17 @@ export default function AdminThesisPage() {
             setExtendDeadlineRoundId('');
           }
         }}
-        title={messages.thesis.admin.reportDeadlineModalTitle}
+        title={
+          extendDeadlineKind === 'gvpb'
+            ? messages.thesis.admin.gvpbDeadlineModalTitle
+            : messages.thesis.admin.reportDeadlineModalTitle
+        }
       >
         <div className="space-y-4">
           <p className="text-sm text-muted-foreground">
-            {messages.thesis.admin.reportDeadlineModalDescription}
+            {extendDeadlineKind === 'gvpb'
+              ? messages.thesis.admin.gvpbDeadlineModalDescription
+              : messages.thesis.admin.reportDeadlineModalDescription}
           </p>
           {extendDeadlineError ? (
             <div className="rounded-md border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive">
@@ -1500,7 +1978,9 @@ export default function AdminThesisPage() {
             </div>
           ) : null}
           <label className="flex flex-col gap-2 text-sm font-medium text-foreground">
-            {messages.thesis.admin.reportDeadline}
+            {extendDeadlineKind === 'gvpb'
+              ? messages.thesis.admin.gvpbDeadline
+              : messages.thesis.admin.reportDeadline}
             <Input
               type="datetime-local" step="0.001"
               value={extendDeadlineValue}
@@ -1508,6 +1988,18 @@ export default function AdminThesisPage() {
               required
             />
           </label>
+          {extendDeadlineKind === 'gvpb' ? (
+            <label className="flex flex-col gap-2 text-sm font-medium text-foreground">
+              {messages.thesis.admin.governanceReasonLabel}
+              <Input
+                type="text"
+                value={extendDeadlineReason}
+                onChange={(e) => setExtendDeadlineReason(e.target.value)}
+                maxLength={500}
+                required
+              />
+            </label>
+          ) : null}
           <div className="flex justify-end gap-2 pt-2">
             <Button
               type="button"
@@ -1522,7 +2014,252 @@ export default function AdminThesisPage() {
               onClick={() => void extendReportDeadline()}
               disabled={isSaving || !extendDeadlineValue}
             >
-              {messages.thesis.admin.reportDeadlineExtend}
+              {extendDeadlineKind === 'gvpb'
+                ? messages.thesis.admin.gvpbDeadlineExtend
+                : messages.thesis.admin.reportDeadlineExtend}
+            </Button>
+          </div>
+        </div>
+      </Modal>
+      {/* Reason-bearing governance actions share one modal; each call writes
+          an audit row server-side with the entered reason. */}
+      <Modal
+        isOpen={reasonAction !== null}
+        onClose={() => {
+          if (!isSaving) setReasonAction(null);
+        }}
+        title={reasonActionTitle}
+      >
+        <div className="space-y-4">
+          {reasonActionError ? (
+            <div className="rounded-md border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive">
+              {reasonActionError}
+            </div>
+          ) : null}
+          {reasonAction?.kind === 'replaceMember' ? (
+            <Select
+              label={messages.thesis.councils.selectLecturer}
+              value={replacementLecturerId}
+              onChange={(e) => setReplacementLecturerId(e.target.value)}
+              options={[
+                { value: '', label: `-- ${messages.thesis.councils.selectLecturer} --` },
+                ...lecturers
+                  .filter(
+                    (l) =>
+                      l.id !== reasonAction.lecturerId &&
+                      !(councils.find((c) => c.id === reasonAction.councilId)?.members ?? []).some(
+                        (m) => m.lecturerId === l.id,
+                      ),
+                  )
+                  .map((l) => ({
+                    value: l.id,
+                    label: l.user ? `${l.user.lastName} ${l.user.firstName}` : l.id,
+                  })),
+              ]}
+            />
+          ) : null}
+          {reasonAction?.kind === 'lateTopic' ? (
+            <>
+              <label className="flex flex-col gap-2 text-sm font-medium text-foreground">
+                {messages.thesis.admin.lateTopicDepartment}
+                <Input
+                  value={lateTopicForm.departmentId}
+                  onChange={(e) => setLateTopicForm({ ...lateTopicForm, departmentId: e.target.value })}
+                  required
+                />
+              </label>
+              <label className="flex flex-col gap-2 text-sm font-medium text-foreground">
+                {messages.thesis.admin.lateTopicTitleField}
+                <Input
+                  value={lateTopicForm.title}
+                  onChange={(e) => setLateTopicForm({ ...lateTopicForm, title: e.target.value })}
+                  maxLength={240}
+                  required
+                />
+              </label>
+              <label className="flex flex-col gap-2 text-sm font-medium text-foreground">
+                {messages.thesis.admin.lateTopicDescription}
+                <Input
+                  value={lateTopicForm.description}
+                  onChange={(e) => setLateTopicForm({ ...lateTopicForm, description: e.target.value })}
+                  required
+                />
+              </label>
+              <label className="flex flex-col gap-2 text-sm font-medium text-foreground">
+                {messages.thesis.admin.lateTopicSupervisor}
+                <Input
+                  value={lateTopicForm.supervisorId}
+                  onChange={(e) => setLateTopicForm({ ...lateTopicForm, supervisorId: e.target.value })}
+                  required
+                />
+              </label>
+              <label className="flex flex-col gap-2 text-sm font-medium text-foreground">
+                {messages.thesis.admin.lateTopicMaxGroups}
+                <Input
+                  type="number"
+                  min={1}
+                  max={20}
+                  value={lateTopicForm.maxGroups}
+                  onChange={(e) => setLateTopicForm({ ...lateTopicForm, maxGroups: e.target.value })}
+                  required
+                />
+              </label>
+            </>
+          ) : null}
+          {reasonAction?.kind === 'rosterOverride' ? (
+            <>
+              <label className="flex flex-col gap-2 text-sm font-medium text-foreground">
+                {messages.thesis.admin.rosterOverrideAction}
+                <Select
+                  value={overrideForm.action}
+                  onChange={(e) =>
+                    setOverrideForm({ ...overrideForm, action: e.target.value as 'ADD' | 'REMOVE' })
+                  }
+                  options={[
+                    { value: 'ADD', label: messages.thesis.admin.rosterOverrideActionAdd },
+                    { value: 'REMOVE', label: messages.thesis.admin.rosterOverrideActionRemove },
+                  ]}
+                />
+              </label>
+              <label className="flex flex-col gap-2 text-sm font-medium text-foreground">
+                {messages.thesis.admin.rosterOverrideGroup}
+                <Input
+                  value={overrideForm.groupId}
+                  onChange={(e) => setOverrideForm({ ...overrideForm, groupId: e.target.value })}
+                  required
+                />
+              </label>
+              <label className="flex flex-col gap-2 text-sm font-medium text-foreground">
+                {messages.thesis.admin.rosterOverrideStudent}
+                <Input
+                  value={overrideForm.studentId}
+                  onChange={(e) => setOverrideForm({ ...overrideForm, studentId: e.target.value })}
+                  required
+                />
+              </label>
+              {overrideForm.action === 'REMOVE' ? (
+                <label className="flex flex-col gap-2 text-sm font-medium text-foreground">
+                  {messages.thesis.admin.rosterOverrideSuccessor}
+                  <Input
+                    value={overrideForm.successorId}
+                    onChange={(e) => setOverrideForm({ ...overrideForm, successorId: e.target.value })}
+                  />
+                </label>
+              ) : null}
+              <label className="flex items-center gap-2 text-sm font-medium text-foreground">
+                <input
+                  type="checkbox"
+                  checked={overrideForm.allowSize}
+                  onChange={(e) => setOverrideForm({ ...overrideForm, allowSize: e.target.checked })}
+                />
+                {messages.thesis.admin.rosterOverrideSizeException}
+              </label>
+            </>
+          ) : null}
+          {reasonAction?.kind === 'topicReassign' ? (
+            <>
+              <label className="flex flex-col gap-2 text-sm font-medium text-foreground">
+                {messages.thesis.admin.topicReassignGroup}
+                <Input
+                  value={reassignForm.groupId}
+                  onChange={(e) => setReassignForm({ ...reassignForm, groupId: e.target.value })}
+                  required
+                />
+              </label>
+              <label className="flex flex-col gap-2 text-sm font-medium text-foreground">
+                {messages.thesis.admin.topicReassignTopic}
+                <Input
+                  value={reassignForm.topicId}
+                  onChange={(e) => setReassignForm({ ...reassignForm, topicId: e.target.value })}
+                  required
+                />
+              </label>
+            </>
+          ) : null}
+          {reasonAction?.kind === 'retractResults' ? (
+            <>
+              <p className="text-sm text-muted-foreground">
+                {messages.thesis.admin.retractResultsHint}
+              </p>
+              <label className="flex flex-col gap-2 text-sm font-medium text-foreground">
+                {messages.thesis.admin.retractResultsConfirmLabel}
+                <Input
+                  value={retractConfirmation}
+                  onChange={(e) => setRetractConfirmation(e.target.value)}
+                  required
+                />
+              </label>
+            </>
+          ) : null}
+          <label className="flex flex-col gap-2 text-sm font-medium text-foreground">
+            {messages.thesis.admin.governanceReasonLabel} <span className="text-destructive">*</span>
+            <Input
+              value={reasonText}
+              onChange={(e) => setReasonText(e.target.value)}
+              maxLength={500}
+              required
+            />
+          </label>
+          <div className="flex justify-end gap-2 pt-2">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setReasonAction(null)}
+              disabled={isSaving}
+            >
+              {messages.common.actions.cancel}
+            </Button>
+            <Button
+              type="button"
+              onClick={() => void submitReasonAction()}
+              disabled={isSaving || !reasonText.trim()}
+            >
+              {messages.common.actions.save}
+            </Button>
+          </div>
+        </div>
+      </Modal>
+      <Modal
+        isOpen={restoreTargetRound !== null}
+        onClose={() => {
+          if (!isSaving) setRestoreTargetRound(null);
+        }}
+        title={messages.thesis.admin.restoreRoundTitle}
+      >
+        <div className="space-y-4">
+          <p className="text-sm text-muted-foreground">
+            {restoreTargetRound?.cancelledFromStatus
+              ? messages.thesis.admin.restoreRoundWindowPassed
+              : messages.thesis.admin.restoreRoundPickTargetRequired}
+          </p>
+          <Select
+            label={messages.thesis.admin.restoreTargetLabel}
+            value={restoreStatusDraft}
+            onChange={(e) => setRestoreStatusDraft(e.target.value as ThesisRoundStatus)}
+            options={restoreTargets.map((status) => ({
+              value: status,
+              label: messages.thesis.status[status] ?? status,
+            }))}
+          />
+          <div className="flex justify-end gap-2 pt-2">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setRestoreTargetRound(null)}
+              disabled={isSaving}
+            >
+              {messages.common.actions.cancel}
+            </Button>
+            <Button
+              type="button"
+              onClick={() => {
+                if (restoreTargetRound && restoreStatusDraft) {
+                  void performRestore(restoreTargetRound.id, restoreStatusDraft);
+                }
+              }}
+              disabled={isSaving || !restoreStatusDraft}
+            >
+              {messages.thesis.admin.restoreRound}
             </Button>
           </div>
         </div>

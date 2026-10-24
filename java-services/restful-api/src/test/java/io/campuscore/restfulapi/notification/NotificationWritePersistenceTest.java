@@ -56,6 +56,7 @@ class NotificationWritePersistenceTest {
                     message VARCHAR(2000) NOT NULL,
                     type VARCHAR(40) NOT NULL,
                     link VARCHAR(500),
+                    announcement_id VARCHAR(120), source_key VARCHAR(160),
                     is_read BOOLEAN NOT NULL DEFAULT FALSE,
                     read_at TIMESTAMP,
                     created_at TIMESTAMP NOT NULL,
@@ -379,6 +380,65 @@ class NotificationWritePersistenceTest {
 
         assertThat(textValue("target", "title")).isEqualTo("Title target");
         assertThat(textValue("target", "type")).isEqualTo("INFO");
+    }
+
+    @Test
+    void adminWriteRejectsUnsafeLinksWithStableCode() throws Exception {
+        insert("target", STUDENT, false, Instant.parse("2026-08-21T01:00:00Z"));
+
+        for (String link : List.of(
+                "javascript:alert(1)",
+                "JaVaScRiPt:alert(1)",
+                " javascript:alert(1)",
+                "data:text/html;base64,PGI+",
+                "//evil.example/phish",
+                "\\\\evil",
+                "/\\\\evil",
+                "/dashboard ok",
+                "https://evil.example")) {
+            String body = """
+                    {
+                      "userId": "student-user-1",
+                      "title": "Link check",
+                      "message": "Link must stay same-origin.",
+                      "type": "INFO",
+                      "link": %s
+                    }
+                    """.formatted(toJsonString(link));
+            mvc.perform(post("/api/v1/notifications")
+                            .with(adminJwt())
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(body))
+                    .andExpect(status().isBadRequest())
+                    .andExpect(jsonPath("$.code").value("INVALID_NOTIFICATION_LINK"));
+
+            mvc.perform(put("/api/v1/notifications/target")
+                            .with(adminJwt())
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content("{\"link\":" + toJsonString(link) + "}"))
+                    .andExpect(status().isBadRequest())
+                    .andExpect(jsonPath("$.code").value("INVALID_NOTIFICATION_LINK"));
+        }
+
+        assertThat(totalRows()).isEqualTo(1);
+        assertThat(textValue("target", "link")).isNull();
+
+        mvc.perform(put("/api/v1/notifications/target")
+                        .with(adminJwt())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"link\":\"/dashboard/register?q=CS101\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.link").value("/dashboard/register?q=CS101"));
+        assertThat(textValue("target", "link")).isEqualTo("/dashboard/register?q=CS101");
+    }
+
+    private static String toJsonString(String value) {
+        return "\"" + value
+                .replace("\\", "\\\\")
+                .replace("\"", "\\\"")
+                .replace("\t", "\\t")
+                .replace("\n", "\\n")
+                + "\"";
     }
 
     private void insert(String id, String userId, boolean read, Instant createdAt) {

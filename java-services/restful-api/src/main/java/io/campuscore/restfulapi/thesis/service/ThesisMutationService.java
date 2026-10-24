@@ -13,15 +13,22 @@ import io.campuscore.restfulapi.thesis.repository.ThesisRoundReadPort;
 import io.campuscore.restfulapi.thesis.repository.ThesisTopicRepository;
 import io.campuscore.restfulapi.thesis.web.ThesisGroupReadDtos.GroupResponse;
 import io.campuscore.restfulapi.thesis.web.ThesisMutationDtos.CloseRegistrationPreviewResponse;
+import io.campuscore.restfulapi.thesis.web.ThesisMutationDtos.GroupApprovalRequest;
 import io.campuscore.restfulapi.thesis.web.ThesisMutationDtos.GroupCreateRequest;
 import io.campuscore.restfulapi.thesis.web.ThesisMutationDtos.MemberRequest;
 import io.campuscore.restfulapi.thesis.web.ThesisMutationDtos.ProgressRequest;
+import io.campuscore.restfulapi.thesis.web.ThesisMutationDtos.PublishResultsExcludedTopic;
+import io.campuscore.restfulapi.thesis.web.ThesisMutationDtos.PublishResultsPreviewResponse;
 import io.campuscore.restfulapi.thesis.web.ThesisMutationDtos.RoundCreateRequest;
 import io.campuscore.restfulapi.thesis.web.ThesisMutationDtos.StudentSearchResponse;
 import io.campuscore.restfulapi.thesis.web.ThesisMutationDtos.TopicAssignmentRequest;
 import io.campuscore.restfulapi.thesis.web.ThesisMutationDtos.TopicCreateRequest;
 import io.campuscore.restfulapi.thesis.web.ThesisMutationDtos.TopicUpdateRequest;
 import io.campuscore.restfulapi.thesis.web.ThesisMutationDtos.GroupRejectionRequest;
+import io.campuscore.restfulapi.thesis.web.ThesisMutationDtos.LateTopicRequest;
+import io.campuscore.restfulapi.thesis.web.ThesisMutationDtos.RetractPublicationRequest;
+import io.campuscore.restfulapi.thesis.web.ThesisMutationDtos.RosterOverrideRequest;
+import io.campuscore.restfulapi.thesis.web.ThesisMutationDtos.TopicReassignRequest;
 import io.campuscore.restfulapi.thesis.web.ThesisRoundDtos.RoundResponse;
 import io.campuscore.restfulapi.thesis.web.ThesisTopicDtos.TopicResponse;
 import io.campuscore.restfulapi.web.DomainException;
@@ -61,6 +68,13 @@ public class ThesisMutationService {
     private final ThesisRoundReadService roundReads;
     private final AdminAuditRecorder audit;
     private final ThesisNotificationService notifier;
+
+    /**
+     * Retract-publication grace window in days
+     * (thesis.results.retract-grace-days, default 7).
+     */
+    @org.springframework.beans.factory.annotation.Value("${thesis.results.retract-grace-days:7}")
+    private int retractGraceDays;
 
     /**
      * Wires the write boundary over the shared JDBC template and the thesis repositories.
@@ -363,9 +377,13 @@ public class ThesisMutationService {
     }
 
     /**
-     * Cancels a round that has not published results. Cancelled groups keep
-     * their historical rosters; the one-active-group index releases the
-     * students for a future round.
+     * Cancels a round that has not published results. Cancellation only moves
+     * the round row: groups, rosters, topics, reports, councils and scores all
+     * stay as history, and the status the round leaves behind is captured in
+     * {@code cancelled_from_status} so {@link #restoreRound} can undo an
+     * accidental cancel. Students of the cancelled round are free to join
+     * another round because the participation checks treat CANCELLED rounds as
+     * holding no seat.
      *
      * @param id round to cancel
      * @param actor caller JWT recorded in the audit row
@@ -377,7 +395,8 @@ public class ThesisMutationService {
     public RoundResponse cancelRound(UUID id, Jwt actor) {
         roundReadPort.requireExisting(id);
         int updated = jdbc.update(
-                "UPDATE thesis.thesis_registration_round SET status = 'CANCELLED', updated_at = CURRENT_TIMESTAMP, version = version + 1 "
+                "UPDATE thesis.thesis_registration_round SET status = 'CANCELLED', cancelled_from_status = status, "
+                        + "updated_at = CURRENT_TIMESTAMP, version = version + 1 "
                         + "WHERE id = :id AND status NOT IN ('RESULTS_PUBLISHED', 'CLOSED', 'CANCELLED')",
                 params().addValue("id", id));
         if (updated != 1) {
@@ -386,6 +405,176 @@ public class ThesisMutationService {
         audit.record(subject(actor), null, "THESIS_ROUND_CANCELLED", "THESIS_ROUND", id.toString(),
                 "Round cancelled");
         return roundReads.get(id);
+    }
+
+    /** Restore targets in lifecycle order — a request may never name RESULTS_PUBLISHED, CLOSED or CANCELLED. */
+    private static final List<RoundStatus> RESTORE_TARGET_ORDER = List.of(
+            RoundStatus.DRAFT, RoundStatus.PROPOSAL_OPEN, RoundStatus.PROPOSALS_PUBLISHED,
+            RoundStatus.REGISTRATION_OPEN, RoundStatus.REGISTRATION_CLOSED);
+
+    /**
+     * Reverses a cancellation (the admin escape hatch). The round returns to
+     * the status captured at cancel time; a caller may instead name an
+     * explicit {@code targetStatus} — the only override the lifecycle allows
+     * is REGISTRATION_CLOSED in place of a recorded REGISTRATION_OPEN whose
+     * window has since closed. Rounds cancelled before
+     * {@code cancelled_from_status} existed carry NULL: a legacy round that
+     * still has live groups requires an explicit target
+     * (ROUND_RESTORE_TARGET_REQUIRED), because its data proves registration
+     * ran and DRAFT would silently re-hold seats; an empty legacy round falls
+     * back to DRAFT, the only status that fabricates no progress.
+     *
+     * <p>Nothing else was mutated by the cancel, so nothing is resurrected
+     * here — the UPDATE is a pure status flip guarded by the row lock and the
+     * {@code status = 'CANCELLED'} predicate, which keeps the optimistic
+     * version check honest against a concurrent restore or cancel. Three
+     * guards run under the locks before the flip:
+     *
+     * <ul>
+     *   <li>a student who joined another still-live round while this one was
+     *   cancelled cannot hold two active seats, so the restore is rejected
+     *   with ROUND_RESTORE_MEMBER_CONFLICT rather than corrupting rosters;</li>
+     *   <li>a round containing frozen historical small groups must not be
+     *   reopened — the V113 trigger is the backstop, and the explicit
+     *   ROUND_RESTORE_FROZEN_HISTORY check gives the admin a clear reason;</li>
+     *   <li>the members' Student rows are locked before the seat count, in the
+     *   same round-then-student order createGroup/addMember take them, so a
+     *   registration in flight either commits first (and is counted) or waits
+     *   for this flip and then sees the round live again — no interleaving can
+     *   leave a student seated in two live rounds.</li>
+     * </ul>
+     *
+     * @param id round to restore
+     * @param targetStatus explicit restore target, or null to use the recorded
+     *        pre-cancel status (DRAFT for a group-less legacy cancellation)
+     * @param actor caller JWT recorded in the audit row
+     * @return the round after restoration
+     */
+    @Transactional
+    public RoundResponse restoreRound(UUID id, String targetStatus, Jwt actor) {
+        Map<String, Object> row = one(
+                "SELECT status, cancelled_from_status FROM thesis.thesis_registration_round WHERE id = :id FOR UPDATE",
+                params().addValue("id", id), "ROUND_NOT_FOUND", "Thesis registration round not found");
+        if (!RoundStatus.CANCELLED.name().equals(row.get("status"))) {
+            throw conflict("ROUND_STATE_CONFLICT", "Only a cancelled round can be restored");
+        }
+        String recorded = (String) row.get("cancelled_from_status");
+        // Same order as registration (requireRoundStatus locks the round, then
+        // requireActiveStudent locks the Student row): round first, students in
+        // id order — so this transaction and an in-flight registration for one
+        // of these students serialize on the Student row either way.
+        jdbc.queryForList(
+                "SELECT s.\"id\" FROM campuscore_auth.\"Student\" s "
+                        + "WHERE s.\"id\" IN ("
+                        + "SELECT m.student_id FROM thesis.thesis_group_member m "
+                        + "JOIN thesis.thesis_group g ON g.id = m.group_id "
+                        + "WHERE g.round_id = :id AND g.status <> 'CANCELLED' AND m.active_participation) "
+                        + "ORDER BY s.\"id\" FOR UPDATE",
+                params().addValue("id", id), String.class);
+        boolean hasLiveGroups = count(
+                "SELECT COUNT(*) FROM thesis.thesis_group WHERE round_id = :id AND status <> 'CANCELLED'",
+                "id", id) > 0;
+        boolean explicitTarget = targetStatus != null && !targetStatus.isBlank();
+        RoundStatus target = resolveRestoreTarget(recorded, targetStatus, hasLiveGroups);
+        // Restoring to an open registration replays the same window guard the
+        // open-registration transition enforces; otherwise the round would
+        // come back "open" while every roster action still fails.
+        if (target == RoundStatus.REGISTRATION_OPEN) {
+            requireLiveRegistrationWindow(id);
+        }
+        Integer seatConflicts = jdbc.queryForObject(
+                "SELECT COUNT(*) FROM thesis.thesis_group_member m "
+                        + "JOIN thesis.thesis_group g ON g.id = m.group_id "
+                        + "JOIN thesis.thesis_group_member other ON other.student_id = m.student_id "
+                        + "JOIN thesis.thesis_group og ON og.id = other.group_id AND og.status <> 'CANCELLED' "
+                        + "JOIN thesis.thesis_registration_round orr ON orr.id = other.round_id "
+                        + "WHERE g.round_id = :id AND g.status <> 'CANCELLED' AND m.active_participation "
+                        + "AND other.round_id <> :id AND other.active_participation "
+                        + "AND orr.status NOT IN ('RESULTS_PUBLISHED', 'CLOSED', 'CANCELLED')",
+                params().addValue("id", id), Integer.class);
+        if (seatConflicts != null && seatConflicts > 0) {
+            throw conflict("ROUND_RESTORE_MEMBER_CONFLICT",
+                    seatConflicts + " student(s) already hold an active seat in another live round; "
+                            + "restoring this round would give them two active groups");
+        }
+        Integer frozenHistory = jdbc.queryForObject(
+                "SELECT COUNT(*) FROM thesis.thesis_group WHERE round_id = :id AND legacy_group_size_exception",
+                params().addValue("id", id), Integer.class);
+        if (frozenHistory != null && frozenHistory > 0) {
+            throw conflict("ROUND_RESTORE_FROZEN_HISTORY",
+                    "This round contains frozen historical small groups and cannot be reopened");
+        }
+        int updated = jdbc.update(
+                "UPDATE thesis.thesis_registration_round SET status = :target, cancelled_from_status = NULL, "
+                        + "updated_at = CURRENT_TIMESTAMP, version = version + 1 "
+                        + "WHERE id = :id AND status = 'CANCELLED'",
+                params().addValue("id", id).addValue("target", target.name()));
+        if (updated != 1) {
+            throw conflict("ROUND_STATE_CONFLICT", "The round is no longer cancelled");
+        }
+        String targetSource = explicitTarget ? "EXPLICIT"
+                : recorded == null ? "LEGACY_DEFAULT" : "RECORDED";
+        audit.record(subject(actor), null, "THESIS_ROUND_RESTORED", "THESIS_ROUND", id.toString(),
+                "Round restored CANCELLED -> " + target.name(),
+                Map.of("status", "CANCELLED",
+                        "cancelled_from_status", recorded == null ? "" : recorded),
+                Map.of("status", target.name(), "target_source", targetSource));
+        return roundReads.get(id);
+    }
+
+    /**
+     * A restore may never skip the lifecycle. With a recorded marker the only
+     * legal targets are that marker itself and — the documented escape hatch —
+     * REGISTRATION_CLOSED when the marker is REGISTRATION_OPEN (the window may
+     * legitimately have closed while the round sat cancelled). Without a
+     * marker the round's own data is the only evidence: live groups prove
+     * registration ran, so no target earlier than REGISTRATION_OPEN is honest,
+     * while an empty legacy round may return to any live status and defaults
+     * to DRAFT.
+     */
+    private RoundStatus resolveRestoreTarget(String recorded, String requested, boolean hasLiveGroups) {
+        RoundStatus marker = recorded == null || recorded.isBlank() ? null : parseRestoreTarget(recorded);
+        if (requested == null || requested.isBlank()) {
+            if (marker != null) {
+                return marker;
+            }
+            if (!hasLiveGroups) {
+                return RoundStatus.DRAFT;
+            }
+            throw conflict("ROUND_RESTORE_TARGET_REQUIRED",
+                    "This round was cancelled before its previous status was recorded and it still has "
+                            + "groups; choose an explicit targetStatus (REGISTRATION_OPEN or REGISTRATION_CLOSED)");
+        }
+        RoundStatus requestedStatus = parseRestoreTarget(requested);
+        if (marker != null) {
+            boolean allowed = requestedStatus == marker
+                    || (marker == RoundStatus.REGISTRATION_OPEN
+                            && requestedStatus == RoundStatus.REGISTRATION_CLOSED);
+            if (!allowed) {
+                throw conflict("ROUND_RESTORE_TARGET_INVALID",
+                        "targetStatus must be " + marker + (marker == RoundStatus.REGISTRATION_OPEN
+                                ? " or REGISTRATION_CLOSED" : ""));
+            }
+            return requestedStatus;
+        }
+        int floor = hasLiveGroups ? RESTORE_TARGET_ORDER.indexOf(RoundStatus.REGISTRATION_OPEN) : 0;
+        if (RESTORE_TARGET_ORDER.indexOf(requestedStatus) < floor) {
+            throw conflict("ROUND_RESTORE_TARGET_INVALID",
+                    "This round still has groups, so its target cannot be earlier than REGISTRATION_OPEN");
+        }
+        return requestedStatus;
+    }
+
+    private static RoundStatus parseRestoreTarget(String name) {
+        try {
+            RoundStatus status = RoundStatus.valueOf(name.trim());
+            if (RESTORE_TARGET_ORDER.contains(status)) {
+                return status;
+            }
+        } catch (IllegalArgumentException ignored) {
+        }
+        throw invalid("targetStatus must be a live status: DRAFT, PROPOSAL_OPEN, "
+                + "PROPOSALS_PUBLISHED, REGISTRATION_OPEN or REGISTRATION_CLOSED");
     }
 
     /**
@@ -473,6 +662,677 @@ public class ThesisMutationService {
     }
 
     /**
+     * The counter-review escape hatch, sibling of {@link #extendReportDeadline}:
+     * a missed {@code gvpb_deadline} left the GVPB window closed forever —
+     * {@code updateRound} stops accepting changes after PROPOSALS_PUBLISHED,
+     * assignReviewer still succeeded but the replacement could never submit.
+     * This audited mutation moves {@code gvpb_deadline} forward while the round
+     * is live (PROPOSALS_PUBLISHED, REGISTRATION_OPEN or REGISTRATION_CLOSED).
+     * The authored schedule ordering still holds: the new deadline may not pass
+     * report_date (thesis_round_schedule_order_valid enforces it), so a deeper
+     * extension must pair with a report-date change the normal way.
+     */
+    @Transactional
+    public RoundResponse extendGvpbDeadline(UUID id, Instant newDeadline, String reason, Jwt actor) {
+        String cleanReason = requireReason(reason);
+        Map<String, Object> current = one(
+                "SELECT status, thesis_type, gvpb_deadline, report_date, report_deadline FROM thesis.thesis_registration_round "
+                        + "WHERE id = :id FOR UPDATE",
+                params().addValue("id", id), "ROUND_NOT_FOUND", "Thesis registration round not found");
+        String status = (String) current.get("status");
+        if (!RoundStatus.PROPOSALS_PUBLISHED.name().equals(status)
+                && !RoundStatus.REGISTRATION_OPEN.name().equals(status)
+                && !RoundStatus.REGISTRATION_CLOSED.name().equals(status)) {
+            throw conflict("ROUND_STATE_CONFLICT",
+                    "The counter-review deadline can only be extended while the round is live");
+        }
+        RoundType roundType = requireRoundType((String) current.get("thesis_type"));
+        if (!roundType.requiresGvpbDeadline()) {
+            throw invalid(roundType + " rounds carry no counter-review deadline");
+        }
+        if (newDeadline == null || !newDeadline.isAfter(Instant.now())) {
+            throw invalid("gvpbDeadline must be in the future");
+        }
+        Instant currentDeadline = instantOf(current.get("gvpb_deadline"));
+        if (currentDeadline != null && newDeadline.isBefore(currentDeadline)) {
+            throw invalid("gvpbDeadline must not be earlier than the current counter-review deadline");
+        }
+        Instant reportDate = instantOf(current.get("report_date"));
+        if (reportDate != null && newDeadline.isAfter(reportDate)) {
+            throw invalid("gvpbDeadline must not be later than the report date; amend the schedule first");
+        }
+        // The report write window falls back to gvpb_deadline when no
+        // report_deadline override exists, so extending GVPB would silently
+        // reopen report editing. Pin the override to the OLD deadline first —
+        // extending only the counter-review window, in the same transaction.
+        Instant currentReportDeadline = instantOf(current.get("report_deadline"));
+        if (currentReportDeadline == null && currentDeadline != null) {
+            jdbc.update(
+                    "UPDATE thesis.thesis_registration_round SET report_deadline = :reportDeadline, "
+                            + "updated_at = CURRENT_TIMESTAMP, version = version + 1 WHERE id = :id",
+                    params().addValue("id", id).addValue("reportDeadline", tsOf(currentDeadline)));
+        }
+        Map<String, Object> beforeState = new LinkedHashMap<>();
+        beforeState.put("gvpb_deadline", currentDeadline);
+        beforeState.put("report_deadline", currentReportDeadline);
+        jdbc.update(
+                "UPDATE thesis.thesis_registration_round SET gvpb_deadline = :gvpbDeadline, "
+                        + "updated_at = CURRENT_TIMESTAMP, version = version + 1 WHERE id = :id",
+                params().addValue("id", id).addValue("gvpbDeadline", tsOf(newDeadline)));
+        Map<String, Object> afterState = new LinkedHashMap<>();
+        afterState.put("gvpb_deadline", newDeadline);
+        afterState.put("report_deadline",
+                currentReportDeadline == null ? currentDeadline : currentReportDeadline);
+        audit.record(subject(actor), null, "THESIS_ROUND_GVPB_DEADLINE_EXTENDED", "THESIS_ROUND", id.toString(),
+                "Counter-review deadline extended; reason: " + cleanReason, beforeState, afterState);
+        return roundReads.get(id);
+    }
+
+    /**
+     * Consequence preview for publish-results: the admin sees exactly which
+     * approved groups will publish and which topics are excluded with their
+     * outcome (REVIEW_FAILED or WITHDRAWN) before confirming.
+     */
+    @Transactional(readOnly = true)
+    public PublishResultsPreviewResponse publishResultsPreview(UUID roundId, Jwt actor) {
+        one("SELECT id FROM thesis.thesis_registration_round WHERE id = :id",
+                params().addValue("id", roundId), "ROUND_NOT_FOUND", "Thesis registration round not found");
+        Map<String, Object> counts = jdbc.queryForMap(
+                "SELECT COUNT(*) AS group_count, "
+                        + "COUNT(*) FILTER (WHERE approval_status = 'APPROVED') AS approved_count, "
+                        + "COUNT(*) FILTER (WHERE approval_status = 'PENDING') AS pending_count "
+                        + "FROM thesis.thesis_group WHERE round_id = :roundId AND status <> 'CANCELLED'",
+                params().addValue("roundId", roundId));
+        // A sub-threshold counter-review while its window is still open is
+        // provisional — the reviewer may overwrite — so it neither excludes
+        // the topic nor blocks anything; the preview lists it separately.
+        // The inclusion predicate must match publishResults exactly: a NULL
+        // result_status makes the exclusion condition NULL, and NOT NULL is
+        // still NULL — so "included" is spelled as IS NULL OR NOT <cond>.
+        Map<String, Object> scoring = jdbc.queryForMap(
+                "SELECT COUNT(*) FILTER (WHERE s.result_status IS NULL OR NOT s.excluded_condition) AS included_count, "
+                        + "COUNT(*) FILTER (WHERE s.final_score IS NULL AND (s.result_status IS NULL OR NOT s.excluded_condition)) AS ungraded_count "
+                        + "FROM (SELECT t.final_score, t.result_status, "
+                        + "  (t.result_status = 'WITHDRAWN' OR (t.result_status = 'REVIEW_FAILED' "
+                        + "    AND r.gvpb_deadline IS NOT NULL AND r.gvpb_deadline <= CURRENT_TIMESTAMP)) "
+                        + "  AS excluded_condition "
+                        + "  FROM thesis.thesis_group g "
+                        + "  JOIN thesis.thesis_topic t ON t.id = g.topic_id "
+                        + "  JOIN thesis.thesis_registration_round r ON r.id = t.round_id "
+                        + "  WHERE g.round_id = :roundId AND g.approval_status = 'APPROVED') s",
+                params().addValue("roundId", roundId));
+        List<PublishResultsExcludedTopic> excluded = excludedTopicsQuery(roundId, actor);
+        List<PublishResultsExcludedTopic> openReview = jdbc.query(
+                "SELECT t.id, t.title, t.result_status, t.result_reason FROM thesis.thesis_topic t "
+                        + "JOIN thesis.thesis_registration_round r ON r.id = t.round_id "
+                        + "WHERE t.round_id = :roundId AND t.result_status = 'REVIEW_FAILED' "
+                        + "AND (r.gvpb_deadline IS NULL OR r.gvpb_deadline > CURRENT_TIMESTAMP) "
+                        + "ORDER BY t.title",
+                params().addValue("roundId", roundId),
+                (rs, ignored) -> new PublishResultsExcludedTopic(
+                        (UUID) rs.getObject("id"), rs.getString("title"),
+                        rs.getString("result_status"), rs.getString("result_reason")));
+        return new PublishResultsPreviewResponse(
+                ((Number) counts.get("group_count")).longValue(),
+                ((Number) counts.get("approved_count")).longValue(),
+                ((Number) counts.get("pending_count")).longValue(),
+                ((Number) scoring.get("included_count")).longValue(),
+                ((Number) scoring.get("ungraded_count")).longValue(),
+                excluded, openReview);
+    }
+
+    /**
+     * Excluded topics of a publish preview, scoped like every other
+     * topic-level governance read: global admins see the whole round, a
+     * faculty head sees only the exclusions inside their own faculty.
+     */
+    private List<PublishResultsExcludedTopic> excludedTopicsQuery(UUID roundId, Jwt actor) {
+        String facultyScope = "";
+        String facultyId = ThesisDeanScope.isFacultyHead(actor) && !ThesisDeanScope.isGlobalAdmin(actor)
+                ? ThesisDeanScope.facultyId(jdbc, actor) : null;
+        if (facultyId != null) {
+            facultyScope = " AND d.\"facultyId\" = :facultyId";
+        }
+        return jdbc.query(
+                "SELECT t.id, t.title, t.result_status, t.result_reason FROM thesis.thesis_topic t "
+                        + "JOIN thesis.thesis_registration_round r ON r.id = t.round_id "
+                        + "JOIN academic.\"Department\" d ON d.\"id\" = t.department_id "
+                        + "WHERE t.round_id = :roundId "
+                        + "AND (t.result_status = 'WITHDRAWN' OR (t.result_status = 'REVIEW_FAILED' "
+                        + "  AND r.gvpb_deadline IS NOT NULL AND r.gvpb_deadline <= CURRENT_TIMESTAMP)) "
+                        + facultyScope
+                        + " ORDER BY t.title",
+                facultyId == null
+                        ? params().addValue("roundId", roundId)
+                        : params().addValue("roundId", roundId).addValue("facultyId", facultyId),
+                (rs, ignored) -> new PublishResultsExcludedTopic(
+                        (UUID) rs.getObject("id"), rs.getString("title"),
+                        rs.getString("result_status"), rs.getString("result_reason")));
+    }
+
+    /**
+     * Governance outcome for a topic that can no longer complete the round —
+     * an unresolvable council/roster failure, a counter-review that cannot be
+     * satisfied, a topic the faculty pulled. The topic keeps its data; only
+     * its publication obligation is released (publishResults excludes it).
+     * Reversible through {@link #reinstateTopic} while no final score exists.
+     *
+     * @param id topic to withdraw
+     * @param reason governance reason (required, at most 500 characters)
+     * @param actor caller JWT; admin, or faculty head when the topic sits in
+     *        their faculty
+     * @return the topic carrying the WITHDRAWN outcome
+     * @throws DomainException with code TOPIC_ALREADY_WITHDRAWN for a repeat,
+     *         SCORE_ALREADY_FINALIZED for a graded topic, or
+     *         ROUND_STATE_CONFLICT for a terminal round
+     */
+    @Transactional
+    public TopicResponse withdrawTopic(UUID id, String reason, Jwt actor) {
+        // Service-level guard: the controller annotation alone must not be the
+        // only role check on a governance outcome.
+        requireGovernanceRole(actor);
+        String cleanReason = requireReason(reason);
+        requireMutableTopicRound(id);
+        lockTopicForGovernance(id);
+        // An outcome decision is governance-only: the dean must own the
+        // topic's faculty, not merely supervise it.
+        ThesisDeanScope.requireTopicGovernanceScope(jdbc, actor, id);
+        Map<String, Object> topic = one(
+                "SELECT status, final_score, result_status, title FROM thesis.thesis_topic WHERE id = :id",
+                params().addValue("id", id), "TOPIC_NOT_FOUND", "Thesis topic not found");
+        if (topic.get("final_score") != null) {
+            throw conflict("SCORE_ALREADY_FINALIZED", "A finalized topic cannot be withdrawn");
+        }
+        if ("WITHDRAWN".equals(topic.get("result_status"))) {
+            throw conflict("TOPIC_ALREADY_WITHDRAWN", "The topic is already withdrawn from the round");
+        }
+        jdbc.update(
+                "UPDATE thesis.thesis_topic SET result_status = 'WITHDRAWN', result_reason = :reason, "
+                        + "result_by = :by, result_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP, "
+                        + "version = version + 1 WHERE id = :id AND final_score IS NULL",
+                params().addValue("id", id).addValue("reason", cleanReason).addValue("by", subject(actor)));
+        audit.record(subject(actor), null, "THESIS_TOPIC_WITHDRAWN", "THESIS_TOPIC", id.toString(),
+                "Topic withdrawn from the round; reason: " + cleanReason,
+                Map.of("result_status", topic.get("result_status") == null ? "" : topic.get("result_status").toString()),
+                Map.of("result_status", "WITHDRAWN", "result_reason", cleanReason));
+        return TopicResponse.from(topics.findById(id).orElseThrow(
+                () -> notFound("TOPIC_NOT_FOUND", "Thesis topic not found")));
+    }
+
+    /**
+     * Reverses a withdrawal while the topic is still ungraded: the outcome
+     * reverts to the counter-review's derived state (REVIEW_FAILED when a
+     * below-threshold score still stands and no waiver applies, otherwise no
+     * outcome) and the topic joins the completeness requirement again.
+     */
+    @Transactional
+    public TopicResponse reinstateTopic(UUID id, String reason, Jwt actor) {
+        requireGovernanceRole(actor);
+        String cleanReason = requireReason(reason);
+        requireMutableTopicRound(id);
+        lockTopicForGovernance(id);
+        ThesisDeanScope.requireTopicGovernanceScope(jdbc, actor, id);
+        Map<String, Object> topic = one(
+                "SELECT status, final_score, result_status, gvpb_waived_reason, title "
+                        + "FROM thesis.thesis_topic WHERE id = :id",
+                params().addValue("id", id), "TOPIC_NOT_FOUND", "Thesis topic not found");
+        if (topic.get("final_score") != null) {
+            throw conflict("SCORE_ALREADY_FINALIZED", "A finalized topic cannot change outcome");
+        }
+        if (!"WITHDRAWN".equals(topic.get("result_status"))) {
+            throw conflict("TOPIC_NOT_WITHDRAWN", "Only a withdrawn topic can be reinstated");
+        }
+        // Derived rule mirrors ThesisCouncilService.syncReviewOutcome through
+        // the shared ThesisReviewOutcome helper: a live sub-threshold
+        // counter-review without a waiver marks the topic again.
+        boolean failed = topic.get("gvpb_waived_reason") == null
+                && ThesisReviewOutcome.isFailingScore(ThesisReviewOutcome.latestGvpbScore(jdbc, id));
+        jdbc.update(
+                "UPDATE thesis.thesis_topic SET result_status = :outcome, "
+                        + "result_reason = CASE WHEN :outcome = 'REVIEW_FAILED' THEN 'Counter-review score below the 5.0 pass threshold' ELSE NULL END, "
+                        + "result_by = CASE WHEN :outcome = 'REVIEW_FAILED' THEN :by ELSE NULL END, "
+                        + "result_at = CASE WHEN :outcome = 'REVIEW_FAILED' THEN CURRENT_TIMESTAMP ELSE NULL END, "
+                        + "updated_at = CURRENT_TIMESTAMP, version = version + 1 "
+                        + "WHERE id = :id AND final_score IS NULL AND result_status = 'WITHDRAWN'",
+                params().addValue("id", id)
+                        .addValue("outcome", failed ? "REVIEW_FAILED" : null)
+                        .addValue("by", subject(actor)));
+        audit.record(subject(actor), null, "THESIS_TOPIC_REINSTATED", "THESIS_TOPIC", id.toString(),
+                "Topic reinstated into the round; reason: " + cleanReason,
+                Map.of("result_status", "WITHDRAWN"),
+                Map.of("result_status", failed ? "REVIEW_FAILED" : ""));
+        return TopicResponse.from(topics.findById(id).orElseThrow(
+                () -> notFound("TOPIC_NOT_FOUND", "Thesis topic not found")));
+    }
+
+    /**
+     * Governance-only escape hatch for a missed lecturer window: a topic whose
+     * supervisor could not submit in time is created directly in PUBLISHED
+     * state while students can still register, never by extending a window the
+     * PROPOSAL_OPEN gate no longer consults. The normal topic validation —
+     * text fields, department, group limit, an active supervisor, dean faculty
+     * scope — still applies, and the reason is audited.
+     */
+    @Transactional
+    public TopicResponse createLateTopic(UUID roundId, LateTopicRequest request, Jwt actor) {
+        requireGovernanceRole(actor);
+        String cleanReason = requireReason(request == null ? null : request.reason());
+        requireText(request == null ? null : request.departmentId(), "departmentId");
+        requireText(request == null ? null : request.title(), "title", 240);
+        requireText(request == null ? null : request.description(), "description");
+        requireText(request.supervisorId(), "supervisorId", 120);
+        String supervisorId = request.supervisorId().trim();
+        int maxGroups = request.maxGroups() == null ? 1 : request.maxGroups();
+        if (maxGroups < 1 || maxGroups > 20) {
+            throw invalid("maxGroups must be between 1 and 20");
+        }
+        // Students must still be able to pick the topic up: once registration
+        // closed a late topic would strand it with no group.
+        requireRoundStatusAny(roundId, RoundStatus.PROPOSALS_PUBLISHED, RoundStatus.REGISTRATION_OPEN);
+        String departmentId = request.departmentId().trim();
+        requireTopicDepartmentScope(actor, departmentId);
+        // The named supervisor must be a real active lecturer — the supervisor
+        // row key joins the Lecturer directory, so storing an unresolvable id
+        // would break supervision the way a legacy User.id did.
+        Integer active = jdbc.queryForObject(
+                "SELECT COUNT(*) FROM campuscore_auth.\"Lecturer\" WHERE \"id\" = :key AND \"isActive\" = TRUE",
+                params().addValue("key", supervisorId), Integer.class);
+        if (active == null || active == 0) {
+            throw invalid("Unknown or inactive supervisor: " + supervisorId);
+        }
+        // Created via the DRAFT path like every topic, then promoted to
+        // PUBLISHED in the same transaction — the escape hatch never exposes
+        // a draft the round already closed proposal submission for.
+        ThesisTopic topic = new ThesisTopic(
+                roundId, departmentId, request.title().trim(), request.description().trim(),
+                maxGroups, subject(actor));
+        topic.publish();
+        topics.saveAndFlush(topic);
+        UUID lateTopicId = topic.getId();
+        jdbc.update(
+                "INSERT INTO thesis.thesis_topic_supervisor (id, topic_id, lecturer_id, supervisor_order) VALUES (:id, :topicId, :lecturerId, 1)",
+                params().addValue("id", UUID.randomUUID()).addValue("topicId", topic.getId())
+                        .addValue("lecturerId", supervisorId));
+        audit.record(subject(actor), null, "THESIS_TOPIC_LATE_CREATED", "THESIS_TOPIC", topic.getId().toString(),
+                "Late topic created for supervisor " + supervisorId + "; reason: " + cleanReason,
+                Map.of("status", ""), Map.of("status", TopicStatus.PUBLISHED.name(), "supervisorId", supervisorId));
+        afterCommit(() -> {
+            if (notifier != null) {
+                notifier.notifySupervisorsAssigned(lateTopicId, List.of(supervisorId));
+            }
+        });
+        return topics.findById(lateTopicId).map(TopicResponse::from).orElseGet(() -> TopicResponse.from(topic));
+    }
+
+    /**
+     * Governance override that adds a student to a roster after the
+     * registration window closed: only while the round is REGISTRATION_CLOSED,
+     * only into a group whose topic has no scores of any kind, and always with
+     * the audited reason. A resulting roster below the minimum additionally
+     * requires the explicit size-exception flag and records it on the group —
+     * the V113 legacy exception cannot serve because its trigger freezes the
+     * whole group.
+     *
+     * <p>Action REMOVE drops a member under the same guards — the departed or
+     * deactivated student case. The member row is deleted, which frees the
+     * (round_id, student_id) seat: the student can immediately join another
+     * group in this round (the unique index only covers live rows) and in any
+     * later round. Removing the leader requires {@code successorStudentId}
+     * naming a remaining member so the one-leader invariant holds; emptying
+     * the group is refused — dissolving it stays on the existing cancel path.
+     */
+    @Transactional
+    public GroupResponse overrideGroupRoster(UUID groupId, RosterOverrideRequest request, Jwt actor) {
+        requireGovernanceRole(actor);
+        String cleanReason = requireReason(request == null ? null : request.reason());
+        requireText(request == null ? null : request.studentId(), "studentId", 120);
+        String studentId = request.studentId().trim();
+        String action = request.action() == null || request.action().isBlank()
+                ? "ADD" : request.action().trim().toUpperCase(java.util.Locale.ROOT);
+        if (!"ADD".equals(action) && !"REMOVE".equals(action)) {
+            throw invalid("action must be ADD or REMOVE");
+        }
+        // The group lock precedes the round lock to match the order every
+        // sibling group mutation uses (approve, update, assign, roster edits);
+        // the opposite order deadlocks under real Postgres row locks.
+        GroupRow group = lockGroup(groupId);
+        requireRoundStatus(group.roundId(), RoundStatus.REGISTRATION_CLOSED);
+        // Post-close roster writes are governance, not review: the dean must
+        // govern the faculty that owns the group (the topic's department or,
+        // for topicless groups, a member's curriculum). The dean-supervisor
+        // escape {@link #isGroupAdmin} keeps for ordinary review work would
+        // otherwise let a foreign dean rewrite an approved roster — including
+        // the size-exception marker the sibling waiver already reserves to
+        // the owning faculty.
+        if (!canGovernGroupScope(group, actor)) {
+            throw notFound("THESIS_GROUP_NOT_FOUND", "Thesis group not found");
+        }
+        Integer topicScores = jdbc.queryForObject(
+                "SELECT COUNT(*) FROM thesis.thesis_topic_score WHERE topic_id = :topicId",
+                params().addValue("topicId", group.topicId()), Integer.class);
+        if (topicScores != null && topicScores > 0) {
+            throw conflict("GROUP_SCORES_EXIST",
+                    "The roster cannot change once scoring has started for the group's topic");
+        }
+        if ("REMOVE".equals(action)) {
+            return removeOverriddenMember(group, request, actor, studentId, cleanReason);
+        }
+        // A cancelled group has no roster to override: ADD must refuse it the
+        // same way REMOVE already does instead of inserting a dead row.
+        requireActiveRoster(group);
+        int memberCount = count("SELECT COUNT(*) FROM thesis.thesis_group_member WHERE group_id = :groupId",
+                "groupId", groupId);
+        if (memberCount >= MAX_GROUP_MEMBERS) {
+            throw conflict("GROUP_FULL", "A thesis group can have at most " + MAX_GROUP_MEMBERS + " members");
+        }
+        Integer already = jdbc.queryForObject(
+                "SELECT COUNT(*) FROM thesis.thesis_group_member WHERE group_id = :groupId AND student_id = :studentId",
+                params().addValue("groupId", groupId).addValue("studentId", studentId), Integer.class);
+        if (already != null && already > 0) {
+            throw conflict("STUDENT_ALREADY_IN_GROUP", "The student is already a member of this group");
+        }
+        requireActiveStudent(studentId);
+        requireNotInAnotherActiveGroup(group.roundId(), studentId);
+        // The minimum only binds an APPROVED roster — the deferred membership
+        // validator enforces it there and accepts a documented marker. A
+        // pending roster has no minimum: growth toward it must always be
+        // possible without the exception flag.
+        boolean underSize = memberCount + 1 < MIN_GROUP_MEMBERS
+                && group.approvalStatus() == ApprovalStatus.APPROVED;
+        if (underSize && !Boolean.TRUE.equals(request.allowSizeException())) {
+            throw conflict("GROUP_SIZE_EXCEPTION_REQUIRED",
+                    "The roster stays below the minimum of " + MIN_GROUP_MEMBERS
+                            + "; pass allowSizeException to accept a documented exception");
+        }
+        jdbc.update("INSERT INTO thesis.thesis_group_member (id, group_id, round_id, student_id, member_order, is_leader) VALUES (:id, :groupId, :roundId, :studentId, :memberOrder, FALSE)",
+                params().addValue("id", UUID.randomUUID()).addValue("groupId", groupId)
+                        .addValue("roundId", group.roundId()).addValue("studentId", studentId)
+                        .addValue("memberOrder", nextMemberOrder(groupId)));
+        // The deferred membership validator only permits a size-exception
+        // marker on an APPROVED group — and underSize already implies one —
+        // so the marker is written exactly when the exception was required.
+        if (underSize) {
+            jdbc.update(
+                    "UPDATE thesis.thesis_group SET size_exception_reason = :reason, size_exception_by = :by, "
+                            + "size_exception_at = CURRENT_TIMESTAMP WHERE id = :groupId",
+                    params().addValue("groupId", groupId).addValue("reason", cleanReason).addValue("by", subject(actor)));
+        }
+        jdbc.update("UPDATE thesis.thesis_group SET updated_at = CURRENT_TIMESTAMP, version = version + 1 WHERE id = :groupId",
+                params().addValue("groupId", groupId));
+        audit.record(subject(actor), null, "THESIS_GROUP_ROSTER_OVERRIDE", "THESIS_GROUP", groupId.toString(),
+                "Member " + studentId + " added after registration closed; reason: " + cleanReason
+                        + (underSize ? "; below-minimum size exception accepted" : ""),
+                Map.of("memberCount", memberCount),
+                Map.of("memberCount", memberCount + 1, "sizeException", underSize));
+        afterCommit(() -> {
+            if (notifier != null) {
+                notifier.notifyGroupRosterChanged(groupId);
+            }
+        });
+        return groups.findById(groupId);
+    }
+
+    /**
+     * The REMOVE branch of the roster override. Shares the entry method's
+     * governance role, reason, REGISTRATION_CLOSED round state, dean scope and
+     * no-scores guards; the member row is already inside the round -> group ->
+     * student lock order because the FOR UPDATE read happens after the group
+     * lock.
+     */
+    private GroupResponse removeOverriddenMember(GroupRow group, RosterOverrideRequest request,
+            Jwt actor, String studentId, String cleanReason) {
+        requireActiveRoster(group);
+        Map<String, Object> member = one(
+                "SELECT id, is_leader FROM thesis.thesis_group_member "
+                        + "WHERE group_id = :groupId AND student_id = :studentId FOR UPDATE",
+                params().addValue("groupId", group.id()).addValue("studentId", studentId),
+                "STUDENT_NOT_IN_GROUP", "The student is not a member of this group");
+        int memberCount = count("SELECT COUNT(*) FROM thesis.thesis_group_member WHERE group_id = :groupId",
+                "groupId", group.id());
+        int remaining = memberCount - 1;
+        if (remaining == 0) {
+            throw conflict("GROUP_EMPTY",
+                    "The group cannot be left with no members; cancel the group instead");
+        }
+        String successorId = null;
+        if (Boolean.TRUE.equals(member.get("is_leader"))) {
+            successorId = request.successorStudentId() == null ? null : request.successorStudentId().trim();
+            if (successorId == null || successorId.isEmpty() || successorId.equals(studentId)) {
+                throw conflict("LEADER_SUCCESSOR_REQUIRED",
+                        "Removing the leader requires successorStudentId naming a remaining member");
+            }
+            one("SELECT id FROM thesis.thesis_group_member "
+                            + "WHERE group_id = :groupId AND student_id = :studentId FOR UPDATE",
+                    params().addValue("groupId", group.id()).addValue("studentId", successorId),
+                    "STUDENT_NOT_IN_GROUP", "The successor is not a member of this group");
+        }
+        // The minimum only binds an APPROVED roster — the same rule the ADD
+        // branch applies. A non-approved group can drop under it freely, so
+        // the exception flag has nothing to waive and must not be demanded.
+        boolean belowMinimum = remaining < MIN_GROUP_MEMBERS;
+        boolean sizeException = belowMinimum && group.approvalStatus() == ApprovalStatus.APPROVED;
+        if (sizeException && !Boolean.TRUE.equals(request.allowSizeException())) {
+            throw conflict("GROUP_SIZE_EXCEPTION_REQUIRED",
+                    "The roster stays below the minimum of " + MIN_GROUP_MEMBERS
+                            + "; pass allowSizeException to accept a documented exception");
+        }
+        jdbc.update("DELETE FROM thesis.thesis_group_member WHERE group_id = :groupId AND student_id = :studentId",
+                params().addValue("groupId", group.id()).addValue("studentId", studentId));
+        if (successorId != null) {
+            jdbc.update("UPDATE thesis.thesis_group_member SET is_leader = TRUE "
+                            + "WHERE group_id = :groupId AND student_id = :studentId",
+                    params().addValue("groupId", group.id()).addValue("studentId", successorId));
+            jdbc.update("UPDATE thesis.thesis_group SET leader_student_id = :successor WHERE id = :groupId",
+                    params().addValue("groupId", group.id()).addValue("successor", successorId));
+        }
+        // The deferred membership validator accepts a 1-2 member approved
+        // roster only while size_exception_reason is set; a non-approved group
+        // has no minimum, so the marker is written for approved groups only.
+        if (sizeException) {
+            jdbc.update(
+                    "UPDATE thesis.thesis_group SET size_exception_reason = :reason, size_exception_by = :by, "
+                            + "size_exception_at = CURRENT_TIMESTAMP WHERE id = :groupId",
+                    params().addValue("groupId", group.id()).addValue("reason", cleanReason)
+                            .addValue("by", subject(actor)));
+        }
+        jdbc.update("UPDATE thesis.thesis_group SET updated_at = CURRENT_TIMESTAMP, version = version + 1 WHERE id = :groupId",
+                params().addValue("groupId", group.id()));
+        audit.record(subject(actor), null, "THESIS_GROUP_ROSTER_OVERRIDE", "THESIS_GROUP", group.id().toString(),
+                "Member " + studentId + " removed after registration closed; reason: " + cleanReason
+                        + (successorId != null ? "; leadership passed to " + successorId : "")
+                        + (belowMinimum ? (sizeException
+                                ? "; below-minimum size exception accepted" : "; below-minimum roster") : ""),
+                Map.of("memberCount", memberCount),
+                Map.of("memberCount", remaining, "sizeException", sizeException));
+        afterCommit(() -> {
+            if (notifier != null) {
+                notifier.notifyGroupMemberRemoved(group.id(), studentId);
+            }
+        });
+        return groups.findById(group.id());
+    }
+
+    /**
+     * Re-points an approved group whose topic governance withdrew after the
+     * registration window closed. Every ordinary path refuses that group —
+     * assignTopic needs REGISTRATION_OPEN, rejectGroup needs a PENDING row,
+     * and member edits are frozen — so without this hatch the roster is
+     * excluded from publication with no way back to a live topic. Approval is
+     * kept: it covered the roster, the rebind itself is the audited act, and
+     * post-close no path could re-approve a demoted group.
+     */
+    @Transactional
+    public GroupResponse reassignOrphanedTopic(UUID groupId, TopicReassignRequest request, Jwt actor) {
+        requireGovernanceRole(actor);
+        String cleanReason = requireReason(request == null ? null : request.reason());
+        if (request == null || request.topicId() == null) {
+            throw invalid("topicId is required");
+        }
+        UUID newTopicId = request.topicId();
+        // The group lock precedes the round lock to match the order every
+        // sibling group mutation uses; the topic rows it binds come last.
+        GroupRow group = lockGroup(groupId);
+        requireRoundStatus(group.roundId(), RoundStatus.REGISTRATION_CLOSED);
+        requireActiveRoster(group);
+        UUID oldTopicId = group.topicId();
+        if (oldTopicId == null) {
+            throw conflict("GROUP_TOPIC_NOT_ORPHANED", "The group has no topic to re-point away from");
+        }
+        if (oldTopicId.equals(newTopicId)) {
+            throw invalid("topicId must differ from the group's current topic");
+        }
+        Map<String, Object> oldTopic = one(
+                "SELECT result_status, final_score FROM thesis.thesis_topic WHERE id = :id FOR UPDATE",
+                params().addValue("id", oldTopicId), "TOPIC_NOT_FOUND", "Thesis topic not found");
+        // The hatch exists only for a governance-orphaned group: a WITHDRAWN
+        // outcome removed its topic from the round. A live or review-failed
+        // binding is a different question (the group chose that topic).
+        if (!ThesisReviewOutcome.WITHDRAWN.equals(oldTopic.get("result_status"))) {
+            throw conflict("GROUP_TOPIC_NOT_ORPHANED",
+                    "Only a group whose topic was withdrawn can be re-pointed");
+        }
+        Map<String, Object> newTopic = one(
+                "SELECT round_id, status, max_groups, result_status, final_score FROM thesis.thesis_topic "
+                        + "WHERE id = :id FOR UPDATE",
+                params().addValue("id", newTopicId), "TOPIC_NOT_FOUND", "Thesis topic not found");
+        // Re-pointing is post-close governance, not supervision: a dean may
+        // only re-point between topics inside their own faculty — supervising
+        // either end from another faculty confers no write. Foreign topics
+        // conceal as not-found on either end.
+        if (!ThesisDeanScope.isGlobalAdmin(actor)) {
+            ThesisDeanScope.requireTopicGovernanceScope(jdbc, actor, oldTopicId);
+            ThesisDeanScope.requireTopicGovernanceScope(jdbc, actor, newTopicId);
+        }
+        // Any score on either side freezes the binding: re-pointing a scored
+        // pair would silently move a verdict the group never earned.
+        Integer scores = jdbc.queryForObject(
+                "SELECT COUNT(*) FROM thesis.thesis_topic_score WHERE topic_id IN (:oldId, :newId)",
+                params().addValue("oldId", oldTopicId).addValue("newId", newTopicId), Integer.class);
+        if (scores != null && scores > 0) {
+            throw conflict("GROUP_SCORES_EXIST",
+                    "The binding cannot change once scoring has started on either topic");
+        }
+        if (oldTopic.get("final_score") != null || newTopic.get("final_score") != null) {
+            throw conflict("GROUP_SCORES_EXIST", "A finalized topic binding cannot be re-pointed");
+        }
+        if (!group.roundId().equals(newTopic.get("round_id"))) {
+            throw conflict("TOPIC_ROUND_MISMATCH", "Topic belongs to another registration round");
+        }
+        if (!TopicStatus.PUBLISHED.name().equals(newTopic.get("status"))
+                || newTopic.get("result_status") != null) {
+            throw conflict("TOPIC_NOT_PUBLISHED",
+                    "Only a published, outcome-free topic can take an orphaned group");
+        }
+        int maxGroups = ((Number) newTopic.get("max_groups")).intValue();
+        if (count("SELECT COUNT(*) FROM thesis.thesis_group WHERE topic_id = :topicId "
+                + "AND status <> 'CANCELLED' AND approval_status <> 'REJECTED'", "topicId", newTopicId) >= maxGroups) {
+            throw conflict("TOPIC_FULL", "This topic has reached its group limit");
+        }
+        jdbc.update("UPDATE thesis.thesis_group SET topic_id = :topicId, updated_at = CURRENT_TIMESTAMP, "
+                        + "version = version + 1 WHERE id = :groupId",
+                params().addValue("topicId", newTopicId).addValue("groupId", groupId));
+        audit.record(subject(actor), null, "THESIS_GROUP_TOPIC_REASSIGNED", "THESIS_GROUP", groupId.toString(),
+                "Orphaned group re-pointed to a live topic; reason: " + cleanReason,
+                Map.of("topicId", oldTopicId.toString()),
+                Map.of("topicId", newTopicId.toString()));
+        afterCommit(() -> {
+            if (notifier != null) {
+                notifier.notifyTopicAssigned(groupId, newTopicId);
+            }
+        });
+        return groups.findById(groupId);
+    }
+
+    /**
+     * Retracts a prematurely published result set: allowed only inside the
+     * configured grace period after publication, requires a reason plus the
+     * typed confirmation "RETRACT", never touches scores, recalls the
+     * "results published" inbox notices, notifies the affected students that
+     * publication was corrected, and returns the round to REGISTRATION_CLOSED
+     * so the normal preview + publish path can republish.
+     */
+    @Transactional
+    public RoundResponse retractResults(UUID id, RetractPublicationRequest request, Jwt actor) {
+        if (!ThesisDeanScope.isGlobalAdmin(actor)) {
+            throw new DomainException(HttpStatus.FORBIDDEN, "RETRACT_ADMIN_REQUIRED",
+                    "Only a global admin can retract published results");
+        }
+        String cleanReason = requireReason(request == null ? null : request.reason());
+        if (!"RETRACT".equals(request == null ? null : request.confirmation())) {
+            throw invalid("confirmation must be the literal RETRACT");
+        }
+        Map<String, Object> round = one(
+                "SELECT status, results_published_at FROM thesis.thesis_registration_round WHERE id = :id FOR UPDATE",
+                params().addValue("id", id), "ROUND_NOT_FOUND", "Thesis registration round not found");
+        if (!RoundStatus.RESULTS_PUBLISHED.name().equals(round.get("status"))) {
+            throw conflict("ROUND_STATE_CONFLICT", "Only a published round can be retracted");
+        }
+        Instant publishedAt = instantOf(round.get("results_published_at"));
+        if (publishedAt == null || Instant.now().isAfter(publishedAt.plus(java.time.Duration.ofDays(retractGraceDays)))) {
+            throw conflict("RETRACT_WINDOW_CLOSED",
+                    "The " + retractGraceDays + "-day retraction grace period has passed; "
+                            + "later corrections need the per-topic appeal path");
+        }
+        int moved = jdbc.update(
+                "UPDATE thesis.thesis_registration_round SET status = 'REGISTRATION_CLOSED', "
+                        + "results_published_at = NULL, updated_at = CURRENT_TIMESTAMP, version = version + 1 "
+                        + "WHERE id = :id AND status = 'RESULTS_PUBLISHED'",
+                params().addValue("id", id));
+        if (moved != 1) {
+            throw conflict("ROUND_STATE_CONFLICT", "Only a published round can be retracted");
+        }
+        // Inbox rows are recalled; e-mails already delivered cannot be —
+        // the audit record states that limitation explicitly.
+        audit.record(subject(actor), null, "THESIS_RESULTS_RETRACTED", "THESIS_ROUND", id.toString(),
+                "Published results retracted; reason: " + cleanReason
+                        + "; typed confirmation accepted; e-mail notifications already sent cannot be recalled",
+                Map.of("status", RoundStatus.RESULTS_PUBLISHED.name()),
+                Map.of("status", RoundStatus.REGISTRATION_CLOSED.name()));
+        afterCommit(() -> {
+            if (notifier != null) {
+                // The retraction already committed: a recall/notify failure
+                // here must not surface as a 500 — log it, mark the audit
+                // trail, and let the retract stand.
+                try {
+                    notifier.recallResultsPublished(id);
+                    notifier.notifyResultsRetracted(id);
+                } catch (RuntimeException exception) {
+                    log.warn("Thesis results retracted for round {} but the inbox recall/notice failed", id, exception);
+                    try {
+                        audit.record(subject(actor), null, "THESIS_RESULTS_RETRACT_NOTIFY_FAILED", "THESIS_ROUND",
+                                id.toString(),
+                                "Results were retracted but the inbox recall/notice failed post-commit");
+                    } catch (RuntimeException auditFailure) {
+                        log.warn("Audit write for the failed retract notice also failed for round {}", id, auditFailure);
+                    }
+                }
+            }
+        });
+        return roundReads.get(id);
+    }
+
+    private void requireGovernanceRole(Jwt actor) {
+        if (!isAdmin(actor)) {
+            throw new DomainException(HttpStatus.FORBIDDEN, "GOVERNANCE_ROLE_REQUIRED",
+                    "This action requires an admin or faculty head role");
+        }
+    }
+
+    private void requireMutableTopicRound(UUID topicId) {
+        UUID roundId = (UUID) one("SELECT round_id FROM thesis.thesis_topic WHERE id = :id",
+                params().addValue("id", topicId), "TOPIC_NOT_FOUND", "Thesis topic not found").get("round_id");
+        requireMutableRound(roundId);
+    }
+
+    private static String requireReason(String value) {
+        String reason = value == null ? "" : value.trim();
+        if (reason.isBlank() || reason.length() > 500) {
+            throw invalid("reason is required and must contain at most 500 characters");
+        }
+        return reason;
+    }
+
+    /**
      * The stored registration window is normative for every registration
      * mutation ({@link #requireRoundStatus}) and for the student registration
      * CTA, so the transition into REGISTRATION_OPEN must not be able to create a
@@ -523,11 +1383,16 @@ public class ThesisMutationService {
      */
     @Transactional
     public RoundResponse publishResults(UUID id) {
-        return publishResults(id, null);
+        return publishResults(id, null, null);
     }
 
     @Transactional
     public RoundResponse publishResults(UUID id, Jwt actor) {
+        return publishResults(id, null, actor);
+    }
+
+    @Transactional
+    public RoundResponse publishResults(UUID id, Boolean confirmAllExcluded, Jwt actor) {
         roundReadPort.requireExisting(id);
         // Lock the round row so a concurrent approveGroup cannot commit between
         // the completeness check below and the guarded status transition.
@@ -537,16 +1402,59 @@ public class ThesisMutationService {
         Integer approved = jdbc.queryForObject(
                 "SELECT COUNT(*) FROM thesis.thesis_group WHERE round_id = :id AND approval_status = 'APPROVED'",
                 params().addValue("id", id), Integer.class);
-        Integer graded = jdbc.queryForObject(
+        // A sub-threshold counter-review is provisional while its window stays
+        // open — the reviewer can still overwrite it — so it neither excludes
+        // the topic nor may the round publish past it. Listed by id so the
+        // operator can re-review, withdraw, or wait for the deadline.
+        List<String> openReview = jdbc.queryForList(
+                "SELECT CAST(t.id AS VARCHAR) || ' ' || t.title FROM thesis.thesis_topic t "
+                        + "JOIN thesis.thesis_registration_round r ON r.id = t.round_id "
+                        + "WHERE t.round_id = :id AND t.result_status = 'REVIEW_FAILED' "
+                        + "AND (r.gvpb_deadline IS NULL OR r.gvpb_deadline > CURRENT_TIMESTAMP) "
+                        + "ORDER BY t.id",
+                params().addValue("id", id), String.class);
+        if (!openReview.isEmpty()) {
+            throw conflict("REVIEW_WINDOW_OPEN",
+                    "The counter-review window is still open for " + openReview.size()
+                            + " topic(s): " + String.join(", ", openReview));
+        }
+        // Only definitive exclusions release the completeness check: WITHDRAWN
+        // always does, REVIEW_FAILED does once its window has closed.
+        String excludedCond = "(t.result_status = 'WITHDRAWN' OR (t.result_status = 'REVIEW_FAILED' "
+                + "AND r.gvpb_deadline IS NOT NULL AND r.gvpb_deadline <= CURRENT_TIMESTAMP))";
+        // NOT <cond> is NULL (never true) for a NULL result_status, so the
+        // included predicate must handle the no-outcome row explicitly.
+        String includedCond = "(t.result_status IS NULL OR NOT " + excludedCond + ")";
+        Integer included = jdbc.queryForObject(
                 "SELECT COUNT(*) FROM thesis.thesis_group g JOIN thesis.thesis_topic t ON t.id = g.topic_id "
-                        + "WHERE g.round_id = :id AND g.approval_status = 'APPROVED' AND t.final_score IS NOT NULL",
+                        + "JOIN thesis.thesis_registration_round r ON r.id = t.round_id "
+                        + "WHERE g.round_id = :id AND g.approval_status = 'APPROVED' "
+                        + "AND " + includedCond,
                 params().addValue("id", id), Integer.class);
-        if (graded == null || graded == 0) {
+        Integer ungraded = jdbc.queryForObject(
+                "SELECT COUNT(*) FROM thesis.thesis_group g JOIN thesis.thesis_topic t ON t.id = g.topic_id "
+                        + "JOIN thesis.thesis_registration_round r ON r.id = t.round_id "
+                        + "WHERE g.round_id = :id AND g.approval_status = 'APPROVED' "
+                        + "AND t.final_score IS NULL AND " + includedCond,
+                params().addValue("id", id), Integer.class);
+        if (approved == null || approved == 0) {
+            throw conflict("RESULTS_NOT_READY", "No approved group exists; there is nothing to publish");
+        }
+        // Publishing a result set where every approved group is excluded must
+        // be a deliberate act: the operator confirms in the request and the
+        // audit names the confirmation.
+        if ((included == null || included == 0) && !Boolean.TRUE.equals(confirmAllExcluded)) {
+            throw conflict("RESULTS_ALL_EXCLUDED",
+                    "Every approved group's topic is excluded from publication; "
+                            + "pass confirmAllExcluded to publish anyway");
+        }
+        if (included != null && included > 0 && ungraded != null && ungraded.equals(included)) {
             throw conflict("RESULTS_NOT_READY", "No topic has been graded yet; the chair must finalize scores first");
         }
-        if (approved == null || graded < approved) {
+        if (ungraded != null && ungraded > 0) {
             throw conflict("SCORES_INCOMPLETE",
-                    "Every approved group must have a finalized score before results are published");
+                    "Every approved group must have a finalized score before results are published "
+                            + "(" + ungraded + " group(s) still ungraded)");
         }
         // A group left PENDING at publication is permanently wedged — approval
         // requires a non-terminal round — so force the governance team to
@@ -558,7 +1466,24 @@ public class ThesisMutationService {
             throw conflict("GROUPS_PENDING_APPROVAL",
                     "There are still " + pending + " group(s) awaiting approval; approve or reject them before publishing results");
         }
+        // The publication audit names its exclusions so a later reader can see
+        // which topics were left out of the completeness check and why.
+        List<String> excluded = jdbc.queryForList(
+                "SELECT CAST(t.id AS VARCHAR) || ' ' || t.result_status FROM thesis.thesis_topic t "
+                        + "WHERE t.round_id = :id AND t.result_status IN ('REVIEW_FAILED', 'WITHDRAWN') ORDER BY t.id",
+                params().addValue("id", id), String.class);
         RoundResponse response = transitionRound(id, RoundStatus.REGISTRATION_CLOSED, RoundStatus.RESULTS_PUBLISHED, actor);
+        jdbc.update(
+                "UPDATE thesis.thesis_registration_round SET results_published_at = CURRENT_TIMESTAMP WHERE id = :id",
+                params().addValue("id", id));
+        if (!excluded.isEmpty()) {
+            String confirmation = (included == null || included == 0)
+                    ? " (operator confirmed an all-excluded publication via confirmAllExcluded)" : "";
+            audit.record(subject(actor), null, "THESIS_RESULTS_PUBLISHED_WITH_EXCLUSIONS", "THESIS_ROUND",
+                    id.toString(),
+                    "Results published excluding " + excluded.size() + " topic(s): " + String.join(", ", excluded)
+                            + confirmation);
+        }
         if (notifier != null) {
             if (TransactionSynchronizationManager.isSynchronizationActive()) {
                 TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
@@ -1002,13 +1927,18 @@ public class ThesisMutationService {
             // first so the downgrade leaves a review trail.
             throw conflict("GROUP_STATE_CONFLICT", "An approved group cannot change its topic");
         }
-        Map<String, Object> topic = one("SELECT id, round_id, status, max_groups, department_id, final_score FROM thesis.thesis_topic WHERE id = :id FOR UPDATE", params().addValue("id", topicId), "TOPIC_NOT_FOUND", "Thesis topic not found");
+        Map<String, Object> topic = one("SELECT id, round_id, status, max_groups, department_id, final_score, result_status FROM thesis.thesis_topic WHERE id = :id FOR UPDATE", params().addValue("id", topicId), "TOPIC_NOT_FOUND", "Thesis topic not found");
         ThesisDeanScope.requireTopicAccess(jdbc, actor, topicId);
         if (!group.roundId().equals(topic.get("round_id"))) {
             throw conflict("TOPIC_ROUND_MISMATCH", "Topic belongs to another registration round");
         }
         if (!TopicStatus.PUBLISHED.name().equals(topic.get("status")) && !TopicStatus.APPROVED.name().equals(topic.get("status"))) {
             throw conflict("TOPIC_NOT_PUBLISHED", "Only published topics can be selected");
+        }
+        // A withdrawn topic is excluded from the round by governance; binding
+        // another group to it would resurrect a dead pick.
+        if (ThesisReviewOutcome.WITHDRAWN.equals(topic.get("result_status"))) {
+            throw conflict("TOPIC_WITHDRAWN", "This topic has been withdrawn from the round");
         }
         // A finalized topic must not absorb a new group: the publication gate
         // counts every approved group under it as graded, so a late assignee
@@ -1067,6 +1997,18 @@ public class ThesisMutationService {
         if (!isProgressStatus(status)) {
             throw invalid("Progress accepts only DRAFT, SUBMITTED, COMPLETED or CANCELLED");
         }
+        // Every lifecycle write a dean-role actor performs is governance on
+        // the group's faculty, not review: DRAFT and SUBMITTED move the
+        // roster the leader owns exactly like CANCELLED and COMPLETED do, so
+        // the supervisor escape in isGroupAdmin must not reach them. Only
+        // the group's own leader, the owning faculty head and a global
+        // admin drive these transitions — a dean who merely supervises the
+        // topic keeps the review verbs, never the lifecycle.
+        if (hasRole(actor, "TRUONG_KHOA")
+                && !group.leaderStudentId().equals(studentId(actor))
+                && !canGovernGroupScope(group, actor)) {
+            throw notFound("THESIS_GROUP_NOT_FOUND", "Thesis group not found");
+        }
         if (group.status() == GroupStatus.CANCELLED && status != GroupStatus.CANCELLED) {
             throw conflict("GROUP_STATE_CONFLICT", "A cancelled group is historical and cannot reopen");
         }
@@ -1115,6 +2057,11 @@ public class ThesisMutationService {
      */
     @Transactional
     public GroupResponse approveGroup(UUID groupId, Jwt actor) {
+        return approveGroup(groupId, null, actor);
+    }
+
+    @Transactional
+    public GroupResponse approveGroup(UUID groupId, GroupApprovalRequest request, Jwt actor) {
         GroupRow group = lockGroup(groupId);
         authorizeReviewer(group, actor);
         // The round row is locked so an approval cannot slip between
@@ -1132,24 +2079,39 @@ public class ThesisMutationService {
         if (group.status() != GroupStatus.SUBMITTED || group.topicId() == null) {
             throw conflict("GROUP_APPROVAL_STATE_CONFLICT", "Only a submitted group with a topic can be approved");
         }
+        // A withdrawn topic is excluded from the round by governance; a group
+        // still bound to it is orphaned and must be re-pointed, not approved.
+        Map<String, Object> boundTopic = one(
+                "SELECT final_score, result_status FROM thesis.thesis_topic WHERE id = :id",
+                params().addValue("id", group.topicId()), "TOPIC_NOT_FOUND", "Thesis topic not found");
+        if (ThesisReviewOutcome.WITHDRAWN.equals(boundTopic.get("result_status"))) {
+            throw conflict("TOPIC_WITHDRAWN", "This topic has been withdrawn from the round");
+        }
         // Approving a group under a topic whose defense score is already
         // finalized lets that group inherit a grade it never defended for —
         // the same wedge assignTopic blocks upstream.
-        Object finalizedScore = one(
-                "SELECT final_score FROM thesis.thesis_topic WHERE id = :id",
-                params().addValue("id", group.topicId()), "TOPIC_NOT_FOUND", "Thesis topic not found")
-                .get("final_score");
-        if (finalizedScore != null) {
+        if (boundTopic.get("final_score") != null) {
             throw conflict("TOPIC_ALREADY_GRADED",
                     "This topic's defense score is finalized; new groups can no longer be approved for it");
         }
         Integer memberCount = count("SELECT COUNT(*) FROM thesis.thesis_group_member WHERE group_id = :groupId", "groupId", groupId);
+        String sizeExceptionReason = null;
         if (memberCount == null || memberCount < MIN_GROUP_MEMBERS) {
             int present = memberCount == null ? 0 : memberCount;
-            throw conflict("GROUP_TOO_SMALL", "A thesis group needs " + MIN_GROUP_MEMBERS + " to " + MAX_GROUP_MEMBERS
-                    + " members before it can be approved; this group has " + present + " ("
-                    + (MIN_GROUP_MEMBERS - present) + " short of the minimum of " + MIN_GROUP_MEMBERS
-                    + ", invite more classmates first)");
+            if (request == null || !Boolean.TRUE.equals(request.allowSizeException())) {
+                throw conflict("GROUP_TOO_SMALL", "A thesis group needs " + MIN_GROUP_MEMBERS + " to " + MAX_GROUP_MEMBERS
+                        + " members before it can be approved; this group has " + present + " ("
+                        + (MIN_GROUP_MEMBERS - present) + " short of the minimum of " + MIN_GROUP_MEMBERS
+                        + ", invite more classmates first)");
+            }
+            // The waiver is governance-only: a topic supervisor reviews normal
+            // rosters but cannot approve under the faculty minimum — and a
+            // dean supervising from another faculty is still only a reviewer.
+            if (!canGovernGroupScope(group, actor)) {
+                throw new DomainException(HttpStatus.FORBIDDEN, "GOVERNANCE_ROLE_REQUIRED",
+                        "An under-size approval requires an admin or faculty head role");
+            }
+            sizeExceptionReason = requireReason(request.reason());
         }
         if (memberCount > MAX_GROUP_MEMBERS) {
             throw conflict("GROUP_TOO_LARGE", "A thesis group can have " + MIN_GROUP_MEMBERS + " to "
@@ -1166,14 +2128,25 @@ public class ThesisMutationService {
         if (leaderCount == null || leaderCount != 1 || matchingLeader == null || matchingLeader != 1) {
             throw conflict("GROUP_LEADER_INVALID", "A thesis group must have exactly one matching leader");
         }
-        int changed = jdbc.update("UPDATE thesis.thesis_group SET approval_status='APPROVED', approved_by=:actor, approved_at=CURRENT_TIMESTAMP, rejection_reason=NULL, updated_at=CURRENT_TIMESTAMP, version=version+1 WHERE id=:id AND approval_status='PENDING'",
-                params().addValue("id", groupId).addValue("actor", subject(actor)));
+        int changed;
+        if (sizeExceptionReason == null) {
+            changed = jdbc.update("UPDATE thesis.thesis_group SET approval_status='APPROVED', approved_by=:actor, approved_at=CURRENT_TIMESTAMP, rejection_reason=NULL, updated_at=CURRENT_TIMESTAMP, version=version+1 WHERE id=:id AND approval_status='PENDING'",
+                    params().addValue("id", groupId).addValue("actor", subject(actor)));
+        } else {
+            // The marker lands in the same statement as the approval so the
+            // deferred membership validator sees both at commit — an
+            // under-size APPROVED roster is only legal while it carries one.
+            changed = jdbc.update("UPDATE thesis.thesis_group SET approval_status='APPROVED', approved_by=:actor, approved_at=CURRENT_TIMESTAMP, rejection_reason=NULL, size_exception_reason=:sizeReason, size_exception_by=:actor, size_exception_at=CURRENT_TIMESTAMP, updated_at=CURRENT_TIMESTAMP, version=version+1 WHERE id=:id AND approval_status='PENDING'",
+                    params().addValue("id", groupId).addValue("actor", subject(actor))
+                            .addValue("sizeReason", sizeExceptionReason));
+        }
         if (changed != 1) throw conflict("GROUP_APPROVAL_STATE_CONFLICT", "Only pending groups can be approved");
         // Symmetric with THESIS_GROUP_REJECTED below: an approval decides who
         // proceeds to the defense phase, so the approving actor must be
         // traceable even though approved_by already stores them on the row.
         audit.record(subject(actor), null, "THESIS_GROUP_APPROVED", "THESIS_GROUP", groupId.toString(),
-                "Thesis group approved");
+                "Thesis group approved" + (sizeExceptionReason == null
+                        ? "" : "; below-minimum size exception: " + sizeExceptionReason));
         if (notifier != null) {
             afterCommit(() -> {
                 try {
@@ -1383,7 +2356,26 @@ public class ThesisMutationService {
         throw new DomainException(HttpStatus.FORBIDDEN, "GROUP_REVIEWER_REQUIRED", "Only an assigned supervisor or admin can review this group");
     }
 
-    /** Group governance is faculty-bound; round/topic lifecycle authority is separate. */
+    /**
+     * Post-close group governance is narrower than {@link #isGroupAdmin}: the
+     * dean-supervisor branch there lets a dean review the groups they
+     * personally supervise, but writing post-close roster state — the
+     * override or the under-minimum waiver — requires the faculty that owns
+     * the group. Supervising its topic from another faculty is still only
+     * review.
+     */
+    private boolean canGovernGroupScope(GroupRow group, Jwt actor) {
+        if (isGlobalAdmin(actor)) return true;
+        if (!hasRole(actor, "TRUONG_KHOA")) return false;
+        return groups.groupInFaculty(group.id(), requireDeanScope(actor).facultyId());
+    }
+
+    /**
+     * Ordinary group authority is faculty-bound OR supervisor-bound: a dean
+     * who supervises the group's topic keeps review/member-management rights
+     * across faculties. Post-close writes use {@link #canGovernGroupScope}
+     * instead, which drops that supervisor escape.
+     */
     private boolean isGroupAdmin(GroupRow group, Jwt actor) {
         if (isGlobalAdmin(actor)) return true;
         if (!hasRole(actor, "TRUONG_KHOA")) return false;
@@ -1439,9 +2431,11 @@ public class ThesisMutationService {
 
     /**
      * Locks the round row and rejects any write once the round is historical.
-     * A round can never leave CANCELLED, RESULTS_PUBLISHED or CLOSED, so the
-     * FOR UPDATE read both fences a concurrent cancel/publish transition and
-     * freezes every topic/group mutation behind it.
+     * RESULTS_PUBLISHED and CLOSED are terminal, and the only way out of
+     * CANCELLED is {@link #restoreRound}, which takes this same row lock
+     * first — so the FOR UPDATE read still fences a concurrent
+     * cancel/restore/publish transition and freezes every topic/group
+     * mutation behind it.
      */
     private void requireMutableRound(UUID roundId) {
         Map<String, Object> round = one(
@@ -1451,6 +2445,20 @@ public class ThesisMutationService {
                 .contains(round.get("status"))) {
             throw conflict("ROUND_STATE_CONFLICT", "The round has finished; its topics and groups are historical");
         }
+    }
+
+    private void requireRoundStatusAny(UUID id, RoundStatus... accepted) {
+        String status = (String) one(
+                "SELECT status FROM thesis.thesis_registration_round WHERE id = :id FOR UPDATE",
+                params().addValue("id", id), "ROUND_NOT_FOUND", "Thesis registration round not found")
+                .get("status");
+        for (RoundStatus candidate : accepted) {
+            if (candidate.name().equals(status)) {
+                return;
+            }
+        }
+        throw conflict("ROUND_STATE_CONFLICT", "Round must be in " + accepted[0].name()
+                + (accepted.length > 1 ? " or " + accepted[1].name() : ""));
     }
 
     private void requireRoundStatus(UUID id, RoundStatus required) {

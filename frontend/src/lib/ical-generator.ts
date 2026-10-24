@@ -1,5 +1,5 @@
 import type { Enrollment, Semester } from '@/types/api';
-import { isActiveEnrollment } from './enrollment-status';
+import { isActiveEnrollment, isCancelledSection } from './enrollment-status';
 
 export interface IcsEvent {
   uid: string;
@@ -162,7 +162,9 @@ export function buildScheduleIcsEvents(
   }
 
   const activeEnrollments = enrollments.filter(
-    (e) => isActiveEnrollment(e.status) || e.status === 'COMPLETED',
+    (e) =>
+      (isActiveEnrollment(e.status) || e.status === 'COMPLETED') &&
+      !isCancelledSection(e),
   );
 
   for (const enrollment of activeEnrollments) {

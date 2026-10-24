@@ -24,12 +24,13 @@ public class AcademicAttendanceWriteRepository {
         this.jdbc = jdbc;
     }
 
-    public boolean sectionExists(String sectionId) {
-        Long count = jdbc.queryForObject(
-                "SELECT COUNT(*) FROM " + SECTION + " WHERE \"id\" = :sectionId",
+    /** Returns the section status, or {@code null} when the section does not exist. */
+    public String sectionStatus(String sectionId) {
+        List<String> statuses = jdbc.queryForList(
+                "SELECT \"status\" FROM " + SECTION + " WHERE \"id\" = :sectionId",
                 new MapSqlParameterSource("sectionId", sectionId),
-                Long.class);
-        return count != null && count > 0;
+                String.class);
+        return statuses.isEmpty() ? null : statuses.get(0);
     }
 
     public boolean isSectionOwnedByLecturer(String sectionId, String lecturerId) {

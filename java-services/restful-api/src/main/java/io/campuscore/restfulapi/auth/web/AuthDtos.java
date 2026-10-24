@@ -43,9 +43,30 @@ public final class AuthDtos {
             @Size(max = 200_000, message = "avatar must be a data URL of at most 200k characters") String avatar) {
     }
 
+    /**
+     * The optional refreshToken lets a bearer-token client (mobile) pin the
+     * session it wants to keep through the rotation, the same role the
+     * refresh cookie plays for browsers — identical to {@link LogoutRequest}.
+     */
     public record ChangePasswordRequest(
             @NotBlank @Size(max = 128) String oldPassword,
-            @NotBlank @Size(min = 8, max = 128) String newPassword) {
+            @NotBlank @Size(min = 8, max = 128) String newPassword,
+            String refreshToken) {
+    }
+
+    /**
+     * {@code sessionPreserved} tells the client whether the server could
+     * keep the calling device's session. When true the credential pair is
+     * returned like login/refresh do (cookies plus body fields for
+     * body-token clients); when false every session was revoked and the
+     * client should land on the rotated-credential login notice.
+     */
+    public record ChangePasswordResponse(
+            String message,
+            boolean sessionPreserved,
+            AuthUserResponse user,
+            String accessToken,
+            String refreshToken) {
     }
 
     public record ForgotPasswordRequest(

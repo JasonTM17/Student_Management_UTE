@@ -25,7 +25,7 @@ import { statusToneClass } from '@/components/ui/status';
 import { useRequireAuth } from '@/context/AuthContext';
 import { enrollmentsApi, semestersApi } from '@/lib/api';
 import { getLocalizedCourseLabel, getLocalizedName } from '@/lib/academic-content';
-import { isActiveEnrollment } from '@/lib/enrollment-status';
+import { isActiveEnrollment, isCancelledSection } from '@/lib/enrollment-status';
 import { displayLabel } from '@/lib/format-display';
 import { pickPreferredSemesterId } from '@/lib/semesters';
 import { Enrollment, Semester } from '@/types/api';
@@ -200,8 +200,9 @@ export default function SchedulePage() {
     enrollments
       .filter(
         (enrollment) =>
-          isActiveEnrollment(enrollment.status) ||
-          enrollment.status === 'COMPLETED',
+          (isActiveEnrollment(enrollment.status) ||
+            enrollment.status === 'COMPLETED') &&
+          !isCancelledSection(enrollment),
       )
       .forEach((enrollment) => {
         const section = enrollment.section;

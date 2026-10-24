@@ -19,7 +19,8 @@ public record ErrorResponse(
         String path,
         String requestId,
         List<FieldErrorItem> fieldErrors,
-        Map<String, String> fields) {
+        Map<String, String> fields,
+        Map<String, Object> details) {
 
     public ErrorResponse(
             Instant timestamp,
@@ -29,6 +30,18 @@ public record ErrorResponse(
             String path,
             String requestId,
             Map<String, String> fields) {
+        this(timestamp, status, code, message, path, requestId, fields, null);
+    }
+
+    public ErrorResponse(
+            Instant timestamp,
+            int status,
+            String code,
+            String message,
+            String path,
+            String requestId,
+            Map<String, String> fields,
+            Map<String, Object> details) {
         this(
                 timestamp,
                 status,
@@ -39,7 +52,8 @@ public record ErrorResponse(
                 fields == null ? List.of() : fields.entrySet().stream()
                         .map(e -> new FieldErrorItem(e.getKey(), e.getValue()))
                         .toList(),
-                fields == null ? Map.of() : fields);
+                fields == null ? Map.of() : fields,
+                details);
     }
 
     public record FieldErrorItem(String field, String message) {

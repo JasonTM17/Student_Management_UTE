@@ -144,6 +144,37 @@ public class AnnouncementWriteService {
         }
     }
 
+    /**
+     * Recalls the announcement's delivered inbox notices once the archive or
+     * delete write commits. Mirrors the publish fan-out's fail-soft contract:
+     * a notification-side failure is logged and swallowed so it can never roll
+     * back a lifecycle change that already succeeded. Restore deliberately does
+     * not run this — the stamped notifiedAt marker keeps the scheduled sweep
+     * from ever refiring, so restoring cannot duplicate inbox rows.
+     */
+    private void recallInboxNotifications(String id) {
+        if (org.springframework.transaction.support.TransactionSynchronizationManager.isSynchronizationActive()) {
+            org.springframework.transaction.support.TransactionSynchronizationManager.registerSynchronization(
+                    new org.springframework.transaction.support.TransactionSynchronization() {
+                        @Override
+                        public void afterCommit() {
+                            recallFanout(id);
+                        }
+                    });
+        } else {
+            recallFanout(id);
+        }
+    }
+
+    private void recallFanout(String id) {
+        try {
+            int recalled = studentNotifier.recallForAnnouncement(id);
+            LOGGER.info("Announcement {} archived; recalled {} inbox notification(s)", id, recalled);
+        } catch (RuntimeException exception) {
+            LOGGER.warn("Announcement {} committed but inbox recall failed; delivered notices may remain", id);
+        }
+    }
+
     @Transactional
     public AnnouncementResponse update(
             String actorId,
@@ -233,7 +264,45 @@ public class AnnouncementWriteService {
                     id, actor, sanitizedElements);
         }
         appendAudit("UPDATED", actor, label, auditReason, before, after, now);
+        // An audience change must not strand delivered inbox notices: once the
+        // update commits, removed students lose their notice and newly included
+        // students are notified — never a second row for anyone already reached.
+        if (audienceFieldsChanged(request)) {
+            reconcileInboxAudience(id);
+        }
         return after;
+    }
+
+    private static boolean audienceFieldsChanged(UpdateAnnouncementRequest request) {
+        return request.has("targetRoles") || request.has("targetYears")
+                || request.has("sectionId") || request.has("isGlobal")
+                || request.has("lecturerId");
+    }
+
+    private void reconcileInboxAudience(String id) {
+        if (org.springframework.transaction.support.TransactionSynchronizationManager.isSynchronizationActive()) {
+            org.springframework.transaction.support.TransactionSynchronizationManager.registerSynchronization(
+                    new org.springframework.transaction.support.TransactionSynchronization() {
+                        @Override
+                        public void afterCommit() {
+                            reconcileAudience(id);
+                        }
+                    });
+        } else {
+            reconcileAudience(id);
+        }
+    }
+
+    private void reconcileAudience(String id) {
+        try {
+            int[] result = studentNotifier.reconcileAudience(id);
+            LOGGER.info("Announcement {} audience reconciled: {} retracted, {} notified",
+                    id, result[0], result[1]);
+        } catch (RuntimeException exception) {
+            // Fail-soft like recall: a reconciliation failure must never roll
+            // back the already-committed update.
+            LOGGER.warn("Announcement {} committed but inbox audience reconciliation failed", id);
+        }
     }
 
     private void requireLecturerAnnouncement(
@@ -320,6 +389,8 @@ public class AnnouncementWriteService {
         AnnouncementResponse before = requireAnnouncementForUpdate(id);
         requireAnnouncementOwner(roles, lecturerId, before);
         if (before.archivedAt() != null) {
+            // Idempotent: also retries a recall that failed on the first archive.
+            recallInboxNotifications(id);
             return new DeleteAnnouncementResponse("Announcement deleted successfully");
         }
         Instant now = Instant.now(clock);
@@ -341,6 +412,7 @@ public class AnnouncementWriteService {
                 before,
                 after,
                 now);
+        recallInboxNotifications(id);
         return new DeleteAnnouncementResponse("Announcement deleted successfully");
     }
 
@@ -458,6 +530,9 @@ public class AnnouncementWriteService {
         }
         AnnouncementResponse after = requireAnnouncement(id);
         appendAudit(archive ? "ARCHIVED" : "RESTORED", actor, label, reason, before, after, now);
+        if (archive) {
+            recallInboxNotifications(id);
+        }
         return after;
     }
 

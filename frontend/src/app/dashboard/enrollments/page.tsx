@@ -16,7 +16,7 @@ import {
 import { useRequireAuth } from '@/context/AuthContext';
 import { curriculumApi, downloadRegistrationSlipPdf, enrollmentsApi } from '@/lib/api';
 import { getLocalizedName } from '@/lib/academic-content';
-import { isDroppableEnrollment } from '@/lib/enrollment-status';
+import { isDroppableEnrollment, isCancelledSection } from '@/lib/enrollment-status';
 import { WorkspaceForbiddenState } from '@/components/ProtectedRoute';
 import { LinkButton } from '@/components/ui/link-button';
 import { Enrollment, MyCurriculumCourse, MyCurriculumResponse } from '@/types/api';
@@ -852,7 +852,8 @@ export default function EnrollmentsPage() {
               ) : (
                 groupedEnrollments.map((group) => {
                   const groupCredits = group.items.reduce(
-                    (total, item) => total + (item.section?.course?.credits ?? 0),
+                    (total, item) =>
+                      total + (isCancelledSection(item) ? 0 : item.section?.course?.credits ?? 0),
                     0,
                   );
                   return (
@@ -906,6 +907,11 @@ export default function EnrollmentsPage() {
                                       <span className="inline-flex rounded-md bg-secondary px-2 py-1 text-xs font-medium text-foreground">
                                         {enrollment.section?.sectionNumber || copy.unknownSection}
                                       </span>
+                                      {isCancelledSection(enrollment) ? (
+                                        <span className={`mt-1 inline-flex rounded-md px-2 py-0.5 text-[11px] font-medium ${metricToneClass('danger')}`}>
+                                          {messages.common.statuses.CANCELLED}
+                                        </span>
+                                      ) : null}
                                     </td>
                                     <td className="px-3 py-3">
                                       {enrollment.section?.schedules?.length ? (
@@ -985,12 +991,19 @@ export default function EnrollmentsPage() {
                                       {copy.sectionPrefix} {enrollment.section?.sectionNumber || copy.unknownSection}
                                     </span>
                                   </div>
-                                  <span
-                                    className={`shrink-0 rounded-md px-2 py-0.5 text-[11px] font-medium ${
-                                      statusTone[enrollment.status] ?? 'bg-secondary text-foreground'
-                                    }`}
-                                  >
-                                    {messages.common.statuses[enrollment.status as keyof typeof messages.common.statuses] ?? messages.common.statuses.UNKNOWN}
+                                  <span className="flex shrink-0 items-center gap-1">
+                                    <span
+                                      className={`rounded-md px-2 py-0.5 text-[11px] font-medium ${
+                                        statusTone[enrollment.status] ?? 'bg-secondary text-foreground'
+                                      }`}
+                                    >
+                                      {messages.common.statuses[enrollment.status as keyof typeof messages.common.statuses] ?? messages.common.statuses.UNKNOWN}
+                                    </span>
+                                    {isCancelledSection(enrollment) ? (
+                                      <span className={`rounded-md px-2 py-0.5 text-[11px] font-medium ${metricToneClass('danger')}`}>
+                                        {messages.common.statuses.CANCELLED}
+                                      </span>
+                                    ) : null}
                                   </span>
                                 </div>
                                 <div className="mt-1 text-sm font-medium leading-snug text-foreground">

@@ -64,6 +64,7 @@ import {
 } from '@/lib/api';
 import { hasCsrfSessionHint } from '@/lib/session-hint';
 import { cn, htmlToPlainText, stripNotificationTagPrefix } from '@/lib/utils';
+import { safeInternalPath } from '@/lib/safe-path';
 import { stripLocaleFromPathname } from '@/i18n/paths';
 import { isDemoUser, loginHref, portalFromPathname } from '@/lib/login-portal';
 
@@ -233,7 +234,7 @@ function resolveNotificationTarget(notification: {
   type?: string;
   link?: string;
 }): string {
-  const link = typeof notification.link === 'string' ? notification.link.trim() : '';
+  const link = safeInternalPath(notification.link);
   if (link) {
     return link;
   }

@@ -7,35 +7,54 @@ const vm = require('node:vm');
 
 const root = path.resolve(__dirname, '..');
 
-async function profilePasswordHandler({ rejectChange = false, newPassword = 'SafeReplacement9', waitForLogout = false } = {}) {
-  const sourcePath = process.env.CAMPUSCORE_PROFILE_ROTATION_SOURCE
-    || path.join(root, 'src/app/dashboard/profile/page.tsx');
+function extractSubmitHandler(sourcePath, declarationName) {
   const source = fs.readFileSync(sourcePath, 'utf8');
   const parsed = ts.createSourceFile(sourcePath, source, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX);
   let handler;
   function visit(node) {
-    if (ts.isVariableDeclaration(node) && node.name.getText(parsed) === 'handlePasswordSubmit') {
+    if (ts.isVariableDeclaration(node) && node.name.getText(parsed) === declarationName) {
       handler = node.initializer;
     }
     ts.forEachChild(node, visit);
   }
   visit(parsed);
-  assert.ok(handler && ts.isArrowFunction(handler), 'Actual profile submit handler required');
-  const events = [];
-  let releaseLogout;
-  const { checkPasswordPolicy } = await loadPolicyModule();
-  const values = { oldPassword: 'BeforeLocal9', newPassword, confirmPassword: newPassword };
-  const form = { elements: { namedItem: name => ({ value: values[name] }) }, reset: () => events.push('reset') };
-  const globals = {
-    checkPasswordPolicy,
+  assert.ok(handler && ts.isArrowFunction(handler), `Actual ${declarationName} submit handler required`);
+  const { outputText } = ts.transpileModule('(' + handler.getText(parsed) + ')', {
+    compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.None },
+  });
+  return outputText;
+}
+
+function rotationGlobals(events, { sessionPreserved = true, rejectChange = false, waitForRefresh = false, releaseRef } = {}) {
+  return {
+    checkPasswordPolicy: null, // replaced by the caller with the real module
     user: { email: 'synthetic-profile@example.invalid' },
     setPasswordError: value => events.push(['error', value]),
+    setError: value => events.push(['error', value]),
     setIsUpdatingPassword: value => events.push(['saving', value]),
+    setIsSaving: value => events.push(['saving', value]),
     setVisiblePasswordFields: () => events.push('hide-fields'),
-    authApi: { changePassword: async () => { events.push('change'); if (rejectChange) throw new Error('Synthetic rejection'); } },
-    messages: { profile: { passwordUpdated: 'Changed', passwordUpdateFailed: 'Failed' }, common: { campusErrors: { codes: { PASSWORD_TOO_SHORT: 'Too short' } } } },
+    authApi: {
+      changePassword: async () => {
+        events.push('change');
+        if (rejectChange) throw new Error('Synthetic rejection');
+        return { message: 'Password changed successfully', sessionPreserved };
+      },
+    },
+    messages: {
+      profile: { passwordUpdated: 'Changed', passwordUpdateFailed: 'Failed' },
+      common: { campusErrors: { codes: { PASSWORD_TOO_SHORT: 'Too short' } } },
+    },
+    copy: { failed: 'Fallback failure copy' },
     toast: { success: () => events.push('success') },
     campusCodeMessage: () => 'Translated rejection',
+    // sessionPreserved=true: the server re-issued this device's session —
+    // re-read the identity and stay. false: nothing could be pinned, every
+    // session was revoked — land on the rotated-credential login notice.
+    refreshUser: () => {
+      events.push('refreshUser');
+      return waitForRefresh ? new Promise(resolve => { releaseRef.resolve = resolve; }) : Promise.resolve();
+    },
     loginHref: (localize, portal, reason) => {
       const params = new URLSearchParams();
       params.set('portal', portal);
@@ -44,63 +63,107 @@ async function profilePasswordHandler({ rejectChange = false, newPassword = 'Saf
     },
     portalFromUser: () => 'student',
     logout: options => {
-      assert.equal(options.redirect, '/vi/login?portal=student&reason=password-rotated');
-      events.push('logout');
-      return waitForLogout ? new Promise(resolve => { releaseLogout = resolve; }) : Promise.resolve();
+      events.push(['logout', options && options.redirect]);
+      return Promise.resolve();
     },
     href: value => '/vi' + value,
     router: { replace: value => events.push(['redirect', value]) },
   };
-  const { outputText } = ts.transpileModule('(' + handler.getText(parsed) + ')', {
-    compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.None },
-  });
-  const invoke = vm.runInNewContext(outputText, globals, { filename: 'profile-password-handler.js' });
-  return { events, submit: () => invoke({ preventDefault() {}, currentTarget: form }), release: () => releaseLogout() };
 }
 
-test('profile password success hands the rotated login target to logout atomically', async () => {
-  const scenario = await profilePasswordHandler({ waitForLogout: true });
+async function profilePasswordHandler({ rejectChange = false, newPassword = 'SafeReplacement9', sessionPreserved = true, waitForRefresh = false } = {}) {
+  const sourcePath = process.env.CAMPUSCORE_PROFILE_ROTATION_SOURCE
+    || path.join(root, 'src/app/dashboard/profile/page.tsx');
+  const handlerSource = extractSubmitHandler(sourcePath, 'handlePasswordSubmit');
+  const events = [];
+  const releaseRef = {};
+  const { checkPasswordPolicy } = await loadPolicyModule();
+  const values = { oldPassword: 'BeforeLocal9', newPassword, confirmPassword: newPassword };
+  const form = { elements: { namedItem: name => ({ value: values[name] }) }, reset: () => events.push('reset') };
+  const globals = rotationGlobals(events, { sessionPreserved, rejectChange, waitForRefresh, releaseRef });
+  globals.checkPasswordPolicy = checkPasswordPolicy;
+  const invoke = vm.runInNewContext(handlerSource, globals, { filename: 'profile-password-handler.js' });
+  return { events, submit: () => invoke({ preventDefault() {}, currentTarget: form }), release: () => releaseRef.resolve() };
+}
+
+async function rotationGateHandler({ rejectChange = false, sessionPreserved = true } = {}) {
+  const handlerSource = extractSubmitHandler(
+    path.join(root, 'src/components/auth/ForcedPasswordRotationGate.tsx'),
+    'handleSubmit',
+  );
+  const events = [];
+  const releaseRef = {};
+  const { checkPasswordPolicy } = await loadPolicyModule();
+  const globals = rotationGlobals(events, { sessionPreserved, rejectChange, releaseRef });
+  globals.checkPasswordPolicy = checkPasswordPolicy;
+  globals.oldPassword = 'IssuedTemp9';
+  globals.newPassword = 'SafeReplacement9';
+  globals.confirmPassword = 'SafeReplacement9';
+  const invoke = vm.runInNewContext(handlerSource, globals, { filename: 'forced-rotation-gate.js' });
+  return { events, submit: () => invoke({ preventDefault() {} }) };
+}
+
+test('profile password success keeps the session and re-reads the identity', async () => {
+  const scenario = await profilePasswordHandler({ sessionPreserved: true, waitForRefresh: true });
   const pending = scenario.submit();
   await new Promise(resolve => setImmediate(resolve));
-  assert.ok(scenario.events.includes('logout'), 'Successful credential replacement must sign out');
+  assert.ok(scenario.events.includes('refreshUser'), 'Successful credential replacement must re-read the identity');
+  assert.equal(scenario.events.some(event => Array.isArray(event) && event[0] === 'logout'), false);
   assert.equal(scenario.events.some(event => Array.isArray(event) && event[0] === 'redirect'), false);
   scenario.release();
   await pending;
-  assert.ok(scenario.events.indexOf('change') < scenario.events.indexOf('logout'));
-  // The handler must not router.replace after logout resolves: that second
-  // navigation raced the dashboard shell's own !user redirect and landed
-  // users on reason=unauthorized instead of password-rotated.
+  assert.ok(scenario.events.indexOf('change') < scenario.events.indexOf('refreshUser'));
+  // The handler must not router.replace after the identity refresh resolves:
+  // navigating to the login page would kick the still-signed-in user out.
   assert.equal(
     scenario.events.some(event => Array.isArray(event) && event[0] === 'redirect'),
     false,
-    'the rotation redirect belongs inside logout, not a caller-side router.replace',
+    'a successful rotation keeps the user in the portal — no navigation at all',
   );
   assert.deepEqual(scenario.events.at(-1), ['saving', false]);
 });
 
-test('both rotation callers pass the login target into logout atomically', () => {
-  for (const rel of [
-    'src/app/dashboard/profile/page.tsx',
-    'src/components/auth/ForcedPasswordRotationGate.tsx',
-  ]) {
-    const source = fs.readFileSync(path.join(root, rel), 'utf8');
-    assert.ok(
-      source.includes("logout({ redirect: loginHref(href, portalFromUser(user), 'password-rotated') })"),
-      `${rel} must hand the rotated login target for the caller's portal to logout`,
-    );
-    assert.equal(
-      source.includes("router.replace(href('/login?reason=password-rotated')"),
-      false,
-      `${rel} must not navigate separately after logout`,
-    );
-  }
+test('profile password fallback without a kept session signs out to the rotated notice', async () => {
+  const scenario = await profilePasswordHandler({ sessionPreserved: false });
+  await scenario.submit();
+  const logoutCall = scenario.events.find(event => Array.isArray(event) && event[0] === 'logout');
+  assert.deepEqual(
+    logoutCall,
+    ['logout', '/vi/login?portal=student&reason=password-rotated'],
+    'when the server preserved no session the user must land on the rotated-credential notice',
+  );
+  assert.equal(scenario.events.includes('refreshUser'), false);
+  assert.equal(scenario.events.some(event => Array.isArray(event) && event[0] === 'redirect'), false);
+  assert.deepEqual(scenario.events.at(-1), ['saving', false]);
+});
+
+test('forced rotation gate keeps the session and re-reads the identity', async () => {
+  const scenario = await rotationGateHandler({ sessionPreserved: true });
+  await scenario.submit();
+  assert.ok(scenario.events.includes('change'), 'the gate must submit the rotation');
+  assert.ok(scenario.events.includes('refreshUser'), 'a preserved session re-reads the identity');
+  assert.equal(scenario.events.some(event => Array.isArray(event) && event[0] === 'logout'), false);
+  assert.equal(scenario.events.some(event => Array.isArray(event) && event[0] === 'redirect'), false);
+});
+
+test('forced rotation gate fallback signs out to the rotated notice', async () => {
+  const scenario = await rotationGateHandler({ sessionPreserved: false });
+  await scenario.submit();
+  const logoutCall = scenario.events.find(event => Array.isArray(event) && event[0] === 'logout');
+  assert.deepEqual(
+    logoutCall,
+    ['logout', '/vi/login?portal=student&reason=password-rotated'],
+    'an unpinned rotation must not drop the user on a bare session-expired',
+  );
+  assert.equal(scenario.events.includes('refreshUser'), false);
 });
 
 test('profile password server rejection keeps the current session and inline failure', async () => {
   const scenario = await profilePasswordHandler({ rejectChange: true });
   await scenario.submit();
   assert.ok(scenario.events.includes('change'));
-  assert.equal(scenario.events.includes('logout'), false);
+  assert.equal(scenario.events.some(event => Array.isArray(event) && event[0] === 'logout'), false);
+  assert.equal(scenario.events.includes('refreshUser'), false);
   assert.equal(scenario.events.some(event => Array.isArray(event) && event[0] === 'redirect'), false);
   assert.ok(scenario.events.some(event => Array.isArray(event) && event[0] === 'error' && event[1] === 'Translated rejection'));
   assert.deepEqual(scenario.events.at(-1), ['saving', false]);
@@ -110,7 +173,8 @@ test('profile password client validation keeps the current session without a req
   const scenario = await profilePasswordHandler({ newPassword: 'short' });
   await scenario.submit();
   assert.equal(scenario.events.includes('change'), false);
-  assert.equal(scenario.events.includes('logout'), false);
+  assert.equal(scenario.events.some(event => Array.isArray(event) && event[0] === 'logout'), false);
+  assert.equal(scenario.events.includes('refreshUser'), false);
   assert.ok(scenario.events.some(event => Array.isArray(event) && event[0] === 'error' && event[1] === 'Too short'));
   assert.deepEqual(scenario.events.at(-1), ['saving', false]);
 });

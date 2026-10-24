@@ -189,6 +189,10 @@ export default function ThesisPage() {
 
   // Reject group modal state
   const [isRejectModalOpen, setIsRejectModalOpen] = useState(false);
+  const [isApproveExceptionModalOpen, setIsApproveExceptionModalOpen] = useState(false);
+  const [approveExceptionGroupId, setApproveExceptionGroupId] = useState('');
+  const [approveExceptionReason, setApproveExceptionReason] = useState('');
+  const [approveExceptionError, setApproveExceptionError] = useState('');
   const [rejectGroupId, setRejectGroupId] = useState('');
   const [rejectReason, setRejectReason] = useState('');
   const [rejectError, setRejectError] = useState('');
@@ -483,16 +487,22 @@ export default function ThesisPage() {
     [canLoadStaffRelations, myLecturerId, topics],
   );
 
+  // Topics whose reviewer score was already requested. topics refreshes mint a
+  // new array on every mutation, so without this each refresh re-fired the
+  // whole parallel fan-out — duplicate reads on the shared per-user thesis
+  // rate limit that lose the reviewer's saved scores to swallowed 429s.
+  const requestedReviewerScoresRef = useRef(new Set<string>());
+
   // Load the reviewer's own stored score for each assigned topic.
-  useEffect(() => {
-    if (myReviewTopics.length === 0) return;
-    let cancelled = false;
-    void (async () => {
-      await Promise.all(
-        myReviewTopics.map(async (t) => {
+  const loadMyReviewerScores = useCallback(async (reviewTopics: ThesisTopic[]) => {
+    const requested = requestedReviewerScoresRef.current;
+    await Promise.all(
+      reviewTopics
+        .filter((t) => !requested.has(t.id))
+        .map(async (t) => {
+          requested.add(t.id);
           try {
             const row = await thesisApi.reviewerScore(t.id);
-            if (cancelled) return;
             setGvpbScores((prev) => ({ ...prev, [t.id]: row }));
             if (row) {
               setGvpbDraftScores((prev) => ({ ...prev, [t.id]: String(row.score) }));
@@ -502,15 +512,17 @@ export default function ThesisPage() {
             }
           } catch {
             // A read failure leaves the form usable; the submit stays the
-            // authoritative path.
+            // authoritative path. Drop the mark so the next refresh retries.
+            requested.delete(t.id);
           }
         }),
-      );
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [myReviewTopics]);
+    );
+  }, []);
+
+  useEffect(() => {
+    if (myReviewTopics.length === 0) return;
+    void loadMyReviewerScores(myReviewTopics);
+  }, [myReviewTopics, loadMyReviewerScores]);
 
   const handleSubmitReviewerScore = async (topicId: string) => {
     const scoreVal = parseFloat(gvpbDraftScores[topicId] || '');
@@ -667,7 +679,11 @@ export default function ThesisPage() {
 
   useEffect(() => {
     if (!isSupervisorOrAdmin || !lecturerWorkload || explicitRoundId || hasAutoSelectedRoundRef.current) return;
-    const withGroups = lecturerWorkload.topics.filter((topic) => topic.groupCount > 0);
+    // A cancelled round has frozen grading — it must never be the default a
+    // lecturer lands on, or the workspace looks inert for no visible reason.
+    const withGroups = lecturerWorkload.topics.filter(
+      (topic) => topic.groupCount > 0 && topic.roundStatus !== 'CANCELLED',
+    );
     if (withGroups.length === 0) return;
     hasAutoSelectedRoundRef.current = true;
     if (withGroups.some((topic) => topic.roundId === selectedRoundId)) return;
@@ -1469,13 +1485,48 @@ export default function ThesisPage() {
       setActionSuccess(messages.thesis.approveSuccess);
     } catch (caught) {
       const code = getThesisErrorCode(caught);
-      if (code === 'GROUP_TOO_SMALL') {
+      if (code === 'GROUP_TOO_SMALL' && isAdmin) {
+        // Governance may still approve an under-size roster — but only via
+        // the documented size exception, not a dead-end error message.
+        setApproveExceptionGroupId(groupId);
+        setApproveExceptionReason('');
+        setApproveExceptionError('');
+        setIsApproveExceptionModalOpen(true);
+      } else if (code === 'GROUP_TOO_SMALL') {
         setActionError(messages.thesis.groupTooSmall);
       } else if (code === 'GROUP_APPROVAL_STATE_CONFLICT') {
         setActionError(messages.thesis.groupStateConflict);
       } else {
         setActionError(thesisActionError(caught));
       }
+    } finally {
+      setIsActionPending(false);
+    }
+  };
+
+  const confirmApproveException = async () => {
+    const trimmed = approveExceptionReason.trim();
+    if (!trimmed) {
+      setApproveExceptionError(messages.thesis.sizeExceptionReasonPlaceholder);
+      return;
+    }
+    if (trimmed.length > 500) {
+      setApproveExceptionError(messages.thesis.reasonTooLong);
+      return;
+    }
+    setIsActionPending(true);
+    setApproveExceptionError('');
+    setActionSuccess('');
+    try {
+      await thesisApi.approveGroup(approveExceptionGroupId, {
+        allowSizeException: true,
+        reason: trimmed,
+      });
+      await refreshGroups();
+      setIsApproveExceptionModalOpen(false);
+      setActionSuccess(messages.thesis.approveSuccess);
+    } catch (caught) {
+      setApproveExceptionError(thesisActionError(caught));
     } finally {
       setIsActionPending(false);
     }
@@ -3035,6 +3086,7 @@ export default function ThesisPage() {
                 <StudentGroupCard
                   messages={messages}
                   group={currentGroup ?? null}
+                  roundCancelled={selectedRound.status === 'CANCELLED'}
                   groupStatusLabel={groupStatusLabel}
                   roleLabel={isGroupLeader ? pageCopy.roleGroupLeaderReport : pageCopy.roleMember}
                   topicTitle={currentGroup?.topicId ? getTopicTitle(currentGroup.topicId) : null}
@@ -3087,14 +3139,33 @@ export default function ThesisPage() {
                           <p className="text-xs text-muted-foreground">
                             {messages.thesis.results.council}: {result.councilName}
                           </p>
+                          {result.resultStatus === 'REVIEW_FAILED' ? (
+                            <p className="text-xs text-muted-foreground">
+                              {messages.thesis.results.notEligible}
+                            </p>
+                          ) : result.resultStatus === 'WITHDRAWN' ? (
+                            <p className="text-xs text-muted-foreground">
+                              {messages.thesis.results.withdrawn}
+                            </p>
+                          ) : null}
                         </div>
                         <div className="text-left sm:text-right">
-                          <p className="text-lg font-semibold text-foreground">
-                            {result.finalScore}
-                          </p>
-                          <p className="text-xs text-muted-foreground">
-                            {messages.thesis.results.finalScore}
-                          </p>
+                          {result.resultStatus === 'REVIEW_FAILED' || result.resultStatus === 'WITHDRAWN' ? (
+                            <p className="text-sm font-medium text-muted-foreground">
+                              {result.resultStatus === 'REVIEW_FAILED'
+                                ? messages.thesis.results.notEligible
+                                : messages.thesis.results.withdrawn}
+                            </p>
+                          ) : (
+                            <>
+                              <p className="text-lg font-semibold text-foreground">
+                                {result.finalScore}
+                              </p>
+                              <p className="text-xs text-muted-foreground">
+                                {messages.thesis.results.finalScore}
+                              </p>
+                            </>
+                          )}
                         </div>
                       </div>
                     ))}
@@ -3378,6 +3449,58 @@ export default function ThesisPage() {
               disabled={isActionPending}
             >
               {isActionPending ? messages.common.states.loading : messages.thesis.reject}
+            </Button>
+          </div>
+        </div>
+      </Modal>
+
+      {/* Under-size Approval Exception Modal (governance only) */}
+      <Modal
+        isOpen={isApproveExceptionModalOpen}
+        onClose={() => {
+          if (!isActionPending) setIsApproveExceptionModalOpen(false);
+        }}
+        title={messages.thesis.approveExceptionModalTitle}
+      >
+        <div className="space-y-4">
+          <p className="text-sm text-muted-foreground">
+            {messages.thesis.approveExceptionModalDescription}
+          </p>
+          {approveExceptionError ? (
+            <div className="rounded-md border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive">
+              {approveExceptionError}
+            </div>
+          ) : null}
+          <div>
+            <label htmlFor="thesis-size-exception-reason" className="mb-1 block text-sm font-medium text-foreground">
+              {messages.thesis.sizeExceptionReason}
+            </label>
+            <Textarea
+              id="thesis-size-exception-reason"
+              value={approveExceptionReason}
+              onChange={(e) => setApproveExceptionReason(e.target.value)}
+              placeholder={messages.thesis.sizeExceptionReasonPlaceholder}
+              maxLength={500}
+              rows={4}
+              disabled={isActionPending}
+            />
+          </div>
+          <div className="flex justify-end gap-2 pt-2">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setIsApproveExceptionModalOpen(false)}
+              disabled={isActionPending}
+            >
+              {messages.common.actions.cancel}
+            </Button>
+            <Button
+              type="button"
+              className="bg-emerald-700 text-white hover:bg-emerald-800"
+              onClick={() => void confirmApproveException()}
+              disabled={isActionPending}
+            >
+              {isActionPending ? messages.common.states.loading : messages.thesis.approveWithException}
             </Button>
           </div>
         </div>
