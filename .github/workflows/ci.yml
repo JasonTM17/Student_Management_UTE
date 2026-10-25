@@ -58,6 +58,9 @@ jobs:
       CAMPUSCORE_COUNCIL_POSTGRES_URL: 'jdbc:postgresql://localhost:5432/campuscore_council_race_ci'
       CAMPUSCORE_COUNCIL_POSTGRES_USER: 'postgres'
       CAMPUSCORE_COUNCIL_POSTGRES_PASSWORD: 'ci-postgres-it-ephemeral-01'
+      CAMPUSCORE_SUPLIST_POSTGRES_URL: 'jdbc:postgresql://localhost:5432/campuscore_it_suplist'
+      CAMPUSCORE_SUPLIST_POSTGRES_USER: 'postgres'
+      CAMPUSCORE_SUPLIST_POSTGRES_PASSWORD: 'ci-postgres-it-ephemeral-01'
       CAMPUSCORE_E2E_POSTGRES_UPGRADE_URL: 'jdbc:postgresql://localhost:5432/campuscore_it_upgrade'
       CAMPUSCORE_E2E_POSTGRES_UPGRADE_USER: 'postgres'
       CAMPUSCORE_E2E_POSTGRES_UPGRADE_PASSWORD: 'ci-postgres-it-ephemeral-01'
@@ -137,6 +140,7 @@ jobs:
           psql -h 127.0.0.1 -U postgres -d postgres -v ON_ERROR_STOP=1 <<'SQL'
           CREATE DATABASE campuscore_it_e2e;
           CREATE DATABASE campuscore_council_race_ci;
+          CREATE DATABASE campuscore_it_suplist;
           CREATE DATABASE campuscore_it_upgrade;
           CREATE DATABASE campuscore_it_assistant_rls;
           CREATE DATABASE campuscore_it_assistant_migration;
