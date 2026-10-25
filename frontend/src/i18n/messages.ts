@@ -213,6 +213,8 @@ export const en = {
         ROUND_RESTORE_TARGET_INVALID:
           'That status is not a reachable restore target for this round.',
         VALIDATION_ERROR: 'Some submitted values are invalid. Review them and try again.',
+        THESIS_ROUND_SCHEDULE_ORDER:
+          'The dates of this round are out of order — check each milestone against the one before it.',
         // Thesis results and council
         RESULTS_NOT_READY: 'No topic has been graded yet; the chair must finalize scores first.',
         RESULTS_INCOMPLETE: 'Every approved group must be graded before results are published.',
@@ -2767,6 +2769,20 @@ export const en = {
       defenseDate: 'Defense date',
       proposalPublishAt: 'Proposal publish date',
       createIncomplete: 'Please fill in name, registration start, and registration end.',
+      scheduleOrder: {
+        REGISTRATION_WINDOW: 'Registration end must be after its start.',
+        LECTURER_WINDOW: 'The lecturer window end must be after its start.',
+        REGISTRATION_START_BEFORE_LECTURER_END:
+          'Registration opens only after the lecturer window closes.',
+        PROPOSAL_PUBLISH_BEFORE_LECTURER_END:
+          'The proposal publish date must be after the lecturer window closes.',
+        GVPB_DEADLINE_BEFORE_REGISTRATION_END:
+          'The reviewer (GVPB) deadline must be after registration closes.',
+        REPORT_DATE_BEFORE_GVPB_DEADLINE:
+          'The council report date must be after the reviewer (GVPB) deadline.',
+        DEFENSE_DATE_BEFORE_REPORT_DATE:
+          'The defense date must be after the council report date.',
+      },
       created: 'Thesis round created successfully.',
       openProposals: 'Open topic proposals (GV)',
       openRegistration: 'Open registration',
@@ -3439,6 +3455,8 @@ export const vi: I18nMessages = {
         ROUND_RESTORE_TARGET_INVALID:
           'Trạng thái đó không phải đích khôi phục hợp lệ của đợt này.',
         VALIDATION_ERROR: 'Một số giá trị đã nhập chưa hợp lệ. Hãy kiểm tra rồi thử lại.',
+        THESIS_ROUND_SCHEDULE_ORDER:
+          'Các mốc thời gian của đợt chưa đúng thứ tự — hãy kiểm tra lại từng mốc.',
         // Kết quả và hội đồng
         RESULTS_NOT_READY: 'Chưa có đề tài nào được chấm điểm; hội đồng cần chốt điểm trước.',
         RESULTS_INCOMPLETE: 'Mọi nhóm đã được duyệt phải có điểm trước khi công bố kết quả.',
@@ -5987,6 +6005,20 @@ export const vi: I18nMessages = {
       defenseDate: 'Ngày bảo vệ',
       proposalPublishAt: 'Ngày công bố đề tài',
       createIncomplete: 'Vui lòng điền tên, thời gian bắt đầu và kết thúc đăng ký.',
+      scheduleOrder: {
+        REGISTRATION_WINDOW: 'Thời điểm kết thúc đăng ký phải sau thời điểm bắt đầu.',
+        LECTURER_WINDOW: 'Thời điểm kết thúc cửa sổ giảng viên phải sau thời điểm bắt đầu.',
+        REGISTRATION_START_BEFORE_LECTURER_END:
+          'Đăng ký chỉ bắt đầu sau khi cửa sổ giảng viên đóng.',
+        PROPOSAL_PUBLISH_BEFORE_LECTURER_END:
+          'Ngày công bố đề tài phải sau khi cửa sổ giảng viên đóng.',
+        GVPB_DEADLINE_BEFORE_REGISTRATION_END:
+          'Hạn giảng viên phản biện (GVPB) phải sau khi đăng ký kết thúc.',
+        REPORT_DATE_BEFORE_GVPB_DEADLINE:
+          'Ngày báo cáo hội đồng phải sau hạn giảng viên phản biện (GVPB).',
+        DEFENSE_DATE_BEFORE_REPORT_DATE:
+          'Ngày bảo vệ phải sau ngày báo cáo hội đồng.',
+      },
       created: 'Đã tạo đợt luận văn thành công.',
       openProposals: 'Mở đăng ký đề tài (GV)',
       openRegistration: 'Mở đăng ký',
