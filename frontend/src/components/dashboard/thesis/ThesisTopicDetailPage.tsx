@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { ArrowLeft, CheckCircle2, FileStack, GraduationCap } from 'lucide-react';
+import { ArrowLeft, CheckCircle2, FileStack, GraduationCap, UsersRound } from 'lucide-react';
 import { useParams, useSearchParams } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { LinkButton } from '@/components/ui/link-button';
@@ -224,11 +224,26 @@ export default function ThesisTopicDetailPage() {
                 {messages.thesis.progressGroupCancelled}
               </p>
             ) : isStudent && !myGroup ? (
-              // Without a group the choose button can never appear, so the
-              // student needs the actual prerequisite, not a silent dead end.
-              <p className="rounded-lg border border-border/70 bg-muted/40 px-3 py-2 text-sm text-muted-foreground">
-                {messages.thesis.noGroup} {messages.thesis.noGroupDescription}
-              </p>
+              // Without a group the choose button cannot appear: guide the student to Workspace
+              <div className="rounded-xl border border-border/80 bg-muted/40 p-4 space-y-3">
+                <div className="space-y-1">
+                  <p className="text-sm font-semibold text-foreground">
+                    {messages.thesis.noGroup}
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    {messages.thesis.noGroupDescription}
+                  </p>
+                </div>
+                <LinkButton
+                  href={`/dashboard/thesis?roundId=${workspace.selectedRoundId}`}
+                  variant="default"
+                  size="sm"
+                  className="gap-2"
+                >
+                  <UsersRound className="h-4 w-4" />
+                  {locale === 'vi' ? 'Đi tới Workspace để tạo nhóm' : 'Go to Workspace to create a group'}
+                </LinkButton>
+              </div>
             ) : null}
           </CardContent>
         </Card>
