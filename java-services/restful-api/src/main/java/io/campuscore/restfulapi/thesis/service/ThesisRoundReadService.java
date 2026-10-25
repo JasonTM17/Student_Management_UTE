@@ -85,7 +85,7 @@ public class ThesisRoundReadService {
         return list.stream()
                 .map(round -> RoundResponse.from(round, deletionInfo(round, counts), closureInfo(round),
                         capabilities.counterReviewWaiverAllowed(round.getThesisType()),
-                        ThesisMutationService.MIN_GROUP_MEMBERS, ThesisMutationService.MAX_GROUP_MEMBERS,
+                        ThesisMutationSupport.MIN_GROUP_MEMBERS, ThesisMutationSupport.MAX_GROUP_MEMBERS,
                         callerView == null || !eligibility.covers(round.getThesisType())
                                 ? null : callerView))
                 .toList();
@@ -122,7 +122,7 @@ public class ThesisRoundReadService {
         return RoundResponse.from(round, deletionInfo(round, deletions.dependentCounts(List.of(id))),
                 closureInfo(round),
                 capabilities.counterReviewWaiverAllowed(round.getThesisType()),
-                ThesisMutationService.MIN_GROUP_MEMBERS, ThesisMutationService.MAX_GROUP_MEMBERS);
+                ThesisMutationSupport.MIN_GROUP_MEMBERS, ThesisMutationSupport.MAX_GROUP_MEMBERS);
     }
 
     /**

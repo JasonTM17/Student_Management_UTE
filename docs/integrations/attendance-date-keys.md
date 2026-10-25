@@ -21,7 +21,7 @@ This contract does not call for a schema change or a rewrite of existing dataset
 
 ## Executable owners
 
-- [AttendanceDay](../../java-services/restful-api/src/main/java/io/campuscore/restfulapi/academic/service/AttendanceDay.java)
+- [AttendanceDay](../../java-services/restful-api/src/main/java/io/campuscore/restfulapi/academic/model/AttendanceDay.java)
   owns the shared campus-day interpretation.
 - [Attendance reads](../../java-services/restful-api/src/main/java/io/campuscore/restfulapi/academic/service/AcademicAttendanceReadService.java)
   and [attendance writes](../../java-services/restful-api/src/main/java/io/campuscore/restfulapi/academic/service/AcademicAttendanceWriteService.java)

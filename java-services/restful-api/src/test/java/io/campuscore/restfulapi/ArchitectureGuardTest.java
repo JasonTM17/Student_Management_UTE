@@ -80,7 +80,6 @@ class ArchitectureGuardTest {
             "thesis/assistant/service/SqlKnowledgeReleasePromoter",
             "thesis/assistant/service/SupabaseKnowledgeSyncService",
             "thesis/service/ThesisCouncilService",
-            "thesis/service/ThesisMutationService",
             "thesis/service/ThesisNotificationService",
             "thesis/service/ThesisReportService",
             "thesis/service/ThesisSupervisorService");

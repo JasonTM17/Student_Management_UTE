@@ -1260,19 +1260,6 @@ export default function AdminUsersPage() {
                       <h3 className="break-words font-semibold text-foreground">
                         {record.lastName} {record.firstName}
                       </h3>
-                      {record.studentId ? (
-                        <div className="inline-flex items-center gap-1.5 my-0.5">
-                          <span className="inline-flex items-center rounded px-1.5 py-0.5 text-[11px] font-mono font-medium bg-blue-500/10 text-blue-700 dark:text-blue-300 border border-blue-500/20">
-                            MSSV: {record.studentId}
-                          </span>
-                        </div>
-                      ) : record.employeeId ? (
-                        <div className="inline-flex items-center gap-1.5 my-0.5">
-                          <span className="inline-flex items-center rounded px-1.5 py-0.5 text-[11px] font-mono font-medium bg-teal-500/10 text-teal-700 dark:text-teal-300 border border-teal-500/20">
-                            MSGV: {record.employeeId}
-                          </span>
-                        </div>
-                      ) : null}
                       <p className="break-all text-xs text-muted-foreground">{record.email}</p>
                     </div>
                     <StatusPill tone={userStatusTone(record.status)} className="shrink-0 py-1">
@@ -1280,7 +1267,10 @@ export default function AdminUsersPage() {
                     </StatusPill>
                   </div>
                   <div className="flex items-center justify-between text-xs text-muted-foreground">
-                    <span className="font-medium text-foreground">{recordRoleLabel(record.roles)}</span>
+                    <span className="font-medium text-foreground">
+                      {recordRoleLabel(record.roles)}
+                      {record.studentId ? ` • MSSV: ${record.studentId}` : record.employeeId ? ` • MSGV: ${record.employeeId}` : ''}
+                    </span>
                     <span>{formatDate(record.createdAt)}</span>
                   </div>
                   <AdminRowActions>

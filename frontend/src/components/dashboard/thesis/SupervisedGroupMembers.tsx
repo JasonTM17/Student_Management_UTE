@@ -138,29 +138,31 @@ export function SupervisedGroupMembers({ group, roundOpen = true, onChanged }: S
                 key={member.studentId}
                 className="flex items-center justify-between gap-2 rounded-md bg-secondary/40 px-2.5 py-1.5"
               >
-                <span className="min-w-0 truncate text-xs text-foreground" title={member.displayName || member.studentNumber || member.studentId}>
-                  {member.displayName || member.studentNumber || member.studentId}
+                <div className="flex min-w-0 flex-1 flex-wrap items-center gap-1.5 text-xs text-foreground">
+                  <span className="truncate max-w-[140px] sm:max-w-none font-medium" title={member.displayName || member.studentNumber || member.studentId}>
+                    {member.displayName || member.studentNumber || member.studentId}
+                  </span>
                   {member.studentNumber ? (
-                    <span className="ml-1.5 font-mono text-[11px] text-muted-foreground">
+                    <span className="font-mono text-[11px] text-muted-foreground shrink-0">
                       {member.studentNumber}
                     </span>
                   ) : null}
                   {member.isLeader ? (
-                    <span className="ml-1.5 rounded bg-primary/10 px-1.5 py-0.5 text-[11px] font-semibold text-primary">
+                    <span className="shrink-0 rounded bg-primary/10 px-1.5 py-0.5 text-[11px] font-semibold text-primary">
                       {messages.thesis.leaderBadge}
                     </span>
                   ) : null}
                   {member.isExternal ? (
-                    <span className="ml-1.5 rounded bg-amber-500/10 px-1.5 py-0.5 text-[11px] font-semibold text-amber-700 dark:text-amber-300">
+                    <span className="shrink-0 rounded bg-amber-500/10 px-1.5 py-0.5 text-[11px] font-semibold text-amber-700 dark:text-amber-300">
                       {messages.thesis.externalBadge}
                     </span>
                   ) : null}
                   {member.eligible === false ? (
-                    <span className="ml-1.5 rounded bg-amber-500/15 px-1.5 py-0.5 text-[11px] font-semibold text-amber-700 dark:text-amber-300">
+                    <span className="shrink-0 rounded bg-amber-500/15 px-1.5 py-0.5 text-[11px] font-semibold text-amber-700 dark:text-amber-300">
                       {messages.thesis.memberIneligibleBadge}
                     </span>
                   ) : null}
-                </span>
+                </div>
                 {member.isLeader ? null : (
                   <Button
                     type="button"
