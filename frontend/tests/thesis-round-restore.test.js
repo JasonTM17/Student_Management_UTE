@@ -173,9 +173,19 @@ test('the admin page gates restore on CANCELLED and drives the picker from the p
   const page = read('src/app/admin/thesis/page.tsx');
   const gate = page.match(/round\.status === 'CANCELLED'[\s\S]{0,400}?restoreRound/);
   assert.ok(gate, 'the restore action must be gated on the CANCELLED status');
-  assert.match(page, /planThesisRoundRestore\(round, hasLiveGroups\)/);
+  assert.match(page, /planThesisRoundRestore\(round, hasLiveGroups, currentAdminTime\(\)\)/);
   assert.match(page, /plan\.requiresChoice/);
   assert.match(page, /performRestore\(restoreTargetRound\.id, restoreStatusDraft\)/);
+});
+
+test('restore blockers disable the action with a localized accessible reason', () => {
+  const page = read('src/app/admin/thesis/page.tsx');
+  assert.match(page, /round\.restoreBlockers/);
+  assert.match(page, /restoreBlockedMessages/);
+  assert.match(page, /disabled=\{isSaving \|\| restoreBlockedMessages\.length > 0\}/);
+  assert.match(page, /aria-describedby=\{restoreBlockedMessages\.length > 0 \? restoreBlockerId : undefined\}/);
+  assert.match(page, /id=\{restoreBlockerId\} role="alert"/);
+  assert.match(page, /messages\.common\.campusErrors\.codes\[code\]/);
 });
 
 test('the progress view explains a cancelled round', () => {

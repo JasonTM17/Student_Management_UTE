@@ -52,6 +52,8 @@ export interface ThesisRound {
   id: string;
   name: string;
   thesisType: string;
+  /** Database wall-clock sample used to keep admin lifecycle availability aligned with the API. */
+  serverNow?: string;
   registrationStart: string;
   registrationEnd: string;
   lecturerSubmitStart: string;
@@ -69,6 +71,8 @@ export interface ThesisRound {
    * currently CANCELLED (older cancellations carry nothing and restore to
    * DRAFT). */
   cancelledFromStatus?: ThesisRoundStatus | null;
+  /** Admin-only, advisory blocker codes for restoring a CANCELLED round. */
+  restoreBlockers?: Array<'ROUND_RESTORE_MEMBER_CONFLICT' | 'ROUND_RESTORE_FROZEN_HISTORY'>;
   /** Read-only deletability view: `deletable` only when the round is an empty
    * DRAFT/CANCELLED; the per-kind counts explain every blocker. */
   deletion?: ThesisRoundDeletionInfo | null;
