@@ -276,7 +276,7 @@ public class AcademicSectionReadRepository {
                 + " semester.\"nameEn\" AS semester_name_en, semester.\"nameVi\" AS semester_name_vi,"
                 + " COUNT(enrollment.\"id\") AS enrolled_count,"
                 + " SUM(CASE WHEN enrollment.\"finalGrade\" IS NOT NULL THEN 1 ELSE 0 END) AS graded_count,"
-                + " SUM(CASE WHEN enrollment.\"gradeStatus\" = 'PUBLISHED' THEN 1 ELSE 0 END) AS published_count"
+                + " SUM(CASE WHEN enrollment.\"gradeStatus\" IN ('PUBLISHED', 'APPEALED') THEN 1 ELSE 0 END) AS published_count"
                 + " FROM " + SECTION + " section"
                 + " JOIN " + COURSE + " course ON course.\"id\" = section.\"courseId\""
                 + " JOIN " + DEPARTMENT + " department ON department.\"id\" = course.\"departmentId\""

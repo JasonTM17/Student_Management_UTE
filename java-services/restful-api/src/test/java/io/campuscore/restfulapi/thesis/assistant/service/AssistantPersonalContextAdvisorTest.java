@@ -2356,7 +2356,8 @@ class AssistantPersonalContextAdvisorTest {
         when(enrollmentService.findStudentEnrollments("student-profile", null)).thenReturn(List.of(
                 enrollmentWithGradeStatus("SE013", "ENROLLED", "NOT_GRADED"),
                 enrollmentWithGradeStatus("SE014", "ENROLLED", "NOT_GRADED"),
-                enrollmentWithGradeStatus("SE410", "ENROLLED", "PUBLISHED")));
+                enrollmentWithGradeStatus("SE410", "ENROLLED", "PUBLISHED"),
+                enrollmentWithGradeStatus("SE411", "ENROLLED", "APPEALED")));
 
         ChatResponse response = advisor.answer(
                 chatRequest("vi", "Tôi học còn bao nhiêu môn chưa có điểm?"), jwtStudent());
@@ -2367,6 +2368,7 @@ class AssistantPersonalContextAdvisorTest {
         assertTrue(response.answer().contains("SE013"), response.answer());
         assertTrue(response.answer().contains("SE014"), response.answer());
         assertFalse(response.answer().contains("SE410"), response.answer());
+        assertFalse(response.answer().contains("SE411"), response.answer());
     }
 
     private static EnrollmentResponse enrollmentWithGradeStatus(String code, String status, String gradeStatus) {

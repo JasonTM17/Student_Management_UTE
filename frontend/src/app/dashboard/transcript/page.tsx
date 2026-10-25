@@ -1242,6 +1242,9 @@ export default function TranscriptPage() {
             record={selectedRecord}
             isOpen={Boolean(selectedRecord)}
             onClose={() => setSelectedRecord(null)}
+            onAppealChanged={() => {
+              void gradesApi.getMyTranscript().then(setTranscriptData).catch(() => undefined);
+            }}
           />
         </>
       )}
