@@ -105,7 +105,7 @@ public class PeopleReadRepository {
 
     /** Eligible inbox recipients: the same year/active-enrollment scope as the notice reader. */
     public List<String> findAnnouncementStudentUserIds(List<Integer> years, String sectionId,
-            List<String> targetRoles, String lecturerId, List<String> departments) {
+            List<String> targetRoles, String lecturerId, List<String> departments, List<String> targetFaculties) {
         MapSqlParameterSource parameters = new MapSqlParameterSource("status", ACTIVE_STUDENT_STATUS);
         String filter = "";
         if (targetRoles != null && !targetRoles.isEmpty()) {
@@ -147,6 +147,17 @@ public class PeopleReadRepository {
                     + " WHERE curriculum.\"id\" = student.\"curriculumId\""
                     + " AND curriculum.\"departmentId\" IN (:departments))";
             parameters.addValue("departments", departments);
+        }
+        if (targetFaculties != null && !targetFaculties.isEmpty()) {
+            // Faculty scoping (V149): a student's faculty is the one their
+            // curriculum's department belongs to. Empty/absent list = every
+            // faculty, matching the reader's CARDINALITY(...) = 0 predicate.
+            filter += " AND EXISTS (SELECT 1 FROM academic.\"Curriculum\" faculty_curriculum"
+                    + " JOIN academic.\"Department\" faculty_department"
+                    + " ON faculty_department.\"id\" = faculty_curriculum.\"departmentId\""
+                    + " WHERE faculty_curriculum.\"id\" = student.\"curriculumId\""
+                    + " AND faculty_department.\"facultyId\" IN (:targetFaculties))";
+            parameters.addValue("targetFaculties", targetFaculties);
         }
         return jdbc.queryForList("SELECT DISTINCT student.\"userId\" FROM " + STUDENT_TABLE + " student"
                         + " JOIN " + USER_TABLE + " user_account ON user_account.\"id\" = student.\"userId\""

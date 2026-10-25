@@ -78,6 +78,7 @@ class AnnouncementPublicPersistenceTest {
                     "targetRoles" VARCHAR ARRAY NOT NULL,
                     "targetYears" INTEGER ARRAY NOT NULL,
                     "targetDepartments" VARCHAR ARRAY NOT NULL DEFAULT ARRAY[],
+                    "targetFaculties" VARCHAR ARRAY,
                     "isGlobal" BOOLEAN NOT NULL,
                     "publishAt" TIMESTAMP WITH TIME ZONE,
                     "expiresAt" TIMESTAMP WITH TIME ZONE,
@@ -252,6 +253,30 @@ class AnnouncementPublicPersistenceTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.length()").value(0))
                 .andExpect(jsonPath("$.meta.total").value(2));
+    }
+
+    @Test
+    void anonymousFeedExcludesFacultyTargetedGlobalRowsLikeDepartmentOnes() throws Exception {
+        insert("faculty-only", "PUBLISHED", true, PAST, null, null, 0, BASE);
+        jdbc.update("""
+                UPDATE "engagement"."Announcement"
+                   SET "targetFaculties" = ARRAY['faculty-private']
+                 WHERE "id" = 'faculty-only'
+                """);
+        insert("dept-and-faculty", "PUBLISHED", true, PAST, null, null, 0, BASE);
+        jdbc.update("""
+                UPDATE "engagement"."Announcement"
+                   SET "targetDepartments" = ARRAY['department-x'],
+                       "targetFaculties" = ARRAY['faculty-private']
+                 WHERE "id" = 'dept-and-faculty'
+                """);
+        insert("global-only", "PUBLISHED", true, PAST, null, null, 1, BASE);
+
+        mvc.perform(get("/api/v1/announcements/public"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.length()").value(1))
+                .andExpect(jsonPath("$.data[0].id").value("global-only"))
+                .andExpect(jsonPath("$.meta.total").value(1));
     }
 
     @Test

@@ -14,6 +14,7 @@ import {
   EnrollmentActionResult,
   Semester,
   Department,
+  Faculty,
   Course,
   StudentGradeRecord,
   StudentTranscript,
@@ -101,6 +102,7 @@ export type AnnouncementRecord = {
   targetRoles?: string[];
   targetYears?: number[];
   targetDepartments?: string[];
+  targetFaculties?: string[];
   isGlobal?: boolean;
   semesterId?: string | null;
   sectionId?: string | null;
@@ -168,7 +170,7 @@ export type CreditLimitApplication = {
   updatedAt: string;
 };
 export type AnnouncementMutation = Partial<Pick<AnnouncementRecord,
-  'title' | 'content' | 'priority' | 'targetRoles' | 'targetYears' | 'targetDepartments' | 'isGlobal' |
+  'title' | 'content' | 'priority' | 'targetRoles' | 'targetYears' | 'targetDepartments' | 'targetFaculties' | 'isGlobal' |
   'publishAt' | 'expiresAt' | 'semesterId' | 'sectionId' | 'lecturerId'>> & {
   reason?: string;
   expectedVersion?: number;
@@ -1326,7 +1328,47 @@ export function clearDepartmentsCache(): void {
   departmentsCache.clear();
 }
 
-// Departments API
+// Faculties API — read-only reference list for audience pickers.
+const facultiesCache = new Map<string, { promise: Promise<ApiResponse<Faculty[]>>; timestamp: number }>();
+const FACULTIES_CACHE_TTL_MS = 5 * 60_000; // 5 minutes
+
+export function clearFacultiesCache(): void {
+  facultiesCache.clear();
+}
+
+export const facultiesApi = {
+  getAll: async (
+    params?: {
+      page?: number;
+      limit?: number;
+    },
+    options?: { forceRefresh?: boolean },
+  ): Promise<ApiResponse<Faculty[]>> => {
+    const key = params ? JSON.stringify(params) : '{}';
+    const now = Date.now();
+    const cached = facultiesCache.get(key);
+    if (!options?.forceRefresh && cached && now - cached.timestamp < FACULTIES_CACHE_TTL_MS) {
+      return cached.promise;
+    }
+    const promise = api
+      .get<ApiResponse<Faculty[]>>('/faculties', {
+        params,
+        timeout: CACHED_GET_TIMEOUT_MS,
+      })
+      .then(
+        (response) => response.data,
+        (error) => {
+          if (facultiesCache.get(key)?.promise === promise) {
+            facultiesCache.delete(key);
+          }
+          throw error;
+        },
+      );
+    facultiesCache.set(key, { promise, timestamp: now });
+    return promise;
+  },
+};
+
 export const departmentsApi = {
   getAll: async (
     params?: {

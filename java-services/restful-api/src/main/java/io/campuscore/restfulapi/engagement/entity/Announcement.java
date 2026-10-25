@@ -41,6 +41,15 @@ public class Announcement {
     @JdbcTypeCode(SqlTypes.ARRAY)
     private String[] targetDepartments;
 
+    /**
+     * Optional faculty scoping (V149): empty means every faculty; a student
+     * matches through their curriculum's department, a lecturer through their
+     * own department.
+     */
+    @Column(name = "\"targetFaculties\"", nullable = false, insertable = false, updatable = false)
+    @JdbcTypeCode(SqlTypes.ARRAY)
+    private String[] targetFaculties;
+
     @Column(name = "\"isGlobal\"", nullable = false, insertable = false, updatable = false)
     private boolean isGlobal;
 
@@ -154,6 +163,10 @@ public class Announcement {
 
     public String[] getTargetDepartments() {
         return targetDepartments;
+    }
+
+    public String[] getTargetFaculties() {
+        return targetFaculties;
     }
 
     public boolean isGlobal() {
