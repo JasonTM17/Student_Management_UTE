@@ -6,6 +6,7 @@ import io.campuscore.restfulapi.thesis.repository.ThesisRoundReadPort;
 import io.campuscore.restfulapi.thesis.repository.ThesisScopeRepository;
 import io.campuscore.restfulapi.thesis.repository.ThesisTopicRepository;
 import io.campuscore.restfulapi.thesis.dto.ThesisTopicDtos.TopicResponse;
+import io.campuscore.restfulapi.thesis.dto.ThesisTopicDtos.TopicSupervisorEntry;
 import java.util.List;
 import java.util.UUID;
 import org.springframework.context.annotation.Profile;
@@ -110,8 +111,15 @@ public class ThesisTopicService {
         java.util.Set<String> inFacultyDepts = deanFacultyDepts;
         java.util.Set<UUID> supervisedByDean = deanSupervisedIds;
         String callerLecturerId = lecturerId;
+        // One batched read resolves every listed topic's supervisor roster, so
+        // the catalog never pays a per-topic request tax. Entries carry names
+        // only; the per-topic endpoint still owns the staff-only email column.
+        java.util.Map<UUID, List<TopicSupervisorEntry>> supervisorsByTopic = result.isEmpty()
+                ? java.util.Map.of()
+                : scope.findSupervisorsByTopicIds(result.stream().map(ThesisTopic::getId).toList());
         return result.stream()
-                .map(TopicResponse::from)
+                .map(topic -> TopicResponse.from(topic,
+                        supervisorsByTopic.getOrDefault(topic.getId(), List.of())))
                 .map(topic -> maskScoreIfNeeded(topic, published,
                         adminCaller || inFacultyDepts.contains(topic.departmentId())
                                 || supervisedByDean.contains(topic.id())
@@ -135,7 +143,8 @@ public class ThesisTopicService {
                 && !ThesisDepartmentScope.owns(scope, actor, topic.getDepartmentId())) {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Thesis topic not found");
         }
-        return maskScoreIfNeeded(TopicResponse.from(topic), isRoundResultsPublished(topic.getRoundId()),
+        return maskScoreIfNeeded(TopicResponse.from(topic, supervisorsOf(topic.getId())),
+                isRoundResultsPublished(topic.getRoundId()),
                 deanInScope || isCouncilGraderOf(topic.getId(), actor),
                 normalize(actor == null ? null : actor.getClaimAsString("lecturerId")));
     }
@@ -175,7 +184,12 @@ public class ThesisTopicService {
                 scoreMasked ? null : topic.resultStatus(),
                 reviewerMasked ? null : topic.gvpbLecturerId(),
                 governanceMasked ? null : topic.gvpbWaivedReason(),
-                governanceMasked ? null : topic.resultReason());
+                governanceMasked ? null : topic.resultReason(),
+                topic.supervisors());
+    }
+
+    private List<TopicSupervisorEntry> supervisorsOf(UUID topicId) {
+        return scope.findSupervisorsByTopicIds(List.of(topicId)).getOrDefault(topicId, List.of());
     }
 
     private boolean isCouncilGraderOf(UUID topicId, Jwt actor) {

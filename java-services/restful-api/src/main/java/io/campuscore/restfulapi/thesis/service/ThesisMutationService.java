@@ -981,7 +981,7 @@ public class ThesisMutationService {
                 "Topic withdrawn from the round; reason: " + cleanReason,
                 Map.of("result_status", topic.get("result_status") == null ? "" : topic.get("result_status").toString()),
                 Map.of("result_status", "WITHDRAWN", "result_reason", cleanReason));
-        return TopicResponse.from(topics.findById(id).orElseThrow(
+        return topicResponse(topics.findById(id).orElseThrow(
                 () -> notFound("TOPIC_NOT_FOUND", "Thesis topic not found")));
     }
 
@@ -1027,7 +1027,7 @@ public class ThesisMutationService {
                 "Topic reinstated into the round; reason: " + cleanReason,
                 Map.of("result_status", "WITHDRAWN"),
                 Map.of("result_status", failed ? "REVIEW_FAILED" : ""));
-        return TopicResponse.from(topics.findById(id).orElseThrow(
+        return topicResponse(topics.findById(id).orElseThrow(
                 () -> notFound("TOPIC_NOT_FOUND", "Thesis topic not found")));
     }
 
@@ -1087,7 +1087,7 @@ public class ThesisMutationService {
                 notifier.notifySupervisorsAssigned(lateTopicId, List.of(supervisorId));
             }
         });
-        return topics.findById(lateTopicId).map(TopicResponse::from).orElseGet(() -> TopicResponse.from(topic));
+        return topics.findById(lateTopicId).map(this::topicResponse).orElseGet(() -> topicResponse(topic));
     }
 
     /**
@@ -1820,7 +1820,7 @@ public class ThesisMutationService {
                 }
             }
         }
-        return TopicResponse.from(topic);
+        return topicResponse(topic);
     }
 
     /**
@@ -1873,7 +1873,7 @@ public class ThesisMutationService {
         String departmentId = request.departmentId().trim();
         requireTopicDepartmentScope(actor, departmentId);
         topic.update(departmentId, request.title().trim(), request.description().trim(), maxGroups);
-        return TopicResponse.from(topics.save(topic));
+        return topicResponse(topics.save(topic));
     }
 
     /**
@@ -1922,7 +1922,7 @@ public class ThesisMutationService {
         } catch (IllegalStateException exception) {
             throw conflict("TOPIC_STATE_CONFLICT", exception.getMessage());
         }
-        TopicResponse response = TopicResponse.from(topics.saveAndFlush(topic));
+        TopicResponse response = topicResponse(topics.saveAndFlush(topic));
         audit.record(subject(actor), null, "THESIS_TOPIC_APPROVED", "THESIS_TOPIC", id.toString(),
                 "Department governance approved the topic for student registration");
         return response;
@@ -1969,7 +1969,7 @@ public class ThesisMutationService {
         } catch (IllegalStateException exception) {
             throw conflict("TOPIC_STATE_CONFLICT", exception.getMessage());
         }
-        TopicResponse response = TopicResponse.from(topics.saveAndFlush(topic));
+        TopicResponse response = topicResponse(topics.saveAndFlush(topic));
         audit.record(subject(actor), null, "THESIS_TOPIC_ARCHIVED", "THESIS_TOPIC", id.toString(),
                 "Unused topic archived without removing its history");
         return response;
@@ -1978,6 +1978,16 @@ public class ThesisMutationService {
     private void lockTopicForGovernance(UUID id) {
         one("SELECT id FROM thesis.thesis_topic WHERE id = :id FOR UPDATE",
                 params().addValue("id", id), "TOPIC_NOT_FOUND", "Thesis topic not found");
+    }
+
+    /**
+     * Renders the topic contract with its supervisor roster filled in through
+     * the same batched repository read the list endpoint uses, inside the
+     * caller's transaction so rows written moments earlier are visible.
+     */
+    private TopicResponse topicResponse(ThesisTopic topic) {
+        return TopicResponse.from(topic,
+                scope.findSupervisorsByTopicIds(List.of(topic.getId())).getOrDefault(topic.getId(), List.of()));
     }
 
     /**

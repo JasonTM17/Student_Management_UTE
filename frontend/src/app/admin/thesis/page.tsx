@@ -287,9 +287,20 @@ export default function AdminThesisPage() {
       if (!isCurrent()) return;
       const byId = new Map<string, (typeof published)[number]>();
       for (const topic of [...published, ...drafts]) byId.set(topic.id, topic);
-      setTopics(Array.from(byId.values()));
+      const merged = Array.from(byId.values());
+      setTopics(merged);
       setGroups(g);
       if (expandedRoundRef.current === roundId) setCouncils(c);
+      // Topic payloads carry their supervisor roster, so the picker hints are
+      // resolved without a per-topic request. Ids the list cannot cover (e.g.
+      // council topics in statuses outside the merge) still fetch below.
+      const embedded: Record<string, string[]> = {};
+      for (const t of merged) {
+        if (!t.supervisors) continue;
+        embedded[t.id] = t.supervisors.map((s) => s.lecturerId);
+        topicSupervisorRequestsRef.current.add(t.id);
+      }
+      setTopicSupervisors((prev) => ({ ...prev, ...embedded }));
       ensureTopicSupervisors(c.flatMap((council) => council.topicIds ?? []));
       if (lecturers.length === 0) {
         await loadLecturers();

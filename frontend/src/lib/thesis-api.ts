@@ -432,6 +432,10 @@ export interface ThesisTopic {
   resultReason?: string | null;
   gvpbLecturerId?: string | null;
   gvpbWaivedReason?: string | null;
+  /** Advisor roster resolved with the topic in one batched read — names only.
+   * The email column stays on the per-topic endpoint, which keeps its
+   * staff/owner-only visibility. Absent on older backends. */
+  supervisors?: ThesisTopicSupervisor[];
 }
 
 /** UI capabilities for a topic returned by the authenticated staff catalog.
