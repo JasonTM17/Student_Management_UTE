@@ -3,6 +3,7 @@ package io.campuscore.restfulapi.thesis.service;
 import io.campuscore.restfulapi.mail.config.MailConfig;
 import io.campuscore.restfulapi.mail.service.EmailService;
 import io.campuscore.restfulapi.notification.repository.NotificationWriteRepository;
+import io.campuscore.restfulapi.thesis.model.RoundStatus;
 import io.campuscore.restfulapi.notification.model.CreateNotificationCommand;
 import java.time.Clock;
 import java.time.Instant;
@@ -237,6 +238,168 @@ public class ThesisNotificationService {
                     "INFO", STUDENT_LINK, null);
         }
         return sent + notifyGroupRosterChanged(groupId);
+    }
+
+    /**
+     * Lifecycle phase signal for the roles that must act next: lecturers hear
+     * when a proposal window opens, students when the catalog publishes or
+     * registration opens, and everyone already engaged in the round when it
+     * closes, cancels, or ends. Runs {@code REQUIRES_NEW} like every thesis
+     * fan-out; callers invoke it only after the transition commits so a
+     * reverted phase never leaves a stale notice behind.
+     */
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public int notifyRoundPhase(UUID roundId, RoundStatus phase) {
+        if (roundId == null || phase == null) {
+            return 0;
+        }
+        Map<String, Object> round = roundPhaseRow(roundId);
+        if (round.isEmpty()) {
+            return 0;
+        }
+        String name = valueOrEmpty(round.get("name")).trim();
+        return switch (phase) {
+            case PROPOSAL_OPEN -> fanOut(activeLecturerUserIds(),
+                    "Đợt khóa luận mở đề xuất đề tài",
+                    "Đợt \"" + name + "\" đã mở cổng đề xuất đề tài cho giảng viên"
+                            + deadlineClause(round.get("lecturer_submit_end"), "Hạn nộp") + ".",
+                    "INFO", LECTURER_LINK);
+            case PROPOSALS_PUBLISHED -> fanOut(activeStudentUserIds(),
+                    "Danh mục đề tài đã công bố",
+                    "Danh mục đề tài của đợt \"" + name + "\" đã được công bố. "
+                            + "Xem đề tài tại trang khóa luận.",
+                    "INFO", STUDENT_LINK);
+            case REGISTRATION_OPEN -> fanOut(activeStudentUserIds(),
+                    "Đợt khóa luận mở đăng ký",
+                    "Đợt \"" + name + "\" đã mở đăng ký đề tài cho nhóm sinh viên"
+                            + deadlineClause(round.get("registration_end"), "Hạn đăng ký") + ".",
+                    "INFO", STUDENT_LINK);
+            case REGISTRATION_CLOSED -> fanOut(participantUserIds(roundId),
+                    "Đợt khóa luận đã đóng đăng ký",
+                    "Đợt \"" + name + "\" đã đóng đăng ký đề tài. "
+                            + "Theo dõi tiến độ và hạn nộp báo cáo tại trang khóa luận.",
+                    "INFO", STUDENT_LINK);
+            case CANCELLED -> fanOut(participantUserIds(roundId),
+                    "Đợt khóa luận đã bị hủy",
+                    "Đợt \"" + name + "\" đã bị hủy. Đăng ký và nhóm của bạn trong đợt này "
+                            + "không còn hiệu lực — theo dõi đợt mới tại trang khóa luận.",
+                    "WARNING", STUDENT_LINK);
+            case CLOSED -> fanOut(participantUserIds(roundId),
+                    "Đợt khóa luận đã kết thúc",
+                    "Đợt \"" + name + "\" đã kết thúc. "
+                            + "Kết quả đã công bố vẫn xem được tại trang khóa luận.",
+                    "INFO", STUDENT_LINK);
+            default -> 0;
+        };
+    }
+
+    /** A cancelled round coming back must tell the same participants. */
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public int notifyRoundRestored(UUID roundId) {
+        String name = roundNameOf(roundId);
+        if (name.isBlank()) {
+            return 0;
+        }
+        return fanOut(participantUserIds(roundId),
+                "Đợt khóa luận được khôi phục",
+                "Đợt \"" + name.trim() + "\" đã được khôi phục. "
+                        + "Kiểm tra lại nhóm và đề tài của bạn tại trang khóa luận.",
+                "INFO", STUDENT_LINK);
+    }
+
+    /** A closed round reopening into results-published is a lifecycle signal too. */
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public int notifyRoundReopened(UUID roundId) {
+        String name = roundNameOf(roundId);
+        if (name.isBlank()) {
+            return 0;
+        }
+        return fanOut(participantUserIds(roundId),
+                "Đợt khóa luận được mở lại",
+                "Đợt \"" + name.trim() + "\" được mở lại; "
+                        + "kết quả đã công bố có thể tra cứu tại trang khóa luận.",
+                "INFO", STUDENT_LINK);
+    }
+
+    private Map<String, Object> roundPhaseRow(UUID roundId) {
+        List<Map<String, Object>> rows = jdbc.queryForList(
+                "SELECT name, lecturer_submit_end, registration_end FROM thesis.thesis_registration_round WHERE id = :id",
+                new MapSqlParameterSource("id", roundId));
+        return rows.isEmpty() ? Map.of() : rows.getFirst();
+    }
+
+    private List<String> activeLecturerUserIds() {
+        return jdbc.queryForList(
+                "SELECT \"userId\" FROM campuscore_auth.\"Lecturer\" WHERE \"isActive\" = TRUE",
+                new MapSqlParameterSource(), String.class);
+    }
+
+    private List<String> activeStudentUserIds() {
+        return jdbc.queryForList(
+                "SELECT \"userId\" FROM campuscore_auth.\"Student\" WHERE \"status\" = 'ACTIVE'",
+                new MapSqlParameterSource(), String.class);
+    }
+
+    /**
+     * Everyone already engaged in the round: group members, topic supervisors,
+     * named counter-reviewers, and seated council members. This is the
+     * audience for phase events that change the fate of their work — closing,
+     * cancelling, or ending the round — rather than the broadcast opens that
+     * address every eligible account.
+     */
+    private List<String> participantUserIds(UUID roundId) {
+        List<String> userIds = jdbc.queryForList(
+                "SELECT s.\"userId\" FROM thesis.thesis_group_member m"
+                        + " JOIN thesis.thesis_group g ON g.id = m.group_id"
+                        + " JOIN campuscore_auth.\"Student\" s ON s.\"id\" = m.student_id"
+                        + " WHERE g.round_id = :roundId"
+                        + " UNION"
+                        + " SELECT u.\"id\" FROM thesis.thesis_topic_supervisor sup"
+                        + " JOIN thesis.thesis_topic t ON t.id = sup.topic_id"
+                        + " JOIN campuscore_auth.\"Lecturer\" l"
+                        + "   ON (l.\"id\" = sup.lecturer_id OR l.\"userId\" = sup.lecturer_id)"
+                        + " JOIN campuscore_auth.\"User\" u ON u.\"id\" = l.\"userId\""
+                        + " WHERE t.round_id = :roundId"
+                        + " UNION"
+                        + " SELECT u.\"id\" FROM thesis.thesis_topic t"
+                        + " JOIN campuscore_auth.\"Lecturer\" l"
+                        + "   ON (l.\"id\" = t.gvpb_lecturer_id OR l.\"userId\" = t.gvpb_lecturer_id)"
+                        + " JOIN campuscore_auth.\"User\" u ON u.\"id\" = l.\"userId\""
+                        + " WHERE t.round_id = :roundId AND t.gvpb_lecturer_id IS NOT NULL"
+                        + " UNION"
+                        + " SELECT u.\"id\" FROM thesis.thesis_council_member cm"
+                        + " JOIN thesis.thesis_council c ON c.id = cm.council_id"
+                        + " JOIN campuscore_auth.\"Lecturer\" l"
+                        + "   ON (l.\"id\" = cm.lecturer_id OR l.\"userId\" = cm.lecturer_id)"
+                        + " JOIN campuscore_auth.\"User\" u ON u.\"id\" = l.\"userId\""
+                        + " WHERE c.round_id = :roundId",
+                new MapSqlParameterSource("roundId", roundId), String.class);
+        return userIds == null ? List.of() : userIds;
+    }
+
+    /** Deadlines inside notices use the same dd/MM/yyyy HH:mm Asia/Bangkok display the workspace pins. */
+    private static String deadlineClause(Object instant, String label) {
+        Instant at = instantValue(instant);
+        if (at == null) {
+            return "";
+        }
+        return ". " + label + ": " + java.time.format.DateTimeFormatter
+                .ofPattern("dd/MM/yyyy HH:mm")
+                .withZone(java.time.ZoneId.of("Asia/Bangkok"))
+                .format(at);
+    }
+
+    private static Instant instantValue(Object value) {
+        if (value instanceof Instant instant) {
+            return instant;
+        }
+        if (value instanceof java.sql.Timestamp timestamp) {
+            return timestamp.toInstant();
+        }
+        if (value instanceof java.time.OffsetDateTime offsetDateTime) {
+            return offsetDateTime.toInstant();
+        }
+        return null;
     }
 
     private static String resultsSourceKey(UUID roundId) {
