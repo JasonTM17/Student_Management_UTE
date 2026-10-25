@@ -67,6 +67,12 @@ jobs:
       CAMPUSCORE_REPORT_POSTGRES_URL: 'jdbc:postgresql://localhost:5432/campuscore_it_report_regression'
       CAMPUSCORE_REPORT_POSTGRES_USER: 'postgres'
       CAMPUSCORE_REPORT_POSTGRES_PASSWORD: 'ci-postgres-it-ephemeral-01'
+      CAMPUSCORE_HOT4_POSTGRES_URL: 'jdbc:postgresql://127.0.0.1:5432/hot4_ci'
+      CAMPUSCORE_HOT4_POSTGRES_USER: 'postgres'
+      CAMPUSCORE_HOT4_POSTGRES_PASSWORD: 'ci-postgres-it-ephemeral-01'
+      CAMPUSCORE_SCBD_POSTGRES_URL: 'jdbc:postgresql://localhost:5432/campuscore_it_scbd'
+      CAMPUSCORE_SCBD_POSTGRES_USER: 'postgres'
+      CAMPUSCORE_SCBD_POSTGRES_PASSWORD: 'ci-postgres-it-ephemeral-01'
       ASSISTANT_RLS_POSTGRES_URL: 'jdbc:postgresql://localhost:5432/campuscore_it_assistant_rls'
       ASSISTANT_RLS_PRIMARY_USER: 'postgres'
       ASSISTANT_RLS_PRIMARY_PASSWORD: 'ci-postgres-it-ephemeral-01'
@@ -146,6 +152,8 @@ jobs:
           CREATE DATABASE campuscore_it_assistant_migration;
           CREATE DATABASE campuscore_it_turn_ledger;
           CREATE DATABASE campuscore_it_report_regression;
+          CREATE DATABASE campuscore_it_scbd;
+          CREATE DATABASE hot4_ci;
           CREATE DATABASE policy_migration_test_notification_audit;
           CREATE DATABASE policy_migration_test_policy_local;
           CREATE DATABASE policy_migration_test_policy_previous_supabase;

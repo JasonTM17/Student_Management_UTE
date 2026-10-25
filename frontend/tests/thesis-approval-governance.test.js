@@ -69,6 +69,7 @@ function listFixture(locale, groups, overrides = {}) {
     '@/components/ui/use-confirmation-dialog': { useConfirmationDialog: () => ({
       confirm: async () => true, confirmationDialog: null }) },
     '@/lib/thesis-api': { thesisApi: { addMember: async () => groups[0], removeMember: async () => groups[0] } },
+    '@/features/thesis/components/ScoreBreakdownPanel': () => null,
   });
   const tree = SupervisedGroupList({
     messages, title: 'Groups', description: 'desc', groups, reportsByGroup: {},

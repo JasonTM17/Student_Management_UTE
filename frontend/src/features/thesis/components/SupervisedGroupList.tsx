@@ -7,6 +7,7 @@ import { EmptyState } from '@/components/ui/state-block';
 import { MemberAvatars } from '@/components/thesis/MemberAvatars';
 import { StatusBadge } from '@/components/thesis/StatusBadge';
 import { SupervisedGroupMembers } from '@/components/dashboard/thesis/SupervisedGroupMembers';
+import ScoreBreakdownPanel from '@/features/thesis/components/ScoreBreakdownPanel';
 import type { I18nMessages } from '@/i18n/messages';
 import { type ThesisGroup, type ThesisGroupReport } from '@/lib/thesis-api';
 
@@ -32,6 +33,9 @@ interface SupervisedGroupListProps {
   canSizeException?: boolean;
   onApproveWithException?: (groupId: string) => void;
   onWithdrawApproval?: (groupId: string) => void;
+  /** Server-side gate mirrored: supervisors read the score breakdown only
+   * once the round published results (RESULTS_PUBLISHED or CLOSED). */
+  resultsPublished?: boolean;
   onDownloadReport: (
     groupId: string,
     report: ThesisGroupReport | null | undefined,
@@ -56,6 +60,7 @@ export default function SupervisedGroupList({
   canSizeException = false,
   onApproveWithException,
   onWithdrawApproval,
+  resultsPublished = false,
   onDownloadReport,
 }: SupervisedGroupListProps) {
   const pageCopy = messages.thesisWorkflow.page;
@@ -138,6 +143,15 @@ export default function SupervisedGroupList({
                       roundOpen={isRoundOpen(group) && group.status !== 'CANCELLED'}
                       onChanged={onGroupUpdated}
                     />
+
+                    {resultsPublished &&
+                    group.approvalStatus === 'APPROVED' &&
+                    group.topicId ? (
+                      <ScoreBreakdownPanel
+                        messages={messages}
+                        topicId={group.topicId}
+                      />
+                    ) : null}
 
                     {group.approvalStatus === 'APPROVED' ? (
                       <div className="mt-2 flex flex-wrap items-center gap-2">
