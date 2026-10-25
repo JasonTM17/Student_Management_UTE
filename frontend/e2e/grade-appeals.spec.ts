@@ -112,6 +112,16 @@ test('student appeal, admin unpublish refusal, lecturer correction, and transcri
   expect(record?.letterGrade).toBe('A+');
 
   await page.goto('/en/dashboard/transcript');
+  // Only the latest semester starts expanded; open the others so every record row is rendered.
+  const semesterToggles = page.getByRole('button', { name: /Collapse or expand semester/ });
+  await expect(semesterToggles.first()).toBeVisible({ timeout: 30_000 });
+  const collapsedToggles = page.getByRole('button', {
+    name: /Collapse or expand semester/,
+    expanded: false,
+  });
+  while ((await collapsedToggles.count()) > 0) {
+    await collapsedToggles.first().click();
+  }
   const transcriptRow = page.locator('tr').filter({ hasText: 'APPEAL1E2E' });
   await expect(transcriptRow).toBeVisible({ timeout: 30_000 });
   await expect(transcriptRow).toContainText('A+');
