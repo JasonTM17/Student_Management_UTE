@@ -2878,13 +2878,44 @@ export default function ThesisPage() {
           ) : null}
 
           <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-            <WorkspaceMetricCard label={messages.thesis.roundStatus} value={statusLabel(selectedRound.status)} icon={<CalendarDays className="h-5 w-5" />} toneClassName={metricToneClass('warning')} />
-            <WorkspaceMetricCard label={messages.thesis.topics} value={topics.length} icon={<FileStack className="h-5 w-5" />} toneClassName={metricToneClass('info')} />
+            <WorkspaceMetricCard
+              label={messages.thesis.roundStatus}
+              value={statusLabel(selectedRound.status)}
+              icon={<CalendarDays className="h-5 w-5" />}
+              toneClassName={metricToneClass('warning')}
+            />
+            <WorkspaceMetricCard
+              label={messages.thesis.topics}
+              value={topics.length}
+              icon={<FileStack className="h-5 w-5" />}
+              toneClassName={metricToneClass('info')}
+              href="/dashboard/thesis/topics"
+            />
             {canLoadStaffRelations || isStudent ? (
-              <WorkspaceMetricCard label={messages.thesis.groups} value={groups.length} icon={<UsersRound className="h-5 w-5" />} toneClassName={metricToneClass('success')} />
+              <WorkspaceMetricCard
+                label={messages.thesis.groups}
+                value={groups.length}
+                icon={<UsersRound className="h-5 w-5" />}
+                toneClassName={metricToneClass('success')}
+                onClick={
+                  isStudent
+                    ? () => {
+                        const target = document.getElementById('student-group-section');
+                        target?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                      }
+                    : undefined
+                }
+              />
             ) : null}
             {isStudent ? (
-              <WorkspaceMetricCard label={messages.thesis.groupMembersMetric} value={currentGroup ? currentGroup.memberStudentIds.length : 0} icon={<Check className="h-5 w-5" />} toneClassName={metricToneClass('neutral')} />
+              <WorkspaceMetricCard label={messages.thesis.groupMembersMetric} value={currentGroup ? currentGroup.memberStudentIds.length : 0}
+                icon={<Check className="h-5 w-5" />}
+                toneClassName={metricToneClass('neutral')}
+                onClick={() => {
+                  const target = document.getElementById('student-group-section');
+                  target?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                }}
+              />
             ) : null}
           </div>
 
@@ -3330,7 +3361,7 @@ export default function ThesisPage() {
           )}
 
               {/* 2-Column Grid for Student */}
-              <div className="grid grid-cols-1 gap-6 xl:grid-cols-[minmax(0,0.92fr)_minmax(0,1.08fr)]">
+              <div id="student-group-section" className="grid grid-cols-1 gap-6 xl:grid-cols-[minmax(0,0.92fr)_minmax(0,1.08fr)] scroll-mt-6">
                 <StudentGroupCard
                   messages={messages}
                   group={currentGroup ?? null}

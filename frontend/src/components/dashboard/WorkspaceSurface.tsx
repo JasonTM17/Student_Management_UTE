@@ -22,6 +22,8 @@ interface WorkspaceMetricCardProps {
   valueClassName?: string;
   compact?: boolean;
   className?: string;
+  href?: string;
+  onClick?: () => void;
 }
 
 export function WorkspaceMetricCard({
@@ -33,41 +35,88 @@ export function WorkspaceMetricCard({
   valueClassName,
   compact = false,
   className,
+  href,
+  onClick,
 }: WorkspaceMetricCardProps) {
-  return (
-    <Card variant="default" className={cn('h-full min-w-0', className)}>
-      <CardContent
-        className={cn(
-          'flex h-full min-h-[126px] flex-col gap-3 p-4',
-          compact && 'min-h-[112px]',
-        )}
-      >
-        <div className="flex items-start justify-between gap-3">
-          <div className="min-w-0">
-            <div
-              className={cn(
-                'min-w-0 break-words text-2xl font-semibold leading-8 text-foreground',
-                compact && 'text-xl',
-                valueClassName,
-              )}
-            >
-              {value}
-            </div>
-            <div className="mt-0.5 break-words text-sm font-medium leading-5 text-foreground">{label}</div>
-          </div>
+  const content = (
+    <CardContent
+      className={cn(
+        'flex h-full min-h-[126px] flex-col gap-3 p-4',
+        compact && 'min-h-[112px]',
+      )}
+    >
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
           <div
             className={cn(
-              'flex h-9 w-9 shrink-0 items-center justify-center rounded-md',
-              toneClassName,
+              'min-w-0 break-words text-2xl font-semibold leading-8 text-foreground',
+              compact && 'text-xl',
+              valueClassName,
             )}
           >
-            {icon}
+            {value}
           </div>
+          <div className="mt-0.5 break-words text-sm font-medium leading-5 text-foreground">{label}</div>
         </div>
-        {detail ? (
-          <p className="mt-auto border-t border-border/70 pt-2 text-xs leading-5 text-muted-foreground">{detail}</p>
-        ) : null}
-      </CardContent>
+        <div
+          className={cn(
+            'flex h-9 w-9 shrink-0 items-center justify-center rounded-md',
+            toneClassName,
+          )}
+        >
+          {icon}
+        </div>
+      </div>
+      {detail ? (
+        <p className="mt-auto border-t border-border/70 pt-2 text-xs leading-5 text-muted-foreground">{detail}</p>
+      ) : null}
+    </CardContent>
+  );
+
+  const isInteractive = Boolean(href || onClick);
+  const cardClassName = cn(
+    'h-full min-w-0',
+    isInteractive &&
+      'cursor-pointer transition-all duration-150 hover:border-primary/50 hover:shadow-xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
+    className,
+  );
+
+  if (href) {
+    return (
+      <LocalizedLink
+        href={href}
+        className="block h-full no-underline rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+      >
+        <Card variant="default" className={cardClassName}>
+          {content}
+        </Card>
+      </LocalizedLink>
+    );
+  }
+
+  if (onClick) {
+    return (
+      <Card
+        variant="default"
+        role="button"
+        tabIndex={0}
+        onClick={onClick}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            onClick();
+          }
+        }}
+        className={cardClassName}
+      >
+        {content}
+      </Card>
+    );
+  }
+
+  return (
+    <Card variant="default" className={cardClassName}>
+      {content}
     </Card>
   );
 }
