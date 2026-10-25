@@ -110,19 +110,29 @@ export default function StudentGroupCard({
                   </span>
                 </div>
                 <h4 className="text-sm font-semibold text-foreground truncate" title={topicTitle ?? undefined}>
-                  {topicTitle ??
-                    (isCancelled ? (
-                      <span className="text-muted-foreground">{groupStatusLabel}</span>
-                    ) : (
-                      // Selection lives in the catalog now, so the empty
-                      // state is an actionable link rather than a label.
+                  {topicTitle ? (
+                    group?.topicId ? (
                       <LocalizedLink
-                        href="/dashboard/thesis/topics"
+                        href={`/dashboard/thesis/topics/${group.topicId}`}
                         className="text-primary hover:underline"
                       >
-                        {messages.thesis.chooseTopic}
+                        {topicTitle}
                       </LocalizedLink>
-                    ))}
+                    ) : (
+                      topicTitle
+                    )
+                  ) : isCancelled ? (
+                    <span className="text-muted-foreground">{groupStatusLabel}</span>
+                  ) : (
+                    // Selection lives in the catalog now, so the empty
+                    // state is an actionable link rather than a label.
+                    <LocalizedLink
+                      href="/dashboard/thesis/topics"
+                      className="text-primary hover:underline"
+                    >
+                      {messages.thesis.chooseTopic}
+                    </LocalizedLink>
+                  )}
                 </h4>
               </div>
 

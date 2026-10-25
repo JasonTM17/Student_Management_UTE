@@ -23,6 +23,7 @@ import { Button } from '@/components/ui/button';
 import { LocalizedLink } from '@/components/LocalizedLink';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
+import { DateTime24Field } from '@/components/ui/date-time-24-field';
 import { Modal } from '@/components/ui/modal';
 import { Select } from '@/components/ui/select';
 import { Combobox } from '@/components/ui/combobox';
@@ -1867,48 +1868,59 @@ export default function AdminThesisPage() {
           />
           <div>
             <p className="text-sm font-medium text-foreground">{messages.thesis.admin.lecturerWindow}</p>
-            <div className="mt-2 grid gap-4 sm:grid-cols-2">
-              <label className="flex flex-col gap-2 text-sm font-medium text-foreground">
-                {messages.thesis.admin.lecturerSubmitStart}
-                <Input type="datetime-local" step="60" value={formLecturerStart} onChange={(e) => setFormLecturerStart(e.target.value)} />
-              </label>
-              <label className="flex flex-col gap-2 text-sm font-medium text-foreground">
-                {messages.thesis.admin.lecturerSubmitEnd}
-                <Input type="datetime-local" step="60" value={formLecturerEnd} onChange={(e) => setFormLecturerEnd(e.target.value)} />
-              </label>
+            <div className="mt-2 grid items-end gap-4 sm:grid-cols-2">
+              <DateTime24Field
+                label={messages.thesis.admin.lecturerSubmitStart}
+                value={formLecturerStart}
+                onChange={setFormLecturerStart}
+              />
+              <DateTime24Field
+                label={messages.thesis.admin.lecturerSubmitEnd}
+                value={formLecturerEnd}
+                onChange={setFormLecturerEnd}
+              />
             </div>
           </div>
-          <label className="flex flex-col gap-2 text-sm font-medium text-foreground">
-            {messages.thesis.admin.proposalPublishAt}
-            <Input type="datetime-local" step="60" value={formProposal} onChange={(e) => setFormProposal(e.target.value)} />
-          </label>
-          <div className="grid gap-4 sm:grid-cols-2">
-            <label className="flex flex-col gap-2 text-sm font-medium text-foreground">
-              {messages.thesis.admin.registrationStart}
-              <Input type="datetime-local" step="60" value={formStart} onChange={(e) => setFormStart(e.target.value)} />
-            </label>
-            <label className="flex flex-col gap-2 text-sm font-medium text-foreground">
-              {messages.thesis.admin.registrationEnd}
-              <Input type="datetime-local" step="60" value={formEnd} onChange={(e) => setFormEnd(e.target.value)} />
-            </label>
+          <DateTime24Field
+            label={messages.thesis.admin.proposalPublishAt}
+            value={formProposal}
+            onChange={setFormProposal}
+          />
+          <div className="grid items-end gap-4 sm:grid-cols-2">
+            <DateTime24Field
+              label={messages.thesis.admin.registrationStart}
+              value={formStart}
+              onChange={setFormStart}
+            />
+            <DateTime24Field
+              label={messages.thesis.admin.registrationEnd}
+              value={formEnd}
+              onChange={setFormEnd}
+            />
           </div>
           {needsGvpb ? (
-            <label className="flex flex-col gap-2 text-sm font-medium text-foreground">
-              {messages.thesis.admin.gvpbDeadline} <span className="text-destructive">*</span>
-              <Input type="datetime-local" step="60" value={formGvpb} onChange={(e) => setFormGvpb(e.target.value)} required />
-            </label>
+            <DateTime24Field
+              label={<>{messages.thesis.admin.gvpbDeadline} <span className="text-destructive">*</span></>}
+              value={formGvpb}
+              onChange={setFormGvpb}
+              required
+            />
           ) : null}
           {needsGvpb ? (
-            <label className="flex flex-col gap-2 text-sm font-medium text-foreground">
-              {messages.thesis.admin.reportDate} <span className="text-destructive">*</span>
-              <Input type="datetime-local" step="60" value={formReportDate} onChange={(e) => setFormReportDate(e.target.value)} required />
-            </label>
+            <DateTime24Field
+              label={<>{messages.thesis.admin.reportDate} <span className="text-destructive">*</span></>}
+              value={formReportDate}
+              onChange={setFormReportDate}
+              required
+            />
           ) : null}
           {needsDefense ? (
-            <label className="flex flex-col gap-2 text-sm font-medium text-foreground">
-              {messages.thesis.admin.defenseDate} <span className="text-destructive">*</span>
-              <Input type="datetime-local" step="60" value={formDefenseDate} onChange={(e) => setFormDefenseDate(e.target.value)} required />
-            </label>
+            <DateTime24Field
+              label={<>{messages.thesis.admin.defenseDate} <span className="text-destructive">*</span></>}
+              value={formDefenseDate}
+              onChange={setFormDefenseDate}
+              required
+            />
           ) : null}
           <div className="flex justify-end gap-2 pt-2">
             <Button type="button" variant="outline" onClick={() => setShowCreateModal(false)}>
@@ -2098,48 +2110,59 @@ export default function AdminThesisPage() {
           />
           <div>
             <p className="text-sm font-medium text-foreground">{messages.thesis.admin.lecturerWindow}</p>
-            <div className="mt-2 grid gap-4 sm:grid-cols-2">
-              <label className="flex flex-col gap-2 text-sm font-medium text-foreground">
-                {messages.thesis.admin.lecturerSubmitStart}
-                <Input type="datetime-local" step="60" value={formLecturerStart} onChange={(e) => setFormLecturerStart(e.target.value)} />
-              </label>
-              <label className="flex flex-col gap-2 text-sm font-medium text-foreground">
-                {messages.thesis.admin.lecturerSubmitEnd}
-                <Input type="datetime-local" step="60" value={formLecturerEnd} onChange={(e) => setFormLecturerEnd(e.target.value)} />
-              </label>
+            <div className="mt-2 grid items-end gap-4 sm:grid-cols-2">
+              <DateTime24Field
+                label={messages.thesis.admin.lecturerSubmitStart}
+                value={formLecturerStart}
+                onChange={setFormLecturerStart}
+              />
+              <DateTime24Field
+                label={messages.thesis.admin.lecturerSubmitEnd}
+                value={formLecturerEnd}
+                onChange={setFormLecturerEnd}
+              />
             </div>
           </div>
-          <label className="flex flex-col gap-2 text-sm font-medium text-foreground">
-            {messages.thesis.admin.proposalPublishAt}
-            <Input type="datetime-local" step="60" value={formProposal} onChange={(e) => setFormProposal(e.target.value)} />
-          </label>
-          <div className="grid gap-4 sm:grid-cols-2">
-            <label className="flex flex-col gap-2 text-sm font-medium text-foreground">
-              {messages.thesis.admin.registrationStart}
-              <Input type="datetime-local" step="60" value={formStart} onChange={(e) => setFormStart(e.target.value)} />
-            </label>
-            <label className="flex flex-col gap-2 text-sm font-medium text-foreground">
-              {messages.thesis.admin.registrationEnd}
-              <Input type="datetime-local" step="60" value={formEnd} onChange={(e) => setFormEnd(e.target.value)} />
-            </label>
+          <DateTime24Field
+            label={messages.thesis.admin.proposalPublishAt}
+            value={formProposal}
+            onChange={setFormProposal}
+          />
+          <div className="grid items-end gap-4 sm:grid-cols-2">
+            <DateTime24Field
+              label={messages.thesis.admin.registrationStart}
+              value={formStart}
+              onChange={setFormStart}
+            />
+            <DateTime24Field
+              label={messages.thesis.admin.registrationEnd}
+              value={formEnd}
+              onChange={setFormEnd}
+            />
           </div>
           {needsGvpb ? (
-            <label className="flex flex-col gap-2 text-sm font-medium text-foreground">
-              {messages.thesis.admin.gvpbDeadline} <span className="text-destructive">*</span>
-              <Input type="datetime-local" step="60" value={formGvpb} onChange={(e) => setFormGvpb(e.target.value)} required />
-            </label>
+            <DateTime24Field
+              label={<>{messages.thesis.admin.gvpbDeadline} <span className="text-destructive">*</span></>}
+              value={formGvpb}
+              onChange={setFormGvpb}
+              required
+            />
           ) : null}
           {needsGvpb ? (
-            <label className="flex flex-col gap-2 text-sm font-medium text-foreground">
-              {messages.thesis.admin.reportDate} <span className="text-destructive">*</span>
-              <Input type="datetime-local" step="60" value={formReportDate} onChange={(e) => setFormReportDate(e.target.value)} required />
-            </label>
+            <DateTime24Field
+              label={<>{messages.thesis.admin.reportDate} <span className="text-destructive">*</span></>}
+              value={formReportDate}
+              onChange={setFormReportDate}
+              required
+            />
           ) : null}
           {needsDefense ? (
-            <label className="flex flex-col gap-2 text-sm font-medium text-foreground">
-              {messages.thesis.admin.defenseDate} <span className="text-destructive">*</span>
-              <Input type="datetime-local" step="60" value={formDefenseDate} onChange={(e) => setFormDefenseDate(e.target.value)} required />
-            </label>
+            <DateTime24Field
+              label={<>{messages.thesis.admin.defenseDate} <span className="text-destructive">*</span></>}
+              value={formDefenseDate}
+              onChange={setFormDefenseDate}
+              required
+            />
           ) : null}
           <div className="flex justify-end gap-2 pt-2">
             <Button type="button" variant="outline" onClick={() => {
@@ -2269,17 +2292,15 @@ export default function AdminThesisPage() {
               {extendDeadlineError}
             </div>
           ) : null}
-          <label className="flex flex-col gap-2 text-sm font-medium text-foreground">
-            {extendDeadlineKind === 'gvpb'
+          <DateTime24Field
+            id="extend-deadline"
+            label={extendDeadlineKind === 'gvpb'
               ? messages.thesis.admin.gvpbDeadline
               : messages.thesis.admin.reportDeadline}
-            <Input
-              type="datetime-local" step="0.001"
-              value={extendDeadlineValue}
-              onChange={(e) => setExtendDeadlineValue(e.target.value)}
-              required
-            />
-          </label>
+            value={extendDeadlineValue}
+            onChange={setExtendDeadlineValue}
+            required
+          />
           {extendDeadlineKind === 'gvpb' ? (
             <label className="flex flex-col gap-2 text-sm font-medium text-foreground">
               {messages.thesis.admin.governanceReasonLabel}
