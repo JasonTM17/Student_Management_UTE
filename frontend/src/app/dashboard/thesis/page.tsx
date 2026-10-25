@@ -368,6 +368,7 @@ export default function ThesisPage() {
     for (const c of councilsList) {
       if (!isCurrent()) return;
       const isMemberOrAdmin = isAdmin || c.members?.some((m) => m.lecturerId === myLecturerId);
+      if (!isMemberOrAdmin) continue;
       const tids = (c as unknown as { topicIds?: string[] }).topicIds || [];
       for (const tid of tids) {
         if (!isCurrent()) return;

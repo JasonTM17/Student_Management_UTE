@@ -46,16 +46,24 @@ export default function ThesisTopicCatalogPage() {
     let cancelled = false;
     const loadSups = async () => {
       try {
-        const results = await Promise.all(
-          workspace.topics.map(async (t) => {
+        // Limit concurrent supervisor requests to avoid clogging browser connections
+        const items = workspace.topics;
+        const limit = 8;
+        const results: (readonly [string, ThesisTopicSupervisor[]])[] = new Array(items.length);
+        let idx = 0;
+        const workers = new Array(Math.min(limit, items.length)).fill(0).map(async () => {
+          while (idx < items.length) {
+            const i = idx++;
+            const t = items[i];
             try {
               const sups = await thesisApi.listSupervisors(t.id);
-              return [t.id, sups] as const;
+              results[i] = [t.id, sups] as const;
             } catch {
-              return [t.id, [] as ThesisTopicSupervisor[]] as const;
+              results[i] = [t.id, [] as ThesisTopicSupervisor[]] as const;
             }
-          }),
-        );
+          }
+        });
+        await Promise.all(workers);
         if (!cancelled) {
           setTopicSupervisorsMap(Object.fromEntries(results));
         }

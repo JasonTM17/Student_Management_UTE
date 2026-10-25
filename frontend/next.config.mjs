@@ -11,10 +11,19 @@
 const nextConfig = {
   reactStrictMode: true,
   output: process.env.OUTPUT_STANDALONE === 'true' || process.platform !== 'win32' ? 'standalone' : undefined,
+  compress: true,
+  poweredByHeader: false,
   experimental: {
     serverActions: {
       bodyParser: false,
     },
+    optimizePackageImports: [
+      'lucide-react',
+      'date-fns',
+      'chart.js',
+      'react-chartjs-2',
+      '@tanstack/react-query',
+    ],
   },
   images: {
     unoptimized: true,
