@@ -432,6 +432,10 @@ export interface ThesisTopic {
   resultReason?: string | null;
   gvpbLecturerId?: string | null;
   gvpbWaivedReason?: string | null;
+  /** Advisor roster resolved with the topic in one batched read — names only.
+   * The email column stays on the per-topic endpoint, which keeps its
+   * staff/owner-only visibility. Absent on older backends. */
+  supervisors?: ThesisTopicSupervisor[];
 }
 
 /** UI capabilities for a topic returned by the authenticated staff catalog.
@@ -519,6 +523,7 @@ export interface ThesisStudentResult {
   studentNumber: string;
   firstName: string;
   lastName: string;
+  email?: string | null;
   curriculumCode?: string | null;
   curriculumName?: string | null;
 }
@@ -694,6 +699,17 @@ export function createAssistantRequestId(): string {
 }
 
 /** Parse one or more SSE frames. Kept pure so the stream contract can be tested without a browser. */
+const thesisSupervisorsCache = new Map<string, { promise: Promise<ThesisTopicSupervisor[]>; timestamp: number }>();
+const SUPERVISORS_CACHE_TTL_MS = 5 * 60_000;
+
+export function clearThesisSupervisorsCache(topicId?: string): void {
+  if (topicId) {
+    thesisSupervisorsCache.delete(topicId);
+  } else {
+    thesisSupervisorsCache.clear();
+  }
+}
+
 export const thesisApi = {
   listRounds: async (status?: ThesisRoundStatus): Promise<ThesisRound[]> => {
     // No status is the "active" list: archived CLOSED rounds stay out of
@@ -1520,6 +1536,7 @@ export const thesisApi = {
     topicId: string,
     supervisorIds: string[],
   ): Promise<void> => {
+    clearThesisSupervisorsCache(topicId);
     await api.put('/thesis/topics/' + topicId + '/supervisors', {
       supervisorIds,
     });
@@ -1527,11 +1544,24 @@ export const thesisApi = {
 
   listSupervisors: async (
     topicId: string,
+    options?: { forceRefresh?: boolean },
   ): Promise<ThesisTopicSupervisor[]> => {
-    const response = await api.get<ThesisTopicSupervisor[]>(
-      '/thesis/topics/' + topicId + '/supervisors',
-    );
-    return response.data;
+    const now = Date.now();
+    const cached = thesisSupervisorsCache.get(topicId);
+    if (!options?.forceRefresh && cached && now - cached.timestamp < SUPERVISORS_CACHE_TTL_MS) {
+      return cached.promise;
+    }
+    const promise = api
+      .get<ThesisTopicSupervisor[]>('/thesis/topics/' + topicId + '/supervisors')
+      .then((res) => res.data)
+      .catch((err) => {
+        if (thesisSupervisorsCache.get(topicId)?.promise === promise) {
+          thesisSupervisorsCache.delete(topicId);
+        }
+        throw err;
+      });
+    thesisSupervisorsCache.set(topicId, { promise, timestamp: now });
+    return promise;
   },
 
   myWorkload: async (): Promise<ThesisLecturerWorkload> => {

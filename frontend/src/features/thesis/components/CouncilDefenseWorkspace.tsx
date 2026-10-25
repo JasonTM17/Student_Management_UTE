@@ -278,8 +278,8 @@ export default function CouncilDefenseWorkspace({
                           {isFinalized ? (
                             <div className="flex items-center gap-1.5 rounded-md bg-status-success/15 px-3 py-1 text-xs font-semibold text-status-success-foreground border border-status-success/30 shrink-0">
                               <Check className="h-3.5 w-3.5" />
-                              {messages.thesis.grading.finalizedBadge}:{' '}
-                              {topic.finalScore}
+                              {messages.thesis.grading.finalizedBadge} (Trung bình cộng):{' '}
+                              <span className="font-mono">{topic.finalScore}</span>
                             </div>
                           ) : null}
                         </div>
@@ -345,11 +345,41 @@ export default function CouncilDefenseWorkspace({
                             {messages.thesis.grading.scoresLoadFailed}
                           </p>
                         ) : scores.length > 0 && (
-                          <div className="rounded-lg bg-background/60 p-2.5 text-xs space-y-1.5 border border-border/40">
-                            <span className="font-semibold text-muted-foreground uppercase text-[11px] tracking-wider">
-                              {messages.thesis.grading.scoresListTitle}:
-                            </span>
-                            <div className="flex flex-wrap gap-2">
+                          <div className="rounded-lg bg-background/60 p-2.5 text-xs space-y-2 border border-border/40">
+                            <div className="flex flex-wrap items-center justify-between gap-2">
+                              <span className="font-semibold text-muted-foreground uppercase text-[11px] tracking-wider">
+                                {messages.thesis.grading.scoresListTitle} ({scores.length} điểm đã chấm):
+                              </span>
+                              {(() => {
+                                const defenseScores = scores.filter(
+                                  (s) => s.component === 'DEFENSE' && s.score != null,
+                                );
+                                if (defenseScores.length > 0) {
+                                  const rawAvg =
+                                    defenseScores.reduce(
+                                      (acc, curr) => acc + Number(curr.score),
+                                      0,
+                                    ) / defenseScores.length;
+                                  const displayAvg = rawAvg.toFixed(2);
+                                  return (
+                                    <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-emerald-700 dark:text-emerald-300">
+                                      <span>
+                                        {isFinalized
+                                          ? 'Điểm chốt (Trung bình cộng):'
+                                          : 'Trung bình cộng tạm tính:'}
+                                      </span>
+                                      <span className="rounded bg-emerald-500/15 border border-emerald-500/30 px-2 py-0.5 font-mono text-sm font-bold text-emerald-700 dark:text-emerald-300">
+                                        {isFinalized && topic?.finalScore != null
+                                          ? topic.finalScore
+                                          : displayAvg}
+                                      </span>
+                                    </span>
+                                  );
+                                }
+                                return null;
+                              })()}
+                            </div>
+                            <div className="space-y-1.5 pt-1">
                               {scores.map((s, sIdx) => {
                                 const lect = lecturers.find(
                                   (l) => l.id === s.lecturerId,
@@ -358,21 +388,22 @@ export default function CouncilDefenseWorkspace({
                                   ? `${lect.user.lastName} ${lect.user.firstName}`
                                   : s.lecturerId;
                                 return (
-                                  <span
+                                  <div
                                     key={sIdx}
-                                    className="inline-flex items-center rounded-md bg-muted px-2 py-1 text-[11px] font-medium text-foreground border border-border/50"
-                                    title={s.comment || undefined}
+                                    className="flex flex-col sm:flex-row sm:items-center justify-between gap-1.5 rounded-md bg-muted/60 px-3 py-1.5 text-xs text-foreground border border-border/50"
                                   >
-                                    {name}:{' '}
-                                    <strong className="ml-1 text-primary">
-                                      {s.score}
-                                    </strong>
+                                    <div className="flex items-center gap-2 shrink-0">
+                                      <span className="font-semibold text-foreground">{name}:</span>
+                                      <span className="rounded bg-primary/10 px-2 py-0.5 font-mono font-bold text-primary">
+                                        {s.score}
+                                      </span>
+                                    </div>
                                     {s.comment ? (
-                                      <span className="ml-1 italic text-muted-foreground line-clamp-1 max-w-[220px]">
-                                        — {s.comment}
+                                      <span className="text-muted-foreground italic text-xs break-words sm:text-right">
+                                        &ldquo;{s.comment}&rdquo;
                                       </span>
                                     ) : null}
-                                  </span>
+                                  </div>
                                 );
                               })}
                             </div>

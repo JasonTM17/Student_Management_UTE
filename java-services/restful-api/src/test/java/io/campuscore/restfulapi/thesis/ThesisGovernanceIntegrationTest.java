@@ -86,6 +86,22 @@ class ThesisGovernanceIntegrationTest {
 
     @BeforeEach
     void cleanDatabase() {
+        jdbc.execute("CREATE SCHEMA IF NOT EXISTS notifications");
+        jdbc.execute("""
+                CREATE TABLE IF NOT EXISTS notifications.notification (
+                    id VARCHAR(120) PRIMARY KEY,
+                    user_id VARCHAR(120) NOT NULL,
+                    title VARCHAR(240) NOT NULL,
+                    message VARCHAR(2000) NOT NULL,
+                    type VARCHAR(60) NOT NULL,
+                    link VARCHAR(500),
+                    announcement_id VARCHAR(120), source_key VARCHAR(160),
+                    is_read BOOLEAN NOT NULL DEFAULT FALSE,
+                    read_at TIMESTAMP,
+                    created_at TIMESTAMP NOT NULL,
+                    updated_at TIMESTAMP NOT NULL
+                )
+                """);
         jdbc.update("DELETE FROM thesis.thesis_group_report");
         jdbc.update("DELETE FROM thesis.thesis_topic_score");
         jdbc.update("DELETE FROM thesis.thesis_council_topic");
@@ -1160,7 +1176,7 @@ class ThesisGovernanceIntegrationTest {
     }
 
     @Test
-    void teammateSearchStaysClosedOutsideRegistrationAndNeverMatchesEmail() throws Exception {
+    void teammateSearchStaysClosedOutsideRegistrationAndMatchesEmail() throws Exception {
         insertRound("Gov Search Closed Round", "REGISTRATION_CLOSED",
                 Instant.now().minusSeconds(7_200), Instant.now().minusSeconds(3_600));
         ensureStudent("gov-search-target", "gov-search-user-t", "unique-target-mail@campuscore.edu");
@@ -1179,11 +1195,15 @@ class ThesisGovernanceIntegrationTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$[0].studentId").value("gov-search-target"));
 
-        // An email fragment must not act as an existence oracle.
+        // Email is now a first-class search surface for leaders inviting
+        // classmates (the roster UI also displays it), so an email fragment
+        // resolves the student and the hit carries the address.
         mvc.perform(get("/api/v1/thesis/students/search").param("q", "unique-target-mail")
                         .with(studentJwt("gov-search-caller")))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.length()").value(0));
+                .andExpect(jsonPath("$.length()").value(1))
+                .andExpect(jsonPath("$[0].studentId").value("gov-search-target"))
+                .andExpect(jsonPath("$[0].email").value("unique-target-mail@campuscore.edu"));
     }
 
     @Test

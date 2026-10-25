@@ -1,6 +1,7 @@
 package io.campuscore.restfulapi.academic.service;
 
 import io.campuscore.restfulapi.academic.registration.service.CreditLimitApplicationService;
+import io.campuscore.restfulapi.academic.model.SemesterStatuses;
 import io.campuscore.restfulapi.audit.service.AdminAuditRecorder;
 import io.campuscore.restfulapi.exception.DomainException;
 import java.time.Instant;

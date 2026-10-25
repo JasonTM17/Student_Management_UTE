@@ -299,9 +299,20 @@ export default function AdminThesisPage() {
       if (!isCurrent()) return;
       const byId = new Map<string, (typeof published)[number]>();
       for (const topic of [...published, ...drafts]) byId.set(topic.id, topic);
-      setTopics(Array.from(byId.values()));
+      const merged = Array.from(byId.values());
+      setTopics(merged);
       setGroups(g);
       if (expandedRoundRef.current === roundId) setCouncils(c);
+      // Topic payloads carry their supervisor roster, so the picker hints are
+      // resolved without a per-topic request. Ids the list cannot cover (e.g.
+      // council topics in statuses outside the merge) still fetch below.
+      const embedded: Record<string, string[]> = {};
+      for (const t of merged) {
+        if (!t.supervisors) continue;
+        embedded[t.id] = t.supervisors.map((s) => s.lecturerId);
+        topicSupervisorRequestsRef.current.add(t.id);
+      }
+      setTopicSupervisors((prev) => ({ ...prev, ...embedded }));
       ensureTopicSupervisors(c.flatMap((council) => council.topicIds ?? []));
       if (lecturers.length === 0) {
         await loadLecturers();
@@ -430,6 +441,19 @@ export default function AdminThesisPage() {
       setIsSaving(false);
     }
   };
+
+  const handleOpenAssignTopicModal = useCallback((councilId: string, roundId: string) => {
+    setModalError('');
+    setTargetCouncilIdForTopic(councilId);
+    setTargetRoundIdForCouncil(roundId);
+    const assigned = new Set(councils.flatMap((c) => c.topicIds ?? []));
+    ensureTopicSupervisors(
+      topics
+        .filter((t) => !assigned.has(t.id) && t.finalScore == null && (t.status === 'PUBLISHED' || t.status === 'APPROVED'))
+        .map((t) => t.id),
+    );
+    setShowAssignTopicModal(true);
+  }, [councils, ensureTopicSupervisors, topics]);
 
   const toggleExpand = (roundId: string) => {
     if (expandedRoundId === roundId) {
@@ -1570,29 +1594,7 @@ export default function AdminThesisPage() {
                                           variant="ghost"
                                           size="sm"
                                           className="h-7 text-xs px-2 text-primary"
-                                          onClick={() => {
-                                            setModalError('');
-                                            setTargetCouncilIdForTopic(council.id);
-                                            setTargetRoundIdForCouncil(round.id);
-                                            // Warm supervisor rows for every
-                                            // topic the modal may offer so the
-                                            // disabled reasons land together.
-                                            const assigned = new Set(
-                                              councils.flatMap((c) => c.topicIds ?? []),
-                                            );
-                                            ensureTopicSupervisors(
-                                              topics
-                                                .filter(
-                                                  (t) =>
-                                                    !assigned.has(t.id) &&
-                                                    t.finalScore == null &&
-                                                    (t.status === 'PUBLISHED' ||
-                                                      t.status === 'APPROVED'),
-                                                )
-                                                .map((t) => t.id),
-                                            );
-                                            setShowAssignTopicModal(true);
-                                          }}
+                                          onClick={() => handleOpenAssignTopicModal(council.id, round.id)}
                                         >
                                           <Plus className="mr-1 h-3 w-3" />
                                           {messages.thesis.councils.assignTopic}

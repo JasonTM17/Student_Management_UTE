@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import {
   BookOpen,
   CalendarClock,
@@ -68,7 +68,14 @@ export function ThesisWorkflowStepper({ round, formatDateTime }: ThesisWorkflowS
   const [selectedStage, setSelectedStage] = useState<number>(activeStage);
   const [isDetailExpanded, setIsDetailExpanded] = useState<boolean>(true);
 
+  // A different round or workflow status starts at its own current stage.
+  // Keep manual browsing intact when the same round is merely refreshed.
+  useEffect(() => {
+    setSelectedStage(activeStage);
+  }, [round.id, round.status, activeStage]);
+
   const stages = useMemo(() => {
+    const reportDeadline = round.reportDeadline ?? round.gvpbDeadline;
     return copy.stages.map((stage, index) => {
       const step = index + 1;
       const timeline =
@@ -81,8 +88,8 @@ export function ThesisWorkflowStepper({ round, formatDateTime }: ThesisWorkflowS
             : step === 3
               ? `${formatDateTime(round.registrationStart)} → ${formatDateTime(round.registrationEnd)}`
               : step === 4
-                ? round.gvpbDeadline
-                  ? fill(copy.reportDeadline, { date: formatDateTime(round.gvpbDeadline) })
+                ? reportDeadline
+                  ? fill(copy.reportDeadline, { date: formatDateTime(reportDeadline) })
                   : copy.fallbackBeforeDefence
                 : (round.defenseDate || round.reportDate)
                   ? fill(copy.reportDate, { date: formatDateTime(round.defenseDate || round.reportDate || '') })
@@ -113,6 +120,8 @@ export function ThesisWorkflowStepper({ round, formatDateTime }: ThesisWorkflowS
   }, [copy, round, progressStage, formatDateTime]);
 
   const currentStageInfo = stages.find((s) => s.step === selectedStage) || stages[activeStage - 1] || stages[0];
+
+  if (round.status === 'CANCELLED') return null;
 
   return (
     <div className="rounded-2xl border border-primary/25 bg-gradient-to-b from-primary/[0.04] via-card to-card p-5 sm:p-6 shadow-sm">

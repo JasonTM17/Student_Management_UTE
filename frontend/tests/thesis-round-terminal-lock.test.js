@@ -247,7 +247,7 @@ test('a live round still renders the counter-review form', () => {
 
 // The workflow stepper is the round's progress summary: once results are
 // published or the round is closed, no stage may still claim to be "current".
-function renderWorkflowStepper(status, locale) {
+function renderWorkflowStepper(status, locale, overrides = {}) {
   const React = require('react');
   const { renderToStaticMarkup } = require('react-dom/server');
   const dictionaries = loadModule('src/i18n/messages-thesis-workflow.ts');
@@ -266,6 +266,7 @@ function renderWorkflowStepper(status, locale) {
     gvpbDeadline: null,
     reportDate: null,
     defenseDate: null,
+    ...overrides,
   };
   const html = renderToStaticMarkup(React.createElement(ThesisWorkflowStepper, {
     round,
@@ -277,6 +278,19 @@ function renderWorkflowStepper(status, locale) {
 const occurrences = (html, text) => html.split(text).length - 1;
 
 for (const locale of ['en', 'vi']) {
+  test(`cancelled round does not present a running workflow (${locale})`, () => {
+    const { html } = renderWorkflowStepper('CANCELLED', locale);
+    assert.equal(html, '', 'the cancelled round summary already owns its status; do not invite progression');
+  });
+
+  test(`report guidance uses the report override, keeping reviewer scoring separate (${locale})`, () => {
+    const { html } = renderWorkflowStepper('REGISTRATION_CLOSED', locale, {
+      reportDeadline: '2026-10-30T10:00:00Z', gvpbDeadline: '2026-10-28T10:00:00Z',
+    });
+    assert.ok(html.includes('2026-10-30T10:00:00Z'), 'show the effective report deadline');
+    assert.ok(html.includes('2026-10-28T10:00:00Z'), 'retain the independent reviewer scoring deadline');
+  });
+
   for (const status of ['RESULTS_PUBLISHED', 'CLOSED']) {
     test(`workflow stepper marks every stage done once the round is ${status} (${locale})`, () => {
       const { html, progress } = renderWorkflowStepper(status, locale);

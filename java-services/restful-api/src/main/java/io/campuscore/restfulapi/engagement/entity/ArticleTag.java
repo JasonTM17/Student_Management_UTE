@@ -16,10 +16,10 @@ import java.time.Instant;
 public class ArticleTag {
 
     @Id
-    @Column(nullable = false, length = 64)
+    @Column(nullable = false, length = 60)
     private String id;
 
-    @Column(nullable = false, length = 80, unique = true)
+    @Column(nullable = false, length = 60, unique = true)
     private String slug;
 
     @Column(name = "\"nameVi\"", nullable = false, length = 80)

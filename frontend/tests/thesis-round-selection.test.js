@@ -19,6 +19,21 @@ const mod = { exports: {} };
 new Function('module', 'exports', 'require', js)(mod, mod.exports, require);
 const { pickPreferredThesisRound, sortThesisRoundsForOverview, mergeThesisRounds } = mod.exports;
 
+test('round picker distinguishes live and cancelled rounds with localized status labels', () => {
+  const labels = { REGISTRATION_OPEN: 'Đang mở đăng ký', CANCELLED: 'Đã hủy' };
+  const rounds = [
+    { id: 'cancelled', name: 'Demo KLTN', status: 'CANCELLED', registrationStart: '2026-10-25' },
+    { id: 'open', name: 'Demo KLTN', status: 'REGISTRATION_OPEN', registrationStart: '2026-10-24' },
+  ];
+  const groups = mod.exports.groupThesisRoundsForPicker(rounds, labels);
+  assert.deepEqual(groups.map(g => g.label), ['Đang mở đăng ký', 'Đã hủy']);
+  assert.equal(groups[0].options[0].value, 'open');
+  assert.equal(groups[0].options[0].label, 'Đang mở đăng ký · Demo KLTN');
+  assert.equal(groups[1].options[0].label, 'Đã hủy · Demo KLTN');
+  assert.equal(rounds[0].id, 'cancelled', 'sorting must not mutate the source');
+  assert.equal(mod.exports.groupThesisRoundsForPicker(rounds, { CANCELLED: 'Cancelled', REGISTRATION_OPEN: 'Open' })[0].label, 'Open');
+});
+
 const round = (id, status = 'REGISTRATION_CLOSED', start = '2026-09-01', thesisType = 'KLTN') => ({
   id,
   status,
