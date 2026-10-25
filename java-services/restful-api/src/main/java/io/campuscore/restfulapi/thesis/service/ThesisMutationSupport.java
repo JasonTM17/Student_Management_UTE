@@ -157,6 +157,10 @@ final class ThesisMutationSupport {
         return new DomainException(HttpStatus.BAD_REQUEST, "VALIDATION_ERROR", message);
     }
 
+    static DomainException invalid(String message, Map<String, Object> details) {
+        return new DomainException(HttpStatus.BAD_REQUEST, "VALIDATION_ERROR", message, details);
+    }
+
     static DomainException conflict(String code, String message) {
         return new DomainException(HttpStatus.CONFLICT, code, message);
     }

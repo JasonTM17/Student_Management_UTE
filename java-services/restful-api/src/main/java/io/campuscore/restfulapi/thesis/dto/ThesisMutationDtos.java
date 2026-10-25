@@ -200,8 +200,8 @@ public final class ThesisMutationDtos {
 
     /**
      * Minimal directory entry so a leader can invite a classmate into the
-     * group. Deliberately carries no email: a directory lookup must not
-     * expose contact PII to the whole student body.
+     * group. Carries the campus email so a leader can confirm the match;
+     * the lookup only runs for students while a round accepts registration.
      */
     public record StudentSearchResponse(
             String studentId,

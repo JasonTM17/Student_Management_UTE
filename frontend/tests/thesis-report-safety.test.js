@@ -212,8 +212,9 @@ test('admin close-registration confirm is backed by the server preview', () => {
     previewAt > -1 && confirmAt > previewAt && closeAt > confirmAt,
     'preview fetch must precede the confirm dialog and the close transition',
   );
-  // A preview read failure still allows closing — never block on a read.
-  assert.match(adminPage, /\.catch\(\(\) => null\)/);
+  // A preview read failure must be translated and shown before confirmation;
+  // the close endpoint cannot run without the server-side consequence preview.
+  assert.match(adminPage, /closeRegistrationPreview\(roundId\)[\s\S]{0,180}catch \(previewError: unknown\)[\s\S]{0,140}setError\(transitionErrorMessage\(previewError\)\)[\s\S]{0,60}return;/);
   // A passed report deadline fills the dialog warning slot.
   assert.match(adminPage, /closePreviewDeadlinePassed/);
 });

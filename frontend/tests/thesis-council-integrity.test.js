@@ -474,6 +474,7 @@ function loadWorkspaceComponent() {
     '@/types/api': {},
     '@/lib/thesis-api': {},
     '@/features/thesis/components/thesis-helpers': helpers,
+    '@/features/thesis/components/ScoreBreakdownPanel': () => null,
     '@/lib/thesis-text': thesisText,
   }).default;
 }

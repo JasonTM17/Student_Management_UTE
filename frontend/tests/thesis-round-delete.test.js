@@ -108,8 +108,10 @@ test('delete-round UI copy exists in both locales', () => {
 
 const page = read('src/app/admin/thesis/page.tsx');
 
-test('the delete button only renders when the backend marks the round deletable', () => {
-  assert.match(page, /round\.deletion\?\.deletable \? \(/);
+test('the delete button is disabled with a reason until the backend marks the round deletable', () => {
+  assert.match(page, /round\.deletion \? \(/);
+  assert.match(page, /disabled=\{isSaving \|\| !round\.deletion\.deletable\}/);
+  assert.match(page, /deleteRoundUnavailable/);
   assert.match(page, /kind: 'deleteRound', roundId: round\.id, roundName: round\.name/);
 });
 
@@ -119,7 +121,7 @@ test('deletion requires the typed round name and carries the reason', () => {
   assert.match(page, /messages\.thesis\.admin\.roundDeleted/);
 });
 
-test('a cancelled round with data keeps blockers visible instead of the button', () => {
-  assert.match(page, /round\.status === 'CANCELLED' && deleteBlockerSummary\(round\)/);
-  assert.match(page, /deleteBlockersLabel[\s\S]{0,80}replace\('\{counts\}'/);
+test('a non-empty round shows the data counts beside the disabled delete action', () => {
+  assert.match(page, /deleteUnavailableReason = round\.deletion\?\.deletable[\s\S]{0,180}deleteBlockerSummary\(round\)/);
+  assert.match(page, /id=\{`delete-round-reason-\$\{round\.id\}`\}/);
 });
