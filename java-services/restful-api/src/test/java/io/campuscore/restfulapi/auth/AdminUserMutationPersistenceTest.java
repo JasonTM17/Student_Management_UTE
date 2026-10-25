@@ -1,6 +1,7 @@
 package io.campuscore.restfulapi.auth;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
@@ -12,6 +13,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.campuscore.restfulapi.academic.service.LecturerMutationService;
 import io.campuscore.restfulapi.auth.service.AdminUserMutationService;
+import io.campuscore.restfulapi.exception.DomainException;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CountDownLatch;
@@ -163,6 +165,50 @@ class AdminUserMutationPersistenceTest {
                         .content("{\"status\":\"LOCKED\"}"))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value("SELF_DEACTIVATION_NOT_ALLOWED"));
+    }
+
+    @Test
+    void lastActiveSuperAdminCannotBeDemoted() {
+        makeOnlyActiveSuperAdmin("target-user");
+
+        assertThatThrownBy(() -> userMutations.update(
+                        "target-user", Map.of("role", "ADMIN"), true, "actor-user"))
+                .isInstanceOfSatisfying(DomainException.class,
+                        exception -> assertThat(exception.getCode()).isEqualTo("LAST_SUPER_ADMIN_REQUIRED"));
+
+        assertThat(roleNames("target-user")).contains("SUPER_ADMIN");
+    }
+
+    @Test
+    void lastActiveSuperAdminCannotBeDeactivated() {
+        makeOnlyActiveSuperAdmin("target-user");
+
+        assertThatThrownBy(() -> userMutations.update(
+                        "target-user", Map.of("status", "DISABLED"), true, "actor-user"))
+                .isInstanceOfSatisfying(DomainException.class,
+                        exception -> assertThat(exception.getCode()).isEqualTo("LAST_SUPER_ADMIN_REQUIRED"));
+
+        assertThat(jdbc.queryForObject(
+                "SELECT \"status\" FROM \"campuscore_auth\".\"User\" WHERE \"id\" = 'target-user'",
+                String.class)).isEqualTo("ACTIVE");
+    }
+
+    @Test
+    void lastActiveSuperAdminCannotBeDeleted() {
+        makeOnlyActiveSuperAdmin("target-user");
+
+        assertThatThrownBy(() -> userMutations.delete("target-user", true, "actor-user"))
+                .isInstanceOfSatisfying(DomainException.class,
+                        exception -> assertThat(exception.getCode()).isEqualTo("LAST_SUPER_ADMIN_REQUIRED"));
+
+        assertThat(jdbc.queryForObject(
+                "SELECT COUNT(*) FROM \"campuscore_auth\".\"User\" WHERE \"id\" = 'target-user'",
+                Integer.class)).isEqualTo(1);
+    }
+
+    private void makeOnlyActiveSuperAdmin(String userId) {
+        jdbc.update("DELETE FROM \"campuscore_auth\".\"UserRole\" WHERE \"roleId\" = 'role-super-admin'");
+        insertUserRole("last-super-role", userId, "role-super-admin");
     }
 
     @Test

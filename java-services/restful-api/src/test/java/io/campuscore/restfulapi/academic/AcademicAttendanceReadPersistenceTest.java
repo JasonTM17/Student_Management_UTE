@@ -6,6 +6,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import java.sql.Timestamp;
 import java.time.Instant;
 import java.time.ZoneOffset;
@@ -20,6 +21,7 @@ import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.MvcResult;
 import org.springframework.test.web.servlet.request.RequestPostProcessor;
 import io.campuscore.restfulapi.testsupport.CurrentAccountJwt;
 
@@ -39,6 +41,9 @@ class AcademicAttendanceReadPersistenceTest {
 
     @Autowired
     private MockMvc mvc;
+
+    @Autowired
+    private ObjectMapper objectMapper;
 
     @BeforeEach
     void prepareReadOnlyFixture() {
@@ -87,7 +92,74 @@ class AcademicAttendanceReadPersistenceTest {
                 .andExpect(jsonPath("$[0].total").value(3))
                 .andExpect(jsonPath("$[0].present").value(1))
                 .andExpect(jsonPath("$[0].late").value(1))
-                .andExpect(jsonPath("$[0].attendanceRate").value(33));
+                .andExpect(jsonPath("$[0].attendanceRate").value(67));
+    }
+
+    @Test
+    void studentAndSectionRatesUseTheSameCountableRecordsAndExcludeExcused() throws Exception {
+        // section-spring already has one EXCUSED record for student-1. Add a
+        // matching PRESENT, LATE and ABSENT record so both summaries see the
+        // same four records: 2 attended of 3 countable, rounded half-up to 67%.
+        insertAttendance("attendance-spring-present", "student-1", "section-spring",
+                BASE_TIME.plusSeconds(2L * 24 * 60 * 60), "PRESENT", null);
+        insertAttendance("attendance-spring-late", "student-1", "section-spring",
+                BASE_TIME.plusSeconds(3L * 24 * 60 * 60), "LATE", null);
+        insertAttendance("attendance-spring-absent", "student-1", "section-spring",
+                BASE_TIME.plusSeconds(4L * 24 * 60 * 60), "ABSENT", null);
+
+        MvcResult studentSummary = mvc.perform(get("/api/v1/attendance/my/summary")
+                        .queryParam("semesterId", "semester-2")
+                        .with(studentJwt("student-user-1", "student-1")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(1))
+                .andExpect(jsonPath("$[0].sectionId").value("section-spring"))
+                .andExpect(jsonPath("$[0].total").value(4))
+                .andExpect(jsonPath("$[0].present").value(1))
+                .andExpect(jsonPath("$[0].late").value(1))
+                .andExpect(jsonPath("$[0].absent").value(1))
+                .andExpect(jsonPath("$[0].excused").value(1))
+                .andReturn();
+
+        MvcResult sectionSummary = mvc.perform(get("/api/v1/attendance/section/section-spring/summary").with(adminJwt()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.totalRecords").value(4))
+                .andExpect(jsonPath("$.present").value(1))
+                .andExpect(jsonPath("$.late").value(1))
+                .andExpect(jsonPath("$.absent").value(1))
+                .andExpect(jsonPath("$.excused").value(1))
+                .andReturn();
+
+        int studentRate = objectMapper.readTree(studentSummary.getResponse().getContentAsString())
+                .get(0).get("attendanceRate").asInt();
+        int sectionRate = objectMapper.readTree(sectionSummary.getResponse().getContentAsString())
+                .get("attendanceRate").asInt();
+        assertThat(studentRate)
+                .as("student rate %s and section rate %s for identical records", studentRate, sectionRate)
+                .isEqualTo(sectionRate)
+                .isEqualTo(67);
+    }
+
+    @Test
+    void attendanceRateIsZeroWhenAllRecordsAreExcusedAndRoundsHalfUp() throws Exception {
+        mvc.perform(get("/api/v1/attendance/my/summary")
+                        .queryParam("semesterId", "semester-2")
+                        .with(studentJwt("student-user-1", "student-1")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].total").value(1))
+                .andExpect(jsonPath("$[0].excused").value(1))
+                .andExpect(jsonPath("$[0].attendanceRate").value(0));
+
+        // section-2 has one PRESENT record. With seven ABSENT records, the
+        // countable ratio is exactly 12.5%, which must round half-up to 13%.
+        for (int day = 1; day <= 7; day++) {
+            insertAttendance("attendance-rounding-" + day, "student-2", "section-2",
+                    BASE_TIME.plusSeconds((long) day * 24 * 60 * 60), "ABSENT", null);
+        }
+        mvc.perform(get("/api/v1/attendance/section/section-2/summary").with(adminJwt()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.present").value(1))
+                .andExpect(jsonPath("$.absent").value(7))
+                .andExpect(jsonPath("$.attendanceRate").value(13));
     }
 
     @Test
