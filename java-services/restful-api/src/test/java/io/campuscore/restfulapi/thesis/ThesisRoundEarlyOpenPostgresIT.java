@@ -55,13 +55,13 @@ class ThesisRoundEarlyOpenPostgresIT {
 
     @DynamicPropertySource
     static void properties(DynamicPropertyRegistry registry) {
-        registry.add("spring.datasource.url", () -> System.getenv("CAMPUSCORE_E2E_POSTGRES_URL"));
-        registry.add("spring.datasource.username", () -> valueOr("CAMPUSCORE_E2E_POSTGRES_USER", "postgres"));
-        registry.add("spring.datasource.password", () -> valueOr("CAMPUSCORE_E2E_POSTGRES_PASSWORD", "postgres"));
+        registry.add("spring.datasource.url", () -> System.getenv("CAMPUSCORE_HOT4_POSTGRES_URL"));
+        registry.add("spring.datasource.username", () -> valueOr("CAMPUSCORE_HOT4_POSTGRES_USER", "postgres"));
+        registry.add("spring.datasource.password", () -> valueOr("CAMPUSCORE_HOT4_POSTGRES_PASSWORD", "postgres"));
     }
 
     static boolean hot4PostgresTargetConfigured() {
-        String url = System.getenv("CAMPUSCORE_E2E_POSTGRES_URL");
+        String url = System.getenv("CAMPUSCORE_HOT4_POSTGRES_URL");
         return url != null && url.matches("jdbc:postgresql://127\\.0\\.0\\.1:[0-9]+/hot4_[a-zA-Z0-9_]+(?:\\?.*)?");
     }
 
