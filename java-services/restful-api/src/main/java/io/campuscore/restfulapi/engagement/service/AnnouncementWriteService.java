@@ -89,6 +89,7 @@ public class AnnouncementWriteService {
             requireLecturerAnnouncement(lecturerId, request.sectionId(), targetRoles, request.isGlobal(), request.lecturerId());
         }
         List<Integer> targetYears = immutableYears(request.targetYears());
+        List<String> targetDepartments = immutableDepartments(request.targetDepartments());
         Instant now = Instant.now(clock);
         AnnouncementResponse created = announcements.create(new CreateAnnouncementCommand(
                 UUID.randomUUID().toString(),
@@ -97,6 +98,7 @@ public class AnnouncementWriteService {
                 priority,
                 targetRoles,
                 targetYears,
+                targetDepartments,
                 Boolean.TRUE.equals(request.isGlobal()),
                 request.publishAt(),
                 request.expiresAt(),
@@ -235,6 +237,10 @@ public class AnnouncementWriteService {
                         request,
                         "targetYears",
                         request.has("targetYears") ? immutableYears(request.targetYears()) : null),
+                patch(
+                        request,
+                        "targetDepartments",
+                        request.has("targetDepartments") ? immutableDepartments(request.targetDepartments()) : null),
                 patch(request, "isGlobal", request.isGlobal()),
                 patch(request, "publishAt", request.publishAt()),
                 patch(request, "expiresAt", request.expiresAt()),
@@ -277,8 +283,8 @@ public class AnnouncementWriteService {
 
     private static boolean audienceFieldsChanged(UpdateAnnouncementRequest request) {
         return request.has("targetRoles") || request.has("targetYears")
-                || request.has("sectionId") || request.has("isGlobal")
-                || request.has("lecturerId");
+                || request.has("targetDepartments") || request.has("sectionId")
+                || request.has("isGlobal") || request.has("lecturerId");
     }
 
     private void reconcileInboxAudience(String id) {
@@ -700,6 +706,29 @@ public class AnnouncementWriteService {
                         "targetRoles must contain supported campus audiences");
             }
             result.add(text);
+        }
+        return List.copyOf(result);
+    }
+
+    /**
+     * Department targets are opaque identifiers from the admin picker — there
+     * is no closed enum to check them against (unlike targetRoles), so the
+     * contract is format-level: strings, non-blank, trimmed, deduplicated.
+     * A mistyped id simply matches nothing, same as an empty list matching
+     * every department.
+     */
+    private static List<String> immutableDepartments(List<?> values) {
+        List<String> raw = immutableStrings(values, "targetDepartments");
+        List<String> result = new java.util.ArrayList<>(raw.size());
+        for (String value : raw) {
+            String trimmed = value.trim();
+            if (trimmed.isEmpty()) {
+                throw new IllegalArgumentException(
+                        "targetDepartments must contain department identifiers");
+            }
+            if (!result.contains(trimmed)) {
+                result.add(trimmed);
+            }
         }
         return List.copyOf(result);
     }

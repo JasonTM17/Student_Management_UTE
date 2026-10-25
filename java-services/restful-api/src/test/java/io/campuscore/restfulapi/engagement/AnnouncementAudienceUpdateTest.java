@@ -66,6 +66,7 @@ class AnnouncementAudienceUpdateTest {
                     "priority" VARCHAR(20) NOT NULL,
                     "targetRoles" VARCHAR ARRAY NOT NULL,
                     "targetYears" INTEGER ARRAY NOT NULL,
+                    "targetDepartments" VARCHAR ARRAY NOT NULL DEFAULT ARRAY[],
                     "isGlobal" BOOLEAN NOT NULL,
                     "publishAt" TIMESTAMP WITH TIME ZONE,
                     "expiresAt" TIMESTAMP WITH TIME ZONE,
@@ -130,8 +131,15 @@ class AnnouncementAudienceUpdateTest {
                     "year" INTEGER,
                     "status" VARCHAR(40) NOT NULL DEFAULT 'ACTIVE',
                     "admissionDate" TIMESTAMP,
+                    "curriculumId" VARCHAR(120),
                     "createdAt" TIMESTAMP,
                     "updatedAt" TIMESTAMP
+                )
+                """);
+        jdbc.execute("""
+                CREATE TABLE IF NOT EXISTS academic."Curriculum" (
+                    "id" VARCHAR(120) PRIMARY KEY,
+                    "departmentId" VARCHAR(120)
                 )
                 """);
         jdbc.execute("""
@@ -230,6 +238,27 @@ class AnnouncementAudienceUpdateTest {
         update(created.id(), roles);
 
         assertTrue(notifiedUsers(created.id()).isEmpty());
+    }
+
+    @Test
+    void departmentTargetChangesReconcileTheAudienceLikeOtherAudienceFields() {
+        // aud-st-1/aud-st-3 share dept-it; aud-st-2/aud-st-4 share dept-cs —
+        // Student → Curriculum → Department, the same path the reader uses.
+        jdbc.update("INSERT INTO academic.\"Curriculum\" (\"id\", \"departmentId\")"
+                + " VALUES ('aud-curr-it', 'dept-it'), ('aud-curr-cs', 'dept-cs')");
+        jdbc.update("UPDATE academic.\"Student\" SET \"curriculumId\" = 'aud-curr-it'"
+                + " WHERE \"id\" IN ('aud-st-1', 'aud-st-3')");
+        jdbc.update("UPDATE academic.\"Student\" SET \"curriculumId\" = 'aud-curr-cs'"
+                + " WHERE \"id\" IN ('aud-st-2', 'aud-st-4')");
+
+        AnnouncementResponse created = createNotice(null);
+        assertEquals(4, notifiedUsers(created.id()).size());
+
+        ObjectNode departments = MAPPER.createObjectNode();
+        departments.putArray("targetDepartments").add("dept-it");
+        update(created.id(), departments);
+
+        assertEquals(List.of("aud-u-1", "aud-u-3"), notifiedUsers(created.id()));
     }
 
     @Test

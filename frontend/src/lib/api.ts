@@ -95,6 +95,7 @@ export type AnnouncementRecord = {
   publishedBy?: string | null;
   targetRoles?: string[];
   targetYears?: number[];
+  targetDepartments?: string[];
   isGlobal?: boolean;
   semesterId?: string | null;
   sectionId?: string | null;
@@ -162,7 +163,7 @@ export type CreditLimitApplication = {
   updatedAt: string;
 };
 export type AnnouncementMutation = Partial<Pick<AnnouncementRecord,
-  'title' | 'content' | 'priority' | 'targetRoles' | 'targetYears' | 'isGlobal' |
+  'title' | 'content' | 'priority' | 'targetRoles' | 'targetYears' | 'targetDepartments' | 'isGlobal' |
   'publishAt' | 'expiresAt' | 'semesterId' | 'sectionId' | 'lecturerId'>> & {
   reason?: string;
   expectedVersion?: number;
@@ -1974,6 +1975,22 @@ export type AttendanceSummary = {
   late: number;
   excused: number;
   attendanceRate: number;
+  // Advisory exam-eligibility signal (additive; older APIs omit these).
+  countableSessions?: number;
+  minRate?: number;
+  minSessions?: number;
+  atRisk?: boolean;
+  examEligibility?: 'OK' | 'AT_RISK' | 'INSUFFICIENT_DATA' | string;
+};
+
+/** One roster student flagged AT_RISK in a section summary. */
+export type AttendanceRiskEntry = {
+  studentId: string;
+  studentCode: string;
+  firstName: string;
+  lastName: string;
+  countableSessions: number;
+  attendanceRate: number;
 };
 
 export type AttendanceStatus = 'PRESENT' | 'ABSENT' | 'LATE' | 'EXCUSED';
@@ -2006,6 +2023,10 @@ export type SectionAttendanceSummary = {
   late: number;
   excused: number;
   attendanceRate: number;
+  // Advisory exam-eligibility signal (additive; older APIs omit these).
+  minRate?: number;
+  minSessions?: number;
+  atRiskStudents?: AttendanceRiskEntry[];
 };
 
 // Attendance roster entry — the markable population (every enrollment except

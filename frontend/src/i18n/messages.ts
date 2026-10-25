@@ -163,6 +163,8 @@ export const en = {
         SECTION_NOT_FOUND: 'This class section is no longer available.',
         SEMESTER_DATES_OVERLAP: 'This semester overlaps another semester in the same academic year.',
         STUDENT_NOT_FOUND: 'Your student profile could not be found. Contact your administrator.',
+        ATTENDANCE_EDIT_WINDOW_CLOSED:
+          'That attendance date is outside the edit window. Ask an administrator to change it.',
         WITHDRAWAL_WINDOW_CLOSED:
           'The withdrawal window for this semester has closed.',
         WITHDRAWAL_SEMESTER_INELIGIBLE:
@@ -3159,6 +3161,13 @@ export const en = {
       LATE: 'Late',
       EXCUSED: 'Excused',
     },
+    eligibility: {
+      label: 'Exam eligibility',
+      ok: 'On track',
+      atRisk: 'Below suggested attendance',
+      insufficient: 'Not enough sessions yet',
+      hint: 'Advisory only — it never blocks an exam or registration.',
+    },
   },
   lecturerAttendance: {
     eyebrow: 'Teaching area',
@@ -3216,6 +3225,9 @@ export const en = {
     statExcusedSuffix: 'excused',
     statSessionsHeldSuffix: 'sessions held',
     sheetTitle: 'Class section attendance sheet',
+    atRiskTitle: 'Below suggested attendance',
+    atRiskHint: 'Advisory signal only — it never blocks exams or grading.',
+    atRiskRate: 'attendance {rate}%',
   },
 } as const;
 
@@ -3390,6 +3402,8 @@ export const vi: I18nMessages = {
         SECTION_NOT_FOUND: 'Lớp học phần này không còn khả dụng.',
         SEMESTER_DATES_OVERLAP: 'Học kỳ này bị trùng thời gian với học kỳ khác trong cùng năm học.',
         STUDENT_NOT_FOUND: 'Không tìm thấy hồ sơ sinh viên. Vui lòng liên hệ quản trị viên.',
+        ATTENDANCE_EDIT_WINDOW_CLOSED:
+          'Ngày điểm danh này đã ngoài thời hạn chỉnh sửa. Vui lòng nhờ quản trị viên thay đổi.',
         WITHDRAWAL_WINDOW_CLOSED:
           'Đã hết thời hạn rút học phần của học kỳ này.',
         WITHDRAWAL_SEMESTER_INELIGIBLE:
@@ -6380,6 +6394,13 @@ export const vi: I18nMessages = {
       LATE: 'Đi muộn',
       EXCUSED: 'Có phép',
     },
+    eligibility: {
+      label: 'Điều kiện dự thi',
+      ok: 'Đang đạt',
+      atRisk: 'Dưới mức chuyên cần đề xuất',
+      insufficient: 'Chưa đủ phiên để đánh giá',
+      hint: 'Chỉ mang tính tham khảo — không ảnh hưởng đến dự thi hay đăng ký.',
+    },
   },
   lecturerAttendance: {
     eyebrow: 'Khu vực giảng dạy',
@@ -6437,6 +6458,9 @@ export const vi: I18nMessages = {
     statExcusedSuffix: 'có phép',
     statSessionsHeldSuffix: 'buổi đã học',
     sheetTitle: 'Bảng điểm danh lớp học phần',
+    atRiskTitle: 'Dưới mức chuyên cần đề xuất',
+    atRiskHint: 'Tín hiệu tham khảo — không ảnh hưởng đến dự thi hay chấm điểm.',
+    atRiskRate: 'chuyên cần {rate}%',
   },
 };
 

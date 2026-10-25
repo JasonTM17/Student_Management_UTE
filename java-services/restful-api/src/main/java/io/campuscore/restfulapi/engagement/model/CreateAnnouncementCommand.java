@@ -10,6 +10,7 @@ public record CreateAnnouncementCommand(
         String priority,
         List<String> targetRoles,
         List<Integer> targetYears,
+        List<String> targetDepartments,
         boolean isGlobal,
         Instant publishAt,
         Instant expiresAt,

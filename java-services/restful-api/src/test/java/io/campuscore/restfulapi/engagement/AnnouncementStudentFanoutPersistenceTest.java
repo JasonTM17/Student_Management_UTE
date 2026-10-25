@@ -84,6 +84,7 @@ class AnnouncementStudentFanoutPersistenceTest {
                     "priority" VARCHAR(20) NOT NULL,
                     "targetRoles" VARCHAR ARRAY NOT NULL,
                     "targetYears" INTEGER ARRAY NOT NULL,
+                    "targetDepartments" VARCHAR ARRAY NOT NULL DEFAULT ARRAY[],
                     "isGlobal" BOOLEAN NOT NULL,
                     "publishAt" TIMESTAMP WITH TIME ZONE,
                     "expiresAt" TIMESTAMP WITH TIME ZONE,
@@ -130,8 +131,21 @@ class AnnouncementStudentFanoutPersistenceTest {
                     "year" INTEGER,
                     "status" VARCHAR(40) NOT NULL DEFAULT 'ACTIVE',
                     "admissionDate" TIMESTAMP,
+                    "curriculumId" VARCHAR(120),
                     "createdAt" TIMESTAMP,
                     "updatedAt" TIMESTAMP
+                )
+                """);
+        jdbc.execute("""
+                CREATE TABLE IF NOT EXISTS academic."Curriculum" (
+                    "id" VARCHAR(120) PRIMARY KEY,
+                    "departmentId" VARCHAR(120)
+                )
+                """);
+        jdbc.execute("""
+                CREATE TABLE IF NOT EXISTS academic."Lecturer" (
+                    "id" VARCHAR(120) PRIMARY KEY,
+                    "departmentId" VARCHAR(120)
                 )
                 """);
         // Auth table shape mirrors NotificationWritePersistenceTest so both
@@ -460,7 +474,7 @@ class AnnouncementStudentFanoutPersistenceTest {
             String section, List<Integer> years, java.time.Instant expires, java.time.Instant archived,
             List<String> roles, boolean global) {
         return new io.campuscore.restfulapi.engagement.dto.AnnouncementReadDtos.AnnouncementResponse(
-                "scoped", "Private title", "Private content", "NORMAL", roles, years, global,
+                "scoped", "Private title", "Private content", "NORMAL", roles, years, List.of(), global,
                 null, expires, "publisher", null, null, section, null, null, null, null, null,
                 java.time.Instant.now(), java.time.Instant.now(), 0, archived, null, null, null, null);
     }

@@ -58,6 +58,7 @@ class AnnouncementWriteServiceConcurrencyTest {
                         null,
                         null,
                         null,
+                        null,
                         "Sửa nội dung",
                         0));
 
@@ -133,6 +134,7 @@ class AnnouncementWriteServiceConcurrencyTest {
                 "NORMAL",
                 List.of("STUDENT"),
                 List.of(1),
+                List.of(),
                 false,
                 null,
                 null,

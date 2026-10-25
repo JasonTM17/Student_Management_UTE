@@ -91,6 +91,7 @@ class AnnouncementReadPersistenceTest {
                     "priority" VARCHAR(20) NOT NULL,
                     "targetRoles" VARCHAR ARRAY NOT NULL,
                     "targetYears" INTEGER ARRAY NOT NULL,
+                    "targetDepartments" VARCHAR ARRAY NOT NULL DEFAULT ARRAY[],
                     "isGlobal" BOOLEAN NOT NULL,
                     "publishAt" TIMESTAMP WITH TIME ZONE,
                     "expiresAt" TIMESTAMP WITH TIME ZONE,
@@ -111,6 +112,25 @@ class AnnouncementReadPersistenceTest {
                     "displayOrder" INTEGER
                 )
                 """);
+        jdbc.execute("""
+                CREATE TABLE IF NOT EXISTS academic."Curriculum" (
+                    "id" VARCHAR(120) PRIMARY KEY,
+                    "departmentId" VARCHAR(120)
+                )
+                """);
+        jdbc.execute("""
+                CREATE TABLE IF NOT EXISTS academic."Lecturer" (
+                    "id" VARCHAR(120) PRIMARY KEY,
+                    "departmentId" VARCHAR(120)
+                )
+                """);
+        jdbc.execute("""
+                CREATE TABLE IF NOT EXISTS academic."Student" (
+                    "id" VARCHAR(120) PRIMARY KEY,
+                    "curriculumId" VARCHAR(120)
+                )
+                """);
+        jdbc.execute("ALTER TABLE academic.\"Student\" ADD COLUMN IF NOT EXISTS \"curriculumId\" VARCHAR(120)");
         fixtureJwt(jdbc, "student-user", "STUDENT");
         io.campuscore.restfulapi.testsupport.AccountAuthorityFixture.student(jdbc, "student-user", "student-profile", 2);
         fixtureJwt(jdbc, "lecturer-user", "LECTURER");
@@ -186,6 +206,80 @@ class AnnouncementReadPersistenceTest {
                                 .claim("student", Map.of("year", Long.MAX_VALUE)), "STUDENT")))
                 .andExpect(status().isUnauthorized())
                 .andExpect(jsonPath("$.code").value("SESSION_INVALID"));
+    }
+
+    @Test
+    void departmentTargetsRestrictStudentAndLecturerFeedsByResolvedDepartment() throws Exception {
+        // student-profile reaches dept-it through Student → Curriculum;
+        // lecturer-1 reaches dept-cs through Lecturer.departmentId.
+        jdbc.update("INSERT INTO academic.\"Curriculum\" (\"id\", \"departmentId\") VALUES ('curr-it', 'dept-it')");
+        jdbc.update("INSERT INTO academic.\"Student\" (\"id\", \"curriculumId\") VALUES ('student-profile', 'curr-it')");
+        jdbc.update("INSERT INTO academic.\"Lecturer\" (\"id\", \"departmentId\") VALUES ('lecturer-1', 'dept-cs')");
+
+        insert(fixture("dept-match", false, new String[]{"STUDENT"}, new Integer[]{2}, "2026-08-20T09:00:00Z"));
+        insert(fixture("dept-miss", false, new String[]{"STUDENT"}, new Integer[]{2}, "2026-08-20T10:00:00Z"));
+        insert(fixture("dept-none", false, new String[]{"STUDENT"}, new Integer[]{2}, "2026-08-20T11:00:00Z"));
+        insert(fixture("dept-lecturer-match", false, new String[]{"LECTURER"}, new Integer[0], "2026-08-20T12:00:00Z"));
+        insert(fixture("dept-lecturer-miss", false, new String[]{"LECTURER"}, new Integer[0], "2026-08-20T13:00:00Z"));
+        jdbc.update("UPDATE \"engagement\".\"Announcement\" SET \"targetDepartments\" = ARRAY['dept-it']"
+                + " WHERE \"id\" IN ('dept-match', 'dept-lecturer-miss')");
+        jdbc.update("UPDATE \"engagement\".\"Announcement\" SET \"targetDepartments\" = ARRAY['dept-cs']"
+                + " WHERE \"id\" IN ('dept-miss', 'dept-lecturer-match')");
+
+        // The dept-it student sees the matching and the untargeted notice but
+        // never the dept-cs one — dimensions stay ANDed.
+        mvc.perform(get("/api/v1/announcements/my")
+                        .with(fixtureJwt(jdbc, "student-user", token -> token
+                                .subject("student-user")
+                                .claim("email", "student@campuscore.edu")
+                                .claim("roles", List.of("STUDENT"))
+                                .claim("studentId", "student-profile")
+                                .claim("student", Map.of("year", 2)), "STUDENT")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.length()").value(2))
+                .andExpect(jsonPath("$.data[0].id").value("dept-none"))
+                .andExpect(jsonPath("$.data[0].targetDepartments.length()").value(0))
+                .andExpect(jsonPath("$.data[1].id").value("dept-match"))
+                .andExpect(jsonPath("$.data[1].targetDepartments[0]").value("dept-it"));
+
+        // A student whose curriculum resolves no department (or who has no
+        // academic row at all) can only see untargeted notices.
+        io.campuscore.restfulapi.testsupport.AccountAuthorityFixture.ensureUser(jdbc, "orphan-user");
+        io.campuscore.restfulapi.testsupport.AccountAuthorityFixture.student(jdbc, "orphan-user", "orphan-profile", 2);
+        mvc.perform(get("/api/v1/announcements/my")
+                        .with(fixtureJwt(jdbc, "orphan-user", token -> token
+                                .subject("orphan-user")
+                                .claim("email", "orphan@campuscore.edu")
+                                .claim("roles", List.of("STUDENT"))
+                                .claim("studentId", "orphan-profile")
+                                .claim("student", Map.of("year", 2)), "STUDENT")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.length()").value(1))
+                .andExpect(jsonPath("$.data[0].id").value("dept-none"));
+
+        // The lecturer feed applies the same AND through Lecturer.departmentId.
+        mvc.perform(get("/api/v1/announcements/my")
+                        .with(fixtureJwt(jdbc, "lecturer-user", "LECTURER")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.length()").value(1))
+                .andExpect(jsonPath("$.data[0].id").value("dept-lecturer-match"))
+                .andExpect(jsonPath("$.data[0].targetDepartments[0]").value("dept-cs"));
+
+        // Single-announcement reads honor the same visibility predicate.
+        mvc.perform(get("/api/v1/announcements/dept-miss")
+                        .with(fixtureJwt(jdbc, "student-user", token -> token
+                                .subject("student-user")
+                                .claim("roles", List.of("STUDENT"))
+                                .claim("studentId", "student-profile")
+                                .claim("student", Map.of("year", 2)), "STUDENT")))
+                .andExpect(status().isNotFound());
+        mvc.perform(get("/api/v1/announcements/dept-match")
+                        .with(fixtureJwt(jdbc, "student-user", token -> token
+                                .subject("student-user")
+                                .claim("roles", List.of("STUDENT"))
+                                .claim("studentId", "student-profile")
+                                .claim("student", Map.of("year", 2)), "STUDENT")))
+                .andExpect(status().isOk());
     }
 
     @Test

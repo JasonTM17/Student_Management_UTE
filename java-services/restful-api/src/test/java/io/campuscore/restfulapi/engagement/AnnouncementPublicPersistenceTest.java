@@ -77,6 +77,7 @@ class AnnouncementPublicPersistenceTest {
                     "priority" VARCHAR(20) NOT NULL,
                     "targetRoles" VARCHAR ARRAY NOT NULL,
                     "targetYears" INTEGER ARRAY NOT NULL,
+                    "targetDepartments" VARCHAR ARRAY NOT NULL DEFAULT ARRAY[],
                     "isGlobal" BOOLEAN NOT NULL,
                     "publishAt" TIMESTAMP WITH TIME ZONE,
                     "expiresAt" TIMESTAMP WITH TIME ZONE,

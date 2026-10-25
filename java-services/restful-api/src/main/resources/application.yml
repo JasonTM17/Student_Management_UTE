@@ -2,6 +2,17 @@ registration:
   # Maximum effective limit for ordinary summer-term registration.
   summer-max-credits: ${REGISTRATION_SUMMER_MAX_CREDITS:10}
 
+attendance:
+  # Advisory exam-eligibility signal. Read-model only: it never blocks an exam
+  # and never blocks registration. at-risk = the section counted at least
+  # min-sessions-for-signal countable records (PRESENT/LATE/ABSENT; EXCUSED
+  # excluded) and the shared attendance rate is below min-rate.
+  min-rate: ${ATTENDANCE_MIN_RATE:0.80}
+  min-sessions-for-signal: ${ATTENDANCE_MIN_SESSIONS:5}
+  # Records older than this many days (Asia/Bangkok calendar, day boundary
+  # inclusive) may only be created or changed by ADMIN/SUPER_ADMIN.
+  edit-window-days: ${ATTENDANCE_EDIT_WINDOW_DAYS:30}
+
 spring:
   application:
     name: campuscore-restful-api
