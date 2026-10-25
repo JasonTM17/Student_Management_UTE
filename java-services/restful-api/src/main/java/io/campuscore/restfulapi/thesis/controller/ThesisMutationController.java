@@ -4,6 +4,7 @@ import io.campuscore.restfulapi.thesis.model.RoundStatus;
 import io.campuscore.restfulapi.thesis.model.StoredReport;
 import io.campuscore.restfulapi.thesis.dto.SupervisorRow;
 import io.campuscore.restfulapi.thesis.service.ThesisMutationService;
+import io.campuscore.restfulapi.thesis.service.ThesisNotificationService;
 import io.campuscore.restfulapi.thesis.service.ThesisReportService;
 import io.campuscore.restfulapi.thesis.service.ThesisSupervisorService;
 import io.campuscore.restfulapi.thesis.dto.ThesisGroupReadDtos.GroupResponse;
@@ -81,17 +82,53 @@ import io.campuscore.restfulapi.thesis.dto.ThesisTopicDtos;
 @RequestMapping("/api/v1/thesis")
 public class ThesisMutationController {
 
+    private static final org.slf4j.Logger log =
+            org.slf4j.LoggerFactory.getLogger(ThesisMutationController.class);
+
     private final ThesisMutationService mutations;
     private final ThesisSupervisorService supervisors;
     private final ThesisReportService reports;
+    private final ThesisNotificationService phaseSignals;
 
     public ThesisMutationController(
             ThesisMutationService mutations,
             ThesisSupervisorService supervisors,
-            ThesisReportService reports) {
+            ThesisReportService reports,
+            ThesisNotificationService phaseSignals) {
         this.mutations = mutations;
         this.supervisors = supervisors;
         this.reports = reports;
+        this.phaseSignals = phaseSignals;
+    }
+
+    /**
+     * Lifecycle fan-out for the roles that must act next (spec: every role
+     * hears when a phase opens). The mutation has already committed by the
+     * time the controller regains control, so a notification failure is
+     * logged but must never fail the completed request.
+     */
+    private void notifyPhaseQuietly(UUID roundId, RoundStatus phase) {
+        try {
+            phaseSignals.notifyRoundPhase(roundId, phase);
+        } catch (RuntimeException exception) {
+            log.warn("Thesis phase notification failed for round {} -> {}", roundId, phase, exception);
+        }
+    }
+
+    private void notifyRestoredQuietly(UUID roundId) {
+        try {
+            phaseSignals.notifyRoundRestored(roundId);
+        } catch (RuntimeException exception) {
+            log.warn("Thesis restore notification failed for round {}", roundId, exception);
+        }
+    }
+
+    private void notifyReopenedQuietly(UUID roundId) {
+        try {
+            phaseSignals.notifyRoundReopened(roundId);
+        } catch (RuntimeException exception) {
+            log.warn("Thesis reopen notification failed for round {}", roundId, exception);
+        }
     }
 
     @Operation(summary = "Khởi tạo đợt khóa luận mới", description = "Tạo một đợt đăng ký khóa luận/tiểu luận mới ở trạng thái DRAFT")
@@ -118,7 +155,9 @@ public class ThesisMutationController {
     public RoundResponse cancelRound(
             @Parameter(description = "Mã UUID của đợt", required = true) @PathVariable UUID id,
             @AuthenticationPrincipal Jwt actor) {
-        return mutations.cancelRound(id, actor);
+        RoundResponse round = mutations.cancelRound(id, actor);
+        notifyPhaseQuietly(id, RoundStatus.CANCELLED);
+        return round;
     }
 
     @Operation(summary = "Khôi phục đợt đã hủy", description = "Đưa đợt CANCELLED về trạng thái trước khi hủy (đợt hủy cũ không có dấu trạng thái mà còn nhóm phải chọn targetStatus rõ ràng); bị chặn khi có sinh viên đã sang đợt khác còn hiệu lực")
@@ -128,7 +167,9 @@ public class ThesisMutationController {
             @Parameter(description = "Mã UUID của đợt", required = true) @PathVariable UUID id,
             @RequestBody(required = false) RoundRestoreRequest request,
             @AuthenticationPrincipal Jwt actor) {
-        return mutations.restoreRound(id, request == null ? null : request.targetStatus(), actor);
+        RoundResponse restored = mutations.restoreRound(id, request == null ? null : request.targetStatus(), actor);
+        notifyRestoredQuietly(id);
+        return restored;
     }
 
     /**
@@ -158,7 +199,9 @@ public class ThesisMutationController {
     @PreAuthorize("hasAnyRole('ADMIN','TRUONG_KHOA','SUPER_ADMIN')")
     public RoundResponse openProposals(@Parameter(description = "Mã UUID của đợt", required = true) @PathVariable UUID id,
             @AuthenticationPrincipal Jwt actor) {
-        return mutations.transitionRound(id, RoundStatus.DRAFT, RoundStatus.PROPOSAL_OPEN, actor);
+        RoundResponse round = mutations.transitionRound(id, RoundStatus.DRAFT, RoundStatus.PROPOSAL_OPEN, actor);
+        notifyPhaseQuietly(id, RoundStatus.PROPOSAL_OPEN);
+        return round;
     }
 
     /** Brief phase one closure: publish the topic catalog to student groups. */
@@ -167,7 +210,9 @@ public class ThesisMutationController {
     @PreAuthorize("hasAnyRole('ADMIN','TRUONG_KHOA','SUPER_ADMIN')")
     public RoundResponse publishProposals(@Parameter(description = "Mã UUID của đợt", required = true) @PathVariable UUID id,
             @AuthenticationPrincipal Jwt actor) {
-        return mutations.transitionRound(id, RoundStatus.PROPOSAL_OPEN, RoundStatus.PROPOSALS_PUBLISHED, actor);
+        RoundResponse round = mutations.transitionRound(id, RoundStatus.PROPOSAL_OPEN, RoundStatus.PROPOSALS_PUBLISHED, actor);
+        notifyPhaseQuietly(id, RoundStatus.PROPOSALS_PUBLISHED);
+        return round;
     }
 
     /** Brief phase two: student groups may register inside the student window. */
@@ -176,7 +221,9 @@ public class ThesisMutationController {
     @PreAuthorize("hasAnyRole('ADMIN','TRUONG_KHOA','SUPER_ADMIN')")
     public RoundResponse openRegistration(@Parameter(description = "Mã UUID của đợt", required = true) @PathVariable UUID id,
             @AuthenticationPrincipal Jwt actor) {
-        return mutations.transitionRound(id, RoundStatus.PROPOSALS_PUBLISHED, RoundStatus.REGISTRATION_OPEN, actor);
+        RoundResponse round = mutations.transitionRound(id, RoundStatus.PROPOSALS_PUBLISHED, RoundStatus.REGISTRATION_OPEN, actor);
+        notifyPhaseQuietly(id, RoundStatus.REGISTRATION_OPEN);
+        return round;
     }
 
     @Operation(summary = "Đóng cổng đăng ký đề tài", description = "Chuyển đợt sang REGISTRATION_CLOSED sau khi hết hạn đăng ký")
@@ -184,7 +231,9 @@ public class ThesisMutationController {
     @PreAuthorize("hasAnyRole('ADMIN','TRUONG_KHOA','SUPER_ADMIN')")
     public RoundResponse closeRegistration(@Parameter(description = "Mã UUID của đợt", required = true) @PathVariable UUID id,
             @AuthenticationPrincipal Jwt actor) {
-        return mutations.transitionRound(id, RoundStatus.REGISTRATION_OPEN, RoundStatus.REGISTRATION_CLOSED, actor);
+        RoundResponse round = mutations.transitionRound(id, RoundStatus.REGISTRATION_OPEN, RoundStatus.REGISTRATION_CLOSED, actor);
+        notifyPhaseQuietly(id, RoundStatus.REGISTRATION_CLOSED);
+        return round;
     }
 
     /**

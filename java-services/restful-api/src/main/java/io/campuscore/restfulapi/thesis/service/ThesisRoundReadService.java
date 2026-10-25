@@ -66,6 +66,14 @@ public class ThesisRoundReadService {
         List<ThesisRegistrationRound> list = status == null
                 ? rounds.findAllByStatusNotOrderByRegistrationStartDesc(RoundStatus.CLOSED)
                 : rounds.findAllByStatusOrderByRegistrationStartDesc(status);
+        // A draft is an unannounced schedule — only the roles that create and
+        // manage rounds may see it; students and lecturers would otherwise
+        // plan around windows the faculty has not committed to.
+        if (!canSeeDrafts(actor)) {
+            list = list.stream()
+                    .filter(round -> round.getStatus() != RoundStatus.DRAFT)
+                    .toList();
+        }
         Map<UUID, Map<String, Number>> counts = deletions.dependentCounts(
                 list.stream().map(ThesisRegistrationRound::getId).toList());
         String callerStudentId = callerStudentId(actor);
@@ -81,6 +89,18 @@ public class ThesisRoundReadService {
                         callerView == null || !eligibility.covers(round.getThesisType())
                                 ? null : callerView))
                 .toList();
+    }
+
+    /**
+     * The roles {@link io.campuscore.restfulapi.thesis.controller.ThesisMutationController#createRound}
+     * accepts are exactly the governance roles allowed to read drafts.
+     */
+    private static boolean canSeeDrafts(Jwt actor) {
+        List<String> roles = actor == null ? null : actor.getClaimAsStringList("roles");
+        if (roles == null) {
+            return false;
+        }
+        return roles.contains("ADMIN") || roles.contains("SUPER_ADMIN") || roles.contains("TRUONG_KHOA");
     }
 
     /** Only a student principal carries a studentId claim worth evaluating. */

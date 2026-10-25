@@ -202,6 +202,11 @@ public class ThesisCouncilService {
                         .addValue("lecturerId", lecturerId).addValue("role", role));
         audit.record(subject(actor), null, "COUNCIL_MEMBER_ADDED", "THESIS_COUNCIL", councilId.toString(),
                 "Lecturer " + lecturerId + " seated as " + role);
+        if (notifier != null) {
+            String seatedLecturer = lecturerId;
+            String seatedRole = role;
+            afterCommit(() -> notifier.notifyCouncilSeated(councilId, seatedLecturer, seatedRole));
+        }
         return getCouncil(councilId);
     }
 
@@ -350,6 +355,9 @@ public class ThesisCouncilService {
                         .addValue("topicId", topicId).addValue("assignedBy", subject(actor)));
         audit.record(subject(actor), null, "COUNCIL_TOPIC_ASSIGNED", "THESIS_COUNCIL", councilId.toString(),
                 "Topic " + topicId + " assigned for defense");
+        if (notifier != null) {
+            afterCommit(() -> notifier.notifyCouncilTopicAssigned(councilId, topicId));
+        }
         return getCouncil(councilId);
     }
 
@@ -755,6 +763,9 @@ public class ThesisCouncilService {
         afterState.put("gvpb_lecturer_id", lecturerId);
         audit.record(subject(actor), null, "GVPB_ASSIGNED", "THESIS_TOPIC", topicId.toString(),
                 "Counter-reviewer assigned to topic " + topicId, beforeState, afterState);
+        if (notifier != null) {
+            afterCommit(() -> notifier.notifyReviewerAssigned(topicId, lecturerId));
+        }
         return afterState;
     }
 
@@ -1237,6 +1248,11 @@ public class ThesisCouncilService {
                 "Council seat " + seat.get("member_role") + " passed from " + outgoingLecturerId.trim()
                         + " to " + incoming + "; reason: " + cleanReason,
                 seat, afterState);
+        if (notifier != null) {
+            String seatedRole = (String) seat.get("member_role");
+            String seatedLecturer = incoming;
+            afterCommit(() -> notifier.notifyCouncilSeated(councilId, seatedLecturer, seatedRole));
+        }
         return getCouncil(councilId);
     }
 
