@@ -28,6 +28,12 @@ interface StudentUteProfileGradeViewProps {
    * (`student-profile`), which must never be printed as if it were the MSSV.
    */
   studentCode?: string;
+  /**
+   * Canonical total credits earned from the transcript summary.
+   * When provided, keeps the progress pie chart and credit counters strictly
+   * in sync with the transcript summary metrics.
+   */
+  totalCreditsEarned?: number | null;
 }
 
 export function StudentUteProfileGradeView({
@@ -37,6 +43,7 @@ export function StudentUteProfileGradeView({
   onSemesterChange,
   availableSemesters = [],
   studentCode,
+  totalCreditsEarned,
 }: StudentUteProfileGradeViewProps) {
   const { user, refreshUser } = useAuth();
   const { messages, locale, formatDate } = useI18n();
@@ -162,13 +169,18 @@ export function StudentUteProfileGradeView({
 
   // Credit progress (Đã học / Còn lại). Numbers render only when the real
   // curriculum and completed coursework agree — no sample values, ever.
+  // Prioritize canonical transcript summary totalCreditsEarned when provided.
   const curriculumTotal = curriculumData?.curriculum?.totalCredits;
-  const earnedCredits = useMemo(() => {
+  const curriculumEarned = useMemo(() => {
     if (!curriculumData?.courses) return null;
     return curriculumData.courses
       .filter((c) => c.status === 'COMPLETED')
       .reduce((acc, c) => acc + c.credits, 0);
   }, [curriculumData]);
+  const earnedCredits =
+    typeof totalCreditsEarned === 'number' && totalCreditsEarned >= 0
+      ? totalCreditsEarned
+      : curriculumEarned;
   const totalCredits =
     typeof curriculumTotal === 'number' && curriculumTotal > 0 ? curriculumTotal : null;
   const creditsKnown = totalCredits !== null && earnedCredits !== null;
