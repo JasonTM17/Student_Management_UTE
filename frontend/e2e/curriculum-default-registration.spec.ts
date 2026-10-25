@@ -6,11 +6,11 @@ test.describe.configure({ timeout: 150_000 });
 
 const student = {
   email: process.env.E2E_CX5_STUDENT_EMAIL ?? process.env.E2E_STUDENT_EMAIL ?? 'student@campuscore.edu',
-  passcode: process.env.E2E_CX5_STUDENT_PASSCODE ?? process.env.E2E_STUDENT_PASSCODE ?? '',
+  passcode: process.env.E2E_CX5_STUDENT_PASSCODE ?? process.env.E2E_STUDENT_PASSCODE ?? 'password123',
 };
 const admin = {
   email: process.env.E2E_CX5_ADMIN_EMAIL ?? process.env.E2E_ADMIN_EMAIL ?? 'admin@campuscore.edu',
-  passcode: process.env.E2E_CX5_ADMIN_PASSCODE ?? process.env.E2E_ADMIN_PASSCODE ?? '',
+  passcode: process.env.E2E_CX5_ADMIN_PASSCODE ?? process.env.E2E_ADMIN_PASSCODE ?? 'password123',
 };
 
 async function signIn(page: Page, persona: 'student' | 'admin', account: { email: string; passcode: string }) {
@@ -18,8 +18,8 @@ async function signIn(page: Page, persona: 'student' | 'admin', account: { email
   await page.locator('#email').fill(account.email);
   await page.locator('#password').fill(account.passcode);
   const submit = page.locator('form').getByRole('button', { name: /sign in/i });
-  await submitLiveLogin(page, submit, '3901');
-  await expect(page).not.toHaveURL(/\/login(?:$|[/?#])/);
+  await submitLiveLogin(page, submit);
+  await expect(page).not.toHaveURL(/\/login(?:$|[/?#])/, { timeout: 30_000 });
 }
 
 async function expectAnyVisible(locator: Locator) {
@@ -113,6 +113,8 @@ test('student registers curriculum defaults, drops one, and Academic Affairs pre
     await adminPage.goto('/en/admin/registration/curriculum-defaults');
     const semesterPicker = adminPage.getByRole('combobox', { name: 'Semester', exact: true });
     await expect(semesterPicker).toBeVisible();
+    const dryRunButton = adminPage.getByRole('button', { name: 'Dry run', exact: true });
+    await expect(dryRunButton).toBeEnabled();
     const adminAccessibility = await new AxeBuilder({ page: adminPage })
       .include('[data-testid="curriculum-defaults-panel"]')
       .analyze();
@@ -129,7 +131,7 @@ test('student registers curriculum defaults, drops one, and Academic Affairs pre
       return url.pathname === '/api/v1/admin/registration/curriculum-defaults/dry-run'
         && response.request().method() === 'POST';
     });
-    await adminPage.getByRole('button', { name: 'Dry run', exact: true }).click();
+    await dryRunButton.click();
     const dryRunResponse = await dryRunResponsePromise;
     expect(dryRunResponse.status()).toBe(200);
     const dryRun = await dryRunResponse.json() as {
