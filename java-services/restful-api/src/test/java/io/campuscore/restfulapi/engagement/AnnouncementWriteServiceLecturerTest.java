@@ -79,6 +79,34 @@ class AnnouncementWriteServiceLecturerTest {
     }
 
     @Test
+    void lecturerCannotTargetAnotherFacultyOnCreate() throws Exception {
+        Fixture fixture = fixture();
+        when(fixture.announcements.sectionBelongsToLecturer("section-1", "lecturer-1")).thenReturn(true);
+        when(fixture.announcements.findLecturerFacultyId("lecturer-1")).thenReturn(Optional.of("faculty-it"));
+
+        DomainException error = assertThrows(DomainException.class, () -> fixture.service.create(
+                "user-1", "Lecturer", List.of("LECTURER"), "lecturer-1",
+                createRequest(List.of("STUDENT"), false, "section-1", List.of(), List.of("faculty-cs"))));
+
+        assertEquals("LECTURER_ANNOUNCEMENT_FORBIDDEN", error.code());
+    }
+
+    @Test
+    void lecturerCanTargetOwnFacultyOrNoFacultyOnCreate() throws Exception {
+        Fixture fixture = fixture();
+        when(fixture.announcements.sectionBelongsToLecturer("section-1", "lecturer-1")).thenReturn(true);
+        when(fixture.announcements.findLecturerFacultyId("lecturer-1")).thenReturn(Optional.of("faculty-it"));
+        when(fixture.announcements.create(any())).thenReturn(announcement("lecturer-1"));
+
+        fixture.service.create("user-1", "Lecturer", List.of("LECTURER"), "lecturer-1",
+                createRequest(List.of("STUDENT"), false, "section-1", List.of(), List.of("faculty-it")));
+        fixture.service.create("user-1", "Lecturer", List.of("LECTURER"), "lecturer-1",
+                createRequest(List.of("STUDENT"), false, "section-1", List.of(), List.of()));
+
+        verify(fixture.announcements, org.mockito.Mockito.times(2)).create(any());
+    }
+
+    @Test
     void adminCanTargetAnyDepartmentOnCreate() throws Exception {
         Fixture fixture = fixture();
         when(fixture.announcements.create(any())).thenReturn(announcement(null));
@@ -96,7 +124,7 @@ class AnnouncementWriteServiceLecturerTest {
                 .thenReturn(Optional.of(announcement("lecturer-2")));
         UpdateAnnouncementRequest request = new UpdateAnnouncementRequest(
                 Set.of("title", "reason", "expectedVersion"), "Updated", null, null, null, null,
-                null, null, null, null, null, null, null, "Correction", 0);
+                null, null, null, null, null, null, null, null, "Correction", 0);
 
         assertThrows(DomainException.class, () -> fixture.service.update(
                 "user-1", "Lecturer", List.of("LECTURER"), "lecturer-1", "notice-1", request));
@@ -115,7 +143,7 @@ class AnnouncementWriteServiceLecturerTest {
         when(fixture.announcements.findById("notice-1")).thenReturn(Optional.of(ownAnnouncement));
         UpdateAnnouncementRequest request = new UpdateAnnouncementRequest(
                 Set.of("title", "reason", "expectedVersion"), "Updated", null, null, null, null,
-                null, null, null, null, null, null, null, "Correction", 0);
+                null, null, null, null, null, null, null, null, "Correction", 0);
 
         fixture.service.update(
                 "user-1", "Lecturer", List.of("LECTURER"), "lecturer-1", "notice-1", request);
@@ -132,7 +160,7 @@ class AnnouncementWriteServiceLecturerTest {
         when(fixture.announcements.findLecturerDepartmentId("lecturer-1")).thenReturn(Optional.of("dept-it"));
         UpdateAnnouncementRequest request = new UpdateAnnouncementRequest(
                 Set.of("targetDepartments", "reason", "expectedVersion"), null, null, null, null, null,
-                List.of("dept-cs"), null, null, null, null, null, null, "Correction", 0);
+                List.of("dept-cs"), null, null, null, null, null, null, null, "Correction", 0);
 
         DomainException error = assertThrows(DomainException.class, () -> fixture.service.update(
                 "user-1", "Lecturer", List.of("LECTURER"), "lecturer-1", "notice-1", request));
@@ -149,7 +177,7 @@ class AnnouncementWriteServiceLecturerTest {
         when(fixture.announcements.findLecturerDepartmentId("lecturer-1")).thenReturn(Optional.of("dept-it"));
         UpdateAnnouncementRequest request = new UpdateAnnouncementRequest(
                 Set.of("title", "reason", "expectedVersion"), "Updated", null, null, null, null,
-                null, null, null, null, null, null, null, "Correction", 0);
+                null, null, null, null, null, null, null, null, "Correction", 0);
 
         assertThrows(DomainException.class, () -> fixture.service.update(
                 "user-1", "Lecturer", List.of("LECTURER"), "lecturer-1", "notice-1", request));
@@ -166,13 +194,52 @@ class AnnouncementWriteServiceLecturerTest {
         when(fixture.announcements.findById("notice-1")).thenReturn(Optional.of(ownAnnouncement));
         UpdateAnnouncementRequest ownDepartment = new UpdateAnnouncementRequest(
                 Set.of("targetDepartments", "reason", "expectedVersion"), null, null, null, null, null,
-                List.of("dept-it"), null, null, null, null, null, null, "Correction", 0);
+                List.of("dept-it"), null, null, null, null, null, null, null, "Correction", 0);
         UpdateAnnouncementRequest noDepartment = new UpdateAnnouncementRequest(
                 Set.of("targetDepartments", "reason", "expectedVersion"), null, null, null, null, null,
-                List.of(), null, null, null, null, null, null, "Correction", 0);
+                List.of(), null, null, null, null, null, null, null, "Correction", 0);
 
         fixture.service.update("user-1", "Lecturer", List.of("LECTURER"), "lecturer-1", "notice-1", ownDepartment);
         fixture.service.update("user-1", "Lecturer", List.of("LECTURER"), "lecturer-1", "notice-1", noDepartment);
+
+        verify(fixture.announcements, org.mockito.Mockito.times(2)).update(any());
+    }
+
+    @Test
+    void lecturerCannotSetAnotherFacultyOnUpdate() throws Exception {
+        Fixture fixture = fixture();
+        AnnouncementResponse ownAnnouncement = announcement("lecturer-1");
+        when(fixture.announcements.findByIdForUpdate("notice-1")).thenReturn(Optional.of(ownAnnouncement));
+        when(fixture.announcements.sectionBelongsToLecturer("section-1", "lecturer-1")).thenReturn(true);
+        when(fixture.announcements.findLecturerFacultyId("lecturer-1")).thenReturn(Optional.of("faculty-it"));
+        UpdateAnnouncementRequest request = new UpdateAnnouncementRequest(
+                Set.of("targetFaculties", "reason", "expectedVersion"), null, null, null, null, null,
+                null, List.of("faculty-cs"), null, null, null, null, null, null, "Correction", 0);
+
+        DomainException error = assertThrows(DomainException.class, () -> fixture.service.update(
+                "user-1", "Lecturer", List.of("LECTURER"), "lecturer-1", "notice-1", request));
+
+        assertEquals("LECTURER_ANNOUNCEMENT_FORBIDDEN", error.code());
+    }
+
+    @Test
+    void lecturerCanUpdateWithOwnOrEmptyFacultyAudience() throws Exception {
+        Fixture fixture = fixture();
+        AnnouncementResponse ownAnnouncement = announcement("lecturer-1");
+        when(fixture.announcements.findByIdForUpdate("notice-1")).thenReturn(Optional.of(ownAnnouncement));
+        when(fixture.announcements.sectionBelongsToLecturer("section-1", "lecturer-1")).thenReturn(true);
+        when(fixture.announcements.findLecturerFacultyId("lecturer-1")).thenReturn(Optional.of("faculty-it"));
+        when(fixture.announcements.update(any())).thenReturn(1);
+        when(fixture.announcements.findById("notice-1")).thenReturn(Optional.of(ownAnnouncement));
+        UpdateAnnouncementRequest ownFaculty = new UpdateAnnouncementRequest(
+                Set.of("targetFaculties", "reason", "expectedVersion"), null, null, null, null, null,
+                null, List.of("faculty-it"), null, null, null, null, null, null, "Correction", 0);
+        UpdateAnnouncementRequest noFaculty = new UpdateAnnouncementRequest(
+                Set.of("targetFaculties", "reason", "expectedVersion"), null, null, null, null, null,
+                null, List.of(), null, null, null, null, null, null, "Correction", 0);
+
+        fixture.service.update("user-1", "Lecturer", List.of("LECTURER"), "lecturer-1", "notice-1", ownFaculty);
+        fixture.service.update("user-1", "Lecturer", List.of("LECTURER"), "lecturer-1", "notice-1", noFaculty);
 
         verify(fixture.announcements, org.mockito.Mockito.times(2)).update(any());
     }
@@ -244,7 +311,7 @@ class AnnouncementWriteServiceLecturerTest {
                 "<a href=\"javascript:alert(1)\">x</a>",
                 "<a href=\"data:text/html;base64,PHNjcmlwdD4=\">x</a>")) {
             CreateAnnouncementRequest request = new CreateAnnouncementRequest(
-                    "Notice", unsafe, "NORMAL", List.of("STUDENT"), List.of(), List.of(), false,
+                    "Notice", unsafe, "NORMAL", List.of("STUDENT"), List.of(), List.of(), List.of(), false,
                     null, null, null, null, null);
             DomainException error = assertThrows(DomainException.class, () -> fixture.service.create(
                     "user-1", "Admin", List.of("ADMIN"), null, request), unsafe);
@@ -260,7 +327,7 @@ class AnnouncementWriteServiceLecturerTest {
                 "Notice",
                 "<p>Học phần <strong>tiên quyết</strong></p>"
                         + "<img src=\"data:image/png;base64,iVBORw0KGgo=\" alt=\"sơ đồ\">",
-                "NORMAL", List.of("STUDENT"), List.of(), List.of(), false, null, null, null, null, null);
+                "NORMAL", List.of("STUDENT"), List.of(), List.of(), List.of(), false, null, null, null, null, null);
 
         fixture.service.create("user-1", "Admin", List.of("ADMIN"), null, request);
 
@@ -268,13 +335,19 @@ class AnnouncementWriteServiceLecturerTest {
     }
 
     private static CreateAnnouncementRequest createRequest(List<String> roles, boolean global, String sectionId) {
-        return createRequest(roles, global, sectionId, List.of());
+        return createRequest(roles, global, sectionId, List.of(), List.of());
     }
 
     private static CreateAnnouncementRequest createRequest(
             List<String> roles, boolean global, String sectionId, List<String> departments) {
-        return new CreateAnnouncementRequest("Notice", "Content", "NORMAL", roles, List.of(), departments, global,
-                null, null, null, sectionId, null);
+        return createRequest(roles, global, sectionId, departments, List.of());
+    }
+
+    private static CreateAnnouncementRequest createRequest(
+            List<String> roles, boolean global, String sectionId,
+            List<String> departments, List<String> faculties) {
+        return new CreateAnnouncementRequest("Notice", "Content", "NORMAL", roles, List.of(), departments,
+                faculties, global, null, null, null, sectionId, null);
     }
 
     private static Fixture fixture() throws Exception {
@@ -287,13 +360,18 @@ class AnnouncementWriteServiceLecturerTest {
     }
 
     private static AnnouncementResponse announcement(String lecturerId) {
-        return announcement(lecturerId, List.of());
+        return announcement(lecturerId, List.of(), List.of());
     }
 
     private static AnnouncementResponse announcement(String lecturerId, List<String> departments) {
+        return announcement(lecturerId, departments, List.of());
+    }
+
+    private static AnnouncementResponse announcement(
+            String lecturerId, List<String> departments, List<String> faculties) {
         Instant now = Instant.parse("2026-09-10T00:00:00Z");
         return new AnnouncementResponse("notice-1", "Notice", "Content", "NORMAL", List.of("STUDENT"),
-                List.of(), departments, false, null, null, "user-1", null, null, "section-1",
+                List.of(), departments, faculties, false, null, null, "user-1", null, null, "section-1",
                 null, null, null, lecturerId, null, now, now, 0, null, null, null, null, null);
     }
 

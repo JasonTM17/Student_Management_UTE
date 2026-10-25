@@ -34,6 +34,7 @@ public class AnnouncementWriteRepository {
     private static final String TABLE = "\"engagement\".\"Announcement\"";
     private static final String SELECT_COLUMNS = """
             "id", "title", "content", "priority", "targetRoles", "targetYears", "targetDepartments",
+            "targetFaculties",
             "isGlobal", "publishAt", "expiresAt", "publishedBy", "semesterId",
             "semesterName", "sectionId", "sectionNumber", "courseCode", "courseName",
             "lecturerId", "lecturerDisplayName", "createdAt", "updatedAt",
@@ -51,10 +52,11 @@ public class AnnouncementWriteRepository {
             try (PreparedStatement statement = connection.prepareStatement("""
                     INSERT INTO "engagement"."Announcement" (
                         "id", "title", "content", "priority", "targetRoles", "targetYears", "targetDepartments",
+                        "targetFaculties",
                         "isGlobal", "publishAt", "expiresAt", "publishedBy", "semesterId",
                         "semesterName", "sectionId", "sectionNumber", "courseCode", "courseName",
                         "lecturerId", "lecturerDisplayName", "createdAt", "updatedAt"
-                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, ?, NULL, NULL, NULL, ?, NULL, ?, ?)
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, ?, NULL, NULL, NULL, ?, NULL, ?, ?)
                     """)) {
                 statement.setString(1, command.id());
                 statement.setString(2, command.title());
@@ -63,15 +65,16 @@ public class AnnouncementWriteRepository {
                 statement.setArray(5, connection.createArrayOf("VARCHAR", command.targetRoles().toArray()));
                 statement.setArray(6, connection.createArrayOf("INTEGER", command.targetYears().toArray()));
                 statement.setArray(7, connection.createArrayOf("VARCHAR", command.targetDepartments().toArray()));
-                statement.setBoolean(8, command.isGlobal());
-                timestamp(statement, 9, command.publishAt());
-                timestamp(statement, 10, command.expiresAt());
-                statement.setString(11, command.publishedBy());
-                statement.setString(12, command.semesterId());
-                statement.setString(13, command.sectionId());
-                statement.setString(14, command.lecturerId());
-                timestamp(statement, 15, command.createdAt());
+                statement.setArray(8, connection.createArrayOf("VARCHAR", command.targetFaculties().toArray()));
+                statement.setBoolean(9, command.isGlobal());
+                timestamp(statement, 10, command.publishAt());
+                timestamp(statement, 11, command.expiresAt());
+                statement.setString(12, command.publishedBy());
+                statement.setString(13, command.semesterId());
+                statement.setString(14, command.sectionId());
+                statement.setString(15, command.lecturerId());
                 timestamp(statement, 16, command.createdAt());
+                timestamp(statement, 17, command.createdAt());
                 statement.executeUpdate();
             }
             return null;
@@ -89,6 +92,7 @@ public class AnnouncementWriteRepository {
         addStringArray(assignments, binders, "targetRoles", command.targetRoles());
         addIntegerArray(assignments, binders, "targetYears", command.targetYears());
         addStringArray(assignments, binders, "targetDepartments", command.targetDepartments());
+        addStringArray(assignments, binders, "targetFaculties", command.targetFaculties());
         addBoolean(assignments, binders, "isGlobal", command.isGlobal());
         addInstant(assignments, binders, "publishAt", command.publishAt());
         addInstant(assignments, binders, "expiresAt", command.expiresAt());
@@ -271,6 +275,19 @@ public class AnnouncementWriteRepository {
         return departmentIds.isEmpty() ? Optional.empty() : Optional.ofNullable(departmentIds.get(0));
     }
 
+    /** Faculty of the lecturer's own department (Lecturer → Department → facultyId). */
+    public Optional<String> findLecturerFacultyId(String lecturerId) {
+        if (lecturerId == null || lecturerId.isBlank()) return Optional.empty();
+        List<String> facultyIds = jdbc.query(
+                "SELECT department.\"facultyId\" FROM \"academic\".\"Lecturer\" lecturer"
+                        + " JOIN \"academic\".\"Department\" department"
+                        + " ON department.\"id\" = lecturer.\"departmentId\""
+                        + " WHERE lecturer.\"id\" = :lecturerId",
+                new MapSqlParameterSource("lecturerId", lecturerId),
+                (resultSet, rowNumber) -> resultSet.getString("facultyId"));
+        return facultyIds.isEmpty() ? Optional.empty() : Optional.ofNullable(facultyIds.get(0));
+    }
+
     /**
      * Loads an announcement while holding its row lock for the surrounding transaction.
      * Mutation services use this read before the CAS write so the audit snapshots cannot
@@ -423,6 +440,7 @@ public class AnnouncementWriteRepository {
                 stringList(resultSet.getArray("targetRoles")),
                 integerList(resultSet.getArray("targetYears")),
                 stringList(resultSet.getArray("targetDepartments")),
+                stringList(resultSet.getArray("targetFaculties")),
                 resultSet.getBoolean("isGlobal"),
                 instant(resultSet, "publishAt"),
                 instant(resultSet, "expiresAt"),

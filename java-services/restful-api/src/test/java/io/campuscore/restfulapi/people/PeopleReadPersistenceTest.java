@@ -336,7 +336,7 @@ class PeopleReadPersistenceTest {
         insertEnrollment("enr-withdrawn", "student-withdrawn", "section-1", "WITHDRAWN");
         insertEnrollment("enr-dropped", "student-dropped", "section-1", "DROPPED");
 
-        assertThat(peopleService.findAnnouncementStudentUserIds(null, "section-1", null, null, null))
+        assertThat(peopleService.findAnnouncementStudentUserIds(null, "section-1", null, null, null, null))
                 .containsExactly("user-student-active");
     }
 
@@ -350,14 +350,40 @@ class PeopleReadPersistenceTest {
         insertStudent("student-cs", "S021", "ACTIVE", 2, BASE_TIME, "department-cs");
 
         assertThat(peopleService.findAnnouncementStudentUserIds(null, null, null, null,
-                        java.util.List.of("department-se")))
+                        java.util.List.of("department-se"), null))
                 .containsExactly("user-student-se");
         assertThat(peopleService.findAnnouncementStudentUserIds(null, null, null, null,
-                        java.util.List.of("department-missing")))
+                        java.util.List.of("department-missing"), null))
                 .isEmpty();
         assertThat(peopleService.findAnnouncementStudentUserIds(null, null, null, null,
+                        java.util.List.of(), null))
+                .containsExactlyInAnyOrder("user-student-se", "user-student-cs");
+    }
+
+    @Test
+    void facultyTargetsNarrowTheAnnouncementStudentFanout() {
+        // Fan-out mirrors the feed's faculty chain: a faculty-targeted notice
+        // only reaches students whose curriculum's department sits in a
+        // listed faculty (Student → Curriculum → Department → facultyId).
+        insertStudent("student-se", "S030", "ACTIVE", 2, BASE_TIME, "department-se");
+        insertStudent("student-cs", "S031", "ACTIVE", 2, BASE_TIME, "department-cs");
+
+        assertThat(peopleService.findAnnouncementStudentUserIds(null, null, null, null, null,
+                        java.util.List.of("faculty-se")))
+                .containsExactly("user-student-se");
+        assertThat(peopleService.findAnnouncementStudentUserIds(null, null, null, null, null,
+                        java.util.List.of("faculty-missing")))
+                .isEmpty();
+        assertThat(peopleService.findAnnouncementStudentUserIds(null, null, null, null, null,
                         java.util.List.of()))
                 .containsExactlyInAnyOrder("user-student-se", "user-student-cs");
+        // Department AND faculty dimensions compose: a student must satisfy both.
+        assertThat(peopleService.findAnnouncementStudentUserIds(null, null, null, null,
+                        java.util.List.of("department-se"), java.util.List.of("faculty-cs")))
+                .isEmpty();
+        assertThat(peopleService.findAnnouncementStudentUserIds(null, null, null, null,
+                        java.util.List.of("department-se"), java.util.List.of("faculty-se")))
+                .containsExactly("user-student-se");
     }
 
     private void insertEnrollment(String id, String studentId, String sectionId, String status) {
@@ -382,7 +408,8 @@ class PeopleReadPersistenceTest {
                 CREATE TABLE IF NOT EXISTS "academic"."Department" (
                     "id" VARCHAR(120) PRIMARY KEY,
                     "code" VARCHAR(40) NOT NULL,
-                    "name" VARCHAR(200) NOT NULL
+                    "name" VARCHAR(200) NOT NULL,
+                    "facultyId" VARCHAR(120)
                 )
                 """);
         jdbc.execute("""
@@ -433,8 +460,9 @@ class PeopleReadPersistenceTest {
     }
 
     private void insertDepartment(String id, String code, String name) {
-        jdbc.update("INSERT INTO \"academic\".\"Department\" (\"id\", \"code\", \"name\") VALUES (?, ?, ?)",
-                id, code, name);
+        jdbc.update("INSERT INTO \"academic\".\"Department\" (\"id\", \"code\", \"name\", \"facultyId\")"
+                        + " VALUES (?, ?, ?, ?)",
+                id, code, name, "faculty-" + id.substring(id.indexOf('-') + 1));
     }
 
     private void insertStudent(
