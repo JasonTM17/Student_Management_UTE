@@ -34,6 +34,11 @@ import { cn } from '@/lib/utils';
 import { toThesisLocalInput as toLocalInput } from '@/lib/thesis-datetime';
 import { mergeThesisRounds, planThesisRoundRestore, sortThesisRoundsForOverview } from '@/lib/thesis-round';
 import {
+  firstThesisRoundScheduleViolation,
+  parseThesisLocalInput,
+  thesisRoundScheduleErrorRule,
+} from '@/lib/thesis-round-schedule';
+import {
   assignTopicConflict,
   councilMemberConflict,
   reviewerConflict,
@@ -310,6 +315,17 @@ export default function AdminThesisPage() {
   const transitionErrorMessage = (err: unknown): string =>
     campusCodeMessage(err, messages.common.campusErrors, messages.thesis.actionFailed);
 
+  /**
+   * A schedule-order rejection carries the violated rule in details.rule, so
+   * the round modals can show the same precise copy the client-side schedule
+   * check produces; every other failure keeps the standard code/kind mapping.
+   */
+  const roundMutationErrorMessage = (err: unknown): string => {
+    const rule = thesisRoundScheduleErrorRule(err);
+    return (rule && messages.thesis.admin.scheduleOrder[rule])
+      || transitionErrorMessage(err);
+  };
+
   const handleCreateCouncil = async (roundId: string) => {
     if (!councilNameInput.trim()) return;
     setIsSaving(true);
@@ -430,6 +446,21 @@ export default function AdminThesisPage() {
       setModalError(messages.thesis.admin.createIncomplete);
       return;
     }
+    const schedule = {
+      lecturerSubmitStart: parseThesisLocalInput(formLecturerStart),
+      lecturerSubmitEnd: parseThesisLocalInput(formLecturerEnd),
+      registrationStart: parseThesisLocalInput(formStart),
+      registrationEnd: parseThesisLocalInput(formEnd),
+      proposalPublishAt: parseThesisLocalInput(formProposal),
+      gvpbDeadline: parseThesisLocalInput(needsGvpb ? formGvpb : ''),
+      reportDate: parseThesisLocalInput(needsGvpb ? formReportDate : ''),
+      defenseDate: parseThesisLocalInput(needsDefense ? formDefenseDate : ''),
+    };
+    const scheduleViolation = firstThesisRoundScheduleViolation(schedule);
+    if (scheduleViolation) {
+      setModalError(messages.thesis.admin.scheduleOrder[scheduleViolation]);
+      return;
+    }
     setIsSaving(true);
     setError('');
     setSuccess('');
@@ -442,15 +473,15 @@ export default function AdminThesisPage() {
         registrationEnd: new Date(formEnd).toISOString(),
         lecturerSubmitStart: new Date(formLecturerStart).toISOString(),
         lecturerSubmitEnd: new Date(formLecturerEnd).toISOString(),
-        proposalPublishAt: formProposal ? new Date(formProposal).toISOString() : undefined,
-        gvpbDeadline: needsGvpb && formGvpb ? new Date(formGvpb).toISOString() : undefined,
+        proposalPublishAt: schedule.proposalPublishAt?.toISOString(),
+        gvpbDeadline: needsGvpb && formGvpb ? schedule.gvpbDeadline?.toISOString() : undefined,
         reportDate:
           needsGvpb && formReportDate
-            ? new Date(formReportDate).toISOString()
+            ? schedule.reportDate?.toISOString()
             : undefined,
         defenseDate:
           needsDefense && formDefenseDate
-            ? new Date(formDefenseDate).toISOString()
+            ? schedule.defenseDate?.toISOString()
             : undefined,
       });
       setSuccess(messages.thesis.admin.created);
@@ -465,8 +496,8 @@ export default function AdminThesisPage() {
       setFormReportDate('');
       setFormDefenseDate('');
       await loadData();
-    } catch {
-      setModalError(messages.thesis.actionFailed);
+    } catch (err: unknown) {
+      setModalError(roundMutationErrorMessage(err));
     } finally {
       setIsSaving(false);
     }
@@ -668,6 +699,21 @@ export default function AdminThesisPage() {
       setModalError(messages.thesis.admin.createIncomplete);
       return;
     }
+    const schedule = {
+      lecturerSubmitStart: parseThesisLocalInput(formLecturerStart),
+      lecturerSubmitEnd: parseThesisLocalInput(formLecturerEnd),
+      registrationStart: parseThesisLocalInput(formStart),
+      registrationEnd: parseThesisLocalInput(formEnd),
+      proposalPublishAt: parseThesisLocalInput(formProposal),
+      gvpbDeadline: parseThesisLocalInput(needsGvpb ? formGvpb : ''),
+      reportDate: parseThesisLocalInput(needsGvpb ? formReportDate : ''),
+      defenseDate: parseThesisLocalInput(needsDefense ? formDefenseDate : ''),
+    };
+    const scheduleViolation = firstThesisRoundScheduleViolation(schedule);
+    if (scheduleViolation) {
+      setModalError(messages.thesis.admin.scheduleOrder[scheduleViolation]);
+      return;
+    }
     setIsSaving(true);
     setError('');
     setSuccess('');
@@ -680,10 +726,10 @@ export default function AdminThesisPage() {
         registrationEnd: new Date(formEnd).toISOString(),
         lecturerSubmitStart: new Date(formLecturerStart).toISOString(),
         lecturerSubmitEnd: new Date(formLecturerEnd).toISOString(),
-        proposalPublishAt: formProposal ? new Date(formProposal).toISOString() : undefined,
-        gvpbDeadline: needsGvpb && formGvpb ? new Date(formGvpb).toISOString() : undefined,
-        reportDate: needsGvpb && formReportDate ? new Date(formReportDate).toISOString() : undefined,
-        defenseDate: needsDefense && formDefenseDate ? new Date(formDefenseDate).toISOString() : undefined,
+        proposalPublishAt: schedule.proposalPublishAt?.toISOString(),
+        gvpbDeadline: needsGvpb && formGvpb ? schedule.gvpbDeadline?.toISOString() : undefined,
+        reportDate: needsGvpb && formReportDate ? schedule.reportDate?.toISOString() : undefined,
+        defenseDate: needsDefense && formDefenseDate ? schedule.defenseDate?.toISOString() : undefined,
       });
       setSuccess(messages.thesis.admin.editRoundSuccess);
       setShowEditRoundModal(false);
@@ -693,7 +739,7 @@ export default function AdminThesisPage() {
         await loadRoundDetail(editingRoundId);
       }
     } catch (err: unknown) {
-      setModalError(transitionErrorMessage(err));
+      setModalError(roundMutationErrorMessage(err));
     } finally {
       setIsSaving(false);
     }
@@ -1811,7 +1857,7 @@ export default function AdminThesisPage() {
       >
         <div className="space-y-4">
           {modalError ? (
-            <div className="rounded-md border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive">
+            <div role="alert" className="rounded-md border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive">
               {modalError}
             </div>
           ) : null}
@@ -1843,49 +1889,49 @@ export default function AdminThesisPage() {
               { value: 'KLTN', label: messages.thesis.admin.thesisTypeOptions.KLTN },
             ]}
           />
-          <div className="grid gap-4 sm:grid-cols-2">
-            <label className="flex flex-col gap-2 text-sm font-medium text-foreground">
-              {messages.thesis.admin.registrationStart}
-              <Input type="datetime-local" step="0.001" value={formStart} onChange={(e) => setFormStart(e.target.value)} />
-            </label>
-            <label className="flex flex-col gap-2 text-sm font-medium text-foreground">
-              {messages.thesis.admin.registrationEnd}
-              <Input type="datetime-local" step="0.001" value={formEnd} onChange={(e) => setFormEnd(e.target.value)} />
-            </label>
-          </div>
           <div>
             <p className="text-sm font-medium text-foreground">{messages.thesis.admin.lecturerWindow}</p>
             <div className="mt-2 grid gap-4 sm:grid-cols-2">
               <label className="flex flex-col gap-2 text-sm font-medium text-foreground">
                 {messages.thesis.admin.lecturerSubmitStart}
-                <Input type="datetime-local" step="0.001" value={formLecturerStart} onChange={(e) => setFormLecturerStart(e.target.value)} />
+                <Input type="datetime-local" step="60" value={formLecturerStart} onChange={(e) => setFormLecturerStart(e.target.value)} />
               </label>
               <label className="flex flex-col gap-2 text-sm font-medium text-foreground">
                 {messages.thesis.admin.lecturerSubmitEnd}
-                <Input type="datetime-local" step="0.001" value={formLecturerEnd} onChange={(e) => setFormLecturerEnd(e.target.value)} />
+                <Input type="datetime-local" step="60" value={formLecturerEnd} onChange={(e) => setFormLecturerEnd(e.target.value)} />
               </label>
             </div>
           </div>
           <label className="flex flex-col gap-2 text-sm font-medium text-foreground">
             {messages.thesis.admin.proposalPublishAt}
-            <Input type="datetime-local" step="0.001" value={formProposal} onChange={(e) => setFormProposal(e.target.value)} />
+            <Input type="datetime-local" step="60" value={formProposal} onChange={(e) => setFormProposal(e.target.value)} />
           </label>
+          <div className="grid gap-4 sm:grid-cols-2">
+            <label className="flex flex-col gap-2 text-sm font-medium text-foreground">
+              {messages.thesis.admin.registrationStart}
+              <Input type="datetime-local" step="60" value={formStart} onChange={(e) => setFormStart(e.target.value)} />
+            </label>
+            <label className="flex flex-col gap-2 text-sm font-medium text-foreground">
+              {messages.thesis.admin.registrationEnd}
+              <Input type="datetime-local" step="60" value={formEnd} onChange={(e) => setFormEnd(e.target.value)} />
+            </label>
+          </div>
           {needsGvpb ? (
             <label className="flex flex-col gap-2 text-sm font-medium text-foreground">
               {messages.thesis.admin.gvpbDeadline} <span className="text-destructive">*</span>
-              <Input type="datetime-local" step="0.001" value={formGvpb} onChange={(e) => setFormGvpb(e.target.value)} required />
+              <Input type="datetime-local" step="60" value={formGvpb} onChange={(e) => setFormGvpb(e.target.value)} required />
             </label>
           ) : null}
           {needsGvpb ? (
             <label className="flex flex-col gap-2 text-sm font-medium text-foreground">
               {messages.thesis.admin.reportDate} <span className="text-destructive">*</span>
-              <Input type="datetime-local" step="0.001" value={formReportDate} onChange={(e) => setFormReportDate(e.target.value)} required />
+              <Input type="datetime-local" step="60" value={formReportDate} onChange={(e) => setFormReportDate(e.target.value)} required />
             </label>
           ) : null}
           {needsDefense ? (
             <label className="flex flex-col gap-2 text-sm font-medium text-foreground">
               {messages.thesis.admin.defenseDate} <span className="text-destructive">*</span>
-              <Input type="datetime-local" step="0.001" value={formDefenseDate} onChange={(e) => setFormDefenseDate(e.target.value)} required />
+              <Input type="datetime-local" step="60" value={formDefenseDate} onChange={(e) => setFormDefenseDate(e.target.value)} required />
             </label>
           ) : null}
           <div className="flex justify-end gap-2 pt-2">
@@ -2045,7 +2091,7 @@ export default function AdminThesisPage() {
       >
         <div className="space-y-4">
           {modalError ? (
-            <div className="rounded-md border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive">
+            <div role="alert" className="rounded-md border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive">
               {modalError}
             </div>
           ) : null}
@@ -2074,49 +2120,49 @@ export default function AdminThesisPage() {
               { value: 'KLTN', label: messages.thesis.admin.thesisTypeOptions.KLTN },
             ]}
           />
-          <div className="grid gap-4 sm:grid-cols-2">
-            <label className="flex flex-col gap-2 text-sm font-medium text-foreground">
-              {messages.thesis.admin.registrationStart}
-              <Input type="datetime-local" step="0.001" value={formStart} onChange={(e) => setFormStart(e.target.value)} />
-            </label>
-            <label className="flex flex-col gap-2 text-sm font-medium text-foreground">
-              {messages.thesis.admin.registrationEnd}
-              <Input type="datetime-local" step="0.001" value={formEnd} onChange={(e) => setFormEnd(e.target.value)} />
-            </label>
-          </div>
           <div>
             <p className="text-sm font-medium text-foreground">{messages.thesis.admin.lecturerWindow}</p>
             <div className="mt-2 grid gap-4 sm:grid-cols-2">
               <label className="flex flex-col gap-2 text-sm font-medium text-foreground">
                 {messages.thesis.admin.lecturerSubmitStart}
-                <Input type="datetime-local" step="0.001" value={formLecturerStart} onChange={(e) => setFormLecturerStart(e.target.value)} />
+                <Input type="datetime-local" step="60" value={formLecturerStart} onChange={(e) => setFormLecturerStart(e.target.value)} />
               </label>
               <label className="flex flex-col gap-2 text-sm font-medium text-foreground">
                 {messages.thesis.admin.lecturerSubmitEnd}
-                <Input type="datetime-local" step="0.001" value={formLecturerEnd} onChange={(e) => setFormLecturerEnd(e.target.value)} />
+                <Input type="datetime-local" step="60" value={formLecturerEnd} onChange={(e) => setFormLecturerEnd(e.target.value)} />
               </label>
             </div>
           </div>
           <label className="flex flex-col gap-2 text-sm font-medium text-foreground">
             {messages.thesis.admin.proposalPublishAt}
-            <Input type="datetime-local" step="0.001" value={formProposal} onChange={(e) => setFormProposal(e.target.value)} />
+            <Input type="datetime-local" step="60" value={formProposal} onChange={(e) => setFormProposal(e.target.value)} />
           </label>
+          <div className="grid gap-4 sm:grid-cols-2">
+            <label className="flex flex-col gap-2 text-sm font-medium text-foreground">
+              {messages.thesis.admin.registrationStart}
+              <Input type="datetime-local" step="60" value={formStart} onChange={(e) => setFormStart(e.target.value)} />
+            </label>
+            <label className="flex flex-col gap-2 text-sm font-medium text-foreground">
+              {messages.thesis.admin.registrationEnd}
+              <Input type="datetime-local" step="60" value={formEnd} onChange={(e) => setFormEnd(e.target.value)} />
+            </label>
+          </div>
           {needsGvpb ? (
             <label className="flex flex-col gap-2 text-sm font-medium text-foreground">
               {messages.thesis.admin.gvpbDeadline} <span className="text-destructive">*</span>
-              <Input type="datetime-local" step="0.001" value={formGvpb} onChange={(e) => setFormGvpb(e.target.value)} required />
+              <Input type="datetime-local" step="60" value={formGvpb} onChange={(e) => setFormGvpb(e.target.value)} required />
             </label>
           ) : null}
           {needsGvpb ? (
             <label className="flex flex-col gap-2 text-sm font-medium text-foreground">
               {messages.thesis.admin.reportDate} <span className="text-destructive">*</span>
-              <Input type="datetime-local" step="0.001" value={formReportDate} onChange={(e) => setFormReportDate(e.target.value)} required />
+              <Input type="datetime-local" step="60" value={formReportDate} onChange={(e) => setFormReportDate(e.target.value)} required />
             </label>
           ) : null}
           {needsDefense ? (
             <label className="flex flex-col gap-2 text-sm font-medium text-foreground">
               {messages.thesis.admin.defenseDate} <span className="text-destructive">*</span>
-              <Input type="datetime-local" step="0.001" value={formDefenseDate} onChange={(e) => setFormDefenseDate(e.target.value)} required />
+              <Input type="datetime-local" step="60" value={formDefenseDate} onChange={(e) => setFormDefenseDate(e.target.value)} required />
             </label>
           ) : null}
           <div className="flex justify-end gap-2 pt-2">

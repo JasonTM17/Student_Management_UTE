@@ -193,26 +193,31 @@ public class ThesisMutationService {
         }
         Instant regStart = request.registrationStart();
         Instant regEnd = request.registrationEnd();
-        requireDates(regStart, regEnd, "registrationStart", "registrationEnd");
+        requireRoundWindow(regStart, regEnd, "registrationStart", "registrationEnd", "REGISTRATION_WINDOW");
         Instant letStart = request.lecturerSubmitStart();
         Instant letEnd = request.lecturerSubmitEnd();
-        requireDates(letStart, letEnd, "lecturerSubmitStart", "lecturerSubmitEnd");
+        requireRoundWindow(letStart, letEnd, "lecturerSubmitStart", "lecturerSubmitEnd", "LECTURER_WINDOW");
         if (regStart.isBefore(letEnd)) {
-            throw invalid("registrationStart must not be before lecturerSubmitEnd");
+            throw scheduleOrder("REGISTRATION_START_BEFORE_LECTURER_END",
+                    "registrationStart must not be before lecturerSubmitEnd");
         }
         if (request.proposalPublishAt() != null && request.proposalPublishAt().isBefore(letEnd)) {
-            throw invalid("proposalPublishAt must not be before lecturerSubmitEnd");
+            throw scheduleOrder("PROPOSAL_PUBLISH_BEFORE_LECTURER_END",
+                    "proposalPublishAt must not be before lecturerSubmitEnd");
         }
         if (request.gvpbDeadline() != null && request.gvpbDeadline().isBefore(regEnd)) {
-            throw invalid("gvpbDeadline must not be before registrationEnd");
+            throw scheduleOrder("GVPB_DEADLINE_BEFORE_REGISTRATION_END",
+                    "gvpbDeadline must not be before registrationEnd");
         }
         if (request.reportDate() != null && request.gvpbDeadline() != null
                 && request.reportDate().isBefore(request.gvpbDeadline())) {
-            throw invalid("reportDate must not be before gvpbDeadline");
+            throw scheduleOrder("REPORT_DATE_BEFORE_GVPB_DEADLINE",
+                    "reportDate must not be before gvpbDeadline");
         }
         if (request.defenseDate() != null && request.reportDate() != null
                 && request.defenseDate().isBefore(request.reportDate())) {
-            throw invalid("defenseDate must not be before reportDate");
+            throw scheduleOrder("DEFENSE_DATE_BEFORE_REPORT_DATE",
+                    "defenseDate must not be before reportDate");
         }
         UUID id = UUID.randomUUID();
         jdbc.update("""
@@ -349,24 +354,31 @@ public class ThesisMutationService {
         if (!roundType.requiresDefenseDate() && request.defenseDate() != null) {
             throw invalid(roundType + " rounds must not specify a defenseDate");
         }
-        requireDates(request.registrationStart(), request.registrationEnd(), "registrationStart", "registrationEnd");
-        requireDates(request.lecturerSubmitStart(), request.lecturerSubmitEnd(), "lecturerSubmitStart", "lecturerSubmitEnd");
+        requireRoundWindow(request.registrationStart(), request.registrationEnd(),
+                "registrationStart", "registrationEnd", "REGISTRATION_WINDOW");
+        requireRoundWindow(request.lecturerSubmitStart(), request.lecturerSubmitEnd(),
+                "lecturerSubmitStart", "lecturerSubmitEnd", "LECTURER_WINDOW");
         if (request.registrationStart().isBefore(request.lecturerSubmitEnd())) {
-            throw invalid("registrationStart must not be before lecturerSubmitEnd");
+            throw scheduleOrder("REGISTRATION_START_BEFORE_LECTURER_END",
+                    "registrationStart must not be before lecturerSubmitEnd");
         }
         if (request.proposalPublishAt() != null && request.proposalPublishAt().isBefore(request.lecturerSubmitEnd())) {
-            throw invalid("proposalPublishAt must not be before lecturerSubmitEnd");
+            throw scheduleOrder("PROPOSAL_PUBLISH_BEFORE_LECTURER_END",
+                    "proposalPublishAt must not be before lecturerSubmitEnd");
         }
         if (request.gvpbDeadline() != null && request.gvpbDeadline().isBefore(request.registrationEnd())) {
-            throw invalid("gvpbDeadline must not be before registrationEnd");
+            throw scheduleOrder("GVPB_DEADLINE_BEFORE_REGISTRATION_END",
+                    "gvpbDeadline must not be before registrationEnd");
         }
         if (request.reportDate() != null && request.gvpbDeadline() != null
                 && request.reportDate().isBefore(request.gvpbDeadline())) {
-            throw invalid("reportDate must not be before gvpbDeadline");
+            throw scheduleOrder("REPORT_DATE_BEFORE_GVPB_DEADLINE",
+                    "reportDate must not be before gvpbDeadline");
         }
         if (request.defenseDate() != null && request.reportDate() != null
                 && request.defenseDate().isBefore(request.reportDate())) {
-            throw invalid("defenseDate must not be before reportDate");
+            throw scheduleOrder("DEFENSE_DATE_BEFORE_REPORT_DATE",
+                    "defenseDate must not be before reportDate");
         }
         Map<String, Object> beforeState = new LinkedHashMap<>();
         for (String column : List.of("name", "thesis_type", "lecturer_submit_start", "lecturer_submit_end",
@@ -3122,10 +3134,14 @@ public class ThesisMutationService {
         requireText(value, name);
         if (value.trim().length() > maxLength) throw invalid(name + " must contain at most " + maxLength + " characters");
     }
-    private static void requireDates(Instant start, Instant end, String startField, String endField) {
+    private static void requireRoundWindow(Instant start, Instant end, String startField, String endField, String rule) {
         if (start == null || end == null || !end.isAfter(start)) {
-            throw invalid(endField + " must be after " + startField);
+            throw scheduleOrder(rule, endField + " must be after " + startField);
         }
+    }
+    private static DomainException scheduleOrder(String rule, String message) {
+        return new DomainException(HttpStatus.BAD_REQUEST, "THESIS_ROUND_SCHEDULE_ORDER", message,
+                Map.of("rule", rule));
     }
     private static boolean isAdmin(Jwt actor) {
         if (actor == null) {
