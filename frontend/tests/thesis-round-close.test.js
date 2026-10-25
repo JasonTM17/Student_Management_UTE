@@ -107,7 +107,15 @@ test('listRounds passes the status filter only when one is given', async () => {
 test('campusCodeMessage maps the new close/reopen codes in both locales', () => {
   const { campusCodeMessage } = loadModule('src/lib/campus-error.ts');
   const { en, vi } = loadMessages();
-  const windowOpen = { response: { status: 409, data: { code: 'RETRACT_WINDOW_OPEN' } } };
+  const windowOpen = {
+    response: {
+      status: 409,
+      data: {
+        code: 'RETRACT_WINDOW_OPEN',
+        details: { retractWindowEndsAt: '2026-11-08T01:00:00Z' },
+      },
+    },
+  };
   const closeAdmin = { response: { status: 403, data: { code: 'CLOSE_ADMIN_REQUIRED' } } };
   const reopenAdmin = { response: { status: 403, data: { code: 'REOPEN_ADMIN_REQUIRED' } } };
   for (const dict of [en, vi]) {
@@ -115,7 +123,13 @@ test('campusCodeMessage maps the new close/reopen codes in both locales', () => 
     for (const code of ['RETRACT_WINDOW_OPEN', 'CLOSE_ADMIN_REQUIRED', 'REOPEN_ADMIN_REQUIRED']) {
       assert.ok(copy.codes[code], `${code} copy missing`);
     }
-    assert.equal(campusCodeMessage(windowOpen, copy), copy.codes.RETRACT_WINDOW_OPEN);
+    assert.equal(
+      campusCodeMessage(windowOpen, copy),
+      copy.codes.RETRACT_WINDOW_OPEN.replace(
+        '{retractWindowEndsAt}',
+        '2026-11-08T01:00:00Z',
+      ),
+    );
     assert.equal(campusCodeMessage(closeAdmin, copy), copy.codes.CLOSE_ADMIN_REQUIRED);
     assert.equal(campusCodeMessage(reopenAdmin, copy), copy.codes.REOPEN_ADMIN_REQUIRED);
   }
