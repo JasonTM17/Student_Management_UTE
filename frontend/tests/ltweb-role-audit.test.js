@@ -234,7 +234,9 @@ test('published grades and thesis results are locked server-side', () => {
     'the published-grade lock must run before any component write',
   );
 
-  const thesis = readJavaSource('ThesisMutationService');
+  const thesis = readJavaSource('ThesisMutationService')
+    + (readJavaSource('ThesisPublicationService') || '')
+    + (readJavaSource('ThesisRoundLifecycleService') || '');
   assert.ok(thesis.includes('SCORES_INCOMPLETE'), 'results publish must require every approved group graded');
   assert.ok(
     thesis.includes('KLTN rounds require a gvpbDeadline'),

@@ -8,7 +8,7 @@ import io.campuscore.restfulapi.academic.registration.dto.RegistrationDtos.Secti
 import io.campuscore.restfulapi.academic.registration.dto.RegistrationDtos.SummaryResponse;
 import io.campuscore.restfulapi.academic.registration.model.SlipPayload;
 import io.campuscore.restfulapi.academic.service.AcademicEnrollmentReadService;
-import io.campuscore.restfulapi.academic.service.SemesterStatuses;
+import io.campuscore.restfulapi.academic.model.SemesterStatuses;
 import io.campuscore.restfulapi.academic.dto.AcademicEnrollmentReadDtos.EnrollmentResponse;
 import io.campuscore.restfulapi.exception.DomainException;
 import java.nio.charset.StandardCharsets;

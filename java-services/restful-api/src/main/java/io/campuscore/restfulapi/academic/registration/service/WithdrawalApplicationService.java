@@ -4,7 +4,7 @@ import io.campuscore.restfulapi.academic.registration.dto.WithdrawalApplicationD
 import io.campuscore.restfulapi.academic.registration.dto.WithdrawalApplicationDtos.WindowResponse;
 import io.campuscore.restfulapi.academic.registration.model.WithdrawalStatuses;
 import io.campuscore.restfulapi.academic.registration.repository.WithdrawalApplicationRepository;
-import io.campuscore.restfulapi.academic.service.SemesterStatuses;
+import io.campuscore.restfulapi.academic.model.SemesterStatuses;
 import io.campuscore.restfulapi.audit.service.AdminAuditRecorder;
 import io.campuscore.restfulapi.exception.DomainException;
 import io.campuscore.restfulapi.notification.model.CreateNotificationCommand;
