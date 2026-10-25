@@ -90,8 +90,8 @@ public class AuthUserRepository {
      */
     public void lockUserRow(String userId) {
         jdbc.queryForList(
-                "SELECT \"id\" FROM " + USER_TABLE + " WHERE \"id\" = :id FOR UPDATE",
-                new MapSqlParameterSource("id", userId), String.class);
+                "SELECT \"id\" FROM " + USER_TABLE + " WHERE \"id\" = :userId FOR UPDATE",
+                new MapSqlParameterSource("userId", userId).addValue("id", userId), String.class);
     }
 
     /** Locks a stable row shared by concurrent changes to SUPER_ADMIN membership. */
