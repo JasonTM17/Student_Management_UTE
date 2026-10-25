@@ -163,6 +163,112 @@ class AcademicAttendanceReadPersistenceTest {
     }
 
     @Test
+    void examEligibilityFlagsAtRiskOnlyOnceCountableSessionsReachTheMinimum() throws Exception {
+        // student-2 already has one PRESENT in section-2; enrolling them and
+        // adding four ABSENT records lands on exactly minSessions=5 countable
+        // records at a 20% rate — inside the AT_RISK band.
+        insertEnrollment("enroll-risk", "student-2", "section-2", "semester-1", "ENROLLED");
+        for (int day = 1; day <= 4; day++) {
+            insertAttendance("risk-absent-" + day, "student-2", "section-2",
+                    BASE_TIME.plusSeconds((long) (day + 10) * 24 * 60 * 60), "ABSENT", null);
+        }
+
+        mvc.perform(get("/api/v1/attendance/my/summary")
+                        .queryParam("semesterId", "semester-1")
+                        .with(studentJwt("student-user-2", "student-2")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.[?(@.sectionId == 'section-2')].countableSessions")
+                        .value(org.hamcrest.Matchers.contains(5)))
+                .andExpect(jsonPath("$.[?(@.sectionId == 'section-2')].attendanceRate")
+                        .value(org.hamcrest.Matchers.contains(20)))
+                .andExpect(jsonPath("$.[?(@.sectionId == 'section-2')].minRate")
+                        .value(org.hamcrest.Matchers.contains(0.8)))
+                .andExpect(jsonPath("$.[?(@.sectionId == 'section-2')].minSessions")
+                        .value(org.hamcrest.Matchers.contains(5)))
+                .andExpect(jsonPath("$.[?(@.sectionId == 'section-2')].atRisk")
+                        .value(org.hamcrest.Matchers.contains(true)))
+                .andExpect(jsonPath("$.[?(@.sectionId == 'section-2')].examEligibility")
+                        .value(org.hamcrest.Matchers.contains("AT_RISK")));
+
+        // The lecturer's section view names the at-risk student — and stays
+        // advisory: atRiskStudents is a list, not a block.
+        mvc.perform(get("/api/v1/attendance/section/section-2/summary").with(adminJwt()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.minRate").value(0.8))
+                .andExpect(jsonPath("$.minSessions").value(5))
+                .andExpect(jsonPath("$.atRiskStudents.length()").value(1))
+                .andExpect(jsonPath("$.atRiskStudents[0].studentId").value("student-2"))
+                .andExpect(jsonPath("$.atRiskStudents[0].studentCode").value("S002"))
+                .andExpect(jsonPath("$.atRiskStudents[0].countableSessions").value(5))
+                .andExpect(jsonPath("$.atRiskStudents[0].attendanceRate").value(20));
+    }
+
+    @Test
+    void examEligibilityReportsInsufficientDataBelowTheSessionFloorAndOkAtThreshold() throws Exception {
+        // section-1 student-1 has 3 countable records (P/A/L) — below
+        // minSessions, so the signal is INSUFFICIENT_DATA even though the
+        // 67% rate sits under the threshold. EXCUSED never counts.
+        mvc.perform(get("/api/v1/attendance/my/summary")
+                        .queryParam("semesterId", "semester-1")
+                        .with(studentJwt("student-user-1", "student-1")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.[?(@.sectionId == 'section-1')].countableSessions")
+                        .value(org.hamcrest.Matchers.contains(3)))
+                .andExpect(jsonPath("$.[?(@.sectionId == 'section-1')].atRisk")
+                        .value(org.hamcrest.Matchers.contains(false)))
+                .andExpect(jsonPath("$.[?(@.sectionId == 'section-1')].examEligibility")
+                        .value(org.hamcrest.Matchers.contains("INSUFFICIENT_DATA")));
+
+        // section-spring holds only an EXCUSED record: countable stays zero.
+        mvc.perform(get("/api/v1/attendance/my/summary")
+                        .queryParam("semesterId", "semester-2")
+                        .with(studentJwt("student-user-1", "student-1")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.[?(@.sectionId == 'section-spring')].countableSessions")
+                        .value(org.hamcrest.Matchers.contains(0)))
+                .andExpect(jsonPath("$.[?(@.sectionId == 'section-spring')].examEligibility")
+                        .value(org.hamcrest.Matchers.contains("INSUFFICIENT_DATA")));
+
+        // Enough countable records at or above the threshold is OK — the
+        // advisory never invents risk.
+        insertEnrollment("enroll-ok", "student-1", "section-other", "semester-1", "ENROLLED");
+        for (int day = 1; day <= 5; day++) {
+            insertAttendance("ok-present-" + day, "student-1", "section-other",
+                    BASE_TIME.plusSeconds((long) (day + 20) * 24 * 60 * 60), "PRESENT", null);
+        }
+        mvc.perform(get("/api/v1/attendance/my/summary")
+                        .queryParam("semesterId", "semester-1")
+                        .with(studentJwt("student-user-1", "student-1")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.[?(@.sectionId == 'section-other')].attendanceRate")
+                        .value(org.hamcrest.Matchers.contains(100)))
+                .andExpect(jsonPath("$.[?(@.sectionId == 'section-other')].atRisk")
+                        .value(org.hamcrest.Matchers.contains(false)))
+                .andExpect(jsonPath("$.[?(@.sectionId == 'section-other')].examEligibility")
+                        .value(org.hamcrest.Matchers.contains("OK")));
+        mvc.perform(get("/api/v1/attendance/section/section-other/summary").with(adminJwt()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.atRiskStudents.length()").value(0));
+    }
+
+    @Test
+    void withdrawnStudentsNeverAppearInTheAtRiskRoster() throws Exception {
+        // student-3 sits in section-1 only as DROPPED per the fixture. A
+        // WITHDRAWN enrollment is likewise no longer a markable seat, so even
+        // perfect-looking bad attendance must stay out of the risk list.
+        insertEnrollment("enroll-withdrawn-risk", "student-3", "section-2", "semester-1", "WITHDRAWN");
+        for (int day = 1; day <= 6; day++) {
+            insertAttendance("withdrawn-absent-" + day, "student-3", "section-2",
+                    BASE_TIME.plusSeconds((long) (day + 30) * 24 * 60 * 60), "ABSENT", null);
+        }
+
+        mvc.perform(get("/api/v1/attendance/section/section-2/summary").with(adminJwt()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.atRiskStudents[?(@.studentId == 'student-3')]")
+                        .value(org.hamcrest.Matchers.empty()));
+    }
+
+    @Test
     void adminListPreservesLegacyEnvelopeFiltersDateAndDescendingDateOrdering() throws Exception {
         mvc.perform(get("/api/v1/attendance")
                         .queryParam("page", "1")

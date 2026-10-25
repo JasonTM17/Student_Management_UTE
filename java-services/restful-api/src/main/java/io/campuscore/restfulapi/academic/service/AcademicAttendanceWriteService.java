@@ -24,11 +24,22 @@ import org.springframework.transaction.annotation.Transactional;
 public class AcademicAttendanceWriteService {
 
     private static final Set<String> ALLOWED_STATUSES = Set.of("PRESENT", "ABSENT", "LATE", "EXCUSED");
+    /**
+     * Edit-window day math runs on the campus civil calendar. AttendanceDay
+     * itself keys records on Asia/Ho_Chi_Minh; both sit at UTC+7, and the
+     * policy contract names Asia/Bangkok, so the window reads that zone
+     * explicitly like the withdrawal window does.
+     */
+    private static final java.time.ZoneId EDIT_WINDOW_ZONE = java.time.ZoneId.of("Asia/Bangkok");
 
     private final AcademicAttendanceWriteRepository repository;
+    private final int editWindowDays;
 
-    public AcademicAttendanceWriteService(AcademicAttendanceWriteRepository repository) {
+    public AcademicAttendanceWriteService(
+            AcademicAttendanceWriteRepository repository,
+            @org.springframework.beans.factory.annotation.Value("${attendance.edit-window-days:30}") int editWindowDays) {
         this.repository = repository;
+        this.editWindowDays = Math.max(0, editWindowDays);
     }
 
     @Transactional
@@ -63,6 +74,18 @@ public class AcademicAttendanceWriteService {
         Instant maxAllowedDate = AttendanceDay.parse(Instant.now().toString());
         if (normalizedDate.isAfter(maxAllowedDate)) {
             throw new DomainException(HttpStatus.BAD_REQUEST, "INVALID_ATTENDANCE_DATE", "Attendance date cannot be in the future");
+        }
+        // Edit window: campus dates at or older than today - editWindowDays
+        // (boundary day inclusive) are admin-only, like the withdrawal window.
+        // Lecturers keep full freedom inside the window; the guard sits ahead
+        // of every write — records and RESET deletes alike.
+        Instant earliestEditableDay = java.time.LocalDate.now(EDIT_WINDOW_ZONE)
+                .minusDays(editWindowDays)
+                .atStartOfDay()
+                .toInstant(java.time.ZoneOffset.UTC);
+        if (!isAdmin && normalizedDate.isBefore(earliestEditableDay)) {
+            throw new DomainException(HttpStatus.CONFLICT, "ATTENDANCE_EDIT_WINDOW_CLOSED",
+                    "Attendance records older than " + editWindowDays + " days can only be changed by an administrator");
         }
 
         if (request.records() == null || request.records().isEmpty()) {

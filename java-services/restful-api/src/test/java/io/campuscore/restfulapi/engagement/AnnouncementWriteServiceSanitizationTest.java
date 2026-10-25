@@ -44,7 +44,7 @@ class AnnouncementWriteServiceSanitizationTest {
         when(fixture.announcements.create(any())).thenReturn(announcement());
         CreateAnnouncementRequest request = new CreateAnnouncementRequest(
                 "Notice", "<a href=\"java\tscript:alert(1)\">x</a>", "NORMAL",
-                List.of("STUDENT"), List.of(), false, null, null, null, null, null);
+                List.of("STUDENT"), List.of(), List.of(), false, null, null, null, null, null);
 
         fixture.service.create("user-1", "Admin", List.of("ADMIN"), null, request);
 
@@ -68,7 +68,7 @@ class AnnouncementWriteServiceSanitizationTest {
                 // the scheme, unknown tag) so the sanitize path is exercised;
                 // an <iframe> would be hard-rejected before sanitizing.
                 "<p>nội dung</p><xss>độc</xss><a href=\"java\tscript:alert(1)\">x</a>",
-                null, null, null, null, null, null, null, null, null, "Correction", 0);
+                null, null, null, null, null, null, null, null, null, null, "Correction", 0);
 
         fixture.service.update("user-1", "Admin", List.of("ADMIN"), null, "notice-1", request);
 
@@ -94,7 +94,7 @@ class AnnouncementWriteServiceSanitizationTest {
         UpdateAnnouncementRequest request = new UpdateAnnouncementRequest(
                 Set.of("content", "reason", "expectedVersion"), null,
                 "<p>nội dung sạch</p>", null, null, null, null, null, null, null, null,
-                null, "Copyedit", 0);
+                null, null, "Copyedit", 0);
 
         fixture.service.update("user-1", "Admin", List.of("ADMIN"), null, "notice-1", request);
 
@@ -110,7 +110,7 @@ class AnnouncementWriteServiceSanitizationTest {
         Fixture fixture = new Fixture();
         CreateAnnouncementRequest request = new CreateAnnouncementRequest(
                 "Notice", "x".repeat(200_001), "NORMAL", List.of("STUDENT"), List.of(),
-                false, null, null, null, null, null);
+                List.of(), false, null, null, null, null, null);
 
         DomainException error = assertThrows(DomainException.class,
                 () -> fixture.service.create("user-1", "Admin", List.of("ADMIN"), null, request));
@@ -120,7 +120,7 @@ class AnnouncementWriteServiceSanitizationTest {
     private static AnnouncementResponse announcement() {
         Instant now = Instant.parse("2026-09-10T00:00:00Z");
         return new AnnouncementResponse("notice-1", "Notice", "Content", "NORMAL", List.of("STUDENT"),
-                List.of(), false, null, null, "user-1", null, null, "section-1",
+                List.of(), List.of(), false, null, null, "user-1", null, null, "section-1",
                 null, null, null, null, null, now, now, 0, null, null, null, null, null);
     }
 

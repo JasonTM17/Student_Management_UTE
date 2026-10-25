@@ -140,6 +140,22 @@ export default function AttendancePage() {
   const courseName = (row: AttendanceSummary) =>
     getLocalizedFlatLabel(locale, row.courseName, row.courseNameEn, row.courseNameVi, row.courseCode);
 
+  // Advisory exam-eligibility signal: calm status text, never a popup, and
+  // nothing here ever blocks an exam or registration — the copy says so.
+  const eligibility = (row: AttendanceSummary) => {
+    const signal = (row.examEligibility ?? '').toUpperCase();
+    if (signal === 'AT_RISK') {
+      return { label: copy.eligibility.atRisk, tone: 'text-status-warning' };
+    }
+    if (signal === 'INSUFFICIENT_DATA') {
+      return { label: copy.eligibility.insufficient, tone: 'text-muted-foreground' };
+    }
+    if (signal === 'OK') {
+      return { label: copy.eligibility.ok, tone: 'text-status-success' };
+    }
+    return null;
+  };
+
   if (authLoading) {
     return <LoadingState label={copy.loading} />;
   }
@@ -265,6 +281,15 @@ export default function AttendancePage() {
                           {formatNumber(row.attendanceRate)}%
                         </span>
                       </div>
+                      {eligibility(row) ? (
+                        <p
+                          role="status"
+                          title={copy.eligibility.hint}
+                          className={`mt-2 text-xs font-medium ${eligibility(row)!.tone}`}
+                        >
+                          {copy.eligibility.label}: {eligibility(row)!.label}
+                        </p>
+                      ) : null}
                       <div className="mt-3 h-2 w-full overflow-hidden rounded-full bg-secondary">
                         <div
                           className={`h-full rounded-full ${rateFillClass(row.attendanceRate)} transition-all duration-300`}
@@ -355,6 +380,15 @@ export default function AttendancePage() {
                                 {formatNumber(row.attendanceRate)}%
                               </span>
                             </div>
+                            {eligibility(row) ? (
+                              <p
+                                role="status"
+                                title={copy.eligibility.hint}
+                                className={`mt-1 text-right text-xs font-medium ${eligibility(row)!.tone}`}
+                              >
+                                {eligibility(row)!.label}
+                              </p>
+                            ) : null}
                           </td>
                         </tr>
                       ))}

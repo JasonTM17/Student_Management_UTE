@@ -16,11 +16,13 @@ import {
   RotateCcw,
   ShieldCheck,
   Sparkles,
+  X,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useAuth } from '@/context/AuthContext';
 import {
   announcementsApi,
+  departmentsApi,
   fetchAllPages,
   lecturersApi,
   sectionsApi,
@@ -41,6 +43,7 @@ import {
 } from '@/components/admin/AdminSurface';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Combobox } from '@/components/ui/combobox';
 import { Input } from '@/components/ui/input';
 import { Modal } from '@/components/ui/modal';
 import { Select } from '@/components/ui/select';
@@ -94,7 +97,7 @@ import {
   type AnnouncementRole,
 } from '@/lib/announcement-presentation';
 import { useOrderedPosts } from '@/components/providers/SiteAppearanceProvider';
-import type { Lecturer, Section, Semester } from '@/types/api';
+import type { Department, Lecturer, Section, Semester } from '@/types/api';
 
 type StatusFilter = 'ACTIVE' | 'ARCHIVED' | 'ALL';
 type ModalKind = 'editor' | 'history' | 'lifecycle' | 'reorder' | null;
@@ -107,6 +110,7 @@ type AnnouncementDraft = {
   isGlobal: boolean;
   targetRoles: AnnouncementRole[];
   targetYears: string;
+  targetDepartments: string[];
   semesterId: string;
   sectionId: string;
   lecturerId: string;
@@ -122,6 +126,7 @@ const emptyDraft: AnnouncementDraft = {
   isGlobal: true,
   targetRoles: [],
   targetYears: '',
+  targetDepartments: [],
   semesterId: '',
   sectionId: '',
   lecturerId: '',
@@ -137,6 +142,7 @@ const historyFields = [
   'isGlobal',
   'targetRoles',
   'targetYears',
+  'targetDepartments',
   'publishAt',
   'expiresAt',
   'semesterId',
@@ -180,6 +186,7 @@ function draftFromAnnouncement(item: AnnouncementRecord): AnnouncementDraft {
     isGlobal: item.isGlobal ?? false,
     targetRoles: announcementRoleValues(item.targetRoles),
     targetYears: (item.targetYears ?? []).join(', '),
+    targetDepartments: [...(item.targetDepartments ?? [])],
     semesterId: item.semesterId ?? '',
     sectionId: item.sectionId ?? '',
     lecturerId: item.lecturerId ?? '',
@@ -244,6 +251,7 @@ export default function AdminAnnouncementsPage() {
   const [semesters, setSemesters] = useState<Semester[]>([]);
   const [sections, setSections] = useState<Section[]>([]);
   const [lecturers, setLecturers] = useState<Lecturer[]>([]);
+  const [departments, setDepartments] = useState<Department[]>([]);
   const [referenceError, setReferenceError] = useState('');
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState('');
@@ -390,6 +398,9 @@ export default function AdminAnnouncementsPage() {
         targeted: 'Chọn nhóm cụ thể',
         targetYears: 'Năm học sinh viên',
         targetYearsHint: 'Nhập các năm, cách nhau bằng dấu phẩy. Để trống nếu áp dụng cho mọi năm.',
+        departments: 'Khoa',
+        departmentsHint: 'Giới hạn thông báo theo khoa của sinh viên hoặc giảng viên. Để trống nếu áp dụng cho mọi khoa.',
+        departmentSearch: 'Tìm và thêm khoa…',
         section: 'Lớp học phần',
         lecturer: 'Giảng viên phụ trách',
         noSelection: 'Không gán',
@@ -474,6 +485,9 @@ export default function AdminAnnouncementsPage() {
         targeted: 'Choose specific groups',
         targetYears: 'Student years',
         targetYearsHint: 'Enter years separated by commas. Leave empty for every year.',
+        departments: 'Departments',
+        departmentsHint: 'Limit the notice to specific student or lecturer departments. Leave empty for every department.',
+        departmentSearch: 'Search and add a department…',
         section: 'Class section',
         lecturer: 'Responsible lecturer',
         noSelection: 'Not assigned',
@@ -606,7 +620,8 @@ export default function AdminAnnouncementsPage() {
       // made later sections/lecturers untargetable. Page through instead.
       fetchAllPages<Section>((p, l) => sectionsApi.getAll({ page: p, limit: l })),
       fetchAllPages<Lecturer>((p, l) => lecturersApi.getAll({ page: p, limit: l })),
-    ]).then(([semesterResult, sectionResult, lecturerResult]) => {
+      fetchAllPages<Department>((p, l) => departmentsApi.getAll({ page: p, limit: l })),
+    ]).then(([semesterResult, sectionResult, lecturerResult, departmentResult]) => {
       if (cancelled) return;
       let failed = false;
       if (semesterResult.status === 'fulfilled') setSemesters(semesterResult.value.data ?? []);
@@ -614,6 +629,8 @@ export default function AdminAnnouncementsPage() {
       if (sectionResult.status === 'fulfilled') setSections(sectionResult.value);
       else failed = true;
       if (lecturerResult.status === 'fulfilled') setLecturers(lecturerResult.value);
+      else failed = true;
+      if (departmentResult.status === 'fulfilled') setDepartments(departmentResult.value);
       else failed = true;
       if (failed) setReferenceError(copy.referenceUnavailable);
     });
@@ -681,6 +698,9 @@ export default function AdminAnnouncementsPage() {
     isGlobal: draft.isGlobal,
     targetRoles: draft.isGlobal ? [] : [...draft.targetRoles],
     targetYears: draft.isGlobal ? [] : parseYears(draft.targetYears).values,
+    // Departments narrow like section/lecturer scope rather than define an
+    // audience, so the list rides on every payload — global notices included.
+    targetDepartments: [...draft.targetDepartments],
     publishAt: isoDateTime(draft.publishAt),
     expiresAt: isoDateTime(draft.expiresAt),
     semesterId: draft.semesterId || null,
@@ -814,6 +834,41 @@ export default function AdminAnnouncementsPage() {
     })),
   ], [copy.noSelection, lecturers]);
 
+  // The searchable Combobox stays single-select: it is the "add" picker, and
+  // the chosen departments render as removable chips beneath it. A department
+  // already targeted disappears from the list so it cannot be added twice.
+  const departmentName = useCallback(
+    (id: string) => {
+      const department = departments.find((row) => row.id === id);
+      return department ? getLocalizedName(locale, department, department.name) : id;
+    },
+    [departments, locale],
+  );
+
+  const editorDepartmentOptions = useMemo(() => [
+    ...departments
+      .filter((department) => !draft.targetDepartments.includes(department.id))
+      .map((department) => ({
+        value: department.id,
+        label: getLocalizedName(locale, department, department.name),
+        keywords: department.code,
+      })),
+  ], [departments, draft.targetDepartments, locale]);
+
+  const addDepartment = (id: string) => {
+    if (!id) return;
+    setDraft((current) => current.targetDepartments.includes(id)
+      ? current
+      : { ...current, targetDepartments: [...current.targetDepartments, id] });
+  };
+
+  const removeDepartment = (id: string) => {
+    setDraft((current) => ({
+      ...current,
+      targetDepartments: current.targetDepartments.filter((value) => value !== id),
+    }));
+  };
+
   const audienceMatches = (role: AnnouncementRole) => {
     if (draft.isGlobal) return true;
     if (!draft.targetRoles.includes(role)) return false;
@@ -826,10 +881,12 @@ export default function AdminAnnouncementsPage() {
   const previewSemester = semesters.find((semester) => semester.id === draft.semesterId);
   const previewSection = sections.find((section) => section.id === draft.sectionId);
   const previewLecturer = lecturers.find((lecturer) => lecturer.id === draft.lecturerId);
+  const previewDepartmentNames = draft.targetDepartments.map(departmentName);
   const previewMeta = [
     previewSemester ? getLocalizedName(locale, previewSemester, previewSemester.name) : '',
     previewSection ? `${previewSection.course?.code ?? ''} · ${previewSection.sectionNumber}`.trim() : '',
     previewLecturer?.user ? `${previewLecturer.user.lastName ?? ''} ${previewLecturer.user.firstName ?? ''}`.trim() : '',
+    previewDepartmentNames.length > 0 ? `${copy.departments}: ${previewDepartmentNames.join(', ')}` : '',
   ].filter(Boolean);
 
   const historyFieldLabel = (field: HistoryField) => {
@@ -840,6 +897,7 @@ export default function AdminAnnouncementsPage() {
       isGlobal: ['Đối tượng', 'Audience'],
       targetRoles: ['Nhóm nhận', 'Audience groups'],
       targetYears: ['Năm học', 'Student years'],
+      targetDepartments: ['Khoa', 'Departments'],
       publishAt: ['Bắt đầu hiển thị', 'Starts showing'],
       expiresAt: ['Ngừng hiển thị', 'Stops showing'],
       semesterId: ['Học kỳ', 'Semester'],
@@ -862,6 +920,11 @@ export default function AdminAnnouncementsPage() {
       return roles.length > 0 ? roles.map((role) => announcementRoleLabel(role, locale)).join(', ') : copy.noSelection;
     }
     if (field === 'targetYears') return Array.isArray(value) && value.length > 0 ? value.join(', ') : copy.noSelection;
+    if (field === 'targetDepartments') {
+      return Array.isArray(value) && value.length > 0
+        ? value.map((id) => (typeof id === 'string' ? departmentName(id) : String(id))).join(', ')
+        : copy.noSelection;
+    }
     if (field === 'isGlobal') return value === true ? copy.global : copy.targeted;
     if (field === 'publishAt' || field === 'expiresAt') return typeof value === 'string' ? formatDateTime(value) : '—';
     if (field === 'archivedAt') return value ? copy.statusArchived : copy.statusVisible;
@@ -1234,8 +1297,36 @@ export default function AdminAnnouncementsPage() {
                       <label htmlFor="announcement-editor-lecturer" className="mb-1 block text-sm font-medium text-foreground">{copy.lecturer}</label>
                       <Select id="announcement-editor-lecturer" aria-label={copy.lecturer} value={draft.lecturerId} onChange={(event) => setDraft((current) => ({ ...current, lecturerId: event.target.value }))} options={editorLecturerOptions} />
                     </div>
+                    <div className="sm:col-span-2">
+                      <Combobox
+                        id="announcement-editor-departments"
+                        label={copy.departments}
+                        aria-label={copy.departments}
+                        options={editorDepartmentOptions}
+                        value=""
+                        onChange={addDepartment}
+                        placeholder={copy.departmentSearch}
+                      />
+                      {draft.targetDepartments.length > 0 ? (
+                        <ul className="mt-2 flex flex-wrap gap-2" aria-label={copy.departments}>
+                          {draft.targetDepartments.map((id) => (
+                            <li key={id}>
+                              <button
+                                type="button"
+                                onClick={() => removeDepartment(id)}
+                                className="inline-flex min-h-9 items-center gap-1.5 rounded-md border border-primary/40 bg-primary/10 px-2.5 text-xs font-medium text-foreground transition-colors hover:bg-primary/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                                aria-label={`${copy.departments}: ${departmentName(id)}`}
+                              >
+                                {departmentName(id)}
+                                <X className="h-3 w-3" aria-hidden="true" />
+                              </button>
+                            </li>
+                          ))}
+                        </ul>
+                      ) : null}
+                    </div>
                   </div>
-                  <p className="text-sm text-muted-foreground">{copy.sectionHint} {copy.lecturerHint}</p>
+                  <p className="text-sm text-muted-foreground">{copy.sectionHint} {copy.lecturerHint} {copy.departmentsHint}</p>
                 </AdminFormSection>
 
                 <AdminFormSection title={copy.schedule} description={vi ? 'Bỏ trống ngày kết thúc nếu thông báo không có hạn.' : 'Leave the end date empty when the notice has no expiry.'}>

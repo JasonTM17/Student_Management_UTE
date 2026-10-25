@@ -10,6 +10,7 @@ public record UpdateAnnouncementCommand(
         PatchValue<String> priority,
         PatchValue<List<String>> targetRoles,
         PatchValue<List<Integer>> targetYears,
+        PatchValue<List<String>> targetDepartments,
         PatchValue<Boolean> isGlobal,
         PatchValue<Instant> publishAt,
         PatchValue<Instant> expiresAt,

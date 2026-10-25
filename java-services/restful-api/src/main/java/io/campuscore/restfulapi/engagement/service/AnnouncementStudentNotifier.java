@@ -151,7 +151,8 @@ public class AnnouncementStudentNotifier {
             return List.of();
         }
         return people.findAnnouncementStudentUserIds(announcement.targetYears(), announcement.sectionId(),
-                announcement.isGlobal() ? List.of() : announcement.targetRoles(), announcement.lecturerId());
+                announcement.isGlobal() ? List.of() : announcement.targetRoles(), announcement.lecturerId(),
+                announcement.targetDepartments());
     }
 
     /**

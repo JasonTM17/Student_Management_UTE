@@ -105,7 +105,7 @@ public class PeopleReadRepository {
 
     /** Eligible inbox recipients: the same year/active-enrollment scope as the notice reader. */
     public List<String> findAnnouncementStudentUserIds(List<Integer> years, String sectionId,
-            List<String> targetRoles, String lecturerId) {
+            List<String> targetRoles, String lecturerId, List<String> departments) {
         MapSqlParameterSource parameters = new MapSqlParameterSource("status", ACTIVE_STUDENT_STATUS);
         String filter = "";
         if (targetRoles != null && !targetRoles.isEmpty()) {
@@ -137,6 +137,16 @@ public class PeopleReadRepository {
                     + " AND enrollment.\"status\" IN "
                     + EnrollmentStatuses.ACTIVE_STATUS_PREDICATE + ")";
             parameters.addValue("sectionId", sectionId);
+        }
+        if (departments != null && !departments.isEmpty()) {
+            // Mirrors AnnouncementReadRepository's department clause: the
+            // student's curriculum carries the department (Student →
+            // Curriculum → Department), and a student without one receives
+            // nothing department-targeted.
+            filter += " AND EXISTS (SELECT 1 FROM academic.\"Curriculum\" curriculum"
+                    + " WHERE curriculum.\"id\" = student.\"curriculumId\""
+                    + " AND curriculum.\"departmentId\" IN (:departments))";
+            parameters.addValue("departments", departments);
         }
         return jdbc.queryForList("SELECT DISTINCT student.\"userId\" FROM " + STUDENT_TABLE + " student"
                         + " JOIN " + USER_TABLE + " user_account ON user_account.\"id\" = student.\"userId\""
