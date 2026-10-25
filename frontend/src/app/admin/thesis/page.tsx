@@ -50,9 +50,24 @@ import {
   LoadingState,
 } from '@/components/ui/state-block';
 import { StatusBadge } from '@/components/thesis/StatusBadge';
+import ScoreBreakdownPanel from '@/features/thesis/components/ScoreBreakdownPanel';
 import { useI18n } from '@/i18n';
 import { fetchAllPages, lecturersApi } from '@/lib/api';
 import { campusCodeMessage } from '@/lib/campus-error';
+import {
+  databaseClockSample,
+  estimatedServerNow,
+  gvpbDeadlineExtensionBlocker,
+  lateTopicAvailability,
+  mergePublishResultsReadiness,
+  publishResultsBlockerCode,
+  publishResultsReadinessForRound,
+  registrationOpeningAvailability,
+} from '@/lib/thesis-round-lifecycle';
+import type {
+  DatabaseClockSample,
+  PublishResultsReadinessState,
+} from '@/lib/thesis-round-lifecycle';
 import type { Lecturer } from '@/types/api';
 import {
   thesisApi,
@@ -68,12 +83,31 @@ import {
 
 /** Shape of the API error envelope (`{ code, message }`) used for domain conflicts. */
 interface ThesisApiErrorShape {
-  response?: { data?: { code?: string } | null } | null;
+  response?: { data?: { code?: string; details?: Record<string, unknown> | null } | null } | null;
 }
 
 function getThesisErrorCode(error: unknown): string {
   const data = (error as ThesisApiErrorShape | undefined)?.response?.data;
   return data?.code ?? '';
+}
+
+function getThesisErrorDetails(error: unknown): Record<string, unknown> {
+  const details = (error as ThesisApiErrorShape | undefined)?.response?.data?.details;
+  return details && typeof details === 'object' ? details : {};
+}
+
+function formatRoundInstant(locale: string, iso: string): string {
+  const date = new Date(iso);
+  if (!Number.isFinite(date.getTime())) return '—';
+  const tag = locale === 'vi' ? 'vi-VN' : 'en-US';
+  return new Intl.DateTimeFormat(tag, {
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+  }).format(date);
 }
 
 /**
@@ -104,6 +138,12 @@ export default function AdminThesisPage() {
     isSuperAdmin,
   } = useAuth();
   const { locale, messages } = useI18n();
+  const formatAdminInstant = (iso: string): string =>
+    Number.isFinite(Date.parse(iso))
+      ? formatRoundInstant(locale, iso)
+      : messages.thesis.admin.unknownScheduleTime;
+  const campusErrorForCode = (code: string): string | undefined =>
+    messages.common.campusErrors.codes[code as keyof typeof messages.common.campusErrors.codes];
   const [rounds, setRounds] = useState<ThesisRound[]>([]);
   const [topics, setTopics] = useState<ThesisTopic[]>([]);
   const [groups, setGroups] = useState<ThesisGroup[]>([]);
@@ -111,11 +151,27 @@ export default function AdminThesisPage() {
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
+  const [, setAdminClockTick] = useState(0);
+  const serverClockSampleRef = useRef<DatabaseClockSample | null>(null);
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [expandedRoundId, setExpandedRoundId] = useState<string | null>(null);
   const expandedRoundRef = useRef<string | null>(null);
   const detailRequestRef = useRef(0);
   const [detailLoading, setDetailLoading] = useState(false);
+  const [publishReadinessByRound, setPublishReadinessByRound] = useState<Record<string, PublishResultsReadinessState>>({});
+  const updatePublishReadiness = (
+    roundId: string,
+    update: Partial<PublishResultsReadinessState>,
+  ) => setPublishReadinessByRound((current) => mergePublishResultsReadiness(current, roundId, update));
+  const currentAdminTime = useCallback(
+    () => estimatedServerNow(serverClockSampleRef.current, performance.now()),
+    [],
+  );
+
+  useEffect(() => {
+    const timer = window.setInterval(() => setAdminClockTick((tick) => tick + 1), 30_000);
+    return () => window.clearInterval(timer);
+  }, [currentAdminTime]);
 
   // Create round form state
   const [formName, setFormName] = useState('');
@@ -217,6 +273,10 @@ export default function AdminThesisPage() {
         thesisApi.listRounds(),
         showClosed ? thesisApi.listRounds('CLOSED') : Promise.resolve([]),
       ]);
+      const receivedAt = performance.now();
+      const sample = mergeThesisRounds(data, closed).find((round) => round.serverNow)?.serverNow;
+      serverClockSampleRef.current = databaseClockSample(sample, receivedAt);
+      setAdminClockTick((tick) => tick + 1);
       setRounds(sortThesisRoundsForOverview(mergeThesisRounds(data, closed)));
     } catch {
       setError(messages.thesis.loadFailed);
@@ -269,11 +329,17 @@ export default function AdminThesisPage() {
     if (expandedRoundRef.current !== roundId) return;
     const requestId = ++detailRequestRef.current;
     const isCurrent = () => requestId === detailRequestRef.current && expandedRoundRef.current === roundId;
+    const detailedRound = rounds.find((round) => round.id === roundId);
     setDetailLoading(true);
     setTopics([]);
     setGroups([]);
     setCouncils([]);
     setError('');
+    updatePublishReadiness(roundId, {
+      preview: null,
+      error: '',
+      loading: detailedRound?.status === 'REGISTRATION_CLOSED',
+    });
     try {
       // Draft proposals are exactly what a DRAFT/PROPOSAL_OPEN round holds, so
       // the detail panel must merge both statuses or pending proposals read as
@@ -305,8 +371,25 @@ export default function AdminThesisPage() {
       if (lecturers.length === 0) {
         await loadLecturers();
       }
+      if (detailedRound?.status === 'REGISTRATION_CLOSED') {
+        try {
+          const preview = await thesisApi.publishResultsPreview(roundId);
+          if (!isCurrent()) return;
+          updatePublishReadiness(roundId, { preview, error: '', loading: false });
+        } catch (previewError: unknown) {
+          if (isCurrent()) updatePublishReadiness(roundId, {
+            error: transitionErrorMessage(previewError),
+            loading: false,
+          });
+        } finally {
+          if (isCurrent()) updatePublishReadiness(roundId, { loading: false });
+        }
+      }
     } catch {
-      if (isCurrent()) setError(messages.thesis.loadFailed);
+      if (isCurrent()) {
+        setError(messages.thesis.loadFailed);
+        updatePublishReadiness(roundId, { loading: false });
+      }
     } finally {
       if (isCurrent()) setDetailLoading(false);
     }
@@ -317,15 +400,89 @@ export default function AdminThesisPage() {
     expandedRoundRef.current = null;
   }, []);
 
-  /**
-   * A round transition can fail with a domain the admin has to see: closing
-   * or publishing over unfinished grading answers SCORES_INCOMPLETE /
-   * RESULTS_NOT_READY, which previously were swallowed into the generic
-   * actionFailed line. Surface the codes that already carry translated copy
-   * (common.campusErrors.codes) and keep the generic fallback for the rest.
-   */
-  const transitionErrorMessage = (err: unknown): string =>
-    campusCodeMessage(err, messages.common.campusErrors, messages.thesis.actionFailed);
+  /** Translate domain refusals for every admin lifecycle surface. */
+  const transitionErrorMessage = (
+    err: unknown,
+    context?: 'registration-open' | 'restore' | 'late-topic',
+  ): string => {
+    const code = getThesisErrorCode(err);
+    const details = getThesisErrorDetails(err);
+    if (code === 'REGISTRATION_EARLY_OPEN_BLOCKED') {
+      const lecturerEnd = details.lecturerSubmitEnd;
+      const time = typeof lecturerEnd === 'string'
+        ? formatAdminInstant(lecturerEnd)
+        : messages.thesis.admin.unknownScheduleTime;
+      return messages.common.campusErrors.codes[code]
+        ?.replace('{end}', time)
+        ?? messages.thesis.admin.registrationEarlyOpenBlocked.replace('{end}', time);
+    }
+    if (code === 'REGISTRATION_WINDOW_CLOSED') {
+      if (context === 'restore') return messages.thesis.admin.restoreRegistrationWindowClosed;
+      if (context === 'late-topic') {
+        const registrationEnd = details.registrationEnd;
+        if (typeof registrationEnd !== 'string' || !Number.isFinite(Date.parse(registrationEnd))) {
+          return messages.thesis.admin.lateTopicRegistrationUnavailable;
+        }
+        const message = details.roundStatus === 'PROPOSALS_PUBLISHED'
+          ? messages.thesis.admin.lateTopicRegistrationClosedBeforeOpen
+          : messages.thesis.admin.lateTopicRegistrationClosed;
+        return message.replace('{end}', formatAdminInstant(registrationEnd));
+      }
+      if (context !== 'registration-open') return messages.thesis.admin.registrationWindowUnavailable;
+      const registrationEnd = details.registrationEnd;
+      return typeof registrationEnd === 'string'
+        ? messages.thesis.admin.registrationWindowExpired.replace(
+            '{end}', formatAdminInstant(registrationEnd),
+          )
+        : messages.thesis.admin.registrationWindowUnavailable;
+    }
+    if (code === 'REGISTRATION_WINDOW_NOT_OPEN') {
+      if (context === 'restore') return messages.thesis.admin.restoreRegistrationWindowNotStarted;
+      if (context === 'late-topic') {
+        const registrationStart = details.registrationStart;
+        return typeof registrationStart === 'string' && Number.isFinite(Date.parse(registrationStart))
+          ? messages.thesis.admin.lateTopicRegistrationNotStarted.replace(
+              '{start}', formatAdminInstant(registrationStart),
+            )
+          : messages.thesis.admin.lateTopicRegistrationUnavailable;
+      }
+      return messages.thesis.admin.registrationWindowNotStarted;
+    }
+    if (code === 'RETRACT_WINDOW_OPEN') {
+      const endsAt = details.retractWindowEndsAt;
+      return typeof endsAt === 'string'
+        ? messages.common.campusErrors.codes[code]?.replace('{retractWindowEndsAt}', formatAdminInstant(endsAt))
+          ?? messages.thesis.admin.transitionFailure
+        : messages.thesis.admin.transitionFailure;
+    }
+    if (code === 'VALIDATION_ERROR' && typeof details.rule === 'string') {
+      const message = messages.thesis.admin.deadlineExtensionRules[
+        details.rule as keyof typeof messages.thesis.admin.deadlineExtensionRules
+      ];
+      if (message) {
+        const date = typeof details.currentDeadline === 'string'
+          ? details.currentDeadline
+          : typeof details.reportDate === 'string' ? details.reportDate : '';
+        return message.replace('{date}', date ? formatAdminInstant(date) : messages.thesis.admin.unknownScheduleTime);
+      }
+    }
+    return campusCodeMessage(err, messages.common.campusErrors, messages.thesis.admin.transitionFailure);
+  };
+
+  const refreshPublishResultsPreview = async (roundId: string) => {
+    const requestId = detailRequestRef.current;
+    const isCurrent = () => requestId === detailRequestRef.current
+      && expandedRoundRef.current === roundId;
+    updatePublishReadiness(roundId, { loading: true, error: '' });
+    try {
+      const preview = await thesisApi.publishResultsPreview(roundId);
+      if (isCurrent()) updatePublishReadiness(roundId, { preview, error: '' });
+    } catch (previewError: unknown) {
+      if (isCurrent()) updatePublishReadiness(roundId, { error: transitionErrorMessage(previewError) });
+    } finally {
+      if (isCurrent()) updatePublishReadiness(roundId, { loading: false });
+    }
+  };
 
   /**
    * A schedule-order rejection carries the violated rule in details.rule, so
@@ -424,7 +581,7 @@ export default function AdminThesisPage() {
       const c = await thesisApi.listCouncils(roundId);
       if (expandedRoundRef.current === roundId) setCouncils(c);
     } catch (assignErr) {
-      setModalError(campusCodeMessage(assignErr, messages.common.campusErrors, messages.thesis.actionFailed));
+      setModalError(transitionErrorMessage(assignErr));
     } finally {
       setIsSaving(false);
     }
@@ -531,26 +688,81 @@ export default function AdminThesisPage() {
   const transitionRound = async (
     roundId: string,
     action: 'open' | 'close' | 'publish' | 'open-proposals' | 'publish-results',
+    round?: ThesisRound,
   ) => {
+    setError('');
+    setSuccess('');
+    const registrationOpenWindow = action === 'open' && round
+      ? registrationOpeningAvailability(round, currentAdminTime())
+      : null;
+    if (registrationOpenWindow?.disabled && registrationOpenWindow.reasonCode) {
+      const details = registrationOpenWindow.reasonCode === 'REGISTRATION_EARLY_OPEN_BLOCKED'
+        ? { lecturerSubmitEnd: round?.lecturerSubmitEnd }
+        : { registrationEnd: round?.registrationEnd };
+      setError(transitionErrorMessage({
+        response: { status: 409, data: { code: registrationOpenWindow.reasonCode, details } },
+      }, 'registration-open'));
+      return;
+    }
     // Lifecycle transitions move every group and lecturer in the round, so a
     // single misclick cannot silently open registration or publish results.
     // Closing registration must never be blind (F2): fetch the server-side
     // consequence preview first so the dialog shows real group/report counts.
-    // A preview read failure must not block the transition — fall back to the
-    // generic confirm copy.
     let closePreview: ThesisCloseRegistrationPreview | null = null;
     if (action === 'close') {
-      closePreview = await thesisApi.closeRegistrationPreview(roundId).catch(() => null);
+      try {
+        closePreview = await thesisApi.closeRegistrationPreview(roundId);
+      } catch (previewError: unknown) {
+        setError(transitionErrorMessage(previewError));
+        return;
+      }
     }
     // Publishing must name its exclusions: preview which topics sit outside
     // the completeness requirement so the confirm is never blind. A preview
-    // read failure falls back to the generic copy like the close preview.
+    // failure or known blocker must stop before confirmation and mutation.
     let publishPreview: ThesisPublishResultsPreview | null = null;
+    let resultPreview: ThesisPublishResultsPreview;
     if (action === 'publish-results') {
-      publishPreview = await thesisApi.publishResultsPreview(roundId).catch(() => null);
+      updatePublishReadiness(roundId, { loading: true, error: '' });
+      try {
+        resultPreview = await thesisApi.publishResultsPreview(roundId);
+        publishPreview = resultPreview;
+        updatePublishReadiness(roundId, { preview: resultPreview, error: '' });
+      } catch (previewError: unknown) {
+        const message = transitionErrorMessage(previewError);
+        updatePublishReadiness(roundId, { error: message });
+        setError(message);
+        return;
+      } finally {
+        updatePublishReadiness(roundId, { loading: false });
+      }
+      const blockerCode = publishResultsBlockerCode(resultPreview);
+      if (blockerCode) {
+        const blockerMessage = campusErrorForCode(blockerCode)
+          ?? messages.thesis.admin.transitionFailure;
+        setError(blockerMessage);
+        return;
+      }
     }
     let message = transitionConfirmCopy(action);
     let warning: string | undefined;
+    if (action === 'open' && registrationOpenWindow && round) {
+      message = [
+        message,
+        messages.thesis.admin.openRegistrationEffectiveWindow.replace(
+          '{window}',
+          formatRoundWindow(locale, registrationOpenWindow.effectiveStart, registrationOpenWindow.effectiveEnd),
+        ),
+      ].join(' ');
+      if (registrationOpenWindow.opensImmediately) {
+        message = [
+          message,
+          messages.thesis.admin.openRegistrationEarlyHint.replace(
+            '{start}', formatRoundInstant(locale, round.registrationStart),
+          ),
+        ].join(' ');
+      }
+    }
     if (publishPreview && publishPreview.excludedTopics.length > 0) {
       message = [
         message,
@@ -610,8 +822,6 @@ export default function AdminThesisPage() {
       if (!confirmAllExcluded) return;
     }
     setIsSaving(true);
-    setError('');
-    setSuccess('');
     try {
       if (action === 'open-proposals') {
         await thesisApi.openProposals(roundId);
@@ -631,7 +841,7 @@ export default function AdminThesisPage() {
       }
       await loadData();
     } catch (err: unknown) {
-      setError(transitionErrorMessage(err));
+      setError(transitionErrorMessage(err, action === 'open' ? 'registration-open' : undefined));
     } finally {
       setIsSaving(false);
     }
@@ -665,7 +875,7 @@ export default function AdminThesisPage() {
       !extendDeadlineRoundId ||
       !parsed ||
       Number.isNaN(parsed.getTime()) ||
-      parsed.getTime() <= Date.now()
+      parsed.getTime() <= currentAdminTime()
     ) {
       setExtendDeadlineError(messages.thesis.admin.reportDeadlineInvalid);
       return;
@@ -809,8 +1019,8 @@ export default function AdminThesisPage() {
     } catch (err: unknown) {
       // Restore runs both from the target-picker modal and the plain confirm
       // flow — write both sinks so the failure is visible on either path.
-      setError(transitionErrorMessage(err));
-      setModalError(transitionErrorMessage(err));
+      setError(transitionErrorMessage(err, 'restore'));
+      setModalError(transitionErrorMessage(err, 'restore'));
     } finally {
       setIsSaving(false);
     }
@@ -827,7 +1037,7 @@ export default function AdminThesisPage() {
       setError(messages.thesis.loadFailed);
       return;
     }
-    const plan = planThesisRoundRestore(round, hasLiveGroups);
+    const plan = planThesisRoundRestore(round, hasLiveGroups, currentAdminTime());
     if (plan.requiresChoice) {
       setModalError('');
       setRestoreTargetRound(round);
@@ -996,7 +1206,10 @@ export default function AdminThesisPage() {
         await loadRoundDetail(action.roundId);
       }
     } catch (err: unknown) {
-      setReasonActionError(transitionErrorMessage(err));
+      setReasonActionError(transitionErrorMessage(
+        err,
+        action.kind === 'lateTopic' ? 'late-topic' : undefined,
+      ));
     } finally {
       setIsSaving(false);
     }
@@ -1114,7 +1327,7 @@ export default function AdminThesisPage() {
       }
     >
       {error ? (
-        <div className="mb-6 rounded-lg border border-destructive/30 bg-destructive/5 px-4 py-3 text-sm text-destructive">
+        <div role="alert" className="mb-6 rounded-lg border border-destructive/30 bg-destructive/5 px-4 py-3 text-sm text-destructive">
           {error}
         </div>
       ) : null}
@@ -1171,6 +1384,89 @@ export default function AdminThesisPage() {
           <div className="space-y-4">
             {rounds.map((round) => {
               const isExpanded = expandedRoundId === round.id;
+              const lifecycleNow = currentAdminTime();
+              const registrationOpenWindow = registrationOpeningAvailability(round, lifecycleNow);
+              const lateTopicAvailabilityState = lateTopicAvailability(
+                round.status, round.registrationStart, round.registrationEnd, lifecycleNow,
+              );
+              const lateTopicUnavailableReason = lateTopicAvailabilityState.reasonCode === 'REGISTRATION_WINDOW_CLOSED'
+                ? Number.isFinite(Date.parse(round.registrationEnd))
+                  ? (round.status === 'PROPOSALS_PUBLISHED'
+                    ? messages.thesis.admin.lateTopicRegistrationClosedBeforeOpen
+                    : messages.thesis.admin.lateTopicRegistrationClosed).replace(
+                      '{end}', formatAdminInstant(round.registrationEnd),
+                    )
+                  : messages.thesis.admin.lateTopicRegistrationUnavailable
+                : lateTopicAvailabilityState.reasonCode === 'REGISTRATION_WINDOW_NOT_OPEN'
+                  ? Number.isFinite(Date.parse(round.registrationStart))
+                    ? messages.thesis.admin.lateTopicRegistrationNotStarted.replace(
+                        '{start}', formatAdminInstant(round.registrationStart),
+                      )
+                    : messages.thesis.admin.lateTopicRegistrationUnavailable
+                  : '';
+              const gvpbExtensionUnavailableAt = gvpbDeadlineExtensionBlocker(round.reportDate, lifecycleNow);
+              const gvpbExtensionUnavailableReason = gvpbExtensionUnavailableAt
+                ? messages.thesis.admin.gvpbExtensionReportDatePassed.replace(
+                    '{date}', formatAdminInstant(gvpbExtensionUnavailableAt),
+                  )
+                : '';
+              const registrationOpenReason = registrationOpenWindow.reasonCode === 'REGISTRATION_EARLY_OPEN_BLOCKED'
+                ? messages.common.campusErrors.codes.REGISTRATION_EARLY_OPEN_BLOCKED
+                  ?.replace('{end}', formatAdminInstant(round.lecturerSubmitEnd))
+                : registrationOpenWindow.reasonCode === 'REGISTRATION_WINDOW_CLOSED'
+                  ? messages.thesis.admin.registrationWindowExpired.replace(
+                      '{end}', formatAdminInstant(round.registrationEnd),
+                    )
+                  : registrationOpenWindow.opensImmediately
+                    ? messages.thesis.admin.openRegistrationEarlyHint.replace(
+                        '{start}', formatRoundInstant(locale, round.registrationStart),
+                      )
+                    : '';
+              const restoreBlockedMessages = (round.restoreBlockers ?? []).flatMap((code) => {
+                const message = messages.common.campusErrors.codes[code];
+                return message ? [message] : [];
+              });
+              const restoreBlockerId = `restore-blockers-${round.id}`;
+              const publishReadiness = publishResultsReadinessForRound(publishReadinessByRound, round.id);
+              const publishResultsBlocker = publishReadiness.preview
+                ? publishResultsBlockerCode(publishReadiness.preview)
+                : null;
+              const publishResultsDisabledReason = publishReadiness.error
+                || (publishReadiness.loading
+                  ? messages.thesis.admin.checkingPublishReadiness
+                  : publishReadiness.preview
+                    ? publishResultsBlocker
+                      ? campusErrorForCode(publishResultsBlocker)
+                        ?? messages.thesis.admin.transitionFailure
+                      : ''
+                    : messages.thesis.admin.publishPreviewUnavailable);
+              const canManageGlobalLifecycle = Boolean(isAdmin || isSuperAdmin);
+              const retractUnavailableReason = !canManageGlobalLifecycle
+                ? messages.thesis.admin.globalAdminRequired
+                : round.closure == null
+                  ? messages.thesis.admin.retractWindowUnavailable
+                  : round.closure.closeAllowed !== false
+                    ? messages.thesis.admin.retractWindowClosed
+                    : '';
+              const closeRoundUnavailableReason = [
+                !canManageGlobalLifecycle ? messages.thesis.admin.globalAdminRequired : '',
+                round.closure?.closeAllowed === false
+                  ? round.closure.closeBlocker === 'RETRACT_WINDOW_OPEN'
+                    ? messages.thesis.admin.closeBlockedRetractWindow.replace(
+                        '{end}',
+                        round.closure.retractWindowEndsAt
+                          ? formatAdminInstant(round.closure.retractWindowEndsAt)
+                          : messages.thesis.admin.unknownScheduleTime,
+                      )
+                    : messages.thesis.admin.closeStatusUnavailable
+                  : '',
+              ].filter(Boolean).join(' ');
+              const deleteUnavailableReason = round.deletion?.deletable
+                ? messages.thesis.admin.deleteRoundAvailable
+                : [
+                    messages.thesis.admin.deleteRoundUnavailable,
+                    deleteBlockerSummary(round),
+                  ].filter(Boolean).join(' ');
               // Mirrors ThesisCouncilService.lockMutableRound: once a round is
               // terminal every council control below can only be refused, so
               // the card keeps the roster readable but drops the actions.
@@ -1201,7 +1497,7 @@ export default function AdminThesisPage() {
                         <div>
                           <CardTitle className="text-lg">{round.name}</CardTitle>
                           <CardDescription className="mt-1">
-                            {messages.thesis.admin.thesisTypeOptions[round.thesisType as keyof typeof messages.thesis.admin.thesisTypeOptions] ?? round.thesisType} · {formatRoundWindow(locale, round.registrationStart, round.registrationEnd)}
+                            {messages.thesis.admin.thesisTypeOptions[round.thesisType as keyof typeof messages.thesis.admin.thesisTypeOptions] ?? round.thesisType} · {messages.thesis.admin.registrationWindowLabel}: {formatRoundWindow(locale, round.registrationStart, round.registrationEnd)}
                           </CardDescription>
                         </div>
                       </div>
@@ -1231,9 +1527,27 @@ export default function AdminThesisPage() {
                             </Button>
                           ) : null}
                           {round.status === 'PROPOSALS_PUBLISHED' ? (
-                            <Button type="button" size="sm" variant="outline" onClick={() => void transitionRound(round.id, 'open')} disabled={isSaving}>
-                              {messages.thesis.admin.openRegistration}
-                            </Button>
+                            <div className="flex flex-col gap-1">
+                              <Button
+                                type="button"
+                                size="sm"
+                                variant="outline"
+                                onClick={() => void transitionRound(round.id, 'open', round)}
+                                disabled={isSaving || registrationOpenWindow.disabled}
+                                aria-describedby={`registration-open-reason-${round.id}`}
+                              >
+                                {messages.thesis.admin.openRegistration}
+                              </Button>
+                              {registrationOpenReason ? (
+                                <p
+                                  id={`registration-open-reason-${round.id}`}
+                                  role={registrationOpenWindow.disabled ? 'alert' : 'status'}
+                                  className="max-w-md text-xs text-muted-foreground"
+                                >
+                                  {registrationOpenReason}
+                                </p>
+                              ) : <span id={`registration-open-reason-${round.id}`} className="sr-only">{messages.thesis.admin.openRegistrationAvailable}</span>}
+                            </div>
                           ) : null}
                           {round.status === 'REGISTRATION_OPEN' ? (
                             <Button type="button" size="sm" variant="outline" onClick={() => void transitionRound(round.id, 'close')} disabled={isSaving}>
@@ -1241,9 +1555,37 @@ export default function AdminThesisPage() {
                             </Button>
                           ) : null}
                           {round.status === 'REGISTRATION_CLOSED' ? (
-                            <Button type="button" size="sm" onClick={() => void transitionRound(round.id, 'publish-results')} disabled={isSaving}>
-                              {messages.thesis.admin.publishResults}
-                            </Button>
+                            <div className="flex flex-col gap-1">
+                              <Button
+                                type="button"
+                                size="sm"
+                                onClick={() => void transitionRound(round.id, 'publish-results')}
+                                disabled={isSaving || publishReadiness.loading || Boolean(publishResultsBlocker)}
+                                aria-describedby={`publish-results-reason-${round.id}`}
+                              >
+                                {messages.thesis.admin.publishResults}
+                              </Button>
+                              {publishResultsBlocker || publishReadiness.error ? (
+                                <Button
+                                  type="button"
+                                  size="sm"
+                                  variant="ghost"
+                                  onClick={() => void refreshPublishResultsPreview(round.id)}
+                                  disabled={isSaving || publishReadiness.loading}
+                                >
+                                  {messages.thesis.admin.refreshPublishReadiness}
+                                </Button>
+                              ) : null}
+                              {publishResultsDisabledReason ? (
+                                <p
+                                  id={`publish-results-reason-${round.id}`}
+                                  role={publishReadiness.error || publishResultsBlocker ? 'alert' : 'status'}
+                                  className="max-w-md text-xs text-muted-foreground"
+                                >
+                                  {publishResultsDisabledReason}
+                                </p>
+                              ) : <span id={`publish-results-reason-${round.id}`} className="sr-only">{messages.thesis.admin.publishResultsAvailable}</span>}
+                            </div>
                           ) : null}
                           {/* F1 escape hatch: a closed round whose report
                               deadline passed gets a visible way to reopen the
@@ -1266,30 +1608,46 @@ export default function AdminThesisPage() {
                             round.status === 'REGISTRATION_OPEN' ||
                             round.status === 'REGISTRATION_CLOSED') &&
                           round.gvpbDeadline ? (
-                            <Button
-                              type="button"
-                              size="sm"
-                              variant="outline"
-                              onClick={() => openExtendDeadlineModal(round, 'gvpb')}
-                              disabled={isSaving}
-                            >
-                              {messages.thesis.admin.gvpbDeadlineExtend}
-                            </Button>
+                            <div className="flex flex-col gap-1">
+                              <Button
+                                type="button"
+                                size="sm"
+                                variant="outline"
+                                onClick={() => openExtendDeadlineModal(round, 'gvpb')}
+                                disabled={isSaving || Boolean(gvpbExtensionUnavailableReason)}
+                                aria-describedby={`gvpb-deadline-reason-${round.id}`}
+                              >
+                                {messages.thesis.admin.gvpbDeadlineExtend}
+                              </Button>
+                              {gvpbExtensionUnavailableReason ? (
+                                <p id={`gvpb-deadline-reason-${round.id}`} role="status" className="max-w-md text-xs text-muted-foreground">
+                                  {gvpbExtensionUnavailableReason}
+                                </p>
+                              ) : <span id={`gvpb-deadline-reason-${round.id}`} className="sr-only">{messages.thesis.admin.gvpbExtensionAvailable}</span>}
+                            </div>
                           ) : null}
                           {/* Late-topic escape: a supervisor who missed the
                               proposal window still gets a publishable topic
                               while students can register (audited). */}
                           {(round.status === 'PROPOSALS_PUBLISHED' ||
                             round.status === 'REGISTRATION_OPEN') ? (
-                            <Button
-                              type="button"
-                              size="sm"
-                              variant="outline"
-                              onClick={() => openReasonAction({ kind: 'lateTopic', roundId: round.id })}
-                              disabled={isSaving}
-                            >
-                              {messages.thesis.admin.lateTopic}
-                            </Button>
+                            <div className="flex flex-col gap-1">
+                              <Button
+                                type="button"
+                                size="sm"
+                                variant="outline"
+                                onClick={() => openReasonAction({ kind: 'lateTopic', roundId: round.id })}
+                                disabled={isSaving || lateTopicAvailabilityState.disabled}
+                                aria-describedby={`late-topic-reason-${round.id}`}
+                              >
+                                {messages.thesis.admin.lateTopic}
+                              </Button>
+                              {lateTopicUnavailableReason ? (
+                                <p id={`late-topic-reason-${round.id}`} role="status" className="max-w-md text-xs text-muted-foreground">
+                                  {lateTopicUnavailableReason}
+                                </p>
+                              ) : <span id={`late-topic-reason-${round.id}`} className="sr-only">{messages.thesis.admin.lateTopicAvailable}</span>}
+                            </div>
                           ) : null}
                           {/* Roster override: a group still below size after
                               registration closed gets an audited admin add. */}
@@ -1316,34 +1674,45 @@ export default function AdminThesisPage() {
                             </Button>
                           ) : null}
                           {round.status === 'RESULTS_PUBLISHED' ? (
-                            <Button
-                              type="button"
-                              size="sm"
-                              variant="ghost"
-                              className="text-destructive hover:text-destructive"
-                              onClick={() => openReasonAction({ kind: 'retractResults', roundId: round.id })}
-                              disabled={isSaving}
-                            >
-                              {messages.thesis.admin.retractResults}
-                            </Button>
+                            <div className="flex flex-col gap-1">
+                              <Button
+                                type="button"
+                                size="sm"
+                                variant="ghost"
+                                className="text-destructive hover:text-destructive"
+                                onClick={() => openReasonAction({ kind: 'retractResults', roundId: round.id })}
+                                disabled={isSaving || !canManageGlobalLifecycle || round.closure?.closeAllowed !== false}
+                                aria-describedby={`retract-results-reason-${round.id}`}
+                              >
+                                {messages.thesis.admin.retractResults}
+                              </Button>
+                              {retractUnavailableReason ? (
+                                <p id={`retract-results-reason-${round.id}`} role="status" className="max-w-md text-xs text-muted-foreground">
+                                  {retractUnavailableReason}
+                                </p>
+                              ) : <span id={`retract-results-reason-${round.id}`} className="sr-only">{messages.thesis.admin.retractResultsAvailable}</span>}
+                            </div>
                           ) : null}
-                          {round.status === 'RESULTS_PUBLISHED' && round.closure?.closeAllowed !== false ? (
-                            <Button
-                              type="button"
-                              size="sm"
-                              variant="outline"
-                              onClick={() => openReasonAction({
-                                kind: 'closeRound', roundId: round.id, roundName: round.name,
-                              })}
-                              disabled={isSaving}
-                            >
-                              {messages.thesis.admin.closeRound}
-                            </Button>
-                          ) : null}
-                          {round.status === 'RESULTS_PUBLISHED' && round.closure?.closeBlocker ? (
-                            <span className="text-xs text-muted-foreground">
-                              {messages.thesis.admin.closeBlockedRetractWindow}
-                            </span>
+                          {round.status === 'RESULTS_PUBLISHED' ? (
+                            <div className="flex flex-col gap-1">
+                              <Button
+                                type="button"
+                                size="sm"
+                                variant="outline"
+                                onClick={() => openReasonAction({
+                                  kind: 'closeRound', roundId: round.id, roundName: round.name,
+                                })}
+                                disabled={isSaving || !canManageGlobalLifecycle || round.closure?.closeAllowed === false}
+                                aria-describedby={`close-round-reason-${round.id}`}
+                              >
+                                {messages.thesis.admin.closeRound}
+                              </Button>
+                              {closeRoundUnavailableReason ? (
+                                <p id={`close-round-reason-${round.id}`} role="status" className="max-w-md text-xs text-muted-foreground">
+                                  {closeRoundUnavailableReason}
+                                </p>
+                              ) : <span id={`close-round-reason-${round.id}`} className="sr-only">{messages.thesis.admin.closeRoundAvailable}</span>}
+                            </div>
                           ) : null}
                           {round.status === 'CLOSED' && round.closure?.reopenAllowed !== false ? (
                             <Button
@@ -1351,10 +1720,16 @@ export default function AdminThesisPage() {
                               size="sm"
                               variant="outline"
                               onClick={() => openReasonAction({ kind: 'reopenRound', roundId: round.id })}
-                              disabled={isSaving}
+                              disabled={isSaving || !canManageGlobalLifecycle}
+                              aria-describedby={`reopen-round-reason-${round.id}`}
                             >
                               {messages.thesis.admin.reopenRound}
                             </Button>
+                          ) : null}
+                          {round.status === 'CLOSED' && round.closure?.reopenAllowed !== false ? (
+                            <span id={`reopen-round-reason-${round.id}`} role={!canManageGlobalLifecycle ? 'status' : undefined} className={!canManageGlobalLifecycle ? 'text-xs text-muted-foreground' : 'sr-only'}>
+                              {!canManageGlobalLifecycle ? messages.thesis.admin.globalAdminRequired : messages.thesis.admin.reopenRoundAvailable}
+                            </span>
                           ) : null}
                           {(round.status === 'DRAFT' || round.status === 'PROPOSAL_OPEN' || round.status === 'PROPOSALS_PUBLISHED') ? (
                             <Button
@@ -1368,15 +1743,23 @@ export default function AdminThesisPage() {
                             </Button>
                           ) : null}
                           {round.status === 'CANCELLED' ? (
-                            <Button
-                              type="button"
-                              size="sm"
-                              variant="outline"
-                              onClick={() => void restoreRound(round)}
-                              disabled={isSaving}
-                            >
-                              {messages.thesis.admin.restoreRound}
-                            </Button>
+                            <>
+                              <Button
+                                type="button"
+                                size="sm"
+                                variant="outline"
+                                onClick={() => void restoreRound(round)}
+                                disabled={isSaving || restoreBlockedMessages.length > 0}
+                                aria-describedby={restoreBlockedMessages.length > 0 ? restoreBlockerId : undefined}
+                              >
+                                {messages.thesis.admin.restoreRound}
+                              </Button>
+                              {restoreBlockedMessages.length > 0 ? (
+                                <p id={restoreBlockerId} role="alert" className="w-full text-sm text-destructive">
+                                  {restoreBlockedMessages.join(' ')}
+                                </p>
+                              ) : null}
+                            </>
                           ) : null}
                           {round.status !== 'RESULTS_PUBLISHED'
                           && round.status !== 'CLOSED'
@@ -1392,7 +1775,7 @@ export default function AdminThesisPage() {
                               {messages.thesis.admin.cancelRound}
                             </Button>
                           ) : null}
-                          {round.deletion?.deletable ? (
+                          {round.deletion ? (
                             <Button
                               type="button"
                               size="sm"
@@ -1401,16 +1784,22 @@ export default function AdminThesisPage() {
                               onClick={() => openReasonAction({
                                 kind: 'deleteRound', roundId: round.id, roundName: round.name,
                               })}
-                              disabled={isSaving}
+                              disabled={isSaving || !round.deletion.deletable}
+                              aria-describedby={`delete-round-reason-${round.id}`}
                             >
                               <Trash2 className="h-3.5 w-3.5" />
                               {messages.thesis.admin.deleteRound}
                             </Button>
                           ) : null}
-                          {round.status === 'CANCELLED' && deleteBlockerSummary(round) ? (
-                            <span className="text-xs text-muted-foreground">
-                              {messages.thesis.admin.deleteBlockersLabel
-                                .replace('{counts}', deleteBlockerSummary(round))}
+                          {round.deletion ? (
+                            <span
+                              id={`delete-round-reason-${round.id}`}
+                              role={!round.deletion.deletable ? 'status' : undefined}
+                              className={!round.deletion.deletable ? 'text-xs text-muted-foreground' : 'sr-only'}
+                            >
+                              {round.deletion.deletable
+                                ? messages.thesis.admin.deleteRoundAvailable
+                                : deleteUnavailableReason}
                             </span>
                           ) : null}
                         </div>
@@ -1734,6 +2123,10 @@ export default function AdminThesisPage() {
                                                   {messages.thesis.admin.gvpbWaivedBadge}
                                                 </span>
                                               ) : null}
+                                              <ScoreBreakdownPanel
+                                                messages={messages}
+                                                topicId={tid}
+                                              />
                                               {top ? (
                                                 <div className="flex flex-wrap gap-1">
                                                   {top.finalScore == null && !councilLocked ? (
@@ -1967,7 +2360,7 @@ export default function AdminThesisPage() {
       >
         <div className="space-y-4">
           {modalError ? (
-            <div className="rounded-md border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive">
+            <div role="alert" className="rounded-md border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive">
               {modalError}
             </div>
           ) : null}
@@ -2002,7 +2395,7 @@ export default function AdminThesisPage() {
       >
         <div className="space-y-4">
           {modalError ? (
-            <div className="rounded-md border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive">
+            <div role="alert" className="rounded-md border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive">
               {modalError}
             </div>
           ) : null}
@@ -2212,7 +2605,7 @@ export default function AdminThesisPage() {
       >
         <div className="space-y-4">
           {modalError ? (
-            <div className="rounded-md border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive">
+            <div role="alert" className="rounded-md border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive">
               {modalError}
             </div>
           ) : null}
@@ -2314,7 +2707,7 @@ export default function AdminThesisPage() {
               : messages.thesis.admin.reportDeadlineModalDescription}
           </p>
           {extendDeadlineError ? (
-            <div className="rounded-md border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive">
+            <div role="alert" className="rounded-md border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive">
               {extendDeadlineError}
             </div>
           ) : null}
@@ -2371,7 +2764,7 @@ export default function AdminThesisPage() {
       >
         <div className="space-y-4">
           {reasonActionError ? (
-            <div className="rounded-md border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive">
+            <div role="alert" className="rounded-md border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive">
               {reasonActionError}
             </div>
           ) : null}
@@ -2618,7 +3011,7 @@ export default function AdminThesisPage() {
       >
         <div className="space-y-4">
           {modalError ? (
-            <div className="rounded-md border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive">
+            <div role="alert" className="rounded-md border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive">
               {modalError}
             </div>
           ) : null}

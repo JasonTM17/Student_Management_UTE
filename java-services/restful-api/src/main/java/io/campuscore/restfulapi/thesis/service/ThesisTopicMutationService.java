@@ -378,9 +378,7 @@ public class ThesisTopicMutationService {
         }
         // Students must still be able to pick the topic up: once registration
         // closed a late topic would strand it with no group.
-        roundLifecycle.requireRoundStatusAny(roundId,
-                io.campuscore.restfulapi.thesis.model.RoundStatus.PROPOSALS_PUBLISHED,
-                io.campuscore.restfulapi.thesis.model.RoundStatus.REGISTRATION_OPEN);
+        roundLifecycle.requireLateTopicWindow(roundId);
         String departmentId = request.departmentId().trim();
         requireTopicDepartmentScope(actor, departmentId);
         // The named supervisor must be a real active lecturer — the supervisor
@@ -403,12 +401,18 @@ public class ThesisTopicMutationService {
         audit.record(subject(actor), null, "THESIS_TOPIC_LATE_CREATED", "THESIS_TOPIC", topic.getId().toString(),
                 "Late topic created for supervisor " + supervisorId + "; reason: " + cleanReason,
                 Map.of("status", ""), Map.of("status", TopicStatus.PUBLISHED.name(), "supervisorId", supervisorId));
+        TopicResponse response = topics.findById(lateTopicId)
+                .map(this::topicResponse).orElseGet(() -> topicResponse(topic));
+        // Recheck after the write/read path so an insert blocked across the
+        // deadline cannot commit a topic students can no longer choose. A
+        // refusal here rolls back the topic, supervisor link, and audit row.
+        roundLifecycle.requireLateTopicWindow(roundId);
         afterCommit(() -> {
             if (notifier != null) {
                 notifier.notifySupervisorsAssigned(lateTopicId, List.of(supervisorId));
             }
         });
-        return topics.findById(lateTopicId).map(this::topicResponse).orElseGet(() -> topicResponse(topic));
+        return response;
     }
 
     private void requireMutableTopicRound(UUID topicId) {
