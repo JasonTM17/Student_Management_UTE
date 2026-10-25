@@ -15,9 +15,8 @@ export function useThesisWorkspace(
   initialRoundId = '',
   options?: { topicsEnabled?: boolean; groupsEnabled?: boolean },
 ) {
-  // The catalog gates topic loading behind a search query (course
-  // requirement: the list only appears after searching), so the hook can be
-  // told not to fetch topics at all.
+  // Callers may defer topic loading until the round is settled — the hook
+  // simply does not fetch topics while topicsEnabled is false.
   const topicsEnabled = options?.topicsEnabled ?? true;
   const groupsEnabled = options?.groupsEnabled ?? true;
   const { user, isStudent } = useAuth();

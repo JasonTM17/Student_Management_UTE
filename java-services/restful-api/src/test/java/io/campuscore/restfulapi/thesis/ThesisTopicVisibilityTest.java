@@ -34,7 +34,11 @@ class ThesisTopicVisibilityTest {
     void setUp() {
         repository = mock(ThesisTopicRepository.class);
         rounds = mock(ThesisRoundReadPort.class);
-        service = new ThesisTopicService(repository, rounds, mock(io.campuscore.restfulapi.thesis.repository.ThesisScopeRepository.class));
+        io.campuscore.restfulapi.thesis.repository.ThesisScopeRepository scope =
+                mock(io.campuscore.restfulapi.thesis.repository.ThesisScopeRepository.class);
+        when(scope.findSupervisorsByTopicIds(org.mockito.ArgumentMatchers.any()))
+                .thenReturn(java.util.Map.of());
+        service = new ThesisTopicService(repository, rounds, scope);
     }
 
     @Test

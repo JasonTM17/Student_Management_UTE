@@ -316,6 +316,9 @@ export default function ThesisPage() {
   const [draftScores, setDraftScores] = useState<Record<string, string>>({});
   const [draftComments, setDraftComments] = useState<Record<string, string>>({});
   const [topicSupervisors, setTopicSupervisors] = useState<Record<string, string[]>>({});
+  // Full supervisor rows seeded from topic list payloads, so the council
+  // loader can reuse them instead of a per-topic request. Keyed by topic id.
+  const topicSupervisorRowsRef = useRef<Record<string, ThesisTopicSupervisor[]>>({});
   // GVPB counter-review state keyed by topic id: the reviewer's own row.
   const [gvpbScores, setGvpbScores] = useState<Record<string, ThesisCouncilScore | null>>({});
   const [gvpbDraftScores, setGvpbDraftScores] = useState<Record<string, string>>({});
@@ -381,7 +384,12 @@ export default function ThesisPage() {
                   () => ({ scores: [] as ThesisCouncilScore[], failed: true }),
                 )
               : Promise.resolve({ scores: [] as ThesisCouncilScore[], failed: false }),
-            thesisApi.listSupervisors(tid).catch(() => []),
+            // Prefer the roster that arrived with the topic payload; only ids
+            // outside the loaded list (e.g. statuses the list does not merge)
+            // still need the per-topic endpoint.
+            topicSupervisorRowsRef.current[tid]
+              ? Promise.resolve(topicSupervisorRowsRef.current[tid])
+              : thesisApi.listSupervisors(tid).catch(() => []),
             thesisApi.getTopicReport(tid).then(
               (report) => ({ report, failed: false }),
               () => ({ report: null, failed: true }),
@@ -777,7 +785,20 @@ export default function ThesisPage() {
         } else {
           next = await thesisApi.listTopics(roundId, 'PUBLISHED');
         }
-        if (isCurrent()) setTopics(next);
+        if (isCurrent()) {
+          setTopics(next);
+          // Topic payloads carry their supervisor roster — feed the council
+          // maps from it so detail loading does not fan out per topic.
+          const embedded: Record<string, string[]> = {};
+          for (const t of next) {
+            if (!t.supervisors) continue;
+            topicSupervisorRowsRef.current[t.id] = t.supervisors;
+            embedded[t.id] = t.supervisors.map((s) => s.lecturerId);
+          }
+          if (Object.keys(embedded).length > 0) {
+            setTopicSupervisors((prev) => ({ ...prev, ...embedded }));
+          }
+        }
       } catch (caught) {
         if (isCurrent()) throw caught;
       }
@@ -802,6 +823,7 @@ export default function ThesisPage() {
     setDraftScores({});
     setDraftComments({});
     setTopicSupervisors({});
+    topicSupervisorRowsRef.current = {};
     setTopicReports({});
     setTopicReportErrors({});
     setCouncilLoadError('');
