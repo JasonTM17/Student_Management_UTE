@@ -53,6 +53,7 @@ class GradeAppealPersistenceTest {
     private static final String STUDENT_USER = "appeal-user-student-1";
     private static final String OTHER_STUDENT_USER = "appeal-user-student-2";
     private static final String LECTURER_USER = "appeal-user-lecturer-1";
+    private static final String PROFILELESS_LECTURER_USER = "appeal-user-lecturer-no-profile";
     private static final String OTHER_LECTURER_USER = "appeal-user-lecturer-2";
     private static final String ADMIN_USER = "appeal-user-admin";
     private static final String STUDENT = "appeal-student-1";
@@ -192,6 +193,29 @@ class GradeAppealPersistenceTest {
     }
 
     @Test
+    void lecturerWithoutProfileCannotReviewAppealWhenSectionHasNoLecturer() throws Exception {
+        jdbc.update("UPDATE academic.\"Section\" SET \"lecturerId\"=NULL WHERE \"id\"=?", SECTION);
+        String appealId = submit(ENROLLMENT, student());
+        var request = post("/api/v1/lecturer/grade-appeals/" + appealId + "/review")
+                .contentType(MediaType.APPLICATION_JSON).content(reviewBody("ACCEPTED", "9.00", REVIEW_REASON));
+
+        mvc.perform(request.with(profilelessLecturer()))
+                .andExpect(status().isForbidden()).andExpect(jsonPath("$.code").value("GRADE_APPEAL_FORBIDDEN"));
+        jdbc.update("INSERT INTO campuscore_auth.\"Lecturer\""
+                + " (\"id\", \"userId\", \"departmentId\", \"employeeId\", \"isActive\")"
+                + " VALUES ('', ?, 'appeal-department', 'BLANK-ID', TRUE)", PROFILELESS_LECTURER_USER);
+        mvc.perform(post("/api/v1/lecturer/grade-appeals/" + appealId + "/review")
+                        .with(CurrentAccountJwt.fixtureJwt(jdbc, PROFILELESS_LECTURER_USER,
+                                token -> token.claim("lecturerId", ""), "LECTURER"))
+                        .contentType(MediaType.APPLICATION_JSON).content(reviewBody("ACCEPTED", "9.00", REVIEW_REASON)))
+                .andExpect(status().isForbidden()).andExpect(jsonPath("$.code").value("GRADE_APPEAL_FORBIDDEN"));
+        assertThat(jdbc.queryForObject("SELECT \"status\" FROM academic.\"GradeAppeal\" WHERE \"id\"=?",
+                String.class, appealId)).isEqualTo("PENDING");
+        assertThat(jdbc.queryForObject("SELECT \"finalGrade\" FROM academic.\"Enrollment\" WHERE \"id\"=?",
+                java.math.BigDecimal.class, ENROLLMENT)).isEqualByComparingTo("8.00");
+    }
+
+    @Test
     void appealWindowIncludesExactDaySevenInBangkokAndClosesImmediatelyAfter() throws Exception {
         Instant exactBoundary = NOW.minusSeconds(7 * 24 * 60 * 60L);
         jdbc.update("UPDATE academic.\"Enrollment\" SET \"gradePublishedAt\"=? WHERE \"id\"=?",
@@ -290,18 +314,18 @@ class GradeAppealPersistenceTest {
 
         mvc.perform(post("/api/v1/admin/sections/" + SECTION + "/grades/unpublish")
                         .with(lecturer()).contentType(MediaType.APPLICATION_JSON)
-                        .content(unpublishBody(List.of(OTHER_ENROLLMENT), REVIEW_REASON)))
+                        .content(unpublishBody(List.of(ENROLLMENT), REVIEW_REASON)))
                 .andExpect(status().isForbidden());
         mvc.perform(post("/api/v1/admin/sections/" + SECTION + "/grades/unpublish")
                         .with(admin()).contentType(MediaType.APPLICATION_JSON)
-                        .content(unpublishBody(List.of(OTHER_ENROLLMENT), REVIEW_REASON)))
+                        .content(unpublishBody(List.of(ENROLLMENT), REVIEW_REASON)))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.unpublishedCount").value(1));
         assertThat(jdbc.queryForObject("SELECT \"gradeStatus\" FROM academic.\"Enrollment\" WHERE \"id\"=?",
-                String.class, OTHER_ENROLLMENT)).isEqualTo("DRAFT");
+                String.class, ENROLLMENT)).isEqualTo("DRAFT");
         assertThat(jdbc.queryForObject("SELECT \"gradePublishedAt\" FROM academic.\"Enrollment\" WHERE \"id\"=?",
-                Timestamp.class, OTHER_ENROLLMENT)).isNull();
+                Timestamp.class, ENROLLMENT)).isNull();
         assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM notifications.notification WHERE user_id=?"
-                + " AND type='GRADE_UNPUBLISH'", Integer.class, OTHER_STUDENT_USER)).isEqualTo(1);
+                + " AND type='GRADE_UNPUBLISH'", Integer.class, STUDENT_USER)).isEqualTo(1);
     }
 
     @Test
@@ -320,18 +344,30 @@ class GradeAppealPersistenceTest {
         mvc.perform(post("/api/v1/admin/sections/" + SECTION + "/grades/unpublish")
                         .with(admin()).contentType(MediaType.APPLICATION_JSON)
                         .content(unpublishBody(List.of(), REVIEW_REASON)))
-                .andExpect(status().isOk()).andExpect(jsonPath("$.unpublishedCount").value(2));
-        assertThat(jdbc.queryForList("SELECT \"gradeStatus\" FROM academic.\"Enrollment\""
-                + " WHERE \"sectionId\"=?", String.class, SECTION)).containsOnly("DRAFT");
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("GRADE_APPEAL_CORRECTION_LOCKED"));
+        assertThat(jdbc.queryForObject("SELECT \"gradeStatus\" FROM academic.\"Enrollment\" WHERE \"id\"=?",
+                String.class, ENROLLMENT)).isEqualTo("PUBLISHED");
+        assertThat(jdbc.queryForObject("SELECT \"finalGrade\" FROM academic.\"Enrollment\" WHERE \"id\"=?",
+                java.math.BigDecimal.class, ENROLLMENT)).isEqualByComparingTo("9.50");
+        assertThat(jdbc.queryForObject("SELECT \"gradePublishedAt\" FROM academic.\"Enrollment\" WHERE \"id\"=?",
+                Timestamp.class, ENROLLMENT)).isEqualTo(Timestamp.from(PUBLISHED_AT));
+
+        mvc.perform(post("/api/v1/admin/sections/" + SECTION + "/grades/unpublish")
+                        .with(admin()).contentType(MediaType.APPLICATION_JSON)
+                        .content(unpublishBody(List.of(OTHER_ENROLLMENT), REVIEW_REASON)))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.unpublishedCount").value(1));
+        assertThat(jdbc.queryForObject("SELECT \"gradeStatus\" FROM academic.\"Enrollment\" WHERE \"id\"=?",
+                String.class, OTHER_ENROLLMENT)).isEqualTo("DRAFT");
         assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM campuscore_audit.\"AdminAudit\""
                 + " WHERE \"entityType\"='Enrollment' AND \"action\"='GRADE_UNPUBLISHED'"
-                + " AND \"entityId\" IN (?, ?)", Integer.class, ENROLLMENT, OTHER_ENROLLMENT)).isEqualTo(2);
+                + " AND \"entityId\"=?", Integer.class, OTHER_ENROLLMENT)).isEqualTo(1);
         String unpublishAudit = jdbc.queryForObject("SELECT \"afterState\" FROM campuscore_audit.\"AdminAudit\""
                 + " WHERE \"entityType\"='Enrollment' AND \"action\"='GRADE_UNPUBLISHED'"
-                + " AND \"entityId\"=?", String.class, ENROLLMENT);
+                + " AND \"entityId\"=?", String.class, OTHER_ENROLLMENT);
         assertThat(unpublishAudit).contains("DRAFT", REVIEW_REASON, "cleared");
         assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM notifications.notification WHERE user_id IN (?, ?)"
-                + " AND type='GRADE_UNPUBLISH'", Integer.class, STUDENT_USER, OTHER_STUDENT_USER)).isEqualTo(2);
+                + " AND type='GRADE_UNPUBLISH'", Integer.class, STUDENT_USER, OTHER_STUDENT_USER)).isEqualTo(1);
     }
 
     @Test
@@ -458,12 +494,16 @@ class GradeAppealPersistenceTest {
         AccountAuthorityFixture.student(jdbc, OTHER_STUDENT_USER, OTHER_STUDENT, 3);
         AccountAuthorityFixture.lecturer(jdbc, LECTURER_USER, LECTURER);
         AccountAuthorityFixture.lecturer(jdbc, OTHER_LECTURER_USER, OTHER_LECTURER);
+        AccountAuthorityFixture.ensureUser(jdbc, PROFILELESS_LECTURER_USER);
+        AccountAuthorityFixture.role(jdbc, PROFILELESS_LECTURER_USER, "LECTURER");
         AccountAuthorityFixture.role(jdbc, ADMIN_USER, "ADMIN");
         jdbc.update("INSERT INTO academic.\"User\" (\"id\", \"email\", \"firstName\", \"lastName\", \"status\")"
                         + " VALUES (?, ?, 'Student', 'One', 'ACTIVE'), (?, ?, 'Student', 'Two', 'ACTIVE'),"
-                        + " (?, ?, 'Lecturer', 'One', 'ACTIVE'), (?, ?, 'Lecturer', 'Two', 'ACTIVE'), (?, ?, 'Admin', 'One', 'ACTIVE')",
+                + " (?, ?, 'Lecturer', 'One', 'ACTIVE'), (?, ?, 'Lecturer', 'Two', 'ACTIVE'),"
+                + " (?, ?, 'Lecturer', 'No Profile', 'ACTIVE'), (?, ?, 'Admin', 'One', 'ACTIVE')",
                 STUDENT_USER, STUDENT_USER + "@fixture.invalid", OTHER_STUDENT_USER, OTHER_STUDENT_USER + "@fixture.invalid",
                 LECTURER_USER, LECTURER_USER + "@fixture.invalid", OTHER_LECTURER_USER, OTHER_LECTURER_USER + "@fixture.invalid",
+                PROFILELESS_LECTURER_USER, PROFILELESS_LECTURER_USER + "@fixture.invalid",
                 ADMIN_USER, ADMIN_USER + "@fixture.invalid");
         jdbc.update("INSERT INTO academic.\"Faculty\" (\"id\", \"name\", \"code\") VALUES ('appeal-faculty', 'Faculty', 'AP-FAC')");
         jdbc.update("INSERT INTO academic.\"Department\" (\"id\", \"name\", \"code\", \"facultyId\")"
@@ -554,6 +594,9 @@ class GradeAppealPersistenceTest {
     private RequestPostProcessor student() { return CurrentAccountJwt.fixtureJwt(jdbc, STUDENT_USER, "STUDENT"); }
     private RequestPostProcessor otherStudent() { return CurrentAccountJwt.fixtureJwt(jdbc, OTHER_STUDENT_USER, "STUDENT"); }
     private RequestPostProcessor lecturer() { return CurrentAccountJwt.fixtureJwt(jdbc, LECTURER_USER, "LECTURER"); }
+    private RequestPostProcessor profilelessLecturer() {
+        return CurrentAccountJwt.fixtureJwt(jdbc, PROFILELESS_LECTURER_USER, "LECTURER");
+    }
     private RequestPostProcessor otherLecturer() { return CurrentAccountJwt.fixtureJwt(jdbc, OTHER_LECTURER_USER, "LECTURER"); }
     private RequestPostProcessor admin() { return CurrentAccountJwt.fixtureJwt(jdbc, ADMIN_USER, "ADMIN"); }
 

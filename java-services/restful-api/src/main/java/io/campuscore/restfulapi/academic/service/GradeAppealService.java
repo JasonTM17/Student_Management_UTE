@@ -205,9 +205,11 @@ public class GradeAppealService {
                     "A corrected score is only provided when accepting an appeal");
         }
 
+        String reviewerLecturerId = admin ? null : required(lecturerId, HttpStatus.FORBIDDEN,
+                "GRADE_APPEAL_FORBIDDEN", "Lecturer profile is required");
         Map<String, Object> head = findAppealHead(appealId);
         String studentId = text(head.get("student_id"));
-        if (!admin && !java.util.Objects.equals(lecturerId, text(head.get("lecturer_id")))) {
+        if (!admin && !java.util.Objects.equals(reviewerLecturerId, text(head.get("lecturer_id")))) {
             throw problem(HttpStatus.FORBIDDEN, "GRADE_APPEAL_FORBIDDEN",
                     "Only the lecturer assigned to this section may review this appeal");
         }
@@ -223,7 +225,7 @@ public class GradeAppealService {
         }
         Map<String, Object> enrollment = lockEnrollment(text(appeal.get("enrollment_id")));
         Map<String, Object> section = lockSection(text(enrollment.get("section_id")));
-        if (!admin && !java.util.Objects.equals(text(section.get("lecturer_id")), lecturerId)) {
+        if (!admin && !java.util.Objects.equals(text(section.get("lecturer_id")), reviewerLecturerId)) {
             throw problem(HttpStatus.FORBIDDEN, "GRADE_APPEAL_FORBIDDEN",
                     "Only the lecturer assigned to this section may review this appeal");
         }
@@ -317,6 +319,11 @@ public class GradeAppealService {
         if (!pending.isEmpty()) {
             throw problem(HttpStatus.CONFLICT, "GRADE_UNPUBLISH_APPEAL_PENDING",
                     "Grades with a pending appeal cannot be unpublished");
+        }
+        List<Map<String, Object>> accepted = repository.lockAcceptedAppeals(enrollmentIds);
+        if (!accepted.isEmpty()) {
+            throw problem(HttpStatus.CONFLICT, "GRADE_APPEAL_CORRECTION_LOCKED",
+                    "Grades corrected by an accepted appeal cannot be unpublished");
         }
         if (lockedEnrollments.size() != enrollmentIds.size()
                 || lockedEnrollments.stream().anyMatch(row -> !section.equals(text(row.get("section_id")))
