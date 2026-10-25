@@ -192,6 +192,8 @@ export const en = {
         GROUP_MEMBER_REQUIRED: 'Only group members can perform this action.',
         GROUP_OWNER_REQUIRED: 'Only the group leader can perform this action.',
         REGISTRATION_WINDOW_CLOSED: 'The registration window for this round has already closed.',
+        REGISTRATION_EARLY_OPEN_BLOCKED:
+          'Lecturer submissions end {end}. Shorten that window or wait before opening registration.',
         THESIS_ELIGIBILITY_NOT_MET:
           'Thesis registration requires enough accumulated credits and a minimum cumulative GPA. Check the eligibility card for your numbers.',
         // Thesis reports
@@ -208,20 +210,21 @@ export const en = {
         REPORT_ARTIFACT_REQUIRED:
           'A report needs a link or an attached document — add one before removing the other.',
         GROUP_STATE_CONFLICT: 'This group is not in a state that allows that action.',
-        ROUND_STATE_CONFLICT: 'This round is not in a state that allows that action.',
+        ROUND_STATE_CONFLICT:
+          'The round status has changed. Refresh the page and choose the action for its current status.',
         ROUND_RESTORE_MEMBER_CONFLICT:
-          'Some students already hold an active seat in another live round; restoring this round would give them two active groups.',
+          'Some students already hold active seats in another live round. Resolve those registrations before restoring this round.',
         ROUND_RESTORE_FROZEN_HISTORY:
-          'This round contains frozen historical groups and cannot be reopened.',
+          'This round contains frozen historical groups and cannot be restored. Leave it cancelled.',
         ROUND_RESTORE_TARGET_REQUIRED:
           'This round was cancelled before its previous status was recorded — pick the status it returns to.',
         ROUND_RESTORE_TARGET_INVALID:
           'That status is not a reachable restore target for this round.',
-        VALIDATION_ERROR: 'Some submitted values are invalid. Review them and try again.',
+        VALIDATION_ERROR: 'Check the required fields, dates, and reason, then try again.',
         THESIS_ROUND_SCHEDULE_ORDER:
           'The dates of this round are out of order — check each milestone against the one before it.',
         // Thesis results and council
-        RESULTS_NOT_READY: 'No topic has been graded yet; the chair must finalize scores first.',
+        RESULTS_NOT_READY: 'No approved group has a final score yet. Approve groups and finalize scores first.',
         RESULTS_INCOMPLETE: 'Every approved group must be graded before results are published.',
         SCORES_INCOMPLETE: 'Every approved group must have a finalized score.',
         RESULTS_NOT_PUBLISHED: 'Results for this round have not been published yet.',
@@ -260,6 +263,8 @@ export const en = {
         REVIEWER_MUST_BE_INDEPENDENT:
           'The counter-reviewer cannot sit on the defense council for this topic.',
         REVIEWER_REQUIRED: 'Only the assigned counter-reviewer can perform this action.',
+        REVIEW_SCORE_NOT_FOUND:
+          'No counter-review score is available. Assign a reviewer or wait for their submission.',
         SUPERVISOR_CANNOT_REVIEW: 'A topic supervisor cannot be its counter-reviewer.',
         GVPB_SCORE_SUBMITTED:
           'The counter-reviewer already submitted a score; the assignment is frozen.',
@@ -283,10 +288,12 @@ export const en = {
         MEMBER_NOT_FOUND: 'The group member could not be found.',
         REGISTRATION_WINDOW_NOT_OPEN: 'Registration opens at {opensAt}.',
         REPORT_FILE_NOT_FOUND: 'The stored report file is no longer available.',
-        ROUND_HAS_DATA: 'The round still has thesis data. Cancel it instead of deleting.',
+        ROUND_CLOSED:
+          'This round is not open for registration, so group changes are blocked. Open registration if it is still available, or choose an active round.',
+        ROUND_HAS_DATA: 'This round still contains thesis data, so it cannot be deleted. Cancel it to archive the data, or leave it cancelled.',
         ROUND_NOT_ACCEPTING_PROPOSALS: 'This round is not accepting topic proposals.',
-        ROUND_NOT_DELETABLE: 'Only a never-opened or cancelled round can be deleted.',
-        ROUND_NOT_FOUND: 'The registration round could not be found.',
+        ROUND_NOT_DELETABLE: 'Only an empty Draft or Cancelled round can be deleted. Cancel an empty live round first; published and closed rounds stay archived.',
+        ROUND_NOT_FOUND: 'The round no longer exists. Refresh the list.',
         SCORES_REQUIRED: 'Scores are required before this step can run.',
         STUDENT_PROFILE_REQUIRED: 'An active student profile is required.',
         SUPERVISOR_STATE_CONFLICT: 'The supervisor list conflicts with this action.',
@@ -312,15 +319,20 @@ export const en = {
           'This round type always requires a counter-reviewer.',
         INVALID_NOTIFICATION_LINK: 'The notification link is not a safe internal path.',
         LEADER_SUCCESSOR_REQUIRED: 'Removing the leader requires naming a successor member.',
+        LEADER_CANNOT_BE_REMOVED:
+          'The selected student is the group leader and cannot be removed. Keep them in the group.',
         REOPEN_CONFLICTS: 'Reopening this section would create student conflicts.',
         RESULTS_ALL_EXCLUDED: 'Every approved topic is excluded from publication.',
         RETRACT_ADMIN_REQUIRED: 'Only an administrator can retract published results.',
-        RETRACT_WINDOW_CLOSED: 'The retraction grace period has passed.',
+        RETRACT_WINDOW_CLOSED:
+          'The retraction period has ended. Use the per-topic appeal process for later corrections.',
         RETRACT_WINDOW_OPEN:
-          'The retraction grace period is still open — wait for it to end before closing this round.',
+          'The retraction period remains open through {end}. Wait until then before closing this round.',
         CLOSE_ADMIN_REQUIRED: 'Only an administrator can close a round.',
         REOPEN_ADMIN_REQUIRED: 'Only an administrator can reopen a closed round.',
-        REVIEW_WINDOW_OPEN: 'The counter-review window is still open for some topics.',
+        ROLE_FORBIDDEN:
+          'Your account role does not have access to this thesis information. Switch to an authorized account or ask an administrator to check your access.',
+        REVIEW_WINDOW_OPEN: 'Finish counter-reviews or wait until their deadlines pass.',
         SECTION_STATUS_CHANGED:
           'This section changed while the edit was open. Review the latest version and try again.',
         STUDENT_NOT_IN_GROUP: 'The student is not a member of this group.',
@@ -2788,6 +2800,14 @@ export const en = {
         DEFENSE_DATE_BEFORE_REPORT_DATE:
           'The defense date must be after the council report date.',
       },
+      deadlineExtensionRules: {
+        REPORT_DEADLINE_NOT_FUTURE: 'Choose a report deadline in the future.',
+        REPORT_DEADLINE_BEFORE_CURRENT: 'Choose a report deadline on or after {date}.',
+        GVPB_DEADLINE_NOT_FUTURE: 'Choose a counter-review deadline in the future.',
+        GVPB_DEADLINE_BEFORE_CURRENT: 'Choose a counter-review deadline on or after {date}.',
+        GVPB_DEADLINE_AFTER_REPORT_DATE:
+          'The counter-review deadline must be on or before the report date ({date}). Choose an earlier deadline.',
+      },
       created: 'Thesis round created successfully.',
       openProposals: 'Open topic proposals (GV)',
       openRegistration: 'Open registration',
@@ -2796,6 +2816,35 @@ export const en = {
       publishResults: 'Publish results',
       registrationOpened: 'Registration is now open.',
       registrationClosed: 'Registration is now closed.',
+      registrationWindowLabel: 'Registration',
+      registrationWindowExpired: 'Registration ended at {end}. Edit schedule to set a later end, then open registration.',
+      registrationWindowUnavailable: 'This round has no valid registration window. Edit schedule before opening it.',
+      registrationWindowNotStarted: 'Registration has not started. Wait until its scheduled start or restore as registration closed.',
+      restoreRegistrationWindowClosed: 'The saved registration window has ended. Choose Registration closed as the restore target.',
+      restoreRegistrationWindowNotStarted: 'The saved registration window has not started. Choose Registration closed or wait until its start.',
+      lateTopicRegistrationClosed: 'Registration ended at {end}; students cannot join this topic. Keep it for the next round.',
+      lateTopicRegistrationClosedBeforeOpen: 'Registration ended at {end}. Edit the schedule to extend it before opening registration, then add this topic.',
+      lateTopicRegistrationNotStarted: 'Registration starts {start}; wait until then to add a late topic.',
+      lateTopicRegistrationUnavailable: 'This round has no valid registration window. Edit the schedule before adding a late topic.',
+      lateTopicAvailable: 'A late topic can be added while students can register.',
+      registrationEarlyOpenBlocked: 'The lecturer submission window has not ended. Shorten it or wait before opening registration.',
+      unknownScheduleTime: 'not available',
+      openRegistrationEffectiveWindow: 'Effective window: {window}.',
+      openRegistrationEarlyHint: 'Registration starts {start}; opening now starts it immediately.',
+      openRegistrationAvailable: 'Registration can open now.',
+      checkingPublishReadiness: 'Checking publication requirements…',
+      publishPreviewUnavailable: 'Select “Publish results” to check readiness again; nothing publishes before confirmation.',
+      refreshPublishReadiness: 'Refresh readiness',
+      publishResultsAvailable: 'All publication requirements are satisfied.',
+      transitionFailure: 'Could not verify this round action. Refresh the round and try again.',
+      globalAdminRequired: 'Only a university-wide administrator can do this.',
+      retractWindowUnavailable: 'The retraction period could not be verified. Refresh the round.',
+      retractWindowClosed: 'The retraction period has ended.',
+      retractResultsAvailable: 'Results can be retracted during the grace period.',
+      closeRoundAvailable: 'This round can be closed.',
+      reopenRoundAvailable: 'This round can be reopened.',
+      deleteRoundAvailable: 'This empty round can be deleted.',
+      deleteRoundUnavailable: 'Only an empty Draft or Cancelled round can be deleted.',
       proposalsPublished: 'Proposals published successfully.',
       proposalsOpened: 'Topic proposal stage opened.',
       resultsPublished: 'Results published successfully.',
@@ -2860,6 +2909,8 @@ export const en = {
       reportDeadlineInvalid: 'Choose a deadline in the future.',
       reportDeadlineSuccess: 'Report deadline extended.',
       gvpbDeadlineExtend: 'Extend counter-review deadline',
+      gvpbExtensionAvailable: 'The counter-review deadline can be extended before the report date.',
+      gvpbExtensionReportDatePassed: 'The report date has passed ({date}); the counter-review deadline cannot be extended.',
       gvpbDeadlineModalTitle: 'Extend counter-review deadline',
       gvpbDeadlineModalDescription:
         'Counter-reviewers can submit scores until this time. The change is recorded in the audit trail.',
@@ -2911,7 +2962,8 @@ export const en = {
       closeRoundTitle: 'Close this round?',
       closeRoundHint: 'The round becomes read-only; results stay viewable and it can be reopened.',
       closeRoundConfirmLabel: 'Type the round name to confirm',
-      closeBlockedRetractWindow: 'Closing unlocks once the retraction grace period ends.',
+      closeBlockedRetractWindow: 'This round can be closed after {end}.',
+      closeStatusUnavailable: 'The round closing requirement could not be verified. Refresh the round before closing it.',
       roundClosed: 'Round closed.',
       reopenRound: 'Reopen',
       reopenRoundTitle: 'Reopen this round?',
@@ -3442,6 +3494,8 @@ export const vi: I18nMessages = {
         GROUP_MEMBER_REQUIRED: 'Chỉ thành viên trong nhóm mới thực hiện được thao tác này.',
         GROUP_OWNER_REQUIRED: 'Chỉ nhóm trưởng mới thực hiện được thao tác này.',
         REGISTRATION_WINDOW_CLOSED: 'Cửa sổ đăng ký của đợt này đã đóng.',
+        REGISTRATION_EARLY_OPEN_BLOCKED:
+          'Hạn nộp đề tài của giảng viên kết thúc lúc {end}. Hãy rút ngắn thời hạn đó hoặc chờ đến mốc này rồi mở đăng ký.',
         THESIS_ELIGIBILITY_NOT_MET:
           'Đăng ký khóa luận yêu cầu đủ tín chỉ tích lũy và CPA tối thiểu. Xem thẻ điều kiện để biết số liệu của bạn.',
         // Nộp tài liệu khóa luận (Word/PDF) và hạn nộp
@@ -3458,20 +3512,21 @@ export const vi: I18nMessages = {
         REPORT_ARTIFACT_REQUIRED:
           'Bài nộp cần một liên kết hoặc tài liệu đính kèm — hãy thêm một phần trước khi gỡ phần còn lại.',
         GROUP_STATE_CONFLICT: 'Nhóm hiện không ở trạng thái cho phép thao tác này.',
-        ROUND_STATE_CONFLICT: 'Đợt hiện không ở trạng thái cho phép thao tác này.',
+        ROUND_STATE_CONFLICT:
+          'Trạng thái đợt đã thay đổi. Hãy tải lại trang rồi chọn thao tác phù hợp với trạng thái hiện tại.',
         ROUND_RESTORE_MEMBER_CONFLICT:
-          'Một số sinh viên đã có suất tham gia ở đợt khác còn hiệu lực; khôi phục đợt này sẽ khiến họ có hai nhóm đang hoạt động.',
+          'Một số sinh viên đã có suất ở đợt khác còn hiệu lực. Hãy xử lý các lượt đăng ký đó rồi khôi phục đợt này.',
         ROUND_RESTORE_FROZEN_HISTORY:
-          'Đợt này chứa nhóm lịch sử đã đóng băng nên không thể mở lại.',
+          'Đợt này có nhóm lịch sử đã đóng băng nên không thể khôi phục. Hãy giữ đợt ở trạng thái đã hủy.',
         ROUND_RESTORE_TARGET_REQUIRED:
           'Đợt này bị hủy trước khi hệ thống ghi lại trạng thái trước đó — hãy chọn trạng thái khôi phục.',
         ROUND_RESTORE_TARGET_INVALID:
           'Trạng thái đó không phải đích khôi phục hợp lệ của đợt này.',
-        VALIDATION_ERROR: 'Một số giá trị đã nhập chưa hợp lệ. Hãy kiểm tra rồi thử lại.',
+        VALIDATION_ERROR: 'Hãy kiểm tra các trường bắt buộc, mốc thời gian và lý do rồi thử lại.',
         THESIS_ROUND_SCHEDULE_ORDER:
           'Các mốc thời gian của đợt chưa đúng thứ tự — hãy kiểm tra lại từng mốc.',
         // Kết quả và hội đồng
-        RESULTS_NOT_READY: 'Chưa có đề tài nào được chấm điểm; hội đồng cần chốt điểm trước.',
+        RESULTS_NOT_READY: 'Chưa có nhóm đã duyệt nào có điểm cuối cùng. Hãy duyệt nhóm và chốt điểm trước.',
         RESULTS_INCOMPLETE: 'Mọi nhóm đã được duyệt phải có điểm trước khi công bố kết quả.',
         SCORES_INCOMPLETE: 'Mọi nhóm đã được duyệt phải có điểm chính thức.',
         RESULTS_NOT_PUBLISHED: 'Kết quả của đợt này chưa được công bố.',
@@ -3510,6 +3565,8 @@ export const vi: I18nMessages = {
         REVIEWER_MUST_BE_INDEPENDENT:
           'Giảng viên phản biện không được ngồi trong hội đồng bảo vệ cùng đề tài.',
         REVIEWER_REQUIRED: 'Chỉ giảng viên phản biện được phân công mới được thực hiện thao tác này.',
+        REVIEW_SCORE_NOT_FOUND:
+          'Chưa có điểm phản biện. Hãy phân công giảng viên phản biện hoặc chờ giảng viên nộp điểm.',
         SUPERVISOR_CANNOT_REVIEW: 'Giảng viên hướng dẫn không thể làm phản biện chính đề tài mình.',
         GVPB_SCORE_SUBMITTED:
           'Giảng viên phản biện đã nộp điểm; phân công này đã bị khóa.',
@@ -3533,10 +3590,12 @@ export const vi: I18nMessages = {
         MEMBER_NOT_FOUND: 'Không tìm thấy thành viên nhóm.',
         REGISTRATION_WINDOW_NOT_OPEN: 'Đợt đăng ký mở lúc {opensAt}.',
         REPORT_FILE_NOT_FOUND: 'Tệp đính kèm của bài nộp không còn khả dụng.',
-        ROUND_HAS_DATA: 'Đợt vẫn còn dữ liệu khóa luận. Hãy hủy đợt thay vì xóa.',
+        ROUND_CLOSED:
+          'Đợt này không mở đăng ký nên không thể thay đổi nhóm. Hãy mở đăng ký nếu đợt còn ở bước phù hợp hoặc chọn một đợt đang mở.',
+        ROUND_HAS_DATA: 'Đợt vẫn còn dữ liệu khóa luận nên không thể xóa. Hãy hủy đợt để lưu trữ dữ liệu hoặc giữ đợt ở trạng thái đã hủy.',
         ROUND_NOT_ACCEPTING_PROPOSALS: 'Đợt này không nhận đề xuất đề tài.',
-        ROUND_NOT_DELETABLE: 'Chỉ có thể xóa đợt chưa mở hoặc đã hủy.',
-        ROUND_NOT_FOUND: 'Không tìm thấy đợt đăng ký.',
+        ROUND_NOT_DELETABLE: 'Chỉ xóa được đợt rỗng ở trạng thái Bản nháp hoặc Đã hủy. Hãy hủy đợt đang hoạt động nếu đợt rỗng; đợt đã công bố hoặc đã đóng phải được giữ lại.',
+        ROUND_NOT_FOUND: 'Đợt không còn tồn tại. Hãy tải lại danh sách.',
         SCORES_REQUIRED: 'Cần có điểm trước khi thực hiện bước này.',
         STUDENT_PROFILE_REQUIRED: 'Cần hồ sơ sinh viên đang hoạt động.',
         SUPERVISOR_STATE_CONFLICT: 'Danh sách hướng dẫn xung đột với thao tác này.',
@@ -3562,15 +3621,20 @@ export const vi: I18nMessages = {
           'Loại đợt này luôn yêu cầu giảng viên phản biện.',
         INVALID_NOTIFICATION_LINK: 'Liên kết thông báo không phải là đường dẫn nội bộ hợp lệ.',
         LEADER_SUCCESSOR_REQUIRED: 'Xóa nhóm trưởng cần chỉ định thành viên kế nhiệm.',
+        LEADER_CANNOT_BE_REMOVED:
+          'Sinh viên được chọn là nhóm trưởng nên không thể xóa khỏi nhóm. Hãy giữ sinh viên này trong nhóm.',
         REOPEN_CONFLICTS: 'Mở lại học phần này sẽ tạo xung đột cho sinh viên.',
         RESULTS_ALL_EXCLUDED: 'Tất cả đề tài đã duyệt đều bị loại khỏi công bố.',
         RETRACT_ADMIN_REQUIRED: 'Chỉ quản trị viên mới có thể thu hồi kết quả đã công bố.',
-        RETRACT_WINDOW_CLOSED: 'Đã hết thời hạn thu hồi kết quả.',
+        RETRACT_WINDOW_CLOSED:
+          'Đã hết thời hạn thu hồi kết quả. Hãy dùng quy trình khiếu nại từng đề tài để chỉnh sửa sau thời hạn này.',
         RETRACT_WINDOW_OPEN:
-          'Thời hạn thu hồi kết quả vẫn còn mở — hãy đợi hết hạn trước khi đóng đợt này.',
+          'Thời hạn thu hồi kết quả còn đến {end}. Hãy chờ qua mốc này rồi đóng đợt.',
         CLOSE_ADMIN_REQUIRED: 'Chỉ quản trị viên mới được đóng đợt.',
         REOPEN_ADMIN_REQUIRED: 'Chỉ quản trị viên mới được mở lại đợt đã đóng.',
-        REVIEW_WINDOW_OPEN: 'Cửa sổ phản biện vẫn đang mở cho một số đề tài.',
+        ROLE_FORBIDDEN:
+          'Vai trò tài khoản của bạn không được xem thông tin khóa luận này. Hãy dùng tài khoản có quyền phù hợp hoặc nhờ quản trị viên kiểm tra quyền truy cập.',
+        REVIEW_WINDOW_OPEN: 'Hãy hoàn tất phản biện hoặc chờ đến khi hết hạn phản biện.',
         SECTION_STATUS_CHANGED:
           'Lớp học phần đã thay đổi trong lúc chỉnh sửa. Hãy xem lại phiên bản mới nhất rồi thử lại.',
         STUDENT_NOT_IN_GROUP: 'Sinh viên không thuộc nhóm này.',
@@ -6032,6 +6096,14 @@ export const vi: I18nMessages = {
         DEFENSE_DATE_BEFORE_REPORT_DATE:
           'Ngày bảo vệ phải sau ngày báo cáo hội đồng.',
       },
+      deadlineExtensionRules: {
+        REPORT_DEADLINE_NOT_FUTURE: 'Hãy chọn hạn nộp báo cáo ở thời điểm trong tương lai.',
+        REPORT_DEADLINE_BEFORE_CURRENT: 'Hãy chọn hạn nộp báo cáo từ {date} trở đi.',
+        GVPB_DEADLINE_NOT_FUTURE: 'Hãy chọn hạn phản biện ở thời điểm trong tương lai.',
+        GVPB_DEADLINE_BEFORE_CURRENT: 'Hãy chọn hạn phản biện từ {date} trở đi.',
+        GVPB_DEADLINE_AFTER_REPORT_DATE:
+          'Hạn phản biện phải trước hoặc bằng ngày báo cáo ({date}). Hãy chọn mốc sớm hơn.',
+      },
       created: 'Đã tạo đợt luận văn thành công.',
       openProposals: 'Mở đăng ký đề tài (GV)',
       openRegistration: 'Mở đăng ký',
@@ -6040,6 +6112,35 @@ export const vi: I18nMessages = {
       publishResults: 'Công bố kết quả',
       registrationOpened: 'Đã mở đăng ký.',
       registrationClosed: 'Đã đóng đăng ký.',
+      registrationWindowLabel: 'Đăng ký',
+      registrationWindowExpired: 'Đăng ký kết thúc lúc {end}. Hãy sửa lịch đợt để đặt mốc kết thúc muộn hơn rồi mở đăng ký.',
+      registrationWindowUnavailable: 'Đợt chưa có khung đăng ký hợp lệ. Hãy sửa lịch đợt trước khi mở đăng ký.',
+      registrationWindowNotStarted: 'Đăng ký chưa bắt đầu. Hãy chờ đến mốc đã lập hoặc khôi phục đợt ở trạng thái đã đóng đăng ký.',
+      restoreRegistrationWindowClosed: 'Khung đăng ký đã kết thúc. Hãy chọn trạng thái Đã đóng đăng ký khi khôi phục.',
+      restoreRegistrationWindowNotStarted: 'Khung đăng ký chưa bắt đầu. Hãy chọn trạng thái Đã đóng đăng ký hoặc chờ đến mốc bắt đầu.',
+      lateTopicRegistrationClosed: 'Đăng ký kết thúc lúc {end}; sinh viên không thể chọn đề tài này. Hãy để đề tài sang đợt kế tiếp.',
+      lateTopicRegistrationClosedBeforeOpen: 'Đăng ký kết thúc lúc {end}. Hãy sửa lịch để gia hạn trước khi mở đăng ký, rồi thêm đề tài này.',
+      lateTopicRegistrationNotStarted: 'Đăng ký bắt đầu lúc {start}; hãy chờ đến mốc này rồi thêm đề tài muộn.',
+      lateTopicRegistrationUnavailable: 'Đợt chưa có khung đăng ký hợp lệ. Hãy sửa lịch trước khi thêm đề tài muộn.',
+      lateTopicAvailable: 'Có thể thêm đề tài muộn khi sinh viên còn đăng ký được.',
+      registrationEarlyOpenBlocked: 'Cửa sổ nộp đề tài của giảng viên chưa kết thúc. Hãy rút ngắn thời hạn hoặc chờ rồi mở đăng ký.',
+      unknownScheduleTime: 'chưa xác định',
+      openRegistrationEffectiveWindow: 'Khung đăng ký sẽ áp dụng: {window}.',
+      openRegistrationEarlyHint: 'Đăng ký dự kiến bắt đầu lúc {start}; mở ngay sẽ bắt đầu đăng ký lập tức.',
+      openRegistrationAvailable: 'Có thể mở đăng ký.',
+      checkingPublishReadiness: 'Đang kiểm tra điều kiện công bố…',
+      publishPreviewUnavailable: 'Chọn “Công bố kết quả” để kiểm tra lại; hệ thống chưa công bố trước khi xác nhận.',
+      refreshPublishReadiness: 'Kiểm tra lại điều kiện',
+      publishResultsAvailable: 'Đã đáp ứng các điều kiện công bố.',
+      transitionFailure: 'Chưa xác minh được thao tác của đợt. Hãy tải lại đợt rồi thử lại.',
+      globalAdminRequired: 'Chỉ quản trị viên toàn trường mới có thể thực hiện thao tác này.',
+      retractWindowUnavailable: 'Chưa xác minh được thời hạn thu hồi. Hãy tải lại đợt.',
+      retractWindowClosed: 'Đã hết thời hạn thu hồi kết quả.',
+      retractResultsAvailable: 'Có thể thu hồi kết quả trong thời hạn cho phép.',
+      closeRoundAvailable: 'Có thể đóng đợt này.',
+      reopenRoundAvailable: 'Có thể mở lại đợt này.',
+      deleteRoundAvailable: 'Có thể xóa đợt rỗng này.',
+      deleteRoundUnavailable: 'Chỉ xóa được đợt rỗng ở trạng thái Bản nháp hoặc Đã hủy.',
       proposalsPublished: 'Đã công bố đề tài thành công.',
       proposalsOpened: 'Đã mở giai đoạn đề tài.',
       resultsPublished: 'Đã công bố kết quả thành công.',
@@ -6104,6 +6205,8 @@ export const vi: I18nMessages = {
       reportDeadlineInvalid: 'Hãy chọn thời điểm trong tương lai.',
       reportDeadlineSuccess: 'Đã gia hạn hạn nộp báo cáo.',
       gvpbDeadlineExtend: 'Gia hạn chấm phản biện',
+      gvpbExtensionAvailable: 'Có thể gia hạn hạn phản biện trước ngày báo cáo.',
+      gvpbExtensionReportDatePassed: 'Ngày báo cáo đã qua ({date}); không thể gia hạn hạn phản biện.',
       gvpbDeadlineModalTitle: 'Gia hạn hạn chấm phản biện',
       gvpbDeadlineModalDescription:
         'Giảng viên phản biện có thể nộp điểm đến thời điểm này. Thay đổi được ghi vào nhật ký kiểm toán.',
@@ -6155,7 +6258,8 @@ export const vi: I18nMessages = {
       closeRoundTitle: 'Đóng đợt này?',
       closeRoundHint: 'Đợt sẽ chuyển sang chỉ đọc; kết quả vẫn xem được và có thể mở lại sau.',
       closeRoundConfirmLabel: 'Nhập tên đợt để xác nhận',
-      closeBlockedRetractWindow: 'Có thể đóng sau khi hết thời hạn thu hồi kết quả.',
+      closeBlockedRetractWindow: 'Có thể đóng đợt này sau {end}.',
+      closeStatusUnavailable: 'Chưa xác minh được điều kiện đóng đợt. Hãy tải lại đợt trước khi đóng.',
       roundClosed: 'Đã đóng đợt.',
       reopenRound: 'Mở lại',
       reopenRoundTitle: 'Mở lại đợt này?',
