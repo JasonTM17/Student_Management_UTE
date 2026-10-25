@@ -160,6 +160,26 @@ public class ThesisScopeRepository {
                 UUID.class);
     }
 
+    /**
+     * Topics a student took part in through an approved group — after results
+     * publication these are the only topic outcomes a student may read, the
+     * same participation scope {@code /me/results} applies.
+     */
+    public List<UUID> findParticipatedTopicIds(String studentId, List<UUID> topicIds) {
+        if (topicIds.isEmpty()) {
+            return List.of();
+        }
+        return jdbc.queryForList(
+                "SELECT DISTINCT g.topic_id FROM thesis.thesis_group g "
+                        + "JOIN thesis.thesis_group_member m ON m.group_id = g.id "
+                        + "WHERE m.student_id = :studentId AND g.approval_status = 'APPROVED' "
+                        + "AND g.topic_id IN (:topicIds)",
+                new MapSqlParameterSource()
+                        .addValue("studentId", studentId)
+                        .addValue("topicIds", topicIds),
+                UUID.class);
+    }
+
     public Integer countCouncilGrader(UUID topicId, String lecturerId) {
         return jdbc.queryForObject(
                 "SELECT COUNT(*) FROM thesis.thesis_council_topic ct "
