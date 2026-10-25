@@ -146,7 +146,20 @@ class ThesisGovernanceIntegrationTest {
                                 .replace("\"lecturerSubmitEnd\":\"2027-01-15T00:00:00Z\"",
                                         "\"lecturerSubmitEnd\":\"2027-01-20T00:00:00Z\""))
                         .with(truongKhoaJwt()))
-                .andExpect(status().isBadRequest());
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("THESIS_ROUND_SCHEDULE_ORDER"))
+                .andExpect(jsonPath("$.details.rule").value("REGISTRATION_START_BEFORE_LECTURER_END"));
+
+        // Each window must also end strictly after it starts.
+        mvc.perform(post("/api/v1/thesis/rounds")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(validRoundBody("KLTN", "Gov Round Inverted Window")
+                                .replace("\"registrationEnd\":\"2027-02-15T00:00:00Z\"",
+                                        "\"registrationEnd\":\"2027-01-10T00:00:00Z\""))
+                        .with(truongKhoaJwt()))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("THESIS_ROUND_SCHEDULE_ORDER"))
+                .andExpect(jsonPath("$.details.rule").value("REGISTRATION_WINDOW"));
 
         mvc.perform(post("/api/v1/thesis/rounds")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -155,6 +168,20 @@ class ThesisGovernanceIntegrationTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.thesisType").value("KLTN"))
                 .andExpect(jsonPath("$.status").value("DRAFT"));
+
+        // The update path names the violated rule the same way.
+        UUID validId = jdbc.queryForObject(
+                "SELECT id FROM thesis.thesis_registration_round WHERE name = 'Gov Round Valid'",
+                UUID.class);
+        mvc.perform(put("/api/v1/thesis/rounds/{id}", validId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(validRoundBody("KLTN", "Gov Round Valid")
+                                .replace("\"registrationStart\":\"2027-01-15T00:00:00Z\"",
+                                        "\"registrationStart\":\"2027-01-14T00:00:00Z\""))
+                        .with(truongKhoaJwt()))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("THESIS_ROUND_SCHEDULE_ORDER"))
+                .andExpect(jsonPath("$.details.rule").value("REGISTRATION_START_BEFORE_LECTURER_END"));
     }
 
     @Test
