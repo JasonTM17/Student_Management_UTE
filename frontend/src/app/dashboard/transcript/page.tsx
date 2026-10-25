@@ -568,6 +568,7 @@ export default function TranscriptPage() {
           <StudentUteProfileGradeView
             transcriptSemesters={transcriptSemesters}
             curriculumData={curriculumData}
+            totalCreditsEarned={transcriptData?.summary?.totalCreditsEarned}
             selectedSemesterId={selectedSemester}
             onSemesterChange={setSelectedSemester}
             studentCode={studentCode}
