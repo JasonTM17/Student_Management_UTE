@@ -96,6 +96,39 @@ public class ThesisScopeRepository {
                 new MapSqlParameterSource("topicId", topicId), BigDecimal.class);
     }
 
+    /**
+     * Display names for the score-breakdown read model, keyed by every stored
+     * key form. Score and roster rows may carry either a Lecturer.id or a
+     * legacy User.id, so both keys map to the same resolved "last first" name;
+     * an unresolved id simply never appears in the map.
+     */
+    public Map<String, String> findLecturerDisplayNames(List<String> storedIds) {
+        if (storedIds == null || storedIds.isEmpty()) {
+            return Map.of();
+        }
+        List<Map<String, Object>> rows = jdbc.queryForList(
+                "SELECT l.\"id\" AS lid, l.\"userId\" AS uid, u.\"firstName\", u.\"lastName\" "
+                        + "FROM campuscore_auth.\"Lecturer\" l "
+                        + "JOIN campuscore_auth.\"User\" u ON u.\"id\" = l.\"userId\" "
+                        + "WHERE l.\"id\" IN (:ids) OR l.\"userId\" IN (:ids)",
+                new MapSqlParameterSource("ids", storedIds));
+        Map<String, String> names = new java.util.HashMap<>();
+        for (Map<String, Object> row : rows) {
+            String first = row.get("firstName") == null ? "" : row.get("firstName").toString().trim();
+            String last = row.get("lastName") == null ? "" : row.get("lastName").toString().trim();
+            String name = (last + " " + first).trim();
+            Object lid = row.get("lid");
+            Object uid = row.get("uid");
+            if (lid != null) {
+                names.put(lid.toString(), name);
+            }
+            if (uid != null) {
+                names.put(uid.toString(), name);
+            }
+        }
+        return names;
+    }
+
     public List<String> findDepartmentIdsInFaculty(String facultyId) {
         return jdbc.queryForList(
                 "SELECT \"id\" FROM academic.\"Department\" WHERE \"facultyId\" = :facultyId",
