@@ -17,10 +17,10 @@ import java.time.Instant;
 public class ArticleCategory {
 
     @Id
-    @Column(nullable = false, length = 64)
+    @Column(nullable = false, length = 60)
     private String id;
 
-    @Column(nullable = false, length = 32, unique = true)
+    @Column(nullable = false, length = 40, unique = true)
     private String code;
 
     @Column(name = "\"nameVi\"", nullable = false, length = 120)
@@ -35,10 +35,10 @@ public class ArticleCategory {
     @Column(length = 500)
     private String description;
 
-    @Column(name = "\"colorTone\"", nullable = false, length = 32)
+    @Column(name = "\"colorTone\"", nullable = false, length = 30)
     private String colorTone;
 
-    @Column(name = "\"iconType\"", nullable = false, length = 64)
+    @Column(name = "\"iconType\"", nullable = false, length = 40)
     private String iconType;
 
     @Column(name = "\"displayOrder\"", nullable = false)
