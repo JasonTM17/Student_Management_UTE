@@ -262,6 +262,15 @@ public class AnnouncementWriteRepository {
         return count != null && count > 0;
     }
 
+    public Optional<String> findLecturerDepartmentId(String lecturerId) {
+        if (lecturerId == null || lecturerId.isBlank()) return Optional.empty();
+        List<String> departmentIds = jdbc.query(
+                "SELECT \"departmentId\" FROM \"academic\".\"Lecturer\" WHERE \"id\" = :lecturerId",
+                new MapSqlParameterSource("lecturerId", lecturerId),
+                (resultSet, rowNumber) -> resultSet.getString("departmentId"));
+        return departmentIds.isEmpty() ? Optional.empty() : Optional.ofNullable(departmentIds.get(0));
+    }
+
     /**
      * Loads an announcement while holding its row lock for the surrounding transaction.
      * Mutation services use this read before the CAS write so the audit snapshots cannot
