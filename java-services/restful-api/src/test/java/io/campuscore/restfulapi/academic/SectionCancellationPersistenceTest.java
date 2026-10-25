@@ -1048,6 +1048,7 @@ class SectionCancellationPersistenceTest {
                     "sectionId" VARCHAR(120) NOT NULL,
                     "semesterId" VARCHAR(120) NOT NULL,
                     "status" VARCHAR(40) NOT NULL,
+                    "registrationSource" VARCHAR(40),
                     "enrolledAt" TIMESTAMP NOT NULL,
                     "droppedAt" TIMESTAMP,
                     "gradeStatus" VARCHAR(40) NOT NULL,

@@ -20,6 +20,8 @@ class CreditLimitOverrideTest {
         CreditLimitApplicationService service = new CreditLimitApplicationService(null, 999);
         assertThat(service.effectiveLimit("any-student", Map.of("credit_limit", 28))).isEqualTo(999);
         assertThat(service.effectiveLimit("any-student", Map.of())).isEqualTo(999);
+        assertThat(service.effectiveLimit("any-student", Map.of("credit_limit", 28, "semester_type", "SUMMER")))
+                .isEqualTo(10);
     }
 
     @Test

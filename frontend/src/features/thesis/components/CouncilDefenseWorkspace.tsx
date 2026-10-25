@@ -305,7 +305,6 @@ export default function CouncilDefenseWorkspace({
                                 min="0"
                                 max="10"
                                 step="0.1"
-                                placeholder="8.5"
                                 value={draftScores[key] ?? ''}
                                 onChange={(e) =>
                                   onScoreDraftChange(key, e.target.value)
