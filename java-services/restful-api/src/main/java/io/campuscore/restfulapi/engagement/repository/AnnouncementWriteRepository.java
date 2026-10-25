@@ -33,7 +33,7 @@ public class AnnouncementWriteRepository {
 
     private static final String TABLE = "\"engagement\".\"Announcement\"";
     private static final String SELECT_COLUMNS = """
-            "id", "title", "content", "priority", "targetRoles", "targetYears",
+            "id", "title", "content", "priority", "targetRoles", "targetYears", "targetDepartments",
             "isGlobal", "publishAt", "expiresAt", "publishedBy", "semesterId",
             "semesterName", "sectionId", "sectionNumber", "courseCode", "courseName",
             "lecturerId", "lecturerDisplayName", "createdAt", "updatedAt",
@@ -50,11 +50,11 @@ public class AnnouncementWriteRepository {
         jdbc.getJdbcOperations().execute((ConnectionCallback<Void>) connection -> {
             try (PreparedStatement statement = connection.prepareStatement("""
                     INSERT INTO "engagement"."Announcement" (
-                        "id", "title", "content", "priority", "targetRoles", "targetYears",
+                        "id", "title", "content", "priority", "targetRoles", "targetYears", "targetDepartments",
                         "isGlobal", "publishAt", "expiresAt", "publishedBy", "semesterId",
                         "semesterName", "sectionId", "sectionNumber", "courseCode", "courseName",
                         "lecturerId", "lecturerDisplayName", "createdAt", "updatedAt"
-                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, ?, NULL, NULL, NULL, ?, NULL, ?, ?)
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, ?, NULL, NULL, NULL, ?, NULL, ?, ?)
                     """)) {
                 statement.setString(1, command.id());
                 statement.setString(2, command.title());
@@ -62,15 +62,16 @@ public class AnnouncementWriteRepository {
                 statement.setString(4, command.priority());
                 statement.setArray(5, connection.createArrayOf("VARCHAR", command.targetRoles().toArray()));
                 statement.setArray(6, connection.createArrayOf("INTEGER", command.targetYears().toArray()));
-                statement.setBoolean(7, command.isGlobal());
-                timestamp(statement, 8, command.publishAt());
-                timestamp(statement, 9, command.expiresAt());
-                statement.setString(10, command.publishedBy());
-                statement.setString(11, command.semesterId());
-                statement.setString(12, command.sectionId());
-                statement.setString(13, command.lecturerId());
-                timestamp(statement, 14, command.createdAt());
+                statement.setArray(7, connection.createArrayOf("VARCHAR", command.targetDepartments().toArray()));
+                statement.setBoolean(8, command.isGlobal());
+                timestamp(statement, 9, command.publishAt());
+                timestamp(statement, 10, command.expiresAt());
+                statement.setString(11, command.publishedBy());
+                statement.setString(12, command.semesterId());
+                statement.setString(13, command.sectionId());
+                statement.setString(14, command.lecturerId());
                 timestamp(statement, 15, command.createdAt());
+                timestamp(statement, 16, command.createdAt());
                 statement.executeUpdate();
             }
             return null;
@@ -87,6 +88,7 @@ public class AnnouncementWriteRepository {
         addString(assignments, binders, "priority", command.priority());
         addStringArray(assignments, binders, "targetRoles", command.targetRoles());
         addIntegerArray(assignments, binders, "targetYears", command.targetYears());
+        addStringArray(assignments, binders, "targetDepartments", command.targetDepartments());
         addBoolean(assignments, binders, "isGlobal", command.isGlobal());
         addInstant(assignments, binders, "publishAt", command.publishAt());
         addInstant(assignments, binders, "expiresAt", command.expiresAt());
@@ -411,6 +413,7 @@ public class AnnouncementWriteRepository {
                 resultSet.getString("priority"),
                 stringList(resultSet.getArray("targetRoles")),
                 integerList(resultSet.getArray("targetYears")),
+                stringList(resultSet.getArray("targetDepartments")),
                 resultSet.getBoolean("isGlobal"),
                 instant(resultSet, "publishAt"),
                 instant(resultSet, "expiresAt"),

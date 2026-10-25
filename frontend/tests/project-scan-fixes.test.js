@@ -711,8 +711,8 @@ test('attendance ships both route twins on the attendance API', () => {
 
   // Every visible string lives in the message catalog, in both blocks.
   const messages = read('src/i18n/messages.ts');
-  assert.match(messages, /statsPresentRateHint: 'present sessions ÷ recorded sessions'/);
-  assert.match(messages, /statsPresentRateHint: 'số phiên có mặt ÷ số phiên đã ghi'/);
+  assert.match(messages, /statsPresentRateHint: 'present or late ÷ present, late, or absent sessions; excused excluded'/);
+  assert.match(messages, /statsPresentRateHint: 'phiên có mặt hoặc đi muộn ÷ phiên có mặt, đi muộn hoặc vắng; không tính vắng có phép'/);
   assert.match(messages, /tableTitle: 'Attendance records'/);
   assert.match(messages, /tableTitle: 'Bản ghi điểm danh'/);
 });

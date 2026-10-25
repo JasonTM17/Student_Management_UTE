@@ -3,6 +3,7 @@ package io.campuscore.restfulapi.academic.repository;
 import io.campuscore.restfulapi.academic.model.AttendanceRow;
 import io.campuscore.restfulapi.academic.model.EnrollmentStatuses;
 import io.campuscore.restfulapi.academic.model.RosterRow;
+import io.campuscore.restfulapi.academic.model.SectionStudentRateRow;
 import io.campuscore.restfulapi.academic.model.SectionSummaryRow;
 import io.campuscore.restfulapi.academic.model.StudentSummaryRow;
 import java.sql.ResultSet;
@@ -172,6 +173,41 @@ public class AcademicAttendanceReadRepository {
                 AcademicAttendanceReadRepository::mapRoster);
     }
 
+    /**
+     * Per-student presence counters for the section's advisory eligibility
+     * signal, scoped to the same markable roster as
+     * {@link #findSectionAttendanceRoster} — WITHDRAWN released the seat and
+     * never enters the at-risk list even though its old attendance rows stay
+     * in the table.
+     */
+    public List<SectionStudentRateRow> sectionStudentRates(String sectionId) {
+        return jdbc.query(
+                "SELECT a.\"studentId\", student.\"studentId\" AS student_number,"
+                        + " student_user.\"firstName\" AS student_first_name,"
+                        + " student_user.\"lastName\" AS student_last_name,"
+                        + " SUM(CASE WHEN a.\"status\" = 'PRESENT' THEN 1 ELSE 0 END) AS present,"
+                        + " SUM(CASE WHEN a.\"status\" = 'LATE' THEN 1 ELSE 0 END) AS late,"
+                        + " SUM(CASE WHEN a.\"status\" = 'ABSENT' THEN 1 ELSE 0 END) AS absent"
+                        + " FROM " + ATTENDANCE + " a"
+                        + " JOIN " + STUDENT + " student ON student.\"id\" = a.\"studentId\""
+                        + " JOIN " + USER + " student_user ON student_user.\"id\" = student.\"userId\""
+                        + " WHERE a.\"sectionId\" = :sectionId"
+                        + " AND EXISTS (SELECT 1 FROM (SELECT \"studentId\","
+                        + " ROW_NUMBER() OVER (PARTITION BY \"studentId\""
+                        + " ORDER BY \"enrolledAt\" DESC, \"id\" DESC) AS roster_rank"
+                        + " FROM " + ENROLLMENT
+                        + " WHERE \"sectionId\" = :sectionId"
+                        + " AND \"status\" IN " + EnrollmentStatuses.ACTIVE_STATUS_PREDICATE
+                        + ") enrollment WHERE enrollment.\"studentId\" = a.\"studentId\""
+                        + " AND enrollment.roster_rank = 1)"
+                        + " GROUP BY a.\"studentId\", student.\"studentId\","
+                        + " student_user.\"firstName\", student_user.\"lastName\""
+                        + " ORDER BY student_user.\"firstName\" ASC, student_user.\"lastName\" ASC,"
+                        + " a.\"studentId\" ASC",
+                new MapSqlParameterSource("sectionId", sectionId),
+                AcademicAttendanceReadRepository::mapSectionStudentRate);
+    }
+
     public Optional<AttendanceRow> findById(String id) {
         return jdbc.query(attendanceSelect() + " WHERE a.\"id\" = :id",
                         new MapSqlParameterSource("id", id),
@@ -325,6 +361,17 @@ public class AcademicAttendanceReadRepository {
                 rs.getLong("absent"),
                 rs.getLong("late"),
                 rs.getLong("excused"));
+    }
+
+    private static SectionStudentRateRow mapSectionStudentRate(ResultSet rs, int ignored) throws SQLException {
+        return new SectionStudentRateRow(
+                rs.getString("studentId"),
+                rs.getString("student_number"),
+                rs.getString("student_first_name"),
+                rs.getString("student_last_name"),
+                rs.getLong("present"),
+                rs.getLong("late"),
+                rs.getLong("absent"));
     }
 
     private static SectionSummaryRow mapSectionSummary(ResultSet rs, int ignored) throws SQLException {

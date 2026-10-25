@@ -116,6 +116,7 @@ class AnnouncementWritePersistenceTest {
                     "priority" VARCHAR(20) NOT NULL,
                     "targetRoles" VARCHAR ARRAY NOT NULL,
                     "targetYears" INTEGER ARRAY NOT NULL,
+                    "targetDepartments" VARCHAR ARRAY NOT NULL DEFAULT ARRAY[],
                     "isGlobal" BOOLEAN NOT NULL,
                     "publishAt" TIMESTAMP WITH TIME ZONE,
                     "expiresAt" TIMESTAMP WITH TIME ZONE,
@@ -137,6 +138,25 @@ class AnnouncementWritePersistenceTest {
                     "notifiedAt" TIMESTAMP WITH TIME ZONE
                 )
                 """);
+        jdbc.execute("""
+                CREATE TABLE IF NOT EXISTS academic."Curriculum" (
+                    "id" VARCHAR(120) PRIMARY KEY,
+                    "departmentId" VARCHAR(120)
+                )
+                """);
+        jdbc.execute("""
+                CREATE TABLE IF NOT EXISTS academic."Lecturer" (
+                    "id" VARCHAR(120) PRIMARY KEY,
+                    "departmentId" VARCHAR(120)
+                )
+                """);
+        jdbc.execute("""
+                CREATE TABLE IF NOT EXISTS academic."Student" (
+                    "id" VARCHAR(120) PRIMARY KEY,
+                    "curriculumId" VARCHAR(120)
+                )
+                """);
+        jdbc.execute("ALTER TABLE academic.\"Student\" ADD COLUMN IF NOT EXISTS \"curriculumId\" VARCHAR(120)");
         jdbc.execute("""
                 CREATE TABLE "engagement"."AnnouncementAudit" (
                     "id" VARCHAR(120) PRIMARY KEY,

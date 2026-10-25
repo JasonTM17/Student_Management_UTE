@@ -6,6 +6,7 @@ import { WorkspaceForbiddenState } from '@/components/ProtectedRoute';
 import { metricToneClass, type StatusTone } from '@/components/ui/status';
 import { useRequireAuth } from '@/context/AuthContext';
 import { attendanceApi, type AttendanceRecord, type AttendanceSummary } from '@/lib/api';
+import { calculateAttendanceRate } from '@/lib/attendance-rate';
 import { getLocalizedFlatLabel } from '@/lib/academic-content';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { PageHeader, SectionEyebrow } from '@/components/ui/page-header';
@@ -91,12 +92,8 @@ export default function AttendancePage() {
       }),
       base,
     );
-    // Weighted across sections: present ÷ all recorded sessions. The label
-    // says exactly that so the card never claims a server-side rate that
-    // counts late or excused sessions differently.
-    const presentRate =
-      summed.total > 0 ? Math.round((summed.present / summed.total) * 100) : null;
-    return { ...summed, presentRate };
+    const attendanceRate = calculateAttendanceRate(summed);
+    return { ...summed, attendanceRate };
   }, [summary]);
 
   const recentRecords = useMemo(() => {
@@ -143,6 +140,22 @@ export default function AttendancePage() {
   const courseName = (row: AttendanceSummary) =>
     getLocalizedFlatLabel(locale, row.courseName, row.courseNameEn, row.courseNameVi, row.courseCode);
 
+  // Advisory exam-eligibility signal: calm status text, never a popup, and
+  // nothing here ever blocks an exam or registration — the copy says so.
+  const eligibility = (row: AttendanceSummary) => {
+    const signal = (row.examEligibility ?? '').toUpperCase();
+    if (signal === 'AT_RISK') {
+      return { label: copy.eligibility.atRisk, tone: 'text-status-warning' };
+    }
+    if (signal === 'INSUFFICIENT_DATA') {
+      return { label: copy.eligibility.insufficient, tone: 'text-muted-foreground' };
+    }
+    if (signal === 'OK') {
+      return { label: copy.eligibility.ok, tone: 'text-status-success' };
+    }
+    return null;
+  };
+
   if (authLoading) {
     return <LoadingState label={copy.loading} />;
   }
@@ -183,13 +196,13 @@ export default function AttendancePage() {
                 <div>
                   <div className="text-sm text-muted-foreground">{copy.statsPresentRate}</div>
                   <div className="mt-1 text-3xl font-semibold tracking-tight text-foreground">
-                    {totals.presentRate === null ? '—' : `${formatNumber(totals.presentRate)}%`}
+                    {totals.attendanceRate === null ? '—' : `${formatNumber(totals.attendanceRate)}%`}
                   </div>
                   <div className="mt-1 text-xs text-muted-foreground">
                     {copy.statsPresentRateHint}
                   </div>
                 </div>
-                <div className={`flex h-11 w-11 items-center justify-center rounded-lg ${metricToneClass(totals.presentRate === null ? 'neutral' : rateTone(totals.presentRate))}`}>
+                <div className={`flex h-11 w-11 items-center justify-center rounded-lg ${metricToneClass(totals.attendanceRate === null ? 'neutral' : rateTone(totals.attendanceRate))}`}>
                   <CalendarCheck className="h-5 w-5" />
                 </div>
               </CardContent>
@@ -268,6 +281,15 @@ export default function AttendancePage() {
                           {formatNumber(row.attendanceRate)}%
                         </span>
                       </div>
+                      {eligibility(row) ? (
+                        <p
+                          role="status"
+                          title={copy.eligibility.hint}
+                          className={`mt-2 text-xs font-medium ${eligibility(row)!.tone}`}
+                        >
+                          {copy.eligibility.label}: {eligibility(row)!.label}
+                        </p>
+                      ) : null}
                       <div className="mt-3 h-2 w-full overflow-hidden rounded-full bg-secondary">
                         <div
                           className={`h-full rounded-full ${rateFillClass(row.attendanceRate)} transition-all duration-300`}
@@ -358,6 +380,15 @@ export default function AttendancePage() {
                                 {formatNumber(row.attendanceRate)}%
                               </span>
                             </div>
+                            {eligibility(row) ? (
+                              <p
+                                role="status"
+                                title={copy.eligibility.hint}
+                                className={`mt-1 text-right text-xs font-medium ${eligibility(row)!.tone}`}
+                              >
+                                {eligibility(row)!.label}
+                              </p>
+                            ) : null}
                           </td>
                         </tr>
                       ))}
