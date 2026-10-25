@@ -122,6 +122,47 @@ class ThesisRoundRegistrationScheduleTest {
     }
 
     @Test
+    void studentActionBeforeTheStoredWindowNamesWhenRegistrationOpens() throws Exception {
+        // A round can sit in REGISTRATION_OPEN while the stored window has not
+        // started (legacy data or a restored row): the refusal must say when
+        // registration opens, not that it "closed".
+        ensureActiveStudent("rs-early-student", "rs-user-early-student");
+        Instant start = Instant.now().plusSeconds(3L * 24 * 60 * 60);
+        insertOpenRound("rs Open Early Window", start, start.plusSeconds(14L * 24 * 60 * 60));
+
+        UUID roundId = jdbc.queryForObject(
+                "SELECT id FROM thesis.thesis_registration_round WHERE name = ?",
+                UUID.class, "rs Open Early Window");
+        mvc.perform(post("/api/v1/thesis/groups")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"roundId\":\"" + roundId + "\"}")
+                        .with(studentJwt("rs-early-student")))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("REGISTRATION_WINDOW_NOT_OPEN"))
+                .andExpect(jsonPath("$.details.opensAt").isString());
+    }
+
+    @Test
+    void studentActionAfterTheStoredWindowReportsItClosed() throws Exception {
+        // An open round whose stored end already passed must keep answering
+        // REGISTRATION_WINDOW_CLOSED — the stale-open state the transition
+        // gate prevents is exactly what this guard catches for seeded data.
+        ensureActiveStudent("rs-late-student", "rs-user-late-student");
+        Instant end = Instant.now().minusSeconds(86_400);
+        insertOpenRound("rs Open Expired Window", end.minusSeconds(14L * 24 * 60 * 60), end);
+
+        UUID roundId = jdbc.queryForObject(
+                "SELECT id FROM thesis.thesis_registration_round WHERE name = ?",
+                UUID.class, "rs Open Expired Window");
+        mvc.perform(post("/api/v1/thesis/groups")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"roundId\":\"" + roundId + "\"}")
+                        .with(studentJwt("rs-late-student")))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("REGISTRATION_WINDOW_CLOSED"));
+    }
+
+    @Test
     void jumpingStraightToRegistrationStillReportsTheStateConflictFirst() throws Exception {
         // The schedule gate must not displace the state machine: the phase order
         // is the more fundamental error and keeps its own code.
@@ -179,6 +220,29 @@ class ThesisRoundRegistrationScheduleTest {
         UUID roundId = jdbc.queryForObject(
                 "SELECT id FROM thesis.thesis_registration_round WHERE name = ?", UUID.class, name);
         assertThat(roundId).isNotNull();
+        return roundId;
+    }
+
+    /**
+     * Seeds a round already in REGISTRATION_OPEN with an authored window —
+     * the API cannot produce this state today (the transition enforces a live
+     * window), which is exactly the stale combination the mutation guard must
+     * still describe correctly.
+     */
+    private UUID insertOpenRound(String name, Instant registrationStart, Instant registrationEnd) {
+        UUID roundId = UUID.randomUUID();
+        jdbc.update(
+                "INSERT INTO thesis.thesis_registration_round "
+                        + "(id, name, thesis_type, lecturer_submit_start, lecturer_submit_end, "
+                        + "registration_start, registration_end, gvpb_deadline, report_date, status) "
+                        + "VALUES (?, ?, 'KLTN', ?, ?, ?, ?, ?, ?, 'REGISTRATION_OPEN')",
+                roundId, name,
+                java.sql.Timestamp.from(registrationStart.minusSeconds(20L * 24 * 60 * 60)),
+                java.sql.Timestamp.from(registrationStart.minusSeconds(6L * 24 * 60 * 60)),
+                java.sql.Timestamp.from(registrationStart),
+                java.sql.Timestamp.from(registrationEnd),
+                java.sql.Timestamp.from(registrationEnd.plusSeconds(86_400)),
+                java.sql.Timestamp.from(registrationEnd.plusSeconds(2 * 86_400)));
         return roundId;
     }
 
