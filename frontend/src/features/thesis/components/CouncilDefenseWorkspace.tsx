@@ -15,6 +15,7 @@ import {
   type ThesisTopic,
 } from '@/lib/thesis-api';
 import { fillCopy } from '@/features/thesis/components/thesis-helpers';
+import ScoreBreakdownPanel from '@/features/thesis/components/ScoreBreakdownPanel';
 import { plainTextThesisDescription } from '@/lib/thesis-text';
 
 interface CouncilDefenseWorkspaceProps {
@@ -64,7 +65,6 @@ export default function CouncilDefenseWorkspace({
   councils,
   myLecturerId,
   topics,
-  lecturers,
   councilLoadError,
   onRetryCouncils,
   councilScores,
@@ -340,44 +340,19 @@ export default function CouncilDefenseWorkspace({
                           </div>
                         ) : null}
 
-                        {/* Scores Breakdown */}
+                        {/* Score breakdown: graders with roles and scores,
+                            the finalize-average, and the still-pending
+                            eligible graders the chair is waiting on. */}
                         {scoresFailed ? (
                           <p className="rounded-lg border border-status-warning/40 bg-status-warning/10 p-2.5 text-xs text-status-warning-foreground">
                             {messages.thesis.grading.scoresLoadFailed}
                           </p>
-                        ) : scores.length > 0 && (
-                          <div className="rounded-lg bg-background/60 p-2.5 text-xs space-y-1.5 border border-border/40">
-                            <span className="font-semibold text-muted-foreground uppercase text-[11px] tracking-wider">
-                              {messages.thesis.grading.scoresListTitle}:
-                            </span>
-                            <div className="flex flex-wrap gap-2">
-                              {scores.map((s, sIdx) => {
-                                const lect = lecturers.find(
-                                  (l) => l.id === s.lecturerId,
-                                );
-                                const name = lect?.user
-                                  ? `${lect.user.lastName} ${lect.user.firstName}`
-                                  : s.lecturerId;
-                                return (
-                                  <span
-                                    key={sIdx}
-                                    className="inline-flex items-center rounded-md bg-muted px-2 py-1 text-[11px] font-medium text-foreground border border-border/50"
-                                    title={s.comment || undefined}
-                                  >
-                                    {name}:{' '}
-                                    <strong className="ml-1 text-primary">
-                                      {s.score}
-                                    </strong>
-                                    {s.comment ? (
-                                      <span className="ml-1 italic text-muted-foreground line-clamp-1 max-w-[220px]">
-                                        — {s.comment}
-                                      </span>
-                                    ) : null}
-                                  </span>
-                                );
-                              })}
-                            </div>
-                          </div>
+                        ) : (
+                          <ScoreBreakdownPanel
+                            messages={messages}
+                            topicId={tid}
+                            refreshKey={`${submittedCount}:${topic?.finalScore ?? ''}`}
+                          />
                         )}
 
                         {/* Chair Finalize Action — suppressed while the score
