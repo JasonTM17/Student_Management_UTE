@@ -335,6 +335,8 @@ async function mockStudent(page: Page, singleTerm = false, overrides: Record<str
         semesterOpen: false, windowStart: null, windowEnd: null, open: false,
       },
       '/api/v1/me/registration/withdrawal-applications': [],
+      '/api/v1/me/grade-appeals': [],
+      '/api/v1/me/grade-appeals/eligibility': { eligible: false, remainingAppeals: 0, windowOpen: false },
       '/api/v1/me/registration/sections': [
         {
           id: 'section-se101-01', sectionNumber: '01', courseId: 'course-se101',

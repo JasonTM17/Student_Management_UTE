@@ -49,7 +49,7 @@ test('student appeal, admin unpublish refusal, lecturer correction, and transcri
   expect(appealResponse.ok(), 'student appeal API response').toBeTruthy();
   const appeal = await appealResponse.json() as { id: string; status: string };
   expect(appeal.status).toBe('PENDING');
-  await expect(studentDialog.getByText('Pending review', { exact: true })).toBeVisible();
+  await expect(studentDialog.getByText('Pending review', { exact: true }).first()).toBeVisible();
 
   const adminContext = await browser.newContext({ viewport: { width: 1280, height: 900 } });
   const adminPage = await adminContext.newPage();
