@@ -1176,7 +1176,7 @@ class ThesisGovernanceIntegrationTest {
     }
 
     @Test
-    void teammateSearchStaysClosedOutsideRegistrationAndNeverMatchesEmail() throws Exception {
+    void teammateSearchStaysClosedOutsideRegistrationAndMatchesEmail() throws Exception {
         insertRound("Gov Search Closed Round", "REGISTRATION_CLOSED",
                 Instant.now().minusSeconds(7_200), Instant.now().minusSeconds(3_600));
         ensureStudent("gov-search-target", "gov-search-user-t", "unique-target-mail@campuscore.edu");
@@ -1195,11 +1195,11 @@ class ThesisGovernanceIntegrationTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$[0].studentId").value("gov-search-target"));
 
-        // An email fragment must not act as an existence oracle.
+        // The directory also matches the campus email while a round is open.
         mvc.perform(get("/api/v1/thesis/students/search").param("q", "unique-target-mail")
                         .with(studentJwt("gov-search-caller")))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.length()").value(0));
+                .andExpect(jsonPath("$[0].studentId").value("gov-search-target"));
     }
 
     @Test
