@@ -9,6 +9,7 @@ import io.campuscore.restfulapi.thesis.model.RoundType;
 import io.campuscore.restfulapi.thesis.entity.ThesisTopic;
 import io.campuscore.restfulapi.thesis.model.TopicStatus;
 import io.campuscore.restfulapi.thesis.repository.ThesisGroupReadRepository;
+import io.campuscore.restfulapi.thesis.repository.ThesisDatabaseClockRepository;
 import io.campuscore.restfulapi.thesis.repository.ThesisRegistrationRoundRepository;
 import io.campuscore.restfulapi.thesis.repository.ThesisRoundReadPort;
 import io.campuscore.restfulapi.thesis.repository.ThesisTopicRepository;
@@ -73,6 +74,7 @@ public class ThesisMutationService {
             org.slf4j.LoggerFactory.getLogger(ThesisMutationService.class);
 
     private final NamedParameterJdbcTemplate jdbc;
+    private final ThesisDatabaseClockRepository databaseClock;
     private final ThesisScopeRepository scope;
     private final ThesisRegistrationRoundRepository rounds;
     private final ThesisRoundReadPort roundReadPort;
@@ -117,7 +119,7 @@ public class ThesisMutationService {
             ThesisRoundReadService roundReads,
             AdminAuditRecorder audit) {
         this(jdbc, rounds, roundReadPort, topics, groups, roundReads, audit, null,
-                new ThesisScopeRepository(jdbc), null);
+                new ThesisScopeRepository(jdbc), null, new ThesisDatabaseClockRepository(jdbc));
     }
 
     public ThesisMutationService(
@@ -130,7 +132,7 @@ public class ThesisMutationService {
             AdminAuditRecorder audit,
             ThesisNotificationService notifier) {
         this(jdbc, rounds, roundReadPort, topics, groups, roundReads, audit, notifier,
-                new ThesisScopeRepository(jdbc), null);
+                new ThesisScopeRepository(jdbc), null, new ThesisDatabaseClockRepository(jdbc));
     }
 
     @org.springframework.beans.factory.annotation.Autowired
@@ -144,8 +146,10 @@ public class ThesisMutationService {
             AdminAuditRecorder audit,
             ThesisNotificationService notifier,
             ThesisScopeRepository scope,
-            ThesisGroupWithdrawalPolicy withdrawalPolicy) {
+            ThesisGroupWithdrawalPolicy withdrawalPolicy,
+            ThesisDatabaseClockRepository databaseClock) {
         this.jdbc = jdbc;
+        this.databaseClock = databaseClock;
         this.scope = scope;
         this.rounds = rounds;
         this.roundReadPort = roundReadPort;
@@ -270,8 +274,8 @@ public class ThesisMutationService {
      * @return the round after the transition
      * @throws ResponseStatusException with status 404 when the round does not exist
      * @throws DomainException with code ROUND_STATE_CONFLICT when a concurrent transition already
-     *         moved the round out of {@code expected}, or REGISTRATION_WINDOW_CLOSED when opening
-     *         registration outside the stored window
+     *         moved the round out of {@code expected}, or a registration-window code when opening
+     *         registration cannot honor the authored schedule
      */
     @Transactional
     public RoundResponse transitionRound(UUID id, RoundStatus expected, RoundStatus next) {
@@ -304,9 +308,83 @@ public class ThesisMutationService {
             }
         }
         if (next == RoundStatus.REGISTRATION_OPEN) {
-            requireLiveRegistrationWindow(id);
+            openRegistrationWindow(id, actor);
         }
         return roundReads.get(id);
+    }
+
+    /**
+     * Opens registration while keeping the authored schedule order intact. If
+     * an administrator opens before the stored registration start, the start
+     * moves to database wall time only after lecturer submissions
+     * have ended. The row is already locked by the conditional status update
+     * above; this explicit lock keeps that ordering boundary visible here and
+     * serializes with schedule edits, which take the same row lock.
+     */
+    private void openRegistrationWindow(UUID id, Jwt actor) {
+        Map<String, Object> round = one(
+                "SELECT registration_start, registration_end, lecturer_submit_end "
+                        + "FROM thesis.thesis_registration_round WHERE id = :id FOR UPDATE",
+                params().addValue("id", id), "ROUND_NOT_FOUND", "Thesis registration round not found");
+        Instant start = instantOf(round.get("registration_start"));
+        Instant end = instantOf(round.get("registration_end"));
+        Instant lecturerEnd = instantOf(round.get("lecturer_submit_end"));
+        Instant now = databaseNow();
+        if (start == null || end == null) {
+            throw conflict("REGISTRATION_WINDOW_CLOSED",
+                    "The round has no usable registration window; amend the round schedule before opening registration");
+        }
+        if (!now.isBefore(end)) {
+            throw new DomainException(HttpStatus.CONFLICT, "REGISTRATION_WINDOW_CLOSED",
+                    "The registration window ended at " + end
+                            + "; amend the round schedule to set a later end before opening registration",
+                    Map.of("registrationEnd", end.toString()));
+        }
+        if (now.isBefore(start)) {
+            if (lecturerEnd == null || now.isBefore(lecturerEnd)) {
+                String endText = lecturerEnd == null ? "not set" : lecturerEnd.toString();
+                throw new DomainException(HttpStatus.CONFLICT, "REGISTRATION_EARLY_OPEN_BLOCKED",
+                        "Registration cannot start before the lecturer submission window ends at " + endText
+                                + "; shorten the lecturer window or wait until then",
+                        Map.of("lecturerSubmitEnd", endText));
+            }
+
+            Map<String, Object> beforeState = new LinkedHashMap<>();
+            beforeState.put("registration_start", start);
+            beforeState.put("registration_end", end);
+            beforeState.put("lecturer_submit_end", lecturerEnd);
+            int adjusted = databaseClock.clampRegistrationStartIfFuture(id, now);
+            if (adjusted != 1) {
+                Instant retryNow = databaseNow();
+                if (!retryNow.isBefore(end)) {
+                    throw new DomainException(HttpStatus.CONFLICT, "REGISTRATION_WINDOW_CLOSED",
+                            "The registration window ended at " + end
+                                    + "; amend the round schedule to set a later end before opening registration",
+                            Map.of("registrationEnd", end.toString()));
+                }
+                if (!retryNow.isBefore(start)) {
+                    return;
+                }
+                throw new DomainException(HttpStatus.CONFLICT, "REGISTRATION_EARLY_OPEN_BLOCKED",
+                        "Registration cannot start before the lecturer submission window ends at "
+                                + lecturerEnd + "; shorten the lecturer window or wait until then",
+                        Map.of("lecturerSubmitEnd", lecturerEnd.toString()));
+            }
+            Map<String, Object> after = one(
+                    "SELECT registration_start, registration_end, lecturer_submit_end "
+                            + "FROM thesis.thesis_registration_round WHERE id = :id",
+                    params().addValue("id", id), "ROUND_NOT_FOUND", "Thesis registration round not found");
+            Map<String, Object> afterState = new LinkedHashMap<>();
+            afterState.put("registration_start", instantOf(after.get("registration_start")));
+            afterState.put("registration_end", instantOf(after.get("registration_end")));
+            afterState.put("lecturer_submit_end", instantOf(after.get("lecturer_submit_end")));
+            audit.record(subject(actor), null, "THESIS_ROUND_SCHEDULE_ADJUSTED", "THESIS_ROUND", id.toString(),
+                    "registration_start moved to now for early registration opening", beforeState, afterState);
+        }
+    }
+
+    private Instant databaseNow() {
+        return databaseClock.now();
     }
 
     /**
@@ -764,15 +842,18 @@ public class ThesisMutationService {
         if (!roundType.requiresGvpbDeadline()) {
             throw invalid(roundType + " rounds carry no GVPB deadline; their report window ends at results publication");
         }
-        if (newDeadline == null || !newDeadline.isAfter(Instant.now())) {
-            throw invalid("reportDeadline must be in the future");
+        if (newDeadline == null || !newDeadline.isAfter(databaseNow())) {
+            throw invalid("reportDeadline must be in the future",
+                    Map.of("rule", "REPORT_DEADLINE_NOT_FUTURE"));
         }
         Instant effectiveDeadline = instantOf(current.get("report_deadline"));
         if (effectiveDeadline == null) {
             effectiveDeadline = instantOf(current.get("gvpb_deadline"));
         }
         if (effectiveDeadline != null && newDeadline.isBefore(effectiveDeadline)) {
-            throw invalid("reportDeadline must not be earlier than the current report deadline");
+            throw invalid("reportDeadline must not be earlier than the current report deadline",
+                    Map.of("rule", "REPORT_DEADLINE_BEFORE_CURRENT",
+                            "currentDeadline", effectiveDeadline.toString()));
         }
         Map<String, Object> beforeState = new LinkedHashMap<>();
         beforeState.put("report_deadline", instantOf(current.get("report_deadline")));
@@ -816,16 +897,21 @@ public class ThesisMutationService {
         if (!roundType.requiresGvpbDeadline()) {
             throw invalid(roundType + " rounds carry no counter-review deadline");
         }
-        if (newDeadline == null || !newDeadline.isAfter(Instant.now())) {
-            throw invalid("gvpbDeadline must be in the future");
+        if (newDeadline == null || !newDeadline.isAfter(databaseNow())) {
+            throw invalid("gvpbDeadline must be in the future",
+                    Map.of("rule", "GVPB_DEADLINE_NOT_FUTURE"));
         }
         Instant currentDeadline = instantOf(current.get("gvpb_deadline"));
         if (currentDeadline != null && newDeadline.isBefore(currentDeadline)) {
-            throw invalid("gvpbDeadline must not be earlier than the current counter-review deadline");
+            throw invalid("gvpbDeadline must not be earlier than the current counter-review deadline",
+                    Map.of("rule", "GVPB_DEADLINE_BEFORE_CURRENT",
+                            "currentDeadline", currentDeadline.toString()));
         }
         Instant reportDate = instantOf(current.get("report_date"));
         if (reportDate != null && newDeadline.isAfter(reportDate)) {
-            throw invalid("gvpbDeadline must not be later than the report date; amend the schedule first");
+            throw invalid("gvpbDeadline must not be later than the report date; amend the schedule first",
+                    Map.of("rule", "GVPB_DEADLINE_AFTER_REPORT_DATE",
+                            "reportDate", reportDate.toString()));
         }
         // The report write window falls back to gvpb_deadline when no
         // report_deadline override exists, so extending GVPB would silently
@@ -1054,7 +1140,7 @@ public class ThesisMutationService {
         }
         // Students must still be able to pick the topic up: once registration
         // closed a late topic would strand it with no group.
-        requireRoundStatusAny(roundId, RoundStatus.PROPOSALS_PUBLISHED, RoundStatus.REGISTRATION_OPEN);
+        requireLateTopicWindow(roundId);
         String departmentId = request.departmentId().trim();
         requireTopicDepartmentScope(actor, departmentId);
         // The named supervisor must be a real active lecturer — the supervisor
@@ -1082,12 +1168,18 @@ public class ThesisMutationService {
         audit.record(subject(actor), null, "THESIS_TOPIC_LATE_CREATED", "THESIS_TOPIC", topic.getId().toString(),
                 "Late topic created for supervisor " + supervisorId + "; reason: " + cleanReason,
                 Map.of("status", ""), Map.of("status", TopicStatus.PUBLISHED.name(), "supervisorId", supervisorId));
+        TopicResponse response = topics.findById(lateTopicId)
+                .map(this::topicResponse).orElseGet(() -> topicResponse(topic));
+        // Recheck after the write/read path so an insert blocked across the
+        // deadline cannot commit a topic students can no longer choose. A
+        // refusal here rolls back the topic, supervisor link, and audit row.
+        requireLateTopicWindow(roundId);
         afterCommit(() -> {
             if (notifier != null) {
                 notifier.notifySupervisorsAssigned(lateTopicId, List.of(supervisorId));
             }
         });
-        return topics.findById(lateTopicId).map(this::topicResponse).orElseGet(() -> topicResponse(topic));
+        return response;
     }
 
     /**
@@ -1563,25 +1655,17 @@ public class ThesisMutationService {
     }
 
     /**
-     * The stored registration window is normative for every registration
-     * mutation ({@link #requireRoundStatus}) and for the student registration
-     * CTA, so the transition into REGISTRATION_OPEN must not be able to create a
-     * round that renders as "registration open" while every group and topic
-     * action answers 409 REGISTRATION_WINDOW_CLOSED.
-     *
-     * <p>An out-of-window transition is rejected rather than accepted: the
-     * PROPOSAL_OPEN clamp above cannot be mirrored here, because
-     * {@code registration_start >= lecturer_submit_end} is part of the authored
-     * two-phase schedule (enforced by thesis_round_schedule_order_valid), so
-     * moving the registration start to "now" would silently rewrite the
-     * published schedule and can violate that oracle. REGISTRATION_OPEN is
-     * therefore only reachable inside the window the faculty authored.
+     * Restoring a cancelled round to REGISTRATION_OPEN does not rewrite its
+     * published schedule, so it must still be inside the stored window. The
+     * ordinary transition uses {@link #openRegistrationWindow(UUID, Jwt)} to
+     * apply the audited early-open rule without breaking
+     * {@code registration_start >= lecturer_submit_end}.
      */
     private void requireLiveRegistrationWindow(UUID id) {
         Map<String, Object> round = one(
                 "SELECT registration_start, registration_end FROM thesis.thesis_registration_round WHERE id = :id",
                 params().addValue("id", id), "ROUND_NOT_FOUND", "Thesis registration round not found");
-        Instant now = Instant.now();
+        Instant now = databaseNow();
         Instant start = instantOf(round.get("registration_start"));
         Instant end = instantOf(round.get("registration_end"));
         if (start == null || end == null) {
@@ -2894,6 +2978,40 @@ public class ThesisMutationService {
                 + (accepted.length > 1 ? " or " + accepted[1].name() : ""));
     }
 
+    private void requireLateTopicWindow(UUID id) {
+        Map<String, Object> round = one(
+                "SELECT status, registration_start, registration_end FROM thesis.thesis_registration_round "
+                        + "WHERE id = :id FOR UPDATE",
+                params().addValue("id", id), "ROUND_NOT_FOUND", "Thesis registration round not found");
+        String status = (String) round.get("status");
+        if (!RoundStatus.PROPOSALS_PUBLISHED.name().equals(status)
+                && !RoundStatus.REGISTRATION_OPEN.name().equals(status)) {
+            throw conflict("ROUND_STATE_CONFLICT",
+                    "Late topics can only be added while proposals are published or registration is open");
+        }
+
+        Instant start = instantOf(round.get("registration_start"));
+        Instant end = instantOf(round.get("registration_end"));
+        Instant now = databaseNow();
+        if (start == null) {
+            throw new DomainException(HttpStatus.CONFLICT, "REGISTRATION_WINDOW_NOT_OPEN",
+                    "The registration start is not set; amend the round schedule before adding a late topic",
+                    Map.of("registrationStart", "not set"));
+        }
+        if (end == null || !now.isBefore(end)) {
+            String endText = end == null ? "not set" : end.toString();
+            throw new DomainException(HttpStatus.CONFLICT, "REGISTRATION_WINDOW_CLOSED",
+                    "The student registration window ended at " + endText
+                            + "; a late topic could no longer receive a student group",
+                    Map.of("registrationEnd", endText, "roundStatus", status));
+        }
+        if (RoundStatus.REGISTRATION_OPEN.name().equals(status) && now.isBefore(start)) {
+            throw new DomainException(HttpStatus.CONFLICT, "REGISTRATION_WINDOW_NOT_OPEN",
+                    "The scheduled registration window has not started; wait until its start before adding a late topic",
+                    Map.of("registrationStart", start.toString()));
+        }
+    }
+
     private String requireRoundStatus(UUID id, RoundStatus required) {
         Map<String, Object> round = one(
                 "SELECT status, thesis_type, registration_start, registration_end FROM thesis.thesis_registration_round WHERE id = :id FOR UPDATE",
@@ -2904,7 +3022,7 @@ public class ThesisMutationService {
         if (required == RoundStatus.REGISTRATION_OPEN) {
             // The stored dates are normative: an open round whose window has
             // passed must not keep accepting registration mutations.
-            Instant now = Instant.now();
+            Instant now = databaseNow();
             Instant start = instantOf(round.get("registration_start"));
             Instant end = instantOf(round.get("registration_end"));
             if (start == null || end == null || !now.isBefore(end)) {
@@ -3182,6 +3300,9 @@ public class ThesisMutationService {
     }
     private static boolean isProgressStatus(GroupStatus status) { return status == GroupStatus.DRAFT || status == GroupStatus.SUBMITTED || status == GroupStatus.COMPLETED || status == GroupStatus.CANCELLED; }
     private static DomainException invalid(String message) { return new DomainException(HttpStatus.BAD_REQUEST, "VALIDATION_ERROR", message); }
+    private static DomainException invalid(String message, Map<String, Object> details) {
+        return new DomainException(HttpStatus.BAD_REQUEST, "VALIDATION_ERROR", message, details);
+    }
     private static DomainException conflict(String code, String message) { return new DomainException(HttpStatus.CONFLICT, code, message); }
     private static DomainException notFound(String code, String message) { return new DomainException(HttpStatus.NOT_FOUND, code, message); }
 

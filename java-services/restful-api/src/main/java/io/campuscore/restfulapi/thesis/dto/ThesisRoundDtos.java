@@ -1,9 +1,11 @@
 package io.campuscore.restfulapi.thesis.dto;
 
+import com.fasterxml.jackson.annotation.JsonInclude;
 import io.campuscore.restfulapi.thesis.entity.ThesisRegistrationRound;
 import io.campuscore.restfulapi.thesis.model.EligibilityView;
 import io.campuscore.restfulapi.thesis.model.RoundStatus;
 import java.time.Instant;
+import java.util.List;
 import java.util.UUID;
 
 public final class ThesisRoundDtos {
@@ -107,7 +109,11 @@ public final class ThesisRoundDtos {
              * student callers so the thesis page can render the eligibility
              * card without a second request. Null for staff/governance callers.
              */
-            EligibilityView eligibility) {
+            EligibilityView eligibility,
+            /** Database wall-clock sample used by clients for schedule-gated actions. */
+            Instant serverNow,
+            /** Admin-only read projection of restore guards; the mutation rechecks under locks. */
+            @JsonInclude(JsonInclude.Include.NON_EMPTY) List<String> restoreBlockers) {
 
         public static RoundResponse from(ThesisRegistrationRound round) {
             return from(round, null, null, false, 0, 0, null);
@@ -124,6 +130,22 @@ public final class ThesisRoundDtos {
                 RoundClosureInfo closure,
                 boolean counterReviewWaiverAllowed, int minGroupSize, int maxGroupSize,
                 EligibilityView eligibility) {
+            return from(round, deletion, closure, counterReviewWaiverAllowed, minGroupSize,
+                    maxGroupSize, eligibility, null);
+        }
+
+        public static RoundResponse from(ThesisRegistrationRound round, RoundDeletionInfo deletion,
+                RoundClosureInfo closure,
+                boolean counterReviewWaiverAllowed, int minGroupSize, int maxGroupSize,
+                EligibilityView eligibility, Instant serverNow) {
+            return from(round, deletion, closure, counterReviewWaiverAllowed, minGroupSize, maxGroupSize,
+                    eligibility, serverNow, null);
+        }
+
+        public static RoundResponse from(ThesisRegistrationRound round, RoundDeletionInfo deletion,
+                RoundClosureInfo closure,
+                boolean counterReviewWaiverAllowed, int minGroupSize, int maxGroupSize,
+                EligibilityView eligibility, Instant serverNow, List<String> restoreBlockers) {
             return new RoundResponse(
                     round.getId(), round.getName(), round.getThesisType(),
                     round.getLecturerSubmitStart(), round.getLecturerSubmitEnd(),
@@ -131,7 +153,7 @@ public final class ThesisRoundDtos {
                     round.getGvpbDeadline(), round.getReportDeadline(), round.getProposalPublishAt(),
                     round.getReportDate(), round.getDefenseDate(), round.getStatus(),
                     round.getCancelledFromStatus(), deletion, closure, counterReviewWaiverAllowed,
-                    minGroupSize, maxGroupSize, eligibility);
+                    minGroupSize, maxGroupSize, eligibility, serverNow, restoreBlockers);
         }
     }
 }
