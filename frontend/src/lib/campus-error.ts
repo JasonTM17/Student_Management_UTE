@@ -96,6 +96,29 @@ export function campusErrorMessage(
 }
 
 /**
+ * `details` values the backend sends with a business code fill `{key}`
+ * placeholders in the localized copy (e.g. `opensAt` on
+ * REGISTRATION_WINDOW_NOT_OPEN). An unresolved placeholder rejects the
+ * template so the caller can fall back to the backend's own message, which
+ * still names the instant rather than showing raw braces.
+ */
+function interpolateDetails(template: string, error: unknown): string | null {
+  const data = axiosLike(error)?.response?.data;
+  const details = isRecord(data) && isRecord(data.details) ? data.details : undefined;
+  if (!/\{\w+\}/.test(template)) return template;
+  if (!details) return null;
+  let resolved = true;
+  const text = template.replace(/\{(\w+)\}/g, (match, key: string) => {
+    if (typeof details[key] === 'string' || typeof details[key] === 'number') {
+      return String(details[key]);
+    }
+    resolved = false;
+    return match;
+  });
+  return resolved ? text : null;
+}
+
+/**
  * Prefer the backend business code (`SCHEDULE_CONFLICT`, `SECTION_FULL`, …)
  * over the generic HTTP-kind copy so students learn why a change failed.
  */
@@ -106,5 +129,13 @@ export function campusCodeMessage(
 ): string {
   const code = campusErrorCode(error);
   const specific = code ? copy.codes?.[code] : undefined;
-  return specific || campusErrorMessage(error, copy, fallback);
+  if (specific) {
+    const resolved = interpolateDetails(specific, error);
+    if (resolved) return resolved;
+    const data = axiosLike(error)?.response?.data;
+    if (isRecord(data) && typeof data.message === 'string' && data.message.trim()) {
+      return data.message;
+    }
+  }
+  return campusErrorMessage(error, copy, fallback);
 }

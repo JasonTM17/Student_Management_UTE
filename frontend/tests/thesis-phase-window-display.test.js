@@ -35,6 +35,7 @@ function loadMessages() {
 }
 
 const { formatThesisDateTime, thesisWindowRemaining } = loadModule('src/lib/thesis-datetime.ts');
+const { campusCodeMessage } = loadModule('src/lib/campus-error.ts');
 
 // ---------- pinned display: dd/MM/yyyy HH:mm in Asia/Bangkok ----------
 
@@ -97,6 +98,55 @@ test('the milestone card shows remaining time for a live window', () => {
     /\.remaining(DaysHours|HoursMinutes|Minutes)/,
     'the card must render the remaining copy',
   );
+});
+
+// ---------- registration window refusal copy ----------
+
+test('the opens-at refusal renders the stored instant in both locales', () => {
+  const { en, vi } = loadMessages();
+  const refusal = {
+    response: {
+      status: 409,
+      data: {
+        code: 'REGISTRATION_WINDOW_NOT_OPEN',
+        details: { opensAt: '25/10/2026 08:00' },
+      },
+    },
+  };
+  assert.equal(
+    campusCodeMessage(refusal, en.common.campusErrors, en.thesis.actionFailed),
+    'Registration opens at 25/10/2026 08:00.',
+  );
+  assert.equal(
+    campusCodeMessage(refusal, vi.common.campusErrors, vi.thesis.actionFailed),
+    'Đợt đăng ký mở lúc 25/10/2026 08:00.',
+  );
+});
+
+test('window-closed copy stays put and a missing detail falls back to the server message', () => {
+  const { en } = loadMessages();
+  const closed = {
+    response: { status: 409, data: { code: 'REGISTRATION_WINDOW_CLOSED' } },
+  };
+  assert.equal(
+    campusCodeMessage(closed, en.common.campusErrors, en.thesis.actionFailed),
+    en.common.campusErrors.codes.REGISTRATION_WINDOW_CLOSED,
+  );
+  // A throw site that names no details (e.g. the admin transition guard)
+  // must still surface the instant the server wrote into its message —
+  // never a literal {opensAt} placeholder.
+  const bare = {
+    response: {
+      status: 409,
+      data: {
+        code: 'REGISTRATION_WINDOW_NOT_OPEN',
+        message: 'Registration opens on 2026-10-25T01:00:00Z; the round cannot be opened before its scheduled window',
+      },
+    },
+  };
+  const rendered = campusCodeMessage(bare, en.common.campusErrors, en.thesis.actionFailed);
+  assert.equal(rendered, bare.response.data.message);
+  assert.doesNotMatch(rendered, /\{opensAt\}/);
 });
 
 test('remaining-time copy exists in both locales with matching placeholders', () => {
