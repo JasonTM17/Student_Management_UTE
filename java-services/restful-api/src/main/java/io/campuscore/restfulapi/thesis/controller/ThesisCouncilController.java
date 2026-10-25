@@ -2,6 +2,7 @@ package io.campuscore.restfulapi.thesis.controller;
 
 import io.campuscore.restfulapi.thesis.service.ThesisCouncilService;
 import io.campuscore.restfulapi.thesis.dto.CouncilResponse;
+import io.campuscore.restfulapi.thesis.dto.ScoreBreakdownResponse;
 import io.campuscore.restfulapi.thesis.dto.ScoreResponse;
 import io.campuscore.restfulapi.thesis.dto.StudentResultRow;
 import io.campuscore.restfulapi.thesis.dto.TopicResult;
@@ -285,6 +286,28 @@ public class ThesisCouncilController {
             @Parameter(description = "Mã UUID của đề tài", required = true) @PathVariable UUID id,
             @AuthenticationPrincipal Jwt actor) {
         return councils.reviewerScore(id, actor);
+    }
+
+    /**
+     * Score transparency: who graded the topic, each score and role, the
+     * finalize average, and which eligible graders are still missing. Staff
+     * and council see everything; supervisors and participant students wait
+     * for publication, and students never see a per-person score or comment.
+     */
+    @Operation(summary = "Bảng điểm chi tiết của đề tài", description = "Ai đã chấm, điểm từng người, vai trò và điểm trung bình; sinh viên chỉ thấy điểm trung bình và tên/vai trò giảng viên sau khi công bố")
+    @ApiResponses({
+        @ApiResponse(responseCode = "200", description = "Trả về bảng điểm chi tiết"),
+        @ApiResponse(responseCode = "401", description = "Chưa xác thực"),
+        @ApiResponse(responseCode = "403", description = "Không thuộc nhóm được xem điểm của đề tài"),
+        @ApiResponse(responseCode = "404", description = "Đề tài không tồn tại hoặc chưa công bố"),
+        @ApiResponse(responseCode = "409", description = "Kết quả của đợt chưa được công bố")
+    })
+    @GetMapping("/topics/{id}/score-breakdown")
+    @PreAuthorize("hasAnyRole('STUDENT','LECTURER','ADMIN','TRUONG_KHOA','TRUONG_BO_MON','SUPER_ADMIN')")
+    public ScoreBreakdownResponse scoreBreakdown(
+            @Parameter(description = "Mã UUID của đề tài", required = true) @PathVariable UUID id,
+            @AuthenticationPrincipal Jwt actor) {
+        return councils.scoreBreakdown(id, actor);
     }
 
     /** Brief R9: students read their own graded result after publication. */

@@ -54,6 +54,7 @@ import { RoundMilestoneCard } from '@/components/thesis/RoundMilestoneCard';
 import { StatusBadge } from '@/components/thesis/StatusBadge';
 import { formatThesisDateTime } from '@/lib/thesis-datetime';
 import CouncilDefenseWorkspace from '@/features/thesis/components/CouncilDefenseWorkspace';
+import ScoreBreakdownPanel from '@/features/thesis/components/ScoreBreakdownPanel';
 import GvpbReviewPanel from '@/features/thesis/components/GvpbReviewPanel';
 import {
   fillCopy,
@@ -3093,6 +3094,10 @@ export default function ThesisPage() {
                     canSizeException={isAdmin}
                     onApproveWithException={isAdmin ? openApproveExceptionModal : undefined}
                     onWithdrawApproval={openWithdrawModal}
+                    resultsPublished={
+                      selectedRound?.status === 'RESULTS_PUBLISHED' ||
+                      selectedRound?.status === 'CLOSED'
+                    }
                     onDownloadReport={downloadReportArtifact}
                   />
                   ) : null}
@@ -3421,8 +3426,9 @@ export default function ThesisPage() {
                     {roundResults.map((result) => (
                       <div
                         key={result.groupId}
-                        className="flex flex-col gap-2 rounded-xl border border-border/70 bg-card p-4 sm:flex-row sm:items-center sm:justify-between"
+                        className="rounded-xl border border-border/70 bg-card p-4 space-y-2"
                       >
+                        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                         <div className="min-w-0">
                           <p className="truncate text-sm font-semibold text-foreground" title={result.topicTitle}>
                             {result.topicTitle}
@@ -3470,6 +3476,22 @@ export default function ThesisPage() {
                             </>
                           )}
                         </div>
+                        </div>
+                        {/* Graders' names and roles — the server redacts
+                            per-person scores and comments for students. */}
+                        {(() => {
+                          const resultTopicId =
+                            ownGroups.find((g) => g.id === result.groupId)?.topicId ??
+                            (result.groupId === currentGroup?.id
+                              ? currentGroup?.topicId
+                              : null);
+                          return resultTopicId ? (
+                            <ScoreBreakdownPanel
+                              messages={messages}
+                              topicId={resultTopicId}
+                            />
+                          ) : null;
+                        })()}
                       </div>
                     ))}
                   </div>
