@@ -77,6 +77,10 @@ function loadWorkspaceComponent() {
     '@/types/api': {},
     '@/lib/thesis-api': {},
     '@/features/thesis/components/thesis-helpers': helpers,
+    // Marker stub: the panel fetches its own data, so tests only prove the
+    // workspace mounts it — including on terminal rounds.
+    '@/features/thesis/components/ScoreBreakdownPanel': () =>
+      React.createElement('div', { 'data-testid': 'score-breakdown' }),
     '@/lib/thesis-text': thesisText,
   }).default;
 }
@@ -163,8 +167,8 @@ for (const status of ['CANCELLED', 'CLOSED', 'RESULTS_PUBLISHED']) {
       `${status}: the finalize action must not render`);
     assert.equal(html.includes('<input'), false,
       `${status}: no score draft input may render`);
-    // The workspace stays readable: the submitted score breakdown remains.
-    assert.ok(html.includes(messages.thesis.grading.scoresListTitle),
+    // The workspace stays readable: the score breakdown panel still mounts.
+    assert.ok(html.includes('data-testid="score-breakdown"'),
       `${status}: the score breakdown must stay visible`);
   });
 }

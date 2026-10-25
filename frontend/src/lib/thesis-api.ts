@@ -272,6 +272,54 @@ export interface ThesisCouncilScore {
   comment?: string | null;
 }
 
+/** Seat a grader scored under; GVPB_REVIEWER is the counter-review row. */
+export type ThesisScoreGraderRole =
+  | 'CHAIR'
+  | 'SECRETARY'
+  | 'MEMBER'
+  | 'GVPB_REVIEWER';
+
+/**
+ * Per-topic score transparency read model. Governance staff, council members,
+ * the counter-reviewer, and (after publication) supervisors receive every
+ * column; a participant student receives the same shape with per-grader
+ * score/comment/scoredAt/countedInAverage nulled and pendingGraders plus the
+ * finalizer identity stripped. The server never returns emails.
+ */
+export interface ThesisScoreBreakdownGrader {
+  lecturerId?: string | null;
+  displayName: string;
+  role: ThesisScoreGraderRole | string;
+  score?: number | null;
+  comment?: string | null;
+  scoredAt?: string | null;
+  /** False marks a leftover score the finalize arithmetic no longer counts. */
+  countedInAverage?: boolean | null;
+}
+
+export interface ThesisScoreBreakdownPendingGrader {
+  lecturerId?: string | null;
+  displayName: string;
+  role: ThesisScoreGraderRole | string;
+}
+
+export interface ThesisScoreBreakdown {
+  topicId: string;
+  councilId?: string | null;
+  councilName?: string | null;
+  /** Arithmetic mean of the eligible DEFENSE rows, HALF_UP to 2 decimals —
+   * identical to the finalize result. */
+  average?: number | null;
+  graderCount: number;
+  complete: boolean;
+  finalScore?: number | null;
+  finalizedBy?: string | null;
+  finalizedAt?: string | null;
+  resultStatus?: string | null;
+  graders: ThesisScoreBreakdownGrader[];
+  pendingGraders?: ThesisScoreBreakdownPendingGrader[];
+}
+
 export interface ThesisFinalScore {
   councilId?: string;
   topicId?: string;
@@ -1437,6 +1485,20 @@ export const thesisApi = {
     // same rendering as a genuinely empty list.
     const response = await api.get<ThesisCouncilScore[]>(
       '/thesis/councils/' + councilId + '/topics/' + topicId + '/scores',
+    );
+    return response.data;
+  },
+
+  /**
+   * Per-topic score transparency read model: who graded, under which role,
+   * each score and (for staff) comment, the finalize-average, and which
+   * eligible graders are still missing before finalization. The response is
+   * already scoped to the caller — participant students get names and roles
+   * only, so the caller must not render a score column when `score` is null.
+   */
+  scoreBreakdown: async (topicId: string): Promise<ThesisScoreBreakdown> => {
+    const response = await api.get<ThesisScoreBreakdown>(
+      '/thesis/topics/' + topicId + '/score-breakdown',
     );
     return response.data;
   },
