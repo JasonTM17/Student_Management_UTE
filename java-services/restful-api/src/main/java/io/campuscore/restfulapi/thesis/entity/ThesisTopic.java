@@ -45,6 +45,12 @@ public class ThesisTopic {
     @Column(name = "final_score")
     private java.math.BigDecimal finalScore;
 
+    @Column(name = "final_score_finalized_by", length = 120)
+    private String finalScoreFinalizedBy;
+
+    @Column(name = "final_score_finalized_at")
+    private Instant finalScoreFinalizedAt;
+
     @Column(name = "result_status", length = 32)
     private String resultStatus;
 
@@ -177,6 +183,14 @@ public class ThesisTopic {
 
     public java.math.BigDecimal getFinalScore() {
         return finalScore;
+    }
+
+    public String getFinalScoreFinalizedBy() {
+        return finalScoreFinalizedBy;
+    }
+
+    public Instant getFinalScoreFinalizedAt() {
+        return finalScoreFinalizedAt;
     }
 
     public String getResultStatus() {
