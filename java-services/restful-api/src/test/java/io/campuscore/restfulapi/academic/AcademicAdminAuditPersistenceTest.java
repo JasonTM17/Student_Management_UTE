@@ -94,6 +94,7 @@ class AcademicAdminAuditPersistenceTest {
                 "enrolledAt" TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 "finalGrade" NUMERIC(5,2),
                 "letterGrade" VARCHAR(8),
+                "gradePublishedAt" TIMESTAMP,
                 "createdAt" TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 "updatedAt" TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )

@@ -1,3 +1,6 @@
+grade:
+  appeal-window-days: ${GRADE_APPEAL_WINDOW_DAYS:7}
+
 registration:
   # Maximum effective limit for ordinary summer-term registration.
   summer-max-credits: ${REGISTRATION_SUMMER_MAX_CREDITS:10}

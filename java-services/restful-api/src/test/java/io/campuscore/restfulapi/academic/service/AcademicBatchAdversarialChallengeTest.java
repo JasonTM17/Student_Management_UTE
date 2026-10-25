@@ -150,7 +150,8 @@ class AcademicBatchAdversarialChallengeTest {
                 "gradeStatus" VARCHAR(32),
                 "finalGrade" NUMERIC(5,2),
                 "letterGrade" VARCHAR(8),
-                "updatedAt" TIMESTAMP
+                "updatedAt" TIMESTAMP,
+                "gradePublishedAt" TIMESTAMP
             )
         """);
 
