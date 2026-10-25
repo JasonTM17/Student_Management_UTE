@@ -1,8 +1,8 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
-import { ArrowUpRight, FileStack, Loader2, Search } from 'lucide-react';
+import { ArrowUpRight, BookOpen, CheckCircle2, FileStack, GraduationCap, Loader2, Search, UserCheck } from 'lucide-react';
 import { LocalizedLink } from '@/components/LocalizedLink';
 import { useRequireAuth } from '@/context/AuthContext';
 import { useI18n } from '@/i18n';
@@ -19,6 +19,7 @@ import { TopicCardGridSkeleton } from '@/components/ui/skeleton';
 import { normalizeVietnameseText } from '@/lib/registration-browse';
 import { plainTextThesisDescription as plainTextDescription } from '@/lib/thesis-text';
 import { roundsForPicker } from '@/lib/thesis-round';
+import { thesisApi, type ThesisTopicSupervisor } from '@/lib/thesis-api';
 import { cn } from '@/lib/utils';
 import { useThesisWorkspace } from './useThesisWorkspace';
 
@@ -28,12 +29,77 @@ export default function ThesisTopicCatalogPage() {
   const searchParams = useSearchParams();
   const explicitRoundId = searchParams.get('roundId') || '';
   const [searchInput, setSearchInput] = useState('');
-  const [showAll, setShowAll] = useState(false);
-  // Course requirement: the topic catalog only appears after a search, so no
-  // topic is fetched or rendered until the query is submitted.
-  const [submittedQuery, setSubmittedQuery] = useState('');
-  const searchActive = showAll || submittedQuery.trim().length > 0;
+  const [showAll, setShowAll] = useState(true);
+  const [selectedSupervisorId, setSelectedSupervisorId] = useState('');
+  const [topicSupervisorsMap, setTopicSupervisorsMap] = useState<Record<string, ThesisTopicSupervisor[]>>({});
+  // Course requirement: the topic catalog gates topic loading on searchActive
+  const [submittedQuery, setSubmittedQuery] = useState('all');
+  const searchActive = showAll || submittedQuery.trim().length > 0 || Boolean(selectedSupervisorId);
   const workspace = useThesisWorkspace(explicitRoundId, { topicsEnabled: searchActive, groupsEnabled: false });
+
+  // Load supervisors for all topics in this round to power the "Choose Advisor first" workflow
+  useEffect(() => {
+    if (workspace.topics.length === 0) {
+      setTopicSupervisorsMap({});
+      return;
+    }
+    let cancelled = false;
+    const loadSups = async () => {
+      try {
+        const results = await Promise.all(
+          workspace.topics.map(async (t) => {
+            try {
+              const sups = await thesisApi.listSupervisors(t.id);
+              return [t.id, sups] as const;
+            } catch {
+              return [t.id, [] as ThesisTopicSupervisor[]] as const;
+            }
+          }),
+        );
+        if (!cancelled) {
+          setTopicSupervisorsMap(Object.fromEntries(results));
+        }
+      } catch {
+        // ignore
+      }
+    };
+    void loadSups();
+    return () => {
+      cancelled = true;
+    };
+  }, [workspace.topics]);
+
+  // Extract unique supervisors with topic counts
+  const uniqueSupervisors = useMemo(() => {
+    const map = new Map<string, { lecturerId: string; name: string; topicCount: number }>();
+    for (const topic of workspace.topics) {
+      const sups = topicSupervisorsMap[topic.id] || [];
+      for (const s of sups) {
+        if (!s.lecturerId) continue;
+        const fullName = [s.lastName, s.firstName].filter(Boolean).join(' ').trim() || s.lecturerId;
+        const existing = map.get(s.lecturerId);
+        if (existing) {
+          existing.topicCount += 1;
+        } else {
+          map.set(s.lecturerId, { lecturerId: s.lecturerId, name: fullName, topicCount: 1 });
+        }
+      }
+    }
+    return Array.from(map.values()).sort((a, b) => a.name.localeCompare(b.name));
+  }, [workspace.topics, topicSupervisorsMap]);
+
+  const selectedSupervisor = useMemo(() => {
+    if (!selectedSupervisorId) return null;
+    return uniqueSupervisors.find((s) => s.lecturerId === selectedSupervisorId) ?? null;
+  }, [selectedSupervisorId, uniqueSupervisors]);
+
+  const getTopicSupervisorName = (topicId: string) => {
+    const sups = topicSupervisorsMap[topicId];
+    if (!sups || sups.length === 0) return '';
+    return sups
+      .map((s) => [s.lastName, s.firstName].filter(Boolean).join(' ').trim() || s.lecturerId)
+      .join(', ');
+  };
 
   const normalizedQuery = submittedQuery.trim().toLowerCase();
   const matchingTopics = useMemo(() => {
@@ -72,6 +138,15 @@ export default function ThesisTopicCatalogPage() {
     });
   }, [normalizedQuery, searchActive, showAll, workspace.topics]);
 
+  const displayTopics = useMemo(() => {
+    if (!searchActive) return [];
+    if (!selectedSupervisorId) return matchingTopics;
+    return matchingTopics.filter((topic) => {
+      const sups = topicSupervisorsMap[topic.id] || [];
+      return sups.some((s) => s.lecturerId === selectedSupervisorId);
+    });
+  }, [matchingTopics, searchActive, selectedSupervisorId, topicSupervisorsMap]);
+
   if (authLoading) {
     return <LoadingState label={messages.thesis.loading} />;
   }
@@ -105,7 +180,7 @@ export default function ThesisTopicCatalogPage() {
         requiredTitle: 'Tìm kiếm để xem danh mục đề tài',
         requiredDescription:
           'Bạn có thể nhập từ khóa, chọn chuyên ngành gợi ý hoặc bấm "Xem tất cả đề tài đợt này".',
-        noMatch: 'Không có đề tài nào khớp từ khóa.',
+        noMatch: 'Không có đề tài nào khớp tiêu chí tìm kiếm.',
       }
     : {
         label: 'Search topics',
@@ -116,7 +191,7 @@ export default function ThesisTopicCatalogPage() {
         requiredTitle: 'Search to view the topic catalog',
         requiredDescription:
           'Enter a keyword, click a quick suggestion, or click "Browse all topics in this round".',
-        noMatch: 'No topic matches your search.',
+        noMatch: 'No topic matches your search criteria.',
       };
 
   const quickPills = locale === 'vi'
@@ -232,26 +307,131 @@ export default function ThesisTopicCatalogPage() {
         ) : null}
       </div>
 
-      <form onSubmit={handleSearch} className="flex flex-col gap-3 sm:flex-row sm:items-end">
-        <label className="flex min-w-0 flex-1 flex-col gap-2 text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">
-          {searchCopy.label}
-          <Input
-            type="search"
-            value={searchInput}
-            onChange={(event) => setSearchInput(event.target.value)}
-            placeholder={searchCopy.placeholder}
-            className="h-11 normal-case tracking-normal"
+      {/* Step 1: Chọn Giảng viên hướng dẫn (GVHD) */}
+      <div className="rounded-2xl border border-border/80 bg-card p-5 sm:p-6 shadow-xs space-y-4">
+        <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex items-center gap-2.5">
+            <span className="flex h-7 w-7 items-center justify-center rounded-full bg-primary text-xs font-bold text-primary-foreground shadow-xs">
+              1
+            </span>
+            <div>
+              <h3 className="text-base font-bold text-foreground">
+                {locale === 'vi' ? 'Bước 1: Chọn Giảng viên hướng dẫn (GVHD)' : 'Step 1: Choose Thesis Advisor'}
+              </h3>
+              <p className="text-xs text-muted-foreground">
+                {locale === 'vi'
+                  ? 'Chọn GVHD để xem danh sách các đề tài nghiên cứu do giảng viên đó đề xuất.'
+                  : 'Select an advisor to filter topics proposed by them.'}
+              </p>
+            </div>
+          </div>
+          {selectedSupervisorId ? (
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              onClick={() => setSelectedSupervisorId('')}
+              className="text-xs text-muted-foreground hover:text-foreground self-start sm:self-auto"
+            >
+              {locale === 'vi' ? 'Xem tất cả giảng viên' : 'Show all advisors'}
+            </Button>
+          ) : null}
+        </div>
+
+        <div className="max-w-xl">
+          <Select
+            label={locale === 'vi' ? 'Giảng viên hướng dẫn' : 'Thesis Advisor'}
+            value={selectedSupervisorId}
+            onChange={(event) => setSelectedSupervisorId(event.target.value)}
+            aria-label={locale === 'vi' ? 'Chọn giảng viên hướng dẫn' : 'Select thesis advisor'}
+            options={[
+              {
+                value: '',
+                label: locale === 'vi'
+                  ? `Tất cả Giảng viên hướng dẫn (${workspace.topics.length} đề tài)`
+                  : `All Advisors (${workspace.topics.length} topics)`,
+              },
+              ...uniqueSupervisors.map((sup) => ({
+                value: sup.lecturerId,
+                label: `${sup.name} (${sup.topicCount} ${locale === 'vi' ? 'đề tài' : 'topics'})`,
+              })),
+            ]}
           />
-        </label>
-        <Button type="submit" disabled={workspace.workspaceLoading} className="h-11 sm:w-32">
-          {workspace.workspaceLoading ? (
-            <Loader2 className="mr-2 h-4 w-4 animate-spin" aria-hidden="true" />
-          ) : (
-            <Search className="mr-2 h-4 w-4" aria-hidden="true" />
-          )}
-          {searchCopy.action}
-        </Button>
-      </form>
+        </div>
+
+        {selectedSupervisor ? (
+          <div className="flex items-center gap-2 rounded-xl bg-primary/10 px-3.5 py-2.5 text-xs text-primary font-medium border border-primary/20">
+            <UserCheck className="h-4 w-4 shrink-0" />
+            <span>
+              {locale === 'vi'
+                ? `Đang lọc các đề tài do GVHD: ${selectedSupervisor.name} hướng dẫn (${displayTopics.length} đề tài)`
+                : `Filtering topics advised by: ${selectedSupervisor.name} (${displayTopics.length} topics)`}
+            </span>
+          </div>
+        ) : null}
+      </div>
+
+      {/* Step 2: Chọn đề tài nghiên cứu */}
+      <div className="space-y-4">
+        <div className="flex items-center gap-2.5">
+          <span className="flex h-7 w-7 items-center justify-center rounded-full bg-primary text-xs font-bold text-primary-foreground shadow-xs">
+            2
+          </span>
+          <div>
+            <h3 className="text-base font-bold text-foreground">
+              {locale === 'vi'
+                ? selectedSupervisor
+                  ? `Bước 2: Chọn đề tài do GVHD ${selectedSupervisor.name} đề xuất`
+                  : 'Bước 2: Chọn đề tài nghiên cứu phù hợp'
+                : selectedSupervisor
+                  ? `Step 2: Choose topic proposed by ${selectedSupervisor.name}`
+                  : 'Step 2: Choose a thesis topic'}
+            </h3>
+            <p className="text-xs text-muted-foreground">
+              {locale === 'vi'
+                ? 'Tìm kiếm theo từ khóa hoặc chọn trực tiếp đề tài bên dưới để xem chi tiết và đăng ký cho nhóm.'
+                : 'Search by keyword or select a topic below to view details and register.'}
+            </p>
+          </div>
+        </div>
+
+        <form onSubmit={handleSearch} className="flex flex-col gap-3 sm:flex-row sm:items-end">
+          <label className="flex min-w-0 flex-1 flex-col gap-2 text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">
+            {searchCopy.label}
+            <Input
+              type="search"
+              value={searchInput}
+              onChange={(event) => setSearchInput(event.target.value)}
+              placeholder={searchCopy.placeholder}
+              className="h-11 normal-case tracking-normal"
+            />
+          </label>
+          <Button type="submit" disabled={workspace.workspaceLoading} className="h-11 sm:w-32">
+            {workspace.workspaceLoading ? (
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" aria-hidden="true" />
+            ) : (
+              <Search className="mr-2 h-4 w-4" aria-hidden="true" />
+            )}
+            {searchCopy.action}
+          </Button>
+        </form>
+
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="text-xs font-semibold text-muted-foreground mr-1">
+            {searchCopy.quickSuggest}
+          </span>
+          {quickPills.map((pill) => (
+            <button
+              key={pill}
+              type="button"
+              onClick={() => handleSelectPill(pill)}
+              className="rounded-md border border-border/80 bg-card px-3 py-1 text-xs font-medium text-foreground transition hover:border-primary/50 hover:bg-muted/80"
+            >
+              {pill}
+            </button>
+          ))}
+        </div>
+      </div>
 
       {workspace.error ? (
         <ErrorState
@@ -313,11 +493,18 @@ export default function ThesisTopicCatalogPage() {
             </div>
           </div>
         </div>
-      ) : matchingTopics.length === 0 ? (
+      ) : displayTopics.length === 0 ? (
         <EmptyState
           icon={FileStack}
           title={workspace.topics.length === 0 ? messages.thesis.noTopics : searchCopy.noMatch}
           description={messages.thesis.noTopicsDescription}
+          action={
+            selectedSupervisorId ? (
+              <Button type="button" variant="outline" onClick={() => setSelectedSupervisorId('')}>
+                {locale === 'vi' ? 'Xem đề tài của tất cả giảng viên' : 'View all topics'}
+              </Button>
+            ) : undefined
+          }
         />
       ) : (
         <Card variant="muted">
@@ -325,47 +512,64 @@ export default function ThesisTopicCatalogPage() {
             <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
               <div>
                 <CardTitle>{messages.thesis.topicsTitle}</CardTitle>
-                <CardDescription>{messages.thesis.topicsDescription}</CardDescription>
+                <CardDescription>
+                  {selectedSupervisor
+                    ? (locale === 'vi' ? `Các đề tài do GVHD ${selectedSupervisor.name} hướng dẫn` : `Topics advised by ${selectedSupervisor.name}`)
+                    : messages.thesis.topicsDescription}
+                </CardDescription>
               </div>
               <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                {matchingTopics.length} {locale === 'vi' ? 'đề tài' : 'topics'}
+                {displayTopics.length} {locale === 'vi' ? 'đề tài' : 'topics'}
               </span>
             </div>
           </CardHeader>
           <CardContent className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-            {matchingTopics.map((topic) => (
-              <LocalizedLink
-                key={topic.id}
-                href={`/dashboard/thesis/topics/${topic.id}`}
-                className={cn(
-                  'group flex min-h-[210px] flex-col rounded-lg border border-border/70 bg-card p-5',
-                  'transition-colors hover:border-primary/50 hover:bg-primary/[0.025]',
-                  'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
-                )}
-              >
-                <div className="flex items-start justify-between gap-3">
-                  <span className="rounded-md bg-secondary px-2.5 py-1 text-xs font-semibold text-muted-foreground">
-                    {topic.maxGroups} {messages.thesis.groups.toLowerCase()}
+            {displayTopics.map((topic) => {
+              const supervisorName = getTopicSupervisorName(topic.id);
+              return (
+                <LocalizedLink
+                  key={topic.id}
+                  href={`/dashboard/thesis/topics/${topic.id}`}
+                  className={cn(
+                    'group flex min-h-[220px] flex-col rounded-xl border border-border/70 bg-card p-5',
+                    'transition duration-200 hover:border-primary/50 hover:bg-primary/[0.025] hover:shadow-sm',
+                    'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
+                  )}
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <span className="rounded-md bg-secondary px-2.5 py-1 text-xs font-semibold text-muted-foreground">
+                      {topic.maxGroups} {messages.thesis.groups.toLowerCase()}
+                    </span>
+                    <ArrowUpRight className="h-4 w-4 text-muted-foreground transition-transform group-hover:-translate-y-0.5 group-hover:translate-x-0.5" />
+                  </div>
+                  <h2
+                    className="mt-4 line-clamp-2 text-base font-bold leading-6 text-foreground group-hover:text-primary transition-colors"
+                    title={topic.title}
+                  >
+                    {topic.title}
+                  </h2>
+                  <div className="mt-2.5 flex items-center gap-1.5 text-xs text-primary font-medium">
+                    <GraduationCap className="h-4 w-4 shrink-0 text-primary" />
+                    <span className="font-bold text-foreground">
+                      {locale === 'vi' ? 'GVHD:' : 'Advisor:'}
+                    </span>
+                    <span className="truncate font-semibold text-primary" title={supervisorName}>
+                      {supervisorName || (locale === 'vi' ? 'Đang cập nhật' : 'TBD')}
+                    </span>
+                  </div>
+                  <p
+                    className="mt-2 line-clamp-3 text-xs leading-5 text-muted-foreground"
+                    title={plainTextDescription(topic.description)}
+                  >
+                    {plainTextDescription(topic.description)}
+                  </p>
+                  <span className={cn('mt-auto pt-4 text-xs font-bold text-primary flex items-center gap-1')}>
+                    {messages.thesis.topicDetailTitle}
+                    <ArrowUpRight className="h-3 w-3" />
                   </span>
-                  <ArrowUpRight className="h-4 w-4 text-muted-foreground transition-transform group-hover:-translate-y-0.5 group-hover:translate-x-0.5" />
-                </div>
-                <h2
-                  className="mt-5 line-clamp-3 text-lg font-semibold leading-7 text-foreground"
-                  title={topic.title}
-                >
-                  {topic.title}
-                </h2>
-                <p
-                  className="mt-2 line-clamp-4 text-sm leading-6 text-muted-foreground"
-                  title={plainTextDescription(topic.description)}
-                >
-                  {plainTextDescription(topic.description)}
-                </p>
-                <span className={cn('mt-auto pt-5 text-sm font-semibold text-primary')}>
-                  {messages.thesis.topicDetailTitle}
-                </span>
-              </LocalizedLink>
-            ))}
+                </LocalizedLink>
+              );
+            })}
           </CardContent>
         </Card>
       )}

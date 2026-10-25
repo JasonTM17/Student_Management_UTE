@@ -50,6 +50,7 @@ import { useI18n } from '@/i18n';
 import { ThesisWorkflowStepper } from '@/components/thesis/ThesisWorkflowStepper';
 import { ThesisRegulationGuide } from '@/components/thesis/ThesisRegulationGuide';
 import { RoundMilestoneCard } from '@/components/thesis/RoundMilestoneCard';
+import { StatusBadge } from '@/components/thesis/StatusBadge';
 import CouncilDefenseWorkspace from '@/features/thesis/components/CouncilDefenseWorkspace';
 import GvpbReviewPanel from '@/features/thesis/components/GvpbReviewPanel';
 import {
@@ -67,6 +68,7 @@ import SupervisedGroupList from '@/features/thesis/components/SupervisedGroupLis
 import ThesisRepositoryWorkspace from '@/features/thesis/components/ThesisRepositoryWorkspace';
 import { departmentsApi, fetchAllPages, lecturersApi } from '@/lib/api';
 import { getLocalizedName } from '@/lib/academic-content';
+import { plainTextThesisDescription } from '@/lib/thesis-text';
 import type { Department, Lecturer } from '@/types/api';
 import {
   getThesisTopicCapabilities,
@@ -2615,27 +2617,114 @@ export default function ThesisPage() {
     return { ...member, displayName: memberDisplayName, identifier: memberIdentifier };
   });
 
-  const renderTopicsCard = () => (
-<Card className="h-full">
-              <CardHeader>
-                <CardTitle>{messages.thesis.topicsTitle}</CardTitle>
-                <CardDescription>{messages.thesis.topicsDescription}</CardDescription>
-              </CardHeader>
-              <CardContent>
-                {/* Topic selection moved to the catalog: the inline grid could
-                    not show every topic, and lecturers were being offered a
-                    chooser for a topic they do not pick. */}
-                <div className="flex flex-col items-start gap-3 rounded-lg border border-border/70 bg-card p-5">
-                  <p className="text-sm leading-6 text-muted-foreground">
-                    {messages.thesis.openCatalogHint}
-                  </p>
-                  <LinkButton href="/dashboard/thesis/topics" variant="outline">
-                    {messages.thesis.navigation.catalog}
-                  </LinkButton>
+  const renderTopicsCard = () => {
+    if (currentGroup?.topicId) {
+      const topicTitle = currentTopic?.title || getTopicTitle(currentGroup.topicId);
+      const topicDescription = currentTopic?.description
+        ? plainTextThesisDescription(currentTopic.description)
+        : null;
+      return (
+        <Card className="h-full border-primary/30 bg-gradient-to-b from-card to-primary/[0.02]">
+          <CardHeader>
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <div className="flex items-center gap-2">
+                <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-primary/10 text-primary">
+                  <BookOpen className="h-4 w-4" />
+                </span>
+                <div>
+                  <CardTitle className="text-base sm:text-lg">
+                    {locale === 'vi' ? 'Đề tài Khóa luận đã đăng ký' : 'Registered Thesis Topic'}
+                  </CardTitle>
+                  <CardDescription>
+                    {locale === 'vi' ? 'Đề tài nghiên cứu chính thức của nhóm' : 'Official research topic for your group'}
+                  </CardDescription>
                 </div>
-              </CardContent>
-            </Card>
-  );
+              </div>
+              <StatusBadge status={currentGroup.approvalStatus} variant="approval" />
+            </div>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="rounded-xl border border-border/80 bg-background/80 p-4 space-y-3">
+              <h3 className="text-base font-bold text-foreground leading-snug">
+                {topicTitle}
+              </h3>
+              {topicDescription && (
+                <p className="text-xs text-muted-foreground line-clamp-3 leading-relaxed">
+                  {topicDescription}
+                </p>
+              )}
+
+              <div className="flex flex-wrap items-center gap-2 pt-2 border-t border-border/60 text-xs">
+                <span className="font-semibold text-muted-foreground flex items-center gap-1">
+                  <GraduationCap className="h-3.5 w-3.5 text-primary" />
+                  {locale === 'vi' ? 'Giảng viên hướng dẫn (GVHD):' : 'Advisor:'}
+                </span>
+                <span className="font-bold text-foreground">
+                  {studentTopicSupervisors.length > 0
+                    ? studentTopicSupervisors.join(', ')
+                    : (locale === 'vi' ? 'Đang cập nhật' : 'TBD')}
+                </span>
+              </div>
+            </div>
+
+            <div className="flex flex-wrap items-center gap-3 pt-1">
+              <LinkButton
+                href={`/dashboard/thesis/topics/${currentGroup.topicId}`}
+                variant="default"
+                size="sm"
+                className="gap-1.5"
+              >
+                <BookOpen className="h-4 w-4" />
+                {locale === 'vi' ? 'Xem chi tiết đề tài' : 'View Topic Details'}
+              </LinkButton>
+              {isGroupLeader && currentGroup.approvalStatus !== 'APPROVED' && isRegistrationWindowOpen && (
+                <LinkButton
+                  href="/dashboard/thesis/topics"
+                  variant="outline"
+                  size="sm"
+                  className="gap-1.5"
+                >
+                  {locale === 'vi' ? 'Đổi đề tài khác' : 'Change Topic'}
+                </LinkButton>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+      );
+    }
+
+    return (
+      <Card className="h-full">
+        <CardHeader>
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <div>
+              <CardTitle>{messages.thesis.topicsTitle}</CardTitle>
+              <CardDescription>{messages.thesis.topicsDescription}</CardDescription>
+            </div>
+            <span className="rounded-md bg-amber-500/10 px-2.5 py-1 text-xs font-semibold text-amber-700 dark:text-amber-400 border border-amber-500/20">
+              {locale === 'vi' ? 'Chưa đăng ký đề tài' : 'No Topic Selected'}
+            </span>
+          </div>
+        </CardHeader>
+        <CardContent>
+          <div className="flex flex-col items-start gap-4 rounded-xl border border-dashed border-border/80 bg-muted/30 p-5">
+            <div className="space-y-1.5">
+              <h4 className="text-sm font-bold text-foreground">
+                {locale === 'vi' ? 'Bước tiếp theo: Chọn GVHD & Đề tài' : 'Next Step: Choose Advisor & Topic'}
+              </h4>
+              <p className="text-xs leading-relaxed text-muted-foreground">
+                {messages.thesis.openCatalogHint}
+              </p>
+            </div>
+            <LinkButton href="/dashboard/thesis/topics" variant="default" className="gap-2">
+              <GraduationCap className="h-4 w-4" />
+              {locale === 'vi' ? 'Chọn GVHD & Đề tài khóa luận' : 'Select Advisor & Topic'}
+            </LinkButton>
+          </div>
+        </CardContent>
+      </Card>
+    );
+  };
 
   return (
     <div className="space-y-8">

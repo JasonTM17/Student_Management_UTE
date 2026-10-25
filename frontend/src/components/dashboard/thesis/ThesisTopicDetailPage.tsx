@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { ArrowLeft, CheckCircle2, FileStack } from 'lucide-react';
+import { ArrowLeft, CheckCircle2, FileStack, GraduationCap } from 'lucide-react';
 import { useParams, useSearchParams } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { LinkButton } from '@/components/ui/link-button';
@@ -13,7 +13,7 @@ import { PageHeader, SectionEyebrow } from '@/components/ui/page-header';
 import { WorkspaceForbiddenState } from '@/components/ProtectedRoute';
 import { EmptyState, ErrorState, LoadingState } from '@/components/ui/state-block';
 import { StatusBadge } from '@/components/thesis/StatusBadge';
-import { thesisApi, type ThesisTopic } from '@/lib/thesis-api';
+import { thesisApi, type ThesisTopic, type ThesisTopicSupervisor } from '@/lib/thesis-api';
 import { campusErrorCode } from '@/lib/campus-error';
 import { useThesisWorkspace } from './useThesisWorkspace';
 
@@ -30,6 +30,7 @@ export default function ThesisTopicDetailPage() {
   // one topic and commit to another.
   const [directTopic, setDirectTopic] = useState<{ id: string; topic: ThesisTopic | null } | null>(null);
   const [directLoading, setDirectLoading] = useState(false);
+  const [supervisors, setSupervisors] = useState<ThesisTopicSupervisor[]>([]);
   const [isChoosing, setIsChoosing] = useState(false);
   const [actionError, setActionError] = useState('');
 
@@ -112,6 +113,25 @@ export default function ThesisTopicDetailPage() {
       setSelectedRoundId(matched.roundId);
     }
   }, [topicId, topics, selectedRoundId, setSelectedRoundId]);
+
+  useEffect(() => {
+    if (!topicId) {
+      setSupervisors([]);
+      return;
+    }
+    let cancelled = false;
+    thesisApi
+      .listSupervisors(topicId)
+      .then((sups) => {
+        if (!cancelled) setSupervisors(sups);
+      })
+      .catch(() => {
+        if (!cancelled) setSupervisors([]);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [topicId]);
 
   const topic = topics.find((item) => item.id === topicId)
     ?? (directTopic !== null && directTopic.id === topicId ? directTopic.topic : null);
@@ -218,6 +238,17 @@ export default function ThesisTopicDetailPage() {
             <CardTitle className="text-lg">{messages.thesis.topicDetailTitle}</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4 text-sm">
+            <div className="flex flex-col gap-1.5 border-b border-border/70 pb-3">
+              <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                {locale === 'vi' ? 'Giảng viên hướng dẫn (GVHD)' : 'Thesis Advisor'}
+              </span>
+              <span className="font-bold text-foreground flex items-center gap-1.5 text-sm">
+                <GraduationCap className="h-4 w-4 text-primary shrink-0" />
+                {supervisors.length > 0
+                  ? supervisors.map((s) => [s.lastName, s.firstName].filter(Boolean).join(' ').trim() || s.lecturerId).join(', ')
+                  : (locale === 'vi' ? 'Đang cập nhật' : 'TBD')}
+              </span>
+            </div>
             <div className="flex items-center justify-between gap-3 border-b border-border/70 pb-3">
               <span className="text-muted-foreground">{messages.thesis.detail.maxGroups}</span>
               <span className="font-semibold text-foreground">{topic.maxGroups}</span>
