@@ -16,6 +16,7 @@ import io.campuscore.restfulapi.testsupport.CurrentAccountJwt;
 import java.sql.Timestamp;
 import java.time.Clock;
 import java.time.Instant;
+import java.time.OffsetDateTime;
 import java.time.ZoneId;
 import java.time.ZonedDateTime;
 import java.util.List;
@@ -326,6 +327,43 @@ class GradeAppealPersistenceTest {
                 Timestamp.class, ENROLLMENT)).isNull();
         assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM notifications.notification WHERE user_id=?"
                 + " AND type='GRADE_UNPUBLISH'", Integer.class, STUDENT_USER)).isEqualTo(1);
+    }
+
+    @Test
+    void unpublishAllLeavesWithdrawnWGradePublishedAndUnpublishesGradeableEnrollments() throws Exception {
+        jdbc.update("UPDATE academic.\"Enrollment\" SET \"status\"='WITHDRAWN', \"letterGrade\"='W'"
+                + " WHERE \"id\"=?", ENROLLMENT);
+
+        mvc.perform(post("/api/v1/admin/sections/" + SECTION + "/grades/unpublish")
+                        .with(admin()).contentType(MediaType.APPLICATION_JSON)
+                        .content(unpublishBody(List.of(), REVIEW_REASON)))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.unpublishedCount").value(1));
+
+        Map<String, Object> withdrawn = jdbc.queryForMap("SELECT \"status\", \"gradeStatus\", \"letterGrade\","
+                + " \"gradePublishedAt\" FROM academic.\"Enrollment\" WHERE \"id\"=?", ENROLLMENT);
+        assertThat(withdrawn).containsEntry("status", "WITHDRAWN")
+                .containsEntry("gradeStatus", "PUBLISHED").containsEntry("letterGrade", "W");
+        assertThat(((OffsetDateTime) withdrawn.get("gradePublishedAt")).toInstant()).isEqualTo(PUBLISHED_AT);
+        assertThat(jdbc.queryForObject("SELECT \"gradeStatus\" FROM academic.\"Enrollment\" WHERE \"id\"=?",
+                String.class, OTHER_ENROLLMENT)).isEqualTo("DRAFT");
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM campuscore_audit.\"AdminAudit\""
+                + " WHERE \"entityType\"='Enrollment' AND \"action\"='GRADE_UNPUBLISHED'"
+                + " AND \"entityId\"=?", Integer.class, ENROLLMENT)).isZero();
+    }
+
+    @Test
+    void explicitlySelectedWithdrawnGradeCannotBeUnpublished() throws Exception {
+        jdbc.update("UPDATE academic.\"Enrollment\" SET \"status\"='WITHDRAWN', \"letterGrade\"='W'"
+                + " WHERE \"id\"=?", ENROLLMENT);
+
+        mvc.perform(post("/api/v1/admin/sections/" + SECTION + "/grades/unpublish")
+                        .with(admin()).contentType(MediaType.APPLICATION_JSON)
+                        .content(unpublishBody(List.of(ENROLLMENT), REVIEW_REASON)))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("GRADE_UNPUBLISH_CONFLICT"));
+
+        assertThat(jdbc.queryForObject("SELECT \"gradeStatus\" FROM academic.\"Enrollment\" WHERE \"id\"=?",
+                String.class, ENROLLMENT)).isEqualTo("PUBLISHED");
     }
 
     @Test
