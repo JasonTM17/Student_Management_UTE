@@ -11,6 +11,7 @@ public record UpdateAnnouncementCommand(
         PatchValue<List<String>> targetRoles,
         PatchValue<List<Integer>> targetYears,
         PatchValue<List<String>> targetDepartments,
+        PatchValue<List<String>> targetFaculties,
         PatchValue<Boolean> isGlobal,
         PatchValue<Instant> publishAt,
         PatchValue<Instant> expiresAt,

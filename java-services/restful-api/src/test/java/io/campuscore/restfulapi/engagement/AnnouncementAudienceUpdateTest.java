@@ -67,6 +67,7 @@ class AnnouncementAudienceUpdateTest {
                     "targetRoles" VARCHAR ARRAY NOT NULL,
                     "targetYears" INTEGER ARRAY NOT NULL,
                     "targetDepartments" VARCHAR ARRAY NOT NULL DEFAULT ARRAY[],
+                    "targetFaculties" VARCHAR ARRAY,
                     "isGlobal" BOOLEAN NOT NULL,
                     "publishAt" TIMESTAMP WITH TIME ZONE,
                     "expiresAt" TIMESTAMP WITH TIME ZONE,

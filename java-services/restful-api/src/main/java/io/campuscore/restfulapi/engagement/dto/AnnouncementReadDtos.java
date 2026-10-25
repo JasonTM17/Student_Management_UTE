@@ -19,6 +19,7 @@ public final class AnnouncementReadDtos {
             List<String> targetRoles,
             List<Integer> targetYears,
             List<String> targetDepartments,
+            List<String> targetFaculties,
             boolean isGlobal,
             @JsonFormat(shape = JsonFormat.Shape.STRING, pattern = "yyyy-MM-dd'T'HH:mm:ss.SSSX", timezone = "UTC")
             Instant publishAt,

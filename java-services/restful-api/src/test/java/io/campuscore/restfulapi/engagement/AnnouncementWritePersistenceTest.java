@@ -99,6 +99,49 @@ class AnnouncementWritePersistenceTest {
                     "registrationSource" VARCHAR(40)
                 )
                 """);
+
+        // Faculty-target resolution chain (V149): the reader predicate parses
+        // Student -> Curriculum -> Department -> Faculty and the lecturer's
+        // own department on every personalized feed query.
+        jdbc.execute("""
+                CREATE TABLE IF NOT EXISTS academic."Faculty" (
+                    "id" VARCHAR(120) PRIMARY KEY,
+                    "name" VARCHAR(240),
+                    "isActive" BOOLEAN NOT NULL DEFAULT TRUE
+                )
+                """);
+        jdbc.execute("""
+                CREATE TABLE IF NOT EXISTS academic."Department" (
+                    "id" VARCHAR(120) PRIMARY KEY,
+                    "name" VARCHAR(240),
+                    "facultyId" VARCHAR(120) NOT NULL,
+                    "isActive" BOOLEAN NOT NULL DEFAULT TRUE
+                )
+                """);
+        jdbc.execute("""
+                CREATE TABLE IF NOT EXISTS academic."Curriculum" (
+                    "id" VARCHAR(120) PRIMARY KEY,
+                    "name" VARCHAR(240),
+                    "departmentId" VARCHAR(120) NOT NULL
+                )
+                """);
+        jdbc.execute("""
+                CREATE TABLE IF NOT EXISTS academic."Student" (
+                    "id" VARCHAR(120) PRIMARY KEY,
+                    "curriculumId" VARCHAR(120)
+                )
+                """);
+        jdbc.execute("""
+                CREATE TABLE IF NOT EXISTS academic."Lecturer" (
+                    "id" VARCHAR(120) PRIMARY KEY,
+                    "departmentId" VARCHAR(120) NOT NULL
+                )
+                """);
+        jdbc.execute("DELETE FROM academic.\"Lecturer\"");
+        jdbc.execute("DELETE FROM academic.\"Student\"");
+        jdbc.execute("DELETE FROM academic.\"Curriculum\"");
+        jdbc.execute("DELETE FROM academic.\"Department\"");
+        jdbc.execute("DELETE FROM academic.\"Faculty\"");
         jdbc.execute("DELETE FROM academic.\"Enrollment\"");
         // The seeded notice is scoped to section-1, so the student who must see
         // it is enrolled there.
@@ -117,6 +160,7 @@ class AnnouncementWritePersistenceTest {
                     "targetRoles" VARCHAR ARRAY NOT NULL,
                     "targetYears" INTEGER ARRAY NOT NULL,
                     "targetDepartments" VARCHAR ARRAY NOT NULL DEFAULT ARRAY[],
+                    "targetFaculties" VARCHAR ARRAY,
                     "isGlobal" BOOLEAN NOT NULL,
                     "publishAt" TIMESTAMP WITH TIME ZONE,
                     "expiresAt" TIMESTAMP WITH TIME ZONE,
@@ -136,18 +180,6 @@ class AnnouncementWritePersistenceTest {
                     "archivedBy" VARCHAR(120),
                     "displayOrder" INTEGER,
                     "notifiedAt" TIMESTAMP WITH TIME ZONE
-                )
-                """);
-        jdbc.execute("""
-                CREATE TABLE IF NOT EXISTS academic."Curriculum" (
-                    "id" VARCHAR(120) PRIMARY KEY,
-                    "departmentId" VARCHAR(120)
-                )
-                """);
-        jdbc.execute("""
-                CREATE TABLE IF NOT EXISTS academic."Lecturer" (
-                    "id" VARCHAR(120) PRIMARY KEY,
-                    "departmentId" VARCHAR(120)
                 )
                 """);
         jdbc.execute("""
@@ -251,6 +283,75 @@ class AnnouncementWritePersistenceTest {
                 .andExpect(jsonPath("$.section").exists())
                 .andExpect(jsonPath("$.lecturer.id").value("lecturer-1"))
                 .andExpect(jsonPath("$.lecturer.displayName").doesNotExist());
+    }
+
+    @Test
+    void facultyTargetedAnnouncementDedupesPersistsAndNarrowsTheFeed() throws Exception {
+        jdbc.update("INSERT INTO academic.\"Faculty\" (\"id\", \"name\") VALUES ('faculty-write-1', 'Faculty One')");
+        jdbc.update("INSERT INTO academic.\"Department\" (\"id\", \"name\", \"facultyId\")"
+                + " VALUES ('department-write-1', 'Department One', 'faculty-write-1')");
+        jdbc.update("INSERT INTO academic.\"Curriculum\" (\"id\", \"name\", \"departmentId\")"
+                + " VALUES ('curriculum-write-1', 'Curriculum One', 'department-write-1')");
+        jdbc.update("INSERT INTO academic.\"Student\" (\"id\", \"curriculumId\")"
+                + " VALUES ('student-profile', 'curriculum-write-1')");
+
+        // Duplicate ids collapse to one entry; the blank entry is rejected.
+        mvc.perform(post("/api/v1/announcements")
+                        .with(adminJwt("admin-1"))
+                        .contentType("application/json")
+                        .content("""
+                                {
+                                  "title": "Faculty-only orientation",
+                                  "content": "Welcome, Faculty One students.",
+                                  "isGlobal": true,
+                                  "targetFaculties": ["faculty-write-1", "faculty-write-1"]
+                                }
+                                """))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.targetFaculties.length()").value(1))
+                .andExpect(jsonPath("$.targetFaculties[0]").value("faculty-write-1"));
+        Integer stored = jdbc.queryForObject(
+                "SELECT COUNT(*) FROM \"engagement\".\"Announcement\""
+                        + " WHERE \"title\" = 'Faculty-only orientation'"
+                        + " AND CARDINALITY(\"targetFaculties\") = 1",
+                Integer.class);
+        org.junit.jupiter.api.Assertions.assertEquals(1, stored);
+
+        mvc.perform(post("/api/v1/announcements")
+                        .with(adminJwt("admin-1"))
+                        .contentType("application/json")
+                        .content("""
+                                {
+                                  "title": "Blank faculty",
+                                  "content": "Rejected.",
+                                  "targetFaculties": ["   "]
+                                }
+                                """))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("INVALID_REQUEST"));
+
+        // The student of that faculty sees it; a student with no academic row
+        // resolves no faculty and must not.
+        mvc.perform(get("/api/v1/announcements/my")
+                        .with(fixtureJwt(jdbc, "student-1", token -> token
+                                .subject("student-1")
+                                .claim("email", "student-1@campuscore.edu")
+                                .claim("roles", List.of("STUDENT"))
+                                .claim("studentId", "student-profile")
+                                .claim("student", Map.of("year", 1)), "STUDENT")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data[?(@.title == 'Faculty-only orientation')]").isNotEmpty());
+        io.campuscore.restfulapi.testsupport.AccountAuthorityFixture.student(
+                jdbc, "student-nofac-1", "student-no-faculty", 1);
+        mvc.perform(get("/api/v1/announcements/my")
+                        .with(fixtureJwt(jdbc, "student-nofac-1", token -> token
+                                .subject("student-nofac-1")
+                                .claim("email", "student-nofac-1@campuscore.edu")
+                                .claim("roles", List.of("STUDENT"))
+                                .claim("studentId", "student-no-faculty")
+                                .claim("student", Map.of("year", 1)), "STUDENT")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data[?(@.title == 'Faculty-only orientation')]").isEmpty());
     }
 
     @Test
