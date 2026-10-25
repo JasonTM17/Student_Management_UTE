@@ -1,5 +1,6 @@
 'use client';
 
+import { useEffect, useState } from 'react';
 import {
   CalendarDays,
   CircleDot,
@@ -13,11 +14,18 @@ import {
 import { cn } from '@/lib/utils';
 import { useI18n } from '@/i18n';
 import type { ThesisRound } from '@/lib/thesis-api';
+import { thesisWindowRemaining } from '@/lib/thesis-datetime';
 
 interface RoundMilestoneCardProps {
   round: ThesisRound;
   formatDateTime: (value: string | number | Date) => string;
   statusLabel: (status: string) => string;
+}
+
+function fill(template: string, values: Record<string, number>): string {
+  return template.replace(/\{(\w+)\}/g, (match, key: string) =>
+    key in values ? String(values[key]) : match,
+  );
 }
 
 export function RoundMilestoneCard({
@@ -27,9 +35,44 @@ export function RoundMilestoneCard({
 }: RoundMilestoneCardProps) {
   const { messages } = useI18n();
   const rm = messages.roundMilestone;
+  // Remaining time only exists on the client clock — computing it during SSR
+  // would stamp the server's instant and then hydrate to a different text.
+  const [now, setNow] = useState<number | null>(null);
+  useEffect(() => {
+    setNow(Date.now());
+    const timer = setInterval(() => setNow(Date.now()), 60_000);
+    return () => clearInterval(timer);
+  }, []);
+
+  const remainingLabel = (end: string | null | undefined) => {
+    if (now === null) return null;
+    const left = thesisWindowRemaining(end, now);
+    if (!left) return null;
+    const template =
+      left.days > 0
+        ? rm.remainingDaysHours
+        : left.hours > 0
+          ? rm.remainingHoursMinutes
+          : rm.remainingMinutes;
+    return fill(template, { d: left.days, h: left.hours, m: left.minutes });
+  };
+
+  // A window counts down to its close only while it is actually open; before
+  // it starts the open/close line already tells the story.
+  const remainingWindowLabel = (start: string | null | undefined, end: string | null | undefined) => {
+    if (now === null) return null;
+    const startMs = start ? new Date(start).getTime() : NaN;
+    if (!Number.isFinite(startMs) || now < startMs) return null;
+    return remainingLabel(end);
+  };
   const isKLTN = round.thesisType === 'KLTN';
   const isTLCN = round.thesisType === 'TLCN';
   const isHasGVPB = isKLTN || isTLCN;
+
+  const phase1Remaining = remainingWindowLabel(round.lecturerSubmitStart, round.lecturerSubmitEnd);
+  const phase2Remaining = remainingWindowLabel(round.registrationStart, round.registrationEnd);
+  const gvpbRemaining = remainingLabel(round.gvpbDeadline);
+  const councilRemaining = remainingLabel(round.defenseDate || round.reportDate);
 
   const typeConfig: Record<string, { label: string; sub: string; badgeClass: string }> = {
     KLTN: {
@@ -112,6 +155,11 @@ export function RoundMilestoneCard({
             <span className="text-muted-foreground">{rm.to}</span>{' '}
             {formatDateTime(round.lecturerSubmitEnd)}
           </p>
+          {phase1Remaining ? (
+            <p className="text-[11px] font-semibold text-primary" role="status">
+              {phase1Remaining}
+            </p>
+          ) : null}
           <p className="text-[11px] text-muted-foreground">
             {rm.phase1Desc}
           </p>
@@ -129,6 +177,11 @@ export function RoundMilestoneCard({
             <span className="text-muted-foreground">{rm.to}</span>{' '}
             {formatDateTime(round.registrationEnd)}
           </p>
+          {phase2Remaining ? (
+            <p className="text-[11px] font-semibold text-primary" role="status">
+              {phase2Remaining}
+            </p>
+          ) : null}
           <p className="text-[11px] text-muted-foreground">
             {rm.phase2Desc}
           </p>
@@ -145,6 +198,11 @@ export function RoundMilestoneCard({
               <p className="text-xs font-semibold text-foreground leading-relaxed">
                 {formatDateTime(round.gvpbDeadline)}
               </p>
+              {gvpbRemaining ? (
+                <p className="text-[11px] font-semibold text-primary" role="status">
+                  {gvpbRemaining}
+                </p>
+              ) : null}
               <p className="text-[11px] text-muted-foreground">
                 {rm.gvpbDesc}
               </p>
@@ -172,6 +230,11 @@ export function RoundMilestoneCard({
               <p className="text-xs font-semibold text-foreground leading-relaxed">
                 {formatDateTime(round.defenseDate || round.reportDate || '')}
               </p>
+              {councilRemaining ? (
+                <p className="text-[11px] font-semibold text-primary" role="status">
+                  {councilRemaining}
+                </p>
+              ) : null}
               <p className="text-[11px] text-muted-foreground">
                 {rm.councilDesc}
               </p>
