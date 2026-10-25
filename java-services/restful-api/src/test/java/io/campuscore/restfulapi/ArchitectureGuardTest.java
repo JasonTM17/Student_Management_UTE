@@ -104,6 +104,7 @@ class ArchitectureGuardTest {
             "academic/entity/Enrollment",
             "academic/entity/EnrollmentEvent",
             "academic/entity/Faculty",
+            "academic/entity/GradeAppeal",
             "academic/entity/GradeItem",
             "academic/entity/GradeItemLegacyArchive",
             "academic/entity/Lecturer",

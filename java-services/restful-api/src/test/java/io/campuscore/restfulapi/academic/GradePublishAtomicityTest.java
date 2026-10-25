@@ -91,7 +91,7 @@ class GradePublishAtomicityTest {
         jdbc.update("UPDATE \"academic\".\"Enrollment\" SET \"status\" = 'COMPLETED', \"gradeStatus\" = 'APPEALED'"
                 + " WHERE \"id\" = 'enrollment'");
         jdbc.update("INSERT INTO \"academic\".\"Student\" VALUES ('student-draft', 'draft-user')");
-        jdbc.update("INSERT INTO \"academic\".\"Enrollment\" VALUES"
+        jdbc.update("INSERT INTO \"academic\".\"Enrollment\" (\"id\", \"studentId\", \"sectionId\", \"status\", \"gradeStatus\", \"finalGrade\", \"letterGrade\", \"updatedAt\") VALUES"
                 + " ('enrollment-draft', 'student-draft', 'section', 'ENROLLED', 'DRAFT', 7, 'B', CURRENT_TIMESTAMP)");
         jdbc.update("INSERT INTO \"academic\".\"StudentGrade\" VALUES"
                 + " ('p-draft', 'enrollment-draft', 'process', 7), ('f-draft', 'enrollment-draft', 'final', 7)");
