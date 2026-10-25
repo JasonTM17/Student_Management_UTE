@@ -1,4 +1,4 @@
-package io.campuscore.restfulapi.academic.service;
+package io.campuscore.restfulapi.academic.model;
 
 import java.util.Locale;
 import java.util.Set;

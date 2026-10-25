@@ -1,6 +1,7 @@
 package io.campuscore.restfulapi.academic.service;
 
 import io.campuscore.restfulapi.academic.registration.service.RegistrationService;
+import io.campuscore.restfulapi.academic.model.SemesterStatuses;
 import io.campuscore.restfulapi.academic.dto.AcademicEnrollmentReadDtos.EnrollmentResponse;
 import io.campuscore.restfulapi.academic.dto.AcademicMutationDtos.GradeUpdate;
 import io.campuscore.restfulapi.audit.service.AdminAuditRecorder;

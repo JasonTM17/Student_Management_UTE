@@ -395,10 +395,9 @@ export default function ThesisAdvisorDirectoryPage() {
       map.set(ownerId, { ...current, topicCount: current.topicCount + 1 });
     };
     topics.forEach((topic) => {
-      // ThesisTopic payloads do not carry supervisors yet; the optional
-      // projection credits every listed supervisor when it ever arrives.
-      const supervisors = (topic as ThesisTopic & { supervisors?: Array<{ lecturerId: string }> })
-        .supervisors;
+      // Topic payloads carry their supervisor roster; an older or cached
+      // payload without it still falls back to crediting the creator.
+      const supervisors = topic.supervisors;
       if (supervisors && supervisors.length > 0) {
         supervisors.forEach((sup) => credit(sup.lecturerId));
       } else {

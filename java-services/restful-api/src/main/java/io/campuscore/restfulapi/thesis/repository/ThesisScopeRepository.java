@@ -1,7 +1,9 @@
 package io.campuscore.restfulapi.thesis.repository;
 
+import io.campuscore.restfulapi.thesis.dto.ThesisTopicDtos.TopicSupervisorEntry;
 import java.math.BigDecimal;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import org.springframework.context.annotation.Profile;
 import org.springframework.jdbc.core.namedparam.MapSqlParameterSource;
@@ -101,6 +103,43 @@ public class ThesisScopeRepository {
                 String.class);
     }
 
+    /**
+     * Batched supervisor roster for a page of topic ids: a single statement
+     * resolves every listed topic's supervisors ordered by supervisor_order,
+     * so the topic list read model never fans out per topic. Names only — the
+     * contact column stays with the per-topic endpoint, which can authorize
+     * staff viewers for it.
+     */
+    public Map<UUID, List<TopicSupervisorEntry>> findSupervisorsByTopicIds(List<UUID> topicIds) {
+        if (topicIds == null || topicIds.isEmpty()) {
+            return Map.of();
+        }
+        Map<UUID, List<TopicSupervisorEntry>> byTopic = jdbc.query(
+                "SELECT supervisor.topic_id AS topic_id, supervisor.lecturer_id, supervisor.supervisor_order,"
+                        + " user_account.\"firstName\" AS first_name,"
+                        + " user_account.\"lastName\" AS last_name"
+                        + " FROM thesis.thesis_topic_supervisor supervisor"
+                        + " LEFT JOIN campuscore_auth.\"Lecturer\" lecturer ON lecturer.\"id\" = supervisor.lecturer_id"
+                        + " LEFT JOIN campuscore_auth.\"User\" user_account ON user_account.\"id\" = lecturer.\"userId\""
+                        + " WHERE supervisor.topic_id IN (:topicIds)"
+                        + " ORDER BY supervisor.topic_id, supervisor.supervisor_order",
+                new MapSqlParameterSource().addValue("topicIds", topicIds),
+                rs -> {
+                    Map<UUID, List<TopicSupervisorEntry>> rows = new java.util.LinkedHashMap<>();
+                    while (rs.next()) {
+                        rows.computeIfAbsent(rs.getObject("topic_id", UUID.class),
+                                        key -> new java.util.ArrayList<>())
+                                .add(new TopicSupervisorEntry(
+                                        rs.getString("lecturer_id"),
+                                        rs.getInt("supervisor_order"),
+                                        rs.getString("first_name"),
+                                        rs.getString("last_name")));
+                    }
+                    return rows;
+                });
+        return byTopic == null ? Map.of() : byTopic;
+    }
+
     public List<UUID> findSupervisedTopicIds(String lecturerId, List<UUID> topicIds) {
         return jdbc.queryForList(
                 "SELECT topic_id FROM thesis.thesis_topic_supervisor WHERE lecturer_id = :lecturerId AND topic_id IN (:topicIds)",
@@ -117,6 +156,26 @@ public class ThesisScopeRepository {
                         + "WHERE m.lecturer_id = :lecturerId AND ct.topic_id IN (:topicIds)",
                 new MapSqlParameterSource()
                         .addValue("lecturerId", lecturerId)
+                        .addValue("topicIds", topicIds),
+                UUID.class);
+    }
+
+    /**
+     * Topics a student took part in through an approved group — after results
+     * publication these are the only topic outcomes a student may read, the
+     * same participation scope {@code /me/results} applies.
+     */
+    public List<UUID> findParticipatedTopicIds(String studentId, List<UUID> topicIds) {
+        if (topicIds.isEmpty()) {
+            return List.of();
+        }
+        return jdbc.queryForList(
+                "SELECT DISTINCT g.topic_id FROM thesis.thesis_group g "
+                        + "JOIN thesis.thesis_group_member m ON m.group_id = g.id "
+                        + "WHERE m.student_id = :studentId AND g.approval_status = 'APPROVED' "
+                        + "AND g.topic_id IN (:topicIds)",
+                new MapSqlParameterSource()
+                        .addValue("studentId", studentId)
                         .addValue("topicIds", topicIds),
                 UUID.class);
     }

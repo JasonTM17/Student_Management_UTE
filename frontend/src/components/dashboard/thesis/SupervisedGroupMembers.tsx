@@ -7,7 +7,6 @@ import { Input } from '@/components/ui/input';
 import { useConfirmationDialog } from '@/components/ui/use-confirmation-dialog';
 import { useI18n } from '@/i18n';
 import { campusCodeMessage } from '@/lib/campus-error';
-import { cn } from '@/lib/utils';
 import { thesisApi, type ThesisGroup, type ThesisGroupMember, type ThesisStudentResult } from '@/lib/thesis-api';
 
 interface SupervisedGroupMembersProps {
@@ -139,29 +138,31 @@ export function SupervisedGroupMembers({ group, roundOpen = true, onChanged }: S
                 key={member.studentId}
                 className="flex items-center justify-between gap-2 rounded-md bg-secondary/40 px-2.5 py-1.5"
               >
-                <span className="min-w-0 truncate text-xs text-foreground" title={member.displayName || member.studentNumber || member.studentId}>
-                  {member.displayName || member.studentNumber || member.studentId}
+                <div className="flex min-w-0 flex-1 flex-wrap items-center gap-1.5 text-xs text-foreground">
+                  <span className="truncate max-w-[140px] sm:max-w-none font-medium" title={member.displayName || member.studentNumber || member.studentId}>
+                    {member.displayName || member.studentNumber || member.studentId}
+                  </span>
                   {member.studentNumber ? (
-                    <span className="ml-1.5 font-mono text-[11px] text-muted-foreground">
+                    <span className="font-mono text-[11px] text-muted-foreground shrink-0">
                       {member.studentNumber}
                     </span>
                   ) : null}
                   {member.isLeader ? (
-                    <span className="ml-1.5 rounded bg-primary/10 px-1.5 py-0.5 text-[11px] font-semibold text-primary">
+                    <span className="shrink-0 rounded bg-primary/10 px-1.5 py-0.5 text-[11px] font-semibold text-primary">
                       {messages.thesis.leaderBadge}
                     </span>
                   ) : null}
                   {member.isExternal ? (
-                    <span className="ml-1.5 rounded bg-amber-500/10 px-1.5 py-0.5 text-[11px] font-semibold text-amber-700 dark:text-amber-300">
+                    <span className="shrink-0 rounded bg-amber-500/10 px-1.5 py-0.5 text-[11px] font-semibold text-amber-700 dark:text-amber-300">
                       {messages.thesis.externalBadge}
                     </span>
                   ) : null}
                   {member.eligible === false ? (
-                    <span className="ml-1.5 rounded bg-amber-500/15 px-1.5 py-0.5 text-[11px] font-semibold text-amber-700 dark:text-amber-300">
+                    <span className="shrink-0 rounded bg-amber-500/15 px-1.5 py-0.5 text-[11px] font-semibold text-amber-700 dark:text-amber-300">
                       {messages.thesis.memberIneligibleBadge}
                     </span>
                   ) : null}
-                </span>
+                </div>
                 {member.isLeader ? null : (
                   <Button
                     type="button"
@@ -211,6 +212,7 @@ export function SupervisedGroupMembers({ group, roundOpen = true, onChanged }: S
                   type="button"
                   size="sm"
                   variant="outline"
+                  className="h-9 shrink-0"
                   onClick={() => void search()}
                   disabled={isPending || !query.trim()}
                 >
@@ -228,12 +230,15 @@ export function SupervisedGroupMembers({ group, roundOpen = true, onChanged }: S
                         {student.studentNumber ? (
                           <span className="ml-1.5 font-mono text-[11px]">{student.studentNumber}</span>
                         ) : null}
+                        {student.email ? (
+                          <span className="ml-1.5 font-mono text-[11px] text-muted-foreground/75">({student.email})</span>
+                        ) : null}
                       </span>
                       <Button
                         type="button"
                         size="sm"
                         variant="outline"
-                        className="h-7"
+                        className="h-9 shrink-0"
                         onClick={() => addInternal(student.studentId)}
                         disabled={isPending}
                       >
@@ -246,7 +251,7 @@ export function SupervisedGroupMembers({ group, roundOpen = true, onChanged }: S
                 <p className="text-xs text-muted-foreground">{messages.thesis.memberSearchEmpty}</p>
               ) : null}
 
-              <div className="flex flex-wrap items-center gap-2 border-t border-border/60 pt-2">
+              <div className="grid gap-2 border-t border-border/60 pt-2 sm:grid-cols-[1fr_1fr_auto]">
                 <Input
                   type="text"
                   value={externalName}
@@ -254,7 +259,7 @@ export function SupervisedGroupMembers({ group, roundOpen = true, onChanged }: S
                   placeholder={messages.thesis.externalMemberName}
                   aria-label={messages.thesis.externalMemberName}
                   disabled={isPending}
-                  className="h-9 max-w-[13rem] text-sm"
+                  className="h-9 text-sm"
                 />
                 <Input
                   type="text"
@@ -263,15 +268,15 @@ export function SupervisedGroupMembers({ group, roundOpen = true, onChanged }: S
                   placeholder={messages.thesis.externalMemberContact}
                   aria-label={messages.thesis.externalMemberContact}
                   disabled={isPending}
-                  className="h-9 max-w-[13rem] text-sm"
+                  className="h-9 text-sm"
                 />
                 <Button
                   type="button"
                   size="sm"
                   variant="outline"
+                  className="h-9"
                   onClick={addExternal}
                   disabled={isPending || !externalName.trim()}
-                  className={cn(!externalName.trim() && 'opacity-50')}
                 >
                   {messages.thesis.memberAddAction}
                 </Button>

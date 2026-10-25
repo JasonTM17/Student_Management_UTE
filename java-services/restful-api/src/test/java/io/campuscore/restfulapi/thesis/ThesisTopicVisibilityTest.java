@@ -1,6 +1,7 @@
 package io.campuscore.restfulapi.thesis;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
@@ -9,8 +10,10 @@ import static org.mockito.Mockito.when;
 import io.campuscore.restfulapi.thesis.entity.ThesisTopic;
 import io.campuscore.restfulapi.thesis.model.TopicStatus;
 import io.campuscore.restfulapi.thesis.repository.ThesisRoundReadPort;
+import io.campuscore.restfulapi.thesis.repository.ThesisScopeRepository;
 import io.campuscore.restfulapi.thesis.repository.ThesisTopicRepository;
 import io.campuscore.restfulapi.thesis.service.ThesisTopicService;
+import java.math.BigDecimal;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -28,13 +31,17 @@ class ThesisTopicVisibilityTest {
 
     private ThesisTopicRepository repository;
     private ThesisRoundReadPort rounds;
+    private ThesisScopeRepository scope;
     private ThesisTopicService service;
 
     @BeforeEach
     void setUp() {
         repository = mock(ThesisTopicRepository.class);
         rounds = mock(ThesisRoundReadPort.class);
-        service = new ThesisTopicService(repository, rounds, mock(io.campuscore.restfulapi.thesis.repository.ThesisScopeRepository.class));
+        scope = mock(ThesisScopeRepository.class);
+        when(scope.findSupervisorsByTopicIds(org.mockito.ArgumentMatchers.any()))
+                .thenReturn(java.util.Map.of());
+        service = new ThesisTopicService(repository, rounds, scope);
     }
 
     @Test
@@ -102,6 +109,70 @@ class ThesisTopicVisibilityTest {
         when(repository.findById(published.getId())).thenReturn(Optional.of(published));
 
         assertEquals(published.getId(), service.get(published.getId(), jwt("student-user-101", "STUDENT")).id());
+    }
+
+    /**
+     * Spec R12/R18: after the round publishes results a student reads the
+     * outcome of the topic their approved group took part in — and only that
+     * one. Other topics keep the outcome masked on the topic resource even
+     * though the topic row itself stays readable.
+     */
+    @Test
+    void publishedOutcomeStaysMaskedForStudentsOutsideTheAssignedGroup() throws ReflectiveOperationException {
+        ThesisTopic published = draftTopic("22222222-2222-2222-2222-222222222202", "lecturer-user-002");
+        setField(published, "status", TopicStatus.PUBLISHED);
+        setField(published, "finalScore", new BigDecimal("8.50"));
+        setField(published, "resultStatus", "GRADED");
+        when(scope.countPublishedResultsRounds(ROUND_ID)).thenReturn(1);
+        when(repository.findById(published.getId())).thenReturn(Optional.of(published));
+        when(scope.findParticipatedTopicIds(eq("student-101"), eq(List.of(published.getId()))))
+                .thenReturn(List.of());
+
+        var outsider = service.get(published.getId(), studentJwt("student-user-101", "student-101"));
+        assertNull(outsider.finalScore());
+        assertNull(outsider.resultStatus());
+
+        when(scope.findParticipatedTopicIds(eq("student-202"), eq(List.of(published.getId()))))
+                .thenReturn(List.of(published.getId()));
+        var participant = service.get(published.getId(), studentJwt("student-user-202", "student-202"));
+        assertEquals(new BigDecimal("8.50"), participant.finalScore());
+        assertEquals("GRADED", participant.resultStatus());
+    }
+
+    @Test
+    void publishedOutcomeStaysMaskedOnTheListForStudentsOutsideTheAssignedGroup()
+            throws ReflectiveOperationException {
+        ThesisTopic published = draftTopic("22222222-2222-2222-2222-222222222202", "lecturer-user-002");
+        setField(published, "status", TopicStatus.PUBLISHED);
+        setField(published, "finalScore", new BigDecimal("8.50"));
+        setField(published, "resultStatus", "GRADED");
+        when(scope.countPublishedResultsRounds(ROUND_ID)).thenReturn(1);
+        when(repository.findAllByRoundIdAndStatusOrderByTitle(eq(ROUND_ID), eq(TopicStatus.PUBLISHED)))
+                .thenReturn(List.of(published));
+        when(repository.findAllByRoundIdAndStatusOrderByTitle(eq(ROUND_ID), eq(TopicStatus.APPROVED)))
+                .thenReturn(List.of());
+        when(scope.findParticipatedTopicIds(eq("student-101"), eq(List.of(published.getId()))))
+                .thenReturn(List.of());
+
+        List<?> listing = service.list(ROUND_ID, null, studentJwt("student-user-101", "student-101"));
+
+        assertEquals(1, listing.size());
+        assertNull(((io.campuscore.restfulapi.thesis.dto.ThesisTopicDtos.TopicResponse) listing.get(0)).finalScore());
+    }
+
+    private static void setField(ThesisTopic topic, String name, Object value) throws ReflectiveOperationException {
+        var field = ThesisTopic.class.getDeclaredField(name);
+        field.setAccessible(true);
+        field.set(topic, value);
+    }
+
+    private static Jwt studentJwt(String subject, String studentId) {
+        return Jwt.withTokenValue("token-value")
+                .header("alg", "HS256")
+                .subject(subject)
+                .claim("roles", List.of("STUDENT"))
+                .claim("studentId", studentId)
+                .build();
     }
 
     private static ThesisTopic draftTopic(String id, String createdBy) {

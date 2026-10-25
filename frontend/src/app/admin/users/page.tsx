@@ -63,6 +63,8 @@ interface UserRecord {
   // held roles act as the fallback signal.
   hasStudentProfile?: boolean;
   hasLecturerProfile?: boolean;
+  studentId?: string | null;
+  employeeId?: string | null;
   createdAt: string;
 }
 
@@ -136,17 +138,17 @@ function RoleTabButton({
     <Button
       type="button"
       size="sm"
-      variant={active ? 'default' : 'secondary'}
+      variant="ghost"
       aria-pressed={active}
       onClick={onClick}
       disabled={disabled}
       title={title}
       className={cn(
-        'h-auto px-3 py-1.5 text-xs',
+        'h-auto px-3 py-1.5 text-xs font-medium transition-colors',
         className,
         active
-          ? activeClassName
-          : inactiveClassName ?? 'bg-secondary/40 text-muted-foreground hover:bg-secondary/40 hover:text-foreground',
+          ? cn('bg-primary text-primary-foreground shadow-xs font-semibold', activeClassName)
+          : inactiveClassName ?? 'bg-secondary/40 text-muted-foreground hover:bg-secondary/60 hover:text-foreground',
       )}
     >
       {children}
@@ -766,10 +768,10 @@ export default function AdminUsersPage() {
       lastName: userRecord.lastName,
       role: primaryManagedRole(userRecord.roles) ?? defaultRole,
       status: (userRecord.status ?? '').trim().toUpperCase() || 'ACTIVE',
-      studentId: '',
+      studentId: userRecord.studentId || '',
       year: '1',
       curriculumId: curricula[0]?.id || '',
-      employeeId: '',
+      employeeId: userRecord.employeeId || '',
       departmentId: departments[0]?.id || '',
       academicTitle: 'TS.',
       specialization: '',
@@ -1109,7 +1111,7 @@ export default function AdminUsersPage() {
               </RoleTabButton>
               <RoleTabButton
                 active={roleFilter === 'STUDENT'}
-                activeClassName="bg-status-info text-status-info-foreground shadow-xs hover:bg-status-info/90"
+                activeClassName={roleSolidClass('STUDENT')}
                 onClick={() => {
                   setRoleFilter('STUDENT');
                   setPage(1);
@@ -1120,7 +1122,7 @@ export default function AdminUsersPage() {
               </RoleTabButton>
               <RoleTabButton
                 active={roleFilter === 'LECTURER'}
-                activeClassName="bg-status-success text-status-success-foreground shadow-xs hover:bg-status-success/90"
+                activeClassName={roleSolidClass('LECTURER')}
                 onClick={() => {
                   setRoleFilter('LECTURER');
                   setPage(1);
@@ -1131,7 +1133,7 @@ export default function AdminUsersPage() {
               </RoleTabButton>
               <RoleTabButton
                 active={roleFilter === 'ADMIN'}
-                activeClassName="bg-status-neutral text-status-neutral-foreground shadow-xs hover:bg-status-neutral/90"
+                activeClassName={roleSolidClass('ADMIN')}
                 onClick={() => {
                   setRoleFilter('ADMIN');
                   setPage(1);
@@ -1142,7 +1144,7 @@ export default function AdminUsersPage() {
               </RoleTabButton>
               <RoleTabButton
                 active={roleFilter === 'TRUONG_KHOA'}
-                activeClassName="bg-status-success text-status-success-foreground shadow-xs hover:bg-status-success/90"
+                activeClassName={roleSolidClass('TRUONG_KHOA')}
                 onClick={() => {
                   setRoleFilter('TRUONG_KHOA');
                   setPage(1);
@@ -1153,7 +1155,7 @@ export default function AdminUsersPage() {
               </RoleTabButton>
               <RoleTabButton
                 active={roleFilter === 'TRUONG_BO_MON'}
-                activeClassName="bg-status-success text-status-success-foreground shadow-xs hover:bg-status-success/90"
+                activeClassName={roleSolidClass('TRUONG_BO_MON')}
                 onClick={() => {
                   setRoleFilter('TRUONG_BO_MON');
                   setPage(1);
@@ -1164,7 +1166,7 @@ export default function AdminUsersPage() {
               </RoleTabButton>
               <RoleTabButton
                 active={roleFilter === 'SUPER_ADMIN'}
-                activeClassName="bg-status-warning text-status-warning-foreground shadow-xs hover:bg-status-warning/90"
+                activeClassName={roleSolidClass('SUPER_ADMIN')}
                 onClick={() => {
                   setRoleFilter('SUPER_ADMIN');
                   setPage(1);
@@ -1265,7 +1267,10 @@ export default function AdminUsersPage() {
                     </StatusPill>
                   </div>
                   <div className="flex items-center justify-between text-xs text-muted-foreground">
-                    <span className="font-medium text-foreground">{recordRoleLabel(record.roles)}</span>
+                    <span className="font-medium text-foreground">
+                      {recordRoleLabel(record.roles)}
+                      {record.studentId ? ` • MSSV: ${record.studentId}` : record.employeeId ? ` • MSGV: ${record.employeeId}` : ''}
+                    </span>
                     <span>{formatDate(record.createdAt)}</span>
                   </div>
                   <AdminRowActions>
@@ -1328,6 +1333,19 @@ export default function AdminUsersPage() {
                           <div className="font-medium text-foreground">
                             {record.lastName} {record.firstName}
                           </div>
+                          {record.studentId ? (
+                            <div className="inline-flex items-center gap-1.5 mt-0.5">
+                              <span className="inline-flex items-center rounded px-1.5 py-0.5 text-[11px] font-mono font-medium bg-blue-500/10 text-blue-700 dark:text-blue-300 border border-blue-500/20">
+                                MSSV: {record.studentId}
+                              </span>
+                            </div>
+                          ) : record.employeeId ? (
+                            <div className="inline-flex items-center gap-1.5 mt-0.5">
+                              <span className="inline-flex items-center rounded px-1.5 py-0.5 text-[11px] font-mono font-medium bg-teal-500/10 text-teal-700 dark:text-teal-300 border border-teal-500/20">
+                                MSGV: {record.employeeId}
+                              </span>
+                            </div>
+                          ) : null}
                         </td>
                         <td className="px-4 py-3.5 text-muted-foreground font-mono text-xs">
                           {record.email}

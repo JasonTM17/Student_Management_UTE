@@ -6,6 +6,7 @@ import io.campuscore.restfulapi.thesis.repository.ThesisRoundReadPort;
 import io.campuscore.restfulapi.thesis.repository.ThesisScopeRepository;
 import io.campuscore.restfulapi.thesis.repository.ThesisTopicRepository;
 import io.campuscore.restfulapi.thesis.dto.ThesisTopicDtos.TopicResponse;
+import io.campuscore.restfulapi.thesis.dto.ThesisTopicDtos.TopicSupervisorEntry;
 import java.util.List;
 import java.util.UUID;
 import org.springframework.context.annotation.Profile;
@@ -106,17 +107,35 @@ public class ThesisTopicService {
             gradingTopicIds.addAll(scope.findGradingCouncilTopicIds(lecturerId,
                     result.stream().map(ThesisTopic::getId).toList()));
         }
+        // After publication a student still reads only the outcome of the
+        // topic their approved group took part in; the rest stay masked.
+        boolean studentScoped = isStudentScoped(actor);
+        java.util.Set<UUID> participatedIds = java.util.Set.of();
+        String callerStudentId = normalize(actor == null ? null : actor.getClaimAsString("studentId"));
+        if (published && studentScoped && !callerStudentId.isEmpty() && !result.isEmpty()) {
+            participatedIds = new java.util.HashSet<>(scope.findParticipatedTopicIds(callerStudentId,
+                    result.stream().map(ThesisTopic::getId).toList()));
+        }
         boolean adminCaller = isAdmin(actor);
         java.util.Set<String> inFacultyDepts = deanFacultyDepts;
         java.util.Set<UUID> supervisedByDean = deanSupervisedIds;
         String callerLecturerId = lecturerId;
+        // One batched read resolves every listed topic's supervisor roster, so
+        // the catalog never pays a per-topic request tax. Entries carry names
+        // only; the per-topic endpoint still owns the staff-only email column.
+        java.util.Map<UUID, List<TopicSupervisorEntry>> supervisorsByTopic = result.isEmpty()
+                ? java.util.Map.of()
+                : scope.findSupervisorsByTopicIds(result.stream().map(ThesisTopic::getId).toList());
+        java.util.Set<UUID> participated = participatedIds;
         return result.stream()
-                .map(TopicResponse::from)
+                .map(topic -> TopicResponse.from(topic,
+                        supervisorsByTopic.getOrDefault(topic.getId(), List.of())))
                 .map(topic -> maskScoreIfNeeded(topic, published,
                         adminCaller || inFacultyDepts.contains(topic.departmentId())
                                 || supervisedByDean.contains(topic.id())
                                 || gradingTopicIds.contains(topic.id()),
-                        callerLecturerId))
+                        callerLecturerId,
+                        !studentScoped || participated.contains(topic.id())))
                 .toList();
     }
 
@@ -135,27 +154,35 @@ public class ThesisTopicService {
                 && !ThesisDepartmentScope.owns(scope, actor, topic.getDepartmentId())) {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Thesis topic not found");
         }
-        return maskScoreIfNeeded(TopicResponse.from(topic), isRoundResultsPublished(topic.getRoundId()),
+        boolean published = isRoundResultsPublished(topic.getRoundId());
+        boolean studentScoped = isStudentScoped(actor);
+        String callerStudentId = normalize(actor == null ? null : actor.getClaimAsString("studentId"));
+        boolean participant = published && studentScoped && !callerStudentId.isEmpty()
+                && !scope.findParticipatedTopicIds(callerStudentId, List.of(topic.getId())).isEmpty();
+        return maskScoreIfNeeded(TopicResponse.from(topic, supervisorsOf(topic.getId())), published,
                 deanInScope || isCouncilGraderOf(topic.getId(), actor),
-                normalize(actor == null ? null : actor.getClaimAsString("lecturerId")));
+                normalize(actor == null ? null : actor.getClaimAsString("lecturerId")),
+                !studentScoped || participant);
     }
 
     /**
      * Scores stay internal until the round publishes results: students (and
      * lecturers who are not grading the topic) must not read a finalized
      * council score off the topic resource early. Governance staff and the
-     * council members assigned to the topic keep full visibility; the
-     * supervisor sees the result with everyone else at publication.
+     * council members assigned to the topic keep full visibility. Publication
+     * opens the outcome only to staff and to the student whose approved group
+     * took the topic — a participant-scoped caller still sees other topics'
+     * results masked, matching what {@code /me/results} returns.
      */
     private TopicResponse maskScoreIfNeeded(TopicResponse topic, boolean roundPublished, boolean councilGrader,
-            String callerLecturerId) {
+            String callerLecturerId, boolean outcomeAuthorized) {
         // The assigned GVPB reviewer is a grading stakeholder too: they need
         // the finalization state to know the counter-review window is closed,
         // while a plain student or unrelated lecturer never does.
         boolean assignedReviewer = topic.gvpbLecturerId() != null
                 && topic.gvpbLecturerId().equals(callerLecturerId);
         boolean internalGrader = councilGrader || assignedReviewer;
-        boolean scoreMasked = !roundPublished && !internalGrader
+        boolean scoreMasked = (!roundPublished || !outcomeAuthorized) && !internalGrader
                 && (topic.finalScore() != null || topic.resultStatus() != null);
         // The GVPB reviewer identity is internal governance data: students and
         // unrelated lecturers must not learn who counter-reviews a topic.
@@ -175,7 +202,23 @@ public class ThesisTopicService {
                 scoreMasked ? null : topic.resultStatus(),
                 reviewerMasked ? null : topic.gvpbLecturerId(),
                 governanceMasked ? null : topic.gvpbWaivedReason(),
-                governanceMasked ? null : topic.resultReason());
+                governanceMasked ? null : topic.resultReason(),
+                topic.supervisors());
+    }
+
+    private List<TopicSupervisorEntry> supervisorsOf(UUID topicId) {
+        return scope.findSupervisorsByTopicIds(List.of(topicId)).getOrDefault(topicId, List.of());
+    }
+
+    /**
+     * A caller with no staff or grading role is scoped to participation: the
+     * only published outcome they may read on a topic is the one their own
+     * approved group earned — staff roles and lecturers keep the published
+     * view they had before.
+     */
+    private static boolean isStudentScoped(Jwt actor) {
+        return !isAdmin(actor) && !ThesisDeanScope.isFacultyHead(actor)
+                && !ThesisDepartmentScope.isDepartmentHead(actor) && !isLecturer(actor);
     }
 
     private boolean isCouncilGraderOf(UUID topicId, Jwt actor) {
