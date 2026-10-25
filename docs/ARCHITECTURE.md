@@ -270,7 +270,7 @@ Backend `java-services/restful-api` (góc `io.campuscore.restfulapi`) được t
 | `dto/` | Các lớp holder request/response (`*Dtos`, record lồng nhau). |
 | `service/` | Business services. |
 | `repository/` | Data access (JDBC repositories, read ports). |
-| `entity/` | JPA `@Entity`/`@Table` types (`thesis.entity.ThesisTopic`, `engagement.entity.Article*`, `academic.registration.entity.*`). |
+| `entity/` | JPA `@Entity`/`@Table` types (`thesis.entity.ThesisTopic`, `engagement.entity.Article*`, `academic.entity.*`, `auth.entity.*`). |
 | `model/` | Tên duy nhất cho kiểu dữ liệu plain (record/enum/value) dùng chung giữa các tầng: row/projection của repository, command/filter/result của service, status enums. Không phụ thuộc `repository`/`service`/`controller`. Không còn package `domain/` — plain data cũ ở `domain` đã gộp vào `model`, JPA entities đã tách sang `entity`. |
 | `config/` | `@Configuration` / `@ConfigurationProperties` của module. |
 | `job/` | Scheduled jobs, retention/reconcile jobs. |
@@ -283,22 +283,22 @@ Bản đồ module → subpackage hiện tại:
 
 | Top-level package | Loại | Subpackages |
 | --- | --- | --- |
-| `academic` | module | `controller`, `dto`, `job`, `model`, `repository`, `service`, `registration/{controller,dto,entity,model,renderer,repository,service}` |
-| `audit` | module | `controller`, `model`, `repository`, `service` |
-| `auth` | module | `controller`, `dto`, `job`, `model`, `repository`, `service` |
+| `academic` | module | `controller`, `dto`, `entity`, `job`, `model`, `repository`, `service`, `registration/{controller,dto,model,renderer,repository,service}` |
+| `audit` | module | `controller`, `entity`, `model`, `repository`, `service` |
+| `auth` | module | `controller`, `dto`, `entity`, `job`, `model`, `repository`, `service` |
 | `engagement` | module | `controller`, `dto`, `entity`, `job`, `model`, `repository`, `service` |
 | `mail` | module | `config`, `controller`, `dto`, `model`, `repository`, `service` |
-| `notification` | module | `controller`, `dto`, `model`, `repository`, `service` |
+| `notification` | module | `controller`, `dto`, `entity`, `model`, `repository`, `service` |
 | `people` | module | `controller`, `dto`, `model`, `repository`, `service` |
-| `site` | module | `controller`, `dto`, `repository`, `service` |
-| `thesis` | module | `config`, `controller`, `dto`, `entity`, `exception`, `model`, `repository`, `scope`, `service`, `storage`, `assistant/{client,config,controller,dto,exception,guard,job,model,properties,repository,rls,service}` |
+| `site` | module | `controller`, `dto`, `entity`, `repository`, `service` |
+| `thesis` | module | `config`, `controller`, `dto`, `entity`, `exception`, `model`, `repository`, `scope`, `service`, `storage`, `assistant/{client,config,controller,dto,entity,exception,guard,job,model,properties,repository,rls,service}` |
 | `common` | cross-cutting | `dto` (response envelopes), `util` (`LikePattern`) |
 | `config` | cross-cutting | `env` (`EnvironmentPostProcessor` đăng ký trong `META-INF/spring.factories`), `jpa` (naming strategy trong `application.yml`), `openapi` |
 | `exception` | cross-cutting | `code`, `handler`, `response` (+ các exception base types dùng chung ở package root `exception/` — xem mục Error handling) |
 | `security` | cross-cutting | `availability`, `config`, `filter`, `model`, `token`, `ratelimit/{annotation,filter,model,properties,service}` |
 | `system` | cross-cutting | `controller` (`Contract`, `Health`), `dto`, `job` (`DatabaseKeepAliveScheduler`) |
 
-`academic.registration` là sub-module của `academic` và tự nó cũng được chia đủ vai trò (`controller`, `dto`, `entity`, `model`, `repository`, `service`, `renderer`); `thesis.assistant` tương tự với các vai trò riêng (`client` gateways, `guard` input/output, `rls` boundary/context/aspect, `properties`, `job`). Các package `controller/`, `dto/`, `job/` ở root cũ đã bị xóa: `Identity` vào `auth`, `Contract`/`Health`/keep-alive vào `system`; `web/` cũ cũng đã bị xóa hoàn toàn từ vòng refactor trước.
+`academic.registration` là sub-module của `academic` và tự nó cũng được chia đủ vai trò (`controller`, `dto`, `model`, `repository`, `service`, `renderer`); `thesis.assistant` tương tự với các vai trò riêng (`client` gateways, `guard` input/output, `rls` boundary/context/aspect, `properties`, `job`). Các package `controller/`, `dto/`, `job/` ở root cũ đã bị xóa: `Identity` vào `auth`, `Contract`/`Health`/keep-alive vào `system`; `web/` cũ cũng đã bị xóa hoàn toàn từ vòng refactor trước.
 
 **Thêm module hoặc lớp mới:** tạo `<module>/<role>/TênLớp.java` (một kiểu top-level mỗi file, tên file trùng tên kiểu, visibility tối thiểu). Module business mới bắt đầu bằng `controller`/`service`/`repository` (+`dto`/`model` khi có payload/carrier); không đặt lớp trực tiếp trong package root của module. Plain data (record/enum/value type) luôn vào `model/`; chỉ JPA entity vào `entity/`; tên `domain` không còn được dùng.
 
@@ -332,12 +332,14 @@ Mọi quan tâm về exception nằm trong các package riêng theo vai trò:
 
 **Chuẩn data-access của backend là JDBC** (`NamedParameterJdbcTemplate`, `JdbcTemplate`, `JdbcOperations`). Toàn bộ SQL và row mapping nằm trong package `repository/` của từng module; service sở hữu transaction (`@Transactional`) và thứ tự lời gọi; controller, service và job không chứa câu lệnh SQL. `ArchitectureGuardTest` bắt buộc quy tắc này: tham chiếu tới `org.springframework.jdbc.core` chỉ được phép trong `..repository..`, `..rls..`, `..config..`, ngoại trừ một allow-list chỉ-giảm (shrink-only) các lớp chưa được di chuyển.
 
-**JPA bị đóng băng trong các "đảo" hiện có** — không thêm entity hay repository JPA mới:
+**Lớp entity JPA bao phủ toàn bộ bảng base của schema** — mỗi bảng thật có đúng một `@Entity` trong package `entity/` của module sở hữu (`academic.entity`, `auth.entity`, `audit.entity`, `engagement.entity`, `notification.entity`, `site.entity`, `thesis.entity`, `thesis.assistant.entity`). Các entity map từng cột đúng schema/tên bảng/tên cột (kể cả identifier camelCase có dấu ngoặc kép), dùng khoá phức hợp `@IdClass` cho bảng liên kết thuần, và chỉ giữ khoá ngoại dạng cột id (không association graph). `SchemaEntityMappingPostgresIT` chứng minh toàn bộ mapping bằng `hbm2ddl.auto=validate` trên schema do Flyway migrate, và so khớp tập bảng được map với tập base table trừ danh sách loại trừ được nêu rõ.
+
+**Spring Data repository vẫn bị đóng băng ở hai đảo hiện có** — không thêm repository JPA mới:
 - `engagement.entity` — `ArticleCategory`, `ArticleTag`, `ArticleAttachment`, `ArticleMediaGallery` + các Spring Data repository tương ứng; chỉ `ArticleTaxonomyController` sử dụng.
 - `thesis.entity` — `ThesisTopic`, `ThesisRegistrationRound` + `thesis.repository.ThesisTopicRepository`, `ThesisRegistrationRoundRepository`; được dùng bên trong các service chủ yếu là JDBC.
 - `thesis.assistant.config.AssistantDatabaseConfiguration` — hạ tầng: primary `JpaTransactionManager`, assistant DataSource + `DataSourceTransactionManager` riêng phục vụ RLS, và `NamedParameterJdbcTemplate` beans.
 
-Tham chiếu `jakarta.persistence` chỉ được phép trong các package entity của hai đảo trên và trong `AssistantDatabaseConfiguration` — guard test cũng chặn điều này.
+Tham chiếu `jakarta.persistence` chỉ được phép trong các lớp nằm trong `JPA_ISLAND_CLASSES` của `ArchitectureGuardTest` (toàn bộ entity + `AssistantDatabaseConfiguration` + các entity/repository hiện hữu) — guard test chặn mọi tham chiếu mới ngoài allow-list; thêm entity mới đòi hỏi một entry tường minh, reviewable trong danh sách đó.
 
 **Hợp đồng thứ tự khóa (lock order) sống trong SQL:**
 - Academic: `Student -> Section -> Round` (`RegistrationService`); auth dùng `User -> Session` và `User -> ResetToken`.
