@@ -86,6 +86,22 @@ class ThesisGovernanceIntegrationTest {
 
     @BeforeEach
     void cleanDatabase() {
+        jdbc.execute("CREATE SCHEMA IF NOT EXISTS notifications");
+        jdbc.execute("""
+                CREATE TABLE IF NOT EXISTS notifications.notification (
+                    id VARCHAR(120) PRIMARY KEY,
+                    user_id VARCHAR(120) NOT NULL,
+                    title VARCHAR(240) NOT NULL,
+                    message VARCHAR(2000) NOT NULL,
+                    type VARCHAR(60) NOT NULL,
+                    link VARCHAR(500),
+                    announcement_id VARCHAR(120), source_key VARCHAR(160),
+                    is_read BOOLEAN NOT NULL DEFAULT FALSE,
+                    read_at TIMESTAMP,
+                    created_at TIMESTAMP NOT NULL,
+                    updated_at TIMESTAMP NOT NULL
+                )
+                """);
         jdbc.update("DELETE FROM thesis.thesis_group_report");
         jdbc.update("DELETE FROM thesis.thesis_topic_score");
         jdbc.update("DELETE FROM thesis.thesis_council_topic");
