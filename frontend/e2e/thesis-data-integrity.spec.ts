@@ -88,15 +88,15 @@ test('admin unchanged schedule save retains every timestamp and supported precis
   expect(bangkok(ROUND_A.registrationStart)).toMatch(/\.140$/);
   expect(Date.parse(`${bangkok(ROUND_A.registrationStart).replace('.140', '.123')}Z`))
     .not.toBe(Date.parse(`${bangkok(ROUND_A.registrationStart)}Z`));
-  // datetime-local .value normalizes .140 to .14, so compare valueAsNumber —
-  // the civil fields encoded as UTC per the HTML spec — which keeps
-  // millisecond precision regardless of the test-runner timezone.
-  // The modal lists fields in schedule order; locate the registration start
-  // input by its label rather than by position.
-  await expect.poll(() =>
-    modal.getByLabel('Registration start', { exact: true })
-      .evaluate((input: HTMLInputElement) => input.valueAsNumber),
-  ).toBe(Date.parse(`${bangkok(ROUND_A.registrationStart)}Z`));
+  // The 24-hour field renders the stored wall time split across a native date
+  // input and hour/minute selects; the unchanged PATCH below still proves the
+  // full instant — including the .140 fraction — round-trips untouched.
+  // Locate the registration start group by its label rather than by position.
+  const registrationStart = modal.getByRole('group', { name: 'Registration start', exact: true });
+  const shown = bangkok(ROUND_A.registrationStart);
+  await expect(registrationStart.getByLabel('Date', { exact: true })).toHaveValue(shown.slice(0, 10));
+  await expect(registrationStart.getByLabel('Hour', { exact: true })).toHaveValue(shown.slice(11, 13));
+  await expect(registrationStart.getByLabel('Minute', { exact: true })).toHaveValue(shown.slice(14, 16));
   await modal.getByRole('button', { name: 'Edit schedule', exact: true }).click();
   await expect.poll(() => patch).not.toBeNull();
   for (const field of ['registrationStart', 'registrationEnd', 'lecturerSubmitStart', 'lecturerSubmitEnd'] as const) {
