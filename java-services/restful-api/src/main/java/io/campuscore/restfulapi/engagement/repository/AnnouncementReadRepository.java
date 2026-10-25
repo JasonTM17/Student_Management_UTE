@@ -134,7 +134,7 @@ public class AnnouncementReadRepository {
 
     /**
      * Anonymous public feed: only announcements that are editorially PUBLISHED,
-     * globally visible (isGlobal — no role/year/section scoping), inside their
+     * globally visible with no department targeting, inside their
      * publish window and not archived.
      */
     public List<PublicAnnouncementResponse> findPublic(long offset, int limit, Instant now) {
@@ -159,6 +159,7 @@ public class AnnouncementReadRepository {
         return List.of(
                 "\"status\" = 'PUBLISHED'",
                 "\"isGlobal\" = TRUE",
+                "CARDINALITY(\"targetDepartments\") = 0",
                 "(\"publishAt\" IS NULL OR \"publishAt\" <= :now)",
                 "(\"expiresAt\" IS NULL OR \"expiresAt\" > :now)",
                 "\"archivedAt\" IS NULL");
@@ -332,7 +333,9 @@ public class AnnouncementReadRepository {
                     + " WHERE viewer_lecturer.\"id\" = :lecturerId"
                     + " AND viewer_lecturer.\"departmentId\" = ANY(\"targetDepartments\"))");
         }
-        if (!departmentMatches.isEmpty()) {
+        if (departmentMatches.isEmpty()) {
+            conditions.add("CARDINALITY(\"targetDepartments\") = 0");
+        } else {
             conditions.add("(CARDINALITY(\"targetDepartments\") = 0 OR "
                     + String.join(" OR ", departmentMatches) + ")");
         }
