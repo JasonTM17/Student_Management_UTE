@@ -1,18 +1,23 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState, type FormEvent } from 'react';
 import { Calendar, Loader2, User } from 'lucide-react';
+import { toast } from 'sonner';
 import { Modal } from '@/components/ui/modal';
 import { gradesApi } from '@/lib/api';
-import { StudentGradeRecord, StudentGradesByEnrollmentResponse } from '@/types/api';
+import { StudentGradeRecord, StudentGradesByEnrollmentResponse, GradeAppeal, GradeAppealEligibility } from '@/types/api';
 import { useI18n } from '@/i18n';
 import { getLocalizedFlatLabel } from '@/lib/academic-content';
 import { resolveGradePoint } from '@/lib/grade-scale';
+import { Button } from '@/components/ui/button';
+import { Textarea } from '@/components/ui/textarea';
+import { campusCodeMessage } from '@/lib/campus-error';
 
 interface GradeDetailModalProps {
   isOpen: boolean;
   onClose: () => void;
   record: StudentGradeRecord | null;
+  onAppealChanged?: () => void;
 }
 
 function isFiniteScore(value: number | null | undefined): value is number {
@@ -38,11 +43,25 @@ function gradeItemLabel(
   return locale === 'vi' ? known.vi : known.en;
 }
 
-export function GradeDetailModal({ isOpen, onClose, record }: GradeDetailModalProps) {
-  const { locale } = useI18n();
+export function GradeDetailModal({ isOpen, onClose, record, onAppealChanged }: GradeDetailModalProps) {
+  const { locale, messages, formatDateTime } = useI18n();
   const [data, setData] = useState<StudentGradesByEnrollmentResponse | null>(null);
   const [loading, setLoading] = useState(false);
   const [detailFailed, setDetailFailed] = useState(false);
+  const [appeals, setAppeals] = useState<GradeAppeal[]>([]);
+  const [eligibility, setEligibility] = useState<GradeAppealEligibility | null>(null);
+  const [appealLoading, setAppealLoading] = useState(false);
+  const [appealLoadError, setAppealLoadError] = useState('');
+  const [appealFormOpen, setAppealFormOpen] = useState(false);
+  const [appealReason, setAppealReason] = useState('');
+  const [appealConfirmed, setAppealConfirmed] = useState(false);
+  const [appealError, setAppealError] = useState('');
+  const [appealSaving, setAppealSaving] = useState(false);
+  const [cancelArmed, setCancelArmed] = useState(false);
+  const [cancelConfirmed, setCancelConfirmed] = useState(false);
+  const [cancelError, setCancelError] = useState('');
+  const [cancelling, setCancelling] = useState(false);
+  const studentCopy = messages.gradeAppeals.student;
 
   useEffect(() => {
     if (!isOpen || !record?.id) {
@@ -75,6 +94,97 @@ export function GradeDetailModal({ isOpen, onClose, record }: GradeDetailModalPr
     };
   }, [isOpen, record?.id]);
 
+  useEffect(() => {
+    if (!isOpen || !record?.id || !['PUBLISHED', 'APPEALED'].includes(record.gradeStatus)) {
+      setAppeals([]);
+      setEligibility(null);
+      setAppealLoadError('');
+      setAppealLoading(false);
+      setAppealFormOpen(false);
+      return;
+    }
+    let cancelled = false;
+    setAppealLoading(true);
+    setAppealLoadError('');
+    setAppealFormOpen(false);
+    setAppealError('');
+    setCancelArmed(false);
+    setCancelConfirmed(false);
+    setCancelError('');
+    Promise.all([gradesApi.getMyGradeAppeals(), gradesApi.getGradeAppealEligibility()])
+      .then(([history, rows]) => {
+        if (cancelled) return;
+        setAppeals(history.filter((appeal) => appeal.enrollmentId === record.id));
+        setEligibility(rows.find((item) => item.enrollmentId === record.id) ?? null);
+      })
+      .catch((cause) => {
+        if (!cancelled) {
+          setAppealLoadError(campusCodeMessage(cause, messages.common.campusErrors, studentCopy.loadFailed));
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setAppealLoading(false);
+      });
+    return () => { cancelled = true; };
+  }, [isOpen, record?.id, record?.gradeStatus, messages.common.campusErrors, studentCopy.loadFailed]);
+
+  const currentAppeal = useMemo(
+    () => appeals.find((appeal) => appeal.status === 'PENDING') ?? appeals[0] ?? null,
+    [appeals],
+  );
+
+  const submitAppeal = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (!record) return;
+    const reason = appealReason.trim();
+    if (reason.length < 20 || reason.length > 1000) {
+      setAppealError(studentCopy.reasonLengthError);
+      return;
+    }
+    if (!appealConfirmed) {
+      setAppealError(studentCopy.confirmationRequired);
+      return;
+    }
+    setAppealSaving(true);
+    setAppealError('');
+    try {
+      const created = await gradesApi.submitGradeAppeal(record.id, reason);
+      setAppeals((current) => [created, ...current]);
+      setAppealFormOpen(false);
+      setAppealReason('');
+      setAppealConfirmed(false);
+      setEligibility((current) => current ? { ...current, gradeStatus: 'APPEALED', appealAllowed: false } : current);
+      toast.success(studentCopy.submitted);
+      onAppealChanged?.();
+    } catch (cause) {
+      setAppealError(campusCodeMessage(cause, messages.common.campusErrors, studentCopy.loadFailed));
+    } finally {
+      setAppealSaving(false);
+    }
+  };
+
+  const cancelAppeal = async () => {
+    if (!currentAppeal || !cancelConfirmed) {
+      setCancelError(studentCopy.cancelConfirmationRequired);
+      return;
+    }
+    setCancelling(true);
+    setCancelError('');
+    try {
+      const cancelledAppeal = await gradesApi.cancelGradeAppeal(currentAppeal.id);
+      setAppeals((current) => current.map((item) => item.id === cancelledAppeal.id ? cancelledAppeal : item));
+      setEligibility((current) => current ? { ...current, gradeStatus: 'PUBLISHED', appealAllowed: false } : current);
+      setCancelArmed(false);
+      setCancelConfirmed(false);
+      toast.success(studentCopy.cancelledMessage);
+      onAppealChanged?.();
+    } catch (cause) {
+      setCancelError(campusCodeMessage(cause, messages.common.campusErrors, studentCopy.loadFailed));
+    } finally {
+      setCancelling(false);
+    }
+  };
+
   if (!record) return null;
 
   const title = getLocalizedFlatLabel(
@@ -85,6 +195,11 @@ export function GradeDetailModal({ isOpen, onClose, record }: GradeDetailModalPr
     record.courseName,
   );
   const emptyValue = locale === 'vi' ? 'Chưa có' : 'N/A';
+  const appealStatusLabel = (status: GradeAppeal['status']) => status === 'PENDING'
+    ? studentCopy.pending
+    : status === 'ACCEPTED' ? studentCopy.accepted
+      : status === 'REJECTED' ? studentCopy.rejected : studentCopy.cancelled;
+  const appealDeadline = currentAppeal?.appealUntil ?? eligibility?.appealUntil ?? null;
 
   // Canonical 50/50 rows come from persisted component scores only.
   const items = data?.grades?.length
@@ -115,7 +230,9 @@ export function GradeDetailModal({ isOpen, onClose, record }: GradeDetailModalPr
   return (
     <Modal
       isOpen={isOpen}
-      onClose={onClose}
+      onClose={() => {
+        if (!appealSaving && !cancelling) onClose();
+      }}
       title={locale === 'vi' ? 'Chi tiết điểm học phần' : 'Course Grade Breakdown'}
       className="max-w-xl"
     >
@@ -267,6 +384,88 @@ export function GradeDetailModal({ isOpen, onClose, record }: GradeDetailModalPr
             </div>
           </div>
         </div>
+
+        {['PUBLISHED', 'APPEALED'].includes(record.gradeStatus) ? (
+          <section className="space-y-4 rounded-xl border border-border/70 bg-card p-4" aria-labelledby="grade-appeal-title">
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <div>
+                <h4 id="grade-appeal-title" className="font-semibold text-foreground">{studentCopy.historyTitle}</h4>
+                {appealDeadline ? (
+                  <p className="mt-1 text-sm text-muted-foreground">
+                    {studentCopy.appealUntil.replace('{date}', formatDateTime(appealDeadline, { timeZone: 'Asia/Bangkok' }))}
+                  </p>
+                ) : null}
+              </div>
+              {record.gradeStatus === 'APPEALED' || currentAppeal?.status === 'PENDING' ? (
+                <span className="rounded-md bg-amber-100 px-2.5 py-1 text-xs font-semibold text-amber-900 dark:bg-amber-950/50 dark:text-amber-100">{studentCopy.pending}</span>
+              ) : null}
+            </div>
+
+            {appealLoading ? <p role="status" className="text-sm text-muted-foreground">{studentCopy.loading}</p> : null}
+            {appealLoadError ? <p role="alert" className="text-sm text-destructive">{appealLoadError}</p> : null}
+            {!appealLoading && !appealLoadError && appeals.length > 0 ? (
+              <ol className="space-y-3">
+                {appeals.map((appeal) => (
+                  <li key={appeal.id} className="rounded-lg border border-border/70 bg-secondary/20 p-3">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <span className="text-sm font-semibold text-foreground">{appealStatusLabel(appeal.status)}</span>
+                      <time className="text-xs text-muted-foreground" dateTime={appeal.createdAt}>{formatDateTime(appeal.createdAt, { timeZone: 'Asia/Bangkok' })}</time>
+                    </div>
+                    <p className="mt-2 whitespace-pre-wrap text-sm leading-5 text-foreground">{appeal.reason}</p>
+                    {appeal.resolutionReason ? <p className="mt-2 border-t border-border/60 pt-2 text-sm text-muted-foreground">{appeal.resolutionReason}</p> : null}
+                  </li>
+                ))}
+              </ol>
+            ) : null}
+
+            {!appealLoading && !appealLoadError && !currentAppeal?.status && eligibility?.appealAllowed && !appealFormOpen ? (
+              <Button type="button" size="sm" onClick={() => { setAppealFormOpen(true); setAppealError(''); }}>{studentCopy.appeal}</Button>
+            ) : null}
+            {!appealLoading && !appealLoadError && !currentAppeal && !eligibility?.appealAllowed ? (
+              <p className="text-sm text-muted-foreground">{studentCopy.noDeadline}</p>
+            ) : null}
+
+            {currentAppeal?.status === 'PENDING' ? (
+              <div className="space-y-3 border-t border-border/70 pt-3">
+                <p role="status" className="text-sm text-muted-foreground">{studentCopy.pendingNotice}</p>
+                {!cancelArmed ? (
+                  <Button type="button" size="sm" variant="outline" onClick={() => setCancelArmed(true)}>{studentCopy.cancelPending}</Button>
+                ) : (
+                  <div className="space-y-3 rounded-lg border border-amber-300/60 bg-amber-50/70 p-3 dark:border-amber-500/30 dark:bg-amber-950/20">
+                    <label className="flex items-start gap-2 text-sm leading-5 text-foreground">
+                      <input type="checkbox" className="mt-1 h-4 w-4 accent-primary" checked={cancelConfirmed} onChange={(event) => setCancelConfirmed(event.target.checked)} />
+                      <span>{studentCopy.cancelPendingConfirm}</span>
+                    </label>
+                    {cancelError ? <p role="alert" className="text-sm text-destructive">{cancelError}</p> : null}
+                    <div className="flex flex-wrap gap-2">
+                      <Button type="button" size="sm" onClick={() => void cancelAppeal()} disabled={!cancelConfirmed || cancelling}>{cancelling ? studentCopy.cancelling : studentCopy.cancel}</Button>
+                      <Button type="button" size="sm" variant="outline" onClick={() => { setCancelArmed(false); setCancelConfirmed(false); setCancelError(''); }} disabled={cancelling}>{messages.common.actions.cancel}</Button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            ) : null}
+
+            {appealFormOpen ? (
+              <form className="space-y-3 border-t border-border/70 pt-3" onSubmit={(event) => void submitAppeal(event)}>
+                <div className="space-y-1.5">
+                  <label htmlFor="student-grade-appeal-reason" className="text-sm font-medium text-foreground">{studentCopy.reasonLabel}</label>
+                  <Textarea id="student-grade-appeal-reason" value={appealReason} onChange={(event) => setAppealReason(event.target.value)} maxLength={1000} aria-describedby="student-grade-appeal-reason-hint" placeholder={studentCopy.reasonPlaceholder} required />
+                  <p id="student-grade-appeal-reason-hint" className="text-xs text-muted-foreground">{studentCopy.reasonHint} · {appealReason.length}/1000</p>
+                </div>
+                <label className="flex items-start gap-2 rounded-lg border border-border/70 p-3 text-sm leading-5 text-foreground">
+                  <input type="checkbox" className="mt-1 h-4 w-4 accent-primary" checked={appealConfirmed} onChange={(event) => setAppealConfirmed(event.target.checked)} />
+                  <span>{studentCopy.confirmLabel}</span>
+                </label>
+                {appealError ? <p role="alert" className="text-sm text-destructive">{appealError}</p> : null}
+                <div className="flex flex-wrap gap-2">
+                  <Button type="submit" size="sm" disabled={appealSaving || !appealConfirmed || appealReason.trim().length < 20}>{appealSaving ? studentCopy.submitting : studentCopy.submit}</Button>
+                  <Button type="button" size="sm" variant="outline" onClick={() => { setAppealFormOpen(false); setAppealError(''); }} disabled={appealSaving}>{messages.common.actions.cancel}</Button>
+                </div>
+              </form>
+            ) : null}
+          </section>
+        ) : null}
       </div>
     </Modal>
   );

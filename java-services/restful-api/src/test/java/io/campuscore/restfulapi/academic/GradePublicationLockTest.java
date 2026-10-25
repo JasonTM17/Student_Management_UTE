@@ -11,9 +11,10 @@ import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.ZoneOffset;
 import java.util.List;
+import java.util.Map;
 import io.campuscore.restfulapi.testsupport.AccountAuthorityFixture;
 import io.campuscore.restfulapi.testsupport.CurrentAccountJwt;
-import java.util.Map;
+import static org.assertj.core.api.Assertions.assertThat;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -103,6 +104,28 @@ class GradePublicationLockTest {
                         .content(payload))
                 .andExpect(status().isConflict())
                 .andExpect(jsonPath("$.code").value("GRADES_PUBLISHED_LOCKED"));
+    }
+
+    @Test
+    void publishingGradesRecordsThePerEnrollmentPublicationInstant() throws Exception {
+        mvc.perform(put("/api/v1/sections/section-1/grades")
+                        .with(lecturerJwt("lecturer-1"))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"grades":[{"enrollmentId":"enrollment-1","processScore":8.0,"finalExamScore":9.0}]}
+                                """))
+                .andExpect(status().isOk());
+
+        Instant startedAt = Instant.now().minusSeconds(2);
+        mvc.perform(post("/api/v1/sections/section-1/grades/publish")
+                        .with(lecturerJwt("lecturer-1")))
+                .andExpect(status().isOk());
+
+        java.sql.Timestamp stored = jdbc.queryForObject(
+                "SELECT \"gradePublishedAt\" FROM \"academic\".\"Enrollment\" WHERE \"id\" = 'enrollment-1'",
+                java.sql.Timestamp.class);
+        assertThat(stored).as("the appeal deadline needs a per-enrollment publication instant").isNotNull();
+        assertThat(stored.toInstant()).isBetween(startedAt, Instant.now().plusSeconds(2));
     }
 
     @Test
@@ -548,6 +571,7 @@ class GradePublicationLockTest {
                     "enrolledAt" TIMESTAMP NOT NULL,
                     "droppedAt" TIMESTAMP,
                     "gradeStatus" VARCHAR(40) NOT NULL,
+                    "gradePublishedAt" TIMESTAMP,
                     "finalGrade" DECIMAL(5, 2),
                     "letterGrade" VARCHAR(10),
                     "createdAt" TIMESTAMP NOT NULL,

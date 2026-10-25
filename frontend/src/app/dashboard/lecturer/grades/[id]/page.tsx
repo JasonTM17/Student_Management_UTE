@@ -73,6 +73,10 @@ function formatVietnameseName(name: string): string {
   return name;
 }
 
+function isOfficialGradeStatus(status: string | null | undefined): boolean {
+  return status === 'PUBLISHED' || status === 'APPEALED';
+}
+
 export default function SectionGradingPage() {
   const params = useParams<{ id: string }>();
   const router = useRouter();
@@ -439,7 +443,7 @@ export default function SectionGradingPage() {
 
   const publishReady = allGraded && !hasChanges && scoreErrors.size === 0
     && !isSaving && !isRefreshing && !isPublishing && !isLoading && !error
-    && Boolean(sectionData?.enrollments.some((enrollment) => enrollment.gradeStatus !== 'PUBLISHED'))
+    && Boolean(sectionData?.enrollments.some((enrollment) => !isOfficialGradeStatus(enrollment.gradeStatus)))
     // The data on screen must belong to the route's section — a transient
     // render after navigation could otherwise publish the previous sheet.
     && sectionData?.sectionId === sectionId;
@@ -944,7 +948,7 @@ export default function SectionGradingPage() {
                     studentCode: enrollment.studentCode,
                     email: enrollment.email,
                   }))}
-                  disabled={isSaving || isPublishing || isRefreshing || sectionData.enrollments.some((enrollment) => enrollment.gradeStatus === 'PUBLISHED')}
+                  disabled={isSaving || isPublishing || isRefreshing || sectionData.enrollments.some((enrollment) => isOfficialGradeStatus(enrollment.gradeStatus))}
                   onApply={applyImportedRows}
                 />
               )}
@@ -984,7 +988,7 @@ export default function SectionGradingPage() {
                   processScore: enrollment.processScore ?? null,
                   finalExamScore: enrollment.finalExamScore ?? null,
                 };
-                const isPublished = enrollment.gradeStatus === 'PUBLISHED';
+                const isPublished = isOfficialGradeStatus(enrollment.gradeStatus);
 
                 return (
                   <article
@@ -1010,7 +1014,9 @@ export default function SectionGradingPage() {
                         )}
                       </div>
                       <span className="shrink-0 rounded-md bg-secondary px-2.5 py-1 text-xs font-medium text-foreground">
-                        {isPublished
+                        {enrollment.gradeStatus === 'APPEALED'
+                          ? statusLabel('APPEALED')
+                          : isPublished
                           ? copy.publishedStatus
                           : statusLabel(enrollment.gradeStatus ?? 'DRAFT')}
                       </span>
@@ -1078,7 +1084,7 @@ export default function SectionGradingPage() {
                       processScore: enrollment.processScore ?? null,
                       finalExamScore: enrollment.finalExamScore ?? null,
                     };
-                    const isPublished = enrollment.gradeStatus === 'PUBLISHED';
+                    const isPublished = isOfficialGradeStatus(enrollment.gradeStatus);
                     const isDirtyRow = editedIds.has(enrollment.id);
 
                     return (
@@ -1156,7 +1162,9 @@ export default function SectionGradingPage() {
                         </td>
                         <td className="px-3 py-3.5 text-right print:hidden">
                           <span className="rounded-md bg-secondary px-2.5 py-1 text-xs font-medium text-foreground">
-                            {isPublished
+                            {enrollment.gradeStatus === 'APPEALED'
+                              ? statusLabel('APPEALED')
+                              : isPublished
                               ? copy.publishedStatus
                               : statusLabel(enrollment.gradeStatus ?? 'DRAFT')}
                           </span>

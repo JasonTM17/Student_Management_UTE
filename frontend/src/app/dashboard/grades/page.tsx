@@ -718,6 +718,7 @@ export default function GradesPage() {
         isOpen={Boolean(selectedRecord)}
         onClose={() => setSelectedRecord(null)}
         record={selectedRecord}
+        onAppealChanged={() => { void fetchGrades(); }}
       />
     </div>
   );

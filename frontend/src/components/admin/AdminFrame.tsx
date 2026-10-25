@@ -160,6 +160,7 @@ export function AdminFrame({
         { href: '/admin/appearance', icon: Palette, label: messages.admin.menuItems[11]?.[0] },
         { href: '/admin/credit-limit-applications', icon: ClipboardCheck, label: messages.admin.menuItems[12]?.[0] },
         { href: '/admin/withdrawal-applications', icon: Undo2, label: messages.admin.menuItems[13]?.[0] },
+        { href: '/admin/grade-appeals', icon: ClipboardCheck, label: messages.admin.menuItems[19]?.[0] },
         {
           href: '/admin/audit',
           icon: ScrollText,
