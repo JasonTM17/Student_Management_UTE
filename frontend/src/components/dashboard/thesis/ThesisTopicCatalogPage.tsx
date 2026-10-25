@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { ArrowUpRight, BookOpen, CheckCircle2, FileStack, GraduationCap, Loader2, Search, UserCheck } from 'lucide-react';
 import { LocalizedLink } from '@/components/LocalizedLink';
@@ -19,7 +19,7 @@ import { TopicCardGridSkeleton } from '@/components/ui/skeleton';
 import { normalizeVietnameseText } from '@/lib/registration-browse';
 import { plainTextThesisDescription as plainTextDescription } from '@/lib/thesis-text';
 import { roundsForPicker } from '@/lib/thesis-round';
-import { thesisApi, type ThesisTopicSupervisor } from '@/lib/thesis-api';
+import type { ThesisTopic } from '@/lib/thesis-api';
 import { cn } from '@/lib/utils';
 import { useThesisWorkspace } from './useThesisWorkspace';
 
@@ -31,58 +31,16 @@ export default function ThesisTopicCatalogPage() {
   const [searchInput, setSearchInput] = useState('');
   const [showAll, setShowAll] = useState(true);
   const [selectedSupervisorId, setSelectedSupervisorId] = useState('');
-  const [topicSupervisorsMap, setTopicSupervisorsMap] = useState<Record<string, ThesisTopicSupervisor[]>>({});
-  // Course requirement: the topic catalog gates topic loading on searchActive
   const [submittedQuery, setSubmittedQuery] = useState('all');
   const searchActive = showAll || submittedQuery.trim().length > 0 || Boolean(selectedSupervisorId);
   const workspace = useThesisWorkspace(explicitRoundId, { topicsEnabled: searchActive, groupsEnabled: false });
 
-  // Load supervisors for all topics in this round to power the "Choose Advisor first" workflow
-  useEffect(() => {
-    if (workspace.topics.length === 0) {
-      setTopicSupervisorsMap({});
-      return;
-    }
-    let cancelled = false;
-    const loadSups = async () => {
-      try {
-        // Limit concurrent supervisor requests to avoid clogging browser connections
-        const items = workspace.topics;
-        const limit = 8;
-        const results: (readonly [string, ThesisTopicSupervisor[]])[] = new Array(items.length);
-        let idx = 0;
-        const workers = new Array(Math.min(limit, items.length)).fill(0).map(async () => {
-          while (idx < items.length) {
-            const i = idx++;
-            const t = items[i];
-            try {
-              const sups = await thesisApi.listSupervisors(t.id);
-              results[i] = [t.id, sups] as const;
-            } catch {
-              results[i] = [t.id, [] as ThesisTopicSupervisor[]] as const;
-            }
-          }
-        });
-        await Promise.all(workers);
-        if (!cancelled) {
-          setTopicSupervisorsMap(Object.fromEntries(results));
-        }
-      } catch {
-        // ignore
-      }
-    };
-    void loadSups();
-    return () => {
-      cancelled = true;
-    };
-  }, [workspace.topics]);
-
-  // Extract unique supervisors with topic counts
+  // Advisors ride inside each topic payload, so the "Choose advisor first"
+  // step is built from the same list response — no per-topic fan-out.
   const uniqueSupervisors = useMemo(() => {
     const map = new Map<string, { lecturerId: string; name: string; topicCount: number }>();
     for (const topic of workspace.topics) {
-      const sups = topicSupervisorsMap[topic.id] || [];
-      for (const s of sups) {
+      for (const s of topic.supervisors ?? []) {
         if (!s.lecturerId) continue;
         const fullName = [s.lastName, s.firstName].filter(Boolean).join(' ').trim() || s.lecturerId;
         const existing = map.get(s.lecturerId);
@@ -94,20 +52,17 @@ export default function ThesisTopicCatalogPage() {
       }
     }
     return Array.from(map.values()).sort((a, b) => a.name.localeCompare(b.name));
-  }, [workspace.topics, topicSupervisorsMap]);
+  }, [workspace.topics]);
 
   const selectedSupervisor = useMemo(() => {
     if (!selectedSupervisorId) return null;
     return uniqueSupervisors.find((s) => s.lecturerId === selectedSupervisorId) ?? null;
   }, [selectedSupervisorId, uniqueSupervisors]);
 
-  const getTopicSupervisorName = (topicId: string) => {
-    const sups = topicSupervisorsMap[topicId];
-    if (!sups || sups.length === 0) return '';
-    return sups
+  const getTopicSupervisorName = (topic: ThesisTopic) =>
+    (topic.supervisors ?? [])
       .map((s) => [s.lastName, s.firstName].filter(Boolean).join(' ').trim() || s.lecturerId)
       .join(', ');
-  };
 
   const normalizedQuery = submittedQuery.trim().toLowerCase();
   const matchingTopics = useMemo(() => {
@@ -149,11 +104,9 @@ export default function ThesisTopicCatalogPage() {
   const displayTopics = useMemo(() => {
     if (!searchActive) return [];
     if (!selectedSupervisorId) return matchingTopics;
-    return matchingTopics.filter((topic) => {
-      const sups = topicSupervisorsMap[topic.id] || [];
-      return sups.some((s) => s.lecturerId === selectedSupervisorId);
-    });
-  }, [matchingTopics, searchActive, selectedSupervisorId, topicSupervisorsMap]);
+    return matchingTopics.filter((topic) =>
+      (topic.supervisors ?? []).some((s) => s.lecturerId === selectedSupervisorId));
+  }, [matchingTopics, searchActive, selectedSupervisorId]);
 
   if (authLoading) {
     return <LoadingState label={messages.thesis.loading} />;
@@ -533,7 +486,7 @@ export default function ThesisTopicCatalogPage() {
           </CardHeader>
           <CardContent className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
             {displayTopics.map((topic) => {
-              const supervisorName = getTopicSupervisorName(topic.id);
+              const supervisorName = getTopicSupervisorName(topic);
               return (
                 <LocalizedLink
                   key={topic.id}
