@@ -128,6 +128,7 @@ export default function EnrollmentsPage() {
           colSection: 'Lớp HP',
           colSchedule: 'Lịch học',
           colStatus: 'Trạng thái',
+          curriculumDefault: 'Theo CTĐT',
           dropCourse: 'Hủy môn học',
           droppingCourse: 'Đang hủy môn',
           confirmTitle: 'Hủy môn học',
@@ -189,6 +190,7 @@ export default function EnrollmentsPage() {
           colSection: 'Class',
           colSchedule: 'Schedule',
           colStatus: 'Status',
+          curriculumDefault: 'Curriculum',
           dropCourse: 'Drop course',
           droppingCourse: 'Dropping course',
           confirmTitle: 'Drop course',
@@ -902,6 +904,11 @@ export default function EnrollmentsPage() {
                                       <div className="mt-0.5 font-medium leading-snug text-foreground">
                                         {courseName}
                                       </div>
+                                      {enrollment.registrationSource === 'CURRICULUM_DEFAULT' ? (
+                                        <span className="mt-1 inline-flex min-h-6 items-center rounded-md border border-primary/25 bg-primary/10 px-2 py-0.5 text-[11px] font-semibold text-primary">
+                                          {copy.curriculumDefault}
+                                        </span>
+                                      ) : null}
                                     </td>
                                     <td className="px-3 py-3">
                                       <span className="inline-flex rounded-md bg-secondary px-2 py-1 text-xs font-medium text-foreground">
@@ -1009,6 +1016,11 @@ export default function EnrollmentsPage() {
                                 <div className="mt-1 text-sm font-medium leading-snug text-foreground">
                                   {courseName}
                                 </div>
+                                {enrollment.registrationSource === 'CURRICULUM_DEFAULT' ? (
+                                  <span className="mt-1 inline-flex min-h-6 items-center rounded-md border border-primary/25 bg-primary/10 px-2 py-0.5 text-[11px] font-semibold text-primary">
+                                    {copy.curriculumDefault}
+                                  </span>
+                                ) : null}
                                 {enrollment.section?.schedules?.length ? (
                                   <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1">
                                     {enrollment.section.schedules.map((schedule, index) => (

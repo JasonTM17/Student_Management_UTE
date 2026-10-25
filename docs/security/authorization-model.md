@@ -192,6 +192,32 @@ retroactively identify password changes made before the revision existed.
   transcript trace), an approved withdrawal is the later regulated path: it
   records `WITHDRAWN` + grade `W` on the transcript, excluded from GPA,
   attempted and earned credits.
+- **Curriculum default registration** splits the same student/admin boundary.
+  The student routes (`GET /api/v1/me/registration/curriculum-plan`,
+  `POST /api/v1/me/registration/curriculum-plan/register`) require `STUDENT` and
+  resolve every plan row and enrollment against the caller's `studentId` claim —
+  no path or body parameter can select another student. Enrollments the plan
+  creates carry `registrationSource = CURRICULUM_DEFAULT`, and a row the student
+  dismisses keeps that marker (`CURRICULUM_DEFAULT_DISMISSED` semantics) so a
+  later batch run cannot re-add it. The batch routes
+  (`POST /api/v1/admin/registration/curriculum-defaults/dry-run`,
+  `POST /api/v1/admin/registration/curriculum-defaults/apply`,
+  `GET /api/v1/admin/registration/curriculum-defaults/runs`) are
+  `ADMIN`/`SUPER_ADMIN` only; lecturers have no apply capability. Owner:
+  [CurriculumDefaultRegistrationController](../../java-services/restful-api/src/main/java/io/campuscore/restfulapi/academic/registration/controller/CurriculumDefaultRegistrationController.java).
+- **Grade appeals** bind student submission and cancellation to the caller's
+  own enrollment; a grade may be appealed once while its published final grade
+  is within `grade.appeal-window-days` (default `7`) from
+  `Enrollment.gradePublishedAt`. A pending appeal makes the grade `APPEALED`
+  and locks ordinary grade edits and publication. The section's assigned
+  lecturer may accept a corrected grade or reject the appeal; `ADMIN` and
+  `SUPER_ADMIN` can resolve any appeal. A reviewer cannot be the student who
+  owns the appeal. `ADMIN`/`SUPER_ADMIN` alone may unpublish a section's grades
+  with a recorded reason; any pending appeal blocks that operation. These
+  actions record before/after audit state and notify the affected student or
+  lecturer. Owners:
+  [GradeAppealController](../../java-services/restful-api/src/main/java/io/campuscore/restfulapi/academic/controller/GradeAppealController.java),
+  [GradeAppealService](../../java-services/restful-api/src/main/java/io/campuscore/restfulapi/academic/service/GradeAppealService.java).
 - **Thesis governance actions** run after the dean-scope check
   (`ThesisDeanScope`), so capability gates never leak topic existence or bypass
   faculty ownership. Group approval withdrawal

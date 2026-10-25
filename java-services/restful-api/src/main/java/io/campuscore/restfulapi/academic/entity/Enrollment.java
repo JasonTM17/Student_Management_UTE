@@ -52,6 +52,12 @@ public class Enrollment {
     @Column(name = "\"updatedAt\"", nullable = false, insertable = false, updatable = false)
     private Instant updatedAt;
 
+    @Column(name = "\"gradePublishedAt\"")
+    private Instant gradePublishedAt;
+
+    @Column(name = "\"registrationSource\"", length = 40)
+    private String registrationSource;
+
     @Column(name = "\"courseId\"", nullable = false, length = 120)
     private String courseId;
 
@@ -113,6 +119,14 @@ public class Enrollment {
 
     public Instant getUpdatedAt() {
         return updatedAt;
+    }
+
+    public Instant getGradePublishedAt() {
+        return gradePublishedAt;
+    }
+
+    public String getRegistrationSource() {
+        return registrationSource;
     }
 
     public String getCourseId() {

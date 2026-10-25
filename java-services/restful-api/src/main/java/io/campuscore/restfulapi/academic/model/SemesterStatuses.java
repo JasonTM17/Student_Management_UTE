@@ -2,13 +2,13 @@ package io.campuscore.restfulapi.academic.model;
 
 import java.util.Locale;
 import java.util.Set;
+import io.campuscore.restfulapi.academic.model.SemesterLifecycleStatuses;
 
 /** Semester lifecycle states shared by every academic write path. */
 public final class SemesterStatuses {
 
     /** Semesters in which academic work (registration, grading, attendance) is still allowed. */
-    public static final Set<String> OPEN =
-            Set.of("OPEN", "REGISTRATION_OPEN", "ADD_DROP_OPEN", "ACTIVE");
+    public static final Set<String> OPEN = SemesterLifecycleStatuses.OPEN;
 
     /**
      * Lifecycle states a semester never leaves. The column is free-form

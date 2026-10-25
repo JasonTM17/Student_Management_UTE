@@ -336,8 +336,28 @@ class PeopleReadPersistenceTest {
         insertEnrollment("enr-withdrawn", "student-withdrawn", "section-1", "WITHDRAWN");
         insertEnrollment("enr-dropped", "student-dropped", "section-1", "DROPPED");
 
-        assertThat(peopleService.findAnnouncementStudentUserIds(null, "section-1", null, null))
+        assertThat(peopleService.findAnnouncementStudentUserIds(null, "section-1", null, null, null))
                 .containsExactly("user-student-active");
+    }
+
+    @Test
+    void departmentTargetsNarrowTheAnnouncementStudentFanout() {
+        // The inbox audience must mirror the feed: a department-targeted
+        // notice only reaches students whose curriculum sits in a listed
+        // department, and an empty target list keeps today's unrestricted
+        // reach.
+        insertStudent("student-se", "S020", "ACTIVE", 2, BASE_TIME, "department-se");
+        insertStudent("student-cs", "S021", "ACTIVE", 2, BASE_TIME, "department-cs");
+
+        assertThat(peopleService.findAnnouncementStudentUserIds(null, null, null, null,
+                        java.util.List.of("department-se")))
+                .containsExactly("user-student-se");
+        assertThat(peopleService.findAnnouncementStudentUserIds(null, null, null, null,
+                        java.util.List.of("department-missing")))
+                .isEmpty();
+        assertThat(peopleService.findAnnouncementStudentUserIds(null, null, null, null,
+                        java.util.List.of()))
+                .containsExactlyInAnyOrder("user-student-se", "user-student-cs");
     }
 
     private void insertEnrollment(String id, String studentId, String sectionId, String status) {

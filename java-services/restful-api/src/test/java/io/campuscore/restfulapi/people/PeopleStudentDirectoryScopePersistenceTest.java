@@ -292,7 +292,8 @@ class PeopleStudentDirectoryScopePersistenceTest {
                     "id" VARCHAR(120) PRIMARY KEY,
                     "studentId" VARCHAR(120) NOT NULL,
                     "sectionId" VARCHAR(120) NOT NULL,
-                    "status" VARCHAR(40) NOT NULL
+                    "status" VARCHAR(40) NOT NULL,
+                    "registrationSource" VARCHAR(40)
                 )
                 """);
         jdbc.execute("""

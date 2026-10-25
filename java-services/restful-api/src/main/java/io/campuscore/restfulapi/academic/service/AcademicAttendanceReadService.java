@@ -3,10 +3,12 @@ package io.campuscore.restfulapi.academic.service;
 import io.campuscore.restfulapi.academic.repository.AcademicAttendanceReadRepository;
 import io.campuscore.restfulapi.academic.model.AttendanceDay;
 import io.campuscore.restfulapi.academic.model.AttendanceRow;
+import io.campuscore.restfulapi.academic.model.SectionStudentRateRow;
 import io.campuscore.restfulapi.academic.model.SectionSummaryRow;
 import io.campuscore.restfulapi.academic.model.StudentSummaryRow;
 import io.campuscore.restfulapi.academic.dto.AcademicAttendanceReadDtos.AttendanceListResponse;
 import io.campuscore.restfulapi.academic.dto.AcademicAttendanceReadDtos.AttendanceResponse;
+import io.campuscore.restfulapi.academic.dto.AcademicAttendanceReadDtos.AttendanceRiskEntry;
 import io.campuscore.restfulapi.academic.dto.AcademicAttendanceReadDtos.AttendanceRosterEntry;
 import io.campuscore.restfulapi.academic.dto.AcademicAttendanceReadDtos.CourseSummary;
 import io.campuscore.restfulapi.academic.dto.AcademicAttendanceReadDtos.PageMeta;
@@ -32,9 +34,18 @@ public class AcademicAttendanceReadService {
     public static final int MAX_PAGE_SIZE = 100;
 
     private final AcademicAttendanceReadRepository attendance;
+    private final double minRate;
+    private final int minSessions;
 
-    public AcademicAttendanceReadService(AcademicAttendanceReadRepository attendance) {
+    public AcademicAttendanceReadService(
+            AcademicAttendanceReadRepository attendance,
+            @org.springframework.beans.factory.annotation.Value("${attendance.min-rate:0.80}") double minRate,
+            @org.springframework.beans.factory.annotation.Value("${attendance.min-sessions-for-signal:5}") int minSessions) {
         this.attendance = attendance;
+        // Advisory thresholds only: an out-of-range config must never invent a
+        // risk flag, so clamp rather than fail.
+        this.minRate = Math.min(1.0, Math.max(0.0, minRate));
+        this.minSessions = Math.max(1, minSessions);
     }
 
     @Transactional(readOnly = true)
@@ -73,7 +84,7 @@ public class AcademicAttendanceReadService {
                         requireProfileId("studentId", studentId),
                         normalizeOptional("semesterId", semesterId))
                 .stream()
-                .map(AcademicAttendanceReadService::studentSummary)
+                .map(this::studentSummary)
                 .toList();
     }
 
@@ -124,6 +135,11 @@ public class AcademicAttendanceReadService {
         String normalizedSectionId = normalizeRequired("sectionId", sectionId);
         requireSectionAccess(normalizedSectionId, roles, lecturerId);
         SectionSummaryRow row = attendance.sectionSummary(normalizedSectionId);
+        List<AttendanceRiskEntry> atRiskStudents = attendance.sectionStudentRates(normalizedSectionId)
+                .stream()
+                .map(this::riskEntry)
+                .filter(Objects::nonNull)
+                .toList();
         return new SectionAttendanceSummaryResponse(
                 normalizedSectionId,
                 row.totalSessions(),
@@ -132,7 +148,10 @@ public class AcademicAttendanceReadService {
                 row.absent(),
                 row.late(),
                 row.excused(),
-                rate(row.present() + row.late(), row.totalRecords()));
+                AttendanceRateCalculator.percentage(row.present(), row.late(), row.absent()),
+                minRate,
+                minSessions,
+                atRiskStudents);
     }
 
     @Transactional(readOnly = true)
@@ -194,7 +213,11 @@ public class AcademicAttendanceReadService {
                                 coalesce(row.courseNameVi(), row.courseName()))));
     }
 
-    private static StudentAttendanceSummaryResponse studentSummary(StudentSummaryRow row) {
+    private StudentAttendanceSummaryResponse studentSummary(StudentSummaryRow row) {
+        int rate = AttendanceRateCalculator.percentage(row.present(), row.late(), row.absent());
+        long countable = row.present() + row.late() + row.absent();
+        AttendanceEligibility.Signal signal =
+                AttendanceEligibility.signal(rate, countable, minSessions, minRate);
         return new StudentAttendanceSummaryResponse(
                 row.sectionId(),
                 row.courseCode(),
@@ -206,7 +229,26 @@ public class AcademicAttendanceReadService {
                 row.absent(),
                 row.late(),
                 row.excused(),
-                rate(row.present(), row.total()));
+                rate,
+                countable,
+                minRate,
+                minSessions,
+                signal == AttendanceEligibility.Signal.AT_RISK,
+                signal.name());
+    }
+
+    private AttendanceRiskEntry riskEntry(SectionStudentRateRow row) {
+        int rate = AttendanceRateCalculator.percentage(row.present(), row.late(), row.absent());
+        if (!AttendanceEligibility.atRisk(rate, row.countable(), minSessions, minRate)) {
+            return null;
+        }
+        return new AttendanceRiskEntry(
+                row.studentId(),
+                row.studentNumber(),
+                row.firstName(),
+                row.lastName(),
+                row.countable(),
+                rate);
     }
 
     private static String requireProfileId(String name, String value) {
@@ -270,10 +312,6 @@ public class AcademicAttendanceReadService {
 
     private static long offset(int page, int limit) {
         return (long) (page - 1) * limit;
-    }
-
-    private static int rate(long numerator, long denominator) {
-        return denominator > 0 ? Math.round((numerator * 100.0f) / denominator) : 0;
     }
 
     private static String coalesce(String value, String fallback) {

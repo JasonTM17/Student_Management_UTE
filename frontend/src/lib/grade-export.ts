@@ -264,7 +264,9 @@ export function generateGradeCsv(options: GradeCsvOptions): string {
     const letter = student.letterGrade || (total !== null ? calculateGrade(total) : '');
     const statusText = student.gradeStatus === 'PUBLISHED'
       ? (isVi ? 'Đã công bố' : 'Published')
-      : (isVi ? 'Bản nháp' : 'Draft');
+      : student.gradeStatus === 'APPEALED'
+        ? (isVi ? 'Đang xem xét' : 'Under review')
+        : (isVi ? 'Bản nháp' : 'Draft');
 
     rows.push(
       [

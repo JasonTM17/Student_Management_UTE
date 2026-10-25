@@ -28,6 +28,11 @@ import {
   SectionSchedule,
   MyCurriculumResponse,
   StudentGradesByEnrollmentResponse,
+  GradeAppeal,
+  GradeAppealEligibility,
+  GradeAppealReviewRequest,
+  GradeAppealStatus,
+  GradeUnpublishRequest,
 } from '@/types/api';
 import { addLocalePrefix, stripLocaleFromPathname } from '@/i18n/paths';
 import { resolvePublicApiBaseUrl } from '@/lib/public-api-url';
@@ -95,6 +100,7 @@ export type AnnouncementRecord = {
   publishedBy?: string | null;
   targetRoles?: string[];
   targetYears?: number[];
+  targetDepartments?: string[];
   isGlobal?: boolean;
   semesterId?: string | null;
   sectionId?: string | null;
@@ -162,7 +168,7 @@ export type CreditLimitApplication = {
   updatedAt: string;
 };
 export type AnnouncementMutation = Partial<Pick<AnnouncementRecord,
-  'title' | 'content' | 'priority' | 'targetRoles' | 'targetYears' | 'isGlobal' |
+  'title' | 'content' | 'priority' | 'targetRoles' | 'targetYears' | 'targetDepartments' | 'isGlobal' |
   'publishAt' | 'expiresAt' | 'semesterId' | 'sectionId' | 'lecturerId'>> & {
   reason?: string;
   expectedVersion?: number;
@@ -874,6 +880,101 @@ export interface RegistrationRound {
   creditLimit: number;
 }
 
+export type CurriculumPlanCourseState =
+  | 'ALREADY_REGISTERED'
+  | 'REGISTERABLE'
+  | 'BLOCKED_PREREQUISITE'
+  | 'NO_OPEN_SECTION'
+  | 'FULL'
+  | 'CONFLICT'
+  | 'DISMISSED';
+
+export interface CurriculumPlanSection {
+  id: string;
+  sectionNumber: string;
+  capacity: number;
+  enrolledCount: number;
+  seatsAvailable: number;
+  status: string;
+  scheduleConflict: boolean;
+  schedules: Array<Pick<RegistrationSectionSchedule, 'dayOfWeek' | 'startTime' | 'endTime'>>;
+}
+
+export interface CurriculumPlanCourse {
+  courseId: string;
+  courseCode: string;
+  name: string;
+  nameEn?: string | null;
+  nameVi?: string | null;
+  credits: number;
+  state: CurriculumPlanCourseState;
+  reasonCode?: string | null;
+  sections: CurriculumPlanSection[];
+  proposedSection?: CurriculumPlanSection | null;
+}
+
+export interface CurriculumPlanResponse {
+  semesterId: string;
+  semesterName: string;
+  semesterNameEn?: string | null;
+  semesterNameVi?: string | null;
+  registrationRoundId?: string | null;
+  registrationOpen: boolean;
+  term: {
+    status: 'RESOLVED' | 'MANUAL' | 'UNKNOWN' | string;
+    curriculumYear?: number | null;
+    curriculumSemester?: number | null;
+    reasonCode?: string | null;
+  };
+  courses: CurriculumPlanCourse[];
+}
+
+export interface CurriculumDefaultRegistrationResult {
+  semesterId: string;
+  registeredCount: number;
+  skippedCount: number;
+  courses: Array<{
+    courseId: string;
+    courseCode: string;
+    state: CurriculumPlanCourseState;
+    reasonCode?: string | null;
+    enrollmentId?: string | null;
+  }>;
+}
+
+export interface CurriculumDefaultAdminRunRequest {
+  roundId?: string;
+  semesterId?: string;
+  batchSize?: number;
+  cursor?: string;
+}
+
+export interface CurriculumDefaultAdminRunResponse {
+  runId?: string | null;
+  roundId: string;
+  semesterId: string;
+  dryRun: boolean;
+  students: number;
+  courses: number;
+  wouldRegister: number;
+  registered: number;
+  skipped: number;
+  failedStudents: number;
+  skippedByReason: Array<{ reasonCode: string; count: number }>;
+  hasMore: boolean;
+  nextCursor?: string | null;
+}
+
+export interface CurriculumDefaultAdminRunList {
+  runs: Array<{
+    id: string;
+    actorLabel?: string | null;
+    summary?: string | null;
+    afterState?: string | null;
+    createdAt: string;
+  }>;
+}
+
 export const registrationApi = {
   rounds: async (semesterId?: string): Promise<RegistrationRound[]> => {
     const response = await api.get<RegistrationRound[]>('/registration/rounds', { params: { semesterId } });
@@ -895,6 +996,28 @@ export const registrationApi = {
   },
   sections: async (params?: { semesterId?: string; roundId?: string }): Promise<RegistrationSection[]> => {
     const response = await api.get<RegistrationSection[]>('/me/registration/sections', { params });
+    return response.data;
+  },
+  curriculumPlan: async (params?: {
+    semesterId?: string;
+    curriculumYear?: number;
+    curriculumSemester?: number;
+  }): Promise<CurriculumPlanResponse> => {
+    const response = await api.get<CurriculumPlanResponse>(
+      '/me/registration/curriculum-plan',
+      { params },
+    );
+    return response.data;
+  },
+  registerCurriculumDefaults: async (payload: {
+    semesterId?: string;
+    curriculumYear?: number;
+    curriculumSemester?: number;
+  }): Promise<CurriculumDefaultRegistrationResult> => {
+    const response = await api.post<CurriculumDefaultRegistrationResult>(
+      '/me/registration/curriculum-plan/register',
+      payload,
+    );
     return response.data;
   },
   summary: async (semesterId?: string) => {
@@ -1023,6 +1146,30 @@ export const adminRegistrationApi = {
     const response = await api.post<WithdrawalApplication>(
       `/admin/registration/withdrawal-applications/${id}/review`,
       { decision, note },
+    );
+    return response.data;
+  },
+  dryRunCurriculumDefaults: async (
+    payload: CurriculumDefaultAdminRunRequest,
+  ): Promise<CurriculumDefaultAdminRunResponse> => {
+    const response = await api.post<CurriculumDefaultAdminRunResponse>(
+      '/admin/registration/curriculum-defaults/dry-run',
+      payload,
+    );
+    return response.data;
+  },
+  applyCurriculumDefaults: async (
+    payload: CurriculumDefaultAdminRunRequest,
+  ): Promise<CurriculumDefaultAdminRunResponse> => {
+    const response = await api.post<CurriculumDefaultAdminRunResponse>(
+      '/admin/registration/curriculum-defaults/apply',
+      payload,
+    );
+    return response.data;
+  },
+  curriculumDefaultRuns: async (): Promise<CurriculumDefaultAdminRunList> => {
+    const response = await api.get<CurriculumDefaultAdminRunList>(
+      '/admin/registration/curriculum-defaults/runs',
     );
     return response.data;
   },
@@ -1310,11 +1457,64 @@ export const gradesApi = {
     return response.data;
   },
 
+  getMyGradeAppeals: async (): Promise<GradeAppeal[]> => {
+    const response = await api.get<GradeAppeal[]>('/me/grade-appeals');
+    return response.data;
+  },
+
+  getGradeAppealEligibility: async (): Promise<GradeAppealEligibility[]> => {
+    const response = await api.get<GradeAppealEligibility[]>('/me/grade-appeals/eligibility');
+    return response.data;
+  },
+
+  submitGradeAppeal: async (enrollmentId: string, reason: string): Promise<GradeAppeal> => {
+    const response = await api.post<GradeAppeal>('/me/grade-appeals', { enrollmentId, reason });
+    return response.data;
+  },
+
+  cancelGradeAppeal: async (id: string): Promise<GradeAppeal> => {
+    const response = await api.post<GradeAppeal>(`/me/grade-appeals/${id}/cancel`);
+    return response.data;
+  },
+
   getStudentGradesByEnrollment: async (
     enrollmentId: string,
   ): Promise<StudentGradesByEnrollmentResponse> => {
     const response = await api.get<StudentGradesByEnrollmentResponse>(
       `/grades/student-grades/enrollment/${enrollmentId}`,
+    );
+    return response.data;
+  },
+};
+
+export const gradeAppealsApi = {
+  lecturerQueue: async (
+    status: GradeAppealStatus | 'ALL' = 'PENDING',
+  ): Promise<GradeAppeal[]> => {
+    const response = await api.get<GradeAppeal[]>('/lecturer/grade-appeals', { params: { status } });
+    return response.data;
+  },
+  reviewAsLecturer: async (id: string, request: GradeAppealReviewRequest): Promise<GradeAppeal> => {
+    const response = await api.post<GradeAppeal>(`/lecturer/grade-appeals/${id}/review`, request);
+    return response.data;
+  },
+  adminQueue: async (
+    status: GradeAppealStatus | 'ALL' = 'PENDING',
+  ): Promise<GradeAppeal[]> => {
+    const response = await api.get<GradeAppeal[]>('/admin/grade-appeals', { params: { status } });
+    return response.data;
+  },
+  reviewAsAdmin: async (id: string, request: GradeAppealReviewRequest): Promise<GradeAppeal> => {
+    const response = await api.post<GradeAppeal>(`/admin/grade-appeals/${id}/review`, request);
+    return response.data;
+  },
+  unpublishSection: async (
+    sectionId: string,
+    request: GradeUnpublishRequest,
+  ): Promise<{ sectionId: string; unpublishedCount: number }> => {
+    const response = await api.post<{ sectionId: string; unpublishedCount: number }>(
+      `/admin/sections/${sectionId}/grades/unpublish`,
+      request,
     );
     return response.data;
   },
@@ -1974,6 +2174,22 @@ export type AttendanceSummary = {
   late: number;
   excused: number;
   attendanceRate: number;
+  // Advisory exam-eligibility signal (additive; older APIs omit these).
+  countableSessions?: number;
+  minRate?: number;
+  minSessions?: number;
+  atRisk?: boolean;
+  examEligibility?: 'OK' | 'AT_RISK' | 'INSUFFICIENT_DATA' | string;
+};
+
+/** One roster student flagged AT_RISK in a section summary. */
+export type AttendanceRiskEntry = {
+  studentId: string;
+  studentCode: string;
+  firstName: string;
+  lastName: string;
+  countableSessions: number;
+  attendanceRate: number;
 };
 
 export type AttendanceStatus = 'PRESENT' | 'ABSENT' | 'LATE' | 'EXCUSED';
@@ -2006,6 +2222,10 @@ export type SectionAttendanceSummary = {
   late: number;
   excused: number;
   attendanceRate: number;
+  // Advisory exam-eligibility signal (additive; older APIs omit these).
+  minRate?: number;
+  minSessions?: number;
+  atRiskStudents?: AttendanceRiskEntry[];
 };
 
 // Attendance roster entry — the markable population (every enrollment except

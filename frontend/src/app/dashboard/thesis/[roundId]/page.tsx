@@ -14,6 +14,7 @@ import { EmptyState, ErrorState, LoadingState } from '@/components/ui/state-bloc
 import { PageHeader, SectionEyebrow } from '@/components/ui/page-header';
 import { LocalizedLink } from '@/components/LocalizedLink';
 import { StatusBadge } from '@/components/thesis/StatusBadge';
+import { ThesisEligibilityBanner } from '@/components/thesis/ThesisEligibilityBanner';
 import { WorkspaceMetricCard } from '@/components/dashboard/WorkspaceSurface';
 import { metricToneClass } from '@/components/ui/status';
 import { useRequireAuth } from '@/context/AuthContext';
@@ -123,6 +124,10 @@ export default function ThesisRoundDetailPage() {
           </div>
         }
       />
+
+      {user?.roles?.includes('STUDENT') && round.eligibility ? (
+        <ThesisEligibilityBanner eligibility={round.eligibility} />
+      ) : null}
 
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <WorkspaceMetricCard label={messages.thesis.roundStatus} value={statusLabel(round.status)} icon={<CalendarDays className="h-5 w-5" />} toneClassName={metricToneClass('warning')} />

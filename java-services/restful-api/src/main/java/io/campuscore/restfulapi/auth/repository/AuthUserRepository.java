@@ -90,8 +90,36 @@ public class AuthUserRepository {
      */
     public void lockUserRow(String userId) {
         jdbc.queryForList(
-                "SELECT \"id\" FROM " + USER_TABLE + " WHERE \"id\" = :id FOR UPDATE",
-                new MapSqlParameterSource("id", userId), String.class);
+                "SELECT \"id\" FROM " + USER_TABLE + " WHERE \"id\" = :userId FOR UPDATE",
+                new MapSqlParameterSource("userId", userId).addValue("id", userId), String.class);
+    }
+
+    /** Locks a stable row shared by concurrent changes to SUPER_ADMIN membership. */
+    public void lockSuperAdminRole() {
+        jdbc.queryForList(
+                "SELECT \"id\" FROM " + ROLE_TABLE + " WHERE \"name\" = 'SUPER_ADMIN' FOR UPDATE",
+                new MapSqlParameterSource(), String.class);
+    }
+
+    public long countActiveSuperAdmins() {
+        Long count = jdbc.queryForObject(
+                "SELECT COUNT(DISTINCT u.\"id\") FROM " + USER_TABLE + " u"
+                        + " JOIN " + USER_ROLE_TABLE + " ur ON ur.\"userId\" = u.\"id\""
+                        + " JOIN " + ROLE_TABLE + " r ON r.\"id\" = ur.\"roleId\""
+                        + " WHERE u.\"status\" = 'ACTIVE' AND r.\"name\" = 'SUPER_ADMIN'",
+                new MapSqlParameterSource(), Long.class);
+        return count == null ? 0 : count;
+    }
+
+    public boolean isActiveSuperAdmin(String userId) {
+        Long count = jdbc.queryForObject(
+                "SELECT COUNT(*) FROM " + USER_TABLE + " u"
+                        + " JOIN " + USER_ROLE_TABLE + " ur ON ur.\"userId\" = u.\"id\""
+                        + " JOIN " + ROLE_TABLE + " r ON r.\"id\" = ur.\"roleId\""
+                        + " WHERE u.\"id\" = :userId AND u.\"status\" = 'ACTIVE'"
+                        + " AND r.\"name\" = 'SUPER_ADMIN'",
+                new MapSqlParameterSource("userId", userId), Long.class);
+        return count != null && count > 0;
     }
 
     /**
