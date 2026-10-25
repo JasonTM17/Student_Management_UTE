@@ -400,8 +400,14 @@ class RbacAndApiErrorSecurityChallengeTest {
 
         private ThesisTopicRepository topicRepo = mock(ThesisTopicRepository.class);
         private ThesisRoundReadPort roundPort = mock(ThesisRoundReadPort.class);
-        private ThesisTopicService topicService = new ThesisTopicService(topicRepo, roundPort,
-                mock(io.campuscore.restfulapi.thesis.repository.ThesisScopeRepository.class));
+        private io.campuscore.restfulapi.thesis.repository.ThesisScopeRepository scopeRepo =
+                mock(io.campuscore.restfulapi.thesis.repository.ThesisScopeRepository.class);
+        private ThesisTopicService topicService = new ThesisTopicService(topicRepo, roundPort, scopeRepo);
+
+        {
+            org.mockito.Mockito.lenient().when(scopeRepo.findSupervisorsByTopicIds(any()))
+                    .thenReturn(java.util.Map.of());
+        }
 
         private ThesisTopic createTopic(String id, String owner, TopicStatus status) {
             ThesisTopic t = new ThesisTopic(ROUND_ID, "IT", "Topic " + id, "Desc", 3, owner);

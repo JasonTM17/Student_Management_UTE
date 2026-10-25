@@ -206,11 +206,12 @@ test('the course registration page renders the full catalog immediately, browse-
   assert.ok(source.includes('courseGroups.map'), 'sections stay grouped by course');
 });
 
-test('the thesis topic catalog is search-first and loads no topics before a query', () => {
+test('the thesis topic catalog is browse-first with the search gate mechanism retained', () => {
   const catalog = readSource('src/components/dashboard/thesis/ThesisTopicCatalogPage.tsx');
   const hook = readSource('src/components/dashboard/thesis/useThesisWorkspace.ts');
-  assert.ok(catalog.includes('topicsEnabled: searchActive'), 'catalog gates topic loading on the search query');
-  assert.ok(catalog.includes('!searchActive ? ('), 'catalog renders the search prompt before any topic card');
+  assert.ok(catalog.includes('useState(true)'), 'browse-first default: the catalog opens showing all topics');
+  assert.ok(catalog.includes('showAll'), 'the show-all toggle stays');
+  assert.ok(catalog.includes('topicsEnabled: searchActive'), 'the workspace only loads topics once the round is settled');
   assert.ok(
     !catalog.includes('autoSwitched'),
     'the old auto-probe that loaded every round before search must stay removed',
