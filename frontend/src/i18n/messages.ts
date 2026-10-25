@@ -59,6 +59,11 @@ export const en = {
       noResults: 'No matching options',
       clearSelection: 'Clear selection',
     },
+    dateTime24: {
+      date: 'Date',
+      hour: 'Hour',
+      minute: 'Minute',
+    },
     statuses: {
       OPEN: 'Open',
       CLOSED: 'Closed',
@@ -3379,6 +3384,11 @@ export const vi: I18nMessages = {
     combobox: {
       noResults: 'Không có kết quả phù hợp',
       clearSelection: 'Xóa lựa chọn',
+    },
+    dateTime24: {
+      date: 'Ngày',
+      hour: 'Giờ',
+      minute: 'Phút',
     },
     statuses: {
       OPEN: 'Đang mở',

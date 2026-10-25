@@ -465,12 +465,13 @@ test('the schedule fields are listed chronologically in both round modals', () =
 
 test('round form datetime inputs use minute precision', () => {
   for (const [name, modal] of [['create', createModal], ['edit', editModal]]) {
-    const inputs = modal.match(/type="datetime-local"[^>]*step="([^"]+)"/g) || [];
-    assert.equal(inputs.length, 8, `${name} modal still carries all eight datetime inputs`);
-    for (const input of inputs) {
-      assert.match(input, /step="60"/, `${name} modal inputs must not expose milliseconds: ${input}`);
-    }
+    const fields = modal.match(/<DateTime24Field\b/g) || [];
+    assert.equal(fields.length, 8, `${name} modal still carries all eight datetime fields`);
+    assert.doesNotMatch(modal, /type="datetime-local"/,
+      `${name} modal must use the 24-hour date/time field, not the locale-dependent native control`);
   }
+  // DateTime24Field only composes 'YYYY-MM-DDTHH:mm' — there is no seconds or
+  // milliseconds surface left to misconfigure.
   assert.doesNotMatch(createModal, /step="0\.001"/);
   assert.doesNotMatch(editModal, /step="0\.001"/);
 });
