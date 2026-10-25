@@ -3392,7 +3392,7 @@ export default function ThesisPage() {
               disabled={isActionPending}
             />
           </div>
-          <div className="grid gap-4 sm:grid-cols-2">
+          <div className="grid gap-4 sm:grid-cols-2 sm:items-end">
             <div>
               {scopedDepartments.length > 0 ? (
                 <Select
@@ -3447,7 +3447,7 @@ export default function ThesisPage() {
               onRetry={() => void loadLecturers()}
             />
           ) : lecturers.length > 0 ? (
-            <div className="grid gap-4 sm:grid-cols-2">
+            <div className="grid gap-4 sm:grid-cols-2 sm:items-end">
               <Combobox
                 label={messages.thesis.supervisorPrimaryLabel}
                 value={proposeSupervisorId}
@@ -4118,7 +4118,7 @@ export default function ThesisPage() {
               disabled={isActionPending}
             />
           </div>
-          <div className="grid gap-4 sm:grid-cols-2">
+          <div className="grid gap-4 sm:grid-cols-2 sm:items-end">
             <div>
               {scopedDepartments.length > 0 ? (
                 <Select
