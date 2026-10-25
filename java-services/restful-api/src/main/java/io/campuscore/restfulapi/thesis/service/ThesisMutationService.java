@@ -2662,14 +2662,13 @@ public class ThesisMutationService {
         for (int i = 0; i < tokens.size(); i++) {
             String paramName = "token" + i;
             searchParams.addValue(paramName, tokens.get(i));
-            // Search covers student number and names only — an email predicate
-            // would double as an existence oracle for student addresses.
             tokenPredicates.append(" AND (TRANSLATE(LOWER(s.\"studentId\"), :foldFrom, :foldTo) LIKE :").append(paramName).append(" ESCAPE '\\'")
                     .append(" OR TRANSLATE(LOWER(u.\"firstName\"), :foldFrom, :foldTo) LIKE :").append(paramName).append(" ESCAPE '\\'")
-                    .append(" OR TRANSLATE(LOWER(u.\"lastName\"), :foldFrom, :foldTo) LIKE :").append(paramName).append(" ESCAPE '\\')");
+                    .append(" OR TRANSLATE(LOWER(u.\"lastName\"), :foldFrom, :foldTo) LIKE :").append(paramName).append(" ESCAPE '\\'")
+                    .append(" OR TRANSLATE(LOWER(u.\"email\"), :foldFrom, :foldTo) LIKE :").append(paramName).append(" ESCAPE '\\')");
         }
         return jdbc.query(
-                "SELECT s.\"id\", s.\"studentId\" AS student_number, u.\"firstName\", u.\"lastName\","
+                "SELECT s.\"id\", s.\"studentId\" AS student_number, u.\"firstName\", u.\"lastName\", u.\"email\","
                         + " cur.\"code\" AS curriculum_code, cur.\"name\" AS curriculum_name"
                         + " FROM campuscore_auth.\"Student\" s"
                         + " JOIN campuscore_auth.\"User\" u ON u.\"id\" = s.\"userId\""
@@ -2683,6 +2682,7 @@ public class ThesisMutationService {
                         rs.getString("student_number"),
                         rs.getString("firstName"),
                         rs.getString("lastName"),
+                        rs.getString("email"),
                         rs.getString("curriculum_code"),
                         rs.getString("curriculum_name")));
     }

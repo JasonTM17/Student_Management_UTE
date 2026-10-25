@@ -228,6 +228,9 @@ export function SupervisedGroupMembers({ group, roundOpen = true, onChanged }: S
                         {student.studentNumber ? (
                           <span className="ml-1.5 font-mono text-[11px]">{student.studentNumber}</span>
                         ) : null}
+                        {student.email ? (
+                          <span className="ml-1.5 font-mono text-[11px] text-muted-foreground/75">({student.email})</span>
+                        ) : null}
                       </span>
                       <Button
                         type="button"

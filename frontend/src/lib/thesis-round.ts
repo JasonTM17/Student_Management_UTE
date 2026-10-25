@@ -112,6 +112,20 @@ const ROUND_STATUS_PRIORITY: Readonly<Record<string, number>> = {
   RESULTS_PUBLISHED: 4,
 };
 
+/** Keep status visible even when the native picker is closed. */
+export function groupThesisRoundsForPicker(
+  rounds: ReadonlyArray<ThesisRound>,
+  statusLabels: Readonly<Record<string, string>>,
+): { label: string; options: { value: string; label: string }[] }[] {
+  const groups = new Map<string, { label: string; options: { value: string; label: string }[] }>();
+  for (const round of sortThesisRoundsForOverview(rounds)) {
+    const label = statusLabels[round.status] ?? round.status;
+    if (!groups.has(round.status)) groups.set(round.status, { label, options: [] });
+    groups.get(round.status)!.options.push({ value: round.id, label: `${label} · ${round.name}` });
+  }
+  return [...groups.values()];
+}
+
 /**
  * Orders thesis rounds for staff/dean observation workspaces so active
  * registration/execution cohorts surface ahead of future proposal-only or
