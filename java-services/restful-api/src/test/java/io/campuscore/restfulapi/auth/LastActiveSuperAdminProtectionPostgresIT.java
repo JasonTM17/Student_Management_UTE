@@ -55,7 +55,7 @@ class LastActiveSuperAdminProtectionPostgresIT {
                 && List.of("localhost", "127.0.0.1", "::1").contains(target.getHost())
                 && target.getUserInfo() == null
                 && target.getPath() != null
-                && target.getPath().matches("/cx6_[a-z0-9_]+");
+                && target.getPath().matches("/(?:cx6|campuscore)_[a-z0-9_]+");
     }
 
     @Test
@@ -64,7 +64,7 @@ class LastActiveSuperAdminProtectionPostgresIT {
         assertThat(target.getScheme()).isEqualTo("postgresql");
         assertThat(target.getHost()).isIn("localhost", "127.0.0.1", "::1");
         assertThat(target.getUserInfo()).isNull();
-        assertThat(target.getPath()).matches("/cx6_[a-z0-9_]+");
+        assertThat(target.getPath()).matches("/(?:cx6|campuscore)_[a-z0-9_]+");
         assertThat(valueOr("CAMPUSCORE_E2E_POSTGRES_USER", "postgres")).isEqualTo("postgres");
 
         String suffix = UUID.randomUUID().toString().replace("-", "");
