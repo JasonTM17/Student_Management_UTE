@@ -1,6 +1,7 @@
 package io.campuscore.restfulapi.academic.service;
 
 import io.campuscore.restfulapi.academic.repository.AcademicAttendanceReadRepository;
+import io.campuscore.restfulapi.academic.model.AttendanceDay;
 import io.campuscore.restfulapi.academic.model.AttendanceRow;
 import io.campuscore.restfulapi.academic.model.SectionSummaryRow;
 import io.campuscore.restfulapi.academic.model.StudentSummaryRow;

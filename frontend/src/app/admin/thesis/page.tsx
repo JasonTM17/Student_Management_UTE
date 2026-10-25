@@ -430,6 +430,19 @@ export default function AdminThesisPage() {
     }
   };
 
+  const handleOpenAssignTopicModal = useCallback((councilId: string, roundId: string) => {
+    setModalError('');
+    setTargetCouncilIdForTopic(councilId);
+    setTargetRoundIdForCouncil(roundId);
+    const assigned = new Set(councils.flatMap((c) => c.topicIds ?? []));
+    ensureTopicSupervisors(
+      topics
+        .filter((t) => !assigned.has(t.id) && t.finalScore == null && (t.status === 'PUBLISHED' || t.status === 'APPROVED'))
+        .map((t) => t.id),
+    );
+    setShowAssignTopicModal(true);
+  }, [councils, ensureTopicSupervisors, topics]);
+
   const toggleExpand = (roundId: string) => {
     if (expandedRoundId === roundId) {
       expandedRoundRef.current = null;
@@ -1605,29 +1618,7 @@ export default function AdminThesisPage() {
                                           variant="ghost"
                                           size="sm"
                                           className="h-7 text-xs px-2 text-primary"
-                                          onClick={() => {
-                                            setModalError('');
-                                            setTargetCouncilIdForTopic(council.id);
-                                            setTargetRoundIdForCouncil(round.id);
-                                            // Warm supervisor rows for every
-                                            // topic the modal may offer so the
-                                            // disabled reasons land together.
-                                            const assigned = new Set(
-                                              councils.flatMap((c) => c.topicIds ?? []),
-                                            );
-                                            ensureTopicSupervisors(
-                                              topics
-                                                .filter(
-                                                  (t) =>
-                                                    !assigned.has(t.id) &&
-                                                    t.finalScore == null &&
-                                                    (t.status === 'PUBLISHED' ||
-                                                      t.status === 'APPROVED'),
-                                                )
-                                                .map((t) => t.id),
-                                            );
-                                            setShowAssignTopicModal(true);
-                                          }}
+                                          onClick={() => handleOpenAssignTopicModal(council.id, round.id)}
                                         >
                                           <Plus className="mr-1 h-3 w-3" />
                                           {messages.thesis.councils.assignTopic}
