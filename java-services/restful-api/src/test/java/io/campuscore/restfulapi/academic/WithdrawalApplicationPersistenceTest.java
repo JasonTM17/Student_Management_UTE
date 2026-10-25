@@ -494,11 +494,13 @@ class WithdrawalApplicationPersistenceTest {
         assertThat(om.readTree(body).get("reviewedAt").isTextual()).isTrue();
 
         Map<String, Object> enrollment = jdbc.queryForMap(
-                "SELECT \"status\", \"letterGrade\", \"gradeStatus\" FROM academic.\"Enrollment\" WHERE \"id\" = ?",
+                "SELECT \"status\", \"letterGrade\", \"gradeStatus\", \"gradePublishedAt\""
+                        + " FROM academic.\"Enrollment\" WHERE \"id\" = ?",
                 ENR_1);
         assertThat(enrollment.get("status")).isEqualTo("WITHDRAWN");
         assertThat(enrollment.get("letterGrade")).isEqualTo("W");
         assertThat(enrollment.get("gradeStatus")).isEqualTo("PUBLISHED");
+        assertThat(enrollment.get("gradePublishedAt")).isNotNull();
 
         Integer seats = jdbc.queryForObject(
                 "SELECT \"enrolledCount\" FROM academic.\"Section\" WHERE \"id\" = ?", Integer.class, SEC_1);

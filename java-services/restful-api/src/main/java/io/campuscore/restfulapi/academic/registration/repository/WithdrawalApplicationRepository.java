@@ -168,7 +168,8 @@ public class WithdrawalApplicationRepository {
     public int markEnrollmentWithdrawn(String enrollmentId, java.util.Set<String> activeStatuses) {
         return jdbc.update(
                 "UPDATE " + ENROLLMENT + " SET \"status\" = 'WITHDRAWN', \"letterGrade\" = 'W',"
-                        + " \"gradeStatus\" = 'PUBLISHED', \"updatedAt\" = CURRENT_TIMESTAMP"
+                        + " \"gradeStatus\" = 'PUBLISHED', \"gradePublishedAt\" = CURRENT_TIMESTAMP,"
+                        + " \"updatedAt\" = CURRENT_TIMESTAMP"
                         + " WHERE \"id\" = :id AND \"status\" IN (:active)",
                 new MapSqlParameterSource()
                         .addValue("id", enrollmentId)
