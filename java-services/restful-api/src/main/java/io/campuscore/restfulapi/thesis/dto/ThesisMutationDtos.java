@@ -208,6 +208,7 @@ public final class ThesisMutationDtos {
             String studentNumber,
             String firstName,
             String lastName,
+            String email,
             String curriculumCode,
             String curriculumName) {
     }

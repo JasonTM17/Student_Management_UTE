@@ -106,6 +106,8 @@ public class AdminUserMutationService {
         String searchClause = buildUserSearchClause(params, search);
         List<Map<String, Object>> data = jdbc.queryForList(
                 "SELECT u.\"id\", u.\"email\", u.\"firstName\", u.\"lastName\", u.\"status\", u.\"phone\", u.\"createdAt\","
+                        + " (SELECT sp.\"studentId\" FROM " + STUDENT + " sp WHERE sp.\"userId\" = u.\"id\" LIMIT 1) AS \"studentId\","
+                        + " (SELECT lp.\"employeeId\" FROM " + LECTURER + " lp WHERE lp.\"userId\" = u.\"id\" LIMIT 1) AS \"employeeId\","
                         + " COALESCE((SELECT STRING_AGG(r.\"name\", ',') FROM " + USER_ROLE + " ur JOIN " + ROLE + " r ON r.\"id\" = ur.\"roleId\" WHERE ur.\"userId\" = u.\"id\"), '') AS roles,"
                         + " EXISTS(SELECT 1 FROM " + STUDENT + " sp WHERE sp.\"userId\" = u.\"id\") AS \"hasStudentProfile\","
                         + " EXISTS(SELECT 1 FROM " + LECTURER + " lp WHERE lp.\"userId\" = u.\"id\") AS \"hasLecturerProfile\""
@@ -462,6 +464,8 @@ public class AdminUserMutationService {
     private Map<String, Object> find(String id) {
         Map<String, Object> user = jdbc.queryForMap(
                 "SELECT u.\"id\", u.\"email\", u.\"firstName\", u.\"lastName\", u.\"status\", u.\"phone\", u.\"createdAt\","
+                        + " (SELECT sp.\"studentId\" FROM " + STUDENT + " sp WHERE sp.\"userId\" = u.\"id\" LIMIT 1) AS \"studentId\","
+                        + " (SELECT lp.\"employeeId\" FROM " + LECTURER + " lp WHERE lp.\"userId\" = u.\"id\" LIMIT 1) AS \"employeeId\","
                         + " COALESCE((SELECT STRING_AGG(r.\"name\", ',') FROM " + USER_ROLE
                         + " ur JOIN " + ROLE + " r ON r.\"id\" = ur.\"roleId\" WHERE ur.\"userId\" = u.\"id\"), '') AS roles,"
                         + " EXISTS(SELECT 1 FROM " + STUDENT + " sp WHERE sp.\"userId\" = u.\"id\") AS \"hasStudentProfile\","

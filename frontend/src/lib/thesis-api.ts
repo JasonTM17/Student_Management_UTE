@@ -523,6 +523,7 @@ export interface ThesisStudentResult {
   studentNumber: string;
   firstName: string;
   lastName: string;
+  email?: string | null;
   curriculumCode?: string | null;
   curriculumName?: string | null;
 }

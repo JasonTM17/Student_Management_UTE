@@ -19,6 +19,7 @@ import {
   GraduationCap,
   Info,
   Lock,
+  MessageSquare,
   Plus,
   Search,
   Send,
@@ -29,7 +30,7 @@ import {
 import { useAuth } from '@/context/AuthContext';
 import { toast } from 'sonner';
 import { classifyThesisScore } from '@/lib/grade-scale';
-import { mergeThesisRounds, pickPreferredThesisRound, roundsForPicker } from '@/lib/thesis-round';
+import { groupThesisRoundsForPicker, mergeThesisRounds, pickPreferredThesisRound, roundsForPicker } from '@/lib/thesis-round';
 import { Button } from '@/components/ui/button';
 import { LinkButton } from '@/components/ui/link-button';
 import { Input } from '@/components/ui/input';
@@ -958,16 +959,9 @@ export default function ThesisPage() {
   }, [canLoadStaffRelations, messages.thesis.loadFailed, selectedRoundId]);
 
   const selectedRound = rounds.find((round) => round.id === selectedRoundId);
-  const roundGroups = useMemo(() => {
-    const map = new Map<string, { value: string; label: string }[]>();
-    for (const r of roundsForPicker(rounds, selectedRoundId)) {
-      const match = r.name.match(/Ni\u00ean kh\u00f3a\s+\d{4}\s*[-–]\s*\d{4}/i);
-      const cohort = match ? match[0] : (r.thesisType === 'KLTN' ? 'Khóa luận Tốt nghiệp' : 'Học phần Tốt nghiệp / Chuyên ngành');
-      if (!map.has(cohort)) map.set(cohort, []);
-      map.get(cohort)!.push({ value: r.id, label: r.name });
-    }
-    return Array.from(map.entries()).map(([label, opts]) => ({ label, options: opts }));
-  }, [rounds, selectedRoundId]);
+  const roundGroups = useMemo(() => groupThesisRoundsForPicker(
+    roundsForPicker(rounds, selectedRoundId), messages.thesis.status,
+  ), [rounds, selectedRoundId, messages.thesis.status]);
   const studentId = user?.studentId ?? '';
   const ownGroups = groups.filter(
     (group) =>
@@ -2786,7 +2780,7 @@ export default function ThesisPage() {
                 {messages.thesis.proposeTopic}
               </Button>
             ) : null}
-            <div className="min-w-[15rem]">
+            <div className="w-full min-w-0 sm:w-80">
               <Select
                 label={messages.thesis.selectRound}
                 value={selectedRoundId}
@@ -2798,10 +2792,6 @@ export default function ThesisPage() {
                 }}
                 aria-label={messages.thesis.selectRound}
                 groups={roundGroups}
-                options={roundsForPicker(rounds, selectedRoundId).map((round) => ({
-                  value: round.id,
-                  label: round.name,
-                }))}
               />
             </div>
           </div>
@@ -3339,6 +3329,44 @@ export default function ThesisPage() {
                   </p>
                 </div>
               </div>
+
+              {myResultItem?.comments && myResultItem.comments.length > 0 && (
+                <div className="mt-5 rounded-xl border border-border/70 bg-background/90 p-4 shadow-2xs">
+                  <div className="flex items-center gap-2 mb-3">
+                    <MessageSquare className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
+                    <h4 className="text-xs font-bold uppercase tracking-wider text-foreground">
+                      Nhận xét &amp; Đánh giá từ Hội đồng
+                    </h4>
+                  </div>
+                  <div className="space-y-2.5">
+                    {myResultItem.comments.map((c, cIdx) => (
+                      <div
+                        key={cIdx}
+                        className="rounded-lg border border-border/50 bg-muted/40 p-3 text-xs"
+                      >
+                        <div className="flex items-center gap-2 mb-1.5">
+                          <span className="rounded bg-primary/10 px-2 py-0.5 text-[11px] font-semibold text-primary">
+                            {c.component === 'GVPB'
+                              ? 'Giảng viên phản biện'
+                              : 'Hội đồng bảo vệ'}
+                          </span>
+                        </div>
+                        <p className="text-foreground italic leading-relaxed text-xs sm:text-sm">
+                          &ldquo;{c.comment}&rdquo;
+                        </p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              <div className="mt-4 flex items-start gap-2.5 rounded-xl border border-emerald-500/30 bg-emerald-500/10 p-3 text-xs text-emerald-900 dark:text-emerald-200">
+                <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-emerald-600 dark:text-emerald-400" />
+                <p>
+                  <span className="font-semibold">{pageCopy.scoreNoticePrefix}:</span>{' '}
+                  {pageCopy.scoreNoticeDetail}
+                </p>
+              </div>
             </div>
           )}
 
@@ -3402,6 +3430,18 @@ export default function ThesisPage() {
                           <p className="text-xs text-muted-foreground">
                             {messages.thesis.results.council}: {result.councilName}
                           </p>
+                          {result.comments && result.comments.length > 0 && (
+                            <div className="mt-2 space-y-1">
+                              {result.comments.map((c, cIdx) => (
+                                <div key={cIdx} className="text-xs text-muted-foreground italic flex items-start gap-1.5 bg-muted/40 px-2.5 py-1.5 rounded-md border border-border/40">
+                                  <span className="font-semibold not-italic text-[11px] px-1.5 py-0.5 rounded bg-primary/10 text-primary shrink-0">
+                                    {c.component === 'GVPB' ? 'Phản biện' : 'Hội đồng'}
+                                  </span>
+                                  <span className="text-foreground">{c.comment}</span>
+                                </div>
+                              ))}
+                            </div>
+                          )}
                           {result.resultStatus === 'REVIEW_FAILED' ? (
                             <p className="text-xs text-muted-foreground">
                               {messages.thesis.results.notEligible}
@@ -4007,7 +4047,10 @@ export default function ThesisPage() {
                         <div className="min-w-0 space-y-0.5">
                           <p className="truncate text-sm font-semibold text-foreground" title={fullName}>{fullName}</p>
                           <p className="truncate text-xs text-muted-foreground">
-                            MSSV: <span className="font-mono">{student.studentNumber}</span>
+                            MSSV: <span className="font-mono font-medium text-foreground">{student.studentNumber}</span>
+                            {student.email ? (
+                              <> &bull; Email: <span className="font-mono">{student.email}</span></>
+                            ) : null}
                           </p>
                           {curriculumLabel ? (
                             <p className="truncate text-xs text-muted-foreground" title={curriculumLabel}>
