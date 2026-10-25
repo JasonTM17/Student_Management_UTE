@@ -86,6 +86,28 @@ class GradePublishAtomicityTest {
         assertThat(inboxCount()).isEqualTo(1);
     }
 
+    @Test
+    void publicationDoesNotNotifyStudentsWhoseGradesAreAlreadyAppealed() {
+        jdbc.update("UPDATE \"academic\".\"Enrollment\" SET \"status\" = 'COMPLETED', \"gradeStatus\" = 'APPEALED'"
+                + " WHERE \"id\" = 'enrollment'");
+        jdbc.update("INSERT INTO \"academic\".\"Student\" VALUES ('student-draft', 'draft-user')");
+        jdbc.update("INSERT INTO \"academic\".\"Enrollment\" VALUES"
+                + " ('enrollment-draft', 'student-draft', 'section', 'ENROLLED', 'DRAFT', 7, 'B', CURRENT_TIMESTAMP)");
+        jdbc.update("INSERT INTO \"academic\".\"StudentGrade\" VALUES"
+                + " ('p-draft', 'enrollment-draft', 'process', 7), ('f-draft', 'enrollment-draft', 'final', 7)");
+
+        service.publishGrades("section", null, true, null);
+
+        assertThat(jdbc.queryForList("SELECT user_id FROM notifications.notification", String.class))
+                .containsExactly("draft-user");
+        assertThat(jdbc.queryForObject(
+                "SELECT \"gradeStatus\" FROM \"academic\".\"Enrollment\" WHERE \"id\" = 'enrollment'",
+                String.class)).isEqualTo("APPEALED");
+        assertThat(jdbc.queryForObject(
+                "SELECT \"gradeStatus\" FROM \"academic\".\"Enrollment\" WHERE \"id\" = 'enrollment-draft'",
+                String.class)).isEqualTo("PUBLISHED");
+    }
+
     private int inboxCount() {
         return jdbc.queryForObject("SELECT COUNT(*) FROM notifications.notification", Integer.class);
     }

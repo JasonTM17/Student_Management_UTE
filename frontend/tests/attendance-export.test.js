@@ -2,10 +2,18 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
+const { calculateAttendanceRate } = require('../src/lib/attendance-rate');
 
 const root = path.resolve(__dirname, '..');
 
 test('Lecturer attendance sheet CSV and print export integrity', async (t) => {
+  await t.test('attendance rate counts present and late, excludes excused, and rounds half-up', () => {
+    assert.equal(calculateAttendanceRate({ present: 1, late: 1, absent: 1, excused: 1 }), 67);
+    assert.equal(calculateAttendanceRate({ present: 1, late: 0, absent: 39 }), 3);
+    assert.equal(calculateAttendanceRate({ present: 0, late: 0, absent: 0 }), null);
+    assert.equal(calculateAttendanceRate({ present: 1, late: 0, absent: 7 }, 1), 12.5);
+  });
+
   await t.test('attendance-export exports required functions and types', () => {
     const fileSource = fs.readFileSync(path.join(root, 'src/lib/attendance-export.ts'), 'utf8');
     assert.match(fileSource, /export function escapeCsvField/, 'must export escapeCsvField');

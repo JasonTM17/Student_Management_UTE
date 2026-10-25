@@ -182,6 +182,8 @@ export const en = {
         SECTION_NOT_FOUND: 'This class section is no longer available.',
         SEMESTER_DATES_OVERLAP: 'This semester overlaps another semester in the same academic year.',
         STUDENT_NOT_FOUND: 'Your student profile could not be found. Contact your administrator.',
+        ATTENDANCE_EDIT_WINDOW_CLOSED:
+          'That attendance date is outside the edit window. Ask an administrator to change it.',
         WITHDRAWAL_WINDOW_CLOSED:
           'The withdrawal window for this semester has closed.',
         WITHDRAWAL_SEMESTER_INELIGIBLE:
@@ -381,6 +383,7 @@ export const en = {
         EMPLOYEE_ID_EXISTS: 'This employee ID already exists.',
         ROLE_ESCALATION:
           'Only a super administrator can grant this role or manage administrator, faculty-head and department-head accounts.',
+        LAST_SUPER_ADMIN_REQUIRED: 'At least one active super administrator must remain.',
         DEAN_ALREADY_ASSIGNED:
           'This faculty already has an active dean. Move the current dean back to lecturer before appointing another.',
         // Password policy & recovery
@@ -3364,8 +3367,8 @@ export const en = {
     emptyTitle: 'No attendance records yet',
     emptyDescription:
       'Once lecturers start marking attendance for your classes, the per-course totals and session history will appear here.',
-    statsPresentRate: 'Present rate',
-    statsPresentRateHint: 'present sessions ÷ recorded sessions',
+    statsPresentRate: 'Attendance rate',
+    statsPresentRateHint: 'present or late ÷ present, late, or absent sessions; excused excluded',
     statsTotalSessions: 'Recorded sessions',
     statsPresent: 'Present',
     statsAbsentLate: 'Absent + late',
@@ -3391,6 +3394,13 @@ export const en = {
       ABSENT: 'Absent',
       LATE: 'Late',
       EXCUSED: 'Excused',
+    },
+    eligibility: {
+      label: 'Exam eligibility',
+      ok: 'On track',
+      atRisk: 'Below suggested attendance',
+      insufficient: 'Not enough sessions yet',
+      hint: 'Advisory only — it never blocks an exam or registration.',
     },
   },
   lecturerAttendance: {
@@ -3426,7 +3436,7 @@ export const en = {
     notesPlaceholder: 'Reason or notes (optional)',
     statsTotalStudents: 'Enrolled students',
     statsMarked: 'Marked today',
-    statsPresentRate: 'Class present rate',
+    statsPresentRate: 'Class attendance rate',
     statuses: {
       PRESENT: 'Present',
       ABSENT: 'Absent',
@@ -3449,6 +3459,9 @@ export const en = {
     statExcusedSuffix: 'excused',
     statSessionsHeldSuffix: 'sessions held',
     sheetTitle: 'Class section attendance sheet',
+    atRiskTitle: 'Below suggested attendance',
+    atRiskHint: 'Advisory signal only — it never blocks exams or grading.',
+    atRiskRate: 'attendance {rate}%',
   },
 } as const;
 
@@ -3642,6 +3655,8 @@ export const vi: I18nMessages = {
         SECTION_NOT_FOUND: 'Lớp học phần này không còn khả dụng.',
         SEMESTER_DATES_OVERLAP: 'Học kỳ này bị trùng thời gian với học kỳ khác trong cùng năm học.',
         STUDENT_NOT_FOUND: 'Không tìm thấy hồ sơ sinh viên. Vui lòng liên hệ quản trị viên.',
+        ATTENDANCE_EDIT_WINDOW_CLOSED:
+          'Ngày điểm danh này đã ngoài thời hạn chỉnh sửa. Vui lòng nhờ quản trị viên thay đổi.',
         WITHDRAWAL_WINDOW_CLOSED:
           'Đã hết thời hạn rút học phần của học kỳ này.',
         WITHDRAWAL_SEMESTER_INELIGIBLE:
@@ -3841,6 +3856,7 @@ export const vi: I18nMessages = {
         EMPLOYEE_ID_EXISTS: 'Mã số giảng viên đã tồn tại.',
         ROLE_ESCALATION:
           'Chỉ quản trị viên cấp cao mới được cấp vai trò này hoặc quản lý tài khoản quản trị viên, Trưởng khoa và Trưởng bộ môn.',
+        LAST_SUPER_ADMIN_REQUIRED: 'Phải luôn còn ít nhất một quản trị viên cấp cao đang hoạt động.',
         DEAN_ALREADY_ASSIGNED:
           'Khoa này đã có Trưởng khoa đang hoạt động. Hãy chuyển Trưởng khoa hiện tại về Giảng viên trước khi bổ nhiệm người khác.',
         // Chính sách mật khẩu & khôi phục
@@ -6818,8 +6834,8 @@ export const vi: I18nMessages = {
     emptyTitle: 'Chưa có bản ghi điểm danh',
     emptyDescription:
       'Khi giảng viên bắt đầu điểm danh cho các lớp của bạn, bảng tổng hợp theo môn và lịch sử phiên học sẽ xuất hiện tại đây.',
-    statsPresentRate: 'Tỷ lệ có mặt',
-    statsPresentRateHint: 'số phiên có mặt ÷ số phiên đã ghi',
+    statsPresentRate: 'Tỷ lệ tham dự',
+    statsPresentRateHint: 'phiên có mặt hoặc đi muộn ÷ phiên có mặt, đi muộn hoặc vắng; không tính vắng có phép',
     statsTotalSessions: 'Tổng số phiên đã ghi',
     statsPresent: 'Số phiên có mặt',
     statsAbsentLate: 'Vắng + đi muộn',
@@ -6845,6 +6861,13 @@ export const vi: I18nMessages = {
       ABSENT: 'Vắng',
       LATE: 'Đi muộn',
       EXCUSED: 'Có phép',
+    },
+    eligibility: {
+      label: 'Điều kiện dự thi',
+      ok: 'Đang đạt',
+      atRisk: 'Dưới mức chuyên cần đề xuất',
+      insufficient: 'Chưa đủ phiên để đánh giá',
+      hint: 'Chỉ mang tính tham khảo — không ảnh hưởng đến dự thi hay đăng ký.',
     },
   },
   lecturerAttendance: {
@@ -6880,7 +6903,7 @@ export const vi: I18nMessages = {
     notesPlaceholder: 'Lý do vắng hoặc ghi chú thêm (không bắt buộc)',
     statsTotalStudents: 'Tổng số sinh viên',
     statsMarked: 'Đã điểm danh hôm nay',
-    statsPresentRate: 'Tỷ lệ chuyên cần',
+    statsPresentRate: 'Tỷ lệ tham dự lớp học',
     statuses: {
       PRESENT: 'Có mặt',
       ABSENT: 'Vắng',
@@ -6903,6 +6926,9 @@ export const vi: I18nMessages = {
     statExcusedSuffix: 'có phép',
     statSessionsHeldSuffix: 'buổi đã học',
     sheetTitle: 'Bảng điểm danh lớp học phần',
+    atRiskTitle: 'Dưới mức chuyên cần đề xuất',
+    atRiskHint: 'Tín hiệu tham khảo — không ảnh hưởng đến dự thi hay chấm điểm.',
+    atRiskRate: 'chuyên cần {rate}%',
   },
 };
 

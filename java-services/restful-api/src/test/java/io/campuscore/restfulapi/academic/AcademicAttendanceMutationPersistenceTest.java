@@ -30,6 +30,9 @@ import org.springframework.test.web.servlet.request.RequestPostProcessor;
 @ActiveProfiles({"test", "persistence"})
 @TestPropertySource(properties = {
         "spring.flyway.enabled=false",
+        // Fixtures write historical dates through the lecturer API; the
+        // 30-day default edit window is exercised by dedicated tests.
+        "attendance.edit-window-days=10000",
         "spring.datasource.url=jdbc:h2:mem:attendance_mutation;MODE=PostgreSQL;DATABASE_TO_LOWER=TRUE;DB_CLOSE_DELAY=-1"
 })
 class AcademicAttendanceMutationPersistenceTest {

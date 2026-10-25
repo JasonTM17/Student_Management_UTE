@@ -45,6 +45,14 @@ public final class AcademicAttendanceReadDtos {
     public record AttendanceListResponse(List<AttendanceResponse> data, PageMeta meta) {
     }
 
+    /**
+     * Per-section totals plus the advisory exam-eligibility signal. The signal
+     * never blocks anything: it is informational only. {@code examEligibility}
+     * is {@code OK}, {@code AT_RISK} (countable sessions reached
+     * {@code minSessions} and the rate is under {@code minRate}), or
+     * {@code INSUFFICIENT_DATA} when fewer than {@code minSessions} countable
+     * records exist.
+     */
     public record StudentAttendanceSummaryResponse(
             String sectionId,
             String courseCode,
@@ -56,6 +64,24 @@ public final class AcademicAttendanceReadDtos {
             long absent,
             long late,
             long excused,
+            int attendanceRate,
+            long countableSessions,
+            double minRate,
+            int minSessions,
+            boolean atRisk,
+            String examEligibility) {
+    }
+
+    /**
+     * One roster student whose advisory exam-eligibility signal is AT_RISK,
+     * listed with the rate that put them there.
+     */
+    public record AttendanceRiskEntry(
+            String studentId,
+            String studentCode,
+            String firstName,
+            String lastName,
+            long countableSessions,
             int attendanceRate) {
     }
 
@@ -67,7 +93,10 @@ public final class AcademicAttendanceReadDtos {
             long absent,
             long late,
             long excused,
-            int attendanceRate) {
+            int attendanceRate,
+            double minRate,
+            int minSessions,
+            List<AttendanceRiskEntry> atRiskStudents) {
     }
 
     public record AttendanceRosterEntry(
