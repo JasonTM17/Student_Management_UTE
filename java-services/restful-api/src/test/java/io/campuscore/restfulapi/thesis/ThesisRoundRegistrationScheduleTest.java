@@ -2,11 +2,16 @@ package io.campuscore.restfulapi.thesis;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import io.campuscore.restfulapi.thesis.repository.ThesisDatabaseClockRepository;
 import java.time.Instant;
+import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
@@ -23,19 +28,17 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.request.RequestPostProcessor;
 
 /**
- * The transition into REGISTRATION_OPEN used to check only the current status,
- * while every registration mutation ({@code requireRoundStatus}) also demands
- * that "now" sits inside the stored registration window. An admin could
- * therefore publish a round the UI renders as "registration open" while every
- * group and topic action answered 409 REGISTRATION_WINDOW_CLOSED.
+ * The transition into REGISTRATION_OPEN used to require the scheduled start
+ * even after lecturer submissions had ended. The admin therefore could not
+ * use the early-open policy already applied to proposals. Once opened, the
+ * registration status must still agree with the window checked by every
+ * group and topic mutation ({@code requireRoundStatus}).
  *
- * <p>The authored schedule is the authority: registration opens only inside
- * {@code [registration_start, registration_end)}. Out-of-window transitions are
- * rejected instead of accepted, because the PROPOSAL_OPEN clamp cannot be
- * mirrored on {@code registration_start} — it must stay >=
- * {@code lecturer_submit_end} (two-phase order, thesis_round_schedule_order_valid)
- * — and silently moving it would rewrite the schedule students were shown.
- * A student never sees a registration CTA the server rejects.
+ * <p>The authored schedule is the authority. An early open may move only
+ * {@code registration_start} to the database's current time, and only after
+ * {@code lecturer_submit_end}; that keeps the existing schedule-order check
+ * intact while avoiding an hour-long dead period after proposals are published.
+ * The original end remains fixed, and the adjustment is audited.
  */
 @SpringBootTest
 @AutoConfigureMockMvc
@@ -55,6 +58,9 @@ class ThesisRoundRegistrationScheduleTest {
     @Autowired
     private MockMvc mvc;
 
+    @org.springframework.test.context.bean.override.mockito.MockitoSpyBean
+    private ThesisDatabaseClockRepository databaseClock;
+
     @BeforeEach
     void cleanDatabase() {
         // thesis_group_report is ON DELETE RESTRICT -> delete reports before groups.
@@ -68,20 +74,32 @@ class ThesisRoundRegistrationScheduleTest {
     }
 
     @Test
-    void openingRegistrationBeforeTheScheduledWindowIsRejectedAndNothingMoves() throws Exception {
+    void openingRegistrationBeforeTheLecturerWindowEndsIsRejectedWithActionableConflict() throws Exception {
         ensureActiveStudent("rs-future-student", "rs-user-future-student");
         UUID roundId = createFutureWindowRound();
         driveToProposalsPublished(roundId);
+        Instant originalStart = registrationStart(roundId);
+        Instant originalEnd = registrationEnd(roundId);
+        int transitionAuditCountBeforeAttempt = jdbc.queryForObject(
+                "SELECT COUNT(*) FROM campuscore_audit.\"AdminAudit\" WHERE \"entityId\" = ? "
+                        + "AND \"action\" = 'THESIS_ROUND_TRANSITION' ",
+                Integer.class, roundId.toString());
 
-        // Pre-fix this returned 200 and set REGISTRATION_OPEN on a round whose
-        // window had not started: the status advertised registration that the
-        // very next group action rejected with REGISTRATION_WINDOW_CLOSED.
+        // Clamping to now here would violate registration_start >=
+        // lecturer_submit_end, so the transition has a specific, actionable refusal.
         mvc.perform(post("/api/v1/thesis/rounds/{id}/open-registration", roundId).with(adminJwt()))
                 .andExpect(status().isConflict())
-                .andExpect(jsonPath("$.code").value("REGISTRATION_WINDOW_NOT_OPEN"));
+                .andExpect(jsonPath("$.code").value("REGISTRATION_EARLY_OPEN_BLOCKED"))
+                .andExpect(jsonPath("$.details.lecturerSubmitEnd").isNotEmpty());
 
         // Rejected means unchanged: the CAS update rolled back with the gate.
         assertThat(roundStatus(roundId)).isEqualTo("PROPOSALS_PUBLISHED");
+        assertThat(registrationStart(roundId)).isEqualTo(originalStart);
+        assertThat(registrationEnd(roundId)).isEqualTo(originalEnd);
+        assertThat(jdbc.queryForObject(
+                "SELECT COUNT(*) FROM campuscore_audit.\"AdminAudit\" WHERE \"entityId\" = ? "
+                        + "AND \"action\" = 'THESIS_ROUND_TRANSITION' ",
+                Integer.class, roundId.toString())).isEqualTo(transitionAuditCountBeforeAttempt);
         mvc.perform(post("/api/v1/thesis/groups")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"roundId\":\"" + roundId + "\"}")
@@ -91,13 +109,49 @@ class ThesisRoundRegistrationScheduleTest {
     }
 
     @Test
+    void openingRegistrationEarlyAfterTheLecturerWindowEndsClampsStartAndAuditsBothSchedules() throws Exception {
+        ensureActiveStudent("rs-early-student", "rs-user-early-student");
+        Instant now = Instant.now().truncatedTo(ChronoUnit.SECONDS);
+        Instant lecturerEnd = now.minusSeconds(3_600);
+        Instant originalStart = now.plusSeconds(3_600);
+        UUID roundId = createRound("rs Early Open", lecturerEnd, originalStart,
+                now.plusSeconds(2 * 86_400));
+        driveToProposalsPublished(roundId);
+        Instant originalEnd = registrationEnd(roundId);
+
+        mvc.perform(post("/api/v1/thesis/rounds/{id}/open-registration", roundId).with(adminJwt()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("REGISTRATION_OPEN"));
+
+        Instant clampedStart = registrationStart(roundId);
+        assertThat(clampedStart).isBeforeOrEqualTo(Instant.now().plusSeconds(2));
+        assertThat(clampedStart).isAfter(Instant.now().minusSeconds(10));
+        assertThat(registrationEnd(roundId)).isEqualTo(originalEnd);
+        assertThat(clampedStart).isAfterOrEqualTo(lecturerEnd);
+
+        List<String> auditStates = jdbc.query(
+                "SELECT \"beforeState\", \"afterState\" FROM campuscore_audit.\"AdminAudit\" "
+                        + "WHERE \"action\" = 'THESIS_ROUND_SCHEDULE_ADJUSTED' AND \"entityId\" = ?",
+                (rs, row) -> rs.getString(1) + " -> " + rs.getString(2), roundId.toString());
+        assertThat(auditStates).hasSize(1);
+        assertThat(auditStates.get(0)).contains(originalStart.toString()).contains(clampedStart.toString());
+
+        mvc.perform(post("/api/v1/thesis/groups")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"roundId\":\"" + roundId + "\"}")
+                        .with(studentJwt("rs-early-student")))
+                .andExpect(status().isOk());
+    }
+
+    @Test
     void openingRegistrationAfterTheScheduledWindowEndedIsRejected() throws Exception {
         UUID roundId = createExpiredWindowRound();
         driveToProposalsPublished(roundId);
 
         mvc.perform(post("/api/v1/thesis/rounds/{id}/open-registration", roundId).with(adminJwt()))
                 .andExpect(status().isConflict())
-                .andExpect(jsonPath("$.code").value("REGISTRATION_WINDOW_CLOSED"));
+                .andExpect(jsonPath("$.code").value("REGISTRATION_WINDOW_CLOSED"))
+                .andExpect(jsonPath("$.details.registrationEnd").isNotEmpty());
 
         assertThat(roundStatus(roundId)).isEqualTo("PROPOSALS_PUBLISHED");
     }
@@ -122,6 +176,31 @@ class ThesisRoundRegistrationScheduleTest {
     }
 
     @Test
+    void studentRegistrationUsesTheSameDatabaseClockThatOpenedTheRound() throws Exception {
+        ensureActiveStudent("rs-skew-student", "rs-user-skew-student");
+        Instant now = Instant.now().truncatedTo(ChronoUnit.MICROS);
+        Instant registrationStart = now.minusSeconds(180);
+        Instant registrationEnd = now.minusSeconds(30);
+        Instant lecturerEnd = registrationStart.minusSeconds(3_600);
+        UUID roundId = createRound("rs Database Clock", lecturerEnd, registrationStart, registrationEnd);
+        driveToProposalsPublished(roundId);
+
+        Instant databaseNow = registrationStart.plusSeconds(90);
+        assertThat(databaseNow).isBefore(registrationEnd);
+        assertThat(Instant.now()).isAfter(registrationEnd);
+        org.mockito.Mockito.doReturn(databaseNow).when(databaseClock).now();
+
+        mvc.perform(post("/api/v1/thesis/rounds/{id}/open-registration", roundId).with(adminJwt()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("REGISTRATION_OPEN"));
+        mvc.perform(post("/api/v1/thesis/groups")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"roundId\":\"" + roundId + "\"}")
+                        .with(studentJwt("rs-skew-student")))
+                .andExpect(status().isOk());
+    }
+
+    @Test
     void jumpingStraightToRegistrationStillReportsTheStateConflictFirst() throws Exception {
         // The schedule gate must not displace the state machine: the phase order
         // is the more fundamental error and keeps its own code.
@@ -131,6 +210,24 @@ class ThesisRoundRegistrationScheduleTest {
                 .andExpect(status().isConflict())
                 .andExpect(jsonPath("$.code").value("ROUND_STATE_CONFLICT"));
         assertThat(roundStatus(roundId)).isEqualTo("DRAFT");
+    }
+
+    @Test
+    void roundReadIncludesDatabaseSampledServerTime() throws Exception {
+        UUID roundId = createLiveWindowRound();
+        Instant before = currentDatabaseTime();
+
+        String response = mvc.perform(get("/api/v1/thesis/rounds").with(adminJwt()))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+
+        JsonNode round = new ObjectMapper().readTree(response).get(0);
+        assertThat(round).isNotNull();
+        assertThat(round.get("id").asText()).isEqualTo(roundId.toString());
+        assertThat(round.hasNonNull("serverNow")).isTrue();
+        Instant serverNow = Instant.parse(round.get("serverNow").asText());
+        Instant after = currentDatabaseTime();
+        assertThat(serverNow).isBetween(before.minusSeconds(2), after.plusSeconds(2));
     }
 
     // ---------- fixtures ----------
@@ -192,6 +289,22 @@ class ThesisRoundRegistrationScheduleTest {
     private String roundStatus(UUID roundId) {
         return jdbc.queryForObject(
                 "SELECT status FROM thesis.thesis_registration_round WHERE id = ?", String.class, roundId);
+    }
+
+    private Instant registrationStart(UUID roundId) {
+        return jdbc.queryForObject(
+                "SELECT registration_start FROM thesis.thesis_registration_round WHERE id = ?",
+                (rs, row) -> rs.getTimestamp(1).toInstant(), roundId);
+    }
+
+    private Instant registrationEnd(UUID roundId) {
+        return jdbc.queryForObject(
+                "SELECT registration_end FROM thesis.thesis_registration_round WHERE id = ?",
+                (rs, row) -> rs.getTimestamp(1).toInstant(), roundId);
+    }
+
+    private Instant currentDatabaseTime() {
+        return jdbc.queryForObject("SELECT CURRENT_TIMESTAMP", (rs, row) -> rs.getTimestamp(1).toInstant());
     }
 
     private void ensureActiveStudent(String studentId, String userId) {
