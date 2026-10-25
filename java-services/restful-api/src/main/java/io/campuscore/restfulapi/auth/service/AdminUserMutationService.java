@@ -354,6 +354,13 @@ public class AdminUserMutationService {
                         (resultSet, ignored) -> resultSet.getString("status"))
                 .stream().findFirst()
                 .orElseThrow(() -> problem(HttpStatus.NOT_FOUND, "USER_NOT_FOUND", "User not found"));
+        boolean removesActiveSuperAdmin = "ACTIVE".equalsIgnoreCase(previousStatus)
+                && hasRole(id, "SUPER_ADMIN")
+                && ((requestedRole != null && !desiredSystemRoles(requestedRole).contains("SUPER_ADMIN"))
+                        || (canonicalStatus != null && !"ACTIVE".equals(canonicalStatus)));
+        if (removesActiveSuperAdmin) {
+            requireAnotherActiveSuperAdmin();
+        }
         int updated = jdbc.update(
                 "UPDATE " + USER + " SET \"firstName\" = COALESCE(:firstName, \"firstName\"),"
                         + " \"lastName\" = COALESCE(:lastName, \"lastName\"), \"phone\" = COALESCE(:phone, \"phone\"),"
@@ -433,9 +440,13 @@ public class AdminUserMutationService {
                     "SELF_DELETION_NOT_ALLOWED",
                     "You cannot delete your own account");
         }
+        lockUserRow(id);
         // Same ceiling as update()/resetPassword(): a plain administrator can
         // neither edit, reset, nor hard-delete an account holding a reserved role.
         requireSuperAdminForProtectedAccount(id, canManageSuperAdmin, "delete");
+        if (isActiveSuperAdmin(id)) {
+            requireAnotherActiveSuperAdmin();
+        }
         requireRemovableProfile(id, "STUDENT");
         requireRemovableProfile(id, "LECTURER");
         // Capture the row first: a hard delete leaves nothing to describe afterwards,
@@ -593,9 +604,22 @@ public class AdminUserMutationService {
      * instead of interleaving a grant between a check and its write.
      */
     private void lockUserRow(String userId) {
-        jdbc.queryForList(
-                "SELECT \"id\" FROM " + USER + " WHERE \"id\" = :userId FOR UPDATE",
-                new MapSqlParameterSource("userId", userId), String.class);
+        authUsers.lockUserRow(userId);
+    }
+
+    /** Serialize removals of the last active SUPER_ADMIN across different target accounts. */
+    private void requireAnotherActiveSuperAdmin() {
+        authUsers.lockSuperAdminRole();
+        if (authUsers.countActiveSuperAdmins() <= 1) {
+            throw problem(
+                    HttpStatus.CONFLICT,
+                    "LAST_SUPER_ADMIN_REQUIRED",
+                    "At least one active super administrator must remain");
+        }
+    }
+
+    private boolean isActiveSuperAdmin(String userId) {
+        return authUsers.isActiveSuperAdmin(userId);
     }
 
     private void guardRoleMutation(String userId, String roleName, boolean canManageSuperAdmin) {

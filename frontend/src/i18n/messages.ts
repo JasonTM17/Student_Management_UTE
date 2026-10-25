@@ -344,6 +344,7 @@ export const en = {
         EMPLOYEE_ID_EXISTS: 'This employee ID already exists.',
         ROLE_ESCALATION:
           'Only a super administrator can grant this role or manage administrator, faculty-head and department-head accounts.',
+        LAST_SUPER_ADMIN_REQUIRED: 'At least one active super administrator must remain.',
         DEAN_ALREADY_ASSIGNED:
           'This faculty already has an active dean. Move the current dean back to lecturer before appointing another.',
         // Password policy & recovery
@@ -3130,8 +3131,8 @@ export const en = {
     emptyTitle: 'No attendance records yet',
     emptyDescription:
       'Once lecturers start marking attendance for your classes, the per-course totals and session history will appear here.',
-    statsPresentRate: 'Present rate',
-    statsPresentRateHint: 'present sessions ÷ recorded sessions',
+    statsPresentRate: 'Attendance rate',
+    statsPresentRateHint: 'present or late ÷ present, late, or absent sessions; excused excluded',
     statsTotalSessions: 'Recorded sessions',
     statsPresent: 'Present',
     statsAbsentLate: 'Absent + late',
@@ -3192,7 +3193,7 @@ export const en = {
     notesPlaceholder: 'Reason or notes (optional)',
     statsTotalStudents: 'Enrolled students',
     statsMarked: 'Marked today',
-    statsPresentRate: 'Class present rate',
+    statsPresentRate: 'Class attendance rate',
     statuses: {
       PRESENT: 'Present',
       ABSENT: 'Absent',
@@ -3570,6 +3571,7 @@ export const vi: I18nMessages = {
         EMPLOYEE_ID_EXISTS: 'Mã số giảng viên đã tồn tại.',
         ROLE_ESCALATION:
           'Chỉ quản trị viên cấp cao mới được cấp vai trò này hoặc quản lý tài khoản quản trị viên, Trưởng khoa và Trưởng bộ môn.',
+        LAST_SUPER_ADMIN_REQUIRED: 'Phải luôn còn ít nhất một quản trị viên cấp cao đang hoạt động.',
         DEAN_ALREADY_ASSIGNED:
           'Khoa này đã có Trưởng khoa đang hoạt động. Hãy chuyển Trưởng khoa hiện tại về Giảng viên trước khi bổ nhiệm người khác.',
         // Chính sách mật khẩu & khôi phục
@@ -6350,8 +6352,8 @@ export const vi: I18nMessages = {
     emptyTitle: 'Chưa có bản ghi điểm danh',
     emptyDescription:
       'Khi giảng viên bắt đầu điểm danh cho các lớp của bạn, bảng tổng hợp theo môn và lịch sử phiên học sẽ xuất hiện tại đây.',
-    statsPresentRate: 'Tỷ lệ có mặt',
-    statsPresentRateHint: 'số phiên có mặt ÷ số phiên đã ghi',
+    statsPresentRate: 'Tỷ lệ tham dự',
+    statsPresentRateHint: 'phiên có mặt hoặc đi muộn ÷ phiên có mặt, đi muộn hoặc vắng; không tính vắng có phép',
     statsTotalSessions: 'Tổng số phiên đã ghi',
     statsPresent: 'Số phiên có mặt',
     statsAbsentLate: 'Vắng + đi muộn',
@@ -6412,7 +6414,7 @@ export const vi: I18nMessages = {
     notesPlaceholder: 'Lý do vắng hoặc ghi chú thêm (không bắt buộc)',
     statsTotalStudents: 'Tổng số sinh viên',
     statsMarked: 'Đã điểm danh hôm nay',
-    statsPresentRate: 'Tỷ lệ chuyên cần',
+    statsPresentRate: 'Tỷ lệ tham dự lớp học',
     statuses: {
       PRESENT: 'Có mặt',
       ABSENT: 'Vắng',
