@@ -64,6 +64,11 @@ public class ThesisMutationService {
     static final int MIN_GROUP_MEMBERS = 3;
     static final int MAX_GROUP_MEMBERS = 5;
 
+    /** Refusal instants use the same dd/MM/yyyy HH:mm Asia/Bangkok display the workspace pins. */
+    private static final java.time.format.DateTimeFormatter BANGKOK_MINUTES = java.time.format.DateTimeFormatter
+            .ofPattern("dd/MM/yyyy HH:mm")
+            .withZone(java.time.ZoneId.of("Asia/Bangkok"));
+
     private static final org.slf4j.Logger log =
             org.slf4j.LoggerFactory.getLogger(ThesisMutationService.class);
 
@@ -2892,8 +2897,16 @@ public class ThesisMutationService {
             Instant now = Instant.now();
             Instant start = instantOf(round.get("registration_start"));
             Instant end = instantOf(round.get("registration_end"));
-            if (start == null || end == null || now.isBefore(start) || !now.isBefore(end)) {
+            if (start == null || end == null || !now.isBefore(end)) {
                 throw conflict("REGISTRATION_WINDOW_CLOSED", "The registration window is closed for this round");
+            }
+            if (now.isBefore(start)) {
+                // A stale or restored REGISTRATION_OPEN row can still precede
+                // its stored start: name the opens-at instant instead of
+                // answering "closed" for a window that has not begun.
+                throw new DomainException(HttpStatus.CONFLICT, "REGISTRATION_WINDOW_NOT_OPEN",
+                        "Registration opens on " + BANGKOK_MINUTES.format(start) + " for this round",
+                        java.util.Map.of("opensAt", BANGKOK_MINUTES.format(start)));
             }
         }
         return (String) round.get("thesis_type");
