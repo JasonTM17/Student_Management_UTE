@@ -6,6 +6,9 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import io.campuscore.restfulapi.thesis.repository.ThesisDatabaseClockRepository;
 import java.sql.Timestamp;
 import java.time.Instant;
 import java.util.List;
@@ -50,8 +53,14 @@ class ThesisRoundRestoreTest {
     @Autowired
     private MockMvc mvc;
 
+    @Autowired
+    private ObjectMapper objectMapper;
+
     @MockitoSpyBean
     private NamedParameterJdbcTemplate jdbcSpy;
+
+    @MockitoSpyBean
+    private ThesisDatabaseClockRepository databaseClock;
 
     @BeforeEach
     void cleanDatabase() {
@@ -259,6 +268,27 @@ class ThesisRoundRestoreTest {
     }
 
     @Test
+    void restoringOpenRegistrationUsesTheDatabaseClockAfterCancellation() throws Exception {
+        Instant now = Instant.now();
+        Timestamp registrationStart = Timestamp.from(now.minusSeconds(60));
+        Timestamp registrationEnd = Timestamp.from(now.plusSeconds(180));
+        UUID roundId = insertRound("rr-round-db-clock", "REGISTRATION_OPEN",
+                registrationStart, registrationEnd);
+        mvc.perform(post("/api/v1/thesis/rounds/{id}/cancel", roundId).with(truongKhoaJwt()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("CANCELLED"));
+
+        Mockito.doReturn(registrationEnd.toInstant().plusSeconds(1)).when(databaseClock).now();
+        mvc.perform(post("/api/v1/thesis/rounds/{id}/restore", roundId).with(truongKhoaJwt()))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("REGISTRATION_WINDOW_CLOSED"));
+
+        assertThat(jdbc.queryForObject(
+                "SELECT status FROM thesis.thesis_registration_round WHERE id = ?", String.class, roundId))
+                .isEqualTo("CANCELLED");
+    }
+
+    @Test
     void restoreLocksMemberStudentRowsBeforeCountingSeatConflicts() throws Exception {
         // The race this pins: a concurrent createGroup holds the Student row
         // while it reads this round's still-CANCELLED status. Restore must take
@@ -322,9 +352,17 @@ class ThesisRoundRestoreTest {
                 .andExpect(status().isConflict())
                 .andExpect(jsonPath("$.code").value("ROUND_RESTORE_MEMBER_CONFLICT"));
 
+        JsonNode adminRound = roundFromList(cancelled, truongKhoaJwt());
+        assertThat(adminRound.path("restoreBlockers").path(0).asText())
+                .isEqualTo("ROUND_RESTORE_MEMBER_CONFLICT");
+        assertThat(roundFromList(cancelled, studentJwt("rr-joiner")).has("restoreBlockers"))
+                .as("student round lists must not disclose restore blocker state")
+                .isFalse();
+
         // Cancelling the other round frees the seat; the restore then succeeds.
         mvc.perform(post("/api/v1/thesis/rounds/{id}/cancel", otherRound).with(truongKhoaJwt()))
                 .andExpect(status().isOk());
+        assertThat(roundFromList(cancelled, truongKhoaJwt()).has("restoreBlockers")).isFalse();
         mvc.perform(post("/api/v1/thesis/rounds/{id}/restore", cancelled).with(truongKhoaJwt()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.status").value("REGISTRATION_CLOSED"));
@@ -340,6 +378,9 @@ class ThesisRoundRestoreTest {
                 groupId, roundId);
         mvc.perform(post("/api/v1/thesis/rounds/{id}/cancel", roundId).with(truongKhoaJwt()))
                 .andExpect(status().isOk());
+
+        assertThat(roundFromList(roundId, truongKhoaJwt()).path("restoreBlockers").path(0).asText())
+                .isEqualTo("ROUND_RESTORE_FROZEN_HISTORY");
 
         mvc.perform(post("/api/v1/thesis/rounds/{id}/restore", roundId).with(truongKhoaJwt()))
                 .andExpect(status().isConflict())
@@ -505,5 +546,19 @@ class ThesisRoundRestoreTest {
                     + "VALUES ('rr-tk-lecturer', 'rr-user-tk', 'department-demo', 'GV-rr-tk', TRUE)");
         }
         return ThesisAuthorityFixture.role(jdbc, "rr-user-tk", "TRUONG_KHOA");
+    }
+
+    private JsonNode roundFromList(UUID roundId, RequestPostProcessor caller) throws Exception {
+        String body = mvc.perform(get("/api/v1/thesis/rounds")
+                        .param("status", "CANCELLED")
+                        .with(caller))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+        for (JsonNode round : objectMapper.readTree(body)) {
+            if (roundId.toString().equals(round.path("id").asText())) {
+                return round;
+            }
+        }
+        throw new AssertionError("Cancelled round was missing from the list: " + roundId);
     }
 }

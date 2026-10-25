@@ -10,9 +10,11 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import org.springframework.context.annotation.Profile;
 import org.springframework.jdbc.core.namedparam.MapSqlParameterSource;
@@ -279,6 +281,47 @@ public class ThesisGroupReadRepository {
                 new MapSqlParameterSource("id", id).addValue("studentId", studentId),
                 ThesisGroupReadRepository::row);
         return hydrate(rows).stream().findFirst().orElse(null);
+    }
+
+    /**
+     * Read-only restore guards for a set of cancelled rounds. The mutation
+     * endpoint repeats these checks under its row/student locks; this batched
+     * projection only lets authorized admins explain an unavailable action.
+     */
+    public Map<UUID, List<String>> restoreBlockers(Collection<UUID> roundIds) {
+        if (roundIds == null || roundIds.isEmpty()) {
+            return Map.of();
+        }
+        var parameters = new MapSqlParameterSource("roundIds", roundIds);
+        Set<UUID> memberConflicts = new HashSet<>(jdbc.queryForList(
+                "SELECT DISTINCT g.round_id FROM thesis.thesis_group_member m "
+                        + "JOIN thesis.thesis_group g ON g.id = m.group_id "
+                        + "JOIN thesis.thesis_group_member other ON other.student_id = m.student_id "
+                        + "JOIN thesis.thesis_group og ON og.id = other.group_id AND og.status <> 'CANCELLED' "
+                        + "JOIN thesis.thesis_registration_round orr ON orr.id = other.round_id "
+                        + "WHERE g.round_id IN (:roundIds) AND g.status <> 'CANCELLED' "
+                        + "AND m.active_participation AND other.round_id <> g.round_id "
+                        + "AND other.active_participation "
+                        + "AND orr.status NOT IN ('RESULTS_PUBLISHED', 'CLOSED', 'CANCELLED')",
+                parameters, UUID.class));
+        Set<UUID> frozenHistory = new HashSet<>(jdbc.queryForList(
+                "SELECT DISTINCT round_id FROM thesis.thesis_group "
+                        + "WHERE round_id IN (:roundIds) AND legacy_group_size_exception",
+                parameters, UUID.class));
+        Map<UUID, List<String>> blockersByRound = new LinkedHashMap<>();
+        for (UUID roundId : roundIds) {
+            List<String> blockers = new ArrayList<>(2);
+            if (memberConflicts.contains(roundId)) {
+                blockers.add("ROUND_RESTORE_MEMBER_CONFLICT");
+            }
+            if (frozenHistory.contains(roundId)) {
+                blockers.add("ROUND_RESTORE_FROZEN_HISTORY");
+            }
+            if (!blockers.isEmpty()) {
+                blockersByRound.put(roundId, List.copyOf(blockers));
+            }
+        }
+        return Map.copyOf(blockersByRound);
     }
 
     private List<GroupResponse> hydrate(List<GroupRow> rows) {
