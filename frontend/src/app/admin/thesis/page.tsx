@@ -50,6 +50,7 @@ import {
   LoadingState,
 } from '@/components/ui/state-block';
 import { StatusBadge } from '@/components/thesis/StatusBadge';
+import ScoreBreakdownPanel from '@/features/thesis/components/ScoreBreakdownPanel';
 import { useI18n } from '@/i18n';
 import { fetchAllPages, lecturersApi } from '@/lib/api';
 import { campusCodeMessage } from '@/lib/campus-error';
@@ -2131,6 +2132,10 @@ export default function AdminThesisPage() {
                                                   {messages.thesis.admin.gvpbWaivedBadge}
                                                 </span>
                                               ) : null}
+                                              <ScoreBreakdownPanel
+                                                messages={messages}
+                                                topicId={tid}
+                                              />
                                               {top ? (
                                                 <div className="flex flex-wrap gap-1">
                                                   {top.finalScore == null && !councilLocked ? (
