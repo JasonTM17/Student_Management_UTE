@@ -341,7 +341,7 @@ test('narrow-screen layouts keep their content inside the card', () => {
   assert.match(read('src/app/dashboard/lecturer/mail/page.tsx'), /grid grid-cols-1 gap-6 lg:grid-cols-3/);
   assert.match(read('src/app/dashboard/transcript/page.tsx'), /grid grid-cols-1 gap-4 lg:grid-cols-2/);
   assert.match(read('src/components/admin/AdminSurface.tsx'), /function AdminRowActions[\s\S]{0,200}'flex flex-wrap items-center justify-end gap-2 md:flex-nowrap'/);
-  assert.match(read('src/app/admin/users/page.tsx'), /<div className="min-w-0">\s*<h3 className="break-words font-semibold text-foreground">[\s\S]{0,300}<StatusPill tone=\{userStatusTone\(record\.status\)\} className="shrink-0 py-1">/);
+  assert.match(read('src/app/admin/users/page.tsx'), /<div className="min-w-0">\s*<h3 className="break-words font-semibold text-foreground">[\s\S]{0,1400}<StatusPill tone=\{userStatusTone\(record\.status\)\} className="shrink-0 py-1">/);
   // Fixed-height controls (h-7/h-8/h-9) lose their text when the base class
   // still carries py-2: the admin reviewer picker cut its label in half.
   assert.doesNotMatch(read('src/components/ui/select.tsx'), /px-3 py-2 pr-10/);

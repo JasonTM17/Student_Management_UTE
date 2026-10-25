@@ -451,7 +451,7 @@ export default function AdminThesisPage() {
     if (code === 'RETRACT_WINDOW_OPEN') {
       const endsAt = details.retractWindowEndsAt;
       return typeof endsAt === 'string'
-        ? messages.common.campusErrors.codes[code]?.replace('{end}', formatAdminInstant(endsAt))
+        ? messages.common.campusErrors.codes[code]?.replace('{retractWindowEndsAt}', formatAdminInstant(endsAt))
           ?? messages.thesis.admin.transitionFailure
         : messages.thesis.admin.transitionFailure;
     }

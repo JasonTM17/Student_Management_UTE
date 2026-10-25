@@ -220,6 +220,7 @@ export const en = {
           'This round was cancelled before its previous status was recorded — pick the status it returns to.',
         ROUND_RESTORE_TARGET_INVALID:
           'That status is not a reachable restore target for this round.',
+        UNAUTHENTICATED: 'Sign in is required for this action.',
         VALIDATION_ERROR: 'Check the required fields, dates, and reason, then try again.',
         THESIS_ROUND_SCHEDULE_ORDER:
           'The dates of this round are out of order — check each milestone against the one before it.',
@@ -327,7 +328,7 @@ export const en = {
         RETRACT_WINDOW_CLOSED:
           'The retraction period has ended. Use the per-topic appeal process for later corrections.',
         RETRACT_WINDOW_OPEN:
-          'The retraction period remains open through {end}. Wait until then before closing this round.',
+          'The retraction period remains open through {retractWindowEndsAt}. Wait until then before closing this round.',
         CLOSE_ADMIN_REQUIRED: 'Only an administrator can close a round.',
         REOPEN_ADMIN_REQUIRED: 'Only an administrator can reopen a closed round.',
         ROLE_FORBIDDEN:
@@ -3532,6 +3533,7 @@ export const vi: I18nMessages = {
           'Đợt này bị hủy trước khi hệ thống ghi lại trạng thái trước đó — hãy chọn trạng thái khôi phục.',
         ROUND_RESTORE_TARGET_INVALID:
           'Trạng thái đó không phải đích khôi phục hợp lệ của đợt này.',
+        UNAUTHENTICATED: 'Cần đăng nhập để thực hiện thao tác này.',
         VALIDATION_ERROR: 'Hãy kiểm tra các trường bắt buộc, mốc thời gian và lý do rồi thử lại.',
         THESIS_ROUND_SCHEDULE_ORDER:
           'Các mốc thời gian của đợt chưa đúng thứ tự — hãy kiểm tra lại từng mốc.',
@@ -3639,7 +3641,7 @@ export const vi: I18nMessages = {
         RETRACT_WINDOW_CLOSED:
           'Đã hết thời hạn thu hồi kết quả. Hãy dùng quy trình khiếu nại từng đề tài để chỉnh sửa sau thời hạn này.',
         RETRACT_WINDOW_OPEN:
-          'Thời hạn thu hồi kết quả còn đến {end}. Hãy chờ qua mốc này rồi đóng đợt.',
+          'Thời hạn thu hồi kết quả còn đến {retractWindowEndsAt}. Hãy chờ qua mốc này rồi đóng đợt.',
         CLOSE_ADMIN_REQUIRED: 'Chỉ quản trị viên mới được đóng đợt.',
         REOPEN_ADMIN_REQUIRED: 'Chỉ quản trị viên mới được mở lại đợt đã đóng.',
         ROLE_FORBIDDEN:
