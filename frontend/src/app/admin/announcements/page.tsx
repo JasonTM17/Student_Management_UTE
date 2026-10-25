@@ -23,6 +23,7 @@ import { useAuth } from '@/context/AuthContext';
 import {
   announcementsApi,
   departmentsApi,
+  facultiesApi,
   fetchAllPages,
   lecturersApi,
   sectionsApi,
@@ -98,7 +99,7 @@ import {
   type AnnouncementRole,
 } from '@/lib/announcement-presentation';
 import { useOrderedPosts } from '@/components/providers/SiteAppearanceProvider';
-import type { Department, Lecturer, Section, Semester } from '@/types/api';
+import type { Department, Faculty, Lecturer, Section, Semester } from '@/types/api';
 
 type StatusFilter = 'ACTIVE' | 'ARCHIVED' | 'ALL';
 type ModalKind = 'editor' | 'history' | 'lifecycle' | 'reorder' | null;
@@ -112,6 +113,7 @@ type AnnouncementDraft = {
   targetRoles: AnnouncementRole[];
   targetYears: string;
   targetDepartments: string[];
+  targetFaculties: string[];
   semesterId: string;
   sectionId: string;
   lecturerId: string;
@@ -128,6 +130,7 @@ const emptyDraft: AnnouncementDraft = {
   targetRoles: [],
   targetYears: '',
   targetDepartments: [],
+  targetFaculties: [],
   semesterId: '',
   sectionId: '',
   lecturerId: '',
@@ -144,6 +147,7 @@ const historyFields = [
   'targetRoles',
   'targetYears',
   'targetDepartments',
+  'targetFaculties',
   'publishAt',
   'expiresAt',
   'semesterId',
@@ -188,6 +192,7 @@ function draftFromAnnouncement(item: AnnouncementRecord): AnnouncementDraft {
     targetRoles: announcementRoleValues(item.targetRoles),
     targetYears: (item.targetYears ?? []).join(', '),
     targetDepartments: [...(item.targetDepartments ?? [])],
+    targetFaculties: [...(item.targetFaculties ?? [])],
     semesterId: item.semesterId ?? '',
     sectionId: item.sectionId ?? '',
     lecturerId: item.lecturerId ?? '',
@@ -253,6 +258,7 @@ export default function AdminAnnouncementsPage() {
   const [sections, setSections] = useState<Section[]>([]);
   const [lecturers, setLecturers] = useState<Lecturer[]>([]);
   const [departments, setDepartments] = useState<Department[]>([]);
+  const [faculties, setFaculties] = useState<Faculty[]>([]);
   const [referenceError, setReferenceError] = useState('');
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState('');
@@ -399,9 +405,12 @@ export default function AdminAnnouncementsPage() {
         targeted: 'Chọn nhóm cụ thể',
         targetYears: 'Năm học sinh viên',
         targetYearsHint: 'Nhập các năm, cách nhau bằng dấu phẩy. Để trống nếu áp dụng cho mọi năm.',
-        departments: 'Khoa',
-        departmentsHint: 'Giới hạn thông báo theo khoa của sinh viên hoặc giảng viên. Để trống nếu áp dụng cho mọi khoa.',
-        departmentSearch: 'Tìm và thêm khoa…',
+        departments: 'Bộ môn',
+        departmentsHint: 'Giới hạn thông báo theo bộ môn của sinh viên hoặc giảng viên. Để trống nếu áp dụng cho mọi bộ môn.',
+        departmentSearch: 'Tìm và thêm bộ môn…',
+        faculties: 'Khoa',
+        facultiesHint: 'Giới hạn thông báo theo khoa của sinh viên hoặc giảng viên. Để trống nếu áp dụng cho mọi khoa.',
+        facultySearch: 'Tìm và thêm khoa…',
         section: 'Lớp học phần',
         lecturer: 'Giảng viên phụ trách',
         noSelection: 'Không gán',
@@ -489,6 +498,9 @@ export default function AdminAnnouncementsPage() {
         departments: 'Departments',
         departmentsHint: 'Limit the notice to specific student or lecturer departments. Leave empty for every department.',
         departmentSearch: 'Search and add a department…',
+        faculties: 'Faculties',
+        facultiesHint: 'Limit the notice to specific student or lecturer faculties. Leave empty for every faculty.',
+        facultySearch: 'Search and add a faculty…',
         section: 'Class section',
         lecturer: 'Responsible lecturer',
         noSelection: 'Not assigned',
@@ -622,7 +634,8 @@ export default function AdminAnnouncementsPage() {
       fetchAllPages<Section>((p, l) => sectionsApi.getAll({ page: p, limit: l })),
       fetchAllPages<Lecturer>((p, l) => lecturersApi.getAll({ page: p, limit: l })),
       fetchAllPages<Department>((p, l) => departmentsApi.getAll({ page: p, limit: l })),
-    ]).then(([semesterResult, sectionResult, lecturerResult, departmentResult]) => {
+      fetchAllPages<Faculty>((p, l) => facultiesApi.getAll({ page: p, limit: l })),
+    ]).then(([semesterResult, sectionResult, lecturerResult, departmentResult, facultyResult]) => {
       if (cancelled) return;
       let failed = false;
       if (semesterResult.status === 'fulfilled') setSemesters(semesterResult.value.data ?? []);
@@ -632,6 +645,8 @@ export default function AdminAnnouncementsPage() {
       if (lecturerResult.status === 'fulfilled') setLecturers(lecturerResult.value);
       else failed = true;
       if (departmentResult.status === 'fulfilled') setDepartments(departmentResult.value);
+      else failed = true;
+      if (facultyResult.status === 'fulfilled') setFaculties(facultyResult.value);
       else failed = true;
       if (failed) setReferenceError(copy.referenceUnavailable);
     });
@@ -699,9 +714,11 @@ export default function AdminAnnouncementsPage() {
     isGlobal: draft.isGlobal,
     targetRoles: draft.isGlobal ? [] : [...draft.targetRoles],
     targetYears: draft.isGlobal ? [] : parseYears(draft.targetYears).values,
-    // Departments narrow like section/lecturer scope rather than define an
-    // audience, so the list rides on every payload — global notices included.
+    // Departments and faculties narrow like section/lecturer scope rather
+    // than define an audience, so both lists ride on every payload — global
+    // notices included.
     targetDepartments: [...draft.targetDepartments],
+    targetFaculties: [...draft.targetFaculties],
     publishAt: isoDateTime(draft.publishAt),
     expiresAt: isoDateTime(draft.expiresAt),
     semesterId: draft.semesterId || null,
@@ -812,6 +829,28 @@ export default function AdminAnnouncementsPage() {
     ...semesters.map((semester) => ({ value: semester.id, label: getLocalizedName(locale, semester, semester.name) })),
   ], [copy.noSelection, locale, semesters]);
 
+  const facultyName = useCallback(
+    (id: string) => {
+      const faculty = faculties.find((row) => row.id === id);
+      return faculty ? getLocalizedName(locale, faculty, faculty.name) : id;
+    },
+    [faculties, locale],
+  );
+
+  // The "add" picker lists only faculties not yet targeted; targeted ones
+  // render as removable chips beneath it.
+  const editorFacultyOptions = useMemo(
+    () =>
+      faculties
+        .filter((faculty) => !draft.targetFaculties.includes(faculty.id))
+        .map((faculty) => ({
+          value: faculty.id,
+          label: getLocalizedName(locale, faculty, faculty.name),
+          keywords: faculty.code,
+        })),
+    [faculties, draft.targetFaculties, locale],
+  );
+
   const editorSectionOptions = useMemo(() => {
     const filtered = draft.semesterId ? sections.filter((section) => section.semesterId === draft.semesterId) : sections;
     const current = draft.sectionId && !filtered.some((section) => section.id === draft.sectionId)
@@ -870,6 +909,20 @@ export default function AdminAnnouncementsPage() {
     }));
   };
 
+  const addFaculty = (id: string) => {
+    if (!id) return;
+    setDraft((current) => current.targetFaculties.includes(id)
+      ? current
+      : { ...current, targetFaculties: [...current.targetFaculties, id] });
+  };
+
+  const removeFaculty = (id: string) => {
+    setDraft((current) => ({
+      ...current,
+      targetFaculties: current.targetFaculties.filter((value) => value !== id),
+    }));
+  };
+
   const audienceMatches = (role: AnnouncementRole) => {
     if (draft.isGlobal) return true;
     if (!draft.targetRoles.includes(role)) return false;
@@ -883,10 +936,12 @@ export default function AdminAnnouncementsPage() {
   const previewSection = sections.find((section) => section.id === draft.sectionId);
   const previewLecturer = lecturers.find((lecturer) => lecturer.id === draft.lecturerId);
   const previewDepartmentNames = draft.targetDepartments.map(departmentName);
+  const previewFacultyNames = draft.targetFaculties.map(facultyName);
   const previewMeta = [
     previewSemester ? getLocalizedName(locale, previewSemester, previewSemester.name) : '',
     previewSection ? `${previewSection.course?.code ?? ''} · ${previewSection.sectionNumber}`.trim() : '',
     previewLecturer?.user ? `${previewLecturer.user.lastName ?? ''} ${previewLecturer.user.firstName ?? ''}`.trim() : '',
+    previewFacultyNames.length > 0 ? `${copy.faculties}: ${previewFacultyNames.join(', ')}` : '',
     previewDepartmentNames.length > 0 ? `${copy.departments}: ${previewDepartmentNames.join(', ')}` : '',
   ].filter(Boolean);
 
@@ -898,7 +953,8 @@ export default function AdminAnnouncementsPage() {
       isGlobal: ['Đối tượng', 'Audience'],
       targetRoles: ['Nhóm nhận', 'Audience groups'],
       targetYears: ['Năm học', 'Student years'],
-      targetDepartments: ['Khoa', 'Departments'],
+      targetDepartments: ['Bộ môn', 'Departments'],
+      targetFaculties: ['Khoa', 'Faculties'],
       publishAt: ['Bắt đầu hiển thị', 'Starts showing'],
       expiresAt: ['Ngừng hiển thị', 'Stops showing'],
       semesterId: ['Học kỳ', 'Semester'],
@@ -924,6 +980,11 @@ export default function AdminAnnouncementsPage() {
     if (field === 'targetDepartments') {
       return Array.isArray(value) && value.length > 0
         ? value.map((id) => (typeof id === 'string' ? departmentName(id) : String(id))).join(', ')
+        : copy.noSelection;
+    }
+    if (field === 'targetFaculties') {
+      return Array.isArray(value) && value.length > 0
+        ? value.map((id) => (typeof id === 'string' ? facultyName(id) : String(id))).join(', ')
         : copy.noSelection;
     }
     if (field === 'isGlobal') return value === true ? copy.global : copy.targeted;
@@ -1326,8 +1387,36 @@ export default function AdminAnnouncementsPage() {
                         </ul>
                       ) : null}
                     </div>
+                    <div className="sm:col-span-2">
+                      <Combobox
+                        id="announcement-editor-faculties"
+                        label={copy.faculties}
+                        aria-label={copy.faculties}
+                        options={editorFacultyOptions}
+                        value=""
+                        onChange={addFaculty}
+                        placeholder={copy.facultySearch}
+                      />
+                      {draft.targetFaculties.length > 0 ? (
+                        <ul className="mt-2 flex flex-wrap gap-2" aria-label={copy.faculties}>
+                          {draft.targetFaculties.map((id) => (
+                            <li key={id}>
+                              <button
+                                type="button"
+                                onClick={() => removeFaculty(id)}
+                                className="inline-flex min-h-9 items-center gap-1.5 rounded-md border border-primary/40 bg-primary/10 px-2.5 text-xs font-medium text-foreground transition-colors hover:bg-primary/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                                aria-label={`${copy.faculties}: ${facultyName(id)}`}
+                              >
+                                {facultyName(id)}
+                                <X className="h-3 w-3" aria-hidden="true" />
+                              </button>
+                            </li>
+                          ))}
+                        </ul>
+                      ) : null}
+                    </div>
                   </div>
-                  <p className="text-sm text-muted-foreground">{copy.sectionHint} {copy.lecturerHint} {copy.departmentsHint}</p>
+                  <p className="text-sm text-muted-foreground">{copy.sectionHint} {copy.lecturerHint} {copy.departmentsHint} {copy.facultiesHint}</p>
                 </AdminFormSection>
 
                 <AdminFormSection title={copy.schedule} description={vi ? 'Bỏ trống ngày kết thúc nếu thông báo không có hạn.' : 'Leave the end date empty when the notice has no expiry.'}>

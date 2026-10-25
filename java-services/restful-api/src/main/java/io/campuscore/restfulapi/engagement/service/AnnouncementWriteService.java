@@ -85,10 +85,11 @@ public class AnnouncementWriteService {
         }
         List<String> targetRoles = immutableStrings(request.targetRoles(), "targetRoles");
         List<String> targetDepartments = immutableDepartments(request.targetDepartments());
+        List<String> targetFaculties = immutableFaculties(request.targetFaculties());
         boolean lecturer = isLecturerOnly(roles);
         if (lecturer) {
             requireLecturerAnnouncement(lecturerId, request.sectionId(), targetRoles, targetDepartments,
-                    request.isGlobal(), request.lecturerId());
+                    targetFaculties, request.isGlobal(), request.lecturerId());
         }
         List<Integer> targetYears = immutableYears(request.targetYears());
         Instant now = Instant.now(clock);
@@ -100,6 +101,7 @@ public class AnnouncementWriteService {
                 targetRoles,
                 targetYears,
                 targetDepartments,
+                targetFaculties,
                 Boolean.TRUE.equals(request.isGlobal()),
                 request.publishAt(),
                 request.expiresAt(),
@@ -215,10 +217,13 @@ public class AnnouncementWriteService {
             List<String> effectiveDepartments = request.has("targetDepartments")
                     ? immutableDepartments(request.targetDepartments())
                     : immutableDepartments(before.targetDepartments());
+            List<String> effectiveFaculties = request.has("targetFaculties")
+                    ? immutableFaculties(request.targetFaculties())
+                    : immutableFaculties(before.targetFaculties());
             Boolean effectiveGlobal = request.has("isGlobal") ? request.isGlobal() : before.isGlobal();
             String requestedLecturer = request.has("lecturerId") ? request.lecturerId() : lecturerId;
             requireLecturerAnnouncement(lecturerId, effectiveSection, effectiveRoles, effectiveDepartments,
-                    effectiveGlobal, requestedLecturer);
+                    effectiveFaculties, effectiveGlobal, requestedLecturer);
         }
         if (request.has("priority") && !PRIORITIES.contains(request.priority())) {
             throw new IllegalArgumentException("priority must be LOW, NORMAL, HIGH, or URGENT");
@@ -246,6 +251,10 @@ public class AnnouncementWriteService {
                         request,
                         "targetDepartments",
                         request.has("targetDepartments") ? immutableDepartments(request.targetDepartments()) : null),
+                patch(
+                        request,
+                        "targetFaculties",
+                        request.has("targetFaculties") ? immutableFaculties(request.targetFaculties()) : null),
                 patch(request, "isGlobal", request.isGlobal()),
                 patch(request, "publishAt", request.publishAt()),
                 patch(request, "expiresAt", request.expiresAt()),
@@ -288,7 +297,8 @@ public class AnnouncementWriteService {
 
     private static boolean audienceFieldsChanged(UpdateAnnouncementRequest request) {
         return request.has("targetRoles") || request.has("targetYears")
-                || request.has("targetDepartments") || request.has("sectionId")
+                || request.has("targetDepartments") || request.has("targetFaculties")
+                || request.has("sectionId")
                 || request.has("isGlobal") || request.has("lecturerId");
     }
 
@@ -323,6 +333,7 @@ public class AnnouncementWriteService {
             String sectionId,
             List<String> targetRoles,
             List<String> targetDepartments,
+            List<String> targetFaculties,
             Boolean isGlobal,
             String requestedLecturerId) {
         if (lecturerId == null || lecturerId.isBlank()
@@ -337,6 +348,13 @@ public class AnnouncementWriteService {
             String lecturerDepartmentId = announcements.findLecturerDepartmentId(lecturerId).orElse(null);
             if (lecturerDepartmentId == null
                     || targetDepartments.stream().anyMatch(departmentId -> !lecturerDepartmentId.equals(departmentId))) {
+                throw forbiddenLecturer();
+            }
+        }
+        if (!targetFaculties.isEmpty()) {
+            String lecturerFacultyId = announcements.findLecturerFacultyId(lecturerId).orElse(null);
+            if (lecturerFacultyId == null
+                    || targetFaculties.stream().anyMatch(facultyId -> !lecturerFacultyId.equals(facultyId))) {
                 throw forbiddenLecturer();
             }
         }
@@ -738,6 +756,29 @@ public class AnnouncementWriteService {
             if (trimmed.isEmpty()) {
                 throw new IllegalArgumentException(
                         "targetDepartments must contain department identifiers");
+            }
+            if (!result.contains(trimmed)) {
+                result.add(trimmed);
+            }
+        }
+        return List.copyOf(result);
+    }
+
+    /**
+     * Faculty targets are opaque identifiers from the admin picker — there is
+     * no closed enum to check them against (unlike targetRoles), so the
+     * contract is format-level: strings, non-blank, trimmed, deduplicated.
+     * A mistyped id simply matches nothing, same as an empty list matching
+     * every faculty. Mirrors the department-target contract (V148).
+     */
+    private static List<String> immutableFaculties(List<?> values) {
+        List<String> raw = immutableStrings(values, "targetFaculties");
+        List<String> result = new java.util.ArrayList<>(raw.size());
+        for (String value : raw) {
+            String trimmed = value.trim();
+            if (trimmed.isEmpty()) {
+                throw new IllegalArgumentException(
+                        "targetFaculties must contain faculty identifiers");
             }
             if (!result.contains(trimmed)) {
                 result.add(trimmed);

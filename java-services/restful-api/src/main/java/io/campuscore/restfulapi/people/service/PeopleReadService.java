@@ -58,8 +58,9 @@ public class PeopleReadService {
 
     @Transactional(readOnly = true)
     public List<String> findAnnouncementStudentUserIds(List<Integer> years, String sectionId,
-            List<String> targetRoles, String lecturerId, List<String> departments) {
-        return people.findAnnouncementStudentUserIds(years, sectionId, targetRoles, lecturerId, departments);
+            List<String> targetRoles, String lecturerId, List<String> departments, List<String> targetFaculties) {
+        return people.findAnnouncementStudentUserIds(years, sectionId, targetRoles, lecturerId, departments,
+                targetFaculties);
     }
 
     @Transactional(readOnly = true)

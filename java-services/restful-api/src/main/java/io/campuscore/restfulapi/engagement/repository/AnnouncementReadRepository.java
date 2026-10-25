@@ -34,6 +34,7 @@ public class AnnouncementReadRepository {
     private static final String TABLE = "\"engagement\".\"Announcement\"";
     private static final String SELECT_COLUMNS = """
             "id", "title", "content", "priority", "targetRoles", "targetYears", "targetDepartments",
+            "targetFaculties",
             "isGlobal", "publishAt", "expiresAt", "publishedBy", "semesterId",
             "semesterName", "sectionId", "sectionNumber", "courseCode", "courseName",
             "lecturerId", "lecturerDisplayName", "createdAt", "updatedAt",
@@ -160,6 +161,7 @@ public class AnnouncementReadRepository {
                 "\"status\" = 'PUBLISHED'",
                 "\"isGlobal\" = TRUE",
                 "CARDINALITY(\"targetDepartments\") = 0",
+                "(\"targetFaculties\" IS NULL OR CARDINALITY(\"targetFaculties\") = 0)",
                 "(\"publishAt\" IS NULL OR \"publishAt\" <= :now)",
                 "(\"expiresAt\" IS NULL OR \"expiresAt\" > :now)",
                 "\"archivedAt\" IS NULL");
@@ -339,6 +341,42 @@ public class AnnouncementReadRepository {
             conditions.add("(CARDINALITY(\"targetDepartments\") = 0 OR "
                     + String.join(" OR ", departmentMatches) + ")");
         }
+
+        // Faculty targeting (R14, V149): AND across dimensions. A student's
+        // faculty is the one their curriculum's department belongs to
+        // (Student → Curriculum → Department → Faculty); a lecturer's is the
+        // faculty of Lecturer.departmentId. An empty targetFaculties matches
+        // every faculty exactly like an empty targetYears matches every year
+        // (NULL is treated as empty — the production column is NOT NULL
+        // DEFAULT ARRAY[] but fixture rows may still carry NULL). A dual-role
+        // viewer matches when either identity resolves a listed faculty; a
+        // viewer with no resolvable faculty only sees untargeted notices —
+        // NULL = ANY never passes.
+        java.util.List<String> facultyMatches = new java.util.ArrayList<>();
+        if (visibility.studentId() != null) {
+            facultyMatches.add("EXISTS ("
+                    + "SELECT 1 FROM academic.\"Student\" faculty_student"
+                    + " JOIN academic.\"Curriculum\" faculty_curriculum"
+                    + " ON faculty_curriculum.\"id\" = faculty_student.\"curriculumId\""
+                    + " JOIN academic.\"Department\" faculty_department"
+                    + " ON faculty_department.\"id\" = faculty_curriculum.\"departmentId\""
+                    + " WHERE faculty_student.\"id\" = :viewerStudentId"
+                    + " AND faculty_department.\"facultyId\" = ANY(\"targetFaculties\"))");
+        }
+        if (visibility.roles().contains("LECTURER") && visibility.lecturerId() != null) {
+            facultyMatches.add("EXISTS ("
+                    + "SELECT 1 FROM academic.\"Lecturer\" faculty_lecturer"
+                    + " JOIN academic.\"Department\" faculty_lecturer_department"
+                    + " ON faculty_lecturer_department.\"id\" = faculty_lecturer.\"departmentId\""
+                    + " WHERE faculty_lecturer.\"id\" = :lecturerId"
+                    + " AND faculty_lecturer_department.\"facultyId\" = ANY(\"targetFaculties\"))");
+        }
+        if (facultyMatches.isEmpty()) {
+            conditions.add("(\"targetFaculties\" IS NULL OR CARDINALITY(\"targetFaculties\") = 0)");
+        } else {
+            conditions.add("(\"targetFaculties\" IS NULL OR CARDINALITY(\"targetFaculties\") = 0 OR "
+                    + String.join(" OR ", facultyMatches) + ")");
+        }
         return new SqlWhere(where(conditions), parameters);
     }
 
@@ -378,6 +416,7 @@ public class AnnouncementReadRepository {
                 stringList(resultSet.getArray("targetRoles")),
                 integerList(resultSet.getArray("targetYears")),
                 stringList(resultSet.getArray("targetDepartments")),
+                stringList(resultSet.getArray("targetFaculties")),
                 resultSet.getBoolean("isGlobal"),
                 instant(resultSet, "publishAt"),
                 instant(resultSet, "expiresAt"),

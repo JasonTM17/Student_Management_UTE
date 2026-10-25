@@ -152,7 +152,7 @@ public class AnnouncementStudentNotifier {
         }
         return people.findAnnouncementStudentUserIds(announcement.targetYears(), announcement.sectionId(),
                 announcement.isGlobal() ? List.of() : announcement.targetRoles(), announcement.lecturerId(),
-                announcement.targetDepartments());
+                announcement.targetDepartments(), announcement.targetFaculties());
     }
 
     /**

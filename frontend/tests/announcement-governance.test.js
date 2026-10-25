@@ -128,3 +128,35 @@ test('dual-domain announcement reader coordinates editorial magazine and officia
   assert.match(homeSection, /AnnouncementReaderModal/);
   assert.match(homePage, /<HomeNewsSection \/>/);
 });
+
+// ---------- R14: faculty-scoped announcements (V149) ----------
+// The audience gains a faculty dimension: the backend stores targetFaculties
+// (AND across dimensions, OR within), the admin editor picks faculties, and
+// the inbox fan-out roster narrows the same way the reader does.
+test('faculty targeting spans the migration, reader predicate, fan-out roster and admin editor', () => {
+  const migration = read('../java-services/restful-api/src/main/resources/db/migration/V149__announcement_faculty_targets.sql');
+  assert.match(migration, /ADD COLUMN IF NOT EXISTS "targetFaculties" TEXT\[\] NOT NULL DEFAULT ARRAY\[\]::TEXT\[\]/);
+
+  const reader = read('../java-services/restful-api/src/main/java/io/campuscore/restfulapi/engagement/repository/AnnouncementReadRepository.java');
+  assert.ok(reader.includes('(\\"targetFaculties\\" IS NULL OR CARDINALITY'), 'reader treats NULL faculties as untargeted');
+  assert.ok(reader.includes('faculty_student.\\"curriculumId\\"'), 'student faculty resolves through their curriculum');
+  assert.ok(reader.includes('faculty_department.\\"facultyId\\" = ANY(\\"targetFaculties\\"))'), 'student faculty predicate matches the target list');
+  assert.ok(reader.includes('faculty_lecturer_department.\\"facultyId\\" = ANY(\\"targetFaculties\\"))'), 'lecturer faculty predicate matches the target list');
+
+  const roster = read('../java-services/restful-api/src/main/java/io/campuscore/restfulapi/people/repository/PeopleReadRepository.java');
+  assert.ok(roster.includes('faculty_department.\\"facultyId\\" IN (:targetFaculties)'), 'inbox roster narrows by the same faculty chain');
+
+  const api = read('src/lib/api.ts');
+  assert.match(api, /targetFaculties\?: string\[\];/);
+  assert.match(api, /facultiesApi/);
+  assert.match(api, /'\/faculties'/);
+
+  const page = read('src/app/admin/announcements/page.tsx');
+  assert.match(page, /targetFaculties: \[\.\.\.draft\.targetFaculties\]/);
+  assert.match(page, /facultiesApi\.getAll/);
+  assert.match(page, /targetFaculties: current\.targetFaculties\.filter/);
+  // The faculty list rides on every payload — global notices included.
+  const payloadIndex = page.indexOf('targetFaculties: [...draft.targetFaculties]');
+  const globalIndex = page.indexOf('targetYears: draft.isGlobal ? []');
+  assert.ok(payloadIndex > globalIndex, 'faculty list must ride the payload even for global notices');
+});

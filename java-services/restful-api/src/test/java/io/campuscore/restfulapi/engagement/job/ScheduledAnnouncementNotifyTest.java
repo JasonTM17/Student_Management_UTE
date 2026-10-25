@@ -84,7 +84,7 @@ class ScheduledAnnouncementNotifyTest {
         when(announcements.update(any())).thenReturn(1);
         UpdateAnnouncementRequest request = new UpdateAnnouncementRequest(
                 Set.of("publishAt", "reason", "expectedVersion"),
-                null, null, null, null, null, null, null,
+                null, null, null, null, null, null, null, null,
                 NOW.plusSeconds(7200), null, null, null, null, "Reschedule", 0);
 
         service.update("admin-1", "admin@campuscore.edu", List.of("ADMIN"), null, "notice-1", request);
@@ -149,9 +149,9 @@ class ScheduledAnnouncementNotifyTest {
         verify(announcements, never()).findById(any());
         when(announcements.markNotified(eq("notice-1"), any())).thenReturn(1);
         when(announcements.findById("notice-1")).thenReturn(Optional.of(announcement(null)));
-        when(people.findAnnouncementStudentUserIds(List.of(1), null, List.of("STUDENT"), null, List.of())).thenReturn(List.of("current-student"));
+        when(people.findAnnouncementStudentUserIds(List.of(1), null, List.of("STUDENT"), null, List.of(), List.of())).thenReturn(List.of("current-student"));
         notifier.notifyAfterPublication("notice-1");
-        verify(people).findAnnouncementStudentUserIds(List.of(1), null, List.of("STUDENT"), null, List.of());
+        verify(people).findAnnouncementStudentUserIds(List.of(1), null, List.of("STUDENT"), null, List.of(), List.of());
         verify(notifications).createBatch(any());
     }
 
@@ -165,14 +165,14 @@ class ScheduledAnnouncementNotifyTest {
 
     private static CreateAnnouncementRequest createRequest(Instant publishAt) {
         return new CreateAnnouncementRequest(
-                "Notice", "<p>Body</p>", "NORMAL", List.of("STUDENT"), List.of(), List.of(), false,
+                "Notice", "<p>Body</p>", "NORMAL", List.of("STUDENT"), List.of(), List.of(), List.of(), false,
                 publishAt, null, null, null, null);
     }
 
     private static AnnouncementResponse announcement(Instant publishAt) {
         return new AnnouncementResponse(
                 "notice-1", "Title", "Content", "NORMAL",
-                List.of("STUDENT"), List.of(1), List.of(), false,
+                List.of("STUDENT"), List.of(1), List.of(), List.of(), false,
                 publishAt, null, "publisher-1",
                 null, null, null, null, null, null, null, null,
                 NOW, NOW, 0, null, null, null, null, null);

@@ -81,6 +81,47 @@ class AnnouncementReadPersistenceTest {
                 )
                 """);
         jdbc.execute("DELETE FROM academic.\"Enrollment\"");
+        // Faculty-target resolution chain (V149): Student -> Curriculum ->
+        // Department -> facultyId, plus the lecturer's own department.
+        jdbc.execute("""
+                CREATE TABLE IF NOT EXISTS academic."Faculty" (
+                    "id" VARCHAR(120) PRIMARY KEY,
+                    "name" VARCHAR(240),
+                    "isActive" BOOLEAN NOT NULL DEFAULT TRUE
+                )
+                """);
+        jdbc.execute("""
+                CREATE TABLE IF NOT EXISTS academic."Department" (
+                    "id" VARCHAR(120) PRIMARY KEY,
+                    "name" VARCHAR(240),
+                    "facultyId" VARCHAR(120) NOT NULL,
+                    "isActive" BOOLEAN NOT NULL DEFAULT TRUE
+                )
+                """);
+        jdbc.execute("""
+                CREATE TABLE IF NOT EXISTS academic."Curriculum" (
+                    "id" VARCHAR(120) PRIMARY KEY,
+                    "name" VARCHAR(240),
+                    "departmentId" VARCHAR(120) NOT NULL
+                )
+                """);
+        jdbc.execute("""
+                CREATE TABLE IF NOT EXISTS academic."Student" (
+                    "id" VARCHAR(120) PRIMARY KEY,
+                    "curriculumId" VARCHAR(120)
+                )
+                """);
+        jdbc.execute("""
+                CREATE TABLE IF NOT EXISTS academic."Lecturer" (
+                    "id" VARCHAR(120) PRIMARY KEY,
+                    "departmentId" VARCHAR(120) NOT NULL
+                )
+                """);
+        jdbc.execute("DELETE FROM academic.\"Lecturer\"");
+        jdbc.execute("DELETE FROM academic.\"Student\"");
+        jdbc.execute("DELETE FROM academic.\"Curriculum\"");
+        jdbc.execute("DELETE FROM academic.\"Department\"");
+        jdbc.execute("DELETE FROM academic.\"Faculty\"");
         jdbc.execute("DROP TABLE IF EXISTS \"engagement\".\"AnnouncementAudit\"");
         jdbc.execute("DROP TABLE IF EXISTS \"engagement\".\"Announcement\"");
         jdbc.execute("""
@@ -93,6 +134,7 @@ class AnnouncementReadPersistenceTest {
                     "targetRoles" VARCHAR ARRAY NOT NULL,
                     "targetYears" INTEGER ARRAY NOT NULL,
                     "targetDepartments" VARCHAR ARRAY NOT NULL DEFAULT ARRAY[],
+                    "targetFaculties" VARCHAR ARRAY,
                     "isGlobal" BOOLEAN NOT NULL,
                     "publishAt" TIMESTAMP WITH TIME ZONE,
                     "expiresAt" TIMESTAMP WITH TIME ZONE,
@@ -114,8 +156,24 @@ class AnnouncementReadPersistenceTest {
                 )
                 """);
         jdbc.execute("""
+                CREATE TABLE IF NOT EXISTS academic."Faculty" (
+                    "id" VARCHAR(120) PRIMARY KEY,
+                    "name" VARCHAR(240),
+                    "isActive" BOOLEAN NOT NULL DEFAULT TRUE
+                )
+                """);
+        jdbc.execute("""
+                CREATE TABLE IF NOT EXISTS academic."Department" (
+                    "id" VARCHAR(120) PRIMARY KEY,
+                    "name" VARCHAR(240),
+                    "facultyId" VARCHAR(120),
+                    "isActive" BOOLEAN NOT NULL DEFAULT TRUE
+                )
+                """);
+        jdbc.execute("""
                 CREATE TABLE IF NOT EXISTS academic."Curriculum" (
                     "id" VARCHAR(120) PRIMARY KEY,
+                    "name" VARCHAR(240),
                     "departmentId" VARCHAR(120)
                 )
                 """);
@@ -695,6 +753,84 @@ class AnnouncementReadPersistenceTest {
         mvc.perform(get("/api/v1/announcements/multi-global").with(adminStudent)).andExpect(status().isOk());
     }
 
+    @Test
+    void facultyTargetedNoticesOnlyReachViewersOfThatFaculty() throws Exception {
+        // faculty-f1 <- department-f1 <- curriculum-f1 <- the student profile;
+        // faculty-f2 <- department-f2 <- curriculum-f2 <- the second student.
+        jdbc.update("INSERT INTO academic.\"Faculty\" (\"id\", \"name\") VALUES ('faculty-f1', 'Faculty 1')");
+        jdbc.update("INSERT INTO academic.\"Faculty\" (\"id\", \"name\") VALUES ('faculty-f2', 'Faculty 2')");
+        jdbc.update("INSERT INTO academic.\"Department\" (\"id\", \"name\", \"facultyId\") VALUES ('department-f1', 'Department 1', 'faculty-f1')");
+        jdbc.update("INSERT INTO academic.\"Department\" (\"id\", \"name\", \"facultyId\") VALUES ('department-f2', 'Department 2', 'faculty-f2')");
+        jdbc.update("INSERT INTO academic.\"Curriculum\" (\"id\", \"name\", \"departmentId\") VALUES ('curriculum-f1', 'Curriculum 1', 'department-f1')");
+        jdbc.update("INSERT INTO academic.\"Curriculum\" (\"id\", \"name\", \"departmentId\") VALUES ('curriculum-f2', 'Curriculum 2', 'department-f2')");
+        jdbc.update("INSERT INTO academic.\"Student\" (\"id\", \"curriculumId\") VALUES ('student-profile', 'curriculum-f1')");
+        jdbc.update("INSERT INTO academic.\"Student\" (\"id\", \"curriculumId\") VALUES ('student-other', 'curriculum-f2')");
+        // The fixture lecturer sits in faculty 1 through their own department.
+        jdbc.update("INSERT INTO academic.\"Lecturer\" (\"id\", \"departmentId\") VALUES ('lecturer-1', 'department-f1')");
+
+        insert(fixture("untargeted", true, new String[0], new Integer[0], "2026-08-20T09:00:00Z"));
+        insert(fixture("for-f1", true, new String[0], new Integer[0], "2026-08-20T10:00:00Z")
+                .withFaculties(new String[]{"faculty-f1"}));
+        insert(fixture("for-f2", true, new String[0], new Integer[0], "2026-08-20T11:00:00Z")
+                .withFaculties(new String[]{"faculty-f2"}));
+        // A mistyped faculty id matches nobody — it narrows to nothing.
+        insert(fixture("for-ghost", true, new String[0], new Integer[0], "2026-08-20T12:00:00Z")
+                .withFaculties(new String[]{"faculty-unknown"}));
+        // OR within the faculty dimension: either listed faculty admits the viewer.
+        insert(fixture("for-f1-or-f2", true, new String[0], new Integer[0], "2026-08-20T12:30:00Z")
+                .withFaculties(new String[]{"faculty-f2", "faculty-f1"}));
+        // AND across dimensions: the faculty matches but the department does
+        // not, so the row stays hidden from the f1 viewers.
+        insert(fixture("for-f1-wrong-dept", true, new String[0], new Integer[0], "2026-08-20T13:00:00Z")
+                .withFaculties(new String[]{"faculty-f1"}));
+        jdbc.update("UPDATE \"engagement\".\"Announcement\" SET \"targetDepartments\" = ARRAY['department-f2']"
+                + " WHERE \"id\" = 'for-f1-wrong-dept'");
+
+        // Student of faculty 1: the untargeted notice and their faculty's.
+        mvc.perform(get("/api/v1/announcements/my")
+                        .with(fixtureJwt(jdbc, "student-user", token -> token
+                                .subject("student-user")
+                                .claim("email", "student@campuscore.edu")
+                                .claim("roles", List.of("STUDENT"))
+                                .claim("studentId", "student-profile")
+                                .claim("student", Map.of("year", 2)), "STUDENT")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.length()").value(3))
+                .andExpect(jsonPath("$.data[0].id").value("for-f1-or-f2"))
+                .andExpect(jsonPath("$.data[1].id").value("for-f1"))
+                .andExpect(jsonPath("$.data[1].targetFaculties[0]").value("faculty-f1"))
+                .andExpect(jsonPath("$.data[2].id").value("untargeted"))
+                .andExpect(jsonPath("$.meta.total").value(3));
+
+        // Lecturer of faculty 1 sees the same split through their department.
+        mvc.perform(get("/api/v1/announcements/my")
+                        .with(fixtureJwt(jdbc, "lecturer-user", token -> token
+                                .subject("lecturer-user")
+                                .claim("email", "lecturer@campuscore.edu")
+                                .claim("roles", List.of("LECTURER"))
+                                .claim("lecturerId", "lecturer-1"), "LECTURER")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.length()").value(3))
+                .andExpect(jsonPath("$.data[0].id").value("for-f1-or-f2"))
+                .andExpect(jsonPath("$.data[1].id").value("for-f1"))
+                .andExpect(jsonPath("$.data[2].id").value("untargeted"));
+
+        // A student whose profile has no academic row resolves no faculty and
+        // only sees the untargeted notice.
+        io.campuscore.restfulapi.testsupport.AccountAuthorityFixture.student(
+                jdbc, "student-nofac-user", "student-nofac", 2);
+        mvc.perform(get("/api/v1/announcements/my")
+                        .with(fixtureJwt(jdbc, "student-nofac-user", token -> token
+                                .subject("student-nofac-user")
+                                .claim("email", "student-nofac@campuscore.edu")
+                                .claim("roles", List.of("STUDENT"))
+                                .claim("studentId", "student-nofac")
+                                .claim("student", Map.of("year", 2)), "STUDENT")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.length()").value(1))
+                .andExpect(jsonPath("$.data[0].id").value("untargeted"));
+    }
+
     private AnnouncementFixture fixture(
             String id,
             boolean global,
@@ -706,6 +842,7 @@ class AnnouncementReadPersistenceTest {
                 "NORMAL",
                 roles,
                 years,
+                new String[0],
                 global,
                 PAST,
                 FUTURE,
@@ -725,10 +862,11 @@ class AnnouncementReadPersistenceTest {
             try (PreparedStatement statement = connection.prepareStatement("""
                     INSERT INTO "engagement"."Announcement" (
                         "id", "title", "content", "priority", "targetRoles", "targetYears",
+                        "targetFaculties",
                         "isGlobal", "publishAt", "expiresAt", "publishedBy", "semesterId",
                         "semesterName", "sectionId", "sectionNumber", "courseCode", "courseName",
                         "lecturerId", "lecturerDisplayName", "createdAt", "updatedAt"
-                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                     """)) {
                 statement.setString(1, fixture.id());
                 statement.setString(2, "Title " + fixture.id());
@@ -736,20 +874,21 @@ class AnnouncementReadPersistenceTest {
                 statement.setString(4, fixture.priority());
                 statement.setArray(5, connection.createArrayOf("VARCHAR", fixture.roles()));
                 statement.setArray(6, connection.createArrayOf("INTEGER", fixture.years()));
-                statement.setBoolean(7, fixture.global());
-                timestamp(statement, 8, fixture.publishAt());
-                timestamp(statement, 9, fixture.expiresAt());
-                statement.setString(10, "publisher-1");
-                statement.setString(11, fixture.semesterId());
-                statement.setString(12, fixture.semesterName());
-                statement.setString(13, fixture.sectionId());
-                statement.setString(14, fixture.sectionNumber());
-                statement.setString(15, fixture.courseCode());
-                statement.setString(16, fixture.courseName());
-                statement.setString(17, fixture.lecturerId());
-                statement.setString(18, fixture.lecturerDisplayName());
-                timestamp(statement, 19, fixture.createdAt());
+                statement.setArray(7, connection.createArrayOf("VARCHAR", fixture.faculties()));
+                statement.setBoolean(8, fixture.global());
+                timestamp(statement, 9, fixture.publishAt());
+                timestamp(statement, 10, fixture.expiresAt());
+                statement.setString(11, "publisher-1");
+                statement.setString(12, fixture.semesterId());
+                statement.setString(13, fixture.semesterName());
+                statement.setString(14, fixture.sectionId());
+                statement.setString(15, fixture.sectionNumber());
+                statement.setString(16, fixture.courseCode());
+                statement.setString(17, fixture.courseName());
+                statement.setString(18, fixture.lecturerId());
+                statement.setString(19, fixture.lecturerDisplayName());
                 timestamp(statement, 20, fixture.createdAt());
+                timestamp(statement, 21, fixture.createdAt());
                 statement.executeUpdate();
             }
             return null;
@@ -773,6 +912,7 @@ class AnnouncementReadPersistenceTest {
             String priority,
             String[] roles,
             Integer[] years,
+            String[] faculties,
             boolean global,
             Instant publishAt,
             Instant expiresAt,
@@ -788,14 +928,14 @@ class AnnouncementReadPersistenceTest {
 
         AnnouncementFixture withWindow(Instant publishAt, Instant expiresAt) {
             return new AnnouncementFixture(
-                    id, priority, roles, years, global, publishAt, expiresAt,
+                    id, priority, roles, years, faculties, global, publishAt, expiresAt,
                     semesterId, semesterName, sectionId, sectionNumber, courseCode,
                     courseName, lecturerId, lecturerDisplayName, createdAt);
         }
 
         AnnouncementFixture withPriority(String priority) {
             return new AnnouncementFixture(
-                    id, priority, roles, years, global, publishAt, expiresAt,
+                    id, priority, roles, years, faculties, global, publishAt, expiresAt,
                     semesterId, semesterName, sectionId, sectionNumber, courseCode,
                     courseName, lecturerId, lecturerDisplayName, createdAt);
         }
@@ -808,14 +948,21 @@ class AnnouncementReadPersistenceTest {
                 String courseCode,
                 String courseName) {
             return new AnnouncementFixture(
-                    id, priority, roles, years, global, publishAt, expiresAt,
+                    id, priority, roles, years, faculties, global, publishAt, expiresAt,
                     semesterId, semesterName, sectionId, sectionNumber, courseCode,
                     courseName, lecturerId, lecturerDisplayName, createdAt);
         }
 
         AnnouncementFixture withLecturer(String lecturerId, String lecturerDisplayName) {
             return new AnnouncementFixture(
-                    id, priority, roles, years, global, publishAt, expiresAt,
+                    id, priority, roles, years, faculties, global, publishAt, expiresAt,
+                    semesterId, semesterName, sectionId, sectionNumber, courseCode,
+                    courseName, lecturerId, lecturerDisplayName, createdAt);
+        }
+
+        AnnouncementFixture withFaculties(String[] faculties) {
+            return new AnnouncementFixture(
+                    id, priority, roles, years, faculties, global, publishAt, expiresAt,
                     semesterId, semesterName, sectionId, sectionNumber, courseCode,
                     courseName, lecturerId, lecturerDisplayName, createdAt);
         }

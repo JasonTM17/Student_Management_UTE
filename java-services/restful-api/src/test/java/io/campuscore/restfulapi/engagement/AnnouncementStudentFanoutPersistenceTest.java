@@ -85,6 +85,7 @@ class AnnouncementStudentFanoutPersistenceTest {
                     "targetRoles" VARCHAR ARRAY NOT NULL,
                     "targetYears" INTEGER ARRAY NOT NULL,
                     "targetDepartments" VARCHAR ARRAY NOT NULL DEFAULT ARRAY[],
+                    "targetFaculties" VARCHAR ARRAY,
                     "isGlobal" BOOLEAN NOT NULL,
                     "publishAt" TIMESTAMP WITH TIME ZONE,
                     "expiresAt" TIMESTAMP WITH TIME ZONE,
@@ -136,18 +137,20 @@ class AnnouncementStudentFanoutPersistenceTest {
                     "updatedAt" TIMESTAMP
                 )
                 """);
-        jdbc.execute("""
-                CREATE TABLE IF NOT EXISTS academic."Curriculum" (
-                    "id" VARCHAR(120) PRIMARY KEY,
-                    "departmentId" VARCHAR(120)
-                )
-                """);
-        jdbc.execute("""
-                CREATE TABLE IF NOT EXISTS academic."Lecturer" (
-                    "id" VARCHAR(120) PRIMARY KEY,
-                    "departmentId" VARCHAR(120)
-                )
-                """);
+        // Faculty-target resolution chain (V149) for the reader predicate;
+        // the same Curriculum/Lecturer tables carry the department chain.
+        jdbc.execute("CREATE TABLE IF NOT EXISTS academic.\"Faculty\" ("
+                + "\"id\" VARCHAR(120) PRIMARY KEY, \"name\" VARCHAR(240),"
+                + " \"isActive\" BOOLEAN NOT NULL DEFAULT TRUE)");
+        jdbc.execute("CREATE TABLE IF NOT EXISTS academic.\"Department\" ("
+                + "\"id\" VARCHAR(120) PRIMARY KEY, \"name\" VARCHAR(240),"
+                + " \"facultyId\" VARCHAR(120) NOT NULL,"
+                + " \"isActive\" BOOLEAN NOT NULL DEFAULT TRUE)");
+        jdbc.execute("CREATE TABLE IF NOT EXISTS academic.\"Curriculum\" ("
+                + "\"id\" VARCHAR(120) PRIMARY KEY, \"name\" VARCHAR(240),"
+                + " \"departmentId\" VARCHAR(120) NOT NULL)");
+        jdbc.execute("CREATE TABLE IF NOT EXISTS academic.\"Lecturer\" ("
+                + "\"id\" VARCHAR(120) PRIMARY KEY, \"departmentId\" VARCHAR(120) NOT NULL)");
         // Auth table shape mirrors NotificationWritePersistenceTest so both
         // ordering hypotheses (this class first, or the auth fixtures first)
         // accept the seeded rows. It is never dropped here: other classes
@@ -474,7 +477,7 @@ class AnnouncementStudentFanoutPersistenceTest {
             String section, List<Integer> years, java.time.Instant expires, java.time.Instant archived,
             List<String> roles, boolean global) {
         return new io.campuscore.restfulapi.engagement.dto.AnnouncementReadDtos.AnnouncementResponse(
-                "scoped", "Private title", "Private content", "NORMAL", roles, years, List.of(), global,
+                "scoped", "Private title", "Private content", "NORMAL", roles, years, List.of(), List.of(), global,
                 null, expires, "publisher", null, null, section, null, null, null, null, null,
                 java.time.Instant.now(), java.time.Instant.now(), 0, archived, null, null, null, null);
     }
