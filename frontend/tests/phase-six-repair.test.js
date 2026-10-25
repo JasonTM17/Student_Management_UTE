@@ -52,9 +52,14 @@ test('admin thesis and home routing distinguish role state explicitly', () => {
   const thesis = read('src/app/admin/thesis/page.tsx');
   const home = read('src/app/page.tsx');
 
-  assert.match(thesis, /if \(!user\) \{[\s\S]*?<ForbiddenState[\s\S]*?href="\/login\?portal=admin"/);
-  assert.match(thesis, /if \(!canAccess\) \{[\s\S]*?<ForbiddenState/);
-  assert.ok(thesis.indexOf('if (!canAccess)') < thesis.indexOf('if (isLoading && rounds.length === 0)'));
+  // Unauthorized roles leave through the same redirect contract every other
+  // admin page follows (see src/app/admin/users/page.tsx): signed-out users go
+  // to the login portal, signed-in but unauthorized roles go to the dashboard,
+  // and rendering falls back to a loading state while the hand-off resolves.
+  assert.match(thesis, /if \(!user\) \{[\s\S]*?router\.replace\(`\$\{href\('\/login'\)\}\?portal=admin/);
+  assert.match(thesis, /if \(!thesisAdminAccess\) \{[\s\S]*?router\.replace\(href\('\/dashboard'\)\)/);
+  assert.match(thesis, /if \(isAuthLoading \|\| isLoggingOut \|\| !canAccess\)/);
+  assert.doesNotMatch(thesis, /<ForbiddenState/);
   assert.match(home, /const workspaceHref = isAdmin \|\| isSuperAdmin/);
   assert.match(home, /isLecturer[\s\S]*?'\/dashboard\/lecturer'/);
   assert.doesNotMatch(home, /href=\{user \? '\/admin' : '\/login'\}/);

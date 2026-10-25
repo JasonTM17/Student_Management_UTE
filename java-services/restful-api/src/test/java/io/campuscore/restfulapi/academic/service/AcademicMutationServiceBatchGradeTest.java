@@ -65,6 +65,7 @@ class AcademicMutationServiceBatchGradeTest {
                 "studentId" VARCHAR(64),
                 "sectionId" VARCHAR(64),
                 "status" VARCHAR(32),
+                "registrationSource" VARCHAR(40),
                 "gradeStatus" VARCHAR(32),
                 "finalGrade" NUMERIC(5,2),
                 "letterGrade" VARCHAR(8),

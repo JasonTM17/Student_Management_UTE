@@ -368,6 +368,13 @@ async function mockStudent(page: Page, singleTerm = false, overrides: Record<str
         },
         courses: singleTerm ? curriculumCourses.slice(0, 1) : curriculumCourses,
       },
+      // The register page mounts the curriculum plan block; an UNKNOWN term
+      // keeps it inert for the schedule/registration polish checks.
+      '/api/v1/me/registration/curriculum-plan': {
+        semesterId: 'term-demo', semesterName: 'Demo term',
+        registrationRoundId: null, registrationOpen: false,
+        term: { status: 'UNKNOWN', reasonCode: 'NO_CURRICULUM_TERM' }, courses: [],
+      },
       '/api/v1/thesis/rounds': [thesisRound],
       '/api/v1/thesis/topics': [thesisTopic],
       // The student group card resolves the topic's supervisors on mount.
