@@ -284,6 +284,29 @@ class AnnouncementReadPersistenceTest {
     }
 
     @Test
+    void departmentTargetsHideFromViewersWithoutDepartmentIdentity() throws Exception {
+        // Viewers whose token carries no studentId or lecturerId (admin, dean,
+        // head-of-department) resolve no department EXISTS clause; the feed must
+        // then show them only untargeted notices, never every department's.
+        insert(fixture("dept-it-global", true, new String[0], new Integer[0], "2026-08-20T09:00:00Z"));
+        insert(fixture("untargeted-global", true, new String[0], new Integer[0], "2026-08-20T10:00:00Z"));
+        jdbc.update("UPDATE \"engagement\".\"Announcement\" SET \"targetDepartments\" = ARRAY['dept-it']"
+                + " WHERE \"id\" = 'dept-it-global'");
+
+        mvc.perform(get("/api/v1/announcements/my")
+                        .with(fixtureJwt(jdbc, "dept-less-admin", "ADMIN")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.length()").value(1))
+                .andExpect(jsonPath("$.data[0].id").value("untargeted-global"));
+
+        // Single reads honor the same audience boundary for non-admin roles:
+        // a head-of-department token with no resolvable department gets 404.
+        mvc.perform(get("/api/v1/announcements/dept-it-global")
+                        .with(fixtureJwt(jdbc, "dept-less-head", "TRUONG_BO_MON")))
+                .andExpect(status().isNotFound());
+    }
+
+    @Test
     void droppedEnrollmentDoesNotGrantSectionNoticeVisibility() throws Exception {
         insert(fixture("dropped-section", false, new String[]{"STUDENT"}, new Integer[0], "2026-08-20T10:00:00Z")
                 .withAcademicContext("semester-1", "Semester 1", "section-dropped", "03", "CS103", "Networks"));

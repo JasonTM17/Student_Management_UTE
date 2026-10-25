@@ -214,6 +214,47 @@ class AnnouncementPublicPersistenceTest {
     }
 
     @Test
+    void anonymousFeedExcludesDepartmentTargetedGlobalRowsFromContentAndPagination() throws Exception {
+        insert("department-only", "PUBLISHED", true, PAST, null, null, 0, BASE);
+        jdbc.update("""
+                UPDATE "engagement"."Announcement"
+                   SET "targetDepartments" = ARRAY['department-private']
+                 WHERE "id" = 'department-only'
+                """);
+        insert("global-first", "PUBLISHED", true, PAST, null, null, 1, BASE);
+        insert("global-second", "PUBLISHED", true, PAST, null, null, 2, BASE);
+
+        mvc.perform(get("/api/v1/announcements/public"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.length()").value(2))
+                .andExpect(jsonPath("$.data[0].id").value("global-first"))
+                .andExpect(jsonPath("$.data[1].id").value("global-second"))
+                .andExpect(jsonPath("$.meta.total").value(2));
+
+        mvc.perform(get("/api/v1/announcements/public")
+                        .queryParam("page", "1").queryParam("limit", "1"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.length()").value(1))
+                .andExpect(jsonPath("$.data[0].id").value("global-first"))
+                .andExpect(jsonPath("$.meta.total").value(2))
+                .andExpect(jsonPath("$.meta.totalPages").value(2));
+
+        mvc.perform(get("/api/v1/announcements/public")
+                        .queryParam("page", "2").queryParam("limit", "1"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.length()").value(1))
+                .andExpect(jsonPath("$.data[0].id").value("global-second"))
+                .andExpect(jsonPath("$.meta.total").value(2))
+                .andExpect(jsonPath("$.meta.totalPages").value(2));
+
+        mvc.perform(get("/api/v1/announcements/public")
+                        .queryParam("page", "3").queryParam("limit", "1"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.length()").value(0))
+                .andExpect(jsonPath("$.meta.total").value(2));
+    }
+
+    @Test
     void adminCanAssignDisplayOrderAndLecturerOrStudentCannot() throws Exception {
         insert("reorder-me", "PUBLISHED", true, PAST, null, null, null, BASE);
 
