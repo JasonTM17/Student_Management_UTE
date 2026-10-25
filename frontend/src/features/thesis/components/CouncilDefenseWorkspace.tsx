@@ -15,6 +15,7 @@ import {
   type ThesisTopic,
 } from '@/lib/thesis-api';
 import { fillCopy } from '@/features/thesis/components/thesis-helpers';
+import ScoreBreakdownPanel from '@/features/thesis/components/ScoreBreakdownPanel';
 import { plainTextThesisDescription } from '@/lib/thesis-text';
 
 interface CouncilDefenseWorkspaceProps {
@@ -64,7 +65,6 @@ export default function CouncilDefenseWorkspace({
   councils,
   myLecturerId,
   topics,
-  lecturers,
   councilLoadError,
   onRetryCouncils,
   councilScores,
@@ -339,75 +339,19 @@ export default function CouncilDefenseWorkspace({
                           </div>
                         ) : null}
 
-                        {/* Scores Breakdown */}
+                        {/* Score breakdown: graders with roles and scores,
+                            the finalize-average, and the still-pending
+                            eligible graders the chair is waiting on. */}
                         {scoresFailed ? (
                           <p className="rounded-lg border border-status-warning/40 bg-status-warning/10 p-2.5 text-xs text-status-warning-foreground">
                             {messages.thesis.grading.scoresLoadFailed}
                           </p>
-                        ) : scores.length > 0 && (
-                          <div className="rounded-lg bg-background/60 p-2.5 text-xs space-y-2 border border-border/40">
-                            <div className="flex flex-wrap items-center justify-between gap-2">
-                              <span className="font-semibold text-muted-foreground uppercase text-[11px] tracking-wider">
-                                {messages.thesis.grading.scoresListTitle} ({scores.length} điểm đã chấm):
-                              </span>
-                              {(() => {
-                                const defenseScores = scores.filter(
-                                  (s) => s.component === 'DEFENSE' && s.score != null,
-                                );
-                                if (defenseScores.length > 0) {
-                                  const rawAvg =
-                                    defenseScores.reduce(
-                                      (acc, curr) => acc + Number(curr.score),
-                                      0,
-                                    ) / defenseScores.length;
-                                  const displayAvg = rawAvg.toFixed(2);
-                                  return (
-                                    <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-emerald-700 dark:text-emerald-300">
-                                      <span>
-                                        {isFinalized
-                                          ? 'Điểm chốt (Trung bình cộng):'
-                                          : 'Trung bình cộng tạm tính:'}
-                                      </span>
-                                      <span className="rounded bg-emerald-500/15 border border-emerald-500/30 px-2 py-0.5 font-mono text-sm font-bold text-emerald-700 dark:text-emerald-300">
-                                        {isFinalized && topic?.finalScore != null
-                                          ? topic.finalScore
-                                          : displayAvg}
-                                      </span>
-                                    </span>
-                                  );
-                                }
-                                return null;
-                              })()}
-                            </div>
-                            <div className="space-y-1.5 pt-1">
-                              {scores.map((s, sIdx) => {
-                                const lect = lecturers.find(
-                                  (l) => l.id === s.lecturerId,
-                                );
-                                const name = lect?.user
-                                  ? `${lect.user.lastName} ${lect.user.firstName}`
-                                  : s.lecturerId;
-                                return (
-                                  <div
-                                    key={sIdx}
-                                    className="flex flex-col sm:flex-row sm:items-center justify-between gap-1.5 rounded-md bg-muted/60 px-3 py-1.5 text-xs text-foreground border border-border/50"
-                                  >
-                                    <div className="flex items-center gap-2 shrink-0">
-                                      <span className="font-semibold text-foreground">{name}:</span>
-                                      <span className="rounded bg-primary/10 px-2 py-0.5 font-mono font-bold text-primary">
-                                        {s.score}
-                                      </span>
-                                    </div>
-                                    {s.comment ? (
-                                      <span className="text-muted-foreground italic text-xs break-words sm:text-right">
-                                        &ldquo;{s.comment}&rdquo;
-                                      </span>
-                                    ) : null}
-                                  </div>
-                                );
-                              })}
-                            </div>
-                          </div>
+                        ) : (
+                          <ScoreBreakdownPanel
+                            messages={messages}
+                            topicId={tid}
+                            refreshKey={`${submittedCount}:${topic?.finalScore ?? ''}`}
+                          />
                         )}
 
                         {/* Chair Finalize Action — suppressed while the score

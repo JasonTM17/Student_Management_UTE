@@ -3,11 +3,14 @@ package io.campuscore.restfulapi.thesis.service;
 import io.campuscore.restfulapi.thesis.model.RoundStatus;
 import io.campuscore.restfulapi.thesis.entity.ThesisRegistrationRound;
 import io.campuscore.restfulapi.thesis.repository.ThesisRegistrationRoundRepository;
+import io.campuscore.restfulapi.thesis.repository.ThesisDatabaseClockRepository;
+import io.campuscore.restfulapi.thesis.repository.ThesisGroupReadRepository;
 import io.campuscore.restfulapi.thesis.model.EligibilityView;
 import io.campuscore.restfulapi.thesis.repository.ThesisRoundDeletionRepository;
 import io.campuscore.restfulapi.thesis.dto.ThesisRoundDtos.RoundClosureInfo;
 import io.campuscore.restfulapi.thesis.dto.ThesisRoundDtos.RoundDeletionInfo;
 import io.campuscore.restfulapi.thesis.dto.ThesisRoundDtos.RoundResponse;
+import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -30,7 +33,9 @@ public class ThesisRoundReadService {
 
     private final ThesisRegistrationRoundRepository rounds;
     private final ThesisRoundDeletionRepository deletions;
+    private final ThesisGroupReadRepository groups;
     private final ThesisGovernanceCapabilities capabilities;
+    private final ThesisDatabaseClockRepository databaseClock;
 
     /** Optional; round listing still works when the policy bean is absent. */
     @org.springframework.beans.factory.annotation.Autowired(required = false)
@@ -39,10 +44,14 @@ public class ThesisRoundReadService {
     public ThesisRoundReadService(
             ThesisRegistrationRoundRepository rounds,
             ThesisRoundDeletionRepository deletions,
-            ThesisGovernanceCapabilities capabilities) {
+            ThesisGroupReadRepository groups,
+            ThesisGovernanceCapabilities capabilities,
+            ThesisDatabaseClockRepository databaseClock) {
         this.rounds = rounds;
         this.deletions = deletions;
+        this.groups = groups;
         this.capabilities = capabilities;
+        this.databaseClock = databaseClock;
     }
 
     /**
@@ -76,6 +85,15 @@ public class ThesisRoundReadService {
         }
         Map<UUID, Map<String, Number>> counts = deletions.dependentCounts(
                 list.stream().map(ThesisRegistrationRound::getId).toList());
+        List<UUID> cancelledRoundIds = list.stream()
+                .filter(round -> round.getStatus() == RoundStatus.CANCELLED)
+                .map(ThesisRegistrationRound::getId)
+                .toList();
+        Map<UUID, List<String>> restoreBlockers = hasRestoreRole(actor)
+                ? groups.restoreBlockers(cancelledRoundIds)
+                : Map.of();
+        Instant serverNow = databaseNow();
+        Instant lifecycleNow = Instant.now();
         String callerStudentId = callerStudentId(actor);
         // One transcript read per request, shared by every covered row —
         // the standing is per student, only the coverage flag differs.
@@ -83,11 +101,11 @@ public class ThesisRoundReadService {
                 || list.stream().noneMatch(r -> eligibility.covers(r.getThesisType()))
                 ? null : eligibility.evaluate(callerStudentId);
         return list.stream()
-                .map(round -> RoundResponse.from(round, deletionInfo(round, counts), closureInfo(round),
+                .map(round -> RoundResponse.from(round, deletionInfo(round, counts), closureInfo(round, lifecycleNow),
                         capabilities.counterReviewWaiverAllowed(round.getThesisType()),
                         ThesisMutationSupport.MIN_GROUP_MEMBERS, ThesisMutationSupport.MAX_GROUP_MEMBERS,
                         callerView == null || !eligibility.covers(round.getThesisType())
-                                ? null : callerView))
+                                ? null : callerView, serverNow, restoreBlockers.get(round.getId())))
                 .toList();
     }
 
@@ -101,6 +119,12 @@ public class ThesisRoundReadService {
             return false;
         }
         return roles.contains("ADMIN") || roles.contains("SUPER_ADMIN") || roles.contains("TRUONG_KHOA");
+    }
+
+    private boolean hasRestoreRole(Jwt actor) {
+        List<String> roles = actor == null ? null : actor.getClaimAsStringList("roles");
+        return roles != null && (roles.contains("ADMIN") || roles.contains("SUPER_ADMIN")
+                || roles.contains("TRUONG_KHOA"));
     }
 
     /** Only a student principal carries a studentId claim worth evaluating. */
@@ -119,10 +143,12 @@ public class ThesisRoundReadService {
                         org.springframework.http.HttpStatus.NOT_FOUND,
                         "ROUND_NOT_FOUND",
                         "Thesis registration round not found"));
+        Instant serverNow = databaseNow();
         return RoundResponse.from(round, deletionInfo(round, deletions.dependentCounts(List.of(id))),
-                closureInfo(round),
+                closureInfo(round, Instant.now()),
                 capabilities.counterReviewWaiverAllowed(round.getThesisType()),
-                ThesisMutationSupport.MIN_GROUP_MEMBERS, ThesisMutationSupport.MAX_GROUP_MEMBERS);
+                ThesisMutationSupport.MIN_GROUP_MEMBERS, ThesisMutationSupport.MAX_GROUP_MEMBERS,
+                null, serverNow);
     }
 
     /**
@@ -144,9 +170,13 @@ public class ThesisRoundReadService {
                 counts.get("councils").longValue());
     }
 
-    private RoundClosureInfo closureInfo(ThesisRegistrationRound round) {
+    private RoundClosureInfo closureInfo(ThesisRegistrationRound round, Instant now) {
         return RoundClosureInfo.of(round.getStatus(), round.getResultsPublishedAt(),
-                retractGraceDays, java.time.Instant.now());
+                retractGraceDays, now);
+    }
+
+    private Instant databaseNow() {
+        return databaseClock.now();
     }
 
     private RoundDeletionInfo deletionInfo(

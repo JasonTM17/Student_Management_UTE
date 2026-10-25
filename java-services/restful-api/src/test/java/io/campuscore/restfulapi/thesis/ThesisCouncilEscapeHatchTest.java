@@ -10,6 +10,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import io.campuscore.restfulapi.thesis.service.ThesisCouncilService;
 import io.campuscore.restfulapi.thesis.service.ThesisMutationService;
+import io.campuscore.restfulapi.thesis.repository.ThesisDatabaseClockRepository;
 import io.campuscore.restfulapi.thesis.dto.ThesisMutationDtos.PublishResultsPreviewResponse;
 import io.campuscore.restfulapi.exception.DomainException;
 import java.math.BigDecimal;
@@ -61,6 +62,8 @@ class ThesisCouncilEscapeHatchTest {
     private ThesisCouncilService councils;
     @Autowired
     private ThesisMutationService mutations;
+    @org.springframework.test.context.bean.override.mockito.MockitoSpyBean
+    private ThesisDatabaseClockRepository databaseClock;
     @Autowired
     private io.campuscore.restfulapi.thesis.service.ThesisTopicService topicReads;
     @org.springframework.test.context.bean.override.mockito.MockitoSpyBean
@@ -113,8 +116,12 @@ class ThesisCouncilEscapeHatchTest {
     @Test
     void missedCounterReviewDeadlineLocksReviewerUntilGovernanceExtendsIt() {
         Instant now = Instant.now();
+        Instant reportDate = now.plusSeconds(5 * 24 * 3_600);
         UUID roundId = insertRound("Esc Round Missed Deadline", "REGISTRATION_CLOSED",
-                now.minusSeconds(3_600), now.plusSeconds(5 * 24 * 3_600));
+                now.minusSeconds(3_600), reportDate);
+        Instant storedReportDate = jdbc.queryForObject(
+                "SELECT report_date FROM thesis.thesis_registration_round WHERE id = ?",
+                (rs, row) -> rs.getTimestamp(1).toInstant(), roundId);
         UUID topicId = insertTopic(roundId, "Esc Missed Deadline Topic");
         insertApprovedGroup(roundId, topicId, "esc-md");
         ensureLecturer("esc-md-reviewer");
@@ -145,8 +152,12 @@ class ThesisCouncilEscapeHatchTest {
                 .isInstanceOf(DomainException.class);
         assertThatThrownBy(() -> mutations.extendGvpbDeadline(
                 roundId, now.plusSeconds(10 * 86_400), "reason", admin()))
-                .isInstanceOf(DomainException.class)
-                .hasMessageContaining("report date");
+                .isInstanceOfSatisfying(DomainException.class, error -> {
+                    assertThat(error.getCode()).isEqualTo("VALIDATION_ERROR");
+                    assertThat(error.getDetails())
+                            .containsEntry("rule", "GVPB_DEADLINE_AFTER_REPORT_DATE")
+                            .containsEntry("reportDate", storedReportDate.toString());
+                });
 
         mutations.extendGvpbDeadline(roundId, now.plusSeconds(2 * 86_400), "reviewer came back", admin());
         councils.submitReviewerScore(topicId, BigDecimal.valueOf(7), null, lecturer("esc-md-reviewer"));
@@ -154,6 +165,96 @@ class ThesisCouncilEscapeHatchTest {
                 "SELECT COUNT(*) FROM thesis.thesis_topic_score WHERE topic_id = ? AND component = 'GVPB'",
                 Integer.class, topicId)).isEqualTo(1);
         assertThat(auditCount(roundId.toString(), "THESIS_ROUND_GVPB_DEADLINE_EXTENDED")).isEqualTo(1);
+    }
+
+    @Test
+    void reportDeadlineCannotMoveEarlierThanCurrentAndNamesTheCurrentDeadline() {
+        Instant now = Instant.now();
+        Instant currentDeadline = now.plusSeconds(4 * 24 * 3_600);
+        UUID roundId = insertRound("Esc Round Report Deadline Validation", "REGISTRATION_CLOSED",
+                currentDeadline, now.plusSeconds(5 * 24 * 3_600));
+        Instant storedDeadline = jdbc.queryForObject(
+                "SELECT gvpb_deadline FROM thesis.thesis_registration_round WHERE id = ?",
+                (rs, row) -> rs.getTimestamp(1).toInstant(), roundId);
+
+        assertThatThrownBy(() -> mutations.extendReportDeadline(
+                roundId, now.plusSeconds(2 * 24 * 3_600), admin()))
+                .isInstanceOfSatisfying(DomainException.class, error -> {
+                    assertThat(error.getCode()).isEqualTo("VALIDATION_ERROR");
+                    assertThat(error.getDetails())
+                            .containsEntry("rule", "REPORT_DEADLINE_BEFORE_CURRENT")
+                            .containsEntry("currentDeadline", storedDeadline.toString());
+                });
+    }
+
+    @Test
+    void everyDeadlineExtensionBoundReturnsItsLocalizedRuleAndThreshold() {
+        Instant now = Instant.now();
+        Instant currentDeadline = now.plusSeconds(5 * 24 * 3_600);
+        Instant reportDate = now.plusSeconds(30 * 24 * 3_600);
+        UUID roundId = insertRound("Esc Round Deadline Rules", "REGISTRATION_CLOSED",
+                currentDeadline, reportDate);
+        Instant storedCurrentDeadline = jdbc.queryForObject(
+                "SELECT gvpb_deadline FROM thesis.thesis_registration_round WHERE id = ?",
+                (rs, row) -> rs.getTimestamp(1).toInstant(), roundId);
+        Instant storedReportDate = jdbc.queryForObject(
+                "SELECT report_date FROM thesis.thesis_registration_round WHERE id = ?",
+                (rs, row) -> rs.getTimestamp(1).toInstant(), roundId);
+
+        assertThatThrownBy(() -> mutations.extendReportDeadline(roundId, now.minusSeconds(1), admin()))
+                .isInstanceOfSatisfying(DomainException.class, error -> {
+                    assertThat(error.getDetails()).containsEntry("rule", "REPORT_DEADLINE_NOT_FUTURE");
+                });
+        assertThatThrownBy(() -> mutations.extendReportDeadline(
+                roundId, now.plusSeconds(2 * 24 * 3_600), admin()))
+                .isInstanceOfSatisfying(DomainException.class, error -> {
+                    assertThat(error.getDetails())
+                            .containsEntry("rule", "REPORT_DEADLINE_BEFORE_CURRENT")
+                            .containsEntry("currentDeadline", storedCurrentDeadline.toString());
+                });
+        assertThatThrownBy(() -> mutations.extendGvpbDeadline(roundId, now.minusSeconds(1), "reason", admin()))
+                .isInstanceOfSatisfying(DomainException.class, error -> {
+                    assertThat(error.getDetails()).containsEntry("rule", "GVPB_DEADLINE_NOT_FUTURE");
+                });
+        assertThatThrownBy(() -> mutations.extendGvpbDeadline(
+                roundId, now.plusSeconds(2 * 24 * 3_600), "reason", admin()))
+                .isInstanceOfSatisfying(DomainException.class, error -> {
+                    assertThat(error.getDetails())
+                            .containsEntry("rule", "GVPB_DEADLINE_BEFORE_CURRENT")
+                            .containsEntry("currentDeadline", storedCurrentDeadline.toString());
+                });
+        assertThatThrownBy(() -> mutations.extendGvpbDeadline(
+                roundId, now.plusSeconds(40 * 24 * 3_600), "reason", admin()))
+                .isInstanceOfSatisfying(DomainException.class, error -> {
+                    assertThat(error.getDetails())
+                            .containsEntry("rule", "GVPB_DEADLINE_AFTER_REPORT_DATE")
+                            .containsEntry("reportDate", storedReportDate.toString());
+                });
+    }
+
+    @Test
+    void reportAndGvpbExtensionsUseTheDatabaseClockForFutureBounds() {
+        Instant databaseNow = Instant.now().plusSeconds(3_600);
+        Instant deadlineJustBeforeDatabaseNow = databaseNow.minusSeconds(1);
+        org.mockito.Mockito.doReturn(databaseNow).when(databaseClock).now();
+        Instant currentDeadline = databaseNow.plusSeconds(5 * 24 * 3_600);
+        Instant reportDate = databaseNow.plusSeconds(30 * 24 * 3_600);
+
+        UUID reportRound = insertRound("Esc Round Report Clock", "REGISTRATION_CLOSED",
+                currentDeadline, reportDate);
+        assertThatThrownBy(() -> mutations.extendReportDeadline(
+                reportRound, deadlineJustBeforeDatabaseNow, admin()))
+                .isInstanceOfSatisfying(DomainException.class, error -> {
+                    assertThat(error.getDetails()).containsEntry("rule", "REPORT_DEADLINE_NOT_FUTURE");
+                });
+
+        UUID gvpbRound = insertRound("Esc Round GVPB Clock", "REGISTRATION_CLOSED",
+                currentDeadline, reportDate);
+        assertThatThrownBy(() -> mutations.extendGvpbDeadline(
+                gvpbRound, deadlineJustBeforeDatabaseNow, "reason", admin()))
+                .isInstanceOfSatisfying(DomainException.class, error -> {
+                    assertThat(error.getDetails()).containsEntry("rule", "GVPB_DEADLINE_NOT_FUTURE");
+                });
     }
 
     @Test
@@ -655,6 +756,9 @@ class ThesisCouncilEscapeHatchTest {
         Instant now = Instant.now();
         UUID roundId = insertRound("Esc Round Late Topic", "REGISTRATION_OPEN",
                 now.plusSeconds(86_400), now.plusSeconds(5 * 86_400));
+        jdbc.update(
+                "UPDATE thesis.thesis_registration_round SET registration_start = ?, registration_end = ? WHERE id = ?",
+                Timestamp.from(now.minusSeconds(3_600)), Timestamp.from(now.plusSeconds(6 * 3_600)), roundId);
         ensureLecturer("esc-lt-supervisor");
         var request = new io.campuscore.restfulapi.thesis.dto.ThesisMutationDtos.LateTopicRequest(
                 "department-demo", "Esc Late Topic", "Late topic description",
@@ -681,6 +785,29 @@ class ThesisCouncilEscapeHatchTest {
         ensureLecturer("esc-lt-lecturer");
         assertThatThrownBy(() -> mutations.createLateTopic(roundId, request, lecturer("esc-lt-lecturer")))
                 .isInstanceOf(DomainException.class);
+    }
+
+    @Test
+    void lateTopicCannotBeCreatedAfterStudentRegistrationEnds() {
+        Instant now = Instant.now();
+        UUID roundId = insertRound("Esc Round Late Topic Expired", "REGISTRATION_OPEN",
+                now.minusSeconds(6 * 86_400), now.minusSeconds(5 * 86_400));
+        Instant registrationEnd = jdbc.queryForObject(
+                "SELECT registration_end FROM thesis.thesis_registration_round WHERE id = ?",
+                (rs, row) -> rs.getTimestamp(1).toInstant(), roundId);
+        ensureLecturer("esc-lt-expired-supervisor");
+        var request = new io.campuscore.restfulapi.thesis.dto.ThesisMutationDtos.LateTopicRequest(
+                "department-demo", "Esc Expired Late Topic", "Late topic description",
+                2, "esc-lt-expired-supervisor", "supervisor missed the window");
+
+        assertThatThrownBy(() -> mutations.createLateTopic(roundId, request, admin()))
+                .isInstanceOfSatisfying(DomainException.class, error -> {
+                    assertThat(error.getCode()).isEqualTo("REGISTRATION_WINDOW_CLOSED");
+                    assertThat(error.getDetails()).containsEntry("registrationEnd", registrationEnd.toString());
+                });
+        assertThat(jdbc.queryForObject(
+                "SELECT COUNT(*) FROM thesis.thesis_topic WHERE round_id = ? AND title = ?",
+                Integer.class, roundId, "Esc Expired Late Topic")).isZero();
     }
 
     @Test

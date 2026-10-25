@@ -7,6 +7,7 @@ import io.campuscore.restfulapi.thesis.model.TopicStatus;
 import io.campuscore.restfulapi.exception.DomainException;
 import io.campuscore.restfulapi.thesis.dto.CouncilMember;
 import io.campuscore.restfulapi.thesis.dto.CouncilResponse;
+import io.campuscore.restfulapi.thesis.dto.ScoreBreakdownResponse;
 import io.campuscore.restfulapi.thesis.dto.ScoreComment;
 import io.campuscore.restfulapi.thesis.dto.ScoreResponse;
 import io.campuscore.restfulapi.thesis.dto.StudentResultRow;
@@ -31,6 +32,7 @@ import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 import org.springframework.util.StringUtils;
 import io.campuscore.restfulapi.thesis.scope.ThesisDeanScope;
+import io.campuscore.restfulapi.thesis.scope.ThesisDepartmentScope;
 
 /**
  * Defense councils and component scoring (brief R6–R9): councils of three to
@@ -928,6 +930,308 @@ public class ThesisCouncilService {
     }
 
     /**
+     * Per-topic score transparency read model: which lecturers graded, under
+     * which role, with what score and comment; the equal-weighted average
+     * computed with the exact finalize filter and rounding; the frozen final
+     * score and its finalizer; and the named eligible graders who have not
+     * submitted yet.
+     *
+     * <p>Visibility is decided by the caller's relation to the topic, in this
+     * order: global admins, the topic faculty's dean, the topic department's
+     * head, the grading council's members, and the assigned counter-reviewer
+     * read the full breakdown at any time. Supervisors of the topic read it
+     * only once the round published results. A student who belongs to the
+     * approved group bound to the topic reads, after publication only, the
+     * average, the grader count, and the graders' names and roles — never a
+     * per-person score, comment, or the finalizer. Everyone else gets the
+     * same refusal the score list uses, and a hidden topic stays concealed
+     * under the topic-read rule.
+     *
+     * @param topicId topic whose graders and average are read
+     * @param actor caller JWT
+     * @return the assembled breakdown; never null
+     * @throws DomainException with code TOPIC_NOT_FOUND for unknown or
+     *         concealed topics, RESULTS_NOT_PUBLISHED for a supervisor or
+     *         participant asking before publication, or
+     *         COUNCIL_SCORE_ACCESS_REQUIRED for every other caller
+     */
+    @Transactional(readOnly = true)
+    public ScoreBreakdownResponse scoreBreakdown(UUID topicId, Jwt actor) {
+        if (actor == null) {
+            throw new DomainException(HttpStatus.UNAUTHORIZED, "UNAUTHENTICATED",
+                    "Authentication is required");
+        }
+        Map<String, Object> topic = one(
+                "SELECT t.id, t.round_id, t.department_id, t.status, t.created_by, "
+                        + "t.final_score, t.final_score_finalized_by, t.final_score_finalized_at, "
+                        + "t.result_status, t.gvpb_lecturer_id, t.gvpb_waived_reason, "
+                        + "r.status AS round_status, r.thesis_type, r.gvpb_deadline "
+                        + "FROM thesis.thesis_topic t "
+                        + "JOIN thesis.thesis_registration_round r ON r.id = t.round_id "
+                        + "WHERE t.id = :topicId",
+                params().addValue("topicId", topicId), "TOPIC_NOT_FOUND", "Thesis topic not found");
+        String topicStatus = (String) topic.get("status");
+        String departmentId = (String) topic.get("department_id");
+        String gvpbLecturerId = (String) topic.get("gvpb_lecturer_id");
+        boolean roundPublished = RoundStatus.RESULTS_PUBLISHED.name().equals(topic.get("round_status"))
+                || RoundStatus.CLOSED.name().equals(topic.get("round_status"));
+
+        List<String> roles = actor.getClaimAsStringList("roles");
+        String callerLecturerId = normalize(actor.getClaimAsString("lecturerId"));
+        String callerStudentId = normalize(actor.getClaimAsString("studentId"));
+
+        Map<String, Object> council = jdbc.query(
+                "SELECT ct.council_id, c.name FROM thesis.thesis_council_topic ct "
+                        + "JOIN thesis.thesis_council c ON c.id = ct.council_id "
+                        + "WHERE ct.topic_id = :topicId",
+                params().addValue("topicId", topicId),
+                (rs, ignored) -> Map.<String, Object>of(
+                        "council_id", rs.getObject("council_id", UUID.class),
+                        "name", rs.getString("name") == null ? "" : rs.getString("name")))
+                .stream().findFirst().orElse(null);
+        UUID councilId = council == null ? null : (UUID) council.get("council_id");
+        String councilName = council == null ? null : (String) council.get("name");
+
+        // --- caller clearance, ordered by the Team Lead's matrix ---
+        boolean globalAdmin = roles != null
+                && (roles.contains("ADMIN") || roles.contains("SUPER_ADMIN"));
+        String deanFacultyId = ThesisDeanScope.isFacultyHead(actor)
+                ? ThesisDeanScope.facultyId(scope, actor) : null;
+        Integer topicsInDeanFaculty = deanFacultyId == null ? 0
+                : scope.countTopicInFaculty(topicId, deanFacultyId);
+        boolean deanOfTopicFaculty = topicsInDeanFaculty != null && topicsInDeanFaculty > 0;
+        boolean deptHeadOwns = ThesisDepartmentScope.owns(scope, actor, departmentId);
+        boolean councilMember = councilId != null && !callerLecturerId.isEmpty()
+                && hasMember(councilId, callerLecturerId);
+        boolean assignedReviewer = gvpbLecturerId != null && gvpbLecturerId.equals(callerLecturerId);
+        boolean supervisor = isTopicSupervisor(topicId, callerLecturerId);
+        boolean participant = !callerStudentId.isEmpty()
+                && scope.findParticipatedTopicIds(callerStudentId, List.of(topicId)).contains(topicId);
+        boolean owner = topic.get("created_by") != null
+                && (topic.get("created_by").equals(subject(actor))
+                        || topic.get("created_by").equals(callerLecturerId));
+
+        // Concealment mirrors ThesisTopicService.get: a hidden topic 404s for
+        // everyone but its owner and scoped governance staff.
+        boolean hidden = !TopicStatus.PUBLISHED.name().equals(topicStatus)
+                && !TopicStatus.APPROVED.name().equals(topicStatus);
+        if (hidden && !globalAdmin && !deptHeadOwns && !owner
+                && !ThesisDeanScope.canAccessTopic(scope, actor, topicId, departmentId)) {
+            throw notFound("TOPIC_NOT_FOUND", "Thesis topic not found");
+        }
+        boolean staffView = globalAdmin || deanOfTopicFaculty || deptHeadOwns
+                || councilMember || assignedReviewer;
+        boolean fullView;
+        if (staffView) {
+            fullView = true;
+        } else if (supervisor) {
+            if (!roundPublished) {
+                throw conflict("RESULTS_NOT_PUBLISHED",
+                        "Results for this round have not been published yet");
+            }
+            fullView = true;
+        } else if (participant) {
+            if (!roundPublished) {
+                throw conflict("RESULTS_NOT_PUBLISHED",
+                        "Results for this round have not been published yet");
+            }
+            fullView = false;
+        } else {
+            throw new DomainException(HttpStatus.FORBIDDEN, "COUNCIL_SCORE_ACCESS_REQUIRED",
+                    "Only council members or governance staff can read topic scores");
+        }
+
+        // --- assembly ---
+        List<Map<String, Object>> members = councilId == null ? List.of() : jdbc.query(
+                "SELECT m.lecturer_id, m.member_role FROM thesis.thesis_council_member m "
+                        + "WHERE m.council_id = :councilId "
+                        + "ORDER BY CASE m.member_role WHEN 'CHAIR' THEN 0 WHEN 'SECRETARY' THEN 1 ELSE 2 END, "
+                        + "m.created_at, m.lecturer_id",
+                params().addValue("councilId", councilId),
+                (rs, ignored) -> Map.<String, Object>of(
+                        "lecturer_id", rs.getString("lecturer_id"),
+                        "member_role", rs.getString("member_role")));
+        Map<String, String> seatRole = new LinkedHashMap<>();
+        for (Map<String, Object> member : members) {
+            seatRole.put((String) member.get("lecturer_id"),
+                    (String) member.get("member_role"));
+        }
+        List<Map<String, Object>> scoreRows = jdbc.query(
+                "SELECT s.id, s.lecturer_id, s.component, s.score, s.comment, s.graded_at "
+                        + "FROM thesis.thesis_topic_score s WHERE s.topic_id = :topicId "
+                        + "ORDER BY s.graded_at, s.created_at, s.id",
+                params().addValue("topicId", topicId),
+                (rs, ignored) -> {
+                    Map<String, Object> row = new LinkedHashMap<>();
+                    row.put("id", rs.getObject("id", UUID.class));
+                    row.put("lecturer_id", rs.getString("lecturer_id"));
+                    row.put("component", rs.getString("component"));
+                    row.put("score", rs.getBigDecimal("score"));
+                    row.put("comment", rs.getString("comment"));
+                    row.put("graded_at", instantOf(rs.getObject("graded_at")));
+                    return row;
+                });
+        // The id/score pairs the finalize arithmetic would consume — same
+        // clause, so the reported average is what a chair's finalize writes.
+        List<Map<String, Object>> eligibleRows = councilId == null ? List.of() : jdbc.query(
+                "SELECT s.id, s.score FROM thesis.thesis_topic_score s " + eligibleDefenseScoreClause(),
+                params().addValue("councilId", councilId).addValue("topicId", topicId)
+                        .addValue("component", SCORE_COMPONENT),
+                (rs, ignored) -> Map.<String, Object>of(
+                        "id", rs.getObject("id", UUID.class),
+                        "score", rs.getBigDecimal("score")));
+        java.util.Set<UUID> countedIds = new java.util.HashSet<>();
+        for (Map<String, Object> row : eligibleRows) {
+            countedIds.add((UUID) row.get("id"));
+        }
+        BigDecimal average = eligibleRows.isEmpty() ? null : eligibleRows.stream()
+                .map(row -> (BigDecimal) row.get("score"))
+                .reduce(BigDecimal.ZERO, BigDecimal::add)
+                .divide(BigDecimal.valueOf(eligibleRows.size()), 2, RoundingMode.HALF_UP);
+
+        // The graders finalize still expects: active, non-supervisor members —
+        // the same predicates eligibleGraderCount applies.
+        List<Map<String, Object>> expected = councilId == null ? List.of() : jdbc.query(
+                "SELECT m.lecturer_id, m.member_role FROM thesis.thesis_council_member m "
+                        + "WHERE m.council_id = :councilId "
+                        + activeMemberClause("m.lecturer_id")
+                        + "AND NOT EXISTS ("
+                        + "  SELECT 1 FROM thesis.thesis_topic_supervisor sup "
+                        + "  JOIN campuscore_auth.\"Lecturer\" l "
+                        + "    ON (l.\"id\" = m.lecturer_id OR l.\"userId\" = m.lecturer_id) "
+                        + "   AND (sup.lecturer_id = l.\"id\" OR sup.lecturer_id = l.\"userId\") "
+                        + "  WHERE sup.topic_id = :topicId"
+                        + ") "
+                        + "ORDER BY CASE m.member_role WHEN 'CHAIR' THEN 0 WHEN 'SECRETARY' THEN 1 ELSE 2 END, "
+                        + "m.created_at, m.lecturer_id",
+                params().addValue("councilId", councilId).addValue("topicId", topicId),
+                (rs, ignored) -> Map.<String, Object>of(
+                        "lecturer_id", rs.getString("lecturer_id"),
+                        "member_role", rs.getString("member_role")));
+
+        RoundType roundType = null;
+        String roundTypeStr = (String) topic.get("thesis_type");
+        if (roundTypeStr != null) {
+            try {
+                roundType = RoundType.valueOf(roundTypeStr);
+            } catch (IllegalArgumentException ignored) {
+                roundType = null;
+            }
+        }
+        boolean waived = topic.get("gvpb_waived_reason") != null;
+        boolean requiresGvpb = !waived
+                && ((roundType != null && roundType.requiresGvpbDeadline()
+                        && topic.get("gvpb_deadline") != null)
+                || gvpbLecturerId != null);
+        Map<String, Object> gvpbRow = scoreRows.stream()
+                .filter(row -> GVPB_COMPONENT.equals(row.get("component")))
+                .findFirst().orElse(null);
+        boolean gvpbOutstanding = requiresGvpb && gvpbRow == null;
+
+        List<String> nameKeys = new java.util.ArrayList<>();
+        for (Map<String, Object> row : scoreRows) {
+            nameKeys.add((String) row.get("lecturer_id"));
+        }
+        for (Map<String, Object> member : members) {
+            nameKeys.add((String) member.get("lecturer_id"));
+        }
+        if (gvpbLecturerId != null) {
+            nameKeys.add(gvpbLecturerId);
+        }
+        Map<String, String> names = scope.findLecturerDisplayNames(nameKeys);
+
+        // Graders in council seat order (chair, secretary, members), then any
+        // defense scorer outside the roster, then the counter-review row.
+        List<ScoreBreakdownResponse.ScoreBreakdownGrader> graders = new java.util.ArrayList<>();
+        java.util.Set<String> emitted = new java.util.HashSet<>();
+        for (Map<String, Object> member : members) {
+            String memberId = (String) member.get("lecturer_id");
+            scoreRows.stream()
+                    .filter(row -> SCORE_COMPONENT.equals(row.get("component"))
+                            && memberId.equals(row.get("lecturer_id")))
+                    .forEach(row -> {
+                        emitted.add(((UUID) row.get("id")).toString());
+                        graders.add(new ScoreBreakdownResponse.ScoreBreakdownGrader(
+                                memberId, names.get(memberId),
+                                (String) member.get("member_role"),
+                                (BigDecimal) row.get("score"), (String) row.get("comment"),
+                                (Instant) row.get("graded_at"),
+                                countedIds.contains((UUID) row.get("id"))));
+                    });
+        }
+        for (Map<String, Object> row : scoreRows) {
+            String rowId = ((UUID) row.get("id")).toString();
+            if (emitted.contains(rowId)) {
+                continue;
+            }
+            emitted.add(rowId);
+            String scorer = (String) row.get("lecturer_id");
+            boolean defense = SCORE_COMPONENT.equals(row.get("component"));
+            graders.add(new ScoreBreakdownResponse.ScoreBreakdownGrader(
+                    scorer, names.get(scorer),
+                    defense ? seatRole.getOrDefault(scorer, "MEMBER") : "GVPB_REVIEWER",
+                    (BigDecimal) row.get("score"), (String) row.get("comment"),
+                    (Instant) row.get("graded_at"),
+                    countedIds.contains((UUID) row.get("id"))));
+        }
+
+        java.util.Set<String> scoredMemberIds = new java.util.HashSet<>();
+        for (Map<String, Object> row : scoreRows) {
+            if (SCORE_COMPONENT.equals(row.get("component"))) {
+                scoredMemberIds.add((String) row.get("lecturer_id"));
+            }
+        }
+        List<ScoreBreakdownResponse.ScoreBreakdownPendingGrader> pending = new java.util.ArrayList<>();
+        for (Map<String, Object> member : expected) {
+            String memberId = (String) member.get("lecturer_id");
+            if (!scoredMemberIds.contains(memberId)) {
+                pending.add(new ScoreBreakdownResponse.ScoreBreakdownPendingGrader(
+                        memberId, names.get(memberId), (String) member.get("member_role")));
+            }
+        }
+        if (gvpbOutstanding && gvpbLecturerId != null) {
+            pending.add(new ScoreBreakdownResponse.ScoreBreakdownPendingGrader(
+                    gvpbLecturerId, names.get(gvpbLecturerId), "GVPB_REVIEWER"));
+        }
+        boolean complete = expected.size() >= MIN_COUNCIL_SIZE
+                && pending.isEmpty() && !gvpbOutstanding;
+
+        if (!fullView) {
+            // Participant students keep the average, count, names and roles —
+            // never a per-person score, comment, timestamp, or the finalizer.
+            List<ScoreBreakdownResponse.ScoreBreakdownGrader> redacted = graders.stream()
+                    .map(grader -> new ScoreBreakdownResponse.ScoreBreakdownGrader(
+                            grader.lecturerId(), grader.displayName(), grader.role(),
+                            null, null, null, null))
+                    .toList();
+            return new ScoreBreakdownResponse(topicId, councilId, councilName,
+                    average, redacted.size(), complete,
+                    (BigDecimal) topic.get("final_score"), null, null,
+                    (String) topic.get("result_status"), redacted, List.of());
+        }
+        return new ScoreBreakdownResponse(topicId, councilId, councilName,
+                average, graders.size(), complete,
+                (BigDecimal) topic.get("final_score"),
+                (String) topic.get("final_score_finalized_by"),
+                instantOf(topic.get("final_score_finalized_at")),
+                (String) topic.get("result_status"), graders, pending);
+    }
+
+    /** Non-throwing twin of {@link #requireNotSupervisor} for read visibility. */
+    private boolean isTopicSupervisor(UUID topicId, String lecturerId) {
+        if (lecturerId == null || lecturerId.isEmpty()) {
+            return false;
+        }
+        return count(
+                "SELECT COUNT(*) FROM thesis.thesis_topic_supervisor sup "
+                        + "JOIN campuscore_auth.\"Lecturer\" l "
+                        + "  ON (l.\"id\" = :lecturerId OR l.\"userId\" = :lecturerId) "
+                        + " AND (sup.lecturer_id = l.\"id\" OR sup.lecturer_id = l.\"userId\") "
+                        + "WHERE sup.topic_id = :topicId",
+                params().addValue("topicId", topicId).addValue("lecturerId", lecturerId)) > 0;
+    }
+
+    /**
      * Freezes a topic's defense result as the equal-weighted average of the eligible member
      * scores. The update is guarded by {@code final_score IS NULL}, so a concurrent finalize
      * loses instead of double-writing.
@@ -1008,18 +1312,7 @@ public class ThesisCouncilService {
             }
         }
         List<BigDecimal> scores = jdbc.queryForList(
-                "SELECT s.score FROM thesis.thesis_topic_score s "
-                        + "JOIN thesis.thesis_council_member m "
-                        + "  ON m.council_id = s.council_id AND m.lecturer_id = s.lecturer_id "
-                        + "WHERE s.council_id = :councilId AND s.topic_id = :topicId AND s.component = :component "
-                        + activeMemberClause("s.lecturer_id")
-                        + "AND NOT EXISTS ("
-                        + "  SELECT 1 FROM thesis.thesis_topic_supervisor sup "
-                        + "  JOIN campuscore_auth.\"Lecturer\" l "
-                        + "    ON (l.\"id\" = s.lecturer_id OR l.\"userId\" = s.lecturer_id) "
-                        + "   AND (sup.lecturer_id = l.\"id\" OR sup.lecturer_id = l.\"userId\") "
-                        + "  WHERE sup.topic_id = :topicId"
-                        + ")",
+                "SELECT s.score FROM thesis.thesis_topic_score s " + eligibleDefenseScoreClause(),
                 params().addValue("councilId", councilId).addValue("topicId", topicId)
                         .addValue("component", SCORE_COMPONENT), BigDecimal.class);
         if (scores.isEmpty()) {
@@ -1601,6 +1894,27 @@ public class ThesisCouncilService {
         }
         throw new DomainException(HttpStatus.FORBIDDEN, "COUNCIL_SCORE_ACCESS_REQUIRED",
                 "Only council members or governance staff can read topic scores");
+    }
+
+    /**
+     * The exact defense-score filter finalize applies: the score's lecturer
+     * must hold an active profile, sit on the grading council, and not
+     * supervise the topic. {@link #finalizeScores} and the score-breakdown
+     * read model share this clause so the reported average can never drift
+     * from the average a finalize would write.
+     */
+    private static String eligibleDefenseScoreClause() {
+        return "JOIN thesis.thesis_council_member m "
+                + "  ON m.council_id = s.council_id AND m.lecturer_id = s.lecturer_id "
+                + "WHERE s.council_id = :councilId AND s.topic_id = :topicId AND s.component = :component "
+                + activeMemberClause("s.lecturer_id")
+                + "AND NOT EXISTS ("
+                + "  SELECT 1 FROM thesis.thesis_topic_supervisor sup "
+                + "  JOIN campuscore_auth.\"Lecturer\" l "
+                + "    ON (l.\"id\" = s.lecturer_id OR l.\"userId\" = s.lecturer_id) "
+                + "   AND (sup.lecturer_id = l.\"id\" OR sup.lecturer_id = l.\"userId\") "
+                + "  WHERE sup.topic_id = :topicId"
+                + ")";
     }
 
     /**
