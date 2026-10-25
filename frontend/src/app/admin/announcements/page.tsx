@@ -42,6 +42,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
+import { DateTime24Field } from '@/components/ui/date-time-24-field';
 import { Modal } from '@/components/ui/modal';
 import { Select } from '@/components/ui/select';
 import { statusToneClass } from '@/components/ui/status';
@@ -1239,13 +1240,18 @@ export default function AdminAnnouncementsPage() {
                 </AdminFormSection>
 
                 <AdminFormSection title={copy.schedule} description={vi ? 'Bỏ trống ngày kết thúc nếu thông báo không có hạn.' : 'Leave the end date empty when the notice has no expiry.'}>
-                  <div className="grid gap-4 sm:grid-cols-2">
-                    <AdminFormField label={copy.publishAt}>
-                      <Input type="datetime-local" value={draft.publishAt} onChange={(event) => setDraft((current) => ({ ...current, publishAt: event.target.value }))} />
-                    </AdminFormField>
-                    <AdminFormField label={copy.expiresAt} description={!draft.expiresAt ? copy.noEnd : undefined}>
-                      <Input type="datetime-local" value={draft.expiresAt} onChange={(event) => setDraft((current) => ({ ...current, expiresAt: event.target.value }))} />
-                    </AdminFormField>
+                  <div className="grid items-end gap-4 sm:grid-cols-2">
+                    <DateTime24Field
+                      label={copy.publishAt}
+                      value={draft.publishAt}
+                      onChange={(value) => setDraft((current) => ({ ...current, publishAt: value }))}
+                    />
+                    <DateTime24Field
+                      label={copy.expiresAt}
+                      hint={!draft.expiresAt ? copy.noEnd : undefined}
+                      value={draft.expiresAt}
+                      onChange={(value) => setDraft((current) => ({ ...current, expiresAt: value }))}
+                    />
                   </div>
                 </AdminFormSection>
 
