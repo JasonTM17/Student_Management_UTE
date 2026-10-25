@@ -696,15 +696,17 @@ export default function ThesisPage() {
 
   useEffect(() => {
     if (!isSupervisorOrAdmin || !lecturerWorkload || explicitRoundId || hasAutoSelectedRoundRef.current) return;
-    // A cancelled round has frozen grading — it must never be the default a
-    // lecturer lands on, or the workspace looks inert for no visible reason.
+    // A cancelled or archived round must not hijack focus when active rounds exist.
     const withGroups = lecturerWorkload.topics.filter(
       (topic) => topic.groupCount > 0 && topic.roundStatus !== 'CANCELLED',
     );
     if (withGroups.length === 0) return;
     hasAutoSelectedRoundRef.current = true;
     if (withGroups.some((topic) => topic.roundId === selectedRoundId)) return;
-    const target = [...withGroups].sort((a, b) => b.groupCount - a.groupCount)[0].roundId;
+    // Prefer live/active rounds (not CLOSED) before considering archived ones
+    const liveWithGroups = withGroups.filter((topic) => topic.roundStatus !== 'CLOSED');
+    const pool = liveWithGroups.length > 0 ? liveWithGroups : withGroups;
+    const target = [...pool].sort((a, b) => b.groupCount - a.groupCount)[0].roundId;
     if (target && rounds.some((round) => round.id === target)) {
       setSelectedRoundId(target);
     }
