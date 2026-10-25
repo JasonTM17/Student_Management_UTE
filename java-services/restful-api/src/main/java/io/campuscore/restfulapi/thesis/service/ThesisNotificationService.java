@@ -484,6 +484,95 @@ public class ThesisNotificationService {
         return value == null ? "" : value.toString();
     }
 
+    /**
+     * Notifies a lecturer newly named counter-reviewer of a topic. The
+     * assignment carries the round's GVPB deadline, so the message names it
+     * in the same dd/MM/yyyy HH:mm Asia/Bangkok display the workspace uses.
+     */
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public int notifyReviewerAssigned(UUID topicId, String lecturerId) {
+        List<String> userIds = lecturerUserIds(List.of(lecturerId));
+        if (userIds.isEmpty()) {
+            return 0;
+        }
+        return fanOut(userIds, "Bạn được phân công phản biện",
+                "Bạn được phân công phản biện đề tài \"" + topicTitle(topicId) + "\""
+                        + gvpbDeadlineClause(topicId) + ".",
+                "INFO", LECTURER_LINK);
+    }
+
+    /** Notifies a lecturer seated on a defense council. */
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public int notifyCouncilSeated(UUID councilId, String lecturerId, String memberRole) {
+        List<String> userIds = lecturerUserIds(List.of(lecturerId));
+        if (userIds.isEmpty()) {
+            return 0;
+        }
+        String roleLabel = switch (memberRole == null ? "" : memberRole) {
+            case "CHAIR" -> "Chủ tịch";
+            case "SECRETARY" -> "Thư ký";
+            default -> "Thành viên";
+        };
+        return fanOut(userIds, "Bạn được phân công vào hội đồng bảo vệ",
+                "Bạn được phân công vào hội đồng \"" + councilName(councilId)
+                        + "\" vai trò " + roleLabel + ".",
+                "INFO", LECTURER_LINK);
+    }
+
+    /** Notifies every seated member when a topic is bound to their council. */
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public int notifyCouncilTopicAssigned(UUID councilId, UUID topicId) {
+        List<String> lecturerIds = jdbc.queryForList(
+                "SELECT lecturer_id FROM thesis.thesis_council_member WHERE council_id = :councilId",
+                new MapSqlParameterSource("councilId", councilId), String.class);
+        List<String> userIds = lecturerUserIds(lecturerIds);
+        if (userIds.isEmpty()) {
+            return 0;
+        }
+        return fanOut(userIds, "Hội đồng được phân công đề tài",
+                "Hội đồng \"" + councilName(councilId)
+                        + "\" được phân công bảo vệ đề tài \"" + topicTitle(topicId) + "\".",
+                "INFO", LECTURER_LINK);
+    }
+
+    /**
+     * lecturer_id columns may store a Lecturer.id or a legacy User.id —
+     * resolving the profile under both keys keeps legacy-keyed assignments
+     * reachable, matching the guard queries' dual-key convention.
+     */
+    private List<String> lecturerUserIds(List<String> lecturerIds) {
+        if (lecturerIds == null || lecturerIds.isEmpty()) {
+            return List.of();
+        }
+        List<String> userIds = jdbc.queryForList(
+                "SELECT DISTINCT u.\"id\" FROM campuscore_auth.\"Lecturer\" l"
+                        + " JOIN campuscore_auth.\"User\" u ON u.\"id\" = l.\"userId\""
+                        + " WHERE l.\"id\" IN (:lecturerIds) OR l.\"userId\" IN (:lecturerIds)",
+                new MapSqlParameterSource("lecturerIds", lecturerIds), String.class);
+        return userIds == null ? List.of() : userIds;
+    }
+
+    private String gvpbDeadlineClause(UUID topicId) {
+        List<Object> deadlines = jdbc.queryForList(
+                "SELECT r.gvpb_deadline FROM thesis.thesis_topic t"
+                        + " JOIN thesis.thesis_registration_round r ON r.id = t.round_id"
+                        + " WHERE t.id = :topicId",
+                new MapSqlParameterSource("topicId", topicId), Object.class);
+        return deadlines.isEmpty() ? "" : deadlineClause(deadlines.get(0), "Hạn chấm");
+    }
+
+    private String councilName(UUID councilId) {
+        try {
+            String name = jdbc.queryForObject(
+                    "SELECT name FROM thesis.thesis_council WHERE id = :id",
+                    new MapSqlParameterSource("id", councilId), String.class);
+            return name == null ? "" : name;
+        } catch (RuntimeException exception) {
+            log.debug("No council name for {} — notification sent without it", councilId, exception);
+            return "";
+        }
+    }
+
     /** Notifies lecturers newly assigned as supervisors of a topic. */
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public int notifySupervisorsAssigned(UUID topicId, List<String> lecturerIds) {
