@@ -87,7 +87,8 @@ class AuthSessionLockOrderingPostgresIT {
             String sql = invocation.getArgument(0, String.class);
             Object result = invocation.callRealMethod();
             if (Thread.currentThread().getName().equals(adminThread)
-                    && sql.contains("FOR UPDATE") && sql.contains(":userId")) {
+                    && sql.contains("FOR UPDATE")
+                    && (sql.contains(":userId") || sql.contains(":id"))) {
                 // The admin transaction now holds the User row lock. Pause
                 // before it can touch Session rows; a Session-first refresher
                 // would already hold the lock that deadlocks this writer.

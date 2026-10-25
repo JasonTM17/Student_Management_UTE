@@ -57,7 +57,7 @@ class AnnouncementWriteServiceLecturerTest {
                 .thenReturn(Optional.of(announcement("lecturer-2")));
         UpdateAnnouncementRequest request = new UpdateAnnouncementRequest(
                 Set.of("title", "reason", "expectedVersion"), "Updated", null, null, null, null,
-                null, null, null, null, null, null, "Correction", 0);
+                null, null, null, null, null, null, null, "Correction", 0);
 
         assertThrows(DomainException.class, () -> fixture.service.update(
                 "user-1", "Lecturer", List.of("LECTURER"), "lecturer-1", "notice-1", request));
@@ -76,7 +76,7 @@ class AnnouncementWriteServiceLecturerTest {
         when(fixture.announcements.findById("notice-1")).thenReturn(Optional.of(ownAnnouncement));
         UpdateAnnouncementRequest request = new UpdateAnnouncementRequest(
                 Set.of("title", "reason", "expectedVersion"), "Updated", null, null, null, null,
-                null, null, null, null, null, null, "Correction", 0);
+                null, null, null, null, null, null, null, "Correction", 0);
 
         fixture.service.update(
                 "user-1", "Lecturer", List.of("LECTURER"), "lecturer-1", "notice-1", request);
@@ -151,7 +151,7 @@ class AnnouncementWriteServiceLecturerTest {
                 "<a href=\"javascript:alert(1)\">x</a>",
                 "<a href=\"data:text/html;base64,PHNjcmlwdD4=\">x</a>")) {
             CreateAnnouncementRequest request = new CreateAnnouncementRequest(
-                    "Notice", unsafe, "NORMAL", List.of("STUDENT"), List.of(), false,
+                    "Notice", unsafe, "NORMAL", List.of("STUDENT"), List.of(), List.of(), false,
                     null, null, null, null, null);
             DomainException error = assertThrows(DomainException.class, () -> fixture.service.create(
                     "user-1", "Admin", List.of("ADMIN"), null, request), unsafe);
@@ -167,7 +167,7 @@ class AnnouncementWriteServiceLecturerTest {
                 "Notice",
                 "<p>Học phần <strong>tiên quyết</strong></p>"
                         + "<img src=\"data:image/png;base64,iVBORw0KGgo=\" alt=\"sơ đồ\">",
-                "NORMAL", List.of("STUDENT"), List.of(), false, null, null, null, null, null);
+                "NORMAL", List.of("STUDENT"), List.of(), List.of(), false, null, null, null, null, null);
 
         fixture.service.create("user-1", "Admin", List.of("ADMIN"), null, request);
 
@@ -175,7 +175,7 @@ class AnnouncementWriteServiceLecturerTest {
     }
 
     private static CreateAnnouncementRequest createRequest(List<String> roles, boolean global, String sectionId) {
-        return new CreateAnnouncementRequest("Notice", "Content", "NORMAL", roles, List.of(), global,
+        return new CreateAnnouncementRequest("Notice", "Content", "NORMAL", roles, List.of(), List.of(), global,
                 null, null, null, sectionId, null);
     }
 
@@ -191,7 +191,7 @@ class AnnouncementWriteServiceLecturerTest {
     private static AnnouncementResponse announcement(String lecturerId) {
         Instant now = Instant.parse("2026-09-10T00:00:00Z");
         return new AnnouncementResponse("notice-1", "Notice", "Content", "NORMAL", List.of("STUDENT"),
-                List.of(), false, null, null, "user-1", null, null, "section-1",
+                List.of(), List.of(), false, null, null, "user-1", null, null, "section-1",
                 null, null, null, lecturerId, null, now, now, 0, null, null, null, null, null);
     }
 

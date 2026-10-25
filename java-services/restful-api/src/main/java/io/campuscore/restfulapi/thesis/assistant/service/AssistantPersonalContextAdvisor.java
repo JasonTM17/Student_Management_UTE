@@ -2372,7 +2372,8 @@ public class AssistantPersonalContextAdvisor {
                 .filter(item -> ACTIVE_ENROLLMENT_STATUSES.contains(item.status()))
                 .toList();
         List<EnrollmentResponse> pending = active.stream()
-                .filter(item -> !"PUBLISHED".equalsIgnoreCase(item.gradeStatus()))
+                .filter(item -> !"PUBLISHED".equalsIgnoreCase(item.gradeStatus())
+                        && !"APPEALED".equalsIgnoreCase(item.gradeStatus()))
                 .toList();
         if (active.isEmpty()) {
             return vi

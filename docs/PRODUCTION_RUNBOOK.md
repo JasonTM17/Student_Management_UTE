@@ -72,6 +72,15 @@ synchronized standby. Current cutover evidence, quota limits and the untested
 reverse-migration gate are recorded in [deployment.md](deployment.md#cutover-database-supabase--neon-free-singapore--15102026-utc).
 Adapted preflight for data-touching migrations:
 
+V147 adds the grade-appeal workflow and starts a one-time grace window for
+grades already `PUBLISHED` or `APPEALED`: rows whose `gradePublishedAt` is
+NULL receive the V147 migration execution time. Set `GRADE_APPEAL_WINDOW_DAYS`
+on the backend (default `7`) before rollout. Tell students that grades
+published before this feature receive a fresh window beginning at V147 release.
+The backfill updates only NULL timestamps, so a retry does not extend a window
+that has already started. New publication and republishing use the transaction's
+publication timestamp; unpublishing clears it.
+
 1. **Snapshot before apply.** When a pushed migration contains `INSERT`,
    `UPDATE`, `DELETE`, or trigger `DISABLE` blocks (seed/repair files, not pure
    DDL), take a backup of the active Neon production database first, using

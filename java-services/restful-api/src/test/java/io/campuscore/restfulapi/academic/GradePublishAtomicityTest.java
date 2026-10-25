@@ -48,7 +48,7 @@ class GradePublishAtomicityTest {
         jdbc.execute("CREATE SCHEMA IF NOT EXISTS notifications");
         jdbc.execute("CREATE TABLE IF NOT EXISTS \"academic\".\"Section\" (\"id\" VARCHAR PRIMARY KEY, \"semesterId\" VARCHAR, \"capacity\" INT, \"enrolledCount\" INT, \"status\" VARCHAR)");
         jdbc.execute("CREATE TABLE IF NOT EXISTS \"academic\".\"Student\" (\"id\" VARCHAR PRIMARY KEY, \"userId\" VARCHAR)");
-        jdbc.execute("CREATE TABLE IF NOT EXISTS \"academic\".\"Enrollment\" (\"id\" VARCHAR PRIMARY KEY, \"studentId\" VARCHAR, \"sectionId\" VARCHAR, \"status\" VARCHAR, \"gradeStatus\" VARCHAR, \"finalGrade\" DECIMAL, \"letterGrade\" VARCHAR, \"updatedAt\" TIMESTAMP)");
+        jdbc.execute("CREATE TABLE IF NOT EXISTS \"academic\".\"Enrollment\" (\"id\" VARCHAR PRIMARY KEY, \"studentId\" VARCHAR, \"sectionId\" VARCHAR, \"status\" VARCHAR, \"gradeStatus\" VARCHAR, \"finalGrade\" DECIMAL, \"letterGrade\" VARCHAR, \"updatedAt\" TIMESTAMP, \"gradePublishedAt\" TIMESTAMP)");
         jdbc.execute("CREATE TABLE IF NOT EXISTS \"academic\".\"GradeItem\" (\"id\" VARCHAR PRIMARY KEY, \"type\" VARCHAR, \"sectionId\" VARCHAR, \"name\" VARCHAR, \"maxScore\" DECIMAL, \"weight\" DECIMAL, \"gradedAt\" TIMESTAMP)");
         jdbc.execute("CREATE TABLE IF NOT EXISTS \"academic\".\"StudentGrade\" (\"id\" VARCHAR PRIMARY KEY, \"enrollmentId\" VARCHAR, \"gradeItemId\" VARCHAR, \"score\" DECIMAL)");
         jdbc.execute("CREATE TABLE IF NOT EXISTS notifications.notification (id VARCHAR PRIMARY KEY, user_id VARCHAR, title VARCHAR, message VARCHAR, type VARCHAR, link VARCHAR, announcement_id VARCHAR(120), source_key VARCHAR(160), is_read BOOLEAN, read_at TIMESTAMP, created_at TIMESTAMP, updated_at TIMESTAMP)");
@@ -58,7 +58,7 @@ class GradePublishAtomicityTest {
         jdbc.execute("DELETE FROM notifications.notification");
         jdbc.execute("INSERT INTO \"academic\".\"Section\" VALUES ('section', 'semester', 30, 1, 'ACTIVE')");
         jdbc.execute("INSERT INTO \"academic\".\"Student\" VALUES ('student', 'student-user')");
-        jdbc.execute("INSERT INTO \"academic\".\"Enrollment\" VALUES ('enrollment', 'student', 'section', 'ENROLLED', 'DRAFT', 8, 'B+', CURRENT_TIMESTAMP)");
+        jdbc.execute("INSERT INTO \"academic\".\"Enrollment\" (\"id\", \"studentId\", \"sectionId\", \"status\", \"gradeStatus\", \"finalGrade\", \"letterGrade\", \"updatedAt\") VALUES ('enrollment', 'student', 'section', 'ENROLLED', 'DRAFT', 8, 'B+', CURRENT_TIMESTAMP)");
         jdbc.execute("INSERT INTO \"academic\".\"GradeItem\" (\"id\", \"type\") VALUES ('process', 'PROCESS'), ('final', 'FINAL')");
         jdbc.execute("INSERT INTO \"academic\".\"StudentGrade\" VALUES ('p', 'enrollment', 'process', 8), ('f', 'enrollment', 'final', 8)");
     }
@@ -84,6 +84,28 @@ class GradePublishAtomicityTest {
         assertThatThrownBy(() -> service.publishGrades("section", null, true, null))
                 .hasMessageContaining("No complete grades");
         assertThat(inboxCount()).isEqualTo(1);
+    }
+
+    @Test
+    void publicationDoesNotNotifyStudentsWhoseGradesAreAlreadyAppealed() {
+        jdbc.update("UPDATE \"academic\".\"Enrollment\" SET \"status\" = 'COMPLETED', \"gradeStatus\" = 'APPEALED'"
+                + " WHERE \"id\" = 'enrollment'");
+        jdbc.update("INSERT INTO \"academic\".\"Student\" VALUES ('student-draft', 'draft-user')");
+        jdbc.update("INSERT INTO \"academic\".\"Enrollment\" (\"id\", \"studentId\", \"sectionId\", \"status\", \"gradeStatus\", \"finalGrade\", \"letterGrade\", \"updatedAt\") VALUES"
+                + " ('enrollment-draft', 'student-draft', 'section', 'ENROLLED', 'DRAFT', 7, 'B', CURRENT_TIMESTAMP)");
+        jdbc.update("INSERT INTO \"academic\".\"StudentGrade\" VALUES"
+                + " ('p-draft', 'enrollment-draft', 'process', 7), ('f-draft', 'enrollment-draft', 'final', 7)");
+
+        service.publishGrades("section", null, true, null);
+
+        assertThat(jdbc.queryForList("SELECT user_id FROM notifications.notification", String.class))
+                .containsExactly("draft-user");
+        assertThat(jdbc.queryForObject(
+                "SELECT \"gradeStatus\" FROM \"academic\".\"Enrollment\" WHERE \"id\" = 'enrollment'",
+                String.class)).isEqualTo("APPEALED");
+        assertThat(jdbc.queryForObject(
+                "SELECT \"gradeStatus\" FROM \"academic\".\"Enrollment\" WHERE \"id\" = 'enrollment-draft'",
+                String.class)).isEqualTo("PUBLISHED");
     }
 
     private int inboxCount() {

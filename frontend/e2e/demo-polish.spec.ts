@@ -335,6 +335,8 @@ async function mockStudent(page: Page, singleTerm = false, overrides: Record<str
         semesterOpen: false, windowStart: null, windowEnd: null, open: false,
       },
       '/api/v1/me/registration/withdrawal-applications': [],
+      '/api/v1/me/grade-appeals': [],
+      '/api/v1/me/grade-appeals/eligibility': { eligible: false, remainingAppeals: 0, windowOpen: false },
       '/api/v1/me/registration/sections': [
         {
           id: 'section-se101-01', sectionNumber: '01', courseId: 'course-se101',
@@ -367,6 +369,13 @@ async function mockStudent(page: Page, singleTerm = false, overrides: Record<str
           nameEn: 'Demo curriculum', nameVi: 'Chương trình mô phỏng', totalCredits: 9,
         },
         courses: singleTerm ? curriculumCourses.slice(0, 1) : curriculumCourses,
+      },
+      // The register page mounts the curriculum plan block; an UNKNOWN term
+      // keeps it inert for the schedule/registration polish checks.
+      '/api/v1/me/registration/curriculum-plan': {
+        semesterId: 'term-demo', semesterName: 'Demo term',
+        registrationRoundId: null, registrationOpen: false,
+        term: { status: 'UNKNOWN', reasonCode: 'NO_CURRICULUM_TERM' }, courses: [],
       },
       '/api/v1/thesis/rounds': [thesisRound],
       '/api/v1/thesis/topics': [thesisTopic],

@@ -24,21 +24,26 @@ test('thesis API mirrors the backend eligibility read model', () => {
 
 test('student thesis page renders the eligibility card and gates create', () => {
   const page = read('src/app/dashboard/thesis/page.tsx');
+  const banner = read('src/components/thesis/ThesisEligibilityBanner.tsx');
 
   // The card is a status region (not colour-only) fed by the round's
-  // caller-scoped eligibility; the create affordance disappears when the
-  // caller is ineligible instead of firing a doomed POST — but only while
-  // enforcement is on. In ADVISORY the card warns and create stays offered.
-  assert.match(page, /role="status"/);
-  assert.match(page, /eligibility\.eligible \?/);
-  assert.match(page, /eligibilityTitle/);
-  assert.match(page, /eligibilityCredits/);
-  assert.match(page, /eligibilityCpa/);
-  assert.match(page, /eligibilityAction/);
+  // caller-scoped eligibility; the shared banner component renders it on the
+  // workspace list and the student round detail page.
+  assert.match(banner, /role="status"/);
+  assert.match(banner, /eligibility\.eligible \?/);
+  assert.match(banner, /eligibilityTitle/);
+  assert.match(banner, /eligibilityCredits/);
+  assert.match(banner, /eligibilityCpa/);
+  assert.match(banner, /eligibilityAction/);
+  assert.match(banner, /href="\/dashboard\/register"/);
+  assert.match(page, /<ThesisEligibilityBanner eligibility=\{selectedRound\.eligibility\}/);
+
+  // The create affordance disappears when the caller is ineligible instead of
+  // firing a doomed POST — but only while enforcement is on. In ADVISORY the
+  // card warns and create stays offered.
   assert.match(page, /eligibility\?\.eligible === false/);
   assert.match(page, /eligibility\?\.enforced === true/);
   assert.doesNotMatch(page, /eligibility\?\.eligible !== false/);
-  assert.match(page, /href="\/dashboard\/register"/);
 });
 
 test('member lists flag ineligible members with a text chip', () => {

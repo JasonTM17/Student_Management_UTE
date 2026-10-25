@@ -94,8 +94,7 @@ public class AdminAnalyticsRepository {
         return jdbc.query("""
                 SELECT s."name" AS name,
                        COUNT(e."id") AS enrollments,
-                       SUM(CASE WHEN e."status" = 'COMPLETED'
-                                  OR e."gradeStatus" IN ('PUBLISHED', 'APPEALED')
+                       SUM(CASE WHEN e."gradeStatus" IN ('PUBLISHED', 'APPEALED')
                                 THEN 1 ELSE 0 END) AS gradedEnrollments,
                        COUNT(DISTINCT e."studentId") AS activeStudents
                 FROM academic."Semester" s
@@ -120,12 +119,14 @@ public class AdminAnalyticsRepository {
                 """, FACULTY_RANK_MAPPER);
     }
 
-    /** Graded enrollment counts per letter band, canonical order first then legacy letters. */
+    /** Official non-withdrawn grade counts per letter band, canonical order first then legacy letters. */
     public List<GradeDistributionEntry> gradeDistribution() {
         List<GradeDistributionEntry> rows = jdbc.query("""
                 SELECT "letterGrade" AS grade, COUNT(*) AS count
                 FROM academic."Enrollment"
-                WHERE "letterGrade" IS NOT NULL AND "letterGrade" <> 'W'
+                WHERE "gradeStatus" IN ('PUBLISHED', 'APPEALED')
+                    AND "status" <> 'WITHDRAWN'
+                    AND "letterGrade" IS NOT NULL AND "letterGrade" <> 'W'
                 GROUP BY "letterGrade"
                 """, GRADE_MAPPER);
         return rows.stream()

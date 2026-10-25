@@ -33,7 +33,7 @@ public class AnnouncementReadRepository {
 
     private static final String TABLE = "\"engagement\".\"Announcement\"";
     private static final String SELECT_COLUMNS = """
-            "id", "title", "content", "priority", "targetRoles", "targetYears",
+            "id", "title", "content", "priority", "targetRoles", "targetYears", "targetDepartments",
             "isGlobal", "publishAt", "expiresAt", "publishedBy", "semesterId",
             "semesterName", "sectionId", "sectionNumber", "courseCode", "courseName",
             "lecturerId", "lecturerDisplayName", "createdAt", "updatedAt",
@@ -134,7 +134,7 @@ public class AnnouncementReadRepository {
 
     /**
      * Anonymous public feed: only announcements that are editorially PUBLISHED,
-     * globally visible (isGlobal — no role/year/section scoping), inside their
+     * globally visible with no department targeting, inside their
      * publish window and not archived.
      */
     public List<PublicAnnouncementResponse> findPublic(long offset, int limit, Instant now) {
@@ -159,6 +159,7 @@ public class AnnouncementReadRepository {
         return List.of(
                 "\"status\" = 'PUBLISHED'",
                 "\"isGlobal\" = TRUE",
+                "CARDINALITY(\"targetDepartments\") = 0",
                 "(\"publishAt\" IS NULL OR \"publishAt\" <= :now)",
                 "(\"expiresAt\" IS NULL OR \"expiresAt\" > :now)",
                 "\"archivedAt\" IS NULL");
@@ -308,6 +309,36 @@ public class AnnouncementReadRepository {
             conditions.add("(\"lecturerId\" IS NULL OR \"lecturerId\" = :lecturerId)");
             parameters.addValue("lecturerId", visibility.lecturerId());
         }
+
+        // Department targeting (ATT1): AND across dimensions. A student's
+        // department is the one on their curriculum (Student → Curriculum →
+        // Department); a lecturer's is Lecturer.departmentId. An empty
+        // targetDepartments matches every department exactly like an empty
+        // targetYears matches every year. A dual-role viewer matches when
+        // either identity resolves a listed department; a viewer with no
+        // resolvable department only sees untargeted notices — NULL = ANY
+        // never passes.
+        java.util.List<String> departmentMatches = new java.util.ArrayList<>();
+        if (visibility.studentId() != null) {
+            departmentMatches.add("EXISTS ("
+                    + "SELECT 1 FROM academic.\"Student\" viewer_student"
+                    + " JOIN academic.\"Curriculum\" viewer_curriculum"
+                    + " ON viewer_curriculum.\"id\" = viewer_student.\"curriculumId\""
+                    + " WHERE viewer_student.\"id\" = :viewerStudentId"
+                    + " AND viewer_curriculum.\"departmentId\" = ANY(\"targetDepartments\"))");
+        }
+        if (visibility.roles().contains("LECTURER") && visibility.lecturerId() != null) {
+            departmentMatches.add("EXISTS ("
+                    + "SELECT 1 FROM academic.\"Lecturer\" viewer_lecturer"
+                    + " WHERE viewer_lecturer.\"id\" = :lecturerId"
+                    + " AND viewer_lecturer.\"departmentId\" = ANY(\"targetDepartments\"))");
+        }
+        if (departmentMatches.isEmpty()) {
+            conditions.add("CARDINALITY(\"targetDepartments\") = 0");
+        } else {
+            conditions.add("(CARDINALITY(\"targetDepartments\") = 0 OR "
+                    + String.join(" OR ", departmentMatches) + ")");
+        }
         return new SqlWhere(where(conditions), parameters);
     }
 
@@ -346,6 +377,7 @@ public class AnnouncementReadRepository {
                 resultSet.getString("priority"),
                 stringList(resultSet.getArray("targetRoles")),
                 integerList(resultSet.getArray("targetYears")),
+                stringList(resultSet.getArray("targetDepartments")),
                 resultSet.getBoolean("isGlobal"),
                 instant(resultSet, "publishAt"),
                 instant(resultSet, "expiresAt"),

@@ -19,6 +19,7 @@ import {
 } from '../../components/Ui';
 import { tokens } from '../../design/tokens';
 import { ApiClientError, apiClient, campusApi, type AuthUser, type JsonObject, type MobileAttendanceSummary, type MobileEnrollment, type MobileNotification, type RegistrationCatalogSection } from '../../api/client';
+import { calculateAttendanceRate } from '../../lib/attendance-rate';
 import { mergeNotificationItems } from './notification-feed';
 import { loadRegistrationCatalog } from './registration-window';
 import type { MobileScreenProps } from '../../navigation/types';
@@ -476,9 +477,14 @@ export function AttendanceScreen({ navigation }: MobileScreenProps) {
     { sectionId: 'preview-ba312', courseCode: 'BA312', courseName: 'Business Analytics', total: 15, present: 14, absent: 1, late: 0, excused: 0, attendanceRate: 93 },
   ];
   const visibleAttendance = apiClient.mode === 'preview' ? previewAttendance : liveAttendance;
-  const overallAttendance = visibleAttendance.length > 0
-    ? Math.round(visibleAttendance.reduce((sum, item) => sum + item.attendanceRate, 0) / visibleAttendance.length)
-    : 0;
+  const overallAttendance = calculateAttendanceRate(visibleAttendance.reduce(
+    (counts, item) => ({
+      present: counts.present + item.present,
+      late: counts.late + item.late,
+      absent: counts.absent + item.absent,
+    }),
+    { present: 0, late: 0, absent: 0 },
+  )) ?? 0;
 
   if (isLoading || error) {
     return (
@@ -512,7 +518,7 @@ export function AttendanceScreen({ navigation }: MobileScreenProps) {
             </View>
             <UiText variant="headlineSmall" tone="success">{course.attendanceRate}%</UiText>
           </View>
-          <ProgressBar value={course.attendanceRate} label={`${course.present} of ${course.total} records present`} tone="success" />
+          <ProgressBar value={course.attendanceRate} label={`${course.present + course.late} of ${course.present + course.late + course.absent} countable sessions attended`} tone="success" />
         </Card>
       ))}
       {visibleAttendance.length === 0 ? <StatePanel kind="empty" title="No attendance records" description="Attendance summaries will appear after your lecturer publishes them." /> : null}

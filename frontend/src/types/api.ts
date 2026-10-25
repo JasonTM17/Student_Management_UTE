@@ -142,6 +142,7 @@ export interface Enrollment {
   enrolledAt: string;
   droppedAt?: string;
   gradeStatus: 'NOT_GRADED' | 'DRAFT' | 'PUBLISHED' | 'APPEALED';
+  registrationSource?: string | null;
   finalGrade?: number;
   letterGrade?: string;
   createdAt: string;
@@ -296,6 +297,56 @@ export interface GradeUpdate {
   enrollmentId: string;
   processScore: number;
   finalExamScore: number;
+}
+
+export type GradeAppealStatus = 'PENDING' | 'ACCEPTED' | 'REJECTED' | 'CANCELLED';
+
+export interface GradeAppealEligibility {
+  enrollmentId: string;
+  gradeStatus: 'PUBLISHED' | 'APPEALED';
+  gradePublishedAt: string | null;
+  appealUntil: string | null;
+  appealAllowed: boolean;
+}
+
+export interface GradeAppeal {
+  id: string;
+  enrollmentId: string;
+  studentId: string;
+  studentCode: string;
+  studentName: string;
+  courseCode: string;
+  courseName: string;
+  sectionId: string;
+  sectionNumber: string;
+  semesterName: string;
+  finalGrade: number | null;
+  letterGrade: string | null;
+  gradeStatus: 'PUBLISHED' | 'APPEALED' | 'DRAFT';
+  gradePublishedAt: string | null;
+  appealUntil: string | null;
+  reason: string;
+  status: GradeAppealStatus;
+  resolutionReason: string | null;
+  reviewedBy: string | null;
+  reviewedAt: string | null;
+  beforeFinalGrade: number | null;
+  beforeLetterGrade: string | null;
+  afterFinalGrade: number | null;
+  afterLetterGrade: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface GradeAppealReviewRequest {
+  decision: 'ACCEPTED' | 'REJECTED';
+  correctedFinalGrade?: number;
+  reason: string;
+}
+
+export interface GradeUnpublishRequest {
+  enrollmentIds?: string[];
+  reason: string;
 }
 
 export interface GradingSection {

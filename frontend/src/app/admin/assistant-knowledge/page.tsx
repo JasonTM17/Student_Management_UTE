@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import {
   Archive,
   BookOpenCheck,
@@ -28,9 +29,8 @@ import { ConfirmModal, Modal } from '@/components/ui/modal';
 import { Input } from '@/components/ui/input';
 import { Select } from '@/components/ui/select';
 import { RichTextEditor } from '@/components/ui/rich-text-editor';
-import { EmptyState, ForbiddenState, LoadingState } from '@/components/ui/state-block';
+import { EmptyState, LoadingState } from '@/components/ui/state-block';
 import { metricToneClass, statusToneClass } from '@/components/ui/status';
-import { LinkButton } from '@/components/ui/link-button';
 import { normalizeVietnameseText } from '@/lib/registration-browse';
 import {
   assistantKnowledgeApi,
@@ -442,7 +442,8 @@ function GuidanceFormModal({
 
 export default function AdminAssistantKnowledgePage() {
   const { user, isAdmin, isSuperAdmin, isLoading: authLoading, isLoggingOut } = useAuth();
-  const { locale } = useI18n();
+  const { href, locale } = useI18n();
+  const router = useRouter();
   const vi = locale === 'vi';
   const canAccess = Boolean(user && (isAdmin || isSuperAdmin));
   const [documents, setDocuments] = useState<AssistantKnowledgeDocument[]>([]);
@@ -488,6 +489,19 @@ export default function AdminAssistantKnowledgePage() {
       setIsLoading(false);
     }
   }, [domainFilter, locale, stateFilter]);
+
+  useEffect(() => {
+    if (authLoading || isLoggingOut) {
+      return;
+    }
+    if (!user) {
+      router.replace(`${href('/login')}?portal=admin&reason=session-expired`);
+      return;
+    }
+    if (!canAccess) {
+      router.replace(href('/dashboard'));
+    }
+  }, [authLoading, canAccess, href, isLoggingOut, router, user]);
 
   useEffect(() => {
     if (canAccess) void load();
@@ -629,28 +643,8 @@ export default function AdminAssistantKnowledgePage() {
     ? 'Quản trị nội dung học vụ công khai cho trợ lý.'
     : 'Manage public campus guidance for the assistant.';
 
-  if (authLoading || isLoggingOut) {
-    return (
-      <AdminFrame title={frameTitle} description={frameDescription}>
-        <LoadingState />
-      </AdminFrame>
-    );
-  }
-
-  if (!user || !canAccess) {
-    return (
-      <AdminFrame title={frameTitle} description={frameDescription}>
-        <ForbiddenState
-          title={vi ? 'Không có quyền truy cập' : 'Access restricted'}
-          description={vi ? 'Chỉ quản trị viên có thể quản lý nội dung đã công bố.' : 'Only administrators can manage published guidance.'}
-          action={
-            <LinkButton href="/dashboard" variant="outline">
-              {vi ? 'Về trang tổng quan' : 'Return to overview'}
-            </LinkButton>
-          }
-        />
-      </AdminFrame>
-    );
+  if (authLoading || isLoggingOut || !canAccess) {
+    return <LoadingState className="m-8" />;
   }
 
   return (

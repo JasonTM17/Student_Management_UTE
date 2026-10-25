@@ -138,6 +138,7 @@ export function AdminFrame({
           label: messages.adminShell.menuAttendance,
         },
         { href: '/admin/semesters', icon: GraduationCap, label: messages.admin.menuItems[6]?.[0] },
+        { href: '/admin/registration/curriculum-defaults', icon: ClipboardCheck, label: messages.adminShell.curriculumDefaults },
         { href: '/admin/academic-years', icon: CalendarRange, label: messages.adminShell.academicYears },
         { href: '/admin/departments', icon: Building2, label: messages.admin.menuItems[7]?.[0] },
         { href: '/admin/classrooms', icon: DoorOpen, label: messages.admin.menuItems[8]?.[0] },
@@ -159,6 +160,7 @@ export function AdminFrame({
         { href: '/admin/appearance', icon: Palette, label: messages.admin.menuItems[11]?.[0] },
         { href: '/admin/credit-limit-applications', icon: ClipboardCheck, label: messages.admin.menuItems[12]?.[0] },
         { href: '/admin/withdrawal-applications', icon: Undo2, label: messages.admin.menuItems[13]?.[0] },
+        { href: '/admin/grade-appeals', icon: ClipboardCheck, label: messages.admin.menuItems[19]?.[0] },
         {
           href: '/admin/audit',
           icon: ScrollText,

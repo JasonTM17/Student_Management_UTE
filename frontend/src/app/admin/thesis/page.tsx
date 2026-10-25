@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import {
   Archive,
   CalendarDays,
@@ -19,7 +20,6 @@ import {
 } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import { Button } from '@/components/ui/button';
-import { LinkButton } from '@/components/ui/link-button';
 import { LocalizedLink } from '@/components/LocalizedLink';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -46,7 +46,6 @@ import {
 } from '@/lib/thesis-picker-rules';
 import {
   EmptyState,
-  ForbiddenState,
   LoadingState,
 } from '@/components/ui/state-block';
 import { StatusBadge } from '@/components/thesis/StatusBadge';
@@ -131,13 +130,13 @@ export default function AdminThesisPage() {
   const {
     user,
     isAdmin,
-    isLecturer,
     isFacultyHead,
     isLoading: isAuthLoading,
     isLoggingOut,
     isSuperAdmin,
   } = useAuth();
-  const { locale, messages } = useI18n();
+  const { href, locale, messages } = useI18n();
+  const router = useRouter();
   const formatAdminInstant = (iso: string): string =>
     Number.isFinite(Date.parse(iso))
       ? formatRoundInstant(locale, iso)
@@ -264,6 +263,19 @@ export default function AdminThesisPage() {
 
   const thesisAdminAccess = Boolean(isAdmin || isSuperAdmin || isFacultyHead);
   const canAccess = Boolean(user && thesisAdminAccess);
+
+  useEffect(() => {
+    if (isAuthLoading || isLoggingOut) {
+      return;
+    }
+    if (!user) {
+      router.replace(`${href('/login')}?portal=admin&reason=session-expired`);
+      return;
+    }
+    if (!thesisAdminAccess) {
+      router.replace(href('/dashboard'));
+    }
+  }, [href, isAuthLoading, isLoggingOut, router, thesisAdminAccess, user]);
 
   const loadData = useCallback(async () => {
     setIsLoading(true);
@@ -1246,44 +1258,8 @@ export default function AdminThesisPage() {
       }[reasonAction.kind]
     : '';
 
-  if (isAuthLoading || isLoggingOut) {
-    return (
-      <AdminFrame title={messages.thesis.admin.title} description={messages.thesis.admin.description}>
-        <LoadingState label={messages.thesis.loading} />
-      </AdminFrame>
-    );
-  }
-
-  if (!user) {
-    return (
-      <AdminFrame title={messages.thesis.admin.title} description={messages.thesis.admin.description}>
-        <ForbiddenState
-          title={messages.thesis.admin.forbiddenTitle}
-          description={messages.thesis.admin.forbiddenDescription}
-          action={
-            <LinkButton href="/login?portal=admin" variant="outline">
-              {messages.common.actions.signIn}
-            </LinkButton>
-          }
-        />
-      </AdminFrame>
-    );
-  }
-
-  if (!canAccess) {
-    return (
-      <AdminFrame title={messages.thesis.admin.title} description={messages.thesis.admin.description}>
-        <ForbiddenState
-          title={messages.thesis.admin.forbiddenTitle}
-          description={messages.thesis.admin.forbiddenDescription}
-          action={
-            <LinkButton href={isLecturer ? '/dashboard/lecturer' : '/dashboard'} variant="outline">
-              {messages.thesis.admin.returnToWorkspace}
-            </LinkButton>
-          }
-        />
-      </AdminFrame>
-    );
+  if (isAuthLoading || isLoggingOut || !canAccess) {
+    return <LoadingState label={messages.thesis.loading} className="m-8" />;
   }
 
   if (isLoading && rounds.length === 0) {

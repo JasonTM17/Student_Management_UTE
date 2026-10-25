@@ -133,6 +133,7 @@ export interface WeeklyGridLabels {
    * `lecturerName` in the same slot instead.
    */
   studentsSuffix?: string;
+  curriculumDefault?: string;
 }
 
 /** Agenda projection: grid items plus the context fields blocks render. */
@@ -140,6 +141,7 @@ export type WeeklyGridAgendaItem = WeeklyGridItem & {
   lecturerName?: string;
   credits?: number;
   status?: string;
+  curriculumDefault?: boolean;
   /** Lecturer-context fields: carried through to the detail modal. */
   departmentName?: string;
   departmentNameEn?: string;
@@ -434,6 +436,14 @@ export function WeeklyGrid({
                           >
                             {courseName}
                           </div>
+                          {agendaItem.curriculumDefault && labels.curriculumDefault ? (
+                            <span
+                              className="mt-1 inline-flex max-w-full min-h-5 items-center truncate rounded border border-primary/25 bg-primary/10 px-1.5 py-0.5 text-[9px] font-semibold text-primary"
+                              title={labels.curriculumDefault}
+                            >
+                              {labels.curriculumDefault}
+                            </span>
+                          ) : null}
                           <div className="mt-2 space-y-1 border-t border-current/10 pt-1.5 text-[11px] text-muted-foreground">
                             <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5">
                               <span className="inline-flex items-center gap-1 font-medium whitespace-nowrap">

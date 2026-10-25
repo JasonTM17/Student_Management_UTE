@@ -135,6 +135,14 @@ async function mockRegistration(page: Page, options: FixtureOptions = {}) {
       ],
       // Logout/login stays in the same client tree to expose stale cross-user cache.
       '/api/v1/me/registration': {},
+      // The merged register page also mounts the curriculum plan block; an
+      // UNKNOWN term keeps it inert so these registration-UX cases see the
+      // same DOM surface as before the feature landed.
+      '/api/v1/me/registration/curriculum-plan': {
+        semesterId: 'term-3', semesterName: 'Fixture semester',
+        registrationRoundId: 'round-fixture', registrationOpen: false,
+        term: { status: 'UNKNOWN', reasonCode: 'NO_CURRICULUM_TERM' }, courses: [],
+      },
       '/api/v1/me/curriculum': {
         curriculum: { id: 'curriculum-fixture', code: 'MATH-DEMO', name: 'Math program', nameEn: 'Math program', nameVi: 'Chương trình Toán', totalCredits: 6 },
         courses: [{ courseId: 'course-mf101', code: 'MF101', name: 'Methods', nameEn: 'Mathematical Methods', nameVi: 'Phương pháp toán học', credits: 3, year: 1, semester: 1, isMandatory: true, status: 'IN_PROGRESS', prerequisites: [] }],
@@ -159,11 +167,13 @@ test('UX repair: U01 enrollment failure cannot look like zero registrations and 
   const fixture = await mockRegistration(page, { enrollmentError: true });
   await page.goto('/en/dashboard/register');
   const main = page.locator('#dashboard-main-content');
-  await expect(main.getByRole('button', { name: /Retry|Try again/ })).toBeVisible({ timeout: 15_000 });
+  // The curriculum plan block has its own 'Retry plan' control; the enrollment
+  // error retry is the shared 'Try again' action.
+  await expect(main.getByRole('button', { name: 'Try again', exact: true })).toBeVisible({ timeout: 15_000 });
   await expect(main.getByText('0 classes', { exact: true })).toHaveCount(0);
   await expect(main.getByRole('button', { name: 'Register', exact: true })).toHaveCount(0);
   fixture.recoverEnrollments();
-  await main.getByRole('button', { name: /Retry|Try again/ }).click();
+  await main.getByRole('button', { name: 'Try again', exact: true }).click();
   await expect(page.getByRole('region', { name: /MF101/ }).getByRole('button', { name: 'Drop course', exact: true })).toBeVisible();
   expect(fixture.errors).toEqual([]);
 });

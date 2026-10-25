@@ -1,6 +1,7 @@
 package io.campuscore.restfulapi.academic;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.SoftAssertions.assertSoftly;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -127,6 +128,7 @@ class AdminAnalyticsOverviewTest {
                     "sectionId" VARCHAR(120) NOT NULL,
                     "semesterId" VARCHAR(120) NOT NULL,
                     "status" VARCHAR(40) NOT NULL,
+                    "registrationSource" VARCHAR(40),
                     "gradeStatus" VARCHAR(40) NOT NULL,
                     "letterGrade" VARCHAR(16)
                 )
@@ -195,6 +197,28 @@ class AdminAnalyticsOverviewTest {
         assertThat(overview.gradeDistribution())
                 .extracting(AdminAnalyticsDtos.GradeDistributionEntry::grade)
                 .doesNotContain("W");
+    }
+
+    @Test
+    void officialGradeStatisticsIncludePublishedAndAppealedButExcludeDraftAndWithdrawn() {
+        seedCampus();
+        enrollment("enr-appealed", "student-3", "section-1", "sem-2", "ENROLLED", "APPEALED", "A-");
+        enrollment("enr-draft", "student-4", "section-1", "sem-2", "ENROLLED", "DRAFT", "C");
+        enrollment("enr-completed-draft", "student-5", "section-1", "sem-2", "COMPLETED", "DRAFT", "D");
+        enrollment("enr-withdrawn-grade", "student-4", "section-1", "sem-2", "WITHDRAWN", "PUBLISHED", "B");
+        enrollment("enr-withdrawn-w", "student-5", "section-1", "sem-2", "WITHDRAWN", "PUBLISHED", "W");
+
+        var overview = service.overview();
+
+        assertSoftly(softly -> {
+            softly.assertThat(overview.gradeDistribution())
+                    .extracting(AdminAnalyticsDtos.GradeDistributionEntry::grade)
+                    .as("distribution contains only official non-withdrawn grades")
+                    .containsExactly("A+", "A", "A-", "B+");
+            softly.assertThat(overview.semesterTrends().get(1).completionRate())
+                    .as("completed drafts are not official grades")
+                    .isEqualTo(50.0);
+        });
     }
 
     private void enrollment(

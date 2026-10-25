@@ -2,8 +2,40 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
+const ts = require('typescript');
 
 const root = path.resolve(__dirname, '..');
+
+function loadGradeExport() {
+  const source = fs.readFileSync(path.join(root, 'src/lib/grade-export.ts'), 'utf8');
+  const output = ts.transpileModule(source, {
+    compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2020 },
+  }).outputText;
+  const moduleRecord = { exports: {} };
+  Function('module', 'exports', output)(moduleRecord, moduleRecord.exports);
+  return moduleRecord.exports;
+}
+
+test('APPEALED grade exports remain official and show the review state in both locales', () => {
+  const { generateGradeCsv } = loadGradeExport();
+  const student = {
+    studentId: 'appeal-e2e-student',
+    studentCode: 'APPEAL-001',
+    studentName: 'Appeal E2E Student',
+    processScore: 8,
+    finalExamScore: 8,
+    totalScore: 8,
+    letterGrade: 'B+',
+    gradeStatus: 'APPEALED',
+  };
+  const en = generateGradeCsv({ sectionNumber: 'APPEAL-01', students: [student], locale: 'en' });
+  const vi = generateGradeCsv({ sectionNumber: 'APPEAL-01', students: [student], locale: 'vi' });
+
+  assert.match(en, /Under review/);
+  assert.doesNotMatch(en, /"Draft"/);
+  assert.match(vi, /Đang xem xét/);
+  assert.doesNotMatch(vi, /"Bản nháp"/);
+});
 
 test('Lecturer grade sheet CSV export and print roster integrity', async (t) => {
   await t.test('grade-export exports required functions and types', () => {

@@ -1,7 +1,10 @@
 package io.campuscore.restfulapi;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import io.campuscore.restfulapi.academic.entity.Enrollment;
+import jakarta.persistence.Column;
 import jakarta.persistence.EmbeddedId;
 import jakarta.persistence.Entity;
 import jakarta.persistence.Id;
@@ -59,6 +62,16 @@ class EntityLayerConventionsTest {
     @Test
     void entityClassesExist() throws Exception {
         assertTrue(!entityClassNames().isEmpty(), "no @Entity classes were discovered");
+    }
+
+    @Test
+    void enrollmentMapsCurriculumRegistrationSourceColumn() throws Exception {
+        Field field = Enrollment.class.getDeclaredField("registrationSource");
+        Column column = field.getAnnotation(Column.class);
+
+        assertEquals(String.class, field.getType());
+        assertEquals("\"registrationSource\"", column.name());
+        assertEquals(40, column.length());
     }
 
     private static boolean hasPrimaryKey(Class<?> type) {

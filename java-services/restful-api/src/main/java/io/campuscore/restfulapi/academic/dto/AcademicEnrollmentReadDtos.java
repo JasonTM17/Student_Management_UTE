@@ -71,7 +71,27 @@ public final class AcademicEnrollmentReadDtos {
             Instant updatedAt,
             StudentSummary student,
             SectionSummary section,
-            SemesterSummary semester) {
+            SemesterSummary semester,
+            String registrationSource) {
+        public EnrollmentResponse(
+                String id,
+                String studentId,
+                String sectionId,
+                String semesterId,
+                String status,
+                Instant enrolledAt,
+                Instant droppedAt,
+                String gradeStatus,
+                BigDecimal finalGrade,
+                String letterGrade,
+                Instant createdAt,
+                Instant updatedAt,
+                StudentSummary student,
+                SectionSummary section,
+                SemesterSummary semester) {
+            this(id, studentId, sectionId, semesterId, status, enrolledAt, droppedAt, gradeStatus,
+                    finalGrade, letterGrade, createdAt, updatedAt, student, section, semester, null);
+        }
     }
 
     public record EnrollmentListResponse(List<EnrollmentResponse> data, PageMeta meta) {

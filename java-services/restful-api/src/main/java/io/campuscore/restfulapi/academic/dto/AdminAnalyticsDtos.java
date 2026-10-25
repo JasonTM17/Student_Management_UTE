@@ -32,10 +32,9 @@ public final class AdminAnalyticsDtos {
      * <li>{@code count} — enrollment rows for the semester excluding
      * DROPPED/CANCELLED (the same rule the announcement feed uses to decide
      * whether a seat is still held).</li>
-     * <li>{@code completionRate} — percentage of those enrollments whose grade
-     * is final: status COMPLETED or gradeStatus PUBLISHED/APPEALED (the same
-     * "graded" definition AcademicEnrollmentReadRepository uses for student
-     * grade visibility), rounded half-up to one decimal.</li>
+     * <li>{@code completionRate} — percentage of those enrollments with an
+     * official grade status PUBLISHED or APPEALED, matching student grade
+     * visibility, rounded half-up to one decimal.</li>
      * <li>{@code activeStudents} — distinct students holding at least one of
      * those enrollments.</li>
      * </ul>
@@ -51,7 +50,7 @@ public final class AdminAnalyticsDtos {
     public record FacultyRank(String rank, long count) {
     }
 
-    /** Graded enrollment count per letter grade band (A+, A, ..., F). */
+    /** Official non-withdrawn enrollment count per letter band (A+, A, ..., F). */
     public record GradeDistributionEntry(String grade, long count) {
     }
 

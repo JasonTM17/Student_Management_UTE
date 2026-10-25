@@ -105,19 +105,24 @@ export default function LecturerGradesPage() {
         title={messages.lecturerGrades.title}
         description={messages.lecturerGrades.description.replace('{semester}', selectedSemesterName)}
         actions={
-          <div className="min-w-[220px]">
-            <Select
-              aria-label={messages.lecturerGrades.selectSemester}
-              value={selectedSemester}
-              onChange={(event) => setSelectedSemester(event.target.value)}
-              options={[
-                { value: '', label: messages.lecturerGrades.allSemestersOption },
-                ...semesters.map((semester) => ({
-                  value: semester.id,
-                  label: getLocalizedName(locale, semester, semester.name),
-                })),
-              ]}
-            />
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+            <LinkButton href="/dashboard/lecturer/grade-appeals" variant="outline">
+              {messages.gradeAppeals.review.openLecturerQueue}
+            </LinkButton>
+            <div className="min-w-[220px]">
+              <Select
+                aria-label={messages.lecturerGrades.selectSemester}
+                value={selectedSemester}
+                onChange={(event) => setSelectedSemester(event.target.value)}
+                options={[
+                  { value: '', label: messages.lecturerGrades.allSemestersOption },
+                  ...semesters.map((semester) => ({
+                    value: semester.id,
+                    label: getLocalizedName(locale, semester, semester.name),
+                  })),
+                ]}
+              />
+            </div>
           </div>
         }
       />

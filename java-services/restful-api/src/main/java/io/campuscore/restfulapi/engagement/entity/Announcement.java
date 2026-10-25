@@ -37,6 +37,10 @@ public class Announcement {
     @JdbcTypeCode(SqlTypes.ARRAY)
     private Integer[] targetYears;
 
+    @Column(name = "\"targetDepartments\"", nullable = false, insertable = false, updatable = false)
+    @JdbcTypeCode(SqlTypes.ARRAY)
+    private String[] targetDepartments;
+
     @Column(name = "\"isGlobal\"", nullable = false, insertable = false, updatable = false)
     private boolean isGlobal;
 
@@ -146,6 +150,10 @@ public class Announcement {
 
     public Integer[] getTargetYears() {
         return targetYears;
+    }
+
+    public String[] getTargetDepartments() {
+        return targetDepartments;
     }
 
     public boolean isGlobal() {
