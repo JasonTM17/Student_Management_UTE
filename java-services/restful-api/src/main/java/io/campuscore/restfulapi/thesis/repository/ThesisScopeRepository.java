@@ -1,7 +1,9 @@
 package io.campuscore.restfulapi.thesis.repository;
 
+import io.campuscore.restfulapi.thesis.dto.ThesisTopicDtos.TopicSupervisorEntry;
 import java.math.BigDecimal;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import org.springframework.context.annotation.Profile;
 import org.springframework.jdbc.core.namedparam.MapSqlParameterSource;
@@ -99,6 +101,43 @@ public class ThesisScopeRepository {
                 "SELECT \"id\" FROM academic.\"Department\" WHERE \"facultyId\" = :facultyId",
                 new MapSqlParameterSource("facultyId", facultyId),
                 String.class);
+    }
+
+    /**
+     * Batched supervisor roster for a page of topic ids: a single statement
+     * resolves every listed topic's supervisors ordered by supervisor_order,
+     * so the topic list read model never fans out per topic. Names only — the
+     * contact column stays with the per-topic endpoint, which can authorize
+     * staff viewers for it.
+     */
+    public Map<UUID, List<TopicSupervisorEntry>> findSupervisorsByTopicIds(List<UUID> topicIds) {
+        if (topicIds == null || topicIds.isEmpty()) {
+            return Map.of();
+        }
+        Map<UUID, List<TopicSupervisorEntry>> byTopic = jdbc.query(
+                "SELECT supervisor.topic_id AS topic_id, supervisor.lecturer_id, supervisor.supervisor_order,"
+                        + " user_account.\"firstName\" AS first_name,"
+                        + " user_account.\"lastName\" AS last_name"
+                        + " FROM thesis.thesis_topic_supervisor supervisor"
+                        + " LEFT JOIN campuscore_auth.\"Lecturer\" lecturer ON lecturer.\"id\" = supervisor.lecturer_id"
+                        + " LEFT JOIN campuscore_auth.\"User\" user_account ON user_account.\"id\" = lecturer.\"userId\""
+                        + " WHERE supervisor.topic_id IN (:topicIds)"
+                        + " ORDER BY supervisor.topic_id, supervisor.supervisor_order",
+                new MapSqlParameterSource().addValue("topicIds", topicIds),
+                rs -> {
+                    Map<UUID, List<TopicSupervisorEntry>> rows = new java.util.LinkedHashMap<>();
+                    while (rs.next()) {
+                        rows.computeIfAbsent(rs.getObject("topic_id", UUID.class),
+                                        key -> new java.util.ArrayList<>())
+                                .add(new TopicSupervisorEntry(
+                                        rs.getString("lecturer_id"),
+                                        rs.getInt("supervisor_order"),
+                                        rs.getString("first_name"),
+                                        rs.getString("last_name")));
+                    }
+                    return rows;
+                });
+        return byTopic == null ? Map.of() : byTopic;
     }
 
     public List<UUID> findSupervisedTopicIds(String lecturerId, List<UUID> topicIds) {
