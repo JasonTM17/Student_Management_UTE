@@ -42,6 +42,7 @@ const menuItems = [
   { href: '/admin/editor', icon: FileEdit, tone: 'warning' as const },
   { href: '/admin/notifications', icon: Bell, tone: 'warning' as const },
   { href: '/admin/attendance', icon: ClipboardCheck, tone: 'info' as const },
+  { href: '/admin/grade-appeals', icon: ClipboardCheck, tone: 'warning' as const },
 ];
 
 export default function AdminDashboardPage() {

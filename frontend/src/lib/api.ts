@@ -28,6 +28,11 @@ import {
   SectionSchedule,
   MyCurriculumResponse,
   StudentGradesByEnrollmentResponse,
+  GradeAppeal,
+  GradeAppealEligibility,
+  GradeAppealReviewRequest,
+  GradeAppealStatus,
+  GradeUnpublishRequest,
 } from '@/types/api';
 import { addLocalePrefix, stripLocaleFromPathname } from '@/i18n/paths';
 import { resolvePublicApiBaseUrl } from '@/lib/public-api-url';
@@ -1310,11 +1315,64 @@ export const gradesApi = {
     return response.data;
   },
 
+  getMyGradeAppeals: async (): Promise<GradeAppeal[]> => {
+    const response = await api.get<GradeAppeal[]>('/me/grade-appeals');
+    return response.data;
+  },
+
+  getGradeAppealEligibility: async (): Promise<GradeAppealEligibility[]> => {
+    const response = await api.get<GradeAppealEligibility[]>('/me/grade-appeals/eligibility');
+    return response.data;
+  },
+
+  submitGradeAppeal: async (enrollmentId: string, reason: string): Promise<GradeAppeal> => {
+    const response = await api.post<GradeAppeal>('/me/grade-appeals', { enrollmentId, reason });
+    return response.data;
+  },
+
+  cancelGradeAppeal: async (id: string): Promise<GradeAppeal> => {
+    const response = await api.post<GradeAppeal>(`/me/grade-appeals/${id}/cancel`);
+    return response.data;
+  },
+
   getStudentGradesByEnrollment: async (
     enrollmentId: string,
   ): Promise<StudentGradesByEnrollmentResponse> => {
     const response = await api.get<StudentGradesByEnrollmentResponse>(
       `/grades/student-grades/enrollment/${enrollmentId}`,
+    );
+    return response.data;
+  },
+};
+
+export const gradeAppealsApi = {
+  lecturerQueue: async (
+    status: GradeAppealStatus | 'ALL' = 'PENDING',
+  ): Promise<GradeAppeal[]> => {
+    const response = await api.get<GradeAppeal[]>('/lecturer/grade-appeals', { params: { status } });
+    return response.data;
+  },
+  reviewAsLecturer: async (id: string, request: GradeAppealReviewRequest): Promise<GradeAppeal> => {
+    const response = await api.post<GradeAppeal>(`/lecturer/grade-appeals/${id}/review`, request);
+    return response.data;
+  },
+  adminQueue: async (
+    status: GradeAppealStatus | 'ALL' = 'PENDING',
+  ): Promise<GradeAppeal[]> => {
+    const response = await api.get<GradeAppeal[]>('/admin/grade-appeals', { params: { status } });
+    return response.data;
+  },
+  reviewAsAdmin: async (id: string, request: GradeAppealReviewRequest): Promise<GradeAppeal> => {
+    const response = await api.post<GradeAppeal>(`/admin/grade-appeals/${id}/review`, request);
+    return response.data;
+  },
+  unpublishSection: async (
+    sectionId: string,
+    request: GradeUnpublishRequest,
+  ): Promise<{ sectionId: string; unpublishedCount: number }> => {
+    const response = await api.post<{ sectionId: string; unpublishedCount: number }>(
+      `/admin/sections/${sectionId}/grades/unpublish`,
+      request,
     );
     return response.data;
   },

@@ -3,6 +3,7 @@ package io.campuscore.restfulapi.academic.service;
 import io.campuscore.restfulapi.academic.registration.service.RegistrationService;
 import io.campuscore.restfulapi.academic.dto.AcademicEnrollmentReadDtos.EnrollmentResponse;
 import io.campuscore.restfulapi.academic.dto.AcademicMutationDtos.GradeUpdate;
+import io.campuscore.restfulapi.academic.repository.GradeMutationLockRepository;
 import io.campuscore.restfulapi.audit.service.AdminAuditRecorder;
 import io.campuscore.restfulapi.common.util.LikePattern;
 import io.campuscore.restfulapi.engagement.service.GradePublishNotifier;
@@ -59,6 +60,7 @@ public class AcademicMutationService {
     private final RegistrationService registration;
     private final AdminAuditRecorder audit;
     private final GradePublishNotifier gradeNotifier;
+    private final GradeMutationLockRepository gradeMutationLocks;
     private final boolean postgres;
 
     /** Compatibility constructor for tests that only exercise limit/publish math. */
@@ -70,18 +72,29 @@ public class AcademicMutationService {
         this(jdbc, reads, registration, audit, null);
     }
 
-    @org.springframework.beans.factory.annotation.Autowired
     public AcademicMutationService(
             NamedParameterJdbcTemplate jdbc,
             AcademicEnrollmentReadService reads,
             RegistrationService registration,
             AdminAuditRecorder audit,
             GradePublishNotifier gradeNotifier) {
+        this(jdbc, reads, registration, audit, gradeNotifier, null);
+    }
+
+    @org.springframework.beans.factory.annotation.Autowired
+    public AcademicMutationService(
+            NamedParameterJdbcTemplate jdbc,
+            AcademicEnrollmentReadService reads,
+            RegistrationService registration,
+            AdminAuditRecorder audit,
+            GradePublishNotifier gradeNotifier,
+            GradeMutationLockRepository gradeMutationLocks) {
         this.jdbc = jdbc;
         this.reads = reads;
         this.registration = registration;
         this.audit = audit;
         this.gradeNotifier = gradeNotifier;
+        this.gradeMutationLocks = gradeMutationLocks;
         this.postgres = databaseIsPostgres(jdbc);
     }
 
@@ -271,6 +284,22 @@ public class AcademicMutationService {
     @Transactional
     public void updateGrades(
             String sectionId, String lecturerId, boolean admin, String actorId, List<GradeUpdate> grades) {
+        if (!admin && !ownsSection(sectionId, lecturerId)) {
+            // Preserve not-found/cancelled precedence while avoiding Student
+            // locks for a lecturer who cannot write this section.
+            requireSection(sectionId);
+            throw problem(HttpStatus.FORBIDDEN, "SECTION_FORBIDDEN",
+                    "Section is not assigned to the current lecturer");
+        }
+        if (gradeMutationLocks != null && grades != null && !grades.isEmpty()) {
+            List<String> targetedEnrollments = grades.stream()
+                    .map(GradeUpdate::enrollmentId)
+                    .filter(id -> id != null && !id.isBlank())
+                    .distinct()
+                    .sorted()
+                    .toList();
+            gradeMutationLocks.lockStudentsForEnrollments(sectionId, targetedEnrollments);
+        }
         requireSection(sectionId);
         if (!admin && !ownsSection(sectionId, lecturerId)) {
             throw problem(HttpStatus.FORBIDDEN, "SECTION_FORBIDDEN", "Section is not assigned to the current lecturer");
@@ -446,7 +475,8 @@ public class AcademicMutationService {
         String sectionLabel = sectionLabel(sectionId);
         int updated = jdbc.update(
                 "UPDATE " + ENROLLMENT + " SET \"gradeStatus\" = 'PUBLISHED', \"status\" = 'COMPLETED',"
-                        + " \"updatedAt\" = CURRENT_TIMESTAMP WHERE \"sectionId\" = :sectionId"
+                        + " \"gradePublishedAt\" = CURRENT_TIMESTAMP, \"updatedAt\" = CURRENT_TIMESTAMP"
+                        + " WHERE \"sectionId\" = :sectionId"
                         + " AND \"status\" IN (:gradeableStatuses)"
                         // A repeat publish must not re-touch or re-notify rows
                         // already published or appealed; IS DISTINCT FROM keeps
@@ -502,6 +532,7 @@ public class AcademicMutationService {
                         + " WHERE e.\"sectionId\" = :sectionId"
                         + " AND e.\"status\" IN (:gradeableStatuses)"
                         + " AND e.\"gradeStatus\" IS DISTINCT FROM 'PUBLISHED'"
+                        + " AND e.\"gradeStatus\" IS DISTINCT FROM 'APPEALED'"
                         + " AND e.\"finalGrade\" IS NOT NULL AND e.\"letterGrade\" IS NOT NULL"
                         + " AND student.\"userId\" IS NOT NULL",
                 new MapSqlParameterSource("sectionId", sectionId)

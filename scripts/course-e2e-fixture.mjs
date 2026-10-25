@@ -109,6 +109,60 @@ BEGIN
 END $$;
 `;
 
+// A dedicated, demo-only published grade for the appeal/review browser journey.
+// It uses the standard demo student and lecturer accounts but does not mutate
+// any of their existing course records.
+export const gradeAppealSql = `
+INSERT INTO academic."Course"
+    ("id", "code", "name", "nameEn", "nameVi", "credits", "departmentId", "semesterId")
+VALUES ('course-grade-appeal-e2e', 'APPEAL1E2E', 'Điểm phúc khảo mẫu',
+        'Grade appeal demo', 'Điểm phúc khảo mẫu', 3, 'department-demo', 'semester-demo')
+ON CONFLICT ("id") DO UPDATE SET
+    "code" = EXCLUDED."code", "name" = EXCLUDED."name", "nameEn" = EXCLUDED."nameEn",
+    "nameVi" = EXCLUDED."nameVi", "credits" = EXCLUDED."credits",
+    "departmentId" = EXCLUDED."departmentId", "semesterId" = EXCLUDED."semesterId";
+
+INSERT INTO academic."Section"
+    ("id", "sectionNumber", "courseId", "semesterId", "lecturerId", "classroomId",
+     "capacity", "enrolledCount", "status")
+VALUES ('section-grade-appeal-e2e', 'APPEAL1E2E-01', 'course-grade-appeal-e2e',
+        'semester-demo', 'lecturer-profile', NULL, 40, 1, 'OPEN')
+ON CONFLICT ("id") DO UPDATE SET
+    "sectionNumber" = EXCLUDED."sectionNumber", "courseId" = EXCLUDED."courseId",
+    "semesterId" = EXCLUDED."semesterId", "lecturerId" = EXCLUDED."lecturerId",
+    "capacity" = EXCLUDED."capacity", "enrolledCount" = EXCLUDED."enrolledCount",
+    "status" = EXCLUDED."status";
+
+INSERT INTO academic."GradeItem"
+    ("id", "sectionId", "name", "type", "maxScore", "weight", "gradedAt")
+VALUES ('appeal-e2e-process', 'section-grade-appeal-e2e', 'Process', 'PROCESS', 10, 50, CURRENT_TIMESTAMP),
+       ('appeal-e2e-final', 'section-grade-appeal-e2e', 'Final exam', 'FINAL', 10, 50, CURRENT_TIMESTAMP)
+ON CONFLICT ("id") DO UPDATE SET
+    "sectionId" = EXCLUDED."sectionId", "name" = EXCLUDED."name", "type" = EXCLUDED."type",
+    "maxScore" = EXCLUDED."maxScore", "weight" = EXCLUDED."weight", "gradedAt" = EXCLUDED."gradedAt";
+
+INSERT INTO academic."Enrollment"
+    ("id", "studentId", "sectionId", "semesterId", "status", "enrolledAt", "gradeStatus",
+     "finalGrade", "letterGrade", "courseId", "roundId", "creditsSnapshot", "version", "gradePublishedAt")
+VALUES ('enrollment-grade-appeal-e2e', 'student-profile', 'section-grade-appeal-e2e',
+        'semester-demo', 'COMPLETED', CURRENT_TIMESTAMP, 'PUBLISHED', 8.00, 'B+',
+        'course-grade-appeal-e2e', NULL, 3, 0, CURRENT_TIMESTAMP)
+ON CONFLICT ("id") DO UPDATE SET
+    "studentId" = EXCLUDED."studentId", "sectionId" = EXCLUDED."sectionId",
+    "semesterId" = EXCLUDED."semesterId", "status" = EXCLUDED."status",
+    "gradeStatus" = EXCLUDED."gradeStatus", "finalGrade" = EXCLUDED."finalGrade",
+    "letterGrade" = EXCLUDED."letterGrade", "courseId" = EXCLUDED."courseId",
+    "roundId" = EXCLUDED."roundId", "creditsSnapshot" = EXCLUDED."creditsSnapshot",
+    "version" = EXCLUDED."version", "gradePublishedAt" = EXCLUDED."gradePublishedAt";
+
+INSERT INTO academic."StudentGrade" ("id", "enrollmentId", "gradeItemId", "score")
+VALUES ('appeal-e2e-student-process', 'enrollment-grade-appeal-e2e', 'appeal-e2e-process', 8.00),
+       ('appeal-e2e-student-final', 'enrollment-grade-appeal-e2e', 'appeal-e2e-final', 8.00)
+ON CONFLICT ("id") DO UPDATE SET
+    "enrollmentId" = EXCLUDED."enrollmentId", "gradeItemId" = EXCLUDED."gradeItemId",
+    "score" = EXCLUDED."score";
+`;
+
 export async function seedWithdrawalE2e(projectName, compose) {
   if (!/^campuscore-course-e2e-[a-z0-9-]+$/i.test(projectName)) {
     throw new Error('Refusing withdrawal fixture outside a disposable E2E project');
@@ -117,6 +171,17 @@ export async function seedWithdrawalE2e(projectName, compose) {
     'exec', '-T', 'postgres', 'sh', '-c',
     'exec psql --no-psqlrc --set ON_ERROR_STOP=1 --username "$POSTGRES_USER" --dbname "$POSTGRES_DB" --command "$1"',
     'course-e2e-withdrawal-fixture', withdrawalWindowSql,
+  ]);
+}
+
+export async function seedGradeAppealE2e(projectName, compose) {
+  if (!/^campuscore-course-e2e-[a-z0-9-]+$/i.test(projectName)) {
+    throw new Error('Refusing grade appeal fixture outside a disposable E2E project');
+  }
+  await compose([
+    'exec', '-T', 'postgres', 'sh', '-c',
+    'exec psql --no-psqlrc --set ON_ERROR_STOP=1 --username "$POSTGRES_USER" --dbname "$POSTGRES_DB" --command "$1"',
+    'course-e2e-grade-appeal-fixture', gradeAppealSql,
   ]);
 }
 
