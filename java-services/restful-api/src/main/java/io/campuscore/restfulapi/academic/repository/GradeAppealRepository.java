@@ -257,6 +257,14 @@ public class GradeAppealRepository {
                 new MapSqlParameterSource("ids", enrollmentIds));
     }
 
+    public List<Map<String, Object>> lockAcceptedAppeals(Collection<String> enrollmentIds) {
+        if (enrollmentIds == null || enrollmentIds.isEmpty()) return List.of();
+        return jdbc.queryForList("SELECT \"id\", \"enrollmentId\" AS enrollment_id FROM " + APPEAL
+                        + " WHERE \"enrollmentId\" IN (:ids) AND \"status\" = 'ACCEPTED'"
+                        + " ORDER BY \"id\" FOR UPDATE",
+                new MapSqlParameterSource("ids", enrollmentIds));
+    }
+
     public List<Map<String, Object>> lockSectionEnrollments(Collection<String> enrollmentIds) {
         if (enrollmentIds == null || enrollmentIds.isEmpty()) return List.of();
         return jdbc.queryForList("SELECT \"id\", \"studentId\" AS student_id,"
