@@ -84,12 +84,13 @@ public class AnnouncementWriteService {
             throw new IllegalArgumentException("priority must be LOW, NORMAL, HIGH, or URGENT");
         }
         List<String> targetRoles = immutableStrings(request.targetRoles(), "targetRoles");
+        List<String> targetDepartments = immutableDepartments(request.targetDepartments());
         boolean lecturer = isLecturerOnly(roles);
         if (lecturer) {
-            requireLecturerAnnouncement(lecturerId, request.sectionId(), targetRoles, request.isGlobal(), request.lecturerId());
+            requireLecturerAnnouncement(lecturerId, request.sectionId(), targetRoles, targetDepartments,
+                    request.isGlobal(), request.lecturerId());
         }
         List<Integer> targetYears = immutableYears(request.targetYears());
-        List<String> targetDepartments = immutableDepartments(request.targetDepartments());
         Instant now = Instant.now(clock);
         AnnouncementResponse created = announcements.create(new CreateAnnouncementCommand(
                 UUID.randomUUID().toString(),
@@ -211,9 +212,13 @@ public class AnnouncementWriteService {
             String effectiveSection = request.has("sectionId") ? request.sectionId() : before.sectionId();
             List<String> effectiveRoles = request.has("targetRoles")
                     ? immutableStrings(request.targetRoles(), "targetRoles") : before.targetRoles();
+            List<String> effectiveDepartments = request.has("targetDepartments")
+                    ? immutableDepartments(request.targetDepartments())
+                    : immutableDepartments(before.targetDepartments());
             Boolean effectiveGlobal = request.has("isGlobal") ? request.isGlobal() : before.isGlobal();
             String requestedLecturer = request.has("lecturerId") ? request.lecturerId() : lecturerId;
-            requireLecturerAnnouncement(lecturerId, effectiveSection, effectiveRoles, effectiveGlobal, requestedLecturer);
+            requireLecturerAnnouncement(lecturerId, effectiveSection, effectiveRoles, effectiveDepartments,
+                    effectiveGlobal, requestedLecturer);
         }
         if (request.has("priority") && !PRIORITIES.contains(request.priority())) {
             throw new IllegalArgumentException("priority must be LOW, NORMAL, HIGH, or URGENT");
@@ -317,6 +322,7 @@ public class AnnouncementWriteService {
             String lecturerId,
             String sectionId,
             List<String> targetRoles,
+            List<String> targetDepartments,
             Boolean isGlobal,
             String requestedLecturerId) {
         if (lecturerId == null || lecturerId.isBlank()
@@ -326,6 +332,13 @@ public class AnnouncementWriteService {
                 || Boolean.TRUE.equals(isGlobal)
                 || (requestedLecturerId != null && !lecturerId.equals(requestedLecturerId))) {
             throw forbiddenLecturer();
+        }
+        if (!targetDepartments.isEmpty()) {
+            String lecturerDepartmentId = announcements.findLecturerDepartmentId(lecturerId).orElse(null);
+            if (lecturerDepartmentId == null
+                    || targetDepartments.stream().anyMatch(departmentId -> !lecturerDepartmentId.equals(departmentId))) {
+                throw forbiddenLecturer();
+            }
         }
     }
 
