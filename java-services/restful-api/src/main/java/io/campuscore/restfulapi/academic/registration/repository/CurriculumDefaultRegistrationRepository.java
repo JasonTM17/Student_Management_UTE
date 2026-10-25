@@ -123,7 +123,7 @@ public class CurriculumDefaultRegistrationRepository {
     public List<String> findPassedCourseIds(String studentId) {
         return jdbc.query("SELECT DISTINCT \"courseId\" FROM " + ENROLLMENT
                         + " WHERE \"studentId\" = :studentId AND \"status\" = 'COMPLETED'"
-                        + " AND \"gradeStatus\" = 'PUBLISHED' AND \"letterGrade\" IS NOT NULL"
+                        + " AND \"gradeStatus\" IN ('PUBLISHED', 'APPEALED') AND \"letterGrade\" IS NOT NULL"
                         + " AND UPPER(\"letterGrade\") NOT IN ('F', 'W')",
                 new MapSqlParameterSource("studentId", studentId), (rs, rowNum) -> rs.getString(1));
     }

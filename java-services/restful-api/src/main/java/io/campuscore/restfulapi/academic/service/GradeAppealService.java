@@ -298,9 +298,15 @@ public class GradeAppealService {
         }
         List<Map<String, Object>> targets = candidates.stream()
                 .filter(row -> all && ("PUBLISHED".equals(text(row.get("grade_status")))
-                        || "APPEALED".equals(text(row.get("grade_status")))))
+                        || "APPEALED".equals(text(row.get("grade_status"))))
+                        && isGradeableEnrollmentStatus(text(row.get("enrollment_status"))))
                 .toList();
         if (!all) targets = candidates;
+        if (!all && targets.stream()
+                .anyMatch(row -> !isGradeableEnrollmentStatus(text(row.get("enrollment_status"))))) {
+            throw problem(HttpStatus.CONFLICT, "GRADE_UNPUBLISH_CONFLICT",
+                    "Every selected enrollment must be eligible for grade publication");
+        }
         if (!all && targets.stream().anyMatch(row -> !"PUBLISHED".equals(text(row.get("grade_status")))
                 && !"APPEALED".equals(text(row.get("grade_status"))))) {
             throw problem(HttpStatus.CONFLICT, "GRADE_UNPUBLISH_CONFLICT",
@@ -327,7 +333,8 @@ public class GradeAppealService {
         }
         if (lockedEnrollments.size() != enrollmentIds.size()
                 || lockedEnrollments.stream().anyMatch(row -> !section.equals(text(row.get("section_id")))
-                        || !"PUBLISHED".equals(text(row.get("grade_status"))))) {
+                        || !"PUBLISHED".equals(text(row.get("grade_status")))
+                        || !isGradeableEnrollmentStatus(text(row.get("enrollment_status"))))) {
             throw problem(HttpStatus.CONFLICT, "GRADE_UNPUBLISH_CONFLICT",
                     "The selected grades changed before they could be unpublished");
         }
@@ -520,6 +527,10 @@ public class GradeAppealService {
 
     private static String actorOr(String actor, String fallback) {
         return actor == null || actor.isBlank() ? fallback : actor;
+    }
+
+    private static boolean isGradeableEnrollmentStatus(String status) {
+        return status != null && Set.of("ENROLLED", "CONFIRMED", "COMPLETED").contains(status);
     }
 
     private static String text(Object value) {
