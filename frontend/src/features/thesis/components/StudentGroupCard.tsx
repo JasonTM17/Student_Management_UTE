@@ -104,9 +104,9 @@ export default function StudentGroupCard({
                     {groupStatusLabel}
                   </span>
                   <StatusBadge status={group.approvalStatus} variant="approval" />
-                  <span className="inline-flex items-center gap-1 rounded-md bg-muted px-2 py-0.5 text-[11px] font-semibold text-foreground">
-                    {pageCopy.yourRoleLabel}{' '}
-                    {roleLabel}
+                  <span className="inline-flex max-w-full flex-wrap items-center gap-1 rounded-md bg-muted px-2 py-0.5 text-[11px] font-semibold text-foreground">
+                    <span className="shrink-0 text-muted-foreground">{pageCopy.yourRoleLabel}</span>
+                    <span className="break-words">{roleLabel}</span>
                   </span>
                 </div>
                 <h4 className="text-sm font-semibold text-foreground truncate" title={topicTitle ?? undefined}>
@@ -228,7 +228,7 @@ export default function StudentGroupCard({
                             {member.displayName}
                           </span>
                           {member.isLeader ? (
-                            <span className="inline-flex items-center gap-1 rounded-md bg-amber-500/15 px-2 py-0.5 text-[11px] font-semibold text-amber-800 dark:text-amber-300">
+                            <span className="inline-flex shrink-0 items-center gap-1 rounded-md bg-amber-500/15 px-2 py-0.5 text-[11px] font-semibold text-amber-800 dark:text-amber-300">
                               <Shield className="h-3 w-3" />
                               {messages.thesis.leaderBadge}
                             </span>

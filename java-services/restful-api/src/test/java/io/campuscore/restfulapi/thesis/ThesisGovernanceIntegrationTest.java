@@ -1195,11 +1195,15 @@ class ThesisGovernanceIntegrationTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$[0].studentId").value("gov-search-target"));
 
-        // The directory also matches the campus email while a round is open.
+        // Email is now a first-class search surface for leaders inviting
+        // classmates (the roster UI also displays it), so an email fragment
+        // resolves the student and the hit carries the address.
         mvc.perform(get("/api/v1/thesis/students/search").param("q", "unique-target-mail")
                         .with(studentJwt("gov-search-caller")))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$[0].studentId").value("gov-search-target"));
+                .andExpect(jsonPath("$.length()").value(1))
+                .andExpect(jsonPath("$[0].studentId").value("gov-search-target"))
+                .andExpect(jsonPath("$[0].email").value("unique-target-mail@campuscore.edu"));
     }
 
     @Test
