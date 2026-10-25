@@ -91,8 +91,10 @@ test('admin unchanged schedule save retains every timestamp and supported precis
   // datetime-local .value normalizes .140 to .14, so compare valueAsNumber —
   // the civil fields encoded as UTC per the HTML spec — which keeps
   // millisecond precision regardless of the test-runner timezone.
+  // The modal lists fields in schedule order; locate the registration start
+  // input by its label rather than by position.
   await expect.poll(() =>
-    modal.locator('input[type="datetime-local"]').first()
+    modal.getByLabel('Registration start', { exact: true })
       .evaluate((input: HTMLInputElement) => input.valueAsNumber),
   ).toBe(Date.parse(`${bangkok(ROUND_A.registrationStart)}Z`));
   await modal.getByRole('button', { name: 'Edit schedule', exact: true }).click();
