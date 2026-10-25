@@ -307,7 +307,7 @@ export function AnnouncementEditModal({
         </div>
 
         {/* Metadata Controls: Priority & Target Role */}
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 sm:items-end">
           <div>
             <label
               htmlFor="announcement-edit-priority"
