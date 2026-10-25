@@ -12,3 +12,9 @@ paths = [
   '''^\.cursor/skills/''',
   '''^engineer/skills/''',
 ]
+
+[[allowlists]]
+description = "ops/thesis-demo-data/expected-image.sql is a generated artifact: it embeds md5 content hashes of demo marker rows, not credentials"
+paths = [
+  '''^ops/thesis-demo-data/expected-image\.sql$''',
+]
