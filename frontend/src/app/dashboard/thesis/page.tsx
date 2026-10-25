@@ -50,6 +50,7 @@ import { useI18n } from '@/i18n';
 import { ThesisWorkflowStepper } from '@/components/thesis/ThesisWorkflowStepper';
 import { ThesisRegulationGuide } from '@/components/thesis/ThesisRegulationGuide';
 import { RoundMilestoneCard } from '@/components/thesis/RoundMilestoneCard';
+import { formatThesisDateTime } from '@/lib/thesis-datetime';
 import CouncilDefenseWorkspace from '@/features/thesis/components/CouncilDefenseWorkspace';
 import GvpbReviewPanel from '@/features/thesis/components/GvpbReviewPanel';
 import {
@@ -140,7 +141,10 @@ export default function ThesisPage() {
   const canProposeTopics = canLoadStaffRelations;
   const isTopicApprover = Boolean(isAdmin || isDepartmentHead);
   const isSupervisorOrAdmin = canLoadStaffRelations;
-  const { locale, formatDateTime, messages } = useI18n();
+  const { locale, messages } = useI18n();
+  // Every phase window and deadline on this workspace is a faculty clock, not
+  // a viewer-local one — pin the shared dd/MM/yyyy HH:mm Asia/Bangkok display.
+  const formatDateTime = formatThesisDateTime;
   const pageCopy = messages.thesisWorkflow.page;
   const searchParams = useSearchParams();
   const explicitRoundId = searchParams.get('roundId') || '';

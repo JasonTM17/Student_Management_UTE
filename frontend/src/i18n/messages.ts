@@ -3083,6 +3083,9 @@ export const en = {
     typeMonHoc: 'Course project (MON_HOC)',
     typeMonHocSub: 'Hands-on project within a specialized course',
     typeFallbackSub: 'Academic topic registration round',
+    remainingDaysHours: 'Remaining: {d}d {h}h',
+    remainingHoursMinutes: 'Remaining: {h}h {m}m',
+    remainingMinutes: 'Remaining: {m}m',
   },
   studentCard: {
     ribbonTitle: 'STUDENT INFORMATION',
@@ -6319,6 +6322,9 @@ export const vi: I18nMessages = {
     typeMonHoc: 'Đồ án môn học (MON_HOC)',
     typeMonHocSub: 'Đồ án thực hành theo học phần chuyên ngành',
     typeFallbackSub: 'Đợt đăng ký đề tài học vụ',
+    remainingDaysHours: 'Còn lại: {d} ngày {h} giờ',
+    remainingHoursMinutes: 'Còn lại: {h} giờ {m} phút',
+    remainingMinutes: 'Còn lại: {m} phút',
   },
   studentCard: {
     ribbonTitle: 'THÔNG TIN SINH VIÊN',
