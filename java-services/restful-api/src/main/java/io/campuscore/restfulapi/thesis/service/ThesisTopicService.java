@@ -163,7 +163,8 @@ public class ThesisTopicService {
                 && !ThesisDepartmentScope.owns(scope, actor, topic.getDepartmentId())) {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Thesis topic not found");
         }
-        if ("WITHDRAWN".equals(topic.getResultStatus()) && isStudentScoped(actor) && !isOwner(topic, actor)) {
+        if ("WITHDRAWN".equals(topic.getResultStatus()) && isStudentScoped(actor) && !isOwner(topic, actor)
+                && !belongsToTopicGroup(topic.getId(), actor)) {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Thesis topic not found");
         }
         boolean published = isRoundResultsPublished(topic.getRoundId());
@@ -248,6 +249,12 @@ public class ThesisTopicService {
     private boolean isRoundResultsPublished(UUID roundId) {
         Integer published = scope.countPublishedResultsRounds(roundId);
         return published != null && published > 0;
+    }
+
+    /** Members of a group bound to the topic keep reading it after a withdrawal. */
+    private boolean belongsToTopicGroup(UUID topicId, Jwt actor) {
+        String studentId = normalize(actor == null ? null : actor.getClaimAsString("studentId"));
+        return !studentId.isEmpty() && !scope.findGroupTopicIds(studentId, List.of(topicId)).isEmpty();
     }
 
     private static boolean isOwner(ThesisTopic topic, Jwt actor) {
