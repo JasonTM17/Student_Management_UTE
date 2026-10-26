@@ -56,7 +56,6 @@ import { campusCodeMessage } from '@/lib/campus-error';
 import {
   databaseClockSample,
   estimatedServerNow,
-  gvpbDeadlineExtensionBlocker,
   lateTopicAvailability,
   mergePublishResultsReadiness,
   publishBlockerTopicTitles,
@@ -1384,12 +1383,6 @@ export default function AdminThesisPage() {
                       )
                     : messages.thesis.admin.lateTopicRegistrationUnavailable
                   : '';
-              const gvpbExtensionUnavailableAt = gvpbDeadlineExtensionBlocker(round.reportDate, lifecycleNow);
-              const gvpbExtensionUnavailableReason = gvpbExtensionUnavailableAt
-                ? messages.thesis.admin.gvpbExtensionReportDatePassed.replace(
-                    '{date}', formatAdminInstant(gvpbExtensionUnavailableAt),
-                  )
-                : '';
               const registrationOpenReason = registrationOpenWindow.reasonCode === 'REGISTRATION_EARLY_OPEN_BLOCKED'
                 ? messages.common.campusErrors.codes.REGISTRATION_EARLY_OPEN_BLOCKED
                   ?.replace('{end}', formatAdminInstant(round.lecturerSubmitEnd))
@@ -1593,16 +1586,12 @@ export default function AdminThesisPage() {
                                 size="sm"
                                 variant="outline"
                                 onClick={() => openExtendDeadlineModal(round, 'gvpb')}
-                                disabled={isSaving || Boolean(gvpbExtensionUnavailableReason)}
+                                disabled={isSaving}
                                 aria-describedby={`gvpb-deadline-reason-${round.id}`}
                               >
                                 {messages.thesis.admin.gvpbDeadlineExtend}
                               </Button>
-                              {gvpbExtensionUnavailableReason ? (
-                                <p id={`gvpb-deadline-reason-${round.id}`} role="status" className="max-w-md text-xs text-muted-foreground">
-                                  {gvpbExtensionUnavailableReason}
-                                </p>
-                              ) : <span id={`gvpb-deadline-reason-${round.id}`} className="sr-only">{messages.thesis.admin.gvpbExtensionAvailable}</span>}
+                              <span id={`gvpb-deadline-reason-${round.id}`} className="sr-only">{messages.thesis.admin.gvpbExtensionAvailable}</span>
                             </div>
                           ) : null}
                           {/* Late-topic escape: a supervisor who missed the
@@ -2693,6 +2682,9 @@ export default function AdminThesisPage() {
               ? messages.thesis.admin.gvpbDeadlineModalDescription
               : messages.thesis.admin.reportDeadlineModalDescription}
           </p>
+          {extendDeadlineKind === 'gvpb' ? (
+            <p className="text-xs text-muted-foreground">{messages.thesis.admin.gvpbDeadlineCascadeHint}</p>
+          ) : null}
           {extendDeadlineError ? (
             <div role="alert" className="rounded-md border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive">
               {extendDeadlineError}
