@@ -232,6 +232,25 @@ public class ThesisScopeRepository {
                 UUID.class);
     }
 
+    /**
+     * Topics among {@code topicIds} that a student's own group is bound to,
+     * whatever the group's approval state. A member keeps read access to the
+     * topic their group points at even when governance has withdrawn it.
+     */
+    public List<UUID> findGroupTopicIds(String studentId, List<UUID> topicIds) {
+        if (topicIds.isEmpty()) {
+            return List.of();
+        }
+        return jdbc.queryForList(
+                "SELECT DISTINCT g.topic_id FROM thesis.thesis_group g "
+                        + "JOIN thesis.thesis_group_member m ON m.group_id = g.id "
+                        + "WHERE m.student_id = :studentId AND g.topic_id IN (:topicIds)",
+                new MapSqlParameterSource()
+                        .addValue("studentId", studentId)
+                        .addValue("topicIds", topicIds),
+                UUID.class);
+    }
+
     public Integer countCouncilGrader(UUID topicId, String lecturerId) {
         return jdbc.queryForObject(
                 "SELECT COUNT(*) FROM thesis.thesis_council_topic ct "

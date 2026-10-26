@@ -111,6 +111,35 @@ class ThesisTopicVisibilityTest {
         assertEquals(published.getId(), service.get(published.getId(), jwt("student-user-101", "STUDENT")).id());
     }
 
+    @Test
+    void withdrawnTopicIsHiddenFromStudentsButRemainsVisibleToItsLecturer() throws ReflectiveOperationException {
+        ThesisTopic withdrawn = draftTopic("22222222-2222-2222-2222-222222222203", "lecturer-user-002");
+        setField(withdrawn, "status", TopicStatus.PUBLISHED);
+        setField(withdrawn, "resultStatus", "WITHDRAWN");
+        when(repository.findById(withdrawn.getId())).thenReturn(Optional.of(withdrawn));
+
+        ResponseStatusException hidden = assertThrows(ResponseStatusException.class,
+                () -> service.get(withdrawn.getId(), jwt("student-user-101", "STUDENT")));
+
+        assertEquals(HttpStatus.NOT_FOUND, hidden.getStatusCode());
+        assertEquals(withdrawn.getId(), service.get(withdrawn.getId(), jwt("lecturer-user-002", "LECTURER")).id());
+    }
+
+    @Test
+    void withdrawnTopicStaysReadableForMembersOfAGroupBoundToIt() throws ReflectiveOperationException {
+        ThesisTopic withdrawn = draftTopic("22222222-2222-2222-2222-222222222204", "lecturer-user-002");
+        setField(withdrawn, "status", TopicStatus.PUBLISHED);
+        setField(withdrawn, "resultStatus", "WITHDRAWN");
+        when(repository.findById(withdrawn.getId())).thenReturn(Optional.of(withdrawn));
+        Jwt member = studentJwt("student-user-101", "student-101");
+        when(scope.findGroupTopicIds(eq("student-101"), eq(List.of(withdrawn.getId()))))
+                .thenReturn(List.of(withdrawn.getId()));
+
+        assertEquals(withdrawn.getId(), service.get(withdrawn.getId(), member).id());
+        assertThrows(ResponseStatusException.class,
+                () -> service.get(withdrawn.getId(), studentJwt("student-user-102", "student-102")));
+    }
+
     /**
      * Spec R12/R18: after the round publishes results a student reads the
      * outcome of the topic their approved group took part in — and only that
