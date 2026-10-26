@@ -22,6 +22,7 @@ import {
   stripLocaleFromPathname,
 } from '@/i18n/paths';
 import { readLocaleCookie, resolveClientLocale } from '@/i18n/resolve-locale';
+import { parseDisplayDate } from '@/lib/format-display';
 
 interface I18nContextValue {
   locale: Locale;
@@ -118,7 +119,7 @@ export function I18nProvider({
       switchLocalePath: (pathname, nextLocale, search = '', hash = '') =>
         buildLocaleSwitchPath(pathname, nextLocale, search, hash),
       formatDate: (value, options) => {
-        const date = new Date(value);
+        const date = parseDisplayDate(value);
         // An unparseable API value used to throw RangeError out of Intl and
         // blank the whole render — print the same em-dash the UI uses for a
         // missing date instead.
@@ -131,7 +132,7 @@ export function I18nProvider({
         }).format(date);
       },
       formatDateTime: (value, options) => {
-        const date = new Date(value);
+        const date = parseDisplayDate(value);
         if (Number.isNaN(date.getTime())) return '—';
         return new Intl.DateTimeFormat(intlLocale, {
           year: 'numeric',
