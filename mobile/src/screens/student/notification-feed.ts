@@ -19,3 +19,26 @@ export function mergeNotificationItems(
   }
   return merged;
 }
+
+/**
+ * The backend sends `createdAt` as an ISO instant; showing it raw is
+ * unreadable, so it is rendered like the web's formatDateTime. Non-date
+ * values (preview rows carry labels such as "10m") pass through untouched.
+ */
+export function formatNotificationTimestamp(value: string | null | undefined): string {
+  const raw = (value ?? '').trim();
+  if (!raw) {
+    return '';
+  }
+  const parsed = new Date(raw);
+  if (Number.isNaN(parsed.getTime())) {
+    return raw;
+  }
+  return parsed.toLocaleString(undefined, {
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  });
+}

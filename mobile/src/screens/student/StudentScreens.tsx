@@ -20,8 +20,10 @@ import {
 import { tokens } from '../../design/tokens';
 import { ApiClientError, apiClient, campusApi, type AuthUser, type JsonObject, type MobileAttendanceSummary, type MobileEnrollment, type MobileNotification, type RegistrationCatalogSection } from '../../api/client';
 import { calculateAttendanceRate } from '../../lib/attendance-rate';
-import { mergeNotificationItems } from './notification-feed';
-import { loadRegistrationCatalog } from './registration-window';
+import { isActiveEnrollment, isActiveEnrollmentStatus, isScheduledEnrollment } from '../../lib/enrollment-status';
+import { passwordIssue, profileAddressIssue, profilePhoneIssue, type PasswordIssue, type ProfileFieldIssue } from '../../lib/profile-validation';
+import { formatNotificationTimestamp, mergeNotificationItems } from './notification-feed';
+import { describeSectionSlot, loadRegistrationCatalog } from './registration-window';
 import type { MobileScreenProps } from '../../navigation/types';
 
 const NOTIFICATION_PAGE_SIZE = 20;
@@ -35,6 +37,7 @@ const friendlyErrorMessageByCode: Record<string, string> = {
   HTTP_403: 'You do not have access to this action.',
   HTTP_404: 'We could not find that item.',
   INVALID_REQUEST: 'Please review the information and try again.',
+  PASSWORD_CHANGE_REQUIRED: 'Change your temporary password in Profile to continue.',
   ROUND_NOT_FOUND: 'Registration is not open right now.',
   UNAUTHENTICATED: 'Please sign in again to continue.',
   WINDOW_CLOSED: 'Registration is not open right now.',
@@ -135,9 +138,7 @@ export function StudentDashboardScreen({ navigation }: MobileScreenProps) {
     async () => (await campusApi.announcements()).data ?? [],
     'Announcements are unavailable.',
   );
-  const activeEnrollments = liveEnrollments.filter(
-    (item) => item.status === 'ENROLLED' && item.section?.status !== 'CANCELLED',
-  );
+  const activeEnrollments = liveEnrollments.filter(isActiveEnrollment);
   const dashboardClasses: Array<{ semesterId?: string; code: string; name: string; time: string; room: string }> = apiClient.mode === 'preview'
     ? upcomingClasses
     : activeEnrollments.slice(0, 3).map((item) => ({
@@ -236,7 +237,7 @@ export function ScheduleScreen({ navigation }: MobileScreenProps) {
     'Schedule is unavailable.',
   );
   const liveSchedule = liveEnrollments
-    .filter((item) => item.section?.status !== 'CANCELLED')
+    .filter(isScheduledEnrollment)
     .flatMap((item) => (item.section?.schedules ?? []).map((slot) => ({
     code: item.section?.course?.code ?? item.section?.sectionNumber ?? item.sectionId,
     name: item.section?.course?.nameVi ?? item.section?.course?.name ?? 'Course',
@@ -334,7 +335,7 @@ export function CoursesScreen({ navigation }: MobileScreenProps) {
   const visibleCourses: Array<{ semesterId?: string; code: string; name: string; lecturer: string; progress: number; status: string }> = apiClient.mode === 'preview'
     ? courses
     : liveEnrollments
-      .filter((item) => item.status === 'ENROLLED' && item.section?.status !== 'CANCELLED')
+      .filter(isActiveEnrollment)
       .map((item) => ({
         code: item.section?.course?.code ?? item.section?.sectionNumber ?? item.sectionId,
         name: item.section?.course?.nameVi ?? item.section?.course?.name ?? 'Course',
@@ -558,9 +559,7 @@ export function RegistrationScreen({ navigation }: MobileScreenProps) {
   const liveSections = registrationData.sections;
   const enrollments = registrationData.enrollments;
   const roundOpen = registrationData.roundOpen;
-  const activeEnrollmentCount = enrollments.filter(
-    (item) => item.status !== 'DROPPED' && item.section?.status !== 'CANCELLED',
-  ).length;
+  const activeEnrollmentCount = enrollments.filter(isActiveEnrollment).length;
 
   const availableSections: Array<{ id: string; code: string; name: string; slot: string; seats: string; status?: string }> = apiClient.mode === 'preview'
     ? [
@@ -573,7 +572,7 @@ export function RegistrationScreen({ navigation }: MobileScreenProps) {
         id: section.id,
         code: section.courseCode,
         name: section.courseName,
-        slot: 'Schedule pending',
+        slot: describeSectionSlot(section),
         seats: section.remainingSeats > 0 ? `${section.remainingSeats} seats left` : 'Full',
         status: section.status,
       }));
@@ -583,7 +582,7 @@ export function RegistrationScreen({ navigation }: MobileScreenProps) {
     setPending(sectionId);
     setMutationError(null);
     try {
-      const existing = enrollments.find((item) => item.sectionId === sectionId && item.status !== 'DROPPED');
+      const existing = enrollments.find((item) => item.sectionId === sectionId && isActiveEnrollmentStatus(item.status));
       if (existing) {
         await campusApi.dropEnrollment(existing.id);
         setRegistrationData((current) => ({
@@ -644,7 +643,7 @@ export function RegistrationScreen({ navigation }: MobileScreenProps) {
         <StatePanel kind="error" title="Could not update registration" description={mutationError} />
       ) : null}
       {availableSections.map((section) => {
-        const enrolled = enrollments.some((item) => item.sectionId === section.id && item.status !== 'DROPPED');
+        const enrolled = enrollments.some((item) => item.sectionId === section.id && isActiveEnrollmentStatus(item.status));
         const isPreview = apiClient.mode === 'preview';
         const cancelled = section.status === 'CANCELLED';
         // A cancelled section stays droppable at any time so a student is
@@ -835,7 +834,7 @@ export function NotificationsScreen({ navigation }: MobileScreenProps) {
           <View key={notification.id}>
             <ListRow
               leading={notification.isRead ? '·' : '•'}
-              meta={notification.createdAt}
+              meta={formatNotificationTimestamp(notification.createdAt)}
               onPress={apiClient.mode === 'live' && !notification.isRead && busyId !== notification.id
                 ? () => void markRead(notification.id)
                 : undefined}
@@ -879,6 +878,20 @@ export function NotificationsScreen({ navigation }: MobileScreenProps) {
   );
 }
 
+const profileFieldIssueMessages: Record<ProfileFieldIssue, string> = {
+  ADDRESS_TOO_LONG: 'Address must be at most 500 characters.',
+  PHONE_INVALID: 'Enter a valid phone number.',
+  PHONE_TOO_LONG: 'Phone must be at most 80 characters.',
+};
+
+const passwordIssueMessages: Record<PasswordIssue, string> = {
+  PASSWORD_CONTAINS_IDENTITY: 'New password must not contain your email address.',
+  PASSWORD_REUSED: 'New password must be different from the current one.',
+  PASSWORD_TOO_LONG: 'New password must be at most 128 characters.',
+  PASSWORD_TOO_SHORT: 'New password must be at least 8 characters.',
+  PASSWORD_TOO_WEAK: 'New password must contain at least one letter and one digit.',
+};
+
 export function ProfileScreen({ navigation, role }: MobileScreenProps) {
   const {
     data: account,
@@ -904,6 +917,11 @@ export function ProfileScreen({ navigation, role }: MobileScreenProps) {
   }, [account]);
 
   const saveProfile = async () => {
+    const fieldIssue = profilePhoneIssue(phone.trim()) ?? profileAddressIssue(address.trim());
+    if (fieldIssue) {
+      setProfileMessage(profileFieldIssueMessages[fieldIssue]);
+      return;
+    }
     setIsSavingProfile(true);
     setProfileMessage(null);
     try {
@@ -920,8 +938,13 @@ export function ProfileScreen({ navigation, role }: MobileScreenProps) {
   };
 
   const updatePassword = async () => {
-    if (newPassword.length < 8) {
-      setProfileMessage('New password must be at least 8 characters.');
+    if (!oldPassword) {
+      setProfileMessage('Enter your current password.');
+      return;
+    }
+    const issue = passwordIssue(newPassword, { email: account?.email, currentPassword: oldPassword });
+    if (issue) {
+      setProfileMessage(passwordIssueMessages[issue]);
       return;
     }
     setIsSavingPassword(true);
@@ -937,6 +960,7 @@ export function ProfileScreen({ navigation, role }: MobileScreenProps) {
       setProfileMessage('Password updated.');
       setOldPassword('');
       setNewPassword('');
+      void reload();
     } catch {
       setProfileMessage('Password could not be updated.');
     } finally {
@@ -1006,6 +1030,11 @@ export function ProfileScreen({ navigation, role }: MobileScreenProps) {
               loading={isSavingProfile}
               onPress={() => void saveProfile()}
             />
+            {account?.mustChangePassword ? (
+              <UiText variant="bodySmall" tone="warning" style={styles.cardCopy}>
+                Your account uses a temporary password. Change it below to unlock the rest of the app.
+              </UiText>
+            ) : null}
             <Field label="Current password" value={oldPassword} onChangeText={setOldPassword} secureTextEntry />
             <Field label="New password" value={newPassword} onChangeText={setNewPassword} secureTextEntry />
             <Button

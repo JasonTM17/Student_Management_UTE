@@ -92,6 +92,7 @@ export interface AuthUser {
   permissions?: string[];
   studentId?: string | null;
   lecturerId?: string | null;
+  mustChangePassword?: boolean;
 }
 
 export interface LoginResponse {
@@ -142,6 +143,14 @@ export interface MobileSection {
   schedules?: Array<{ dayOfWeek: number; startTime: string; endTime: string; classroom?: { building?: string; roomNumber?: string } }>;
 }
 
+export interface RegistrationCatalogSchedule {
+  dayOfWeek?: number | null;
+  startTime?: string | null;
+  endTime?: string | null;
+  room?: string | null;
+  lecturer?: string | null;
+}
+
 export interface RegistrationCatalogSection {
   id: string;
   sectionNumber: string;
@@ -155,6 +164,7 @@ export interface RegistrationCatalogSection {
   status: string;
   scheduleConflict?: boolean;
   alreadyEnrolled?: boolean;
+  schedules?: RegistrationCatalogSchedule[];
 }
 
 export interface MobileEnrollment {
