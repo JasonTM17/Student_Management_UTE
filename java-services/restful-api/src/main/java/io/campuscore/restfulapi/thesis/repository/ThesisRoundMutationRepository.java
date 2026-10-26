@@ -223,16 +223,20 @@ public class ThesisRoundMutationRepository {
 
     public Map<String, Object> lockGvpbDeadlineRow(UUID id) {
         return one(jdbc,
-                "SELECT status, thesis_type, gvpb_deadline, report_date, report_deadline FROM thesis.thesis_registration_round "
+                "SELECT status, thesis_type, gvpb_deadline, report_date, defense_date, report_deadline FROM thesis.thesis_registration_round "
                         + "WHERE id = :id FOR UPDATE",
                 params().addValue("id", id), "ROUND_NOT_FOUND", ROUND_NOT_FOUND_MESSAGE);
     }
 
-    public int setGvpbDeadline(UUID id, Timestamp gvpbDeadline) {
+    public int setGvpbDeadline(UUID id, Timestamp gvpbDeadline, Timestamp reportDate, Timestamp defenseDate) {
         return jdbc.update(
                 "UPDATE thesis.thesis_registration_round SET gvpb_deadline = :gvpbDeadline, "
+                        + "report_date = :reportDate, defense_date = :defenseDate, "
                         + "updated_at = CURRENT_TIMESTAMP, version = version + 1 WHERE id = :id",
-                params().addValue("id", id).addValue("gvpbDeadline", gvpbDeadline));
+                params().addValue("id", id)
+                        .addValue("gvpbDeadline", gvpbDeadline)
+                        .addValue("reportDate", reportDate)
+                        .addValue("defenseDate", defenseDate));
     }
 
     /** Unlocked registration window read for the open-registration transition guard. */
