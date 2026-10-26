@@ -1,6 +1,6 @@
 import type { NextRequest } from 'next/server';
 
-import { buildApiProxyUrl } from '@/lib/proxy-url';
+import { buildApiProxyUrl, ProxyPathError } from '@/lib/proxy-url';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -46,7 +46,15 @@ async function handle(request: NextRequest, context: RouteContext) {
     headers.set('x-campuscore-client-ip', clientIp);
   }
 
-  const upstreamUrl = buildApiProxyUrl(origin, path, request.nextUrl.search);
+  let upstreamUrl: URL;
+  try {
+    upstreamUrl = buildApiProxyUrl(origin, path, request.nextUrl.search);
+  } catch (error) {
+    if (error instanceof ProxyPathError) {
+      return new Response(null, { status: 400 });
+    }
+    throw error;
+  }
 
   const response = await fetch(upstreamUrl, {
     method: request.method,
