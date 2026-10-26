@@ -179,6 +179,8 @@ export const en = {
         INVALID_SEMESTER_STATUS: 'Choose a valid semester status.',
         REFERENCE_NOT_FOUND: 'A selected academic record could not be found. Refresh and choose it again.',
         RESOURCE_IN_USE: 'This record is still used by another academic record and cannot be deleted.',
+        SECTION_HAS_ENROLLMENTS:
+          'Course and semester cannot change once students are enrolled in the section.',
         SECTION_NOT_FOUND: 'This class section is no longer available.',
         SEMESTER_DATES_OVERLAP: 'This semester overlaps another semester in the same academic year.',
         STUDENT_NOT_FOUND: 'Your student profile could not be found. Contact your administrator.',
@@ -3716,6 +3718,8 @@ export const vi: I18nMessages = {
         INVALID_SEMESTER_STATUS: 'Hãy chọn trạng thái học kỳ hợp lệ.',
         REFERENCE_NOT_FOUND: 'Không tìm thấy hồ sơ học vụ đã chọn. Hãy tải lại và chọn lại.',
         RESOURCE_IN_USE: 'Không thể xóa hồ sơ này vì vẫn đang được hồ sơ học vụ khác sử dụng.',
+        SECTION_HAS_ENROLLMENTS:
+          'Không thể đổi môn học hoặc học kỳ khi lớp học phần đã có sinh viên đăng ký.',
         SECTION_NOT_FOUND: 'Lớp học phần này không còn khả dụng.',
         SEMESTER_DATES_OVERLAP: 'Học kỳ này bị trùng thời gian với học kỳ khác trong cùng năm học.',
         STUDENT_NOT_FOUND: 'Không tìm thấy hồ sơ sinh viên. Vui lòng liên hệ quản trị viên.',

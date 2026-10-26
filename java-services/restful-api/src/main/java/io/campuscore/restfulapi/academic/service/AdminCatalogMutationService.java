@@ -962,8 +962,12 @@ public class AdminCatalogMutationService {
         }
         boolean touchesCapacity = input.containsKey("capacity");
         boolean touchesRoom = input.containsKey("classroomId");
+        boolean touchesScope = input.containsKey("courseId") || input.containsKey("semesterId");
+        Map<String, Object> current = null;
+        if (touchesCapacity || touchesRoom || touchesScope) {
+            current = requireRow(SECTION, id);
+        }
         if (touchesCapacity || touchesRoom) {
-            Map<String, Object> current = requireRow(SECTION, id);
             int capacity = touchesCapacity
                     ? number(input, "capacity", 0)
                     : ((Number) current.get("capacity")).intValue();
@@ -996,6 +1000,20 @@ public class AdminCatalogMutationService {
         String semesterId = text(input, "semesterId", null);
         if (input.containsKey("semesterId") && semesterId != null) {
             requireCatalogReference(SEMESTER, "semesterId", semesterId);
+        }
+        // Every enrollment row carries its own courseId/semesterId copy, so
+        // re-scoping the section behind those rows would split the record.
+        boolean rescopes = input.containsKey("courseId") && !java.util.Objects.equals(courseId, current.get("courseId"))
+                || input.containsKey("semesterId") && !java.util.Objects.equals(semesterId, current.get("semesterId"));
+        if (rescopes) {
+            Long enrollments = jdbc.queryForObject(
+                    "SELECT COUNT(*) FROM " + ENROLLMENT + " WHERE \"sectionId\" = :sectionId",
+                    new MapSqlParameterSource("sectionId", id),
+                    Long.class);
+            if (enrollments != null && enrollments > 0) {
+                throw problem(HttpStatus.CONFLICT, "SECTION_HAS_ENROLLMENTS",
+                        "Course and semester cannot change once students are enrolled in the section");
+            }
         }
         String lecturerId = text(input, "lecturerId", null);
         if (input.containsKey("lecturerId") && lecturerId != null) {
