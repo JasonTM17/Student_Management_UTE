@@ -77,6 +77,18 @@ test('the Java API proxy preserves query parameters and encodes path segments', 
   );
 });
 
+test('the Java API proxy refuses dot segments that would leave the API prefix', () => {
+  const { buildApiProxyUrl } = loadTypeScriptModule('src/lib/proxy-url.ts');
+
+  for (const path of [['..', 'actuator', 'health'], ['sections', '..', '..', 'x'], ['.', 'sections']]) {
+    assert.throws(() => buildApiProxyUrl('http://127.0.0.1:4010', path, ''), /Dot segments/);
+  }
+  assert.equal(
+    buildApiProxyUrl('http://127.0.0.1:4010', ['files', 'a..b'], '').toString(),
+    'http://127.0.0.1:4010/api/v1/files/a..b',
+  );
+});
+
 test('site metadata defaults to the local course demo and contains no retired domain', () => {
   const siteSource = read('src/lib/site.ts');
   const envExample = read('.env.example');
