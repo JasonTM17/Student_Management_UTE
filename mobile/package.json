@@ -7,7 +7,7 @@
     "start": "expo start",
     "android": "expo start --android",
     "ios": "expo start --ios",
-    "test": "node --test tests/screen-atlas.test.mjs tests/phase-six-repair.test.mjs tests/student-json.test.mjs tests/session-rotation.test.mjs tests/sign-in-role-gate.test.mjs tests/two-factor-sign-in.test.mjs tests/notification-feed.test.mjs tests/registration-window.test.mjs tests/attendance-rate.test.mjs tests/notification-timestamp.test.mjs",
+    "test": "node --test tests/screen-atlas.test.mjs tests/phase-six-repair.test.mjs tests/student-json.test.mjs tests/session-rotation.test.mjs tests/sign-in-role-gate.test.mjs tests/two-factor-sign-in.test.mjs tests/notification-feed.test.mjs tests/registration-window.test.mjs tests/attendance-rate.test.mjs tests/notification-timestamp.test.mjs tests/enrollment-status.test.mjs",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
