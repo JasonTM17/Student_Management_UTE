@@ -69,11 +69,13 @@ test('the thesis page classifies scores through the shared scale', () => {
 });
 
 test('the backend transcript map adopts the same 4.0 convention', () => {
+  const scale = readJavaSource('LetterGrades');
+  assert.ok(scale.includes('Map.entry("B+", BigDecimal.valueOf(3.5))'), 'backend B+ must convert to 3.5');
+  assert.ok(scale.includes('Map.entry("C+", BigDecimal.valueOf(2.5))'), 'backend C+ must convert to 2.5');
+  assert.ok(scale.includes('Map.entry("D+", BigDecimal.valueOf(1.5))'), 'backend D+ must convert to 1.5');
+  assert.ok(!scale.includes('BigDecimal.valueOf(3.3)'), 'the US-style 3.3 point must be gone');
   const source = readJavaSource('AcademicEnrollmentReadService');
-  assert.ok(source.includes('Map.entry("B+", BigDecimal.valueOf(3.5))'), 'backend B+ must convert to 3.5');
-  assert.ok(source.includes('Map.entry("C+", BigDecimal.valueOf(2.5))'), 'backend C+ must convert to 2.5');
-  assert.ok(source.includes('Map.entry("D+", BigDecimal.valueOf(1.5))'), 'backend D+ must convert to 1.5');
-  assert.ok(!source.includes('BigDecimal.valueOf(3.3)'), 'the US-style 3.3 point must be gone');
+  assert.ok(source.includes('LetterGrades.points'), 'the transcript must read the shared letter scale');
 });
 
 // ---------- Item 6: catalog is the only topic chooser ----------
