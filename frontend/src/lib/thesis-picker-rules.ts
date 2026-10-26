@@ -21,6 +21,8 @@
 export interface LecturerIdentity {
   id: string;
   userId?: string | null;
+  /** Bound account, when the directory carries it — status decides assignability. */
+  user?: { status?: string | null } | null;
 }
 
 export interface TopicReviewerRef {
@@ -29,6 +31,7 @@ export interface TopicReviewerRef {
 }
 
 export type PickerConflictKey =
+  | 'conflictNoUserAccount'
   | 'conflictSupervisorOfTopic'
   | 'conflictCouncilMemberOfTopic'
   | 'conflictReviewsAssignedTopic'
@@ -80,6 +83,16 @@ export function reviewerConflict(args: {
   supervisorIds: readonly string[];
   councilMemberIds: readonly string[];
 }): PickerConflictKey | null {
+  // A profile without a live bound account can never sign in to submit — the
+  // backend refuses it (LECTURER_ACCOUNT_REQUIRED), so it stays out of the picker.
+  if (
+    !args.lecturer.userId ||
+    (args.lecturer.user != null &&
+      args.lecturer.user.status != null &&
+      args.lecturer.user.status !== 'ACTIVE')
+  ) {
+    return 'conflictNoUserAccount';
+  }
   if (lecturerMatches(args.lecturer, args.supervisorIds)) {
     return 'conflictSupervisorOfTopic';
   }
