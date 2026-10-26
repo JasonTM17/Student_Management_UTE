@@ -63,9 +63,9 @@ test('student screens key enrollment lists by semester and guard profile saves',
   assert.doesNotMatch(screens, /key=\{item\.code\}|key=\{course\.code\}|key=\{grade\.code\}/);
   // Dashboard and courses speak for active enrollments, not dropped history
   // or sections an admin cancelled underneath the student.
-  assert.match(dashboard, /liveEnrollments\.filter\(\s*\(item\) => item\.status === 'ENROLLED' && item\.section\?\.status !== 'CANCELLED'/);
+  assert.match(dashboard, /liveEnrollments\.filter\(isActiveEnrollment\)/);
   assert.match(dashboard, /String\(activeEnrollments\.length\)/);
-  assert.match(courses, /liveEnrollments\s*\.filter\(\(item\) => item\.status === 'ENROLLED' && item\.section\?\.status !== 'CANCELLED'\)/);
+  assert.match(courses, /liveEnrollments\s*\r?\n?\s*\.filter\(isActiveEnrollment\)/);
   // Schedule times must build with the same separator the card parses.
   assert.match(schedule, /slot\.startTime\} – \$\{slot\.endTime\}/);
   // Profile and password actions clear stale messages, validate input, and

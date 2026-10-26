@@ -20,6 +20,7 @@ import {
 import { tokens } from '../../design/tokens';
 import { ApiClientError, apiClient, campusApi, type AuthUser, type JsonObject, type MobileAttendanceSummary, type MobileEnrollment, type MobileNotification, type RegistrationCatalogSection } from '../../api/client';
 import { calculateAttendanceRate } from '../../lib/attendance-rate';
+import { isActiveEnrollment, isScheduledEnrollment } from '../../lib/enrollment-status';
 import { formatNotificationTimestamp, mergeNotificationItems } from './notification-feed';
 import { loadRegistrationCatalog } from './registration-window';
 import type { MobileScreenProps } from '../../navigation/types';
@@ -135,9 +136,7 @@ export function StudentDashboardScreen({ navigation }: MobileScreenProps) {
     async () => (await campusApi.announcements()).data ?? [],
     'Announcements are unavailable.',
   );
-  const activeEnrollments = liveEnrollments.filter(
-    (item) => item.status === 'ENROLLED' && item.section?.status !== 'CANCELLED',
-  );
+  const activeEnrollments = liveEnrollments.filter(isActiveEnrollment);
   const dashboardClasses: Array<{ semesterId?: string; code: string; name: string; time: string; room: string }> = apiClient.mode === 'preview'
     ? upcomingClasses
     : activeEnrollments.slice(0, 3).map((item) => ({
@@ -236,7 +235,7 @@ export function ScheduleScreen({ navigation }: MobileScreenProps) {
     'Schedule is unavailable.',
   );
   const liveSchedule = liveEnrollments
-    .filter((item) => item.section?.status !== 'CANCELLED')
+    .filter(isScheduledEnrollment)
     .flatMap((item) => (item.section?.schedules ?? []).map((slot) => ({
     code: item.section?.course?.code ?? item.section?.sectionNumber ?? item.sectionId,
     name: item.section?.course?.nameVi ?? item.section?.course?.name ?? 'Course',
@@ -334,7 +333,7 @@ export function CoursesScreen({ navigation }: MobileScreenProps) {
   const visibleCourses: Array<{ semesterId?: string; code: string; name: string; lecturer: string; progress: number; status: string }> = apiClient.mode === 'preview'
     ? courses
     : liveEnrollments
-      .filter((item) => item.status === 'ENROLLED' && item.section?.status !== 'CANCELLED')
+      .filter(isActiveEnrollment)
       .map((item) => ({
         code: item.section?.course?.code ?? item.section?.sectionNumber ?? item.sectionId,
         name: item.section?.course?.nameVi ?? item.section?.course?.name ?? 'Course',
