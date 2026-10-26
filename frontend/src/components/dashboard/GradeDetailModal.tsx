@@ -9,6 +9,7 @@ import { StudentGradeRecord, StudentGradesByEnrollmentResponse, GradeAppeal, Gra
 import { useI18n } from '@/i18n';
 import { getLocalizedFlatLabel } from '@/lib/academic-content';
 import { resolveGradePoint } from '@/lib/grade-scale';
+import { shouldShowAppealDeadline } from '@/lib/grade-appeal-deadline';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { campusCodeMessage } from '@/lib/campus-error';
@@ -390,7 +391,7 @@ export function GradeDetailModal({ isOpen, onClose, record, onAppealChanged }: G
             <div className="flex flex-wrap items-start justify-between gap-3">
               <div>
                 <h4 id="grade-appeal-title" className="font-semibold text-foreground">{studentCopy.historyTitle}</h4>
-                {appealDeadline ? (
+                {shouldShowAppealDeadline(eligibility?.appealAllowed === true, appealDeadline) ? (
                   <p className="mt-1 text-sm text-muted-foreground">
                     {studentCopy.appealUntil.replace('{date}', formatDateTime(appealDeadline, { timeZone: 'Asia/Bangkok' }))}
                   </p>
