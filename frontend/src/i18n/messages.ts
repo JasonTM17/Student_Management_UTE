@@ -3039,8 +3039,6 @@ export const en = {
         REPORT_DEADLINE_BEFORE_CURRENT: 'Choose a report deadline on or after {date}.',
         GVPB_DEADLINE_NOT_FUTURE: 'Choose a counter-review deadline in the future.',
         GVPB_DEADLINE_BEFORE_CURRENT: 'Choose a counter-review deadline on or after {date}.',
-        GVPB_DEADLINE_AFTER_REPORT_DATE:
-          'The counter-review deadline must be on or before the report date ({date}). Choose an earlier deadline.',
       },
       created: 'Thesis round created successfully.',
       openProposals: 'Open topic proposals (GV)',
@@ -3144,11 +3142,12 @@ export const en = {
       reportDeadlineInvalid: 'Choose a deadline in the future.',
       reportDeadlineSuccess: 'Report deadline extended.',
       gvpbDeadlineExtend: 'Extend counter-review deadline',
-      gvpbExtensionAvailable: 'The counter-review deadline can be extended before the report date.',
-      gvpbExtensionReportDatePassed: 'The report date has passed ({date}); the counter-review deadline cannot be extended.',
+      gvpbExtensionAvailable: 'The counter-review deadline can be extended for a live round.',
       gvpbDeadlineModalTitle: 'Extend counter-review deadline',
       gvpbDeadlineModalDescription:
         'Counter-reviewers can submit scores until this time. The change is recorded in the audit trail.',
+      gvpbDeadlineCascadeHint:
+        'Extending past the report date also moves the report date and moves the defense date if needed.',
       gvpbDeadlineSuccess: 'Counter-review deadline extended.',
       publishPreviewExcluded: 'Excluded from publication: {titles}.',
       waiveGvpb: 'Waive counter-review',
@@ -6581,8 +6580,6 @@ export const vi: I18nMessages = {
         REPORT_DEADLINE_BEFORE_CURRENT: 'Hãy chọn hạn nộp báo cáo từ {date} trở đi.',
         GVPB_DEADLINE_NOT_FUTURE: 'Hãy chọn hạn phản biện ở thời điểm trong tương lai.',
         GVPB_DEADLINE_BEFORE_CURRENT: 'Hãy chọn hạn phản biện từ {date} trở đi.',
-        GVPB_DEADLINE_AFTER_REPORT_DATE:
-          'Hạn phản biện phải trước hoặc bằng ngày báo cáo ({date}). Hãy chọn mốc sớm hơn.',
       },
       created: 'Đã tạo đợt luận văn thành công.',
       openProposals: 'Mở đăng ký đề tài (GV)',
@@ -6686,11 +6683,12 @@ export const vi: I18nMessages = {
       reportDeadlineInvalid: 'Hãy chọn thời điểm trong tương lai.',
       reportDeadlineSuccess: 'Đã gia hạn hạn nộp báo cáo.',
       gvpbDeadlineExtend: 'Gia hạn chấm phản biện',
-      gvpbExtensionAvailable: 'Có thể gia hạn hạn phản biện trước ngày báo cáo.',
-      gvpbExtensionReportDatePassed: 'Ngày báo cáo đã qua ({date}); không thể gia hạn hạn phản biện.',
+      gvpbExtensionAvailable: 'Có thể gia hạn hạn phản biện khi đợt còn hoạt động.',
       gvpbDeadlineModalTitle: 'Gia hạn hạn chấm phản biện',
       gvpbDeadlineModalDescription:
         'Giảng viên phản biện có thể nộp điểm đến thời điểm này. Thay đổi được ghi vào nhật ký kiểm toán.',
+      gvpbDeadlineCascadeHint:
+        'Nếu gia hạn vượt quá ngày báo cáo, ngày báo cáo sẽ được dời theo và ngày bảo vệ cũng được dời khi cần.',
       gvpbDeadlineSuccess: 'Đã gia hạn hạn chấm phản biện.',
       publishPreviewExcluded: 'Không công bố: {titles}.',
       waiveGvpb: 'Miễn phản biện',

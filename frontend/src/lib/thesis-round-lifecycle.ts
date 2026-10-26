@@ -125,15 +125,6 @@ export function estimatedServerNow(
     : fallbackClientNow;
 }
 
-/** A GVPB extension must remain no later than the authored report date. */
-export function gvpbDeadlineExtensionBlocker(
-  reportDate: string | null | undefined,
-  now: number = Date.now(),
-): string | null {
-  const reportDateAt = Date.parse(reportDate ?? '');
-  return Number.isFinite(reportDateAt) && now >= reportDateAt ? reportDate ?? null : null;
-}
-
 export interface LateTopicAvailability {
   disabled: boolean;
   reasonCode: 'REGISTRATION_WINDOW_NOT_OPEN' | 'REGISTRATION_WINDOW_CLOSED' | null;

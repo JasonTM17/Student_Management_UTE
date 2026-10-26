@@ -22,19 +22,21 @@ final class AttendanceEligibility {
     private AttendanceEligibility() {
     }
 
-    static Signal signal(int attendanceRate, long countableSessions, int minSessions, double minRate) {
+    static Signal signal(long present, long late, long countableSessions, int minSessions, double minRate) {
         if (countableSessions < minSessions) {
             return Signal.INSUFFICIENT_DATA;
         }
-        // BigDecimal comparison: a student sitting exactly on the threshold is
-        // OK, never rounded into risk by floating-point representation error.
-        BigDecimal threshold = BigDecimal.valueOf(minRate).multiply(BigDecimal.valueOf(100));
-        return BigDecimal.valueOf(attendanceRate).compareTo(threshold) < 0
+        // Compare attended sessions against the exact decimal threshold. The
+        // rounded whole-percent value is only for display and can mask a small
+        // shortfall such as 35/44 at an 80% threshold.
+        BigDecimal attended = BigDecimal.valueOf(present).add(BigDecimal.valueOf(late));
+        BigDecimal required = BigDecimal.valueOf(countableSessions).multiply(BigDecimal.valueOf(minRate));
+        return attended.compareTo(required) < 0
                 ? Signal.AT_RISK
                 : Signal.OK;
     }
 
-    static boolean atRisk(int attendanceRate, long countableSessions, int minSessions, double minRate) {
-        return signal(attendanceRate, countableSessions, minSessions, minRate) == Signal.AT_RISK;
+    static boolean atRisk(long present, long late, long countableSessions, int minSessions, double minRate) {
+        return signal(present, late, countableSessions, minSessions, minRate) == Signal.AT_RISK;
     }
 }

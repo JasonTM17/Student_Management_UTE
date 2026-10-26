@@ -217,7 +217,7 @@ public class AcademicAttendanceReadService {
         int rate = AttendanceRateCalculator.percentage(row.present(), row.late(), row.absent());
         long countable = row.present() + row.late() + row.absent();
         AttendanceEligibility.Signal signal =
-                AttendanceEligibility.signal(rate, countable, minSessions, minRate);
+                AttendanceEligibility.signal(row.present(), row.late(), countable, minSessions, minRate);
         return new StudentAttendanceSummaryResponse(
                 row.sectionId(),
                 row.courseCode(),
@@ -239,7 +239,7 @@ public class AcademicAttendanceReadService {
 
     private AttendanceRiskEntry riskEntry(SectionStudentRateRow row) {
         int rate = AttendanceRateCalculator.percentage(row.present(), row.late(), row.absent());
-        if (!AttendanceEligibility.atRisk(rate, row.countable(), minSessions, minRate)) {
+        if (!AttendanceEligibility.atRisk(row.present(), row.late(), row.countable(), minSessions, minRate)) {
             return null;
         }
         return new AttendanceRiskEntry(
