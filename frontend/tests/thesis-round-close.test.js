@@ -208,12 +208,8 @@ test('registration availability follows the database clock despite browser clock
   assert.equal(availability.effectiveStart, new Date(estimatedServerNow).toISOString());
 });
 
-test('the GVPB extension blocker follows the report-date ceiling', () => {
-  const now = Date.parse('2026-10-25T02:30:00.000Z');
-  assert.equal(lifecycleRules.gvpbDeadlineExtensionBlocker('2026-10-25T02:00:00.000Z', now),
-    '2026-10-25T02:00:00.000Z');
-  assert.equal(lifecycleRules.gvpbDeadlineExtensionBlocker('2026-10-25T03:00:00.000Z', now), null);
-  assert.equal(lifecycleRules.gvpbDeadlineExtensionBlocker(null, now), null);
+test('the report date no longer blocks a GVPB extension in the client', () => {
+  assert.equal(typeof lifecycleRules.gvpbDeadlineExtensionBlocker, 'undefined');
 });
 
 test('late-topic availability accounts for the registration end and open status', () => {
@@ -478,11 +474,22 @@ test('opening registration confirms the effective window and immediate start', a
 
 const page = read('src/app/admin/thesis/page.tsx');
 
-test('the GVPB deadline action explains the report-date limit accessibly', () => {
-  assert.match(page, /disabled=\{isSaving \|\| Boolean\(gvpbExtensionUnavailableReason\)\}/);
-  assert.match(page, /gvpbExtensionReportDatePassed/);
-  assert.match(page, /aria-describedby=\{`gvpb-deadline-reason-\$\{round\.id\}`\}/);
-  assert.match(page, /id=\{`gvpb-deadline-reason-\$\{round\.id\}`\} role="status"/);
+test('a GVPB extension past the report date explains the schedule change', () => {
+  assert.doesNotMatch(page, /gvpbDeadlineExtensionBlocker|gvpbExtensionUnavailableReason|gvpbExtensionReportDatePassed/);
+  const buttonStart = page.indexOf("onClick={() => openExtendDeadlineModal(round, 'gvpb')}");
+  const buttonEnd = page.indexOf('</Button>', buttonStart);
+  const button = page.slice(buttonStart, buttonEnd);
+  assert.match(button, /disabled=\{isSaving\}/);
+  assert.doesNotMatch(button, /reportDate|Boolean\(/);
+
+  const modalStart = page.indexOf('isOpen={showExtendDeadlineModal}');
+  const modalEnd = page.indexOf('{/* Reason-bearing governance actions', modalStart);
+  assert.match(page.slice(modalStart, modalEnd), /messages\.thesis\.admin\.gvpbDeadlineCascadeHint/);
+
+  const messages = read('src/i18n/messages.ts');
+  assert.equal((messages.match(/gvpbDeadlineCascadeHint:/g) || []).length, 2);
+  assert.match(messages, /gvpbDeadlineCascadeHint:\s*'Extending past the report date also moves the report date and moves the defense date if needed\.'/);
+  assert.match(messages, /gvpbDeadlineCascadeHint:\s*'Nếu gia hạn vượt quá ngày báo cáo, ngày báo cáo sẽ được dời theo và ngày bảo vệ cũng được dời khi cần\.'/);
 });
 
 test('the GVPB deadline action is hidden before a supported GVPB phase', () => {
@@ -500,7 +507,6 @@ test('deadline extension availability and input validation use the sampled datab
   assert.match(page, /parsed\.getTime\(\) <= currentAdminTime\(\)/);
   assert.match(page, /const lifecycleNow = currentAdminTime\(\)/);
   assert.match(page, /registrationOpeningAvailability\(round, lifecycleNow\)/);
-  assert.match(page, /gvpbDeadlineExtensionBlocker\(round\.reportDate, lifecycleNow\)/);
 });
 
 test('a published round keeps Close visible but disables it with an accessible reason when blocked', () => {
@@ -705,7 +711,6 @@ test('deadline extension refusals name the violated date rule in both locales', 
     ['REPORT_DEADLINE_BEFORE_CURRENT', { currentDeadline: '2026-10-30T04:00:00.000Z' }, /on or after localized:/, /từ localized:.*trở đi/],
     ['GVPB_DEADLINE_NOT_FUTURE', {}, /future/, /tương lai/],
     ['GVPB_DEADLINE_BEFORE_CURRENT', { currentDeadline: '2026-10-30T04:00:00.000Z' }, /on or after localized:/, /từ localized:.*trở đi/],
-    ['GVPB_DEADLINE_AFTER_REPORT_DATE', { reportDate: '2026-10-30T04:00:00.000Z' }, /on or before the report date \(localized:/, /trước hoặc bằng ngày báo cáo \(localized:/],
   ];
   for (const [rule, details, englishGuidance, vietnameseGuidance] of ruleCases) {
     const error = {
@@ -719,8 +724,6 @@ test('deadline extension refusals name the violated date rule in both locales', 
     assert.doesNotMatch(vietnamese, /cannot complete this action|transitionFailure/i);
   }
 
-  assert.match(vi.thesis.admin.deadlineExtensionRules.GVPB_DEADLINE_AFTER_REPORT_DATE,
-    /phải trước hoặc bằng ngày báo cáo/);
   assert.match(vi.common.campusErrors.codes.ROUND_HAS_DATA, /giữ đợt ở trạng thái đã hủy/);
 });
 

@@ -18,6 +18,7 @@ import java.sql.Timestamp;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -114,14 +115,16 @@ class ThesisCouncilEscapeHatchTest {
     }
 
     @Test
-    void missedCounterReviewDeadlineLocksReviewerUntilGovernanceExtendsIt() {
-        Instant now = Instant.now();
-        Instant reportDate = now.plusSeconds(5 * 24 * 3_600);
-        UUID roundId = insertRound("Esc Round Missed Deadline", "REGISTRATION_CLOSED",
-                now.minusSeconds(3_600), reportDate);
-        Instant storedReportDate = jdbc.queryForObject(
-                "SELECT report_date FROM thesis.thesis_registration_round WHERE id = ?",
-                (rs, row) -> rs.getTimestamp(1).toInstant(), roundId);
+    void missedCounterReviewDeadlineMovesReportScheduleAndUnblocksPublication() throws Exception {
+        Instant now = Instant.now().truncatedTo(ChronoUnit.SECONDS);
+        Instant oldDeadline = now.minusSeconds(2 * 24 * 3_600);
+        Instant reportDate = now.minusSeconds(24 * 3_600);
+        Instant defenseDate = now.minusSeconds(3_600);
+        Instant newDeadline = now.plusSeconds(24 * 3_600);
+        UUID roundId = insertRound("Esc Round Missed Deadline", "REGISTRATION_CLOSED", oldDeadline, reportDate);
+        jdbc.update("UPDATE thesis.thesis_registration_round SET defense_date = ? WHERE id = ?",
+                Timestamp.from(defenseDate), roundId);
+        Instant storedReportDate = roundInstant(roundId, "report_date");
         UUID topicId = insertTopic(roundId, "Esc Missed Deadline Topic");
         insertApprovedGroup(roundId, topicId, "esc-md");
         ensureLecturer("esc-md-reviewer");
@@ -137,34 +140,90 @@ class ThesisCouncilEscapeHatchTest {
         try {
             mvc.perform(put("/api/v1/thesis/rounds/{id}/gvpb-deadline", roundId)
                             .contentType(MediaType.APPLICATION_JSON)
-                            .content("{\"gvpbDeadline\":\"" + now.plusSeconds(2 * 86_400) + "\"}")
+                            .content("{\"gvpbDeadline\":\"" + newDeadline + "\"}")
                             .with(ThesisAuthorityFixture.student(jdbc, "esc-md-student-x")))
                     .andExpect(status().isForbidden());
         } catch (Exception e) {
             throw new AssertionError(e);
         }
 
-        // Invalid targets stay invalid: the past, the old deadline, and beyond
-        // the report date all fail before the row moves.
         assertThatThrownBy(() -> mutations.extendGvpbDeadline(roundId, now.minusSeconds(60), "reason", admin()))
-                .isInstanceOf(DomainException.class);
-        assertThatThrownBy(() -> mutations.extendGvpbDeadline(roundId, now.minusSeconds(3_600), "reason", admin()))
-                .isInstanceOf(DomainException.class);
-        assertThatThrownBy(() -> mutations.extendGvpbDeadline(
-                roundId, now.plusSeconds(10 * 86_400), "reason", admin()))
-                .isInstanceOfSatisfying(DomainException.class, error -> {
-                    assertThat(error.getCode()).isEqualTo("VALIDATION_ERROR");
-                    assertThat(error.getDetails())
-                            .containsEntry("rule", "GVPB_DEADLINE_AFTER_REPORT_DATE")
-                            .containsEntry("reportDate", storedReportDate.toString());
-                });
+                .isInstanceOfSatisfying(DomainException.class, error ->
+                        assertThat(error.getDetails()).containsEntry("rule", "GVPB_DEADLINE_NOT_FUTURE"));
 
-        mutations.extendGvpbDeadline(roundId, now.plusSeconds(2 * 86_400), "reviewer came back", admin());
+        mutations.extendGvpbDeadline(roundId, newDeadline, "reviewer came back", admin());
+        assertThat(roundInstant(roundId, "gvpb_deadline")).isEqualTo(newDeadline);
+        assertThat(roundInstant(roundId, "report_date")).isEqualTo(newDeadline);
+        assertThat(roundInstant(roundId, "defense_date")).isEqualTo(newDeadline);
+        assertThat(roundInstant(roundId, "report_deadline")).isEqualTo(oldDeadline);
+
+        Map<String, Object> audit = jdbc.queryForMap(
+                "SELECT \"summary\", \"beforeState\", \"afterState\" FROM campuscore_audit.\"AdminAudit\" "
+                        + "WHERE \"entityId\" = ? AND \"action\" = 'THESIS_ROUND_GVPB_DEADLINE_EXTENDED'",
+                roundId.toString());
+        assertThat((String) audit.get("beforeState"))
+                .contains("gvpb_deadline=" + oldDeadline, "report_date=" + storedReportDate,
+                        "defense_date=" + defenseDate, "report_deadline=null");
+        assertThat((String) audit.get("afterState"))
+                .contains("gvpb_deadline=" + newDeadline, "report_date=" + newDeadline,
+                        "defense_date=" + newDeadline, "report_deadline=" + oldDeadline);
+        assertThat((String) audit.get("summary"))
+                .contains("report date moved", "defense date moved", storedReportDate.toString(), newDeadline.toString());
+
         councils.submitReviewerScore(topicId, BigDecimal.valueOf(7), null, lecturer("esc-md-reviewer"));
         assertThat(jdbc.queryForObject(
                 "SELECT COUNT(*) FROM thesis.thesis_topic_score WHERE topic_id = ? AND component = 'GVPB'",
                 Integer.class, topicId)).isEqualTo(1);
+
+        UUID councilId = insertCouncil(roundId, "Esc Missed Deadline Council");
+        seat(councilId, "esc-md-chair", "CHAIR");
+        seat(councilId, "esc-md-secretary", "SECRETARY");
+        seat(councilId, "esc-md-member", "MEMBER");
+        assignCouncilTopic(councilId, topicId);
+        submitDefense(councilId, topicId, "esc-md-chair", 8);
+        submitDefense(councilId, topicId, "esc-md-secretary", 8);
+        submitDefense(councilId, topicId, "esc-md-member", 8);
+        councils.finalizeScores(councilId, topicId, lecturer("esc-md-chair"));
+
+        // Simulate the end of the newly opened counter-review window after the
+        // reviewer and council have completed scoring.
+        jdbc.update("UPDATE thesis.thesis_registration_round SET gvpb_deadline = ? WHERE id = ?",
+                Timestamp.from(now.minusSeconds(60)), roundId);
+        mutations.publishResults(roundId, null, admin());
+        assertThat(jdbc.queryForObject(
+                "SELECT status FROM thesis.thesis_registration_round WHERE id = ?", String.class, roundId))
+                .isEqualTo("RESULTS_PUBLISHED");
         assertThat(auditCount(roundId.toString(), "THESIS_ROUND_GVPB_DEADLINE_EXTENDED")).isEqualTo(1);
+    }
+
+    @Test
+    void movingReportDateKeepsAnAlreadyLaterDefenseDate() {
+        Instant now = Instant.now().truncatedTo(ChronoUnit.SECONDS);
+        Instant newDeadline = now.plusSeconds(24 * 3_600);
+        Instant laterDefenseDate = now.plusSeconds(2 * 24 * 3_600);
+        UUID roundId = insertRound("Esc Round Later Defense", "REGISTRATION_CLOSED",
+                now.minusSeconds(2 * 24 * 3_600), now.minusSeconds(24 * 3_600));
+        jdbc.update("UPDATE thesis.thesis_registration_round SET defense_date = ? WHERE id = ?",
+                Timestamp.from(laterDefenseDate), roundId);
+
+        mutations.extendGvpbDeadline(roundId, newDeadline, "reviewer returned", admin());
+
+        assertThat(roundInstant(roundId, "report_date")).isEqualTo(newDeadline);
+        assertThat(roundInstant(roundId, "defense_date")).isEqualTo(laterDefenseDate);
+    }
+
+    @Test
+    void extendingCounterReviewKeepsAMissingReportDateNull() {
+        Instant now = Instant.now().truncatedTo(ChronoUnit.SECONDS);
+        Instant newDeadline = now.plusSeconds(24 * 3_600);
+        UUID roundId = insertRound("Esc Round Missing Report Date", "REGISTRATION_CLOSED",
+                now.minusSeconds(2 * 24 * 3_600), null);
+
+        mutations.extendGvpbDeadline(roundId, newDeadline, "reviewer returned", admin());
+
+        assertThat(roundInstant(roundId, "gvpb_deadline")).isEqualTo(newDeadline);
+        assertThat(roundInstant(roundId, "report_date")).isNull();
+        assertThat(roundInstant(roundId, "defense_date")).isNull();
     }
 
     @Test
@@ -197,10 +256,6 @@ class ThesisCouncilEscapeHatchTest {
         Instant storedCurrentDeadline = jdbc.queryForObject(
                 "SELECT gvpb_deadline FROM thesis.thesis_registration_round WHERE id = ?",
                 (rs, row) -> rs.getTimestamp(1).toInstant(), roundId);
-        Instant storedReportDate = jdbc.queryForObject(
-                "SELECT report_date FROM thesis.thesis_registration_round WHERE id = ?",
-                (rs, row) -> rs.getTimestamp(1).toInstant(), roundId);
-
         assertThatThrownBy(() -> mutations.extendReportDeadline(roundId, now.minusSeconds(1), admin()))
                 .isInstanceOfSatisfying(DomainException.class, error -> {
                     assertThat(error.getDetails()).containsEntry("rule", "REPORT_DEADLINE_NOT_FUTURE");
@@ -222,13 +277,6 @@ class ThesisCouncilEscapeHatchTest {
                     assertThat(error.getDetails())
                             .containsEntry("rule", "GVPB_DEADLINE_BEFORE_CURRENT")
                             .containsEntry("currentDeadline", storedCurrentDeadline.toString());
-                });
-        assertThatThrownBy(() -> mutations.extendGvpbDeadline(
-                roundId, now.plusSeconds(40 * 24 * 3_600), "reason", admin()))
-                .isInstanceOfSatisfying(DomainException.class, error -> {
-                    assertThat(error.getDetails())
-                            .containsEntry("rule", "GVPB_DEADLINE_AFTER_REPORT_DATE")
-                            .containsEntry("reportDate", storedReportDate.toString());
                 });
     }
 
@@ -1742,5 +1790,15 @@ class ThesisCouncilEscapeHatchTest {
                 "SELECT COUNT(*) FROM campuscore_audit.\"AdminAudit\" WHERE \"entityId\" = ? AND \"action\" = ?",
                 Integer.class, entityId, action);
         return count == null ? 0 : count;
+    }
+
+    private Instant roundInstant(UUID roundId, String column) {
+        return jdbc.queryForObject(
+                "SELECT " + column + " FROM thesis.thesis_registration_round WHERE id = ?",
+                (rs, row) -> {
+                    Timestamp value = rs.getTimestamp(1);
+                    return value == null ? null : value.toInstant();
+                },
+                roundId);
     }
 }

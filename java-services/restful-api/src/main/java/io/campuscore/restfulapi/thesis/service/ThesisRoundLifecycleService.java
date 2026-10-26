@@ -31,6 +31,7 @@ import java.time.Instant;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
 import org.springframework.context.annotation.Profile;
@@ -683,9 +684,9 @@ public class ThesisRoundLifecycleService {
      * assignReviewer still succeeded but the replacement could never submit.
      * This audited mutation moves {@code gvpb_deadline} forward while the round
      * is live (PROPOSALS_PUBLISHED, REGISTRATION_OPEN or REGISTRATION_CLOSED).
-     * The authored schedule ordering still holds: the new deadline may not pass
-     * report_date (thesis_round_schedule_order_valid enforces it), so a deeper
-     * extension must pair with a report-date change the normal way.
+     * If the new deadline passes report_date, the same locked mutation advances
+     * report_date and any earlier defense_date so the authored schedule order
+     * remains valid.
      */
     public RoundResponse extendGvpbDeadline(UUID id, Instant newDeadline, String reason, Jwt actor) {
         String cleanReason = requireReason(reason);
@@ -713,10 +714,14 @@ public class ThesisRoundLifecycleService {
                             "currentDeadline", currentDeadline.toString()));
         }
         Instant reportDate = instantOf(current.get("report_date"));
+        Instant defenseDate = instantOf(current.get("defense_date"));
+        Instant updatedReportDate = reportDate;
+        Instant updatedDefenseDate = defenseDate;
         if (reportDate != null && newDeadline.isAfter(reportDate)) {
-            throw invalid("gvpbDeadline must not be later than the report date; amend the schedule first",
-                    Map.of("rule", "GVPB_DEADLINE_AFTER_REPORT_DATE",
-                            "reportDate", reportDate.toString()));
+            updatedReportDate = newDeadline;
+            if (defenseDate != null && defenseDate.isBefore(newDeadline)) {
+                updatedDefenseDate = newDeadline;
+            }
         }
         // The report write window falls back to gvpb_deadline when no
         // report_deadline override exists, so extending GVPB would silently
@@ -729,13 +734,24 @@ public class ThesisRoundLifecycleService {
         Map<String, Object> beforeState = new LinkedHashMap<>();
         beforeState.put("gvpb_deadline", currentDeadline);
         beforeState.put("report_deadline", currentReportDeadline);
-        rounds.setGvpbDeadline(id, tsOf(newDeadline));
+        beforeState.put("report_date", reportDate);
+        beforeState.put("defense_date", defenseDate);
+        rounds.setGvpbDeadline(id, tsOf(newDeadline), tsOf(updatedReportDate), tsOf(updatedDefenseDate));
         Map<String, Object> afterState = new LinkedHashMap<>();
         afterState.put("gvpb_deadline", newDeadline);
         afterState.put("report_deadline",
                 currentReportDeadline == null ? currentDeadline : currentReportDeadline);
+        afterState.put("report_date", updatedReportDate);
+        afterState.put("defense_date", updatedDefenseDate);
+        String message = "Counter-review deadline extended";
+        if (!Objects.equals(reportDate, updatedReportDate)) {
+            message += "; report date moved from " + reportDate + " to " + updatedReportDate;
+        }
+        if (!Objects.equals(defenseDate, updatedDefenseDate)) {
+            message += "; defense date moved from " + defenseDate + " to " + updatedDefenseDate;
+        }
         audit.record(subject(actor), null, "THESIS_ROUND_GVPB_DEADLINE_EXTENDED", "THESIS_ROUND", id.toString(),
-                "Counter-review deadline extended; reason: " + cleanReason, beforeState, afterState);
+                message + "; reason: " + cleanReason, beforeState, afterState);
         return roundReads.get(id);
     }
 
