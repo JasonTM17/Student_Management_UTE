@@ -78,6 +78,12 @@ export async function PUT(request: NextRequest) {
   }
 
   const body = await request.json().catch(() => null);
+  // An unparseable body is not an empty payload: sanitizeSiteAppearance(null)
+  // answers with defaults, so persisting it would silently reset the saved
+  // branding while reporting success.
+  if (body === null) {
+    return NextResponse.json({ message: 'BAD_JSON_BODY' }, { status: 400 });
+  }
   let appearance: Awaited<ReturnType<typeof writeSiteAppearance>>;
   try {
     appearance = await writeSiteAppearance(body);
