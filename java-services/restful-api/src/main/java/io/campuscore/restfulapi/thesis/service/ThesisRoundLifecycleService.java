@@ -650,7 +650,8 @@ public class ThesisRoundLifecycleService {
         }
         RoundType roundType = requireRoundType((String) current.get("thesis_type"));
         if (!roundType.requiresGvpbDeadline()) {
-            throw invalid(roundType + " rounds carry no GVPB deadline; their report window ends at results publication");
+            throw conflict("ROUND_HAS_NO_COUNTER_REVIEW",
+                    roundType + " rounds carry no GVPB deadline; their report window ends at results publication");
         }
         if (newDeadline == null || !newDeadline.isAfter(databaseNow())) {
             throw invalid("reportDeadline must be in the future",
@@ -698,7 +699,8 @@ public class ThesisRoundLifecycleService {
         }
         RoundType roundType = requireRoundType((String) current.get("thesis_type"));
         if (!roundType.requiresGvpbDeadline()) {
-            throw invalid(roundType + " rounds carry no counter-review deadline");
+            throw conflict("ROUND_HAS_NO_COUNTER_REVIEW",
+                    roundType + " rounds carry no counter-review deadline");
         }
         if (newDeadline == null || !newDeadline.isAfter(databaseNow())) {
             throw invalid("gvpbDeadline must be in the future",
