@@ -717,6 +717,14 @@ public class ThesisCouncilService {
         if (!lecturerExists(lecturerId)) {
             throw invalid("Unknown or inactive lecturer: " + lecturerId);
         }
+        // The assignee must be able to grade: the lecturerId claim is minted
+        // from the profile's bound account at login, so a profile without an
+        // ACTIVE user can never submit the counter-review score and would
+        // wedge the topic at finalize until someone reassigns it.
+        if (!lecturerAccountActive(lecturerId)) {
+            throw conflict("LECTURER_ACCOUNT_REQUIRED",
+                    "The counter-reviewer needs an active user account to submit a score");
+        }
         // Same dual-key resolution as requireNotSupervisor: a legacy
         // User.id-keyed supervisor row must not slip past the check.
         Integer supervising = count(
@@ -881,14 +889,19 @@ public class ThesisCouncilService {
                 "SELECT gvpb_lecturer_id FROM thesis.thesis_topic WHERE id = :topicId",
                 params().addValue("topicId", topicId), "TOPIC_NOT_FOUND", "Thesis topic not found");
         String assigned = (String) topic.get("gvpb_lecturer_id");
-        if (!governance && (lecturerId == null || !lecturerId.equals(assigned))) {
+        boolean assignedReviewer = lecturerId != null && lecturerId.equals(assigned);
+        if (!governance && !assignedReviewer) {
             throw new DomainException(HttpStatus.FORBIDDEN, "REVIEWER_REQUIRED",
                     "Only the assigned counter-reviewer can read the GVPB score");
         }
-        // A dean caller is governance but stays faculty-bound: without this the
-        // unconditional governance branch leaked foreign-faculty counter-review
-        // scores and comments pre-publication.
-        ThesisDeanScope.requireTopicAccess(scope, actor, topicId);
+        // A dean caller is governance but stays faculty-bound — except on the
+        // topic they were assigned to counter-review: that assignment is the
+        // access grant (the same escape the report read and the submit path
+        // already apply). Without it the assigned dean's own score read 404s
+        // while their submission is accepted, hiding the review workspace.
+        if (!assignedReviewer) {
+            ThesisDeanScope.requireTopicAccess(scope, actor, topicId);
+        }
         if (assigned == null) {
             throw new DomainException(HttpStatus.NOT_FOUND, "REVIEW_SCORE_NOT_FOUND",
                     "No counter-reviewer is assigned to this topic");
@@ -1271,8 +1284,11 @@ public class ThesisCouncilService {
         }
         int submittedScores = submittedEligibleScoreCount(councilId, topicId);
         if (submittedScores < expectedScores) {
-            throw conflict("SCORES_INCOMPLETE",
-                    "Every eligible council member must submit a defense score before finalizing");
+            throw new DomainException(HttpStatus.CONFLICT, "SCORES_INCOMPLETE",
+                    "Only " + submittedScores + " of " + expectedScores
+                            + " eligible council members have submitted a defense score; "
+                            + "every member must score before the chair can finalize",
+                    Map.of("submitted", submittedScores, "expected", expectedScores));
         }
         Map<String, Object> roundAndTopic = one(
                 "SELECT r.thesis_type, r.gvpb_deadline, t.gvpb_lecturer_id, t.gvpb_waived_reason "
@@ -1303,12 +1319,26 @@ public class ThesisCouncilService {
                     params().addValue("topicId", topicId).addValue("component", GVPB_COMPONENT),
                     BigDecimal.class);
             if (gvpbScores.isEmpty() || gvpbScores.get(0) == null) {
-                throw conflict("REVIEW_SCORE_REQUIRED",
-                        "A counter-review (GVPB) score is required before the defense score can be finalized");
+                if (gvpbLecturerId == null) {
+                    throw conflict("REVIEW_SCORE_REQUIRED",
+                            "No counter-reviewer is assigned; assign one before the defense score can be finalized");
+                }
+                // Name the reviewer so the chair/admin knows exactly who must
+                // submit — or who to reassign — instead of a bare refusal.
+                String reviewerName = scope
+                        .findLecturerDisplayNames(java.util.List.of(gvpbLecturerId))
+                        .getOrDefault(gvpbLecturerId, gvpbLecturerId);
+                throw new DomainException(HttpStatus.CONFLICT, "REVIEW_SCORE_REQUIRED",
+                        "The assigned counter-reviewer (" + reviewerName + ") has not submitted a score; "
+                                + "they must submit it, or governance must reassign the topic",
+                        Map.of("reviewerId", gvpbLecturerId, "reviewer", reviewerName));
             }
             if (gvpbScores.get(0).compareTo(BigDecimal.valueOf(5.0)) < 0) {
-                throw conflict("REVIEW_SCORE_BELOW_THRESHOLD",
-                        "Topic counter-review score must be at least 5.0 to qualify for defense");
+                throw new DomainException(HttpStatus.CONFLICT, "REVIEW_SCORE_BELOW_THRESHOLD",
+                        "The counter-review score " + gvpbScores.get(0)
+                                + " is below the 5.0 pass threshold; the reviewer may resubmit while the "
+                                + "window is open, or governance must re-review or withdraw the topic",
+                        Map.of("score", gvpbScores.get(0)));
             }
         }
         List<BigDecimal> scores = jdbc.queryForList(
@@ -2073,6 +2103,19 @@ public class ThesisCouncilService {
                 "SELECT COUNT(*) FROM campuscore_auth.\"Lecturer\" WHERE \"id\" = :lecturerId AND \"isActive\" = TRUE",
                 params().addValue("lecturerId", lecturerId));
         return count != null && count > 0;
+    }
+
+    /**
+     * Whether the profile resolves to a live sign-in identity — the same join
+     * {@code AuthUserRepository} uses to mint the {@code lecturerId} claim.
+     * Without it the reviewer can never authenticate as this lecturer.
+     */
+    private boolean lecturerAccountActive(String lecturerId) {
+        return count(
+                "SELECT COUNT(*) FROM campuscore_auth.\"Lecturer\" l "
+                        + "JOIN campuscore_auth.\"User\" u ON u.\"id\" = l.\"userId\" AND u.\"status\" = 'ACTIVE' "
+                        + "WHERE l.\"id\" = :lecturerId AND l.\"isActive\" = TRUE",
+                params().addValue("lecturerId", lecturerId)) > 0;
     }
 
     /**

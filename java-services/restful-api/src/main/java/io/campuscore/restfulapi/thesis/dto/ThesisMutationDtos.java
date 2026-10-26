@@ -148,12 +148,17 @@ public final class ThesisMutationDtos {
             long includedGroupCount,
             long ungradedGroupCount,
             List<PublishResultsExcludedTopic> excludedTopics,
-            List<PublishResultsExcludedTopic> openReviewTopics) {
+            List<PublishResultsExcludedTopic> openReviewTopics,
+            List<PublishResultsUngradedTopic> ungradedTopics) {
     }
 
     /** One topic excluded from publication completeness, with its outcome. */
     public record PublishResultsExcludedTopic(
             UUID id, String title, String resultStatus, String resultReason) {
+    }
+
+    /** One approved-group topic still waiting on its finalized defense score. */
+    public record PublishResultsUngradedTopic(UUID id, String title) {
     }
 
     /**

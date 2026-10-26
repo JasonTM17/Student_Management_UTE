@@ -182,6 +182,25 @@ public class ThesisScopeRepository {
                 UUID.class);
     }
 
+    /**
+     * Topics the caller counter-reviews: {@code gvpb_lecturer_id} is always
+     * written as a Lecturer.id by assignReviewer, so a single key form is
+     * enough. The assignment is the access grant — like the supervisor and
+     * council-grader escapes, a faculty head keeps sight of the topic they
+     * were named to review even outside their faculty.
+     */
+    public List<UUID> findReviewAssignedTopicIds(String lecturerId, List<UUID> topicIds) {
+        if (topicIds == null || topicIds.isEmpty()) {
+            return List.of();
+        }
+        return jdbc.queryForList(
+                "SELECT id FROM thesis.thesis_topic WHERE gvpb_lecturer_id = :lecturerId AND id IN (:topicIds)",
+                new MapSqlParameterSource()
+                        .addValue("lecturerId", lecturerId)
+                        .addValue("topicIds", topicIds),
+                UUID.class);
+    }
+
     public List<UUID> findGradingCouncilTopicIds(String lecturerId, List<UUID> topicIds) {
         return jdbc.queryForList(
                 "SELECT ct.topic_id FROM thesis.thesis_council_topic ct "
