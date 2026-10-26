@@ -138,6 +138,10 @@ public class ThesisSupervisorService {
             if (!lecturerExists(lecturerId)) {
                 throw invalid("Unknown or inactive lecturer: " + lecturerId);
             }
+            if (!lecturerAccountActive(lecturerId)) {
+                throw conflict("LECTURER_ACCOUNT_REQUIRED",
+                        "The lecturer must be linked to an active account");
+            }
             // A counter-reviewer's independence would be void if they also
             // supervised the topic; keep the invariant at write time instead of
             // only rejecting their score submission later.
@@ -332,6 +336,16 @@ public class ThesisSupervisorService {
     private boolean lecturerExists(String lecturerId) {
         Integer count = jdbc.queryForObject(
                 "SELECT COUNT(*) FROM campuscore_auth.\"Lecturer\" WHERE \"id\" = :lecturerId AND \"isActive\" = TRUE",
+                new MapSqlParameterSource().addValue("lecturerId", lecturerId), Integer.class);
+        return count != null && count > 0;
+    }
+
+    private boolean lecturerAccountActive(String lecturerId) {
+        Integer count = jdbc.queryForObject(
+                "SELECT COUNT(*) FROM campuscore_auth.\"Lecturer\" l "
+                        + "JOIN campuscore_auth.\"User\" u ON u.\"id\" = l.\"userId\" "
+                        + "AND u.\"status\" = 'ACTIVE' "
+                        + "WHERE l.\"id\" = :lecturerId AND l.\"isActive\" = TRUE",
                 new MapSqlParameterSource().addValue("lecturerId", lecturerId), Integer.class);
         return count != null && count > 0;
     }
