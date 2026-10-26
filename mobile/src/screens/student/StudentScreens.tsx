@@ -20,7 +20,7 @@ import {
 import { tokens } from '../../design/tokens';
 import { ApiClientError, apiClient, campusApi, type AuthUser, type JsonObject, type MobileAttendanceSummary, type MobileEnrollment, type MobileNotification, type RegistrationCatalogSection } from '../../api/client';
 import { calculateAttendanceRate } from '../../lib/attendance-rate';
-import { mergeNotificationItems } from './notification-feed';
+import { formatNotificationTimestamp, mergeNotificationItems } from './notification-feed';
 import { loadRegistrationCatalog } from './registration-window';
 import type { MobileScreenProps } from '../../navigation/types';
 
@@ -835,7 +835,7 @@ export function NotificationsScreen({ navigation }: MobileScreenProps) {
           <View key={notification.id}>
             <ListRow
               leading={notification.isRead ? '·' : '•'}
-              meta={notification.createdAt}
+              meta={formatNotificationTimestamp(notification.createdAt)}
               onPress={apiClient.mode === 'live' && !notification.isRead && busyId !== notification.id
                 ? () => void markRead(notification.id)
                 : undefined}
