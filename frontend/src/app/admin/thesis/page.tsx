@@ -1091,14 +1091,7 @@ export default function AdminThesisPage() {
       setSuccess(messages.thesis.admin.reviewerAssigned);
       await loadRoundDetail(roundId);
     } catch (err: unknown) {
-      const code = getThesisErrorCode(err);
-      setError(
-        code === 'SUPERVISOR_CANNOT_REVIEW'
-          ? messages.thesis.admin.reviewerIsSupervisor
-          : code === 'GVPB_SCORE_SUBMITTED'
-            ? messages.thesis.admin.reviewerFrozen
-            : transitionErrorMessage(err),
-      );
+      setError(transitionErrorMessage(err));
     } finally {
       setIsSaving(false);
     }
@@ -2033,6 +2026,7 @@ export default function AdminThesisPage() {
                                               </div>
                                               {/* GVPB counter-reviewer (spec: one reviewer per defended topic) */}
                                               {!councilLocked ? (
+                                              round.gvpbDeadline ? (
                                               <div className="flex items-center gap-1.5">
                                                 <Combobox
                                                   aria-label={messages.thesis.admin.assignReviewer}
@@ -2088,6 +2082,11 @@ export default function AdminThesisPage() {
                                                     : messages.thesis.admin.assignReviewer}
                                                 </Button>
                                               </div>
+                                              ) : (
+                                                <p className="text-[11px] text-muted-foreground">
+                                                  {messages.thesis.admin.noCounterReviewPhase}
+                                                </p>
+                                              )
                                               ) : null}
                                               {reviewerId ? (
                                                 <p className="text-[11px] text-muted-foreground">
@@ -2135,7 +2134,9 @@ export default function AdminThesisPage() {
                                                     </Button>
                                                   ) : null}
                                                   {top.finalScore == null && !councilLocked &&
-                                                  (top.gvpbWaivedReason != null || round.counterReviewWaiverAllowed) ? (
+                                                  (top.gvpbWaivedReason != null ||
+                                                    (round.counterReviewWaiverAllowed &&
+                                                      (round.gvpbDeadline != null || reviewerId !== ''))) ? (
                                                     top.gvpbWaivedReason ? (
                                                       <Button
                                                         type="button"
