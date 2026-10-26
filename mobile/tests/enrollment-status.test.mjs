@@ -102,3 +102,28 @@ test('schedule hides dropped and withdrawn history instead of every non-cancelle
   assert.match(schedule, /liveEnrollments\s*\r?\n?\s*\.filter\(isScheduledEnrollment\)/);
   assert.doesNotMatch(schedule, /\.filter\(\(item\) => item\.section\?\.status !== 'CANCELLED'\)/);
 });
+
+test('registration counts and toggles only active selections', () => {
+  const registration = screenSlice('RegistrationScreen');
+
+  // `!== 'DROPPED'` treats WITHDRAWN/COMPLETED/CANCELLED history as a live
+  // selection: it inflates the counter and offers a Drop button the backend
+  // always rejects with ENROLLMENT_NOT_ACTIVE.
+  assert.doesNotMatch(registration, /item\.status !== 'DROPPED'/);
+  assert.match(registration, /enrollments\.filter\(isActiveEnrollment\)/);
+  assert.match(registration, /enrollments\.find\(\(item\) => item\.sectionId === sectionId && isActiveEnrollmentStatus\(item\.status\)\)/);
+  assert.match(registration, /enrollments\.some\(\(item\) => item\.sectionId === section\.id && isActiveEnrollmentStatus\(item\.status\)\)/);
+});
+
+test('isActiveEnrollmentStatus keeps cancelled-section rows enrolled so they stay droppable', () => {
+  const { isActiveEnrollmentStatus } = loadStatusModule();
+
+  assert.equal(isActiveEnrollmentStatus('ENROLLED'), true);
+  assert.equal(isActiveEnrollmentStatus('PENDING'), true);
+  assert.equal(isActiveEnrollmentStatus('CONFIRMED'), true);
+  assert.equal(isActiveEnrollmentStatus('DROPPED'), false);
+  assert.equal(isActiveEnrollmentStatus('WITHDRAWN'), false);
+  assert.equal(isActiveEnrollmentStatus('COMPLETED'), false);
+  assert.equal(isActiveEnrollmentStatus('CANCELLED'), false);
+  assert.equal(isActiveEnrollmentStatus(undefined), false);
+});
