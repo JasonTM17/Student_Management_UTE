@@ -53,6 +53,7 @@ interface Section {
   semesterId: string;
   lecturerId?: string;
   capacity: number;
+  enrolledCount?: number;
   status: 'OPEN' | 'CLOSED' | 'CANCELLED';
   course?: {
     code: string;
@@ -1119,6 +1120,7 @@ export default function AdminSectionsPage() {
               }
               options={courseOptions}
               required
+              disabled={editingSection != null && (editingSection.enrolledCount ?? 0) > 0}
             />
             <Select
               label={copy.fields.semester}
@@ -1131,6 +1133,7 @@ export default function AdminSectionsPage() {
               }
               options={semesterOptions}
               required
+              disabled={editingSection != null && (editingSection.enrolledCount ?? 0) > 0}
             />
           </div>
 
