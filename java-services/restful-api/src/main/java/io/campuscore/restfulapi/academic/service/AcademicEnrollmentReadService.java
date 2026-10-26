@@ -4,6 +4,7 @@ import io.campuscore.restfulapi.academic.repository.AcademicEnrollmentReadReposi
 import io.campuscore.restfulapi.academic.model.EnrollmentRow;
 import io.campuscore.restfulapi.academic.model.GradeItemRow;
 import io.campuscore.restfulapi.academic.model.GradeSummaryRow;
+import io.campuscore.restfulapi.academic.model.LetterGrades;
 import io.campuscore.restfulapi.academic.model.ScheduleRow;
 import io.campuscore.restfulapi.academic.model.StudentGradeRow;
 import io.campuscore.restfulapi.academic.dto.AcademicEnrollmentReadDtos.ClassroomSummary;
@@ -59,28 +60,8 @@ public class AcademicEnrollmentReadService {
             "GPA và tín chỉ tính theo điểm tốt nhất mỗi môn (chính sách học lại)",
             "GPA and credits use your best attempt per course (retake policy)");
 
-    // Feedback item 2: the 4.0 conversion follows the official HCMUTE table
-    // for the 10-point scale (A+/A=4.0, B+=3.5, B=3.0, C+=2.5, C=2.0, D+=1.5,
-    // D=1.0, F=0), so the transcript GPA matches the published bands. The
-    // minus rows never come out of the 10-point letter assignment; they only
-    // exist so legacy records with those letters still render.
-    private static final Map<String, BigDecimal> GRADE_POINTS = Map.ofEntries(
-            Map.entry("A+", BigDecimal.valueOf(4.0)),
-            Map.entry("A", BigDecimal.valueOf(4.0)),
-            Map.entry("A-", BigDecimal.valueOf(3.7)),
-            Map.entry("B+", BigDecimal.valueOf(3.5)),
-            Map.entry("B", BigDecimal.valueOf(3.0)),
-            Map.entry("B-", BigDecimal.valueOf(2.7)),
-            Map.entry("C+", BigDecimal.valueOf(2.5)),
-            Map.entry("C", BigDecimal.valueOf(2.0)),
-            Map.entry("C-", BigDecimal.valueOf(1.7)),
-            Map.entry("D+", BigDecimal.valueOf(1.5)),
-            Map.entry("D", BigDecimal.valueOf(1.0)),
-            Map.entry("D-", BigDecimal.valueOf(0.7)),
-            Map.entry("F", BigDecimal.ZERO));
-
     private static BigDecimal gradePoint(String letterGrade) {
-        return letterGrade == null ? null : GRADE_POINTS.get(letterGrade);
+        return LetterGrades.points(letterGrade);
     }
 
     private final AcademicEnrollmentReadRepository academic;

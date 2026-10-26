@@ -701,6 +701,36 @@ class AcademicEnrollmentMutationPersistenceTest {
     }
 
     @Test
+    void prerequisiteFloorRanksPassingMinusLetters() throws Exception {
+        // Legacy rows can carry minus letters the 10-point scale never emits;
+        // each of them still has a position on the grade scale.
+        jdbc.update(
+                "INSERT INTO \"academic\".\"CourseRequirement\""
+                        + " (\"id\", \"courseId\", \"requiredCourseId\", \"kind\", \"minLetterGrade\")"
+                        + " VALUES ('req-minus-floor', 'course-open', 'course-overlap', 'PREREQ', 'C')");
+        seedCompletedEnrollment("enrollment-minus-letter", "section-overlap", "course-overlap", "C-");
+
+        mvc.perform(post("/api/v1/enrollments/enroll")
+                        .with(studentJwt("student-user-1", "student-1"))
+                        .header("Idempotency-Key", "enroll-c-minus-blocked")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"sectionId\":\"section-open\"}"))
+                .andExpect(status().isUnprocessableEntity())
+                .andExpect(jsonPath("$.code").value("PREREQUISITE_UNMET"));
+
+        jdbc.update(
+                "UPDATE \"academic\".\"Enrollment\" SET \"letterGrade\" = 'B-' WHERE \"id\" = 'enrollment-minus-letter'");
+
+        mvc.perform(post("/api/v1/enrollments/enroll")
+                        .with(studentJwt("student-user-1", "student-1"))
+                        .header("Idempotency-Key", "enroll-b-minus-met")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"sectionId\":\"section-open\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("ENROLLED"));
+    }
+
+    @Test
     void corequisiteGateRequiresAConcurrentEnrollmentInThePairedCourse() throws Exception {
         // section-two (SE404) carries no schedules, so the paired enrollment
         // cannot trip the schedule-overlap conflict (409) instead of the gate.
