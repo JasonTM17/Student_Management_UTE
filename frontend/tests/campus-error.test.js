@@ -192,3 +192,46 @@ test('academic registration and catalog failures have bilingual code copy', () =
     assert.match(read(page), /campusCodeMessage\(/, `${page} should show mapped business errors`);
   }
 });
+
+test('admin user-management guard codes have bilingual code copy', () => {
+  const source = read('src/i18n/messages.ts');
+  const viStart = source.indexOf('export const vi: I18nMessages = {');
+  assert.notEqual(viStart, -1);
+  const en = source.slice(source.indexOf('export const en = {'), viStart);
+  const vi = source.slice(viStart);
+  // Emitted by AdminUserMutationService and surfaced through the users page's
+  // campusCodeMessage; without an entry they collapse to a wrong kind copy
+  // ("no access") or a vague conflict line.
+  const codes = [
+    'SELF_PASSWORD_RESET_NOT_ALLOWED',
+    'SELF_ROLE_CHANGE_NOT_ALLOWED',
+    'SELF_DEACTIVATION_NOT_ALLOWED',
+    'SELF_DELETION_NOT_ALLOWED',
+    'INVALID_ACCOUNT_STATUS',
+    'PROFILE_IN_USE',
+    'PROFILE_HAS_HISTORY',
+    'USER_IN_USE',
+  ];
+
+  // Emitted by CsrfCookieFilter on any mutating call whose token is missing or
+  // stale; the 403 kind copy ("no access") reads as a permission refusal.
+  const sessionCodes = ['CSRF_INVALID'];
+
+  for (const code of sessionCodes) {
+    const key = new RegExp(`\\b${code}:\\s*['\"]`);
+    assert.ok(key.test(en), `English campusErrors.codes is missing ${code}`);
+    assert.ok(key.test(vi), `Vietnamese campusErrors.codes is missing ${code}`);
+  }
+
+  for (const code of codes) {
+    const key = new RegExp(`\\b${code}:\\s*['\"]`);
+    assert.ok(key.test(en), `English campusErrors.codes is missing ${code}`);
+    assert.ok(key.test(vi), `Vietnamese campusErrors.codes is missing ${code}`);
+  }
+
+  assert.match(
+    read('src/app/admin/users/page.tsx'),
+    /campusCodeMessage\(/,
+    'admin users page should show mapped business errors',
+  );
+});
