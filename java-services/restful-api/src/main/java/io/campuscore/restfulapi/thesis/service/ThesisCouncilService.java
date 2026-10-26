@@ -712,7 +712,8 @@ public class ThesisCouncilService {
             throw conflict("SCORE_ALREADY_FINALIZED", "A finalized topic cannot change its counter-reviewer");
         }
         if (topic.get("gvpb_deadline") == null) {
-            throw invalid("This round's thesis type has no counter-review phase");
+            throw conflict("ROUND_HAS_NO_COUNTER_REVIEW",
+                    "This round's thesis type has no counter-review phase");
         }
         if (!lecturerExists(lecturerId)) {
             throw invalid("Unknown or inactive lecturer: " + lecturerId);
@@ -1652,7 +1653,8 @@ public class ThesisCouncilService {
         boolean requiresGvpb = (roundType != null && roundType.requiresGvpbDeadline()
                 && topic.get("gvpb_deadline") != null) || topic.get("gvpb_lecturer_id") != null;
         if (!requiresGvpb) {
-            throw invalid("This topic has no counter-review requirement to waive");
+            throw conflict("TOPIC_HAS_NO_COUNTER_REVIEW",
+                    "This topic has no counter-review requirement to waive");
         }
         jdbc.update(
                 "UPDATE thesis.thesis_topic SET gvpb_waived_reason = :reason, gvpb_waived_by = :by, "

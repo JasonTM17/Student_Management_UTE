@@ -234,8 +234,8 @@ class ThesisCloseRegistrationSafetyTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"reportDeadline\":\"" + Instant.now().plusSeconds(86_400) + "\"}")
                         .with(adminJwt()))
-                .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.code").value("VALIDATION_ERROR"));
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("ROUND_HAS_NO_COUNTER_REVIEW"));
     }
 
     @Test

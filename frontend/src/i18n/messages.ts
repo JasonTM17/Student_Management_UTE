@@ -355,6 +355,10 @@ export const en = {
           'A counter-review score already exists; it can only change through re-review.',
         COUNTER_REVIEW_WAIVER_NOT_SUPPORTED:
           'This round type always requires a counter-reviewer.',
+        ROUND_HAS_NO_COUNTER_REVIEW:
+          'This round type has no counter-review phase.',
+        TOPIC_HAS_NO_COUNTER_REVIEW:
+          'This topic has no counter-review requirement to waive.',
         INVALID_NOTIFICATION_LINK: 'The notification link is not a safe internal path.',
         LEADER_SUCCESSOR_REQUIRED: 'Removing the leader requires naming a successor member.',
         LEADER_CANNOT_BE_REMOVED:
@@ -3125,6 +3129,7 @@ export const en = {
       reviewerAssigned: 'Counter-reviewer assigned.',
       reviewerIsSupervisor: 'A topic supervisor cannot be its counter-reviewer.',
       reviewerFrozen: 'The counter-reviewer already submitted a score — the assignment is frozen.',
+      noCounterReviewPhase: 'This round has no counter-review phase.',
       closePreviewGroups: 'Groups in this round: {count}.',
       closePreviewApproved: 'Approved: {count}.',
       closePreviewPending: 'Awaiting approval: {count}.',
@@ -3898,6 +3903,10 @@ export const vi: I18nMessages = {
           'Đã có điểm phản biện; chỉ có thể thay đổi qua phản biện lại.',
         COUNTER_REVIEW_WAIVER_NOT_SUPPORTED:
           'Loại đợt này luôn yêu cầu giảng viên phản biện.',
+        ROUND_HAS_NO_COUNTER_REVIEW:
+          'Loại đợt này không có giai đoạn phản biện.',
+        TOPIC_HAS_NO_COUNTER_REVIEW:
+          'Đề tài này không có yêu cầu phản biện để miễn.',
         INVALID_NOTIFICATION_LINK: 'Liên kết thông báo không phải là đường dẫn nội bộ hợp lệ.',
         LEADER_SUCCESSOR_REQUIRED: 'Xóa nhóm trưởng cần chỉ định thành viên kế nhiệm.',
         LEADER_CANNOT_BE_REMOVED:
@@ -6662,6 +6671,7 @@ export const vi: I18nMessages = {
       reviewerAssigned: 'Đã phân công giảng viên phản biện.',
       reviewerIsSupervisor: 'Giảng viên hướng dẫn không thể làm phản biện đề tài của chính mình.',
       reviewerFrozen: 'Giảng viên phản biện đã nộp điểm — không thể đổi phân công.',
+      noCounterReviewPhase: 'Đợt này không có giai đoạn phản biện.',
       closePreviewGroups: 'Số nhóm trong đợt: {count}.',
       closePreviewApproved: 'Đã duyệt: {count}.',
       closePreviewPending: 'Chờ xét duyệt: {count}.',
