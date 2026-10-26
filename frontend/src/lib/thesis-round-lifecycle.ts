@@ -62,6 +62,8 @@ export interface PublishResultsReadiness {
   ungradedGroupCount: number;
   pendingApprovalGroupCount: number;
   openReviewTopics: unknown[];
+  /** Approved-group topics still missing a finalized score (older payloads omit it). */
+  ungradedTopics?: { id: string; title: string }[];
 }
 
 export interface PublishResultsReadinessState {
@@ -168,4 +170,21 @@ export function publishResultsBlockerCode(preview: PublishResultsReadiness): str
   if (preview.ungradedGroupCount > 0) return 'SCORES_INCOMPLETE';
   if (preview.pendingApprovalGroupCount > 0) return 'GROUPS_PENDING_APPROVAL';
   return null;
+}
+
+/**
+ * Topic titles that explain a publish blocker: open-review topics for
+ * REVIEW_WINDOW_OPEN, still-ungraded topics for the score blockers. Empty
+ * when the blocker carries no topic list (e.g. nothing approved yet).
+ */
+export function publishBlockerTopicTitles(
+  preview: PublishResultsReadiness,
+  code: string,
+): string[] {
+  if (code === 'REVIEW_WINDOW_OPEN') {
+    return preview.openReviewTopics
+      .map((topic) => (topic as { title?: unknown }).title)
+      .filter((title): title is string => typeof title === 'string' && title.length > 0);
+  }
+  return (preview.ungradedTopics ?? []).map((topic) => topic.title);
 }

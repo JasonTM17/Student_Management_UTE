@@ -148,9 +148,9 @@ export const en = {
         SUPERVISOR_CANNOT_CHAIR_COUNCIL:
           'A supervisor cannot serve as the council chair for their supervised topic.',
         REVIEW_SCORE_REQUIRED:
-          'A counter-review (GVPB) score is required before finalizing council scores.',
+          'The assigned counter-reviewer ({reviewer}) has not submitted a score; they must submit it or the topic must be reassigned.',
         REVIEW_SCORE_BELOW_THRESHOLD:
-          'The counter-review (GVPB) score must be at least 5.0 to be eligible for defense.',
+          'The counter-review score {score} is below the 5.0 pass threshold; the reviewer may resubmit while the window is open, or an admin must reassign or withdraw the topic.',
         COUNCIL_SIZE_INVALID:
           'An evaluation council must consist of 3 to 5 members per academic regulations.',
         CREDIT_LIMIT_APPLICATION_EXISTS:
@@ -309,6 +309,8 @@ export const en = {
         GROUP_TOO_LARGE: 'The group exceeds the maximum member limit.',
         GROUP_LEADER_INVALID: 'The group needs exactly one valid leader.',
         LECTURER_PROFILE_REQUIRED: 'An active lecturer profile is required.',
+        LECTURER_ACCOUNT_REQUIRED:
+          'The selected reviewer has no active user account and can never submit a score. Pick another lecturer.',
         FACULTY_PROFILE_REQUIRED:
           'An active lecturer profile bound to the faculty head is required.',
         COUNCIL_ROLE_REQUIRED: 'A council seat needs a valid role.',
@@ -2913,6 +2915,7 @@ export const en = {
       memberReplacedSuccess: 'Council member replaced.',
       topicUnassignedSuccess: 'Topic unassigned from council.',
       conflicts: {
+        conflictNoUserAccount: 'No active user account — cannot submit a score',
         conflictSupervisorOfTopic: 'Supervises this topic',
         conflictCouncilMemberOfTopic: 'Sits on the defense council',
         conflictReviewsAssignedTopic: 'Counter-reviews an assigned topic',
@@ -3197,6 +3200,7 @@ export const en = {
       roundReopened: 'Round reopened.',
       showClosedRounds: 'Show closed',
       publishReviewOpen: 'Counter-review still open: {titles}.',
+      publishBlockerTopics: 'Blocking topic(s): {titles}.',
       publishAllExcluded: 'Every approved group is excluded; publishing will show no results.',
     },
   },
@@ -3687,9 +3691,9 @@ export const vi: I18nMessages = {
         SUPERVISOR_CANNOT_CHAIR_COUNCIL:
           'Giảng viên hướng dẫn không được đảm nhiệm vị trí Chủ tịch hội đồng bảo vệ cho đề tài này.',
         REVIEW_SCORE_REQUIRED:
-          'Cần có điểm chấm phản biện (GVPB) trước khi chốt điểm hội đồng.',
+          'Người phản biện được phân công ({reviewer}) chưa nộp điểm; họ phải nộp hoặc đề tài phải được phân công lại.',
         REVIEW_SCORE_BELOW_THRESHOLD:
-          'Điểm phản biện (GVPB) phải đạt từ 5.0 trở lên để đủ điều kiện bảo vệ.',
+          'Điểm phản biện {score} dưới ngưỡng đạt 5.0; người phản biện có thể nộp lại khi còn hạn, hoặc quản trị viên phải phân công lại hoặc thu hồi đề tài.',
         COUNCIL_SIZE_INVALID:
           'Hội đồng đánh giá phải có từ 3 đến 5 thành viên theo quy chế.',
         CREDIT_LIMIT_APPLICATION_EXISTS:
@@ -3848,6 +3852,8 @@ export const vi: I18nMessages = {
         GROUP_TOO_LARGE: 'Nhóm vượt quá số thành viên tối đa.',
         GROUP_LEADER_INVALID: 'Nhóm cần đúng một nhóm trưởng hợp lệ.',
         LECTURER_PROFILE_REQUIRED: 'Cần hồ sơ giảng viên đang hoạt động.',
+        LECTURER_ACCOUNT_REQUIRED:
+          'Người phản biện được chọn không có tài khoản đang hoạt động nên không thể nộp điểm. Hãy chọn giảng viên khác.',
         FACULTY_PROFILE_REQUIRED:
           'Cần hồ sơ giảng viên đang hoạt động gắn với trưởng khoa.',
         COUNCIL_ROLE_REQUIRED: 'Ghế hội đồng cần một vai trò hợp lệ.',
@@ -6446,6 +6452,7 @@ export const vi: I18nMessages = {
       memberReplacedSuccess: 'Đã thay thế thành viên hội đồng.',
       topicUnassignedSuccess: 'Đã gỡ đề tài khỏi hội đồng.',
       conflicts: {
+        conflictNoUserAccount: 'Không có tài khoản hoạt động — không thể nộp điểm',
         conflictSupervisorOfTopic: 'Giảng viên hướng dẫn đề tài này',
         conflictCouncilMemberOfTopic: 'Nằm trong hội đồng bảo vệ',
         conflictReviewsAssignedTopic: 'Phản biện một đề tài đã gán',
@@ -6730,6 +6737,7 @@ export const vi: I18nMessages = {
       roundReopened: 'Đã mở lại đợt.',
       showClosedRounds: 'Hiện đợt đã đóng',
       publishReviewOpen: 'Phản biện còn mở: {titles}.',
+      publishBlockerTopics: 'Đề tài đang chặn: {titles}.',
       publishAllExcluded: 'Mọi nhóm đã duyệt đều bị loại; công bố sẽ không có kết quả.',
     },
   },

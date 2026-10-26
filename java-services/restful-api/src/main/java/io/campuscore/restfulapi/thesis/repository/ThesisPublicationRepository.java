@@ -4,6 +4,7 @@ import static io.campuscore.restfulapi.thesis.repository.ThesisMutationSql.one;
 import static io.campuscore.restfulapi.thesis.repository.ThesisMutationSql.params;
 
 import io.campuscore.restfulapi.thesis.dto.ThesisMutationDtos.PublishResultsExcludedTopic;
+import io.campuscore.restfulapi.thesis.dto.ThesisMutationDtos.PublishResultsUngradedTopic;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -97,6 +98,28 @@ public class ThesisPublicationRepository {
                         rs.getString("result_status"), rs.getString("result_reason")));
     }
 
+    /**
+     * Topics still blocking publication because an approved group under them
+     * has no finalized score — the same included+ungraded predicate
+     * {@link #countUngradedGroups} counts, expanded to the topic identities
+     * the operator must chase (the chair finalizes per topic).
+     */
+    public List<PublishResultsUngradedTopic> listUngradedTopics(UUID roundId) {
+        return jdbc.query(
+                "SELECT DISTINCT t.id, t.title FROM thesis.thesis_group g "
+                        + "JOIN thesis.thesis_topic t ON t.id = g.topic_id "
+                        + "JOIN thesis.thesis_registration_round r ON r.id = t.round_id "
+                        + "WHERE g.round_id = :roundId AND g.approval_status = 'APPROVED' "
+                        + "AND t.final_score IS NULL "
+                        + "AND (t.result_status IS NULL OR NOT (t.result_status = 'WITHDRAWN' "
+                        + "OR (t.result_status = 'REVIEW_FAILED' "
+                        + "AND r.gvpb_deadline IS NOT NULL AND r.gvpb_deadline <= CURRENT_TIMESTAMP))) "
+                        + "ORDER BY t.title",
+                params().addValue("roundId", roundId),
+                (rs, ignored) -> new PublishResultsUngradedTopic(
+                        (UUID) rs.getObject("id"), rs.getString("title")));
+    }
+
     /** Locks the round row so a concurrent approve cannot slip past the completeness check. */
     public void lockRoundRow(UUID id) {
         jdbc.queryForObject(
@@ -117,6 +140,21 @@ public class ThesisPublicationRepository {
                         + "WHERE t.round_id = :id AND t.result_status = 'REVIEW_FAILED' "
                         + "AND (r.gvpb_deadline IS NULL OR r.gvpb_deadline > CURRENT_TIMESTAMP) "
                         + "ORDER BY t.id",
+                params().addValue("id", id), String.class);
+    }
+
+    /** "id title" rows of the still-ungraded included topics, mirroring {@link #listOpenReviewIdTitles}. */
+    public List<String> listUngradedIdTitles(UUID id) {
+        return jdbc.queryForList(
+                "SELECT DISTINCT CAST(t.id AS VARCHAR) || ' ' || t.title FROM thesis.thesis_group g "
+                        + "JOIN thesis.thesis_topic t ON t.id = g.topic_id "
+                        + "JOIN thesis.thesis_registration_round r ON r.id = t.round_id "
+                        + "WHERE g.round_id = :id AND g.approval_status = 'APPROVED' "
+                        + "AND t.final_score IS NULL "
+                        + "AND (t.result_status IS NULL OR NOT (t.result_status = 'WITHDRAWN' "
+                        + "OR (t.result_status = 'REVIEW_FAILED' "
+                        + "AND r.gvpb_deadline IS NOT NULL AND r.gvpb_deadline <= CURRENT_TIMESTAMP))) "
+                        + "ORDER BY 1",
                 params().addValue("id", id), String.class);
     }
 

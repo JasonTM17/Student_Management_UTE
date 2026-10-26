@@ -76,12 +76,21 @@ public class ThesisTopicService {
             deanSupervisedIds = deanLecturerId.isEmpty() || result.isEmpty() ? java.util.Set.of() : new java.util.HashSet<>(
                     scope.findSupervisedTopicIds(deanLecturerId,
                             result.stream().map(ThesisTopic::getId).toList()));
+            // A dean named as a topic's counter-reviewer must reach it through
+            // the same catalog a plain lecturer sees: the review assignment is
+            // the access grant, the same escape ThesisReportService applies to
+            // the report read. Without it the dean's review list silently
+            // hides foreign-faculty assignments and they can never score.
+            java.util.Set<UUID> reviewedByDean = deanLecturerId.isEmpty() || result.isEmpty() ? java.util.Set.of() : new java.util.HashSet<>(
+                    scope.findReviewAssignedTopicIds(deanLecturerId,
+                            result.stream().map(ThesisTopic::getId).toList()));
             java.util.Set<String> inFacultyDepts = deanFacultyDepts;
             java.util.Set<UUID> supervisedByDean = deanSupervisedIds;
             result = result.stream()
                     .filter(topic -> inFacultyDepts.contains(topic.getDepartmentId())
                             || isOwner(topic, actor)
-                            || supervisedByDean.contains(topic.getId()))
+                            || supervisedByDean.contains(topic.getId())
+                            || reviewedByDean.contains(topic.getId()))
                     .toList();
         } else if (!isAdmin(actor) && ThesisDepartmentScope.isDepartmentHead(actor)) {
             String departmentId = ThesisDepartmentScope.departmentId(scope, actor);
