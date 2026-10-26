@@ -59,6 +59,7 @@ import {
   gvpbDeadlineExtensionBlocker,
   lateTopicAvailability,
   mergePublishResultsReadiness,
+  publishBlockerTopicTitles,
   publishResultsBlockerCode,
   publishResultsReadinessForRound,
   registrationOpeningAvailability,
@@ -143,6 +144,18 @@ export default function AdminThesisPage() {
       : messages.thesis.admin.unknownScheduleTime;
   const campusErrorForCode = (code: string): string | undefined =>
     messages.common.campusErrors.codes[code as keyof typeof messages.common.campusErrors.codes];
+  // A publish blocker names the topics that gate it — the operator should see
+  // which topics to chase, not just a rule label.
+  const publishBlockerMessage = (
+    preview: ThesisPublishResultsPreview,
+    code: string,
+  ): string => {
+    const base = campusErrorForCode(code) ?? messages.thesis.admin.transitionFailure;
+    const titles = publishBlockerTopicTitles(preview, code);
+    return titles.length > 0
+      ? `${base} ${messages.thesis.admin.publishBlockerTopics.replace('{titles}', titles.join(', '))}`
+      : base;
+  };
   const [rounds, setRounds] = useState<ThesisRound[]>([]);
   const [topics, setTopics] = useState<ThesisTopic[]>([]);
   const [groups, setGroups] = useState<ThesisGroup[]>([]);
@@ -750,9 +763,7 @@ export default function AdminThesisPage() {
       }
       const blockerCode = publishResultsBlockerCode(resultPreview);
       if (blockerCode) {
-        const blockerMessage = campusErrorForCode(blockerCode)
-          ?? messages.thesis.admin.transitionFailure;
-        setError(blockerMessage);
+        setError(publishBlockerMessage(resultPreview, blockerCode));
         return;
       }
     }
@@ -1412,8 +1423,7 @@ export default function AdminThesisPage() {
                   ? messages.thesis.admin.checkingPublishReadiness
                   : publishReadiness.preview
                     ? publishResultsBlocker
-                      ? campusErrorForCode(publishResultsBlocker)
-                        ?? messages.thesis.admin.transitionFailure
+                      ? publishBlockerMessage(publishReadiness.preview, publishResultsBlocker)
                       : ''
                     : messages.thesis.admin.publishPreviewUnavailable);
               const canManageGlobalLifecycle = Boolean(isAdmin || isSuperAdmin);

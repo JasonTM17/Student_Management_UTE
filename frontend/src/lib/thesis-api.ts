@@ -183,6 +183,8 @@ export interface ThesisPublishResultsPreview {
   excludedTopics: ThesisExcludedTopic[];
   /** Topics whose counter-review verdict is still provisional (window open). */
   openReviewTopics: ThesisExcludedTopic[];
+  /** Approved-group topics still missing a finalized defense score. */
+  ungradedTopics: ThesisUngradedTopic[];
 }
 
 export interface ThesisExcludedTopic {
@@ -190,6 +192,11 @@ export interface ThesisExcludedTopic {
   title: string;
   resultStatus: string | null;
   resultReason: string | null;
+}
+
+export interface ThesisUngradedTopic {
+  id: string;
+  title: string;
 }
 
 export interface ThesisRepositorySupervisor {

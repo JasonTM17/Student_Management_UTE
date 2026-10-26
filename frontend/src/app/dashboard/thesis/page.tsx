@@ -71,6 +71,7 @@ import SubmissionStatusTimeline from '@/features/thesis/components/SubmissionSta
 import SupervisedGroupList from '@/features/thesis/components/SupervisedGroupList';
 import ThesisRepositoryWorkspace from '@/features/thesis/components/ThesisRepositoryWorkspace';
 import { departmentsApi, fetchAllPages, lecturersApi } from '@/lib/api';
+import { campusCodeMessage } from '@/lib/campus-error';
 import { getLocalizedName } from '@/lib/academic-content';
 import { plainTextThesisDescription } from '@/lib/thesis-text';
 import type { Department, Lecturer } from '@/types/api';
@@ -1377,12 +1378,11 @@ export default function ThesisPage() {
     }
   };
 
-  /** Backend domain code → dictionary copy, falling back to the generic line. */
-  const thesisActionError = (caught: unknown): string => {
-    const codes = messages.common.campusErrors.codes as Record<string, string>;
-    const code = getThesisErrorCode(caught);
-    return (code ? codes[code] : undefined) ?? messages.thesis.actionFailed;
-  };
+  /** Backend domain code → dictionary copy, interpolating `details` into
+   * `{key}` placeholders and falling back to the backend message when a
+   * template needs data the error did not carry. */
+  const thesisActionError = (caught: unknown): string =>
+    campusCodeMessage(caught, messages.common.campusErrors, messages.thesis.actionFailed);
 
   const createGroup = async () => {
     if (!selectedRoundId) return;

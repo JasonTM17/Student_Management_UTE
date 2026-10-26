@@ -11,6 +11,7 @@ import io.campuscore.restfulapi.audit.service.AdminAuditRecorder;
 import io.campuscore.restfulapi.exception.DomainException;
 import io.campuscore.restfulapi.thesis.dto.ThesisMutationDtos.PublishResultsExcludedTopic;
 import io.campuscore.restfulapi.thesis.dto.ThesisMutationDtos.PublishResultsPreviewResponse;
+import io.campuscore.restfulapi.thesis.dto.ThesisMutationDtos.PublishResultsUngradedTopic;
 import io.campuscore.restfulapi.thesis.dto.ThesisMutationDtos.RetractPublicationRequest;
 import io.campuscore.restfulapi.thesis.dto.ThesisMutationDtos.RoundClosureRequest;
 import io.campuscore.restfulapi.thesis.dto.ThesisRoundDtos.RoundResponse;
@@ -85,13 +86,14 @@ public class ThesisPublicationService {
         Map<String, Object> scoring = publication.countScoringStates(roundId);
         List<PublishResultsExcludedTopic> excluded = excludedTopicsQuery(roundId, actor);
         List<PublishResultsExcludedTopic> openReview = publication.listOpenReviewTopics(roundId);
+        List<PublishResultsUngradedTopic> ungraded = publication.listUngradedTopics(roundId);
         return new PublishResultsPreviewResponse(
                 ((Number) counts.get("group_count")).longValue(),
                 ((Number) counts.get("approved_count")).longValue(),
                 ((Number) counts.get("pending_count")).longValue(),
                 ((Number) scoring.get("included_count")).longValue(),
                 ((Number) scoring.get("ungraded_count")).longValue(),
-                excluded, openReview);
+                excluded, openReview, ungraded);
     }
 
     /**
@@ -154,12 +156,14 @@ public class ThesisPublicationService {
                             + "pass confirmAllExcluded to publish anyway");
         }
         if (included != null && included > 0 && ungraded != null && ungraded.equals(included)) {
-            throw conflict("RESULTS_NOT_READY", "No topic has been graded yet; the chair must finalize scores first");
+            throw conflict("RESULTS_NOT_READY",
+                    "No topic has been graded yet; the defense council chair must finalize scores first. "
+                            + "Ungraded: " + String.join(", ", publication.listUngradedIdTitles(id)));
         }
         if (ungraded != null && ungraded > 0) {
             throw conflict("SCORES_INCOMPLETE",
-                    "Every approved group must have a finalized score before results are published "
-                            + "(" + ungraded + " group(s) still ungraded)");
+                    "Every approved group must have a finalized score before results are published. "
+                            + "Ungraded: " + String.join(", ", publication.listUngradedIdTitles(id)));
         }
         // A group left PENDING at publication is permanently wedged — approval
         // requires a non-terminal round — so force the governance team to
