@@ -20,7 +20,7 @@ import {
 import { tokens } from '../../design/tokens';
 import { ApiClientError, apiClient, campusApi, type AuthUser, type JsonObject, type MobileAttendanceSummary, type MobileEnrollment, type MobileNotification, type RegistrationCatalogSection } from '../../api/client';
 import { calculateAttendanceRate } from '../../lib/attendance-rate';
-import { isActiveEnrollment, isScheduledEnrollment } from '../../lib/enrollment-status';
+import { isActiveEnrollment, isActiveEnrollmentStatus, isScheduledEnrollment } from '../../lib/enrollment-status';
 import { formatNotificationTimestamp, mergeNotificationItems } from './notification-feed';
 import { loadRegistrationCatalog } from './registration-window';
 import type { MobileScreenProps } from '../../navigation/types';
@@ -557,9 +557,7 @@ export function RegistrationScreen({ navigation }: MobileScreenProps) {
   const liveSections = registrationData.sections;
   const enrollments = registrationData.enrollments;
   const roundOpen = registrationData.roundOpen;
-  const activeEnrollmentCount = enrollments.filter(
-    (item) => item.status !== 'DROPPED' && item.section?.status !== 'CANCELLED',
-  ).length;
+  const activeEnrollmentCount = enrollments.filter(isActiveEnrollment).length;
 
   const availableSections: Array<{ id: string; code: string; name: string; slot: string; seats: string; status?: string }> = apiClient.mode === 'preview'
     ? [
@@ -582,7 +580,7 @@ export function RegistrationScreen({ navigation }: MobileScreenProps) {
     setPending(sectionId);
     setMutationError(null);
     try {
-      const existing = enrollments.find((item) => item.sectionId === sectionId && item.status !== 'DROPPED');
+      const existing = enrollments.find((item) => item.sectionId === sectionId && isActiveEnrollmentStatus(item.status));
       if (existing) {
         await campusApi.dropEnrollment(existing.id);
         setRegistrationData((current) => ({
@@ -643,7 +641,7 @@ export function RegistrationScreen({ navigation }: MobileScreenProps) {
         <StatePanel kind="error" title="Could not update registration" description={mutationError} />
       ) : null}
       {availableSections.map((section) => {
-        const enrolled = enrollments.some((item) => item.sectionId === section.id && item.status !== 'DROPPED');
+        const enrolled = enrollments.some((item) => item.sectionId === section.id && isActiveEnrollmentStatus(item.status));
         const isPreview = apiClient.mode === 'preview';
         const cancelled = section.status === 'CANCELLED';
         // A cancelled section stays droppable at any time so a student is
