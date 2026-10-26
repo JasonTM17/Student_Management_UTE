@@ -23,7 +23,7 @@ import { calculateAttendanceRate } from '../../lib/attendance-rate';
 import { isActiveEnrollment, isActiveEnrollmentStatus, isScheduledEnrollment } from '../../lib/enrollment-status';
 import { passwordIssue, profileAddressIssue, profilePhoneIssue, type PasswordIssue, type ProfileFieldIssue } from '../../lib/profile-validation';
 import { formatNotificationTimestamp, mergeNotificationItems } from './notification-feed';
-import { loadRegistrationCatalog } from './registration-window';
+import { describeSectionSlot, loadRegistrationCatalog } from './registration-window';
 import type { MobileScreenProps } from '../../navigation/types';
 
 const NOTIFICATION_PAGE_SIZE = 20;
@@ -571,7 +571,7 @@ export function RegistrationScreen({ navigation }: MobileScreenProps) {
         id: section.id,
         code: section.courseCode,
         name: section.courseName,
-        slot: 'Schedule pending',
+        slot: describeSectionSlot(section),
         seats: section.remainingSeats > 0 ? `${section.remainingSeats} seats left` : 'Full',
         status: section.status,
       }));
