@@ -195,6 +195,53 @@ class AdminCatalogMutationPersistenceTest {
     }
 
     @Test
+    void sectionUpdateLocksCourseAndSemesterOnceEnrollmentsExist() throws Exception {
+        // Any enrollment row — seated or not — keeps its own courseId/semesterId
+        // snapshot, so the section scope is frozen from the first row on.
+        jdbc.update("INSERT INTO \"academic\".\"Enrollment\""
+                + " (\"id\", \"studentId\", \"sectionId\", \"courseId\", \"gradeStatus\")"
+                + " VALUES ('enrollment-block-1', 'student-1', 'section-existing', 'course-old', 'NOT_GRADED')");
+
+        mvc.perform(put("/api/v1/sections/section-existing")
+                        .with(adminJwt())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"courseId\":\"course-new\"}"))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("SECTION_HAS_ENROLLMENTS"));
+
+        mvc.perform(put("/api/v1/sections/section-existing")
+                        .with(adminJwt())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"semesterId\":\"semester-new\"}"))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("SECTION_HAS_ENROLLMENTS"));
+
+        assertThat(jdbc.queryForObject(
+                "SELECT \"courseId\" FROM \"academic\".\"Section\" WHERE \"id\" = 'section-existing'",
+                String.class)).isEqualTo("course-old");
+        assertThat(jdbc.queryForObject(
+                "SELECT \"semesterId\" FROM \"academic\".\"Section\" WHERE \"id\" = 'section-existing'",
+                String.class)).isEqualTo("semester-old");
+
+        // Echoing the stored values back and editing other fields stays legal.
+        mvc.perform(put("/api/v1/sections/section-existing")
+                        .with(adminJwt())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"courseId\":\"course-old\",\"semesterId\":\"semester-old\",\"capacity\":32}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.capacity").value(32));
+
+        jdbc.update("DELETE FROM \"academic\".\"Enrollment\" WHERE \"id\" = 'enrollment-block-1'");
+        mvc.perform(put("/api/v1/sections/section-existing")
+                        .with(adminJwt())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"courseId\":\"course-new\",\"semesterId\":\"semester-new\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.courseId").value("course-new"))
+                .andExpect(jsonPath("$.semesterId").value("semester-new"));
+    }
+
+    @Test
     void sectionUpdateRollsBackFieldsAndSchedulesWhenReplacementFails() {
         assertThatThrownBy(() -> catalog.update(
                 "\"academic\".\"Section\"",
