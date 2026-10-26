@@ -8,6 +8,7 @@ import io.campuscore.restfulapi.academic.registration.dto.RegistrationDtos.Secti
 import io.campuscore.restfulapi.academic.registration.dto.RegistrationDtos.SummaryResponse;
 import io.campuscore.restfulapi.academic.registration.model.SlipPayload;
 import io.campuscore.restfulapi.academic.service.AcademicEnrollmentReadService;
+import io.campuscore.restfulapi.academic.model.LetterGrades;
 import io.campuscore.restfulapi.academic.model.SemesterStatuses;
 import io.campuscore.restfulapi.academic.dto.AcademicEnrollmentReadDtos.EnrollmentResponse;
 import io.campuscore.restfulapi.exception.DomainException;
@@ -1259,9 +1260,10 @@ public class RegistrationService {
         }
     }
 
-    /** Letter ordering used for prerequisite minimum-grade enforcement. */
-    private static final java.util.Map<String, Integer> LETTER_RANK = java.util.Map.of(
-            "F", 0, "D", 1, "D+", 2, "C", 3, "C+", 4, "B", 5, "B+", 6, "A", 7, "A+", 8);
+    private static int letterRank(String letter) {
+        Integer rank = LetterGrades.rank(letter);
+        return rank == null ? Integer.MIN_VALUE : rank;
+    }
 
     private boolean hasCompleted(String studentId, String courseId, String minLetter) {
         // Same predicate as the transcript read: a COMPLETED enrollment whose
@@ -1287,9 +1289,9 @@ public class RegistrationService {
         // achieved letter must rank at or above it; an unknown floor value is
         // ignored rather than silently tightening or loosening the rule.
         int minRank = minLetter == null ? Integer.MIN_VALUE
-                : LETTER_RANK.getOrDefault(minLetter.trim().toUpperCase(java.util.Locale.ROOT), Integer.MIN_VALUE);
+                : letterRank(minLetter.trim().toUpperCase(java.util.Locale.ROOT));
         return letters.stream()
-                .map(letter -> LETTER_RANK.getOrDefault(letter, Integer.MIN_VALUE))
+                .map(RegistrationService::letterRank)
                 .anyMatch(rank -> rank >= minRank);
     }
 
