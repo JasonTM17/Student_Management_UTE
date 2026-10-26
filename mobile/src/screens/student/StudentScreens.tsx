@@ -21,6 +21,7 @@ import { tokens } from '../../design/tokens';
 import { ApiClientError, apiClient, campusApi, type AuthUser, type JsonObject, type MobileAttendanceSummary, type MobileEnrollment, type MobileNotification, type RegistrationCatalogSection } from '../../api/client';
 import { calculateAttendanceRate } from '../../lib/attendance-rate';
 import { isActiveEnrollment, isActiveEnrollmentStatus, isScheduledEnrollment } from '../../lib/enrollment-status';
+import { passwordIssue, profileAddressIssue, profilePhoneIssue, type PasswordIssue, type ProfileFieldIssue } from '../../lib/profile-validation';
 import { formatNotificationTimestamp, mergeNotificationItems } from './notification-feed';
 import { loadRegistrationCatalog } from './registration-window';
 import type { MobileScreenProps } from '../../navigation/types';
@@ -876,6 +877,20 @@ export function NotificationsScreen({ navigation }: MobileScreenProps) {
   );
 }
 
+const profileFieldIssueMessages: Record<ProfileFieldIssue, string> = {
+  ADDRESS_TOO_LONG: 'Address must be at most 500 characters.',
+  PHONE_INVALID: 'Enter a valid phone number.',
+  PHONE_TOO_LONG: 'Phone must be at most 80 characters.',
+};
+
+const passwordIssueMessages: Record<PasswordIssue, string> = {
+  PASSWORD_CONTAINS_IDENTITY: 'New password must not contain your email address.',
+  PASSWORD_REUSED: 'New password must be different from the current one.',
+  PASSWORD_TOO_LONG: 'New password must be at most 128 characters.',
+  PASSWORD_TOO_SHORT: 'New password must be at least 8 characters.',
+  PASSWORD_TOO_WEAK: 'New password must contain at least one letter and one digit.',
+};
+
 export function ProfileScreen({ navigation, role }: MobileScreenProps) {
   const {
     data: account,
@@ -901,6 +916,11 @@ export function ProfileScreen({ navigation, role }: MobileScreenProps) {
   }, [account]);
 
   const saveProfile = async () => {
+    const fieldIssue = profilePhoneIssue(phone.trim()) ?? profileAddressIssue(address.trim());
+    if (fieldIssue) {
+      setProfileMessage(profileFieldIssueMessages[fieldIssue]);
+      return;
+    }
     setIsSavingProfile(true);
     setProfileMessage(null);
     try {
@@ -917,8 +937,13 @@ export function ProfileScreen({ navigation, role }: MobileScreenProps) {
   };
 
   const updatePassword = async () => {
-    if (newPassword.length < 8) {
-      setProfileMessage('New password must be at least 8 characters.');
+    if (!oldPassword) {
+      setProfileMessage('Enter your current password.');
+      return;
+    }
+    const issue = passwordIssue(newPassword, { email: account?.email, currentPassword: oldPassword });
+    if (issue) {
+      setProfileMessage(passwordIssueMessages[issue]);
       return;
     }
     setIsSavingPassword(true);

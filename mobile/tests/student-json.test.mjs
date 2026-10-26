@@ -74,7 +74,7 @@ test('student screens key enrollment lists by semester and guard profile saves',
   assert.match(profile, /const \[isSavingPassword, setIsSavingPassword\] = useState\(false\)/);
   assert.match(profile, /disabled=\{isSavingProfile\}/);
   assert.match(profile, /disabled=\{isSavingPassword\}/);
-  assert.match(profile, /newPassword\.length < 8/);
+  assert.match(profile, /passwordIssue\(newPassword/);
   assert.match(profile, /setProfileMessage\(null\)/);
 });
 
