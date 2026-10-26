@@ -139,6 +139,17 @@ public class ThesisTopicMutationRepository {
                 params().addValue("topicId", topicId), Integer.class);
     }
 
+    /** Active supervisor assignments whose lecturer profiles can authenticate. */
+    public Integer countActiveSupervisors(UUID topicId) {
+        return jdbc.queryForObject(
+                "SELECT COUNT(DISTINCT s.lecturer_id) FROM thesis.thesis_topic_supervisor s "
+                        + "JOIN campuscore_auth.\"Lecturer\" l ON (l.\"id\" = s.lecturer_id "
+                        + "OR l.\"userId\" = s.lecturer_id) AND l.\"isActive\" = TRUE "
+                        + "JOIN campuscore_auth.\"User\" u ON u.\"id\" = l.\"userId\" "
+                        + "AND u.\"status\" = 'ACTIVE' WHERE s.topic_id = :topicId",
+                params().addValue("topicId", topicId), Integer.class);
+    }
+
     /** Whether the creator already occupies the first supervisor seat. */
     public Integer countSupervisorOrFirstSeat(UUID topicId, String supervisorId) {
         return jdbc.queryForObject(
@@ -157,7 +168,10 @@ public class ThesisTopicMutationRepository {
     /** Late topics may only name a real, active lecturer as supervisor. */
     public Integer countActiveLecturers(String supervisorId) {
         return jdbc.queryForObject(
-                "SELECT COUNT(*) FROM campuscore_auth.\"Lecturer\" WHERE \"id\" = :key AND \"isActive\" = TRUE",
+                "SELECT COUNT(*) FROM campuscore_auth.\"Lecturer\" l "
+                        + "JOIN campuscore_auth.\"User\" u ON u.\"id\" = l.\"userId\" "
+                        + "AND u.\"status\" = 'ACTIVE' "
+                        + "WHERE l.\"id\" = :key AND l.\"isActive\" = TRUE",
                 params().addValue("key", supervisorId), Integer.class);
     }
 

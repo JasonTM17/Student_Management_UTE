@@ -206,7 +206,7 @@ public class ThesisTopicMutationService {
             throw new DomainException(HttpStatus.FORBIDDEN, "TOPIC_APPROVER_REQUIRED",
                     "Only department governance can approve a topic");
         }
-        Integer supervisorCount = topicWrites.countSupervisors(id);
+        Integer supervisorCount = topicWrites.countActiveSupervisors(id);
         ThesisDeanScope.requireTopicAccess(scope, actor, id);
         if (supervisorCount == null || supervisorCount < 1 || supervisorCount > 2) {
             throw conflict("TOPIC_SUPERVISOR_REQUIRED",

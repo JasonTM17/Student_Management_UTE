@@ -788,6 +788,28 @@ class ThesisCouncilEscapeHatchTest {
     }
 
     @Test
+    void lateTopicRequiresSupervisorWithAnActiveAccount() {
+        Instant now = Instant.now();
+        UUID roundId = insertRound("Esc Round Inactive Late Supervisor", "REGISTRATION_OPEN",
+                now.plusSeconds(86_400), now.plusSeconds(5 * 86_400));
+        jdbc.update(
+                "UPDATE thesis.thesis_registration_round SET registration_start = ?, registration_end = ? WHERE id = ?",
+                Timestamp.from(now.minusSeconds(3_600)), Timestamp.from(now.plusSeconds(6 * 3_600)), roundId);
+        ensureLecturer("esc-lt-inactive-account");
+        jdbc.update("UPDATE campuscore_auth.\"User\" SET \"status\"='INACTIVE' WHERE \"id\"=?",
+                "esc-user-esc-lt-inactive-account");
+        var request = new io.campuscore.restfulapi.thesis.dto.ThesisMutationDtos.LateTopicRequest(
+                "department-demo", "Inactive supervisor topic", "Late topic description",
+                2, "esc-lt-inactive-account", "supervisor missed the window");
+
+        assertThatThrownBy(() -> mutations.createLateTopic(roundId, request, admin()))
+                .isInstanceOf(DomainException.class);
+        assertThat(jdbc.queryForObject(
+                "SELECT COUNT(*) FROM thesis.thesis_topic WHERE round_id = ? AND title = ?",
+                Integer.class, roundId, "Inactive supervisor topic")).isZero();
+    }
+
+    @Test
     void lateTopicCannotBeCreatedAfterStudentRegistrationEnds() {
         Instant now = Instant.now();
         UUID roundId = insertRound("Esc Round Late Topic Expired", "REGISTRATION_OPEN",
