@@ -47,7 +47,10 @@ test('the waive action is driven by the round read-model capability', () => {
 test('revoke stays reachable for a topic that already carries a waiver', () => {
   // The same button block renders revoke for an existing waiver even when the
   // round capability is off, so stored waivers can always be cleared.
-  assert.match(page, /top\.gvpbWaivedReason != null \|\| round\.counterReviewWaiverAllowed/);
+  assert.match(
+    page,
+    /top\.gvpbWaivedReason != null \|\|[\s\S]{0,60}round\.counterReviewWaiverAllowed &&[\s\S]{0,60}round\.gvpbDeadline/,
+  );
   assert.match(page, /top\.gvpbWaivedReason \? \([\s\S]{0,900}kind: 'revokeGvpbWaiver'/);
 });
 

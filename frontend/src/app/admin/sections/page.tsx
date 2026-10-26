@@ -1137,6 +1137,12 @@ export default function AdminSectionsPage() {
             />
           </div>
 
+          {editingSection != null && (editingSection.enrolledCount ?? 0) > 0 ? (
+            <p className="-mt-2 text-xs text-muted-foreground">
+              {messages.common.campusErrors.codes.SECTION_HAS_ENROLLMENTS}
+            </p>
+          ) : null}
+
           <div className="grid gap-4 sm:grid-cols-3">
             <AdminFormField label={copy.fields.sectionNumber}>
               <Input
