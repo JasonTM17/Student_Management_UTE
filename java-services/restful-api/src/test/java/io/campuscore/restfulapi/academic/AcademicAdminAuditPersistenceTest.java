@@ -186,6 +186,13 @@ class AcademicAdminAuditPersistenceTest {
         return count == null ? 0 : count;
     }
 
+    private int sectionSeats(String sectionId) {
+        Integer count = jdbc.queryForObject(
+                "SELECT \"enrolledCount\" FROM \"academic\".\"Section\" WHERE \"id\" = ?",
+                Integer.class, sectionId);
+        return count == null ? 0 : count;
+    }
+
     @Test
     void adminHardDeleteWritesEnrollmentEventAndAuditRow() {
         seedEnrollment("enr-del-1", "ENROLLED", "DRAFT");
@@ -207,6 +214,31 @@ class AcademicAdminAuditPersistenceTest {
                         + " WHERE \"entityType\" = 'ENROLLMENT' AND \"entityId\" = ?",
                 String.class, "enr-del-1");
         assertThat(beforeState).contains("stu-9").contains("ENROLLED");
+    }
+
+    @Test
+    void adminHardDeleteReleasesOnlySeatedEnrollmentRows() {
+        // A published, completed row still holds a seat in the nightly recount,
+        // so deleting it must free that seat.
+        seedEnrollment("enr-completed", "COMPLETED", "PUBLISHED");
+        jdbc.update("UPDATE \"academic\".\"Section\" SET \"enrolledCount\" = 1 WHERE \"id\" = 'sec-audit'");
+
+        service.deleteEnrollment("enr-completed", "admin-user");
+        assertThat(sectionSeats("sec-audit")).isZero();
+
+        // A non-seated status was already absent from the recount.
+        seedEnrollment("enr-withdrawn", "WITHDRAWN", "PUBLISHED");
+        jdbc.update("UPDATE \"academic\".\"Section\" SET \"enrolledCount\" = 1 WHERE \"id\" = 'sec-audit'");
+
+        service.deleteEnrollment("enr-withdrawn", "admin-user");
+        assertThat(sectionSeats("sec-audit")).isEqualTo(1);
+
+        // The counter never dips below zero even when the stored count lags.
+        seedEnrollment("enr-completed-floor", "COMPLETED", "PUBLISHED");
+        jdbc.update("UPDATE \"academic\".\"Section\" SET \"enrolledCount\" = 0 WHERE \"id\" = 'sec-audit'");
+
+        service.deleteEnrollment("enr-completed-floor", "admin-user");
+        assertThat(sectionSeats("sec-audit")).isZero();
     }
 
     @Test
