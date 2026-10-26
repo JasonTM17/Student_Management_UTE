@@ -14,7 +14,16 @@ const CSRF_HEADER_NAME = 'X-CSRF-Token';
 function cookieValue(cookieSource: string, name: string): string {
   const escapedName = name.replace(/([.*+?^${}()|[\]\\])/g, '\\$1');
   const match = cookieSource.match(new RegExp(`(?:^|; )${escapedName}=([^;]*)`));
-  return match ? decodeURIComponent(match[1]) : '';
+  if (!match) {
+    return '';
+  }
+  // A malformed percent-encoding (e.g. a bare "%" cookie value) makes
+  // decodeURIComponent throw; a bad cookie must mean "no token", not a 500.
+  try {
+    return decodeURIComponent(match[1]);
+  } catch {
+    return '';
+  }
 }
 
 function javaOrigin(): string {
@@ -69,6 +78,12 @@ export async function PUT(request: NextRequest) {
   }
 
   const body = await request.json().catch(() => null);
+  // An unparseable body is not an empty payload: sanitizeSiteAppearance(null)
+  // answers with defaults, so persisting it would silently reset the saved
+  // branding while reporting success.
+  if (body === null) {
+    return NextResponse.json({ message: 'BAD_JSON_BODY' }, { status: 400 });
+  }
   let appearance: Awaited<ReturnType<typeof writeSiteAppearance>>;
   try {
     appearance = await writeSiteAppearance(body);
