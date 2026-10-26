@@ -163,6 +163,9 @@ public class ThesisTopicService {
                 && !ThesisDepartmentScope.owns(scope, actor, topic.getDepartmentId())) {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Thesis topic not found");
         }
+        if ("WITHDRAWN".equals(topic.getResultStatus()) && isStudentScoped(actor) && !isOwner(topic, actor)) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Thesis topic not found");
+        }
         boolean published = isRoundResultsPublished(topic.getRoundId());
         boolean studentScoped = isStudentScoped(actor);
         String callerStudentId = normalize(actor == null ? null : actor.getClaimAsString("studentId"));
