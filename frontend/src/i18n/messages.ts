@@ -408,6 +408,19 @@ export const en = {
         LAST_SUPER_ADMIN_REQUIRED: 'At least one active super administrator must remain.',
         DEAN_ALREADY_ASSIGNED:
           'This faculty already has an active dean. Move the current dean back to lecturer before appointing another.',
+        SELF_PASSWORD_RESET_NOT_ALLOWED:
+          'Use your own change-password flow instead of resetting your password from this console.',
+        SELF_ROLE_CHANGE_NOT_ALLOWED: 'You cannot change your own system role.',
+        SELF_DEACTIVATION_NOT_ALLOWED: 'You cannot deactivate or lock your own account.',
+        SELF_DELETION_NOT_ALLOWED: 'You cannot delete your own account.',
+        INVALID_ACCOUNT_STATUS: 'That account status is not recognized.',
+        PROFILE_IN_USE:
+          'This academic profile is still referenced by records and cannot be removed.',
+        PROFILE_HAS_HISTORY:
+          'This profile has academic history. Deactivate the account instead of converting its role.',
+        USER_IN_USE:
+          'This account is still referenced by an academic profile and cannot be deleted.',
+        CSRF_INVALID: 'Your session token expired. Try the action again.',
         // Password policy & recovery
         PASSWORD_TOO_SHORT: 'Choose a password with at least 8 characters.',
         PASSWORD_TOO_LONG: 'Choose a password no longer than 128 characters.',
@@ -3956,6 +3969,19 @@ export const vi: I18nMessages = {
         LAST_SUPER_ADMIN_REQUIRED: 'Phải luôn còn ít nhất một quản trị viên cấp cao đang hoạt động.',
         DEAN_ALREADY_ASSIGNED:
           'Khoa này đã có Trưởng khoa đang hoạt động. Hãy chuyển Trưởng khoa hiện tại về Giảng viên trước khi bổ nhiệm người khác.',
+        SELF_PASSWORD_RESET_NOT_ALLOWED:
+          'Hãy dùng chức năng đổi mật khẩu của chính bạn thay vì đặt lại mật khẩu tại đây.',
+        SELF_ROLE_CHANGE_NOT_ALLOWED: 'Bạn không thể đổi vai trò hệ thống của chính mình.',
+        SELF_DEACTIVATION_NOT_ALLOWED: 'Bạn không thể vô hiệu hoặc khóa tài khoản của chính mình.',
+        SELF_DELETION_NOT_ALLOWED: 'Bạn không thể xóa tài khoản của chính mình.',
+        INVALID_ACCOUNT_STATUS: 'Trạng thái tài khoản này không được hệ thống nhận diện.',
+        PROFILE_IN_USE:
+          'Hồ sơ học vụ này vẫn đang được các dữ liệu khác tham chiếu nên không thể xóa.',
+        PROFILE_HAS_HISTORY:
+          'Hồ sơ này đã có dữ liệu học vụ. Hãy vô hiệu tài khoản thay vì chuyển đổi vai trò.',
+        USER_IN_USE:
+          'Tài khoản này vẫn đang được một hồ sơ học vụ tham chiếu nên không thể xóa.',
+        CSRF_INVALID: 'Phiên làm việc đã hết hạn. Hãy thử lại thao tác.',
         // Chính sách mật khẩu & khôi phục
         PASSWORD_TOO_SHORT: 'Hãy chọn mật khẩu có ít nhất 8 ký tự.',
         PASSWORD_TOO_LONG: 'Hãy chọn mật khẩu không quá 128 ký tự.',
