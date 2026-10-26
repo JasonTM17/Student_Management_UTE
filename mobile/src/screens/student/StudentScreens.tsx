@@ -37,6 +37,7 @@ const friendlyErrorMessageByCode: Record<string, string> = {
   HTTP_403: 'You do not have access to this action.',
   HTTP_404: 'We could not find that item.',
   INVALID_REQUEST: 'Please review the information and try again.',
+  PASSWORD_CHANGE_REQUIRED: 'Change your temporary password in Profile to continue.',
   ROUND_NOT_FOUND: 'Registration is not open right now.',
   UNAUTHENTICATED: 'Please sign in again to continue.',
   WINDOW_CLOSED: 'Registration is not open right now.',
@@ -959,6 +960,7 @@ export function ProfileScreen({ navigation, role }: MobileScreenProps) {
       setProfileMessage('Password updated.');
       setOldPassword('');
       setNewPassword('');
+      void reload();
     } catch {
       setProfileMessage('Password could not be updated.');
     } finally {
@@ -1028,6 +1030,11 @@ export function ProfileScreen({ navigation, role }: MobileScreenProps) {
               loading={isSavingProfile}
               onPress={() => void saveProfile()}
             />
+            {account?.mustChangePassword ? (
+              <UiText variant="bodySmall" tone="warning" style={styles.cardCopy}>
+                Your account uses a temporary password. Change it below to unlock the rest of the app.
+              </UiText>
+            ) : null}
             <Field label="Current password" value={oldPassword} onChangeText={setOldPassword} secureTextEntry />
             <Field label="New password" value={newPassword} onChangeText={setNewPassword} secureTextEntry />
             <Button

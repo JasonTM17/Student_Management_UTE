@@ -92,6 +92,7 @@ export interface AuthUser {
   permissions?: string[];
   studentId?: string | null;
   lecturerId?: string | null;
+  mustChangePassword?: boolean;
 }
 
 export interface LoginResponse {
