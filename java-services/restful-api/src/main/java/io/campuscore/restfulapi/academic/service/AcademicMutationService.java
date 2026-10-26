@@ -1,6 +1,7 @@
 package io.campuscore.restfulapi.academic.service;
 
 import io.campuscore.restfulapi.academic.registration.service.RegistrationService;
+import io.campuscore.restfulapi.academic.model.EnrollmentStatuses;
 import io.campuscore.restfulapi.academic.model.SemesterStatuses;
 import io.campuscore.restfulapi.academic.dto.AcademicEnrollmentReadDtos.EnrollmentResponse;
 import io.campuscore.restfulapi.academic.dto.AcademicMutationDtos.GradeUpdate;
@@ -162,7 +163,7 @@ public class AcademicMutationService {
                 new MapSqlParameterSource()
                         .addValue("studentId", enrollment.get("student_id"))
                         .addValue("semesterId", enrollment.get("semester_id")));
-        if (List.of("ENROLLED", "PENDING", "CONFIRMED").contains(status)) {
+        if (EnrollmentStatuses.ACTIVE_STATUSES.contains(status)) {
             jdbc.update(
                     "UPDATE " + SECTION + " SET \"enrolledCount\" = GREATEST(0, \"enrolledCount\" - 1),"
                             + " \"updatedAt\" = CURRENT_TIMESTAMP WHERE \"id\" = :sectionId",
