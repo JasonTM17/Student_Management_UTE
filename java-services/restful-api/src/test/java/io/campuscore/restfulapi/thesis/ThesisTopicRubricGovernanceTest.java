@@ -3,6 +3,7 @@ package io.campuscore.restfulapi.thesis;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -101,6 +102,39 @@ class ThesisTopicRubricGovernanceTest {
                 .andExpect(status().isOk()).andExpect(jsonPath("$.status").value("PUBLISHED"));
         assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM campuscore_audit.\"AdminAudit\" WHERE \"entityId\"=? AND \"action\"='THESIS_TOPIC_APPROVED'",
                 Integer.class, id.toString())).isEqualTo(1);
+    }
+
+    @Test
+    void supervisorReplacementRejectsLecturerWhoseAccountIsInactive() throws Exception {
+        UUID id = topic("department-demo", "DRAFT");
+        staff("rtg-inactive-supervisor", "department-demo", "LECTURER");
+        jdbc.update("UPDATE campuscore_auth.\"User\" SET \"status\"='INACTIVE' WHERE \"id\" = "
+                + "(SELECT \"userId\" FROM campuscore_auth.\"Lecturer\" WHERE \"id\"='rtg-inactive-supervisor')");
+
+        mvc.perform(put("/api/v1/thesis/topics/{id}/supervisors", id)
+                        .with(staff("rtg-head", "department-demo", "TRUONG_BO_MON"))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"supervisorIds\":[\"rtg-inactive-supervisor\"]}"))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("LECTURER_ACCOUNT_REQUIRED"));
+
+        assertThat(jdbc.queryForList(
+                "SELECT lecturer_id FROM thesis.thesis_topic_supervisor WHERE topic_id=? ORDER BY supervisor_order",
+                String.class, id)).containsExactly("rtg-owner");
+    }
+
+    @Test
+    void topicCannotBePublishedWhenItsSupervisorAccountIsInactive() throws Exception {
+        UUID id = topic("department-demo", "DRAFT");
+        jdbc.update("UPDATE campuscore_auth.\"User\" SET \"status\"='INACTIVE' WHERE \"id\" = "
+                + "(SELECT \"userId\" FROM campuscore_auth.\"Lecturer\" WHERE \"id\"='rtg-owner')");
+
+        mvc.perform(post("/api/v1/thesis/topics/{id}/publish", id)
+                        .with(staff("rtg-head", "department-demo", "TRUONG_BO_MON")))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("TOPIC_SUPERVISOR_REQUIRED"));
+
+        assertThat(topicStatus(id)).isEqualTo("DRAFT");
     }
 
     @Test
