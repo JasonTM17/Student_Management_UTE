@@ -261,30 +261,42 @@ function redirectToLogin(reason: 'session-expired' | 'unauthorized') {
   }
 
   const csrfHintBefore = getCookie(CSRF_COOKIE_NAME);
-  sessionDeathConfirmationPromise = authApi
-    .me()
-    .then(() => undefined)
-    .catch((confirmationError: unknown) => {
-      const status = (
-        confirmationError as { response?: { status?: number } } | undefined
-      )?.response?.status;
-      const csrfHintAfter = getCookie(CSRF_COOKIE_NAME);
-      // Re-check inside the async confirm: a logout may have started while
-      // the probe was in flight (marker was still false at entry).
-      if (isLogoutInProgress()) {
+  const probeStatus = (probeError: unknown) =>
+    (probeError as { response?: { status?: number } } | undefined)?.response
+      ?.status;
+  const confirmedDead = (probeError: unknown) =>
+    // Re-checked inside the async confirm: a logout may have started while a
+    // probe was in flight (marker was still false at entry).
+    !isLogoutInProgress() &&
+    probeStatus(probeError) === 401 &&
+    getCookie(CSRF_COOKIE_NAME) === csrfHintBefore;
+
+  sessionDeathConfirmationPromise = (async () => {
+    try {
+      await authApi.me();
+      return;
+    } catch (firstError) {
+      if (probeStatus(firstError) !== 401) {
         return;
       }
-      if (status === 401 && csrfHintAfter === csrfHintBefore) {
-        // A 401 means the shared session cookie is dead for every tab — tell
-        // siblings so they converge to login instead of idling on a revoked
-        // session until their own next request discovers it.
-        publishSessionChange('signed-out');
-        navigateToLogin(reason);
+      // The probe 401s on the same possibly-expired access cookie the failed
+      // request used; rotate once before declaring the shared session dead.
+      try {
+        await refreshSessionSingleFlight();
+        await authApi.me();
+      } catch (recheckError) {
+        if (confirmedDead(recheckError)) {
+          // A 401 means the shared session cookie is dead for every tab —
+          // tell siblings so they converge to login instead of idling on a
+          // revoked session until their own next request discovers it.
+          publishSessionChange('signed-out');
+          navigateToLogin(reason);
+        }
       }
-    })
-    .finally(() => {
-      sessionDeathConfirmationPromise = null;
-    });
+    }
+  })().finally(() => {
+    sessionDeathConfirmationPromise = null;
+  });
 }
 
 function getCookie(name: string): string | undefined {
