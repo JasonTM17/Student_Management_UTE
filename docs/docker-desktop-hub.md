@@ -9,8 +9,6 @@ Do not guess the Hub namespace from GitHub (`jasontm17`). Read the signed-in Doc
 3. Field `0` is Base64 JSON. Decode it and use `Username`.
 4. Never commit that file. It is machine-local login state.
 
-On this machine the Hub user is `nguyenson1710`.
-
 ## Publish images manually (fallback)
 
 ```powershell
