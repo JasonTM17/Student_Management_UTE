@@ -75,6 +75,17 @@ Hệ thống trợ lý học vụ AI (`ThesisAssistantService`) áp dụng kiế
 - Đơn nâng hạn mức đã được duyệt tiếp tục theo hành vi hiện có, kể cả ở học kỳ hè. Giới hạn tối thiểu `14` chỉ là thông tin tư vấn trên trang đăng ký và không chặn việc thêm từng học phần. Dữ liệu hiện không xác định chắc chắn học kỳ cuối, vì vậy Phòng Đào tạo phải áp dụng ngoại lệ học kỳ cuối thủ công khi cần.
 - Đăng ký theo chương trình đào tạo (curriculum default) không thêm biến môi trường mới. Cột đánh dấu nguồn `academic."Enrollment"."registrationSource"` (V146, `VARCHAR(40)`, nullable) phân biệt đăng ký do hệ thống tạo (`CURRICULUM_DEFAULT`) với đăng ký thủ công (`NULL`); hàng bị sinh viên huỷ giữ nguyên dấu nguồn để lần áp dụng loạt sau không tự thêm lại. Giá trị này chỉ đọc qua API, không cấu hình được.
 
+### 3.3. Cấu hình runtime dùng chung
+
+Backend đọc các cấu hình dưới đây. Các biến ghi đè thời hạn phiên, tên cookie và CORS chưa có trong `.env.example` hoặc Compose; Compose không chuyển tiếp biến giới hạn tốc độ, còn `.env.example` chỉ liệt kê hai tuỳ chọn tin cậy proxy. Cấu hình mail và SMTP đã có trong `.env.example` và Compose. Mặc định cùng tên property được khai báo trong [application.yml](../java-services/restful-api/src/main/resources/application.yml); CORS có credential do [SecurityConfig](../java-services/restful-api/src/main/java/io/campuscore/restfulapi/security/config/SecurityConfig.java) quản lý.
+
+| Nhóm | Biến và mặc định |
+|---|---|
+| Phiên | `JWT_ACCESS_TOKEN_TTL_SECONDS=900`, `JWT_REFRESH_TOKEN_TTL_SECONDS=604800`; cookie mặc định `ACCESS_TOKEN_COOKIE=cc_access_token`, `REFRESH_TOKEN_COOKIE=cc_refresh_token`, `CSRF_COOKIE=cc_csrf`, header `CSRF_HEADER=X-CSRF-Token`; `COOKIE_SECURE=false`. |
+| Email | `MAIL_ENABLED` mặc định `true` trong ứng dụng; `.env.example` và Compose đặt `false`. SMTP dùng `MAIL_FROM` và `SPRING_MAIL_*` như trong `.env.example`. |
+| Giới hạn tốc độ | `RATE_LIMIT_ENABLED=true`; `RATE_LIMIT_LOGIN=15`, `RATE_LIMIT_DEFAULT=40`, `RATE_LIMIT_WINDOW_SECONDS=60`; `RATE_LIMIT_TRUST_PROXY_HEADERS` và `RATE_LIMIT_TRUST_REAL_IP` mặc định `false`. Khi dùng xác thực IP ở Next.js proxy, đặt cùng giá trị bí mật cho `CAMPUSCORE_PROXY_TOKEN` (web) và `RATE_LIMIT_PROXY_TOKEN` (API); cả hai hiện chưa có trong ví dụ môi trường hoặc Compose. Các bucket mail, thesis và enrollment được cố định trong [RateLimitFilter](../java-services/restful-api/src/main/java/io/campuscore/restfulapi/security/ratelimit/filter/RateLimitFilter.java). |
+| CORS | `APP_CORS_ALLOWED_ORIGIN_PATTERNS` mặc định allowlist localhost và hai domain CampusUTE; chỉ thêm origin triển khai cụ thể, không dùng wildcard công khai. |
+
 ---
 
 ## 4. Tối Ưu Hóa Nhận Diện Thương Hiệu & SEO
