@@ -1,0 +1,552 @@
+{
+  "capturedAt": "2026-10-27T07:56:47.891Z",
+  "baseUrl": "http://127.0.0.1:3210",
+  "viewport": {
+    "width": 1440,
+    "height": 1000
+  },
+  "records": [
+    {
+      "role": "student",
+      "probe": "/api/v1/auth/me",
+      "status": 200,
+      "roles": [
+        "STUDENT"
+      ],
+      "identityMatches": true
+    },
+    {
+      "role": "student",
+      "locale": "vi",
+      "route": "/dashboard",
+      "file": "student-dashboard-vi.png",
+      "status": 200,
+      "apiErrors": []
+    },
+    {
+      "role": "student",
+      "locale": "vi",
+      "route": "/dashboard/register",
+      "file": "student-registration-vi.png",
+      "status": 200,
+      "apiErrors": []
+    },
+    {
+      "role": "student",
+      "locale": "vi",
+      "route": "/dashboard/enrollments",
+      "file": "student-enrollments-vi.png",
+      "status": 200,
+      "apiErrors": []
+    },
+    {
+      "role": "student",
+      "locale": "vi",
+      "route": "/dashboard/schedule",
+      "file": "student-schedule-vi.png",
+      "status": 200,
+      "apiErrors": []
+    },
+    {
+      "role": "student",
+      "locale": "vi",
+      "route": "/dashboard/grades",
+      "file": "student-grades-vi.png",
+      "status": 200,
+      "apiErrors": []
+    },
+    {
+      "role": "student",
+      "locale": "vi",
+      "route": "/dashboard/transcript",
+      "file": "student-transcript-vi.png",
+      "status": 200,
+      "apiErrors": []
+    },
+    {
+      "role": "student",
+      "locale": "vi",
+      "route": "/dashboard/curriculum",
+      "file": "student-curriculum-vi.png",
+      "status": 200,
+      "apiErrors": []
+    },
+    {
+      "role": "student",
+      "locale": "vi",
+      "route": "/dashboard/attendance",
+      "file": "student-attendance-vi.png",
+      "status": 200,
+      "apiErrors": []
+    },
+    {
+      "role": "student",
+      "locale": "vi",
+      "route": "/dashboard/conduct",
+      "file": "student-conduct-vi.png",
+      "status": 200,
+      "apiErrors": []
+    },
+    {
+      "role": "student",
+      "locale": "vi",
+      "route": "/dashboard/thesis",
+      "file": "student-thesis-vi.png",
+      "status": 200,
+      "apiErrors": [
+        {
+          "path": "/api/v1/thesis/groups/f9a4d567-2e0b-445a-b634-4e5f6a7b8c93/report",
+          "status": 404
+        }
+      ]
+    },
+    {
+      "role": "student",
+      "locale": "vi",
+      "route": "/dashboard/assistant-specialized",
+      "file": "student-assistant-vi.png",
+      "status": 200,
+      "apiErrors": []
+    },
+    {
+      "role": "student",
+      "locale": "vi",
+      "route": "/dashboard/assistant-specialized",
+      "file": "student-assistant-answer-vi.png",
+      "interaction": "Submitted actual academic question; waited for stream completion."
+    },
+    {
+      "role": "student",
+      "locale": "vi",
+      "route": "/dashboard/notifications",
+      "file": "student-notifications-vi.png",
+      "status": 200,
+      "apiErrors": []
+    },
+    {
+      "role": "student",
+      "locale": "en",
+      "route": "/dashboard",
+      "file": "student-dashboard-en.png",
+      "status": 200,
+      "apiErrors": []
+    },
+    {
+      "role": "student",
+      "locale": "en",
+      "route": "/dashboard/register",
+      "file": "student-registration-en.png",
+      "status": 200,
+      "apiErrors": []
+    },
+    {
+      "role": "student",
+      "locale": "en",
+      "route": "/dashboard/enrollments",
+      "file": "student-enrollments-en.png",
+      "status": 200,
+      "apiErrors": []
+    },
+    {
+      "role": "student",
+      "locale": "en",
+      "route": "/dashboard/schedule",
+      "file": "student-schedule-en.png",
+      "status": 200,
+      "apiErrors": []
+    },
+    {
+      "role": "student",
+      "locale": "en",
+      "route": "/dashboard/grades",
+      "file": "student-grades-en.png",
+      "status": 200,
+      "apiErrors": []
+    },
+    {
+      "role": "student",
+      "locale": "en",
+      "route": "/dashboard/transcript",
+      "file": "student-transcript-en.png",
+      "status": 200,
+      "apiErrors": []
+    },
+    {
+      "role": "student",
+      "locale": "en",
+      "route": "/dashboard/curriculum",
+      "file": "student-curriculum-en.png",
+      "status": 200,
+      "apiErrors": []
+    },
+    {
+      "role": "student",
+      "locale": "en",
+      "route": "/dashboard/attendance",
+      "file": "student-attendance-en.png",
+      "status": 200,
+      "apiErrors": []
+    },
+    {
+      "role": "student",
+      "locale": "en",
+      "route": "/dashboard/conduct",
+      "file": "student-conduct-en.png",
+      "status": 200,
+      "apiErrors": []
+    },
+    {
+      "role": "student",
+      "locale": "en",
+      "route": "/dashboard/thesis",
+      "file": "student-thesis-en.png",
+      "status": 200,
+      "apiErrors": [
+        {
+          "path": "/api/v1/thesis/groups/f9a4d567-2e0b-445a-b634-4e5f6a7b8c93/report",
+          "status": 404
+        }
+      ]
+    },
+    {
+      "role": "student",
+      "locale": "en",
+      "route": "/dashboard/assistant-specialized",
+      "file": "student-assistant-en.png",
+      "status": 200,
+      "apiErrors": []
+    },
+    {
+      "role": "student",
+      "locale": "en",
+      "route": "/dashboard/assistant-specialized",
+      "file": "student-assistant-answer-en.png",
+      "interaction": "Submitted actual academic question; waited for stream completion."
+    },
+    {
+      "role": "student",
+      "locale": "en",
+      "route": "/dashboard/notifications",
+      "file": "student-notifications-en.png",
+      "status": 200,
+      "apiErrors": []
+    },
+    {
+      "role": "lecturer",
+      "probe": "/api/v1/auth/me",
+      "status": 200,
+      "roles": [
+        "LECTURER"
+      ],
+      "identityMatches": true
+    },
+    {
+      "role": "lecturer",
+      "locale": "vi",
+      "route": "/dashboard/lecturer",
+      "file": "lecturer-dashboard-vi.png",
+      "status": 200,
+      "apiErrors": []
+    },
+    {
+      "role": "lecturer",
+      "locale": "vi",
+      "route": "/dashboard/lecturer/schedule",
+      "file": "lecturer-schedule-vi.png",
+      "status": 200,
+      "apiErrors": []
+    },
+    {
+      "role": "lecturer",
+      "locale": "vi",
+      "route": "/dashboard/lecturer/grades",
+      "file": "lecturer-grades-vi.png",
+      "status": 200,
+      "apiErrors": []
+    },
+    {
+      "role": "lecturer",
+      "locale": "vi",
+      "route": "/dashboard/lecturer/attendance",
+      "file": "lecturer-attendance-vi.png",
+      "status": 200,
+      "apiErrors": []
+    },
+    {
+      "role": "lecturer",
+      "locale": "vi",
+      "route": "/dashboard/lecturer/thesis",
+      "file": "lecturer-thesis-vi.png",
+      "status": 200,
+      "apiErrors": []
+    },
+    {
+      "role": "lecturer",
+      "locale": "vi",
+      "route": "/dashboard/lecturer/mail",
+      "file": "lecturer-mail-vi.png",
+      "status": 200,
+      "apiErrors": []
+    },
+    {
+      "role": "lecturer",
+      "locale": "vi",
+      "route": "/dashboard/lecturer/announcements",
+      "file": "lecturer-announcements-vi.png",
+      "status": 200,
+      "apiErrors": []
+    },
+    {
+      "role": "lecturer",
+      "locale": "en",
+      "route": "/dashboard/lecturer",
+      "file": "lecturer-dashboard-en.png",
+      "status": 200,
+      "apiErrors": []
+    },
+    {
+      "role": "lecturer",
+      "locale": "en",
+      "route": "/dashboard/lecturer/schedule",
+      "file": "lecturer-schedule-en.png",
+      "status": 200,
+      "apiErrors": []
+    },
+    {
+      "role": "lecturer",
+      "locale": "en",
+      "route": "/dashboard/lecturer/grades",
+      "file": "lecturer-grades-en.png",
+      "status": 200,
+      "apiErrors": []
+    },
+    {
+      "role": "lecturer",
+      "locale": "en",
+      "route": "/dashboard/lecturer/attendance",
+      "file": "lecturer-attendance-en.png",
+      "status": 200,
+      "apiErrors": []
+    },
+    {
+      "role": "lecturer",
+      "locale": "en",
+      "route": "/dashboard/lecturer/thesis",
+      "file": "lecturer-thesis-en.png",
+      "status": 200,
+      "apiErrors": []
+    },
+    {
+      "role": "lecturer",
+      "locale": "en",
+      "route": "/dashboard/lecturer/mail",
+      "file": "lecturer-mail-en.png",
+      "status": 200,
+      "apiErrors": []
+    },
+    {
+      "role": "lecturer",
+      "locale": "en",
+      "route": "/dashboard/lecturer/announcements",
+      "file": "lecturer-announcements-en.png",
+      "status": 200,
+      "apiErrors": []
+    },
+    {
+      "role": "admin",
+      "probe": "/api/v1/auth/me",
+      "status": 200,
+      "roles": [
+        "ADMIN"
+      ],
+      "identityMatches": true
+    },
+    {
+      "role": "admin",
+      "locale": "vi",
+      "route": "/admin",
+      "file": "admin-dashboard-vi.png",
+      "status": 200,
+      "apiErrors": []
+    },
+    {
+      "role": "admin",
+      "locale": "vi",
+      "route": "/admin/users",
+      "file": "admin-users-vi.png",
+      "status": 200,
+      "apiErrors": []
+    },
+    {
+      "role": "admin",
+      "locale": "vi",
+      "route": "/admin/sections",
+      "file": "admin-sections-vi.png",
+      "status": 200,
+      "apiErrors": []
+    },
+    {
+      "role": "admin",
+      "locale": "vi",
+      "route": "/admin/thesis",
+      "file": "admin-thesis-vi.png",
+      "status": 200,
+      "apiErrors": []
+    },
+    {
+      "role": "admin",
+      "locale": "vi",
+      "route": "/admin/assistant-knowledge",
+      "file": "admin-knowledge-vi.png",
+      "status": 200,
+      "apiErrors": []
+    },
+    {
+      "role": "admin",
+      "locale": "vi",
+      "route": "/admin/registration/curriculum-defaults",
+      "file": "admin-curriculum-defaults-vi.png",
+      "status": 200,
+      "apiErrors": []
+    },
+    {
+      "role": "admin",
+      "locale": "vi",
+      "route": "/admin/grade-appeals",
+      "file": "admin-appeals-vi.png",
+      "status": 200,
+      "apiErrors": []
+    },
+    {
+      "role": "admin",
+      "locale": "vi",
+      "route": "/admin/announcements",
+      "file": "admin-announcements-vi.png",
+      "status": 200,
+      "apiErrors": []
+    },
+    {
+      "role": "admin",
+      "locale": "vi",
+      "route": "/admin/audit",
+      "file": "admin-audit-vi.png",
+      "status": 200,
+      "apiErrors": []
+    },
+    {
+      "role": "admin",
+      "locale": "en",
+      "route": "/admin",
+      "file": "admin-dashboard-en.png",
+      "status": 200,
+      "apiErrors": []
+    },
+    {
+      "role": "admin",
+      "locale": "en",
+      "route": "/admin/users",
+      "file": "admin-users-en.png",
+      "status": 200,
+      "apiErrors": []
+    },
+    {
+      "role": "admin",
+      "locale": "en",
+      "route": "/admin/sections",
+      "file": "admin-sections-en.png",
+      "status": 200,
+      "apiErrors": []
+    },
+    {
+      "role": "admin",
+      "locale": "en",
+      "route": "/admin/thesis",
+      "file": "admin-thesis-en.png",
+      "status": 200,
+      "apiErrors": []
+    },
+    {
+      "role": "admin",
+      "locale": "en",
+      "route": "/admin/assistant-knowledge",
+      "file": "admin-knowledge-en.png",
+      "status": 200,
+      "apiErrors": []
+    },
+    {
+      "role": "admin",
+      "locale": "en",
+      "route": "/admin/registration/curriculum-defaults",
+      "file": "admin-curriculum-defaults-en.png",
+      "status": 200,
+      "apiErrors": []
+    },
+    {
+      "role": "admin",
+      "locale": "en",
+      "route": "/admin/grade-appeals",
+      "file": "admin-appeals-en.png",
+      "status": 200,
+      "apiErrors": []
+    },
+    {
+      "role": "admin",
+      "locale": "en",
+      "route": "/admin/announcements",
+      "file": "admin-announcements-en.png",
+      "status": 200,
+      "apiErrors": []
+    },
+    {
+      "role": "admin",
+      "locale": "en",
+      "route": "/admin/audit",
+      "file": "admin-audit-en.png",
+      "status": 200,
+      "apiErrors": []
+    },
+    {
+      "role": "dean",
+      "probe": "/api/v1/auth/me",
+      "status": 200,
+      "roles": [
+        "LECTURER",
+        "TRUONG_KHOA"
+      ],
+      "identityMatches": true
+    },
+    {
+      "role": "dean",
+      "locale": "vi",
+      "route": "/dashboard/dean",
+      "file": "dean-dashboard-vi.png",
+      "status": 200,
+      "apiErrors": []
+    },
+    {
+      "role": "dean",
+      "locale": "vi",
+      "route": "/admin/thesis",
+      "file": "dean-thesis-vi.png",
+      "status": 200,
+      "apiErrors": []
+    },
+    {
+      "role": "dean",
+      "locale": "en",
+      "route": "/dashboard/dean",
+      "file": "dean-dashboard-en.png",
+      "status": 200,
+      "apiErrors": []
+    },
+    {
+      "role": "dean",
+      "locale": "en",
+      "route": "/admin/thesis",
+      "file": "dean-thesis-en.png",
+      "status": 200,
+      "apiErrors": []
+    }
+  ],
+  "note": "Disposable local fixtures. Real browser rendering. No external SMTP/LLM acceptance claim."
+}
