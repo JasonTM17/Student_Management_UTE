@@ -9,8 +9,8 @@ import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.ObjectMapper;
 import io.campuscore.restfulapi.thesis.ThesisAuthorityFixture;
 import io.campuscore.restfulapi.thesis.assistant.dto.ThesisAssistantDtos.ChatResponse;
 import io.campuscore.restfulapi.thesis.assistant.model.KnowledgeDocument;
@@ -26,7 +26,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
+import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.annotation.DirtiesContext;
@@ -66,7 +66,7 @@ class ThesisAssistantGroupPolicyRetrievalTest {
         try (var input = ThesisAssistantGroupPolicyRetrievalTest.class.getResourceAsStream(
                 "/assistant/group-policy-v113-public-corpus.json")) {
             assertThat(input).isNotNull();
-            corpus = new ObjectMapper().readTree(input);
+            corpus = tools.jackson.databind.json.JsonMapper.builder().build().readTree(input);
         }
         assertThat(corpus.path("release").path("id").asText()).isEqualTo(RELEASE);
         assertThat(corpus.path("release").path("corpusHash").asText()).isEqualTo(CORPUS_HASH);
@@ -195,7 +195,7 @@ class ThesisAssistantGroupPolicyRetrievalTest {
     @Test
     void specializedScopeDoesNotBorrowAcademicGroupPolicy() throws Exception {
         JsonNode response = chat("How many members can a thesis project group have?", "en", "specialized");
-        assertThat(response.path("citations").findValuesAsText("slug"))
+        assertThat(response.path("citations").findValuesAsString("slug"))
                 .noneMatch(slug -> slug.startsWith("thesis-group-members-rules-"));
     }
 

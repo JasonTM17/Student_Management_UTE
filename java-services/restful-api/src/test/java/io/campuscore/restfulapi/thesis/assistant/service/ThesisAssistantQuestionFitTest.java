@@ -20,7 +20,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
 import java.util.UUID;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.ObjectMapper;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.junit.jupiter.api.Test;
@@ -250,7 +250,7 @@ class ThesisAssistantQuestionFitTest {
     }
 
     private static String injectionSeed(String locale) throws Exception {
-        var rows = new ObjectMapper().readTree(Files.readString(Path.of("../../supabase/seed/assistant-specialized-knowledge.json")));
+        var rows = tools.jackson.databind.json.JsonMapper.builder().build().readTree(Files.readString(Path.of("../../supabase/seed/assistant-specialized-knowledge.json")));
         for (var row : rows) {
             if (row.path("slug").asText().equals("specialized-spring-dependency-constructor-injection-" + locale))
                 return row.path("content").asText();

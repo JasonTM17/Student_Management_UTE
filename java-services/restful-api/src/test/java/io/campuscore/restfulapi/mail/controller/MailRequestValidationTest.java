@@ -6,8 +6,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.mock;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 
-import com.fasterxml.jackson.core.type.TypeReference;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.core.type.TypeReference;
+import tools.jackson.databind.ObjectMapper;
 import io.campuscore.restfulapi.exception.handler.GlobalExceptionHandler;
 import io.campuscore.restfulapi.mail.dto.MailDtos.AcademicNoticeRequest;
 import io.campuscore.restfulapi.mail.dto.MailDtos.CourseItem;
@@ -34,7 +34,7 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 class MailRequestValidationTest {
 
     private static final Validator VALIDATOR = Validation.buildDefaultValidatorFactory().getValidator();
-    private final ObjectMapper mapper = new ObjectMapper();
+    private final ObjectMapper mapper = tools.jackson.databind.json.JsonMapper.builder().build();
     private final MockMvc mvc = MockMvcBuilders
             .standaloneSetup(new MailController(mock(EmailService.class), mock(ObjectProvider.class)))
             .setCustomArgumentResolvers(new AuthenticationPrincipalArgumentResolver())

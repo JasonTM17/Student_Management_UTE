@@ -5,7 +5,7 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.ObjectMapper;
 import io.campuscore.restfulapi.auth.repository.AuthUserRepository;
 import io.campuscore.restfulapi.exception.response.ApiErrorWriter;
 import io.campuscore.restfulapi.security.availability.DatabaseAvailabilityTracker;
@@ -54,7 +54,7 @@ class AccountAuthorityPersistenceTest {
         jdbc.update("INSERT INTO campuscore_auth.\"UserRole\" VALUES ('user','role')");
         var repository = new AuthUserRepository(new NamedParameterJdbcTemplate(jdbc));
         var beans = new StaticListableBeanFactory(Map.of("users", repository));
-        filter = new AccountStateFilter(beans.getBeanProvider(AuthUserRepository.class), new ApiErrorWriter(new ObjectMapper()));
+        filter = new AccountStateFilter(beans.getBeanProvider(AuthUserRepository.class), new ApiErrorWriter(tools.jackson.databind.json.JsonMapper.builder().build()));
         authenticate(List.of("ADMIN"), List.of(), null);
     }
 

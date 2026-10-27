@@ -4,7 +4,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.ObjectMapper;
 import com.sun.net.httpserver.HttpServer;
 import io.campuscore.restfulapi.thesis.assistant.dto.StreamCitation;
 import io.campuscore.restfulapi.thesis.assistant.dto.StreamDelta;
@@ -413,7 +413,9 @@ class RagAssistantGatewayTest {
                 false,
                 1_000,
                 readTimeoutMs),
-                new ObjectMapper());
+                tools.jackson.databind.json.JsonMapper.builder()
+                        .disable(tools.jackson.databind.DeserializationFeature.FAIL_ON_NULL_FOR_PRIMITIVES)
+                        .build());
     }
 
     private void startServer(com.sun.net.httpserver.HttpHandler handler, String path) throws IOException {
