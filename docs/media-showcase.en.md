@@ -72,7 +72,7 @@ The existing lecturer mail recipient summary still displays the literal `{max}` 
 | student transcript | [PNG](assets/showcase-2026-10/student-transcript-vi.png) | [PNG](assets/showcase-2026-10/student-transcript-en.png) |
 
 ## Current diagrams
- 
+
 ![Architecture](assets/showcase-2026-10/architecture-en.png)
 
 [SVG](assets/showcase-2026-10/architecture-en.svg)

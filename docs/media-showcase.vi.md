@@ -72,7 +72,7 @@ Trang email giảng viên hiện còn hiển thị placeholder `{max}` trong ph�
 | student transcript | [PNG](assets/showcase-2026-10/student-transcript-vi.png) | [PNG](assets/showcase-2026-10/student-transcript-en.png) |
 
 ## Sơ đồ hiện tại
- 
+
 ![Architecture](assets/showcase-2026-10/architecture-vi.png)
 
 [SVG](assets/showcase-2026-10/architecture-vi.svg)
