@@ -25,9 +25,9 @@
              (CP1258/CP1252) mangle them at compile time. -->
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
-        <postgresql.version>42.7.13</postgresql.version>
+        <postgresql.version>42.7.14</postgresql.version>
         <springdoc.version>2.8.17</springdoc.version>
-        <tomcat.version>10.1.59</tomcat.version>
+        <tomcat.version>10.1.61</tomcat.version>
     </properties>
 
     <modules>
