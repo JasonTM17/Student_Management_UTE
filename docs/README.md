@@ -11,6 +11,12 @@ the authority for current implementation behavior.
 - [English project overview](../README.en.md)
 - [Mobile app guide](../mobile/README.md)
 
+## Whole-project technical guide / Kỹ thuật toàn dự án
+
+- [Tiếng Việt: 42 technical topics](technical/README.vi.md)
+- [English: 42 technical topics](technical/README.en.md)
+- [Current screenshots and GIFs — Việt](media-showcase.vi.md) / [English](media-showcase.en.md)
+
 ## Architecture and development
 
 - [System architecture](ARCHITECTURE.md)
@@ -42,4 +48,5 @@ the authority for current implementation behavior.
 ## Visual assets
 
 - [Architecture diagrams and project media](assets/)
-- [UI screenshots](assets/screenshots/)
+- [Current screenshots, diagrams and GIFs](assets/showcase-2026-10/)
+- [Capture provenance and asset checksums](assets/showcase-2026-10/provenance.json)

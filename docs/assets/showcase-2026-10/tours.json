@@ -1,0 +1,84 @@
+{
+  "kind": "Animated sequence of actual screenshots; not continuous action recordings.",
+  "secondsPerScreen": 4,
+  "width": 1200,
+  "tours": [
+    {
+      "name": "student-tour-vi",
+      "files": [
+        "student-dashboard-vi.png",
+        "student-registration-vi.png",
+        "student-schedule-vi.png",
+        "student-transcript-vi.png",
+        "student-thesis-vi.png",
+        "student-assistant-answer-vi.png"
+      ]
+    },
+    {
+      "name": "staff-tour-vi",
+      "files": [
+        "lecturer-dashboard-vi.png",
+        "lecturer-grades-vi.png",
+        "lecturer-attendance-vi.png",
+        "lecturer-mail-vi.png",
+        "admin-dashboard-vi.png",
+        "admin-knowledge-vi.png"
+      ]
+    },
+    {
+      "name": "thesis-governance-tour-vi",
+      "files": [
+        "student-thesis-vi.png",
+        "lecturer-thesis-vi.png",
+        "dean-dashboard-vi.png",
+        "dean-thesis-vi.png",
+        "admin-thesis-vi.png",
+        "admin-audit-vi.png"
+      ]
+    },
+    {
+      "name": "student-tour-en",
+      "files": [
+        "student-dashboard-en.png",
+        "student-registration-en.png",
+        "student-schedule-en.png",
+        "student-transcript-en.png",
+        "student-thesis-en.png",
+        "student-assistant-answer-en.png"
+      ]
+    },
+    {
+      "name": "staff-tour-en",
+      "files": [
+        "lecturer-dashboard-en.png",
+        "lecturer-grades-en.png",
+        "lecturer-attendance-en.png",
+        "lecturer-mail-en.png",
+        "admin-dashboard-en.png",
+        "admin-knowledge-en.png"
+      ]
+    },
+    {
+      "name": "thesis-governance-tour-en",
+      "files": [
+        "student-thesis-en.png",
+        "lecturer-thesis-en.png",
+        "dean-dashboard-en.png",
+        "dean-thesis-en.png",
+        "admin-thesis-en.png",
+        "admin-audit-en.png"
+      ]
+    },
+    {
+      "name": "language-tour",
+      "files": [
+        "public-home-vi.png",
+        "public-home-en.png",
+        "student-dashboard-vi.png",
+        "student-dashboard-en.png",
+        "dean-dashboard-vi.png",
+        "dean-dashboard-en.png"
+      ]
+    }
+  ]
+}

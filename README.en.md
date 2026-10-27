@@ -1,567 +1,219 @@
-# CampusCore — Bilingual Enterprise Academic Information & Management System
+# CampusCore — CampusUTE academic portal
 
-> **A publication-grade academic portal for identity, course registration, grading, thesis lifecycle, and an intelligent RAG assistant.**
-> Service-oriented architecture: a central Spring Boot Java REST API, a Next.js Web Portal, PostgreSQL managed via Flyway, and a private RAG sidecar reachable only inside the internal network.
+**A Vietnamese–English academic system:** course registration, grading, attendance, projects/theses, academic communication and a source-grounded AI assistant.
 
-[![Java 21](https://img.shields.io/badge/Java-21-orange.svg?style=flat-square&logo=openjdk)](https://openjdk.org/)
-[![Spring Boot 4.1](https://img.shields.io/badge/Spring%20Boot-4.1-brightgreen.svg?style=flat-square&logo=springboot)](https://spring.io/projects/spring-boot)
-[![Next.js 15](https://img.shields.io/badge/Next.js-15-black.svg?style=flat-square&logo=next.js)](https://nextjs.org/)
-[![PostgreSQL 15](https://img.shields.io/badge/PostgreSQL-15-blue.svg?style=flat-square&logo=postgresql)](https://www.postgresql.org/)
-[![Flyway](https://img.shields.io/badge/Flyway-Migrations-red.svg?style=flat-square)](https://flywaydb.org/)
-[![Docker Compose](https://img.shields.io/badge/Docker-Compose%20Ready-2496ED.svg?style=flat-square&logo=docker)](https://www.docker.com/)
+[Tiếng Việt](README.vi.md) · [English](README.en.md) · [Complete technical guide](docs/technical/README.en.md) · [Current screenshots/GIFs](docs/media-showcase.en.md)
 
-> This is the English mirror of the documentation. The Vietnamese source of truth lives in [README.md](README.md).
+![Java 21](https://img.shields.io/badge/Java-21-orange?logo=openjdk)
+![Spring Boot 4.1](https://img.shields.io/badge/Spring_Boot-4.1-green?logo=springboot)
+![Next.js 15](https://img.shields.io/badge/Next.js-15-black?logo=nextdotjs)
+![PostgreSQL 15](https://img.shields.io/badge/PostgreSQL-15-blue?logo=postgresql)
 
----
+CampusCore is the project/codebase name; the UI currently displays **CampusUTE**. Its backend is a domain-organized **Spring Boot modular monolith**, with a Next.js portal and PostgreSQL/Flyway. RAG runs as an internal sidecar. The Expo mobile client is under development and shares Java's API.
 
-## Table of Contents
+## Contents
 
-1. [Project Overview](#project-overview)
-2. [Live Application UI Showcase & Animated GIFs](#live-application-ui-showcase--animated-gifs)
-   - [Public Homepage & Multi-Portal Gateway](#1-public-homepage--multi-portal-gateway)
-   - [Student Journey (Role: STUDENT)](#2-student-journey-role-student)
-   - [Lecturer Journey (Role: LECTURER)](#3-lecturer-journey-role-lecturer)
-   - [Administrator Journey (Role: ADMIN)](#4-administrator-journey-role-admin)
-   - [Animated GIFs Demonstration](#5-animated-gifs-demonstration)
-3. [Core Technical Innovations](#core-technical-innovations)
-   - [4-Layer Anti-Race Concurrency Control Engine](#1-4-layer-anti-race-concurrency-control-engine)
-   - [Bilingual RAG Assistant & Atomic Quota Ledger](#2-bilingual-rag-assistant--atomic-quota-ledger)
-   - [Two-Admin Knowledge Governance Workflow](#3-two-admin-knowledge-governance-workflow)
-   - [Fail-Closed Security & Timing-Safe Secrets](#4-fail-closed-security--timing-safe-secrets)
-4. [System Architecture & Diagrams](#system-architecture--diagrams)
-   - [High-Level Topology](#high-level-topology)
-   - [Database Entity Relationship Diagram (ERD)](#database-entity-relationship-diagram-erd)
-   - [4-Layer Anti-Race Enrollment Sequence](#4-layer-anti-race-enrollment-sequence)
-   - [CampusCore RAG Assistant Query Pipeline](#campuscore-rag-assistant-query-pipeline)
-   - [Two-Admin Knowledge State Machine](#two-admin-knowledge-state-machine)
-   - [Role-Based Access Control (RBAC) Flow](#role-based-access-control-rbac-flow)
-5. [Technology Stack](#technology-stack)
-6. [Installation & Local Deployment Guide](#installation--local-deployment-guide)
-7. [Demo Test Accounts](#demo-test-accounts)
-8. [RESTful API Specification](#restful-api-specification)
-9. [Testing and Quality Assurance](#testing-and-quality-assurance)
-10. [Reference Documentation](#reference-documentation)
+- [Overview and roles](#overview)
+- [Screenshots and GIFs](#showcase)
+- [Whole-project techniques](#techniques)
+- [Architecture](#architecture)
+- [Technology](#stack)
+- [Run locally](#quick-start)
+- [Demo accounts](#demo)
+- [Verification and evidence boundaries](#verification)
+- [Related documentation](#docs)
 
----
+<a id="overview"></a>
+## Overview and roles
 
-## Project Overview
+| Role | Main workflows | Boundary |
+|---|---|---|
+| Student | Registration/drop, curriculum, schedules, grades, appeals, attendance, conduct, thesis groups | Own records and explicitly authorized resources |
+| Lecturer | Teaching schedule, rosters, grades, attendance, announcements/email, thesis proposals/supervision/grading | Actual sections/topics/assignments |
+| Department / faculty head | Academic review/governance, progress and workload | Department/faculty plus legitimate academic assignments |
+| Admin / Super Admin | Accounts, catalogs, sections, rounds, appeals, audit, RAG knowledge | Corresponding administrative authority and business guards |
 
-**CampusCore** is an enterprise-grade academic management and information system designed to support students, faculty members, and academic administrators within a single unified platform.
+The **academic office issues accounts**; public self-registration is unavailable. Visible login tabs are Student, Lecturer and Dean. Administrative entry uses role-based routing/deep links. Menu visibility does not replace service/database authorization.
 
-Inspired by the academic credit system and institutional identity of **Ho Chi Minh City University of Technology and Education (HCMUTE)**, CampusCore delivers a bilingual (English & Vietnamese) interface while solving critical distributed software engineering challenges: **peak-hour course registration stampedes**, **tamper-proof gradebook management**, **end-to-end thesis supervision**, and **trustworthy academic Q&A with server-verified citations using Retrieval-Augmented Generation (RAG)**.
+<a id="showcase"></a>
+## Screenshots and GIFs
 
-```
-Next.js Web Portal (:3000) ────┐
-                               ├───► Spring Boot REST API (:4010) ───► PostgreSQL (:5432)
-Expo Mobile App (Experimental)─┘         │ (internal /internal/rag)
-                                         ▼
-                                  rag-service Sidecar (:4011) ───► (Optional) DeepSeek API
-```
+Captured from a **new local build of the 27 October 2026 source**, using a separate PostgreSQL/demo environment without production data. Every role signs in and checks identity through the API. [Complete gallery, provenance and limitations](docs/media-showcase.en.md) · [Runtime manifest](docs/assets/showcase-2026-10/provenance.json).
 
-> The ports above are the **Docker Compose defaults**. Every host port can be overridden through environment variables in `.env` (see the [Installation guide](#installation--local-deployment-guide)).
+### Public pages and login
 
----
+| Vietnamese homepage | English homepage |
+|---|---|
+| ![Vietnamese homepage](docs/assets/showcase-2026-10/public-home-vi.png) | ![English homepage](docs/assets/showcase-2026-10/public-home-en.png) |
 
-## Live Application UI Showcase & Animated GIFs
+| Current login portals | Account recovery guidance |
+|---|---|
+| ![Current login](docs/assets/showcase-2026-10/public-login-en.png) | ![Account recovery](docs/assets/showcase-2026-10/public-recovery-en.png) |
 
-All screenshots and animated GIFs below were captured directly from the running local environment.
+### Student journey
 
-### 1. Public Homepage & Multi-Portal Gateway
+| Dashboard | Registration and curriculum plan |
+|---|---|
+| ![Student dashboard](docs/assets/showcase-2026-10/student-dashboard-en.png) | ![Course registration](docs/assets/showcase-2026-10/student-registration-en.png) |
 
-| English Homepage | Vietnamese Homepage |
-| --- | --- |
-| ![English Homepage](docs/assets/screenshots/campuscore-home-en-live.png) | ![Vietnamese Homepage](docs/assets/screenshots/campuscore-home-vi-live.png) |
+| Weekly schedule | Cumulative transcript |
+|---|---|
+| ![Schedule](docs/assets/showcase-2026-10/student-schedule-en.png) | ![Transcript](docs/assets/showcase-2026-10/student-transcript-en.png) |
 
-| Multi-Portal Sign In (Student / Lecturer / Admin) | Student Self-Registration Interface |
-| --- | --- |
-| ![Login Portals](docs/assets/screenshots/campuscore-login-portals.png) | ![Registration Form](docs/assets/screenshots/campuscore-register-live.png) |
+| Attendance | Projects and theses |
+|---|---|
+| ![Attendance](docs/assets/showcase-2026-10/student-attendance-en.png) | ![Student thesis workspace](docs/assets/showcase-2026-10/student-thesis-en.png) |
 
----
+| Conduct results | Specialized assistant with technical-corpus answer |
+|---|---|
+| ![Conduct](docs/assets/showcase-2026-10/student-conduct-en.png) | ![Specialized answer](docs/assets/showcase-2026-10/student-assistant-answer-en.png) |
 
-### 2. Student Journey (Role: STUDENT)
+### Lecturers and academic governance
 
-Demo Account: `student@campuscore.edu` | Password: `password123`
+| Course grading | Academic email |
+|---|---|
+| ![Grade management](docs/assets/showcase-2026-10/lecturer-grades-en.png) | ![Mail compose workspace](docs/assets/showcase-2026-10/lecturer-mail-en.png) |
 
-| Student Overview Dashboard | Course Registration Portal |
-| --- | --- |
-| ![Student Dashboard](docs/assets/screenshots/student-01-dashboard.png) | ![Course Registration](docs/assets/screenshots/student-02-registration.png) |
-| *Academic progress signals, today's schedule, and announcements* | *Live course catalog, capacity validation, and anti-race submission* |
+| Lecturer thesis workspace | Faculty-head overview |
+|---|---|
+| ![Lecturer theses](docs/assets/showcase-2026-10/lecturer-thesis-en.png) | ![Faculty thesis overview](docs/assets/showcase-2026-10/dean-dashboard-en.png) |
 
-| Enrolled Courses & Credit Summary | Weekly Visual Timetable |
-| --- | --- |
-| ![My Courses](docs/assets/screenshots/student-03-my-courses.png) | ![Weekly Schedule](docs/assets/screenshots/student-04-schedule.png) |
-| *Registered section roster, credit counters, and course drop* | *Interactive grid sorted by day, periods, and room assignments* |
+### Administration
 
-| Continuous Evaluation Grades | Cumulative Academic Transcript |
-| --- | --- |
-| ![Grades Breakdown](docs/assets/screenshots/student-05-grades.png) | ![Official Transcript](docs/assets/screenshots/student-06-transcript.png) |
-| *Midterm, final exam, lab assignments, and letter grades* | *Official cumulative transcript with GPA on 4.0 and 10.0 scales* |
+| Accounts and roles | Project/thesis rounds |
+|---|---|
+| ![Users](docs/assets/showcase-2026-10/admin-users-en.png) | ![Rounds](docs/assets/showcase-2026-10/admin-thesis-en.png) |
 
-| CampusCore AI Assistant Chat Drawer | Graduation Thesis Portal |
-| --- | --- |
-| ![AI Assistant Chat](docs/assets/screenshots/student-07-assistant-chat.png) | ![Thesis Management](docs/assets/screenshots/student-08-thesis.png) |
-| *RAG-powered Q&A with verified document citations & daily quota* | *Thesis defense rounds, mentor topics, and group registration* |
+| Curriculum default registration | Governed knowledge |
+|---|---|
+| ![Curriculum dry-run and apply](docs/assets/showcase-2026-10/admin-curriculum-defaults-en.png) | ![Knowledge governance](docs/assets/showcase-2026-10/admin-knowledge-en.png) |
 
----
+### Animated walkthroughs
 
-### 3. Lecturer Journey (Role: LECTURER)
+GIFs are **sequences of real captured screens**, held for approximately four seconds each. They are not continuous action recordings and do not prove mutations were performed.
 
-Demo Account: `lecturer@campuscore.edu` | Password: `password123`
+**Student:** dashboard → registration → schedule → transcript → thesis → assistant.
 
-| Lecturer Overview Dashboard | Weekly Teaching Schedule |
-| --- | --- |
-| ![Lecturer Dashboard](docs/assets/screenshots/lecturer-01-dashboard.png) | ![Teaching Schedule](docs/assets/screenshots/lecturer-02-schedule.png) |
-| *Assigned sections, student headcounts, and upcoming lectures* | *Weekly teaching schedule with room assignments and rosters* |
+![Student journey in English](docs/assets/showcase-2026-10/student-tour-en.gif)
 
-| Grade Management Overview | Section Gradebook Entry Spreadsheet |
-| --- | --- |
-| ![Grade Management](docs/assets/screenshots/lecturer-03-grades-management.png) | ![Grade Entry Sheet](docs/assets/screenshots/lecturer-04-grade-entry.png) |
-| *Submission deadlines and grade lock status per section* | *Direct in-place score input for continuous & final components* |
+**Lecturer and admin:** grades → attendance → email → admin overview → knowledge.
 
----
+![Staff journey in English](docs/assets/showcase-2026-10/staff-tour-en.gif)
 
-### 4. Administrator Journey (Role: ADMIN)
+**Thesis governance:** student → lecturer → faculty head → round management → audit.
 
-Demo Account: `admin@campuscore.edu` | Password: `password123`
+![Thesis governance journey](docs/assets/showcase-2026-10/thesis-governance-tour-en.gif)
 
-| Operational Administration Dashboard | User Accounts & Role Provisioning |
-| --- | --- |
-| ![Admin Dashboard](docs/assets/screenshots/admin-01-dashboard.png) | ![User Accounts](docs/assets/screenshots/admin-02-users.png) |
-| *System health metrics, student counts, and administrative tools* | *Provision users, assign roles (Student, Lecturer, Admin)* |
+**Languages:** compare VI/EN homepages, student dashboards and dean overviews.
 
-| Course Sections & Scheduling | Two-Admin Knowledge Governance |
-| --- | --- |
-| ![Section Scheduling](docs/assets/screenshots/admin-03-sections.png) | ![Assistant Knowledge](docs/assets/screenshots/admin-05-assistant-knowledge.png) |
-| *Open course sections, set capacities, assign faculty and rooms* | *Review drafts, enforce four-eyes principle, and trigger privacy gate* |
+![Language comparison](docs/assets/showcase-2026-10/language-tour.gif)
 
----
+<a id="techniques"></a>
+## Whole-project techniques
 
-### 5. Animated GIFs Demonstration
+The [English technical guide](docs/technical/README.en.md) / [Vietnamese edition](docs/technical/README.vi.md) explains **42 topics**, including the problem, flow, invariants, failures, trade-offs and source/test owners.
 
-#### Student Full Experience Tour
-From Login → Dashboard → Course Registration → Timetable → Transcript → CampusCore AI Assistant:
-![CampusCore Student Tour](docs/assets/campuscore-student-tour.gif)
+| Technical area | Highlights | Details |
+|---|---|---|
+| Architecture and frontend | Modular monolith, service/repository, bounded JDBC/JPA; cookie/SSE-preserving BFF, traversal guards; identity-safe React Query; locales/civil dates | [T01–T05](docs/technical/architecture-security.en.md) |
+| Security and sessions | Access/refresh JWTs, current authority/credential revision, CSRF, 2FA, single-flight, Web Locks, rotation overlap, RBAC + scope, rate limits | [T06–T10](docs/technical/architecture-security.en.md#t06-jwt-and-cookies-authentication-versus-current-authority) |
+| Enrollment and curriculum | Student/Section locks, conditional seats, unique indexes, idempotency/hash, prerequisites/schedules/credits, dry-run/apply/cursors, W withdrawals | [T11–T14](docs/technical/academic.en.md) |
+| Academic records | Draft/publication, 50/50 grading, best-attempt GPA, timed/audited appeals, exact attendance warnings, conduct, CSV/PDF/iCalendar | [T15–T18](docs/technical/academic.en.md#t15-grade-entry-publication-and-cumulative-transcripts) |
+| Projects/theses | Transaction-preserving facade extraction, round-type state machine, faculty/department scope, eligibility/groups/exceptions, artifact rollback, counter-review, councils and guarded publication | [T19–T26](docs/technical/thesis.en.md) |
+| AI and knowledge | Weighted lexical RAG, difficulty routing, corpus scope, personal context, SSE/heartbeats/cancellation, quota/leases/CAS, RLS, two-person review and guards | [T27–T32](docs/technical/assistant-engagement.en.md) |
+| Communication | Self-hosted TinyMCE and two-layer sanitization, audience/version/scheduling, safe notification links, audit, scoped recipients and DTO/client validation | [T33–T34](docs/technical/assistant-engagement.en.md#t33-tinymce-articles-announcements-and-audit) |
+| Mobile/operations | Expo Bearer/refresh, Flyway, local/database/Supabase storage, multi-stage Docker, readiness/timeouts, backup/restore, CI/image identity, evidence and media reproduction | [T35–T42](docs/technical/operations-verification.en.md) |
 
-#### Lecturer & Administrator Tour
-Lecturer teaching schedule and grade entry → Admin overview, section scheduling, and 2-Admin knowledge publication:
-![CampusCore Lecturer and Admin Tour](docs/assets/campuscore-lecturer-admin-tour.gif)
+Key distinctions: row locks serialize contested records without making every transaction serializable; retrieval uses weighted lexical matching, not BM25/vector search; attendance warnings are advisory; quota semantics follow dispatch branches rather than every click; report metadata does not establish surviving file bytes.
 
-#### Instant Bilingual Switch
-Seamless live switching between English and Vietnamese across the entire application:
-![CampusCore Language Tour](docs/assets/campuscore-language-tour-live.gif)
+<a id="architecture"></a>
+## Architecture
 
----
+![Current architecture](docs/assets/showcase-2026-10/architecture-en.png)
 
-## Core Technical Innovations
+[SVG](docs/assets/showcase-2026-10/architecture-en.svg) · [Architecture boundaries](docs/ARCHITECTURE.md)
 
-### 1. 4-Layer Anti-Race Concurrency Control Engine
-
-To eliminate overselling during high-traffic course registration windows, CampusCore employs a deep **4-layer concurrency defense model**:
-
-1. **Layer 1 (Pessimistic Row Lock)**: Executes `SELECT * FROM academic."Section" WHERE "id" = :id FOR UPDATE` inside a database transaction, forcing concurrent threads to queue up deterministically.
-2. **Layer 2 (Atomic Conditional Update)**: Modifies capacity using `UPDATE academic."Section" SET "enrolledCount" = "enrolledCount" + 1 WHERE "id" = :id AND "enrolledCount" < "capacity";`. If full, 0 rows are updated and the transaction instantly rolls back.
-3. **Layer 3 (Partial Unique Index)**: Enforces the partial unique index `academic_enrollment_active_student_section_uq` on `academic."Enrollment" ("studentId", "sectionId") WHERE "status" IN ('ENROLLED', 'PENDING', 'CONFIRMED')`, guaranteeing at the database engine level that a student cannot hold two active enrollments in the same section.
-4. **Layer 4 (Idempotency Key)**: The web portal sends an `Idempotency-Key` header (UUIDv4) with every enroll/drop request; the system records the key so network retries never double-apply a mutation.
-5. **Verified by tests**: `AcademicEnrollmentMutationPersistenceTest` spawns independent threads competing for the last remaining seat (see [Testing](#testing-and-quality-assurance) to re-run it).
-
----
-
-### 2. Bilingual RAG Assistant & Atomic Quota Ledger
-
-- **Network Isolation**: Encapsulated within a private sidecar (`rag-service`, internal port 4011, only `expose`d on the Compose network — never published to the host). No public AI endpoints are exposed.
-- **Bilingual Prompt Injection Guard (`AssistantInputGuard`)**: Filters adversarial system prompt overrides and jailbreaks in both Vietnamese and English (*"ignore previous instructions"*, *"bỏ qua hướng dẫn trước đó"*).
-- **Atomic Quota Bucket (20 requests/user/day)**: Enforces daily consumption limits using Compare-And-Swap (CAS) so parallel tabs cannot exceed the quota.
-- **Deterministic Lexical Search + LLM Fallback**:
-  - Baseline: BM25 / tsvector retrieval against immutable PostgreSQL snapshots, serving citations `[1]`, `[2]` with low latency.
-  - Optional DeepSeek Integration: When `DEEPSEEK_ENABLED=true`, complex queries are routed to `deepseek-v4-flash`. The system automatically falls back to the lexical response on timeout or missing credentials.
-
----
-
-### 3. Two-Admin Knowledge Governance Workflow
-
-- **Four-Eyes Principle**: Knowledge revisions are created in `DRAFT` or `PENDING_REVIEW` state by Admin 1. The publish query only accepts a pending revision created by a different admin (`created_by <> actor`); if the only pending revision is the requester's own, the API returns `409 Conflict` with code `KNOWLEDGE_SECOND_REVIEW_REQUIRED` ("A different admin must publish this revision").
-- **Automated Privacy Gate**: Inspects drafts for PII (emails, phone numbers, secret keys) before promotion into the active RAG runtime snapshot.
-
----
-
-### 4. Fail-Closed Security & Timing-Safe Secrets
-
-- **Fail-Closed Bootstrapping**: Critical security credentials (JWT secret, refresh secret, health check key) are validated at application startup; missing required configuration fails the boot instead of running on insecure defaults. Values shipped in `.env.example` are local-only placeholders and must be replaced before real deployments.
-- **Timing-Safe Equality**: Validates CSRF tokens, health check keys, and service authentication tokens using `MessageDigest.isEqual()` to prevent timing side-channel attacks.
-- **Client Token Separation**: The web client uses HTTP-only SameSite=Strict cookies with CSRF protection; the mobile client uses Bearer access and refresh tokens.
-
----
-
-## System Architecture & Diagrams
-
-### High-Level Topology
-
-```mermaid
-flowchart TD
-    subgraph CLIENTS["PRESENTATION & CLIENT LAYER"]
-        Browser["User Browser\n(Desktop / Mobile)"]
-        Web["Next.js 15 Web Portal\n(:3000 | HttpOnly Cookie + CSRF)"]
-        Mobile["Expo Mobile App\n(Experimental | Bearer JWT)"]
-    end
-
-    subgraph BACKEND["CORE JAVA APPLICATION SERVICES"]
-        REST["Spring Boot 4.1 REST API\n(:4010 | /api/v1/)\n• Auth & RBAC Filter Chain\n• 4-Layer Registration Engine\n• Gradebook & Transcript Service\n• Thesis Lifecycle Manager\n• Assistant Proxy & Quota Ledger"]
-        RAG["Private rag-service Sidecar\n(:4011 | internal expose only)\n• Bilingual Prompt Injection Guard\n• Lexical ranking BM25\n• Snapshot runtime reader\n• Runs Flyway migrations in the compose stack"]
-    end
-
-    subgraph DATA["PERSISTENCE LAYER"]
-        PG[("PostgreSQL 15\n(:5432 host default | DB campuscore_restful)\nSchemas: campuscore_auth · academic · thesis ·\nassistant · engagement · notifications")]
-    end
-
-    subgraph EXTERNAL["EXTERNAL SERVICES"]
-        Mailpit["Mailpit Local SMTP\n(:8025 UI / :1025 SMTP)"]
-        DeepSeek["DeepSeek API\ndeepseek-v4-flash (Optional)"]
-    end
-
-    Browser --> Web
-    Web -->|"same-origin /api/v1 proxy"| REST
-    Mobile -->|"NEXT/EXPO_PUBLIC_API_URL"| REST
-
-    REST --> PG
-    REST -->|"internal bearer token"| RAG
-    RAG --> PG
-    RAG -.->|"DEEPSEEK_ENABLED=true"| DeepSeek
-    REST -.->|"MAIL_ENABLED=true"| Mailpit
+```text
+Next.js web ── same-origin /api/v1 ──► Java REST API ──► PostgreSQL
+Expo mobile ───── Bearer JWT ────────►       │
+                                            ├──► Report storage
+                                            ├──► SMTP (optional)
+                                            └──► Internal RAG sidecar ──► DeepSeek (optional)
 ```
 
-> Inside the Docker Compose stack, the `rag-service` container is the Flyway migration executor (`restful-api` runs with `FLYWAY_ENABLED=false` so two processes never race). When running the JAR directly outside Compose, Flyway is enabled by default via `application.yml`. Migration scripts live under `java-services/restful-api/src/main/resources/db/migration/`.
+<a id="stack"></a>
+## Technology
 
----
+| Layer | Technology and version owner |
+|---|---|
+| Java API | Java 21, Spring Boot 4.1, Spring Security/Validation, JDBC, limited JPA — [Maven](java-services/pom.xml) |
+| Web | Next.js 15, React 18, TypeScript, React Query, Tailwind, Radix, TinyMCE — [package.json](frontend/package.json) |
+| Data | PostgreSQL 15, Flyway, constraints/triggers/indexes/RLS — [database image](database/Dockerfile), [migrations](java-services/restful-api/src/main/resources/db/migration/) |
+| Mobile | Expo, React Native, TypeScript — [mobile manifest](mobile/package.json) |
+| Integrations | Internal lexical RAG; configurable DeepSeek, SMTP, Supabase storage — [Compose](docker-compose.yml) |
+| QA/operations | JUnit/Mockito, PostgreSQL IT, node:test, Playwright, Docker/Compose, GitHub Actions — [CI](.github/workflows/ci.yml) |
 
-### Database Entity Relationship Diagram (ERD)
+<a id="quick-start"></a>
+## Run locally
 
-```mermaid
-erDiagram
-    USER ||--o{ REFRESH_TOKEN : "owns"
-    USER ||--|| STUDENT : "identifies"
-    USER ||--|| LECTURER : "identifies"
-
-    DEPARTMENT ||--o{ MAJOR : "offers"
-    DEPARTMENT ||--o{ LECTURER : "employs"
-    MAJOR ||--o{ STUDENT : "enrolls"
-
-    COURSE ||--o{ SECTION : "instantiates"
-    SEMESTER ||--o{ SECTION : "schedules"
-    CLASSROOM ||--o{ SECTION : "hosts"
-    LECTURER ||--o{ SECTION : "teaches"
-
-    STUDENT ||--o{ ENROLLMENT : "registers"
-    SECTION ||--o{ ENROLLMENT : "admits"
-    ENROLLMENT ||--|| GRADE : "evaluates"
-
-    THESIS_ROUND ||--o{ THESIS_TOPIC : "announces"
-    LECTURER ||--o{ THESIS_TOPIC : "proposes"
-    THESIS_TOPIC ||--o{ THESIS_GROUP : "supervises"
-    STUDENT ||--o{ THESIS_GROUP_MEMBER : "participates"
-
-    KNOWLEDGE_REVISION ||--|| KNOWLEDGE_SNAPSHOT : "promotes_to"
-    USER ||--o{ KNOWLEDGE_REVISION : "authors_reviews"
-
-    ANNOUNCEMENT ||--o{ NOTIFICATION : "generates"
-    USER ||--o{ NOTIFICATION : "receives"
-```
-
----
-
-### 4-Layer Anti-Race Enrollment Sequence
-
-```mermaid
-sequenceDiagram
-    autonumber
-    actor Student as Student (Browser)
-    participant Web as Next.js Web Portal
-    participant API as Spring Boot REST API
-    participant DB as PostgreSQL Database
-
-    Student->>Web: Click "Enroll" on Course Section
-    Web->>Web: Generate Idempotency-Key (UUIDv4)
-    Web->>API: POST /api/v1/me/enrollments (SectionId, Key)
-
-    activate API
-    API->>API: Validate Session & Role Authority (STUDENT)
-    API->>DB: BEGIN TRANSACTION (Read Committed)
-
-    API->>DB: Layer 1: SELECT * FROM section WHERE id = :id FOR UPDATE
-    Note over DB: Section row locked (Pessimistic Row Lock)
-
-    API->>DB: Layer 2: UPDATE section SET "enrolledCount" = "enrolledCount" + 1 WHERE "id" = :id AND "enrolledCount" < "capacity"
-    alt Section is Full
-        DB-->>API: 0 rows updated
-        API->>DB: ROLLBACK
-        API-->>Web: HTTP 409 Conflict (SECTION_FULL)
-        Web-->>Student: Display "Section capacity reached"
-    else Space Available
-        DB-->>API: 1 row updated successfully
-        API->>DB: Layer 3: INSERT INTO enrollment (studentId, sectionId, status) VALUES (..., 'ENROLLED')
-        alt Duplicate Registration Attempt
-            DB-->>API: Error: Unique violation (academic_enrollment_active_student_section_uq)
-            API->>DB: ROLLBACK
-            API-->>Web: HTTP 409 Conflict (ALREADY_ENROLLED)
-            Web-->>Student: Display "Already registered for this section"
-        else Valid Insertion
-            DB-->>API: Insert OK
-            API->>DB: COMMIT TRANSACTION
-            API-->>Web: HTTP 201 Created (Enrollment)
-            Web-->>Student: Update Timetable & Show Success Banner
-        end
-    end
-    deactivate API
-```
-
----
-
-### CampusCore RAG Assistant Query Pipeline
-
-```mermaid
-sequenceDiagram
-    autonumber
-    actor User as Student / Lecturer
-    participant Web as Web Chat Drawer
-    participant REST as REST API Gateway (:4010)
-    participant Sidecar as rag-service Sidecar (:4011)
-    participant PG as PostgreSQL Snapshot
-    participant DeepSeek as DeepSeek API (External)
-
-    User->>Web: Ask: "When is the tuition deadline for semester 2?"
-    Web->>REST: POST /api/v1/assistant/chat (Session Cookie)
-
-    activate REST
-    REST->>REST: Validate JWT Token & Role
-    REST->>REST: AssistantInputGuard: bilingual prompt-injection scan (VI/EN)
-
-    alt Jailbreak / Prompt Leak Detected
-        REST-->>Web: HTTP 400 Bad Request (PROMPT_INJECTION_DETECTED)
-    else Safe Input
-        REST->>PG: CAS Quota Check (max 20 requests/day)
-        alt Quota Exhausted
-            REST-->>Web: HTTP 429 Too Many Requests (QUOTA_EXCEEDED)
-        else Quota Available
-            REST->>Sidecar: POST /internal/rag/assistant (Question, Service Token)
-            activate Sidecar
-            Sidecar->>PG: Lexical BM25 search on active_snapshot
-            PG-->>Sidecar: Top-ranked regulation passages
-            alt High-confidence retrieval
-                Sidecar->>Sidecar: Format answer with citations [1], [2]
-                Sidecar-->>REST: 200 OK (Answer + Citations)
-            else Complex reasoning & DEEPSEEK_ENABLED=true
-                Sidecar->>DeepSeek: Trimmed context + question (Flash model)
-                DeepSeek-->>Sidecar: Generated response
-                Sidecar->>Sidecar: Cross-check citations against snapshot
-                Sidecar-->>REST: 200 OK (Synthesized Answer + Citations)
-            end
-            deactivate Sidecar
-            REST-->>Web: Render answer with real document citations
-        end
-    end
-    deactivate REST
-```
-
----
-
-### Two-Admin Knowledge State Machine
-
-```mermaid
-stateDiagram-v2
-    [*] --> DRAFT: Admin 1 creates a knowledge draft
-    DRAFT --> PENDING_REVIEW: Admin 1 submits for review
-
-    state PENDING_REVIEW {
-        [*] --> CheckingAuthority: Validate approving admin
-        CheckingAuthority --> RejectedSameAdmin: Approver == Creator
-        CheckingAuthority --> RunningPrivacyGate: Approver != Creator
-        RunningPrivacyGate --> GateFailed: PII / sensitive data found
-        RunningPrivacyGate --> GatePassed: Clean content
-    }
-
-    RejectedSameAdmin --> PENDING_REVIEW: 409 KNOWLEDGE_SECOND_REVIEW_REQUIRED (another admin required)
-    GateFailed --> DRAFT: Return for edits
-    GatePassed --> PUBLISHED: Approve publication
-
-    PUBLISHED --> ATOMIC_PROMOTION: Atomically refresh the snapshot
-    ATOMIC_PROMOTION --> LIVE_RAG: Assistant serves new knowledge instantly
-    LIVE_RAG --> [*]
-```
-
----
-
-### Role-Based Access Control (RBAC) Flow
-
-```mermaid
-flowchart LR
-    subgraph ROLES["USER ROLES"]
-        Guest["Guest (GUEST)"]
-        Student["Student (STUDENT)"]
-        Lecturer["Lecturer (LECTURER)"]
-        Admin["Administrator (ADMIN)"]
-    end
-
-    subgraph FEATURES["SYSTEM CAPABILITIES"]
-        F1["Public homepage, course catalog lookup, account sign-up"]
-        F2["Course registration (anti-race), weekly timetable, grades & transcript"]
-        F3["CampusCore AI assistant (regulated Q&A with citations)"]
-        F4["Thesis workspace (topic registration, student groups)"]
-        F5["Teaching schedule, gradebook entry, section rosters"]
-        F6["User management, section scheduling, room assignment, announcements"]
-        F7["Two-admin RAG knowledge review, system appearance configuration"]
-    end
-
-    Guest --> F1
-    Student --> F1 & F2 & F3 & F4
-    Lecturer --> F1 & F3 & F4 & F5
-    Admin --> F1 & F6 & F7
-```
-
----
-
-## Technology Stack
-
-| Layer | Technology | Version | Purpose |
-| --- | --- | --- | --- |
-| **Backend API** | Java / Spring Boot | 21 / 4.1.2 | Central RESTful API, Spring Security, Validation, JPA/Hibernate |
-| **Frontend Web** | Next.js (App Router) | 15.5 | Interactive portal, Server Components, same-origin `/api/v1` proxy |
-| **UI Libraries** | Tailwind CSS, Radix UI, TinyMCE | 3.4 / Radix / 8 | HCMUTE-inspired design system, data tables, rich-text editing |
-| **Build Tooling** | Maven / Node.js | 3.9.12 / 20 | Java build tool and Node runtime for the frontend |
-| **Database** | PostgreSQL | 15 (postgres:15-alpine) | ACID transactions, partial indexes, tsvector full-text search |
-| **Schema Management** | Flyway | bundled with Spring Boot | Versioned migrations in `java-services/restful-api/src/main/resources/db/migration/` |
-| **RAG Sidecar** | Spring Boot (sidecar mode) | 4.1.2 | Internal AI service on port 4011, lexical ranking, injection guard |
-| **AI Model** | DeepSeek | deepseek-v4-flash | Optional LLM for complex questions, fully switchable via `DEEPSEEK_ENABLED` |
-| **Email Testing** | Mailpit | v1.21 | Local SMTP sink for notification emails in development |
-| **Testing & QA** | JUnit 6, Mockito, node:test, Playwright | Latest | Backend unit tests, frontend smoke tests, Playwright e2e |
-| **Deployment** | Docker & Docker Compose | Compose v2 | Packages 5 containers: postgres, mailpit, rag-service, restful-api, web |
-
----
-
-## Installation & Local Deployment Guide
-
-### Prerequisites
-
-- Docker Desktop 24.0+ installed and running.
-- At least 4 GB of free RAM and ports `3000` (web), `4010` (API), `5432` (PostgreSQL), `8025` (Mailpit UI) available.
-
-### Quick Start Commands
+Docker/Compose must be running. Read `.env.example` and the [demo runbook](docs/DEMO_RUNBOOK.md) before selecting ports, demo accounts or SMTP.
 
 ```powershell
-# 1. Clone the repository
 git clone https://github.com/JasonTM17/Student_Management_UTE.git
 cd Student_Management_UTE
-
-# 2. Create a local environment file from the template and review the secrets
 Copy-Item .env.example .env
-
-# 3. Launch the full stack via Docker Compose
-docker compose up -d --build postgres mailpit rag-service restful-api web
-
-# 4. Verify container health status
+# Configure local values and secrets using .env.example.
+docker compose up -d --build
 docker compose ps
-
-# 5. Verify API health probes
-#    Note: replace <HEALTH_READINESS_KEY> with the HEALTH_READINESS_KEY value from your .env
 curl.exe http://127.0.0.1:4010/api/v1/health/liveness
-curl.exe -H "X-Health-Key: <HEALTH_READINESS_KEY>" http://127.0.0.1:4010/api/v1/health/readiness
-
-# 6. Inspect the OpenAPI contract
-curl.exe http://127.0.0.1:4010/v3/api-docs
 ```
 
-### Port Mappings & Overrides
+| Service | Default host port | Override |
+|---|---|---|
+| Web | 3000 | `FRONTEND_HOST_PORT` |
+| API | 4010 | `RESTFUL_API_HOST_PORT` |
+| PostgreSQL | 5432 | `POSTGRES_HOST_PORT` |
+| Mailpit UI / SMTP | 8025 / 1025 | `MAILPIT_UI_HOST_PORT` / `MAILPIT_SMTP_HOST_PORT` |
+| RAG | Internal 4011 only | No published host port |
 
-The values below are the **Docker Compose defaults**. Every host port can be overridden through the matching environment variable in `.env` (definitions live in `docker-compose.yml`; the template lives in `.env.example`):
+OpenAPI is `/v3/api-docs`, Swagger `/swagger-ui.html` on the API origin. Readiness requires the configured `X-Health-Key`. Compose provisions the assistant role before migration; RAG runs Flyway and API disables it. A running Mailpit does not mean `MAIL_ENABLED` is on. See [operations](docs/technical/operations-verification.en.md) for builds, storage and recovery.
 
-| Service | Default host port | `.env` override |
-| --- | --- | --- |
-| Web Portal (Next.js) | `3000` | `FRONTEND_HOST_PORT` |
-| RESTful API | `4010` | `RESTFUL_API_HOST_PORT` |
-| PostgreSQL | `5432` | `POSTGRES_HOST_PORT` |
-| Mailpit UI / SMTP | `8025` / `1025` | `MAILPIT_UI_HOST_PORT` / `MAILPIT_SMTP_HOST_PORT` |
-| rag-service | not published (internal 4011) | — |
+<a id="demo"></a>
+## Demo accounts
 
-### Access Endpoints
+Use only in authorized local/evaluation environments with `DEMO_ACCOUNTS_ENABLED=true`. Local Compose opts in; public deployments must verify demo lockout. `DemoAccountGate` reapplies policy on boot; manual SQL unlocking is not a substitute.
 
-- **Web Portal**: `http://127.0.0.1:3000`
-- **Swagger / OpenAPI**: `http://127.0.0.1:4010/swagger-ui.html`
-- **Mailpit Web UI**: `http://127.0.0.1:8025`
-- **PostgreSQL**: `127.0.0.1:5432` | Database: `campuscore_restful` | User: `campuscore`
+| Role | Seed account |
+|---|---|
+| Students | `student@campuscore.edu`, `student2@campuscore.edu`, `student3@campuscore.edu`, `student4@campuscore.edu` |
+| Lecturer | `lecturer@campuscore.edu` |
+| Faculty head | `truongkhoa@campuscore.demo` |
+| Department head | `truongbomon@campuscore.demo` |
+| Admin / second knowledge reviewer | `admin@campuscore.edu`, `admin002@campuscore.demo` |
 
----
+The published demo seed password is `password123`. Quick-fill additionally requires build opt-in/password variables in the [runbook](docs/DEMO_RUNBOOK.md); administrators have no client password prefill. Some display-only profiles are deliberately locked; directory presence is not proof of login access. Email OTP/2FA and recovery depend on configured SMTP.
 
-## Demo Test Accounts
-
-| Role | Email | Password | Granted Scope |
-| --- | --- | --- | --- |
-| **Student** | `student@campuscore.edu` | `password123` | Course enrollment, timetable, grades, AI assistant, thesis |
-| **Lecturer** | `lecturer@campuscore.edu` | `password123` | Teaching schedule, gradebook entry, thesis guidance |
-| **Admin** | `admin@campuscore.edu` | `password123` | User administration, catalog & section scheduling, RAG drafting |
-| **Second Admin** | `admin002@campuscore.demo` | `password123` | Independent admin used for the Four-Eyes cross-review of RAG knowledge |
-
-The demo seed also provisions a supporting lecturer directory (`lecturer002@campuscore.demo` through `lecturer012@campuscore.demo`) so section rosters, committees, and teaching schedules mirror a real campus population.
-
----
-
-## RESTful API Specification
-
-All endpoints share the `/api/v1` prefix and are grouped by resource. The **complete, machine-readable catalog** (including request/response schemas) is published at `GET /v3/api-docs`, with a browsable Swagger UI at `/swagger-ui.html`:
-
-| Resource Group | Path Prefix | Description |
-| --- | --- | --- |
-| Authentication & sessions | `/api/v1/auth` | Sign-up, role-scoped portal sign-in, token refresh, sign-out |
-| Personal profile | `/api/v1/me` | Profile data, registration eligibility, registration summary and slip |
-| Course registration | `/api/v1/me/enrollments` | Enroll (4-layer anti-race, mandatory `Idempotency-Key`), drop, list enrolled sections |
-| Catalog & lookups | `/api/v1/sections`, `/api/v1/schedules`, `/api/v1/attendance`, `/api/v1/lecturers` | Section catalog, timetables, attendance, lecturer directory |
-| Admin catalog | `/api/v1/departments`, `/api/v1/courses`, `/api/v1/classrooms`, `/api/v1/semesters`, `/api/v1/academic-years` | Maintain the academic catalog tree and open sections |
-| User administration | `/api/v1/users` | Manage accounts and assign Student / Lecturer / Admin roles |
-| Graduation thesis | `/api/v1/thesis`, `/api/v1/thesis/rounds`, `/api/v1/thesis/topics`, `/api/v1/thesis/groups` | Defense rounds, topic proposals, student groups, grading and progress |
-| CampusCore AI assistant | `/api/v1/assistant` | RAG Q&A (`/chat`), SSE streaming (`/chat/stream`), message feedback |
-| RAG knowledge governance | see Swagger (assistant-knowledge group) | Draft creation, two-admin review, privacy gate activation |
-| Announcements & notifications | `/api/v1/announcements`, `/api/v1/notifications` | Academic bulletin board and per-user notification inbox |
-| System health | `/api/v1/health` | Liveness and readiness probes guarded by `X-Health-Key` |
-
----
-
-## Testing and Quality Assurance
+<a id="verification"></a>
+## Verification and evidence boundaries
 
 ```powershell
-# Run the backend verification suite
-mvn -q -f java-services/pom.xml verify
-
-# Run frontend tests (node:test)
 npm test --prefix frontend
-
-# TypeScript type checking
 npm run typecheck --prefix frontend
-
-# ESLint checks
-npm run lint --prefix frontend
-
-# Build the frontend production bundle
-npm run build --prefix frontend
-
-# Re-run the multi-threaded anti-race test in isolation
-mvn test -f java-services/pom.xml -Dtest=AcademicEnrollmentMutationPersistenceTest
+npm test --prefix mobile
+mvn -f java-services/pom.xml verify
+node scripts/check-doc-hygiene.mjs
+git diff --check
 ```
 
-### Safety Verification Matrix
+PostgreSQL race/RLS suites need disposable databases and the [CI configuration](.github/workflows/ci.yml). The [evidence matrix](docs/technical/operations-verification.en.md#t40-verification-layers-and-evidence-limits) distinguishes unit, H2, PostgreSQL, browser and live providers. Current media proves local rendering and requests recorded in its manifest, not every mutation, production load, email receipt or deployment.
 
-- **Race Condition Concurrency Test**: `AcademicEnrollmentMutationPersistenceTest` spawns independent threads competing for a section's last seat. Exactly one thread succeeds, the rest receive HTTP 409, and capacity is never oversold.
-- **Bilingual Injection Test**: The `AssistantInputGuard` test suite covers prompt-injection variants in English and Vietnamese; malicious inputs are rejected at the gateway layer.
-- **Two-Admin Governance Test**: A self-approval attempt (creator approving their own pending draft) is rejected with `409 Conflict` (`KNOWLEDGE_SECOND_REVIEW_REQUIRED`) as designed.
-- **PostgreSQL Integration Tests**: The `*PostgresIT` classes (seat races, lock ordering, assistant RLS, council/publication races) only execute against a real PostgreSQL — each disables itself when its JDBC env var is absent, so a plain `mvn verify` skips them silently. The `postgres-it` CI job starts a disposable `postgres:15` service, pre-creates the dedicated database each env family requires (the `CAMPUSCORE_*`/`ASSISTANT_*` variables and database-name conventions live in `.github/workflows/ci.yml`), then runs `mvn -f java-services/pom.xml -P assistant-postgres-it verify`; `scripts/check-postgres-its.mjs` guards the end of the job and fails it if any IT class skipped. To run locally, create the matching empty databases on your own PostgreSQL, export the same variables, and run the same Maven command.
+<a id="docs"></a>
+## Related documentation
 
----
-
-## Reference Documentation
-
-- [System Architecture Details (docs/ARCHITECTURE.md)](docs/ARCHITECTURE.md): runtime boundaries, concurrency invariants, and non-goals.
-- [Step-by-Step Demo Runbook (docs/DEMO_RUNBOOK.md)](docs/DEMO_RUNBOOK.md): guided script for evaluation sessions.
-- [Release Criteria (docs/RELEASE.md)](docs/RELEASE.md): container packaging and acceptance standards.
-- [Production deployment (docs/deployment.md)](docs/deployment.md) and [PRODUCTION_RUNBOOK.md](docs/PRODUCTION_RUNBOOK.md).
-- [DeepSeek Assistant Integration (docs/integrations/deepseek-assistant.md)](docs/integrations/deepseek-assistant.md): secure configuration and fallback behavior.
-- [Vietnamese Documentation (README.md)](README.md).
-
----
-
-*CampusCore Student & Academic Management System — Faculty of Information Technology, HCMUTE.*
+- [Documentation index](docs/README.md)
+- [Complete techniques — English](docs/technical/README.en.md) / [Tiếng Việt](docs/technical/README.vi.md)
+- [Media — English](docs/media-showcase.en.md) / [Tiếng Việt](docs/media-showcase.vi.md)
+- [Architecture](docs/ARCHITECTURE.md) · [Authorization](docs/security/authorization-model.md)
+- [Thesis group governance](docs/integrations/thesis-group-governance.md) · [Report storage/recovery](docs/integrations/thesis-report-storage.md)
+- [Demo](docs/DEMO_RUNBOOK.md) · [Deployment](docs/deployment.md) · [Production runbook](docs/PRODUCTION_RUNBOOK.md) · [Backup](ops/backup/README.md)
+- [Mobile](mobile/README.md) · [Release](docs/RELEASE.md)

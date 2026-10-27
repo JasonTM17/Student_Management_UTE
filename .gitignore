@@ -11,9 +11,13 @@ target/
 **/target/
 
 # Environment
-.env*
-!.env.example
-!.env.production.example
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+.env.production
+.env.vercel*
 
 # Logs
 logs
@@ -44,8 +48,6 @@ scripts/*
 # Test
 coverage/
 .nyc_output/
-test-results/
-playwright-report/
 
 # Production
 *.tgz
@@ -61,6 +63,13 @@ frontend/node_modules/
 frontend/.next/
 frontend/out/
 frontend/public/tinymce/
+frontend/playwright-report/
+frontend/test-results/
+frontend/.env
+frontend/.env.local
+frontend/.env.development.local
+frontend/.env.test.local
+frontend/.env.production.local
 frontend/src/designs/
 frontend/.data/
 
@@ -73,15 +82,8 @@ src/designs/
 # Local agent harness
 .omp/
 
-# Local-only planning and agent runtime data
-/plans/
-/.agentkit/
-/.claude/
-/.codex/
-/.agents/
-/.artifacts/
-/artifacts/
-/CLAUDE.md
+# Local-only planning and Grok workflow artifacts
+/plans/260901-1809-campuscore-production-readiness-and-professional-ux/
 /.grok/workflows/
 /ORIGINAL_REQUEST.md
 /PROJECT.md
@@ -114,3 +116,4 @@ scratch/
 /database/domain_management_system*.sql
 /docs/report_images/
 ~$*
+*.docx

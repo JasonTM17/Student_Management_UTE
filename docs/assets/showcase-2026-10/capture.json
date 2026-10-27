@@ -1,0 +1,59 @@
+{
+  "capturedAt": "2026-10-27T07:52:43.054Z",
+  "baseUrl": "http://127.0.0.1:3210",
+  "viewport": {
+    "width": 1440,
+    "height": 1000
+  },
+  "records": [
+    {
+      "role": "public",
+      "locale": "vi",
+      "route": "",
+      "file": "public-home-vi.png",
+      "status": 200,
+      "apiErrors": []
+    },
+    {
+      "role": "public",
+      "locale": "vi",
+      "route": "/login",
+      "file": "public-login-vi.png",
+      "status": 200,
+      "apiErrors": []
+    },
+    {
+      "role": "public",
+      "locale": "vi",
+      "route": "/forgot-password",
+      "file": "public-recovery-vi.png",
+      "status": 200,
+      "apiErrors": []
+    },
+    {
+      "role": "public",
+      "locale": "en",
+      "route": "",
+      "file": "public-home-en.png",
+      "status": 200,
+      "apiErrors": []
+    },
+    {
+      "role": "public",
+      "locale": "en",
+      "route": "/login",
+      "file": "public-login-en.png",
+      "status": 200,
+      "apiErrors": []
+    },
+    {
+      "role": "public",
+      "locale": "en",
+      "route": "/forgot-password",
+      "file": "public-recovery-en.png",
+      "status": 200,
+      "apiErrors": []
+    }
+  ],
+  "note": "Disposable local fixtures. Real browser rendering. No external SMTP/LLM acceptance claim."
+}
