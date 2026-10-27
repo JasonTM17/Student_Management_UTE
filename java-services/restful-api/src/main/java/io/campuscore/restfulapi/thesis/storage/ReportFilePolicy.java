@@ -116,7 +116,7 @@ public final class ReportFilePolicy {
     }
 
     /**
-     * Wukong finding: the client-controlled Content-Type was stored verbatim
+     * the client-controlled Content-Type was stored verbatim
      * and echoed on download, so a garbage value could break the download and
      * text/html leaned on disposition alone. The type now derives from the
      * validated extension and the browser's declared type is ignored.

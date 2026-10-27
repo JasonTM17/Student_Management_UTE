@@ -445,7 +445,7 @@ class ThesisAssistantServiceTest {
         assertTrue(ThesisAssistantService.isPortalDenialAnswer(
                 "Cổng học vụ chưa công bố các môn còn lại của chương trình."));
 
-        // Round-2 review regressions: domain compounds and adverbial "còn"
+        // domain compounds and adverbial "còn"
         // must not be chopped into <8-word fragments that fake boilerplate.
         assertFalse(ThesisAssistantService.isPortalDenialAnswer(
                 "Cổng học vụ chưa công bố lịch thi. "
@@ -526,7 +526,7 @@ class ThesisAssistantServiceTest {
         assertTrue(ThesisAssistantService.isCertificateQuery("Where do I get an enrollment certificate?"));
         assertTrue(ThesisAssistantService.isCertificateQuery("How do I request a student verification letter?"));
         // Proof-of-enrollment phrasing carries registration vocabulary too;
-        // the certificate branch must still claim the question (Kongming R4:
+        // the certificate branch must still claim the question:
         // the registration branch used to absorb it first).
         assertTrue(ThesisAssistantService.isCertificateQuery(
                 "Xin giấy xác nhận đã đăng ký học phần kỳ này"));
@@ -597,7 +597,7 @@ class ThesisAssistantServiceTest {
         assertTrue(!ThesisAssistantService.isMultiIntentQuery("Đăng ký học phần khi nào mở?"));
         assertTrue(!ThesisAssistantService.isMultiIntentQuery("Thủ tục xin giấy xác nhận?"));
         // Two families inside ONE request with only a trailing "?" is still a
-        // single intent — the punctuation joins nothing (Kongming R4 pin: this
+        // single intent — the punctuation joins nothing (this
         // exact phrasing used to skip family scoping and cite "Học kỳ phụ").
         assertTrue(!ThesisAssistantService.isMultiIntentQuery(
                 "Xin giấy xác nhận đã đăng ký học phần kỳ này lấy ở đâu?"));
@@ -1241,7 +1241,7 @@ class ThesisAssistantServiceTest {
 
     @Test
     void joinedQuestionGroundsEveryDetectedFamilyInsideThePromptLimit() {
-        // Phase-8: "Phúc khảo điểm thế nào, và lịch thi cuối kỳ khi nào?"
+        // "Phúc khảo điểm thế nào, và lịch thi cuối kỳ khi nào?"
         // detects the grades + exam families, but the exam/grades predicates
         // did not exist — generic docs crowded the second family out of the
         // top-3 prompt window and the provider answered only the first
@@ -1388,7 +1388,7 @@ class ThesisAssistantServiceTest {
 
         // Academic wording keeps the grounded RAG chain.
         assertNull(service.generalAnswerIfOffTopic("Lịch thi cuối kỳ khi nào?", "vi", null, null));
-        // Round-2 chat-1: scope='specialized' skips the general fallback — the
+        // scope='specialized' skips the general fallback — the
         // professional corpus is the right source for those questions.
         assertNull(service.generalAnswerIfOffTopic("SOLID là gì?", "vi", null, "specialized"));
         // Provider dead → null so the normal NO_MATCH/curated chain runs.

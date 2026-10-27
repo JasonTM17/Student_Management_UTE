@@ -118,7 +118,7 @@ test('admin enrollments filter fallback copy lives in the dictionary', () => {
   // The page consumes the key and no longer carries the inline pair.
   assert.match(enrollmentsPage, /messages\.admin\.enrollments\.filterLoadFailed/);
   assert.doesNotMatch(enrollmentsPage, /ch\u01b0a t\u1ea3i \u0111\u01b0\u1ee3c \u0111\u1ea7y \u0111\u1ee7/);
-  // The reference-loader contract (phase-six-repair) is untouched.
+  // The reference-loader contract (portal-source-contract) is untouched.
   assert.match(enrollmentsPage, /setReferenceError\(/);
   assert.match(enrollmentsPage, /setSectionReferenceError\(/);
 });

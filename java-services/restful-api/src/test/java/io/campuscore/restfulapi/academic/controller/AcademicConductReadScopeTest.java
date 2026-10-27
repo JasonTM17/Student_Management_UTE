@@ -18,7 +18,7 @@ import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.server.ResponseStatusException;
 
 /**
- * LEC-P1-5: the conduct read must not become a directory of the student body.
+ * the conduct read must not become a directory of the student body.
  *
  * <p>The attendance endpoints already scoped a lecturer to their own sections, while
  * this one accepted any student id from any lecturer. The sweep's ledger initially

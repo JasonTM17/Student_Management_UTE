@@ -55,7 +55,7 @@ public class AnnouncementReadRepository {
      * across PostgreSQL and H2. The trailing id keeps the rank total: seeded
      * rows share createdAt in bulk (12 identical timestamps), and an OFFSET
      * window over a tied order dropped records from full crawls and duplicated
-     * ids across adjacent pages (round-3 thesis-1).
+     * ids across adjacent pages.
      */
     static final String DISPLAY_ORDER_CLAUSE =
             " ORDER BY CASE WHEN \"displayOrder\" IS NULL THEN 1 ELSE 0 END,"
@@ -115,7 +115,7 @@ public class AnnouncementReadRepository {
         return Objects.requireNonNullElse(count, 0L);
     }
 
-    /** Round-3 ct-9: single announcement fetch for the detail endpoint. */
+    /** single announcement fetch for the detail endpoint. */
     public java.util.Optional<AnnouncementResponse> findById(String id) {
         return jdbc.query(
                 "SELECT " + SELECT_COLUMNS + " FROM " + TABLE + " WHERE \"id\" = :id",

@@ -91,7 +91,7 @@
     --portal-header-height: 3.75rem;
     /* Single source for portal content width: both shells cap at 90rem
        (1440px). DESIGN.md previously documented 1280px — updated to match
-       the rendered reality audited in Phase 6. */
+       the rendered layout. */
     --content-max: 90rem;
     --space-section: clamp(3.5rem, 7vw, 7rem);
     --focus-width: 0.1875rem;
@@ -580,7 +580,7 @@
   color: #86efac;
 }
 
-/* RT-P3-e: the editor previews these through `content_style`, but the reader had
+/* Reader block styles: the editor previews these through `content_style`, but the reader had
    no rules for them, so an authored code block or accordion arrived unstyled —
    a bare run of monospace text with no box, and a <details> that looked like a
    stray sentence. Every value below is a semantic token, so the same markup
@@ -777,7 +777,7 @@
     box-shadow: none !important;
   }
 
-  /* RT-P3-f: `article` must not sit in a `break-inside: avoid` rule. A magazine
+  /* `article` must not sit in a `break-inside: avoid` rule. A magazine
      article is longer than one A4 page, so the browser refused to split it,
      pushed the whole thing to sheet 2, and printed a blank first page. Keep the
      guard for the blocks that do fit on a page: cards, figures, headings. */

@@ -625,7 +625,7 @@ export const authApi = {
     return response.data;
   },
 
-  // Round-4 verified fix: disable is two-step — password starts an emailed
+  // disable is two-step — password starts an emailed
   // challenge, the emailed code confirms. A stolen session + phished password
   // alone can no longer unenroll the second factor.
   startDisableTwoFactor: async (password: string): Promise<{ challengeId: string }> => {
@@ -2076,7 +2076,7 @@ export const adminNotificationsApi = {
   },
 };
 
-// Admin audit trail (round-3 ct-2/ct-4 completion): the governance read side
+// Admin audit trail: the governance read side
 // for campuscore_audit."AdminAudit" — ADMIN/SUPER_ADMIN only on the backend.
 export interface AdminAuditEntry {
   id: string;

@@ -107,12 +107,12 @@ test('course-demo copy excludes retired finance and monitoring language', () => 
   );
 });
 
-test('npm test includes smoke, portal, and Phase 6 source regressions', () => {
+test('npm test includes smoke, portal, and source contract regressions', () => {
   const packageJson = JSON.parse(read('package.json'));
 
   assert.match(packageJson.scripts.test, /frontend-smoke\.test\.js/);
   assert.match(packageJson.scripts.test, /portal-shell\.test\.js/);
-  assert.match(packageJson.scripts.test, /phase-six-repair\.test\.js/);
+  assert.match(packageJson.scripts.test, /portal-source-contract\.test\.js/);
   assert.match(packageJson.scripts.test, /docker-browser-api-origin\.test\.js/);
   // The viewport shell check used to be banned from this gate because it needed
   // a live browser + dev server. It is now skip-aware (skips, never fails, when

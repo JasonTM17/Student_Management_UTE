@@ -12,7 +12,7 @@ function readSource(relativePath) {
 /**
  * Native `required` attributes on app inputs make the browser bubble fire
  * before the app's inline Vietnamese validator can explain the problem
- * (round-10 polish: "let the app's own validator speak"). Commit 13ae3683
+ * ("let the app's own validator speak"). Commit 13ae3683
  * removed them from the lecturer notice modal; this test locks the contract
  * on every lecturer-facing input surface so they cannot creep back.
  *

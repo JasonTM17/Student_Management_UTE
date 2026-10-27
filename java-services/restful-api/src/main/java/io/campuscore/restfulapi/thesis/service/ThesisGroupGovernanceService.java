@@ -100,7 +100,7 @@ public class ThesisGroupGovernanceService {
         GroupRow group = guard.lockGroup(groupId);
         guard.authorizeLeaderOrAdmin(group, actor);
         String thesisType = roundLifecycle.requireRoundStatus(group.roundId(), RoundStatus.REGISTRATION_OPEN);
-        // Round-5 post-deploy sweep: the topic binding and approval trace of a
+        // the topic binding and approval trace of a
         // CANCELLED group are historical — the roster trigger cannot see this
         // path, so the guard is enforced here too (admin early-return in
         // authorizeLeaderOrAdmin used to let this through).
@@ -365,7 +365,7 @@ public class ThesisGroupGovernanceService {
         if (reason.isBlank() || reason.length() > 500) throw invalid("reason is required and must contain at most 500 characters");
         int changed = groupRepo.rejectGroup(groupId, reason);
         if (changed != 1) throw conflict("GROUP_APPROVAL_STATE_CONFLICT", "Only pending groups can be rejected");
-        // Round-3 contract ct-3: the group row nulls approved_by on rejection and
+        // the group row nulls approved_by on rejection and
         // has no rejected_by column, so without this trail the rejecting actor is
         // untraceable — the one approval action with no who. Same lockstep
         // transaction as the mutation (recorder runs MANDATORY).

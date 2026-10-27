@@ -71,7 +71,7 @@ test('inline image src policy keeps publishable schemes only', () => {
     'data:image/png;base64,',                  // empty payload
     // U+2007 (figure space) is NOT in the server's strip set and Java's \s
     // does not match it — the server drops this img at publish; the editor
-    // must drop it too (Wukong N3 counterexample).
+    // must drop it too.
     'data:image/png;base64,QUJD\u2007DEU=',
     'data:image/png;base64,QUJD\u3000DEU=',
     'data:text/html;base64,PGI+',              // non-image data uri

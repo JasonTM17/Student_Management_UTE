@@ -15,7 +15,7 @@ import static org.assertj.core.api.Assertions.assertThat;
  * Degraded assistant answers (QUOTA_EXCEEDED and friends) serve the top
  * document verbatim, so the corpus itself must carry the structure the panel
  * renders: a '## topic' heading and '- ' bullets — never again the inline
- * "1. … N. …" wall of text (round-4 user report). Also guards the V78 guard
+ * "1. … N. …" wall of text. Also guards the V78 guard
  * repair (the blocked phrase must not be resurrected by a rebuild) and the
  * V78-style release projection protocol.
  */

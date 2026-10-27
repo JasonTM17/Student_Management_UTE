@@ -21,7 +21,7 @@ export function shouldSeedDefaultEditorDocument(input: EditorSeedInput): boolean
  * A saved browser draft. `editingId`/`editingVersion` are part of the payload
  * because the page is stateless across reloads: without them a reloaded draft
  * lost the edit context and "Publish" silently created a duplicate of the
- * announcement the author meant to update (K1).
+ * announcement the author meant to update.
  */
 export interface StoredEditorDocument {
   title: string;
@@ -38,7 +38,7 @@ export interface StoredEditorDocument {
 /**
  * Hydrates a raw localStorage payload. Returns null when there is nothing to
  * restore (missing or malformed), so the caller falls back to seeding exactly
- * as it did before the helper existed. Legacy drafts written before K1 carry
+ * as it did before the helper existed. Legacy drafts written before carry
  * no edit context and hydrate as new documents.
  */
 export function parseStoredEditorDocument(raw: string | null): StoredEditorDocument | null {
@@ -85,7 +85,7 @@ export function parseStoredEditorDocument(raw: string | null): StoredEditorDocum
  * U+0300–U+036F block also carries the horn of ơ/ư), map đ/Đ explicitly (they
  * have no decomposition), then collapse every other separator run. The old
  * `[^a-z0-9-_]` filter deleted Vietnamese letters outright and produced names
- * like `-cng--ti-kha-lun-tt-nghip.html` (K2).
+ * like `-cng--ti-kha-lun-tt-nghip.html`.
  */
 export function slugifyDocumentTitle(title: string, fallback = 'academic-document'): string {
   const slug = (title || '')

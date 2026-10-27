@@ -15,7 +15,7 @@ import org.springframework.stereotype.Repository;
 import io.campuscore.restfulapi.audit.service.AdminAuditRecorder;
 
 /**
- * Read side of the admin audit trail (round-3 contract ct-2). The trail was
+ * Read side of the admin audit trail. The trail was
  * write-only — AdminAuditRecorder INSERTs and nothing in the codebase ever
  * SELECTed it, so "admin xem audit" meant opening the database directly and no
  * endpoint existed on which scoping could even be evaluated. Governance roles
@@ -41,7 +41,7 @@ public class AdminAuditReadRepository {
     /**
      * Newest first with an id tiebreaker: admin operations batch inside the
      * same transaction timestamp, and an OFFSET walk without one reshuffles
-     * tied rows between pages (the announcement-feed defect, round-3 thesis-1).
+     * tied rows between pages (the announcement-feed defect).
      */
     public AuditPage page(
             int page,

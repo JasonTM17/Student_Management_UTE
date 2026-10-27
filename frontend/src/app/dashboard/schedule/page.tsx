@@ -425,7 +425,7 @@ export default function SchedulePage() {
         ? `Lịch học - ${selectedSemesterName || 'CampusUTE'}`
         : `Schedule - ${selectedSemesterName || 'CampusUTE'}`;
     const icsContent = generateIcsCalendar(events, calName);
-    // K12: the filename uses the same Unicode-aware rule as the reader anchors
+    // the filename uses the same Unicode-aware rule as the reader anchors
     // (NFD-decompose, map đ/Đ, drop combining marks, collapse separators). The
     // old ASCII-only filter turned "Lịch học Học kỳ 1" into "l_ch_h_c_h_c_k__1".
     const semCode = targetSemester?.name

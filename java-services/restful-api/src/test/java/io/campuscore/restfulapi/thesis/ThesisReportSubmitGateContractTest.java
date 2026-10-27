@@ -11,7 +11,7 @@ import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.multipart.MultipartFile;
 
 /**
- * LEC-P2-5: the two report-SUBMIT gates used to advertise
+ * the two report-SUBMIT gates used to advertise
  * ADMIN/TRUONG_KHOA/LECTURER while ThesisReportService.requireWriteAccess
  * 403s everyone except the student group leader — a lying contract. The
  * submit gates must name only STUDENT; the GET/download matrix keeps staff.
@@ -29,7 +29,7 @@ class ThesisReportSubmitGateContractTest {
 
     @Test
     void reportReadAndDownloadGatesKeepTheStaffMatrix() throws Exception {
-        // Deliberately unchanged by the LEC-P2-5 fix.
+        // Deliberately unchanged by the related fix.
         assertThat(gateOf("getReport", UUID.class, Jwt.class)).contains("ADMIN");
         assertThat(gateOf("downloadReportFile", UUID.class, Jwt.class)).contains("ADMIN");
         assertThat(gateOf("listReportsByRound", UUID.class, Jwt.class)).contains("ADMIN");

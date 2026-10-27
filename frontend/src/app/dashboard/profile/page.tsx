@@ -181,7 +181,7 @@ export default function ProfilePage() {
   const [twoFactorStage, setTwoFactorStage] = useState<'idle' | 'confirm'>('idle');
   const [twoFactorCode, setTwoFactorCode] = useState('');
   const [twoFactorChallengeId, setTwoFactorChallengeId] = useState('');
-  // Which flow the shared confirm-code form completes (round-4: disable is two-step too).
+  // Which flow the shared confirm-code form completes (disable is two-step too).
   const [twoFactorPendingAction, setTwoFactorPendingAction] = useState<'enable' | 'disable'>('enable');
   const [isTwoFactorBusy, setIsTwoFactorBusy] = useState(false);
   const [twoFactorError, setTwoFactorError] = useState('');
@@ -309,7 +309,7 @@ export default function ProfilePage() {
     setIsTwoFactorBusy(true);
     try {
       if (twoFactorPendingAction === 'disable') {
-        // Round-4 verified fix: the emailed code now guards turning 2FA OFF.
+        // the emailed code now guards turning 2FA OFF.
         const result = await authApi.disableTwoFactor(twoFactorChallengeId, normalizedCode);
         setTwoFactorEnabled(Boolean(result.enabled));
         resetTwoFactorFlow();
@@ -347,7 +347,7 @@ export default function ProfilePage() {
 
     setIsTwoFactorBusy(true);
     try {
-      // Round-4 verified fix: the password now only STARTS the disable
+      // the password now only STARTS the disable
       // challenge; the emailed code confirms it (mirrors the enable flow).
       const { challengeId } = await authApi.startDisableTwoFactor(password);
       setTwoFactorChallengeId(challengeId);

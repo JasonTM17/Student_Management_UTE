@@ -22,9 +22,9 @@ import java.util.regex.Pattern;
 import org.junit.jupiter.api.Test;
 
 /**
- * RT-P2-5 proving tests: every payload from the frontend XSS set must come out
+ * proving tests: every payload from the frontend XSS set must come out
  * of the write-time sanitizer neutralized, the plugins the editor keeps
- * enabled must round-trip (RT-P2-2), and the whole policy must match the
+ * enabled must round-trip, and the whole policy must match the
  * shared allowlist fixture that the TypeScript suite also asserts against, so
  * the two hand-maintained policies cannot drift apart silently.
  */
@@ -55,7 +55,7 @@ class AnnouncementHtmlSanitizerTest {
     @Test
     void storedXssPayloadsAreNeutralizedByTheWriteTimeSanitizer() {
         // Each payload mirrors the frontend suite (tests/rich-editor.test.js),
-        // including the markdown-branch bypass set (RT-P1-1): interior
+        // including the markdown-branch bypass set: interior
         // tab/newline, entities, mixed case and leading whitespace all
         // normalize to a rejected javascript: scheme.
         record Attack(String payload, String forbidden) {}
@@ -86,7 +86,7 @@ class AnnouncementHtmlSanitizerTest {
 
     @Test
     void pluginsKeptByTheEditorRoundTripThroughTheSanitizer() {
-        // RT-P2-2: accordion and anchor are the plugins the editor keeps, so
+        // accordion and anchor are the plugins the editor keeps, so
         // their output must survive the write-time policy.
         SanitizationResult accordion = AnnouncementHtmlSanitizer.sanitize(
                 "<details><summary>Tiêu đề mục</summary><p>nội dung bên trong</p></details>");
@@ -99,7 +99,7 @@ class AnnouncementHtmlSanitizerTest {
         assertTrue(anchor.html().contains("id=\"muc-1\""), anchor.html());
         assertTrue(anchor.html().contains("href=\"#muc-1\""), anchor.html());
 
-        // RT-P2-2: the media plugin was removed — its iframe output must not survive.
+        // the media plugin was removed — its iframe output must not survive.
         SanitizationResult media = AnnouncementHtmlSanitizer.sanitize(
                 "<iframe src=\"https://youtu.be/x\"></iframe>");
         assertFalse(media.html().toLowerCase(Locale.ROOT).contains("iframe"), media.html());

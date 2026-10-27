@@ -14,7 +14,7 @@ import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * ADM-P0-3: records destructive or privilege-affecting administrative operations.
+ * records destructive or privilege-affecting administrative operations.
  *
  * <p>Announcements already had an audit table, so the gap was never "we do not know
  * how" — it was that nothing else was wired to the idea. User creation, role

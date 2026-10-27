@@ -21,7 +21,7 @@ test('catch-all block carries the hardened header set', async () => {
   assert.equal(catchAll.length, 1, 'exactly one catch-all headers() block');
   const byKey = new Map(catchAll[0].headers.map((h) => [h.key, h.value]));
 
-  // CSP graduated to enforced nonce mode in middleware.ts (RT-P2-4); the
+  // CSP uses enforced nonce mode in middleware.ts; the
   // static header table must NOT reintroduce a report-only policy.
   assert.equal(byKey.get('Content-Security-Policy-Report-Only'), undefined);
   assert.equal(byKey.get('X-Frame-Options'), 'DENY');

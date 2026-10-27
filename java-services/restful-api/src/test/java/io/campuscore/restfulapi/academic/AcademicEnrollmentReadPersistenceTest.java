@@ -306,10 +306,10 @@ class AcademicEnrollmentReadPersistenceTest {
     }
 
     /**
-     * L-P1-2: draft component scores are the lecturer's working record. A
+     * draft component scores are the lecturer's working record. A
      * student who knows their own enrollment id must not be able to poll the
      * detail endpoint before the lecturer publishes, and the enrollment reads
-     * must hide the provisional total/letter for drafts (Wukong residual).
+     * must hide the provisional total/letter for drafts.
      */
     @Test
     void studentCannotReadDraftGradeComponentsOrProvisionalTotals() throws Exception {
@@ -465,7 +465,7 @@ class AcademicEnrollmentReadPersistenceTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.enrollment.id").value("enrollment-1"));
 
-        // Round-11 contract change: section-scoped reads for a lecturer who
+        // section-scoped reads for a lecturer who
         // does not own the section now raise 403 SECTION_FORBIDDEN like the
         // sibling grades write path, instead of answering a silent empty list
         // that made "no rows" indistinguishable from "not yours".
@@ -477,7 +477,7 @@ class AcademicEnrollmentReadPersistenceTest {
                 .andExpect(status().isForbidden())
                 .andExpect(jsonPath("$.code").value("SECTION_FORBIDDEN"));
 
-        // Round-12 alignment: reading grades for an enrollment belonging to another
+        // reading grades for an enrollment belonging to another
         // lecturer's section now raises 403 SECTION_FORBIDDEN matching the section grades read.
         mvc.perform(get("/api/v1/grades/student-grades/enrollment/enrollment-1").with(lecturerJwt("lecturer-other")))
                 .andExpect(status().isForbidden())

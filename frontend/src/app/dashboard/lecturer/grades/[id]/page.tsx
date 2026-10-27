@@ -352,7 +352,7 @@ export default function SectionGradingPage() {
         });
       });
 
-      // LEC-P3-B3: after a partial save the server copy of the skipped rows
+      // after a partial save the server copy of the skipped rows
       // is older than what is on screen, so overlay the local half-entered
       // drafts instead of wiping them, and keep those rows flagged as edited
       // so the marker and the save-count stay truthful.
@@ -418,7 +418,7 @@ export default function SectionGradingPage() {
 
   const hasChanges = editedIds.size > 0;
 
-  // LEC-P3-B1: leaving the sheet with typed scores discards them. The shared
+  // leaving the sheet with typed scores discards them. The shared
   // guard adds the beforeunload dialog, the in-app confirm for the back link,
   // and — with interceptRouteChanges — covers SPA route changes the browser
   // dialog never sees: sidebar <Link> clicks and browser Back now confirm
@@ -635,7 +635,7 @@ export default function SectionGradingPage() {
         toast.warning(copy.partialRowsSkipped.replace('{count}', formatNumber(partialRows.length)));
       }
       toast.success(copy.saved);
-      // LEC-P3-B3: hand the silent refetch the drafts of the rows it skipped
+      // hand the silent refetch the drafts of the rows it skipped
       // so their half-entered scores survive instead of vanishing from the
       // cells behind the warning.
       const skippedDrafts = partialRows

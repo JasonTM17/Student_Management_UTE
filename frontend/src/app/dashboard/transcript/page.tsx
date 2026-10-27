@@ -668,7 +668,7 @@ export default function TranscriptPage() {
                         : copy.gpaBothTrend}
                   </p>
                 </div>
-                {/* Round-5 polish: a single pill-shaped segmented control —
+                {/* a single pill-shaped segmented control —
                     the active mode is a filled primary pill, the rest quiet. */}
                 <div
                   className="inline-flex items-center gap-0.5 rounded-full border border-border/70 bg-muted/50 p-1 text-xs font-medium"

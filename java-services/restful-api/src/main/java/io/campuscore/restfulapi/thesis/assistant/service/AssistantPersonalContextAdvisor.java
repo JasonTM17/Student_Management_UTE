@@ -84,7 +84,7 @@ public class AssistantPersonalContextAdvisor {
     // Precompiled day detectors — detectRequestedDay ran on every personal
     // question and recompiled ~7 patterns each call (audit S8).
     private static final Pattern DAY_1 = Pattern.compile("chủ\\s*nhật|chu\\s*nhat|\\bcn\\b|sunday", Pattern.CASE_INSENSITIVE);
-    // Wukong round-9 F1: SCHEDULE_INTENT accepts unaccented "thu N" but the
+    // SCHEDULE_INTENT accepts unaccented "thu N" but the
     // day detectors did not — "thu 3 toi co lop gi" passed the gate, parsed
     // no day, and answered the whole list/week instead of Wednesday.
     private static final Pattern DAY_2 = Pattern.compile("thứ\\s*(?:hai|2)|thu\\s*(?:hai|2)|\\bt2\\b|monday", Pattern.CASE_INSENSITIVE);
@@ -112,7 +112,7 @@ public class AssistantPersonalContextAdvisor {
                     // không?" and "Thứ Hai hàng tuần tôi có môn nào, học mấy giờ,
                     // ở phòng nào?" fell to the KB path because the noun group
                     // had no "lớp" and the week-qualifier / first-person gap was
-                    // hard-capped at adjacent whitespace. Kongming: the day
+                    // hard-capped at adjacent whitespace. the day
                     // group, possessive, "có", and noun group all lacked the
                     // unaccented twins, so "thu 2 toi co lop khong" / "hom nay
                     // toi co lop khong" still missed every arm.
@@ -131,14 +131,14 @@ public class AssistantPersonalContextAdvisor {
                     // phụ trách for the verb-first line to catch. The
                     // interrogative "nào" stays required so a public "ai phụ
                     // trách lớp này" question does not become a personal
-                    // timetable request. Wukong: the branch must carry a
+                    // timetable request. the branch must carry a
                     // first-person marker — a third-person "Giáo viên phụ trách
                     // lớp nào?" is public catalog knowledge, not the asker's
                     // own timetable.
                     + "|tôi\\s*[^?!.]{0,12}?phụ\\s*trách[^?!.]{0,25}?lớp\\s*(?:học\\s*phần\\s*)?nào"
                     + "|toi\\s*[^?!.]{0,12}?phu\\s*trach[^?!.]{0,25}?lop\\s*(?:hoc\\s*phan\\s*)?nao"
                     + "|(my\\s+)?(class\\s+|teaching\\s+)?schedule|timetable|my\\s+classes|(classes|teaching)\\s+(today|tomorrow|on\\s+\\w+)"
-                    // Round-3 chat-4: "Do I have class today?" and "What classes
+                    // "Do I have class today?" and "What classes
                     // do I have today?" fell to the KB path and the model denied
                     // any schedule exists — while the Vietnamese twin answered
                     // correctly. Both natural EN phrasings route to the personal
@@ -162,7 +162,7 @@ public class AssistantPersonalContextAdvisor {
                     // word "đang", not the policy word "tối đa". The accented
                     // "tối đa" needs no boundary because the diacritics already
                     // make it a distinct token.
-                    // Wukong F4: bare "toi da" is also unaccented "tôi đã"
+                    // bare "toi da" is also unaccented "tôi đã"
                     // (I already) — "Toi da dang ky nhung lop nao?" lost its
                     // only pronoun and died on the knowledge path while the
                     // accented twin routed correctly. The lookahead keeps
@@ -222,7 +222,7 @@ public class AssistantPersonalContextAdvisor {
                     // "Học kỳ này tôi phụ trách những lớp nào?" — phụ trách sits
                     // BEFORE the lớp noun, which the lớp-first alternatives miss.
                     + "|phụ\\s*trách[^?!.]{0,25}?lớp|phu\\s*trach[^?!.]{0,25}?lop"
-                    // Kongming/Wukong review: the lecturer suggestion chips
+                    // the lecturer suggestion chips
                     // "Các lớp tôi giảng dạy" / "Which sections do I teach?"
                     // carry no "phụ trách"/"nào" token, so the hint never
                     // fired and a dual-profile (student+lecturer) JWT took the
@@ -233,7 +233,7 @@ public class AssistantPersonalContextAdvisor {
                     // Verb-first order: "tôi giảng dạy những lớp nào?",
                     // "tôi dạy môn nào?" — the object follows the verb, so
                     // the noun-first alternative above cannot reach it
-                    // (Kongming round-4: the named-semester branch then
+                    // (the named-semester branch then
                     // answered a teaching question from the student
                     // transcript).
                     + "|(?:giảng\\s*dạy|giang\\s*day|dạy|day|phụ\\s*trách|phu\\s*trach)[^?!.]{0,20}?"
@@ -254,7 +254,7 @@ public class AssistantPersonalContextAdvisor {
                     + "|thi\\s*(?:cuối\\s*kỳ|cuối\\s*ky|kết\\s*thúc|học\\s*phần|hoc\\s*phan|tốt\\s*nghiệp|tot\\s*nghiep|lại|lai|bù|bu)"
                     + "|thi\\s*(?:cuoi\\s*ky|ket\\s*thuc)"
                     + "|kỳ\\s*thi|ky\\s*thi|khoá\\s*thi|khóa\\s*thi|khoa\\s*thi|phòng\\s*thi|phong\\s*thi"
-                    // Wukong round-9 F7: the schedule qualifier was optional,
+                    // the schedule qualifier was optional,
                     // so "my exam grades/scores" was vetoed while "my grades"
                     // routed — exclude the grade-words that belong to the
                     // grades intent.
@@ -263,7 +263,7 @@ public class AssistantPersonalContextAdvisor {
             Pattern.CASE_INSENSITIVE | Pattern.UNICODE_CASE | Pattern.UNICODE_CHARACTER_CLASS);
 
     private static final Pattern FIRST_PERSON_PRONOUN = Pattern.compile(
-            // Wukong round-9 F10: colloquial self pronouns join the gate —
+            // colloquial self pronouns join the gate —
             // "tớ/tui/mến đang học lớp nào" missed every first-person arm.
             // "cháu" stays OUT: it is also the ordinary third-person noun
             // (grandchild) — the E-arm keeps vetoing it, which is the safer
@@ -333,7 +333,7 @@ public class AssistantPersonalContextAdvisor {
      * {@link #isEnrollmentListIntent(String)}.
      */
     private static final Pattern ENROLLMENT_LIST_INTENT = Pattern.compile(
-            // Round-3 chat-2: "môn" (subject) joins the noun group —
+            // "môn" (subject) joins the noun group —
             // "Học kỳ 1 năm học 2025-2026 tôi học những môn nào?" hit the KB
             // path, which answered "chưa công bố danh sách môn" while the
             // transcript carried six graded courses for exactly that semester.
@@ -342,7 +342,7 @@ public class AssistantPersonalContextAdvisor {
                     + "|(?:da\\s*)?dang\\s*ky.*?(?:lop|hoc\\s*phan|class)"
                     + "|(?:lớp|lop|học\\s*phần|hoc\\s*phan).*?(?:đã\\s*)?đăng\\s*ký"
                     + "|registere?d\\s+(?:in|for)\\b"
-                    // Round-3 chat-5: "Which classes am I taking?" — the
+                    // "Which classes am I taking?" — the
                     // interrogative sits BEFORE the noun, which the noun-first
                     // alternative above cannot reach, and the existing EN
                     // branches only know "registered in/for".
@@ -355,7 +355,7 @@ public class AssistantPersonalContextAdvisor {
                     // branches the message fell to the general path and the
                     // model answered "cổng chưa công bố thông tin lớp của
                     // từng sinh viên" while the enrollment list existed.
-                    // Wukong review: the pronoun must sit INSIDE the noun→verb
+                    // the pronoun must sit INSIDE the noun→verb
                     // span — a bare "đang học" branch let "toi" from "tối nay"
                     // ("Toi nay lop dang hoc may gio?") and vocative "em"
                     // impersonate the first-person gate elsewhere in the
@@ -367,7 +367,7 @@ public class AssistantPersonalContextAdvisor {
                     // immediately before "đang". A message-wide pronoun let
                     // "Bạn tôi đang học lớp này" (my friend), "Em oi, dang hoc
                     // mon nay" (vocative) and "Toi nay dang hoc mon gi" (tối
-                    // nay) impersonate ownership (Wukong re-verify).
+                    // nay) impersonate ownership.
                     + "|(?:tôi|toi|mình|minh|em)\\s*(?:đang|dang)\\s*(?:học|hoc|theo\\s*học|theo\\s*hoc)"
                     + "[^?!.]{0,25}?(?:lớp|lop|môn|mon|học\\s*phần|hoc\\s*phan)"
                     + "|(?:lớp|lop|học\\s*phần|hoc\\s*phan|môn|mon)(?:\\s+(?:học|hoc))?\\s+(?:của|cua)\\s+(?:tôi|mình|em|toi|minh)"
@@ -400,17 +400,17 @@ public class AssistantPersonalContextAdvisor {
      * "lớp em ấy đang học" (their class, not the asker's), "Bạn tôi đang học"
      * (my friend's class), "anh tôi…". {@link #FIRST_PERSON_PRONOUN} and the
      * pronoun-in-span branches only check token position, so the enrollment
-     * list intent vetoes these subjects explicitly (Wukong re-verify).
+     * list intent vetoes these subjects explicitly.
      */
     private static final Pattern THIRD_PERSON_SUBJECT = Pattern.compile(
-            // UNICODE_CHARACTER_CLASS is load-bearing (Wukong round-3): plain
+            // UNICODE_CHARACTER_CLASS is load-bearing: plain
             // \b uses ASCII \w, so a boundary before "ông/đứa" only fires
             // mid-word (inside "không/đông") and a trailing \b after "đó/sẽ/
             // có" is dead before space — the accented spellings users type
             // most would silently disable the veto.
             // A) relation + demonstrative: "em ấy", "anh ta", "bạn đó",
             // "dua ay". "day" was REMOVED — it collides with unaccented
-            // "dạy" ("em day" = I teach, a lecturer chip — Wukong round-4).
+            // "dạy" ("em day" = I teach, a lecturer chip).
             "\\b(?:em|anh|chị|cô|bạn|thầy|giáo|mẹ|bố|ông|bà|vợ|chồng|con|nó|người|cháu|đứa"
                     + "|chú|dì|cậu|mợ|bác|dượng|cha|má|thằng|thím|cụ|bé"
                     + "|sinh\\s+viên|giảng\\s+viên|học\\s+sinh|giáo\\s+viên|lớp\\s+trưởng"
@@ -424,21 +424,21 @@ public class AssistantPersonalContextAdvisor {
                     // inside "xem/điem", "ba" inside "bang/bây" must not
                     // anchor). Commas/semicolons are excluded so vocative
                     // phrasing "mẹ, tôi đang học" can't trip the gate
-                    // (Wukong round-4); "X ơi" vocatives are stripped
+                    //; "X ơi" vocatives are stripped
                     // earlier by VOCATIVE_ADDRESS. "anh/chị em" collectives
                     // ("anh em mình" = we) are stripped earlier by
                     // COLLECTIVE_FIRST_PERSON, which replaced the inert
                     // anh|chị lookahead — the "em" arm caught the same
-                    // pronoun anyway (Wukong round-5).
+                    // pronoun anyway.
                     // "cô" joins B: "cô tôi" is exclusively "my teacher"
                     // (the self-address "cô ơi" is stripped by VOCATIVE
-                    // first) — Wukong round-7 B1: the accented twin of the
+                    // first) — the accented twin of the
                     // C-arm's "co" escaped every subject arm.
                     + "|\\b(?:bạn|thầy|cô|mẹ|bố|ông|bà|vợ|chồng|cháu|đứa|người"
                     + "|chú|dì|cậu|mợ|bác|dượng|cha|má"
                     // "thằng/thím/cụ/bé" were F-only (possessive) — their
                     // subject+possessive shapes ("thím tôi đang học")
-                    // escaped the veto entirely (Wukong round-7 B2). The
+                    // escaped the veto entirely. The
                     // unaccented twins stay OUT: "thang" is "tháng" (month)
                     // and "be" is the English verb, both common in
                     // first-person questions — the miss is fail-soft.
@@ -453,12 +453,11 @@ public class AssistantPersonalContextAdvisor {
                     + "|chị(?!\\s+em\\s+(?!tôi|mình|em|toi|minh)\\b)"
                     // "giáo viên tôi" stays a teacher reference, but bare
                     // "giáo" must not veto "giáo trình/án/dục/khoa/việc tôi"
-                    // (textbook, lesson plan, education, coursework —
-                    // Wukong round-5). The lookahead excludes compounds; the
+                    // (textbook, lesson plan, education, coursework). The lookahead excludes compounds; the
                     // explicit "giáo viên" alternative keeps real teachers.
                     + "|giáo\\s+viên|giáo(?!\\s+(?:trình|án|dục|khoa|viên|việc)\\b)"
                     + "|giao\\s+vien|giao(?!\\s+(?:trinh|an|duc|khoa|vien|viec)\\b)"
-                    // Wukong round-9 F4: workplace/authority roles were
+                    // workplace/authority roles were
                     // F-only, so "đồng nghiệp tôi đang học lớp nào" escaped
                     // every subject arm. Compound nouns only — "co van"
                     // stays out because it is also "có vấn đề" (fail-soft).
@@ -469,11 +468,11 @@ public class AssistantPersonalContextAdvisor {
                     + "|nhóm\\s+trưởng|nhom\\s+truong|trưởng\\s+nhóm|truong\\s+nhom"
                     + "|tổ\\s+trưởng|to\\s+truong|bí\\s+thư|bi\\s+thu|chủ\\s+nhiệm|chu\\s+nhiem)\\b"
                     + "[^?!.,;:]{0,12}?\\b(?:tôi|mình|em|toi|minh)\\b"
-                    // Kongming: "em" gets its own arm whose target excludes
+                    // "em" gets its own arm whose target excludes
                     // "em" — "cho em hỏi em đang học lớp nào" is the asker's
                     // self-echo (em…em), while "em tôi/em của tôi" (my younger
                     // sibling) still vetoes against a real non-em pronoun.
-                    // Wukong round-7 A2: "em mình" is the same self-
+                    // "em mình" is the same self-
                     // collective as "anh em mình" ("em mình đang học" = I
                     // study), so only the tôi-possessive vetoes now.
                     + "|\\bem\\b[^?!.,;:]{0,12}?\\b(?:tôi|toi)\\b"
@@ -481,8 +480,7 @@ public class AssistantPersonalContextAdvisor {
                     // pronoun — covers compound subjects that beat B's
                     // adjacency or 12-char cap: "ban than toi", "co giao
                     // toi", "ong xa toi", "me ke toi", "bạn thân thiết của
-                    // tôi" (16 chars), "giáo viên chủ nhiệm tôi" (Wukong
-                    // round-4).
+                    // tôi" (16 chars), "giáo viên chủ nhiệm tôi".
                     + "|\\b(?:em|anh|chị|cô|bạn|thầy|giáo|mẹ|bố|ông|bà|vợ|chồng|con|người|cháu|đứa"
                     + "|chú|dì|cậu|mợ|bác|dượng|cha|má|thằng|thím|cụ|bé"
                     + "|sinh\\s+viên|giảng\\s+viên|học\\s+sinh|giáo\\s+viên|lớp\\s+trưởng"
@@ -491,7 +489,7 @@ public class AssistantPersonalContextAdvisor {
                     + "|sinh\\s+vien|giang\\s+vien|hoc\\s+sinh|giao\\s+vien|lop\\s+truong)"
                     + "\\s+(?:thân|than|bè|be|gái|gai|trai|yêu|yeu|xã|xa|kế|ke|nuôi|nuoi"
                     + "|ruột|ruot|chủ\\s*nhiệm|chu\\s*nhiem|trưởng|truong|giáo|giao"
-                    // Wukong round-5: in-law/generation qualifiers — "con
+                    // in-law/generation qualifiers — "con
                     // dâu tôi", "chị dâu tôi", "con rể tôi", "ông nội tôi",
                     // "bà ngoại tôi", "bạn đời tôi", "bạn cùng tôi". "noi"
                     // (nói) and "ngoai" (ngoài) stay out — their homographs
@@ -506,7 +504,7 @@ public class AssistantPersonalContextAdvisor {
                     // đang hướng dẫn" where a widened gap would veto the
                     // asker's own workload question (regression-pinned).
                     + "|\\b(?:co|thay|me|bo|vo|chong|chau|nguoi|chi|chu|bac|duong|ong|ban"
-                    // Wukong round-5: di|cau|mo cover unaccented kinship at
+                    // di|cau|mo cover unaccented kinship at
                     // strict adjacency ("dì tôi", "cậu tôi", "mợ tôi") —
                     // "đi tôi"/"mở tôi" are ungrammatical self-shapes so
                     // there is no homograph cost. "ma" stays OUT: "X mà tôi
@@ -522,14 +520,14 @@ public class AssistantPersonalContextAdvisor {
                     // "con của em"). Bare "con toi" is far more often
                     // unaccented "còn tôi" ("I still") than "con tôi" (my
                     // child), and "con" alone is also a counter word
-                    // ("con đường tôi đi") — Kongming round-4: the
+                    // ("con đường tôi đi") — the
                     // asymmetric cost favors missing "con tôi" over
                     // vetoing "còn tôi". Likewise "ba" is dropped from
                     // every arm: "thứ ba"/"ba môn" (Tuesday / three)
                     // outnumber "ba tôi" (Southern dad) by orders of
                     // magnitude, and the miss is fail-soft (serves the
                     // asker's own rows).
-                    // Wukong round-8 M4: the qualifier disambiguates "con"
+                    // the qualifier disambiguates "con"
                     // from "còn", so unaccented twins (gai/ruot/nuoi/de) and
                     // in-law/birth forms (dâu/rể/đẻ/cưng) join — "con gai
                     // toi" (my daughter) used to read the trailing "toi" as
@@ -540,7 +538,7 @@ public class AssistantPersonalContextAdvisor {
                     // pronouns ("nó đi học") AND non-self relations ("mẹ
                     // đang dạy", "bạn đang học", "giảng viên đang dạy"),
                     // because a bare "bạn đang học lớp nào? Tôi muốn biết."
-                    // sailed past every possessive rule (Wukong round-4).
+                    // sailed past every possessive rule.
                     // Self-reference-capable tokens (anh|chị|em|thầy|cô|
                     // giáo) stay OUT: "em đang học" and "thầy dạy môn gì"
                     // are the asker. Verb whitelist covers đi/mới/cũng/hay
@@ -552,11 +550,11 @@ public class AssistantPersonalContextAdvisor {
                     // an ordinary negation. B/C keep "cha" for the
                     // unambiguous possessive "cha tôi".
                     + "|chú|dì|cậu|mợ|bác|dượng"
-                    // Wukong round-8 M3: accented-only additions (same B/F
+                    // accented-only additions (same B/F
                     // policy) — "thím đang dạy" escaped because these had
                     // been added to B and F but never to E's subjects.
                     + "|thím|cụ|bé|thằng"
-                    // Wukong round-9 F4: F-only workplace/authority roles as
+                    // F-only workplace/authority roles as
                     // bare subjects — "đồng nghiệp đang dạy", "sếp học lớp
                     // nào". Same compound-only set as arm B.
                     + "|đồng\\s+nghiệp|dong\\s+nghiep|sếp|sep"
@@ -582,7 +580,7 @@ public class AssistantPersonalContextAdvisor {
                     + "|đàn\\s+(?:anh|chị|em)|dan\\s+(?:anh|chi|em)"
                     + "|sinh\\s+viên|giảng\\s+viên|học\\s+sinh|giáo\\s+viên|lớp\\s+trưởng"
                     + "|người\\s+yêu|nguoi\\s+yeu|bạn\\s+bè|ban\\s+be|gia\\s+đình|gia\\s+dinh"
-                    // Wukong round-5/6: di|ma|cha|bo|mo|cau|duong|dua|han
+                    // di|ma|cha|bo|mo|cau|duong|dua|han
                     // were dropped from the unaccented subject list — their
                     // homographs đi (go), mà (that), chả (not), bỏ (drop),
                     // mở (open), câu (sentence), đường (road), đưa (hand),
@@ -591,7 +589,7 @@ public class AssistantPersonalContextAdvisor {
                     // "lop ma dang hoc", "duong di hoc xa", "han dang ky
                     // mon") and vetoed the asker's own questions. Same
                     // homograph policy as ba/con: the miss is fail-soft
-                    // (serves own rows). Wukong round-9 F3: bare "bạn|ban"
+                    // (serves own rows). bare "bạn|ban"
                     // is dropped from E too — "bạn" addressing the bot is
                     // the canonical second person, and the friend readings
                     // stay covered by B ("bạn tôi"), B2 ("bạn thân"), F
@@ -600,11 +598,11 @@ public class AssistantPersonalContextAdvisor {
                     + "|sinh\\s+vien|giang\\s+vien|hoc\\s+sinh|giao\\s+vien|lop\\s+truong)"
                     // "X có biết" is the politeness frame "do you know", not
                     // a verb of X's — "bạn có biết tôi đang học lớp nào" is
-                    // the ASKER's class (Wukong round-6). The lookahead
+                    // the ASKER's class. The lookahead
                     // only spares that frame; "bạn có đang học" still vets.
                     + "\\s+(?:đang|dang|có(?!\\s+biết)|co(?!\\s+biet)|vẫn|van|sẽ|se|còn|con|đã|da|vừa|vua|muốn|muon"
                     + "|thích|thich|định|dinh|sắp|sap|học|hoc|thi|đăng|dang|dạy|day"
-                    // Wukong round-8 M3: start/direction/completion verbs —
+                    // start/direction/completion verbs —
                     // "mẹ bắt đầu học môn nào", "bạn vào lớp", "nó học xong".
                     // The topic noun after the gap still anchors the veto to
                     // academic subjects, so the common-word cost is bounded.
@@ -613,13 +611,13 @@ public class AssistantPersonalContextAdvisor {
                     + "|đi|hay|cũng|cung|mới|moi|thường|thuong|cứ|cu|lại|lai|từng|tung"
                     // Negation carries the same third-person evidence:
                     // "mẹ không học lớp nào" is still about the mother
-                    // (Wukong round-5 — first-word negation escaped).
+                    //.
                     + "|không|khong|chưa|chua)"
                     + "\\b[^?!.]{0,20}?(?:học|hoc|thi|lớp|lop|môn|mon|điểm|diem|tín\\s*chỉ|tin\\s*chi|đăng|dang|dạy|day)"
                     // F) possessive "của X" needs no pronoun-of-mine: "lịch
                     // học của mẹ", "thời khóa biểu của chồng", "điểm của
                     // nó". Expanded to every non-self kinship/role and the
-                    // third-person pronouns (Wukong round-4: the old list
+                    // third-person pronouns (the old list
                     // forgot mẹ/chồng/bà/nó/họ — and SCHEDULE_INTENT has no
                     // pronoun gate, so this veto is the ONLY guard there).
                     // "em" stays out ("điểm của em" is self-possessive);
@@ -627,13 +625,13 @@ public class AssistantPersonalContextAdvisor {
                     + "|\\b(?:của|cua)\\s+(?:(?:các|mấy|những|bọn|tụi|hai|cả|mọi|toàn|cac|may|nhung|bon|tui|ca|moi|toan)\\s+)?"
                     + "(?:thầy|cô|giáo|bạn|anh|chị|con|người"
                     + "|mẹ|má|bố|cha|ông|bà|vợ|chồng|chú|dì|cậu|mợ|bác|dượng|cháu|đứa"
-                    // Wukong round-9 F2: unaccented "thang" is dropped — it
+                    // unaccented "thang" is dropped — it
                     // is "tháng" (month), so "lịch học của tháng này" was
                     // vetoed as a person. The "của" anchor disambiguates
                     // cu/thim/be ("của be" can only read as "bé"), unlike
                     // the subject arm where the same words collide.
                     + "|thím|thim|cụ|cu|bé|be|thằng"
-                    // Wukong round-7 B3: "ba" re-enters ONLY inside the
+                    // "ba" re-enters ONLY inside the
                     // possessive arm — "thứ ba" (Tuesday) can never follow
                     // "của", so "lịch học của ba" = dad's schedule without
                     // the subject-arm homograph cost. Southern pronouns
@@ -641,12 +639,12 @@ public class AssistantPersonalContextAdvisor {
                     + "|ba|ảnh|bả|sếp|sep|đồng\\s+nghiệp|dong\\s+nghiep"
                     + "|gia\\s+sư|gia\\s+su|trợ\\s+giảng|tro\\s+giang"
                     + "|cố\\s+vấn|co\\s+van|hiệu\\s+trưởng|hieu\\s+truong|hiệu\\s+phó|hieu\\s+pho"
-                    // Collective/relational third persons (Wukong F2):
+                    // Collective/relational third persons:
                     // "của chúng nó", "của bọn họ", "của em trai". The
                     // self-plurals "tụi em|bọn mình|chúng ta|chúng mình"
                     // stay out — "của chúng ta" is still the asker.
                     + "|chúng\\s+nó|chung\\s+no|bọn\\s+họ|bon\\s+ho|tụi\\s+nó|tui\\s+no"
-                    // Wukong round-8 M2: uncovered non-self relations —
+                    // uncovered non-self relations —
                     // seniors (đàn anh/chị/em), homeroom/guild/group roles,
                     // and the "somebody/them" collectives. SCHEDULE_INTENT
                     // has no pronoun gate so this arm is the sole guard.
@@ -657,7 +655,7 @@ public class AssistantPersonalContextAdvisor {
                     + "|nhóm\\s+trưởng|nhom\\s+truong|trưởng\\s+nhóm|truong\\s+nhom"
                     + "|tổ\\s+trưởng|to\\s+truong|bí\\s+thư|bi\\s+thu"
                     + "|ai\\s+đó|ai\\s+do|nhà|nha"
-                    // Wukong round-9 F4: institutional owners — "lịch dạy
+                    // institutional owners — "lịch dạy
                     // của khoa", "điểm của phòng đào tạo" name an org, not
                     // the asker. "khoa" covers khóa/khoa alike; both are
                     // institutional readings.
@@ -665,7 +663,7 @@ public class AssistantPersonalContextAdvisor {
                     + "|ban\\s+giám\\s+hiệu|ban\\s+giam\\s+hieu"
                     + "|nhân\\s+viên|nhan\\s+vien|quản\\s+lý|quan\\s+ly|người\\s+quen|nguoi\\s+quen"
                     + "|em\\s+(?:trai|gái|gai|dâu|dau|rể|re|ấy|ay"
-                    // Wukong round-8 M1: the full "em <kinship>" family —
+                    // the full "em <kinship>" family —
                     // em họ/em út/em nuôi/em ruột/em chồng/em vợ are
                     // unambiguous non-self relations ("the class my little
                     // sister takes"), unlike bare "em" which stays self.
@@ -681,7 +679,7 @@ public class AssistantPersonalContextAdvisor {
                     // is a student group, while a bare "của em" stays the
                     // asker's own self-possessive.
                     + "|\\b(?:của|cua)\\s+(?:các|mấy|những|bọn|tụi|cac|may|nhung|bon|tui)\\s+em\\b"
-                    // Wukong round-9 F4: "của <CapitalizedName>" names a
+                    // "của <CapitalizedName>" names a
                     // person — "điểm của Nam", "lịch học của Hùng". Mid-
                     // sentence capitalization is the name signal (unaccented
                     // lowercase names stay the documented fail-soft miss);
@@ -691,12 +689,12 @@ public class AssistantPersonalContextAdvisor {
                     // CASE, \p{Lu} also matches lowercase, so without the
                     // flag-off group this arm vetoed EVERY noun after "của"
                     // ("lịch học của tháng này", "điểm của môn này").
-                    // Wukong round-10 F1: the pronoun exemption must itself be
+                    // the pronoun exemption must itself be
                     // case-sensitive — "của Minh"/"của Em" capitalized are
                     // names, while "của mình"/"của em" lowercase are self.
                     // "của em <Name>" (em Lan, em Hùng — sibling naming) also
-                    // vetoes: a bare "của em" still self-resolves. Wukong
-                    // round-11 follow-up: the relation+name frame generalizes
+                    // vetoes: a bare "của em" still self-resolves.
+                    // the relation+name frame generalizes
                     // beyond "em" — "của anh Tuấn", "của chị Lan", "của thầy
                     // Hùng", "của bạn Minh" name someone else too. The bare
                     // second-person "bạn" is safe here: without a following
@@ -707,7 +705,7 @@ public class AssistantPersonalContextAdvisor {
                     + "|(?!(?-i:tôi|mình|em|toi|minh)\\b)(?-i:\\p{Lu}\\p{Ll}+))\\b"
                     // G) English third-person: "his schedule", "her grades",
                     // "my friend's/professor's classes", "he studies".
-                    // Plural-tolerant stems (Wukong F3): friend|friends|
+                    // Plural-tolerant stems: friend|friends|
                     // friend's|friends' all veto — "my friends' classes"
                     // used to slip through the singular-only stems.
                     + "|\\b(?:my|our)\\s+(?:friends?['’ʼ′`]?s?|classmates?['’ʼ′`]?s?|roommates?['’ʼ′`]?s?"
@@ -718,14 +716,14 @@ public class AssistantPersonalContextAdvisor {
                     + "|boyfriends?['’ʼ′`]?s?|girlfriends?['’ʼ′`]?s?|siblings?['’ʼ′`]?s?|nieces?['’ʼ′`]?s?|nephews?['’ʼ′`]?s?"
                     + "|wife|husband|sons?['’ʼ′`]?s?|daughters?['’ʼ′`]?s?)\\b"
                     // Bare "<name>'s schedule/grades" needs no my/our
-                    // (Wukong F3): "Nam's timetable", "the professor's
+                    //"Nam's timetable", "the professor's
                     // schedule". The my/our lookbehind keeps "my class's
                     // schedule" (the asker's own class) on the personal
                     // path; "my friend's" is still vetoed by the stem arm.
                     // U+2019 accepted: phone keyboards emit the curly
-                    // apostrophe (Wukong round-7 B4 companion).
+                    // apostrophe.
                     + "|(?<!\\bmy\\s)(?<!\\bour\\s)\\b"
-                    // Wukong round-9 F12: pronoun-stem contractions are not
+                    // pronoun-stem contractions are not
                     // possessives — "let's schedule my classes" vetoed the
                     // asker's own request.
                     + "(?!(?:let|it|that|what|there|here|who|this)['’ʼ′`]s\\b)"
@@ -760,7 +758,7 @@ public class AssistantPersonalContextAdvisor {
      * "&lt;relation&gt; ơi/ạ/à" addresses the ASSISTANT, not a third party —
      * "anh ơi cho em xem điểm" means "hey, show me my grades". These spans
      * are stripped before the third-person veto runs, so the relation noun
-     * cannot be misread as someone else's subject (Wukong round-4: the
+     * cannot be misread as someone else's subject (the
      * gap-rule vetoed the asker's own question).
      */
     private static final Pattern VOCATIVE_ADDRESS = Pattern.compile(
@@ -773,13 +771,13 @@ public class AssistantPersonalContextAdvisor {
                     // "bác em ơi" address the assistant as "<relation> kid".
                     // Without this arm the lone "em ơi" strip left a stray
                     // relation token that armed the third-person veto
-                    // (Wukong round-8 L7).
+                    //.
                     + "|\\b(?<!của\\s)(?<!cua\\s)"
                     + "(?:chú|cháu|cô|bác|dì|mợ|thím|cậu|chu|chau|co|bac|di|mo|thim|cau)"
                     + "\\s+em\\s+(?:ơi|oi|ạ)\\b"
                     // A relation sitting as the object of "của" is NOT a vocative —
                     // "lịch học của mẹ ạ" must keep arm-F's "của mẹ" veto armed
-                    // (Wukong F1: stripping "mẹ ạ" left a dangling "của" and served
+                    // (stripping "mẹ ạ" left a dangling "của" and served
                     // the asker's own timetable).
                     + "|\\b(?<!của\\s)(?<!cua\\s)"
                     + "(?:anh|chị|em|cô|thầy|giáo|bạn|ba|mẹ|bố|ông|bà|vợ|chồng|con|cháu|đứa|người"
@@ -793,7 +791,7 @@ public class AssistantPersonalContextAdvisor {
                     // stay out: "sinh viên A", "lớp trưởng A", "nhóm A" are
                     // section/group letters, and stripping them silences the
                     // third-person veto on exactly the "X của sinh viên A"
-                    // shapes it must catch (Wukong round-7 A2: "anh à cho
+                    // shapes it must catch ("anh à cho
                     // em…" no-comma phrasing bridged the B-arm gap).
                     + "|\\b(?<!của\\s)(?<!cua\\s)"
                     + "(?:anh|chị|em|cô|thầy|bạn|mẹ|bố|ông|bà|con|cháu|đứa"
@@ -808,12 +806,12 @@ public class AssistantPersonalContextAdvisor {
      * ourselves. The span is stripped (like a vocative) so the bare "em"
      * cannot pair with "mình" and arm the veto; "anh em TÔI" (my siblings)
      * keeps its veto because the lookahead only accepts the collective
-     * pronouns mình/minh (Wukong round-5: the anh|chị lookahead in the B
+     * pronouns mình/minh (the anh|chị lookahead in the B
      * arm was dead code — the independent "em" arm fired anyway).
      */
     private static final Pattern COLLECTIVE_FIRST_PERSON = Pattern.compile(
             // "anh chị em" is the longer collective form ("anh chị em mình"
-            // = all of us — Wukong round-6); the middle anh|chị|chi is
+            // = all of us); the middle anh|chị|chi is
             // optional. A collective prefix (bọn/chúng/tụi/cả …) may sit
             // before the pronoun: "anh em bon minh", "anh em chung minh".
             // Only the "anh [chị] em" span is stripped — the real pronoun
@@ -824,7 +822,7 @@ public class AssistantPersonalContextAdvisor {
                     // Other collective self forms: "hai đứa mình" (the two
                     // of us), "bọn em mình", "tụi em mình" — the stripped
                     // span would otherwise leave "em … mình" for the B-arm
-                    // veto (Wukong round-7 A2).
+                    // veto.
                     + "|\\b(?:hai\\s+đứa|hai\\s+dua|bọn\\s+em|bon\\s+em|tụi\\s+em|tui\\s+em)"
                     + "(?=\\s+(?:của\\s+|cua\\s+)?(?:mình|minh)\\b)",
             Pattern.CASE_INSENSITIVE | Pattern.UNICODE_CASE | Pattern.UNICODE_CHARACTER_CLASS);
@@ -834,7 +832,7 @@ public class AssistantPersonalContextAdvisor {
      * noun addresses the assistant and "có biết" is its verb, so neither is
      * third-person evidence for the question's subject. Stripping the whole
      * frame keeps "bạn có biết TÔI đang học lớp nào" on the personal path
-     * (Wukong round-6: the B-arm gap rule vetoed it through the pronoun)
+     * (the B-arm gap rule vetoed it through the pronoun)
      * while a genuine marker outside the frame — "bạn có biết EM ẤY học lớp
      * nào" — still vets.
      */
@@ -850,7 +848,7 @@ public class AssistantPersonalContextAdvisor {
      * is the asker. Likewise "cho em xem/hỏi" without a leading relation
      * ("cho em xem tôi đang học môn gì"). Stripping the frame keeps the
      * real pronoun for the intent gate while a genuine marker elsewhere
-     * still vets (Wukong round-7 A2 — the ơi/ạ/có-biết strips missed the
+     * still vets (the the ơi/ạ/có-biết strips missed the
      * most common request frames, and the relation→pronoun gap vetoed the
      * asker's own questions).
      */
@@ -859,7 +857,7 @@ public class AssistantPersonalContextAdvisor {
                     + "(?:giúp|giup|cho|hãy|hay|làm\\s+ơn|lam\\s+on|vui\\s+lòng|vui\\s+long"
                     + "|xin|hỗ\\s*trợ|ho\\s*tro|có\\s*thể|co\\s*the)\\s+"
                     + "(?:em|tôi|toi|mình|minh|anh|chị)\\b"
-                    // Wukong round-9 F3: the modal chain "<relation> có thể
+                    // the modal chain "<relation> có thể
                     // <request-verb> <pronoun>" — "bạn có thể cho tôi xem
                     // điểm" — needs its own arm; arm 1 expects the pronoun
                     // immediately after the verb and leaves a stray "bạn"
@@ -877,7 +875,7 @@ public class AssistantPersonalContextAdvisor {
      * things — the possessor is an object noun, not a person. The arm-G
      * generic 's arm cannot see the leading "my " (its lookbehind inspected
      * characters before the match start, which IS "my" — dead code,
-     * Wukong round-7 A4). Stripping ONLY the own-noun possessive leaves
+     * a regression). Stripping ONLY the own-noun possessive leaves
      * "my schedule", which correctly stays personal; "my friend's" still
      * vets via the stem arm, and "the section's schedule" (no pronoun)
      * simply fails to find an intent — the same knowledge-path outcome the
@@ -902,7 +900,7 @@ public class AssistantPersonalContextAdvisor {
         // Order matters: the collective must see "anh em oi minh" before the
         // vocative strip eats its trailing "em oi" — a lone "em ơi" is a
         // real vocative, but "anh em oi" is the collective "we" plus the
-        // group's own particle (Wukong round-7 A2 regression).
+        // group's own particle.
         String scope = COLLECTIVE_FIRST_PERSON.matcher(message).replaceAll(" ");
         scope = VOCATIVE_ADDRESS.matcher(scope).replaceAll(" ");
         scope = POLITENESS_KNOW_FRAME.matcher(scope).replaceAll(" ");
@@ -921,7 +919,7 @@ public class AssistantPersonalContextAdvisor {
      * "nhà trường" compound covers the institutional reading.
      */
     private static final Pattern INSTITUTIONAL_POSSESSIVE = Pattern.compile(
-            // Kongming C1: mirror the F-arm quantifier set — "điểm của cả
+            // mirror the F-arm quantifier set — "điểm của cả
             // trường" is an institutional aggregate, not a named person.
             "\\b(?:của|cua)\\s+(?:(?:các|mấy|những|bọn|cả|mọi|toàn|hai|tụi"
                     + "|cac|may|nhung|bon|ca|moi|toan|tui)\\s+)?"
@@ -962,7 +960,7 @@ public class AssistantPersonalContextAdvisor {
      * institutional owners ("điểm chuẩn của trường", "lịch thi của khoa")
      * keep the public knowledge path, and questions without a personal-data
      * noun ("giáo viên chủ nhiệm của tôi là ai") fall through normally.
-     * Documented fail-soft edges (Kongming C3): a person named "Trường" or
+     * Documented fail-soft edges: a person named "Trường" or
      * "Khoa" collides with the institutional scrub ("điểm của Trường" deflects
      * to KB rather than refusing — no leak), and the VI exam arms of
      * EXAM_SCHEDULE_INTENT carve out "điểm thi học phần của <name>" (an exam
@@ -1008,12 +1006,12 @@ public class AssistantPersonalContextAdvisor {
     /**
      * In unaccented Vietnamese, "toi" is both "tôi" (I) and "tối/tới" — "tối
      * nay", "tới giờ". When the token precedes a time word it cannot be the
-     * pronoun, so the enrollment-list intent vetoes it (Wukong re-verify:
+     * pronoun, so the enrollment-list intent vetoes it (
      * "Toi nay dang hoc mon gi?" impersonated ownership through the
      * noun→interrogative branch).
      */
     private static final Pattern FIRST_PERSON_FALSE_FRIEND = Pattern.compile(
-            // Kongming: bare "toi" only pairs with words that CANNOT be a
+            // bare "toi" only pairs with words that CANNOT be a
             // first-person phrase — "toi day/qua/truong" is "tôi dạy" (I
             // teach), "tôi qua" (I passed), "tôi trường"…, real pronouns
             // that must survive the scope-strip. Ambiguous time words stay
@@ -1043,7 +1041,7 @@ public class AssistantPersonalContextAdvisor {
                     // "tín chỉ"; it fell to the KB path while the twin
                     // "tôi còn bao nhiêu tín chỉ đăng ký" answered correctly.
                     + "|hạn\\s*mức\\s*đăng\\s*ký|han\\s*muc\\s*dang\\s*ky"
-                    // Round-3 chat-3: "How many credits remain?" — the verb
+                    // "How many credits remain?" — the verb
                     // form "remain" was absent while "remaining" and the VI
                     // twin both matched; the EN question got an LLM denial
                     // contradicting /me/registration/summary (creditsRemaining).
@@ -1119,7 +1117,7 @@ public class AssistantPersonalContextAdvisor {
             Pattern.CASE_INSENSITIVE | Pattern.UNICODE_CASE | Pattern.UNICODE_CHARACTER_CLASS);
 
     /**
-     * Round-3 chat-6: a semester the asker NAMED ("Học kỳ 1 năm học 2025-2026",
+     * a semester the asker NAMED ("Học kỳ 1 năm học 2025-2026",
      * "semester 2 2025-2026"). The grades answer used to ignore it and always
      * print the newest semester — asking for HK1 (GPA 3.16) returned HK2 (3.03)
      * with no disclaimer. When a named semester parses, grades and course-list
@@ -1127,7 +1125,7 @@ public class AssistantPersonalContextAdvisor {
      * answer says so instead of silently substituting another semester.
      */
     private static final Pattern NAMED_SEMESTER = Pattern.compile(
-            // Wukong round-8 L2: "ki" (unaccented kỳ), the "HK2" shorthand,
+            // "ki" (unaccented kỳ), the "HK2" shorthand,
             // bare "năm" without "học", and a single year all failed the
             // old alternation — the named term was silently ignored and the
             // newest semester substituted. The range end stays optional;
@@ -1163,7 +1161,7 @@ public class AssistantPersonalContextAdvisor {
         String folded = AssistantInputGuard.foldForMatching(label)
                 .replaceAll("\\s+", " ").toLowerCase(java.util.Locale.ROOT);
         // "hk" joins the label stems: fixtures/labels like "HK2 2025-2026"
-        // carry no "hoc ky"/"semester" wording (Kongming F4).
+        // carry no "hoc ky"/"semester" wording.
         boolean termHit = folded.matches(".*\\b(?:hoc ky|semester|hk)\\s*" + semester.term() + "\\b.*");
         return termHit && folded.contains(semester.yearStart());
     }
@@ -1176,7 +1174,7 @@ public class AssistantPersonalContextAdvisor {
     }
 
     /**
-     * Kongming F1: the lecturer schedule/​credits answers used to label
+     * the lecturer schedule/​credits answers used to label
      * themselves "kỳ này" while {@code findLecturerSchedule(lecturerId, null)}
      * returns EVERY semester the lecturer ever taught — a veteran's answer
      * summed three cohorts of sections into one "this term" total. Scope the
@@ -1191,7 +1189,7 @@ public class AssistantPersonalContextAdvisor {
         }
         // CANCELLED sections are not teaching load — without this a
         // lecturer whose newest-semester assignment was cancelled would
-        // get it presented as the current schedule (Kongming F3).
+        // get it presented as the current schedule.
         teaching = teaching.stream()
                 .filter(row -> !"CANCELLED".equalsIgnoreCase(row.status()))
                 .toList();
@@ -1284,7 +1282,7 @@ public class AssistantPersonalContextAdvisor {
                 Pattern.CASE_INSENSITIVE | Pattern.UNICODE_CASE | Pattern.UNICODE_CHARACTER_CLASS).matcher(message).find()) {
             return false;
         }
-        // Wukong review: the how-to exclusion above knows cách/hướng dẫn/điều
+        // the how-to exclusion above knows cách/hướng dẫn/điều
         // kiện but not the rule-wording family — "Chính sách cho phép em đang
         // học tối đa mấy môn?" shaped like the new progressive branch would
         // otherwise answer a policy question with the asker's section list.
@@ -1293,16 +1291,16 @@ public class AssistantPersonalContextAdvisor {
         // qua?", "học phần nào nên học?") are general advice questions, not
         // a request to list the asker's registrations — the noun→
         // interrogative arm revived by UNICODE_CHARACTER_CLASS used to
-        // swallow them (Wukong round-6 F5).
+        // swallow them.
         if (Pattern.compile("(?:nào|nao|gì|gi|which)\\s*(?:là\\s*)?"
-                        // Wukong round-9 F6: an optional asker pronoun may
+                        // an optional asker pronoun may
                         // sit between the interrogative and the adjective —
                         // "môn nào tôi nên học" read straight through to the
                         // enrollment list.
                         + "(?:(?:tôi|toi|em|mình|minh)\\s+)?(?:khó|kho|dễ|de"
                         // "hay không" is the yes/no particle, not the adjective
                         // "interesting" — "Tôi có môn nào hay không?" is an
-                        // ordinary personal question (Wukong round-7 A3).
+                        // ordinary personal question.
                         + "|hay(?!\\s*không|\\s*khong)|nên|nen"
                         + "|tốt|tot|xấu|xau|quan\\s*trọng|quan\\s*trong|phù\\s*hợp|phu\\s*hop"
                         + "|thú\\s*vị|thu\\s*vi|nặng|nang|nhẹ|nhe"
@@ -1323,7 +1321,7 @@ public class AssistantPersonalContextAdvisor {
         // "hạn đăng ký/nộp/chót" is a DEADLINE question (calendar/policy),
         // not a request to list registrations — "hạn đăng ký môn nào"
         // asks when registration closes, not which of the asker's classes.
-        // Wukong round-7 A1: a bare "han" matched mid-word inside
+        // a bare "han" matched mid-word inside
         // "phAN/thANg/hANg/nhAN" and over-blocked the flagship unaccented
         // phrasing "toi dang ky hoc phan nao" — the guard now requires a
         // deadline noun to FOLLOW the token, and "hạn mức" (credit cap)
@@ -1334,7 +1332,7 @@ public class AssistantPersonalContextAdvisor {
                 .matcher(message).find()) {
             return false;
         }
-        // Wukong re-verify: a first-person token attached to a THIRD-PERSON
+        // a first-person token attached to a THIRD-PERSON
         // subject is not ownership — "Lớp em ấy đang học" (his/her class),
         // "Bạn tôi đang học lớp này" (my friend's class), "anh tôi…". The
         // pronoun-in-span branches check position, not reference, so these
@@ -1344,13 +1342,12 @@ public class AssistantPersonalContextAdvisor {
         // "tối/tới" — "Toi nay dang hoc mon gi?" ("which subject TONIGHT?").
         // Strip the false-friend span, then require a real first-person token
         // in what remains: "Tối nay tôi có lớp gì?" keeps its genuine "tôi"
-        // while "Toi nay…" loses its only (fake) ownership evidence (Wukong
-        // round-2: a veto would also kill legit "tối nay" personal questions).
+        // while "Toi nay…" loses its only (fake) ownership evidence (a veto would also kill legit "tối nay" personal questions).
         String pronounScope = FIRST_PERSON_FALSE_FRIEND.matcher(message).replaceAll(" ");
         // The pronoun inside a politeness prefix is not ownership of the
         // question's subject — "cho tôi hỏi môn gì khó nhất" asks a general
         // question; the second "em" in "cho em hỏi em đang học lớp nào" is
-        // the real asker and survives the strip (Wukong round-6 F5).
+        // the real asker and survives the strip.
         pronounScope = Pattern.compile("\\bcho\\s+(?:tôi|toi|em|mình|minh)\\s+(?:hỏi|hoi)\\b",
                         Pattern.CASE_INSENSITIVE | Pattern.UNICODE_CASE | Pattern.UNICODE_CHARACTER_CLASS)
                 .matcher(pronounScope).replaceAll(" ");
@@ -1422,7 +1419,7 @@ public class AssistantPersonalContextAdvisor {
         if (!StringUtils.hasText(message)) return false;
         if (ENROLLMENT_HOWTO_INTENT.matcher(message).find()) return false;
         if (CREDITS_POLICY_INTENT.matcher(message).find()) return false;
-        // Round-2 sweep chat-3: Vietnamese drops the pronoun constantly
+        // Vietnamese drops the pronoun constantly
         // ("còn bao nhiêu môn chưa có điểm") — the FIRST_PERSON gate used to
         // route exactly that to the KB miss. The pattern itself is specific
         // enough (môn + chưa có điểm) that the pronoun gate is redundant.
@@ -1455,7 +1452,7 @@ public class AssistantPersonalContextAdvisor {
         if (!StringUtils.hasText(message)) return false;
         if (isConductIntent(message)) return false;
         // "điểm danh" (attendance) is not "điểm" (grades) — the possessive
-        // gap arm served the transcript for "điểm danh của tôi" (Wukong F8).
+        // gap arm served the transcript for "điểm danh của tôi".
         if (Pattern.compile("điểm\\s*danh|diem\\s*danh|điem\\s*danh",
                 Pattern.CASE_INSENSITIVE | Pattern.UNICODE_CASE | Pattern.UNICODE_CHARACTER_CLASS)
                 .matcher(message).find()) {
@@ -1481,7 +1478,7 @@ public class AssistantPersonalContextAdvisor {
         if (WORDING_POLICY_INTENT.matcher(message).find()) return false;
         // How-to / advice wording ("ở trang nào", "có nên ... mới") is a
         // knowledge question even when it names supervision groups — answering
-        // it with the asker's own workload list was a Wukong-flagged drift.
+        // it with the asker's own workload list was a regression.
         if (Pattern.compile("trang\\s*nào|có\\s*nên|nên\\s*không|ở\\s*đâu",
                 Pattern.CASE_INSENSITIVE | Pattern.UNICODE_CASE | Pattern.UNICODE_CHARACTER_CLASS).matcher(message).find()) {
             return false;
@@ -1494,7 +1491,7 @@ public class AssistantPersonalContextAdvisor {
     private static boolean isLecturerGradingIntent(String message) {
         if (!StringUtils.hasText(message)) return false;
         if (isGradesIntent(message)) return false;
-        // Wukong round-9 F14: rule wording stays on the knowledge path —
+        // rule wording stays on the knowledge path —
         // "quy định nhập điểm học phần tôi phụ trách" asks for the policy,
         // not the asker's grading queue.
         if (WORDING_POLICY_INTENT.matcher(message).find()) return false;
@@ -1618,7 +1615,7 @@ public class AssistantPersonalContextAdvisor {
      * "t\u0302i" route identically (NFC only ever composes — it cannot
      * split a token the patterns rely on).
      */
-    // Wukong round-8 M5: Java \s covers only [ \t\n\x0B\f\r], so Zl/Zp
+    // Java \s covers only [ \t\n\x0B\f\r], so Zl/Zp
     // (soft line breaks pasted from Word/Docs), NEL/other Cc controls, the
     // combining grapheme joiner (U+034F), and the Hangul fillers
     // (U+1160/U+3164/U+FFA0) glued possessive tokens exactly like ZWSP did
@@ -1636,7 +1633,7 @@ public class AssistantPersonalContextAdvisor {
         // rather than deleting them: the guard's join-normalize is right
         // for injection keyword checks, but for routing it glued
         // "của\u200Bmẹ" into "củamẹ" and let the possessive slip past the
-        // third-person veto (Wukong round-7 B4). Splitting a glued
+        // third-person veto. Splitting a glued
         // first-person token ("t\u200Bôi" → "t ôi") merely loses a pronoun
         // match, which fails soft to the knowledge path instead of serving
         // the wrong person's rows.
@@ -1656,14 +1653,14 @@ public class AssistantPersonalContextAdvisor {
         // answer path in this advisor serves the ASKER's own rows, so "Điểm
         // của em ấy?", "Thứ 3 lớp bạn của tôi đang học", "Nó đang học lớp
         // nào?" belong on the public/RAG path no matter which intent door
-        // they would otherwise open (Wukong round-2: the veto used to live
+        // they would otherwise open (the veto used to live
         // only inside the enrollment branch, leaving grades, conduct, thesis
-        // and the day-timetable fallthrough unguarded). Kongming round-4: a
+        // and the day-timetable fallthrough unguarded). a
         // message naming a concrete SECTION (code + schedule hint) asks for
         // public catalog data — "lịch của lớp SE013 của thầy" is public even
         // though "của thầy" names a person — so that door stays open.
         if (hasThirdPersonSubject(message) && !isSectionDetailIntent(message)) return false;
-        // Wukong round-9 F5: every other door vets policy wording — the
+        // every other door vets policy wording — the
         // schedule door did not, so "Quy định về lịch học kỳ này thế nào?"
         // answered a rule question with the asker's own timetable.
         return (SCHEDULE_INTENT.matcher(message).find()
@@ -1898,7 +1895,7 @@ public class AssistantPersonalContextAdvisor {
                         .matcher(message).find()) {
             // "Hôm nay tôi có lớp dạy không?" — a dual-profile user asking
             // existence-day about TEACHING must get the teaching schedule,
-            // not the student timetable (Wukong round-7 A7).
+            // not the student timetable.
             if (StringUtils.hasText(lecturerId) && sections != null
                     && LECTURER_TEACHING_LIST_HINT.matcher(message).find()) {
                 return lecturerAnswer(lecturerId, locale, existenceDay,
@@ -1918,7 +1915,7 @@ public class AssistantPersonalContextAdvisor {
         // "Tuần này tôi học những môn nào, ở phòng nào?" has no "lịch" noun.
         // Keep the enrollment classifier's policy/ownership guards, but let
         // current-week and room/time qualifiers reach the timetable below.
-        // Kongming review: a DAY-qualified phrasing ("Thứ 3 lớp tôi đang học")
+        // a DAY-qualified phrasing ("Thứ 3 lớp tôi đang học")
         // wants the day-filtered timetable, not the whole registration list —
         // the existence-day check above only knows "có lớp", so the day word
         // must veto the list branch here as well.
@@ -1933,13 +1930,13 @@ public class AssistantPersonalContextAdvisor {
             // when the question names a semester ("Học kỳ 1 ... tôi giảng
             // dạy những lớp nào?"), so the teaching-list hint is checked
             // BEFORE both the named-semester and the plain student branches
-            // (Wukong + Kongming reviews).
+            //.
             if (StringUtils.hasText(lecturerId) && sections != null
                     && LECTURER_TEACHING_LIST_HINT.matcher(message).find()) {
                 return lecturerAnswer(lecturerId, locale, null,
                         parseNamedSemester(message));
             }
-            // Round-3 chat-2: a NAMED semester in the question asks about that
+            // a NAMED semester in the question asks about that
             // semester's courses (the transcript's published rows are the
             // durable record), not the current-term registration list.
             NamedSemester namedSemester = parseNamedSemester(message);
@@ -1953,10 +1950,10 @@ public class AssistantPersonalContextAdvisor {
             // dạy môn nào?") keeps its old route: the personal teaching
             // timetable below. Returning null here used to be unreachable for
             // students and wrong for lecturers once "môn" joined the noun
-            // group (round-3 chat-2/5).
+            // group.
         }
         Integer requestedDay = detectRequestedDay(message);
-        // Wukong F6: a DAY/WEEK/room-qualified teaching question ("thứ 5
+        // a DAY/WEEK/room-qualified teaching question ("thứ 5
         // tôi dạy môn nào?", "tuần này tôi giảng dạy môn gì?") skips the
         // enrollment block above — including its teaching-list hint — and
         // used to land on the studentId-first fallthrough, answering a
@@ -2028,7 +2025,7 @@ public class AssistantPersonalContextAdvisor {
             bySemester.computeIfAbsent(grade.semesterId(), ignored -> new ArrayList<>()).add(grade);
         }
 
-        // Round-3 chat-6: when the asker NAMED a semester, answer THAT semester.
+        // when the asker NAMED a semester, answer THAT semester.
         // The old behavior always printed the newest semester, so "Học kỳ 1
         // (GPA 3.16)" was answered with HK2's 3.03 and no disclaimer.
         List<GradeSummary> requestedRows = null;
@@ -2589,7 +2586,7 @@ public class AssistantPersonalContextAdvisor {
             return null;
         }
         // Catalog keys are uppercase; a typed "se013" must compare equal
-        // (Wukong F10 — the SQL already UPPER()s the column side).
+        //s the column side).
         String code = matcher.group().toUpperCase(java.util.Locale.ROOT);
         // A null studentId (admin/lecturer/unlinked account) skips the
         // registered-sections lookup; the published catalog below still
@@ -2832,7 +2829,7 @@ public class AssistantPersonalContextAdvisor {
         // Same scope as the timetable and teaching-credits answers — a named
         // term filters to it, otherwise the lecturer's newest semester.
         // Without it the grading list spanned every historical term while
-        // implying "kỳ này" (Kongming F1).
+        // implying "kỳ này".
         List<LecturerScheduleResponse> scopeRows = lecturerSemesterScope(
                 sections.findLecturerSchedule(lecturerId, null), named);
         if (named != null && scopeRows.isEmpty()) {
@@ -2840,7 +2837,7 @@ public class AssistantPersonalContextAdvisor {
                     ? "Mình không tìm thấy lớp nào bạn được phân công trong học kỳ bạn nêu."
                     : "I could not find any sections assigned to you in the semester you named.";
         }
-        // Wukong round-10 F2: an empty scope means the lecturer has no
+        // an empty scope means the lecturer has no
         // sections at all — a null semesterId here used to run the grading
         // query unscoped and dump every historical/cancelled section.
         if (scopeRows.isEmpty()) {
@@ -2951,7 +2948,7 @@ public class AssistantPersonalContextAdvisor {
         String normalized = code.toUpperCase(java.util.Locale.ROOT);
         // Scope before matching: the same course/section code can repeat
         // across semesters, so an unscoped first-match could resolve a stale
-        // row while the question implies "this term" (Kongming F2). Fall
+        // row while the question implies "this term". Fall
         // back to the full list when the scope is empty — a code the
         // lecturer only taught in an older term still resolves (the
         // attendance answer stays honest about which day it checked).
@@ -3244,7 +3241,7 @@ public class AssistantPersonalContextAdvisor {
         }
         // A named semester filters the rows the same way the lecturer path
         // does — "Học kỳ 1 … thứ 3 tôi học môn gì?" used to answer with the
-        // CURRENT term's Tuesday instead (Kongming F2). The miss is named-
+        // CURRENT term's Tuesday instead. The miss is named-
         // empty copy, not a silent scope swap.
         List<EnrollmentResponse> currentTerm = named != null
                 ? active.stream()
@@ -3340,7 +3337,7 @@ public class AssistantPersonalContextAdvisor {
     }
 
     /**
-     * Round-3 chat-2: "Học kỳ 1 năm học 2025-2026 tôi học những môn nào?" —
+     * "Học kỳ 1 năm học 2025-2026 tôi học những môn nào?" —
      * the courses of the NAMED semester, taken from the same published grade
      * rows the transcript shows (the durable record of what was taken). A
      * semester with no rows says so and falls back to the current-term list
@@ -3440,7 +3437,7 @@ public class AssistantPersonalContextAdvisor {
                 .filter(item -> item.section() != null && item.section().semester() != null
                         // Objects.equals: a null-dated row must not NPE the
                         // whole answer (the equals-on-null form escaped the
-                        // DataAccessException containment as a 500 — Kongming F6).
+                        // DataAccessException containment as a 500).
                         && java.util.Objects.equals(item.section().semester().startDate(), currentTermStart))
                 .toList();
     }
@@ -3486,7 +3483,7 @@ public class AssistantPersonalContextAdvisor {
             return noClassesMessage(locale);
         }
         // Name the semester the rows actually belong to — the label used to
-        // imply "this term" while rows spanned every cohort (Kongming F1).
+        // imply "this term" while rows spanned every cohort.
         return timetableAnswer(slots, lecturerSemesterName(scoped, locale), locale, requestedDay, true);
     }
 
@@ -3666,7 +3663,7 @@ public class AssistantPersonalContextAdvisor {
         // Delegate to the guard: it trims, so the locale stamped on the
         // answer always matches the locale the controller hashed into the
         // idempotency key — " en " used to split the two and break replay
-        // symmetry (Kongming F4).
+        // symmetry.
         return request != null ? AssistantInputGuard.normalizeLocale(request.locale()) : "vi";
     }
 

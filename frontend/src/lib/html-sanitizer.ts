@@ -15,10 +15,10 @@
  * what is safe.
  */
 
-// RT-P2-2: the editor's `accordion` plugin emits <details>/<summary>, so the
+// the editor's `accordion` plugin emits <details>/<summary>, so the
 // allowlist must accept them or authored accordions silently flatten. Both the
 // frontend sets and the Java write-time policy are pinned to the shared
-// fixture in `tests/fixtures/announcement-content-policy.json` (RT-P2-5).
+// fixture in `tests/fixtures/announcement-content-policy.json`.
 export const ALLOWED_TAGS = new Set([
   'a', 'abbr', 'b', 'blockquote', 'br', 'caption', 'code', 'col', 'colgroup',
   'dd', 'details', 'div', 'dl', 'dt', 'em', 'figcaption', 'figure', 'h1', 'h2',
@@ -51,7 +51,7 @@ const VOID_TAGS = new Set(['br', 'hr', 'col', 'img']);
 // their centering and colors without opening CSS-based scheme injection.
 export const GLOBAL_ATTRS = new Set(['class', 'title', 'dir', 'lang', 'align', 'style']);
 
-// RT-P2-2: the editor's `anchor` plugin sets `id` on the block around the
+// the editor's `anchor` plugin sets `id` on the block around the
 // cursor so in-document links (`#slug`) can jump to it. `id` is therefore
 // allowlisted only on block-level targets and only for values that are valid
 // HTML ids (letter first, no quotes/whitespace/entities), which keeps the
@@ -112,7 +112,7 @@ function normalizeForSchemeCheck(value: string): string {
 }
 
 /**
- * RT-P1-1: the one URL-scheme policy for announcement content. Both the HTML
+ * the one URL-scheme policy for announcement content. Both the HTML
  * branch (attributes) and the markdown branch (links/images in the renderer)
  * must call these — a local `startsWith('javascript:')` test in the renderer
  * was bypassable because browsers strip `\t\n\r` from URLs before resolving

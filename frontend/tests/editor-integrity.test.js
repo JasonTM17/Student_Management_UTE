@@ -72,7 +72,7 @@ test('TinyMCE cleanup without an initialized editor never deletes any draft', ()
   assert.equal(entries.size, 1);
 });
 
-// --- T-P0-1: the editor must never reseed a live document on locale switch ---
+// --- the editor must never reseed a live document on locale switch ---
 
 const editorPolicy = loadTs('src/lib/editor-document.ts');
 const editorPage = read('src/app/dashboard/editor/page.tsx');
@@ -118,7 +118,7 @@ test('studio page wires the seeding guard into a locale-independent init effect'
   );
 });
 
-// --- K1/K2: the studio draft keeps its edit context and exports keep their title ---
+// --- K1/the studio draft keeps its edit context and exports keep their title ---
 
 const editorDraft = loadTs('src/lib/editor-document.ts');
 
@@ -193,7 +193,7 @@ test('legacy edit draft omits unestablished metadata instead of widening an exis
   }
 });
 
-test('K1 editor-document round-trips the edit context stored with a draft', () => {
+test('editor-document round-trips the edit context stored with a draft', () => {
   const draft = editorDraft.parseStoredEditorDocument(
     JSON.stringify({
       title: 'Thông báo học vụ',
@@ -209,7 +209,7 @@ test('K1 editor-document round-trips the edit context stored with a draft', () =
   assert.equal(draft.editingVersion, 3);
 });
 
-test('K1 legacy and malformed drafts hydrate without an edit context', () => {
+test('legacy and malformed drafts hydrate without an edit context', () => {
   const legacy = editorDraft.parseStoredEditorDocument(
     JSON.stringify({ title: 'x', content: 'y', updatedAt: '09:00' }),
   );
@@ -219,7 +219,7 @@ test('K1 legacy and malformed drafts hydrate without an edit context', () => {
   assert.equal(editorDraft.parseStoredEditorDocument(null), null);
 });
 
-test('K1 the studio persists the edit context and Publish routes to update', () => {
+test('the studio persists the edit context and Publish routes to update', () => {
   assert.match(
     editorPage,
     /editingId,\s*\n\s*editingVersion,/,
@@ -242,7 +242,7 @@ test('K1 the studio persists the edit context and Publish routes to update', () 
   );
 });
 
-test('K1 the two edit-mode save buttons carry distinct labels and both update', () => {
+test('the two edit-mode save buttons carry distinct labels and both update', () => {
   // Both buttons still run the update path in edit mode.
   assert.match(editorPage, /onClick=\{handleUpdateAnnouncement\}/);
   assert.match(editorPage, /onClick=\{handlePublishAnnouncement\}/);
@@ -263,7 +263,7 @@ test('K1 the two edit-mode save buttons carry distinct labels and both update', 
   );
 });
 
-test('K2 the export slug keeps Vietnamese words and both export paths share it', () => {
+test('the export slug keeps Vietnamese words and both export paths share it', () => {
   assert.equal(
     editorDraft.slugifyDocumentTitle('Đề cương đề tài khóa luận tốt nghiệp'),
     'de-cuong-de-tai-khoa-luan-tot-nghiep',
@@ -276,7 +276,7 @@ test('K2 the export slug keeps Vietnamese words and both export paths share it',
   assert.doesNotMatch(editorPage, /\[\^a-z0-9-_\]/);
 });
 
-// --- A-P0-1: closing the create form must not wipe the issued credential ---
+// --- closing the create form must not wipe the issued credential ---
 
 const adminUsersPage = read('src/app/admin/users/page.tsx');
 
@@ -299,7 +299,7 @@ test('admin user form close is split from credential dismissal', () => {
   );
 });
 
-// --- S-P0-1 / S-P0-2: official documents carry no fabricated data ---
+// --- official documents carry no fabricated data ---
 
 const transcriptPage = read('src/app/dashboard/transcript/page.tsx');
 
@@ -331,7 +331,7 @@ test('grade overview never invents credit or score numbers', () => {
   assert.ok(gradeView.includes('creditsKnown'), 'credit progress is gated on real numbers');
 });
 
-// --- S-P0-3: dashboard term count excludes dropped rows ---
+// --- dashboard term count excludes dropped rows ---
 
 const dashboardPage = read('src/app/dashboard/page.tsx');
 

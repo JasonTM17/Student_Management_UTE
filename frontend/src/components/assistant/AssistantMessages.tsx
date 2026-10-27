@@ -147,8 +147,7 @@ function isLocalOnlyAssistantMessage(message: ChatMessage): boolean {
   return (
     message.role === 'assistant' &&
     !message.pending &&
-    // PERSONAL_CONTEXT is persisted to history server-side (Round-3 ledger
-    // change) — listing it here contradicted the notice, claiming a saved
+    // PERSONAL_CONTEXT is persisted to history server-side — listing it here contradicted the notice, claiming a saved
     // answer was "not saved to conversation history".
     (message.reasonCode === 'LOCAL_ASSIST' ||
       message.reasonCode === 'CONVERSATIONAL')

@@ -20,7 +20,7 @@ interface AssistantMarkdownContentProps {
   streaming?: boolean;
   /** Only assistant output is sanitized; user messages remain verbatim. */
   guardOutput?: boolean;
-  /** Answer scope: 'specialized' skips the technical-phrasing checks (round-5). */
+  /** Answer scope: 'specialized' skips the technical-phrasing checks. */
   scope?: AssistantScope;
 }
 

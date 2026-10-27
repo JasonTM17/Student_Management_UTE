@@ -1,4 +1,4 @@
-// Round-5 regression: the specialized answer scope must keep corpus teaching
+// the specialized answer scope must keep corpus teaching
 // content ("docker compose up" in a DevOps lesson) while every scope still
 // refuses leaked machinery (system prompt, api key, stack traces, endpoints).
 // The academic scope keeps the full strict set.

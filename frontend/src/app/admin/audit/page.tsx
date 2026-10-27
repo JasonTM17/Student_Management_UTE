@@ -29,7 +29,7 @@ function actionTone(action: string): StatusTone {
   return 'info';
 }
 
-/** Round-3 ct-2 completion: the admin-facing viewer for GET /api/v1/admin/audit. */
+/** the admin-facing viewer for GET /api/v1/admin/audit. */
 export default function AdminAuditTrailPage() {
   const { user, isAdmin, isSuperAdmin, isLoading: authLoading, isLoggingOut } = useAuth();
   const { href, messages, formatDateTime } = useI18n();

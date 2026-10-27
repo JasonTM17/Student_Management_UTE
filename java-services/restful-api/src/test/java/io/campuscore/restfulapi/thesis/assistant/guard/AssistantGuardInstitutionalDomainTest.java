@@ -8,7 +8,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 /**
- * CB-P2-4: institutional *.edu.vn addresses that the curated corpus itself
+ * institutional *.edu.vn addresses that the curated corpus itself
  * publishes (e.g. studentId@student.hcmute.edu.vn) must survive the
  * output-side and knowledge-admission gates, while user input stays strict
  * and arbitrary third-party addresses are still rejected on every path.

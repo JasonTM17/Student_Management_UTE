@@ -208,7 +208,7 @@ test('status primitives use semantic tokens instead of raw Tailwind palettes', (
   const pill = read('src/components/ui/status-pill.tsx');
   const badge = read('src/components/thesis/StatusBadge.tsx');
   const layout = read('src/app/layout.tsx');
-  // The unused data-table primitive was deleted (UX-P2-6); assert it stays
+  // The unused data-table primitive was deleted; assert it stays
   // gone instead of scanning it for raw palettes.
   assert.equal(fs.existsSync(path.join(root, 'src/components/ui/data-table.tsx')), false);
 
@@ -252,7 +252,7 @@ test('status primitives use semantic tokens instead of raw Tailwind palettes', (
 test('alpha modifiers stay inside the Tailwind opacity scale', () => {
   // Tailwind v3 resolves `/<n>` modifiers through theme('opacity') only —
   // values outside the scale (e.g. `/12`) silently emit no CSS at all, which
-  // shipped transparent status pills until Phase 5. Scan every source class
+  // shipped transparent status pills before the shared pill styles. Scan every source class
   // string for non-scale modifiers. Arbitrary `/[0.xx]` forms are fine.
   const SCALE = new Set([0, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55, 60, 65, 70, 75, 80, 85, 90, 95, 100]);
   const ALPHA_RE = /(?:bg|text|border|ring|divide|from|via|to|fill|stroke|outline|placeholder|caret|accent|decoration|shadow|border-[trblxyse])-[A-Za-z0-9[\]#_.(),%-]+\/(\d+)(?![\d.%\]])/g;

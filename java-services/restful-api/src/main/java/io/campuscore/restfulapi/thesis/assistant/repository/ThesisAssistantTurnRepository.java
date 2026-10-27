@@ -357,7 +357,7 @@ public class ThesisAssistantTurnRepository {
     }
 
     /**
-     * Round-3 cb3-10: the request hash recorded for a client request id, or
+     * the request hash recorded for a client request id, or
      * null when the key was never used. The personal-context path consults it
      * so a reused key with a different payload conflicts exactly like the KB
      * path's reserve does. Read-only — no lease, no reservation.
@@ -370,7 +370,7 @@ public class ThesisAssistantTurnRepository {
     }
 
     /**
-     * Round-3 cb3-10 completion: an intercepted PERSONAL_CONTEXT turn records
+     * an intercepted PERSONAL_CONTEXT turn records
      * its own COMPLETED ledger row, so the idempotency key is consumed exactly
      * like a KB turn — a later request reusing the key with a different
      * payload conflicts (enforcePersonalIdempotency / reserve), and an exact

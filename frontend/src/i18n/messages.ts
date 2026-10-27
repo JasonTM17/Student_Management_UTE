@@ -2638,7 +2638,7 @@ export const en = {
       nextPage: 'More sections',
     },
   },
-  // LEC-P3-B2: discard confirm for the lecturer student-notice composer.
+  // discard confirm for the lecturer student-notice composer.
   lecturerAnnouncementDraft: {
     discardTitle: 'Discard this announcement draft?',
     discardMessage:
@@ -6219,7 +6219,7 @@ export const vi: I18nMessages = {
       nextPage: 'Các lớp tiếp theo',
     },
   },
-  // LEC-P3-B2: discard confirm for the lecturer student-notice composer.
+  // discard confirm for the lecturer student-notice composer.
   lecturerAnnouncementDraft: {
     discardTitle: 'Bỏ bản nháp thông báo này?',
     discardMessage:

@@ -17,7 +17,7 @@ import io.campuscore.restfulapi.academic.dto.AcademicEnrollmentReadDtos;
 import io.campuscore.restfulapi.academic.dto.AcademicMutationDtos;
 
 /**
- * LEC-P2-10: the deprecated enroll/drop endpoints sent `Sunset: true`, which
+ * the deprecated enroll/drop endpoints sent `Sunset: true`, which
  * is not an HTTP-date and is therefore ignored by conforming clients
  * (RFC 8594). The header must be gone, not mangled.
  */

@@ -32,7 +32,7 @@ public class ThesisAssistantKnowledgeRepository {
      * Characters that end a word in the published corpus. They are folded to
      * spaces so "term flanked by spaces" is an exact whole-word test.
      */
-    // Round-4: markdown markers join the set — the V93 corpus is bulleted
+    // markdown markers join the set — the V93 corpus is bulleted
     // markdown ("- **Label**: text"), and without folding "*"/"#"/">"/"-"
     // a term wrapped in emphasis or opening a heading would lose its
     // whole-word bonus (POSITION(' term ')) and could drop out of the

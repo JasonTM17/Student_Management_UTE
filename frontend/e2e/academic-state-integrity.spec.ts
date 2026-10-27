@@ -41,7 +41,7 @@ async function openSectionEditor(page: Page) {
   return page.getByRole('dialog', { name: 'Chỉnh sửa lớp học phần', exact: true });
 }
 
-test('academic audit: unsaved scores cannot release stale server grades', async ({ page }) => {
+test('unsaved scores cannot release stale server grades', async ({ page }) => {
   await signIn(page, 'lecturer');
   await page.goto(`/vi/dashboard/lecturer/grades/${sectionId}`);
   const score = page.locator('[data-cell="grade-enrollment-ux-audit:processScore"]').filter({ visible: true });
@@ -53,7 +53,7 @@ test('academic audit: unsaved scores cannot release stale server grades', async 
   await page.screenshot({ path: test.info().outputPath('unsaved-grades.png'), fullPage: true });
 });
 
-test('academic audit: saved scores publish and appear in the student account', async ({ page, browser }) => {
+test('saved scores publish and appear in the student account', async ({ page, browser }) => {
   await signIn(page, 'lecturer');
   await page.goto(`/vi/dashboard/lecturer/grades/${sectionId}`);
   await page.locator('[data-cell="grade-enrollment-ux-audit:processScore"]').filter({ visible: true }).fill('9');
@@ -98,7 +98,7 @@ test('academic audit: saved scores publish and appear in the student account', a
   }
 });
 
-test('academic audit: a ten-student roster identifies only edited rows as unsaved', async ({ page }) => {
+test('a ten-student roster identifies only edited rows as unsaved', async ({ page }) => {
   await signIn(page, 'lecturer');
   await page.goto(`/vi/dashboard/lecturer/grades/${sectionId}`);
   const primary = page.locator('[data-cell="grade-enrollment-ux-audit:processScore"]').filter({ visible: true });
@@ -115,7 +115,7 @@ test('academic audit: a ten-student roster identifies only edited rows as unsave
   await expect(page.getByText('Chưa lưu', { exact: true }).filter({ visible: true })).toHaveCount(0);
 });
 
-test('academic audit: deleting the final meeting persists after reopening', async ({ page }) => {
+test('deleting the final meeting persists after reopening', async ({ page }) => {
   const dialog = await openSectionEditor(page);
   await dialog.getByRole('button', { name: 'Xóa lịch 1', exact: true }).click();
   const response = page.waitForResponse(r => r.url().endsWith(`/sections/${sectionId}`) && r.request().method() === 'PUT');
@@ -128,7 +128,7 @@ test('academic audit: deleting the final meeting persists after reopening', asyn
   await expect(page.getByRole('dialog').getByRole('button', { name: 'Xóa lịch 1', exact: true })).toHaveCount(0);
 });
 
-test('academic audit: meeting controls keep keyboard focus during editing', async ({ page }) => {
+test('meeting controls keep keyboard focus during editing', async ({ page }) => {
   const dialog = await openSectionEditor(page);
   const start = dialog.locator('input[type="time"]').first();
   await start.scrollIntoViewIfNeeded();
@@ -158,7 +158,7 @@ test('academic audit: meeting controls keep keyboard focus during editing', asyn
   await page.screenshot({ path: test.info().outputPath('meeting-editor.png'), fullPage: true });
 });
 
-test('academic audit: failed schedule reads preserve meetings on metadata save', async ({ page }) => {
+test('failed schedule reads preserve meetings on metadata save', async ({ page }) => {
   await page.route(`**/api/v1/sections/${sectionId}`, route => route.request().method() === 'GET'
     ? route.fulfill({ status: 503, contentType: 'application/json', body: '{"code":"UNAVAILABLE"}' })
     : route.continue());
@@ -175,7 +175,7 @@ test('academic audit: failed schedule reads preserve meetings on metadata save',
   expect((await detail.json()).schedules).toHaveLength(1);
 });
 
-test('academic audit: failed curriculum load explains failure and offers retry', async ({ page }) => {
+test('failed curriculum load explains failure and offers retry', async ({ page }) => {
   await page.route('**/api/v1/me/curriculum', route => route.fulfill({ status: 503,
     contentType: 'application/json', body: '{"code":"UNAVAILABLE"}' }));
   await signIn(page, 'student');
@@ -200,7 +200,7 @@ test('academic audit: failed curriculum load explains failure and offers retry',
   expect(enrollmentReloads).toBe(0);
 });
 
-test('academic audit: login throttling gives a localized recovery instruction', async ({ page }) => {
+test('login throttling gives a localized recovery instruction', async ({ page }) => {
   await page.route('**/api/v1/auth/login', route => route.fulfill({status:429,
     contentType:'application/json',headers:{'Retry-After':'60'},body:'{"code":"RATE_LIMIT_EXCEEDED"}'}));
   for (const locale of ['vi','en']) {
@@ -215,7 +215,7 @@ test('academic audit: login throttling gives a localized recovery instruction', 
 });
 
 
-test('academic audit: teaching timetable opens details with keyboard', async ({ page }) => {
+test('teaching timetable opens details with keyboard', async ({ page }) => {
   await signIn(page, 'lecturer');
   await page.goto('/vi/dashboard/lecturer/schedule');
   const event = page.getByRole('button').filter({ hasText: 'AUDITUX' }).filter({ visible: true }).first();
@@ -228,7 +228,7 @@ test('academic audit: teaching timetable opens details with keyboard', async ({ 
   await expect(page.getByRole('dialog')).not.toBeVisible();
 });
 
-test('academic audit: assistant starters follow the lecturer role in both locales', async ({ page }) => {
+test('assistant starters follow the lecturer role in both locales', async ({ page }) => {
   await signIn(page, 'lecturer');
   for (const [locale, prompt, studentPrompt] of [
     ['vi', 'Lịch giảng dạy tuần này', 'Lớp tôi đang học'],

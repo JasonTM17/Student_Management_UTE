@@ -196,7 +196,7 @@ export function LecturerAnnouncementCreateModal({
   const draftCopy = messages.lecturerAnnouncementDraft;
   const { confirm, confirmationDialog } = useConfirmationDialog();
 
-  // LEC-P3-B2: the host page keeps this modal mounted, so the values above
+  // the host page keeps this modal mounted, so the values above
   // are the pristine baseline every reset returns to and every dirty check
   // compares against.
   const initialTitle = initialTemplate.defaultTitle;
@@ -262,7 +262,7 @@ export function LecturerAnnouncementCreateModal({
     }
   };
 
-  // LEC-P3-B2: wipe every authored field back to the template defaults. The
+  // wipe every authored field back to the template defaults. The
   // TinyMCE surface is driven by the controlled `value` prop, so resetting
   // `content` here also clears the WYSIWYG document.
   const resetForm = () => {
@@ -276,7 +276,7 @@ export function LecturerAnnouncementCreateModal({
 
   const isDraftDirty = title !== initialTitle || content !== initialContent || priority !== 'HIGH';
 
-  // LEC-P3-B2: closing mid-draft is destructive, so it goes through the same
+  // closing mid-draft is destructive, so it goes through the same
   // inline confirm the admin announcement editor uses before discarding.
   const requestClose = async () => {
     if (isSubmitting) return;
@@ -342,7 +342,7 @@ export function LecturerAnnouncementCreateModal({
 
       await announcementsApi.create(payload);
       toast.success(isVi ? 'Đã đăng thông báo cho sinh viên thành công!' : 'Notice published to students successfully!');
-      // LEC-P3-B2: clear the published draft BEFORE closing. The host page
+      // clear the published draft BEFORE closing. The host page
       // keeps this modal mounted, so leftover state used to reopen showing
       // the just-published text, and a second Publish created a duplicate.
       resetForm();
@@ -684,7 +684,7 @@ export function LecturerAnnouncementCreateModal({
         </div>
       </form>
     </Modal>
-    {/* LEC-P3-B2: inline discard confirm, rendered beside the composer the
+    {/* inline discard confirm, rendered beside the composer the
         same way the admin announcements page renders it beside its editor. */}
     {confirmationDialog}
     </>

@@ -20,7 +20,7 @@ import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.TestPropertySource;
 
 /**
- * STUD-P1-1: curriculum progress must not treat an F-failed course as
+ * curriculum progress must not treat an F-failed course as
  * COMPLETED. publishGrades stamps status='COMPLETED' on every graded row
  * (failures included), so the progress CASE requires a published passing
  * letter — the same condition its passed_grade/passed_letter siblings use.

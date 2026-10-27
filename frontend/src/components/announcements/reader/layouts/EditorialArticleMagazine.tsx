@@ -59,7 +59,7 @@ export function EditorialArticleMagazine({
   const coverDetails = extractCoverImageDetails(announcement.content);
   const inlineCoverImage = coverDetails?.url || extractCoverImage(announcement.content);
   const coverImage = inlineCoverImage || resolveArticleCover(announcement);
-  // RT-P3-b: `resolveArticleCover` always answers (a branded placeholder is the
+  // `resolveArticleCover` always answers (a branded placeholder is the
   // last resort), so the old `coverImage ?` test stripped the body image on
   // every article — including the ones whose hero is that placeholder, where
   // the author's photo then appeared nowhere in the reader. Strip only when the

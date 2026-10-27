@@ -48,7 +48,7 @@ export function StudentUteProfileGradeView({
   const { user, refreshUser } = useAuth();
   const { messages, locale, formatDate } = useI18n();
   const card = messages.studentCard;
-  // Round-5: the line/bar/combo toggle is gone — 'line' rendered an empty
+  // the line/bar/combo toggle is gone — 'line' rendered an empty
   // plot and 'combo' was pixel-identical to 'bar' after the class-average
   // series was removed. The widget now always draws the per-course bars.
   const chartType = 'bar' as const;
@@ -94,7 +94,7 @@ export function StudentUteProfileGradeView({
     if (!svg) {
       // The chart element only exists when graded courses exist, and the
       // control is disabled in that state. Never fall back to opening the
-      // print dialog from a control labelled "download chart" (F-3).
+      // print dialog from a control labelled "download chart".
       toast.info(card.chartNoData);
       return;
     }

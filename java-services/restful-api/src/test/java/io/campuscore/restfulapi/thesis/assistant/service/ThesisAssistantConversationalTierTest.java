@@ -70,7 +70,7 @@ class ThesisAssistantConversationalTierTest {
         assertNull(ThesisAssistantService.conversationalAnswer(
                 "Thứ Hai hàng tuần tôi có môn nào, học mấy giờ, ở phòng nào?", "vi"));
         assertNull(ThesisAssistantService.conversationalAnswer("thứ hai tuần này có hạn nộp gì không?", "vi"));
-        // Wukong round-7 A8: a conversational OPENER must not hijack the
+        // a conversational OPENER must not hijack the
         // real question after it — "Cảm ơn, lịch học của tôi" used to
         // answer the thanks boilerplate instead of the schedule.
         assertNull(ThesisAssistantService.conversationalAnswer("Cảm ơn, lịch học của tôi", "vi"));
@@ -83,7 +83,7 @@ class ThesisAssistantConversationalTierTest {
         // The bare greeting still works.
         assertNotNull(ThesisAssistantService.conversationalAnswer("hai", "vi"));
 
-        // Wukong round-8:
+
         // M6 — "bai" (the dropped bye transliteration) is also "bài" =
         // assignment/test paper. "bai cua toi" got whole-message coverage
         // via the filler words and returned the goodbye boilerplate.
@@ -95,10 +95,10 @@ class ThesisAssistantConversationalTierTest {
         assertNotNull(ThesisAssistantService.conversationalAnswer("hi 👋", "vi"));
         assertNotNull(ThesisAssistantService.conversationalAnswer("chào 😊", "vi"));
         assertNotNull(ThesisAssistantService.conversationalAnswer("cảm ơn 🙏", "vi"));
-        // Kongming F6 — English courtesy tails stay conversational.
+        // English courtesy tails stay conversational.
         assertNotNull(ThesisAssistantService.conversationalAnswer("thank you for your help", "en"));
 
-        // Wukong round-9:
+
         // F8 — the tier now normalizes like the other paths: NFD input and
         // invisible separators used to miss every opener and fall through
         // to the provider path.
