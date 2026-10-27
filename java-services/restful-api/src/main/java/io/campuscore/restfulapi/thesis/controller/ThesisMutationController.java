@@ -267,8 +267,10 @@ public class ThesisMutationController {
 
     /**
      * Escape hatch for the counter-review dead-end: while the round is live
-     * the GVPB deadline may be extended forward (never backwards, never past
-     * the report date). The change is audited.
+     * the GVPB deadline may be extended forward. If it passes the report date,
+     * the report date moves to the new deadline; a defense date earlier than
+     * that deadline moves with it. The audit entry records before-and-after
+     * values for the GVPB, report, and defense dates in the same transaction.
      */
     @Operation(summary = "Gia hạn chấm phản biện (GVPB)", description = "Dời hạn chấm phản biện (gvpbDeadline) của đợt đang mở sang thời điểm mới; thao tác được ghi audit kèm lý do")
     @PutMapping("/rounds/{id}/gvpb-deadline")

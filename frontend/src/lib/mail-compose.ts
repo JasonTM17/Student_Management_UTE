@@ -15,6 +15,66 @@ export const MAIL_COMPOSE_TEMPLATES: readonly MailComposeTemplate[] = [
   'grade-alert',
 ];
 
+/** Limits mirrored from the Java mail request DTOs. */
+export const MAIL_COMPOSE_LIMITS = {
+  common: {
+    email: 255,
+    recipientName: 255,
+    studentName: 255,
+    studentId: 255,
+    semester: 255,
+    courseCode: 255,
+    courseName: 255,
+  },
+  testEmail: {
+    recipientName: 255,
+    introMessage: 20_000,
+  },
+  notice: {
+    email: 255,
+    recipientName: 255,
+    category: 255,
+    title: 300,
+    author: 255,
+    content: 20_000,
+    highlights: 20,
+    highlight: 500,
+    actionUrl: 2_048,
+    actionText: 500,
+  },
+  registration: {
+    email: 255,
+    studentName: 255,
+    studentId: 255,
+    department: 255,
+    semester: 255,
+    courses: 30,
+    courseCode: 255,
+    courseName: 255,
+    credits: 30,
+    lecturer: 255,
+    schedule: 255,
+    totalCredits: 60,
+  },
+  gradeAlert: {
+    email: 255,
+    studentName: 255,
+    studentId: 255,
+    semester: 255,
+    gpa4: 4,
+    gpa10: 10,
+    academicStanding: 100,
+    conductScore: 100,
+    conductRank: 100,
+    grades: 60,
+    courseCode: 255,
+    courseName: 255,
+    credits: 30,
+    score10: 10,
+    scoreLetter: 100,
+  },
+} as const;
+
 export function isMailComposeTemplate(value: unknown): value is MailComposeTemplate {
   return (
     value === 'notice' || value === 'registration' || value === 'grade-alert'
@@ -95,15 +155,19 @@ export function toWireInt(value: number | null | undefined, fallback = 0): numbe
 /**
  * Whether a course/grade table credits cell is acceptable for the payload.
  * An empty cell is allowed (it sends 0); anything present must parse to a
- * non-negative number. Negative or unparseable input must surface as a
- * validation issue instead of being silently clamped or zeroed.
+ * number in the DTO's 0–30 range. Negative, out-of-range, or unparseable input
+ * must surface as a validation issue instead of being silently clamped or zeroed.
  */
 export function rowCreditsValid(credits: number | string): boolean {
   if (String(credits).trim() === '') {
     return true;
   }
   const parsed = parseNumericInput(credits);
-  return parsed !== null && parsed >= 0;
+  if (parsed === null || parsed < 0) {
+    return false;
+  }
+  const wireCredits = toWireInt(parsed);
+  return wireCredits >= 0 && wireCredits <= MAIL_COMPOSE_LIMITS.registration.credits;
 }
 
 export interface MailGradeRow {
@@ -144,51 +208,147 @@ export function isValidEmail(value: string): boolean {
 export type MailFieldIssue =
   | 'emailRequired'
   | 'emailInvalid'
+  | 'emailTooLong'
+  | 'recipientNameTooLong'
+  | 'categoryTooLong'
   | 'titleRequired'
+  | 'titleTooLong'
+  | 'authorTooLong'
   | 'contentRequired'
+  | 'contentTooLong'
+  | 'highlightsTooMany'
+  | 'highlightTooLong'
+  | 'actionUrlTooLong'
+  | 'actionTextTooLong'
+  | 'introMessageTooLong'
   | 'studentNameRequired'
+  | 'studentNameTooLong'
   | 'studentIdRequired'
+  | 'studentIdTooLong'
+  | 'departmentTooLong'
+  | 'semesterTooLong'
   | 'coursesRequired'
+  | 'coursesTooMany'
   | 'courseRowsInvalid'
+  | 'courseCodeTooLong'
+  | 'courseNameTooLong'
+  | 'lecturerTooLong'
+  | 'scheduleTooLong'
   | 'creditsInvalid'
+  | 'totalCreditsInvalid'
   | 'gradesRequired'
+  | 'gradesTooMany'
   | 'gradeRowsInvalid'
-  | 'gpaInvalid'
-  | 'conductInvalid';
+  | 'gpa4Invalid'
+  | 'gpa10Invalid'
+  | 'academicStandingTooLong'
+  | 'conductInvalid'
+  | 'conductRankTooLong'
+  | 'scoreLetterTooLong';
+
+export interface MailTestEmailFormInput {
+  to?: string;
+  recipientName?: string;
+  introMessage?: string;
+}
+
+/** Length-only checks for the admin-only TestEmailRequest DTO. */
+export function testEmailFormIssues(form: MailTestEmailFormInput): MailFieldIssue[] {
+  const issues: MailFieldIssue[] = [];
+  if (rawTextTooLong(form.to, MAIL_COMPOSE_LIMITS.common.email)) {
+    issues.push('emailTooLong');
+  }
+  if (rawTextTooLong(form.recipientName, MAIL_COMPOSE_LIMITS.testEmail.recipientName)) {
+    issues.push('recipientNameTooLong');
+  }
+  if (rawTextTooLong(form.introMessage, MAIL_COMPOSE_LIMITS.testEmail.introMessage)) {
+    issues.push('introMessageTooLong');
+  }
+  return issues;
+}
 
 export interface MailNoticeFormInput {
   to: string;
   title: string;
   content: string;
+  recipientName?: string;
+  category?: string;
+  author?: string;
+  highlights?: ReadonlyArray<string>;
+  actionUrl?: string;
+  actionText?: string;
 }
 
 export function noticeFormIssues(form: MailNoticeFormInput): MailFieldIssue[] {
   const issues: MailFieldIssue[] = [];
   const email = form.to.trim();
+  if (email.length > MAIL_COMPOSE_LIMITS.notice.email) {
+    issues.push('emailTooLong');
+  }
   if (!email) {
     issues.push('emailRequired');
   } else if (!isValidEmail(email)) {
     issues.push('emailInvalid');
   }
+  if (textTooLong(form.recipientName, MAIL_COMPOSE_LIMITS.notice.recipientName)) {
+    issues.push('recipientNameTooLong');
+  }
+  if (textTooLong(form.category, MAIL_COMPOSE_LIMITS.notice.category)) {
+    issues.push('categoryTooLong');
+  }
   if (!form.title.trim()) {
     issues.push('titleRequired');
+  }
+  if (textTooLong(form.title, MAIL_COMPOSE_LIMITS.notice.title)) {
+    issues.push('titleTooLong');
+  }
+  if (textTooLong(form.author, MAIL_COMPOSE_LIMITS.notice.author)) {
+    issues.push('authorTooLong');
   }
   if (!form.content.trim()) {
     issues.push('contentRequired');
   }
-  return issues;
+  if (textTooLong(form.content, MAIL_COMPOSE_LIMITS.notice.content)) {
+    issues.push('contentTooLong');
+  }
+  const highlights = form.highlights ?? [];
+  if (highlights.length > MAIL_COMPOSE_LIMITS.notice.highlights) {
+    issues.push('highlightsTooMany');
+  }
+  if (highlights.some((line) => textTooLong(line, MAIL_COMPOSE_LIMITS.notice.highlight))) {
+    issues.push('highlightTooLong');
+  }
+  if (textTooLong(form.actionUrl, MAIL_COMPOSE_LIMITS.notice.actionUrl)) {
+    issues.push('actionUrlTooLong');
+  }
+  if (textTooLong(form.actionText, MAIL_COMPOSE_LIMITS.notice.actionText)) {
+    issues.push('actionTextTooLong');
+  }
+  return [...new Set(issues)];
 }
 
 export interface MailRegistrationFormInput {
   to: string;
   studentName: string;
   studentId: string;
-  courses: ReadonlyArray<{ code: string; name: string; credits?: number | string }>;
+  department?: string;
+  semester?: string;
+  courses: ReadonlyArray<{
+    code: string;
+    name: string;
+    credits?: number | string;
+    lecturer?: string;
+    schedule?: string;
+  }>;
+  totalCredits?: number;
 }
 
 export function registrationFormIssues(form: MailRegistrationFormInput): MailFieldIssue[] {
   const issues: MailFieldIssue[] = [];
   const email = form.to.trim();
+  if (email.length > MAIL_COMPOSE_LIMITS.registration.email) {
+    issues.push('emailTooLong');
+  }
   if (!email) {
     issues.push('emailRequired');
   } else if (!isValidEmail(email)) {
@@ -197,22 +357,54 @@ export function registrationFormIssues(form: MailRegistrationFormInput): MailFie
   if (!form.studentName.trim()) {
     issues.push('studentNameRequired');
   }
+  if (textTooLong(form.studentName, MAIL_COMPOSE_LIMITS.registration.studentName)) {
+    issues.push('studentNameTooLong');
+  }
   if (!form.studentId.trim()) {
     issues.push('studentIdRequired');
   }
+  if (textTooLong(form.studentId, MAIL_COMPOSE_LIMITS.registration.studentId)) {
+    issues.push('studentIdTooLong');
+  }
+  if (textTooLong(form.department, MAIL_COMPOSE_LIMITS.registration.department)) {
+    issues.push('departmentTooLong');
+  }
+  if (textTooLong(form.semester, MAIL_COMPOSE_LIMITS.registration.semester)) {
+    issues.push('semesterTooLong');
+  }
+  if (form.courses.length > MAIL_COMPOSE_LIMITS.registration.courses) {
+    issues.push('coursesTooMany');
+  }
   if (form.courses.length === 0) {
     issues.push('coursesRequired');
-  } else {
-    if (form.courses.some((course) => !course.code.trim() || !course.name.trim())) {
-      issues.push('courseRowsInvalid');
-    }
-    // Negative (or junk) credits must block the send with an inline message —
-    // never a silent clamp to 0, which used to fabricate a course load.
-    if (form.courses.some((course) => !rowCreditsValid(course.credits ?? ''))) {
-      issues.push('creditsInvalid');
-    }
   }
-  return issues;
+  if (form.courses.some((course) => !course.code.trim() || !course.name.trim())) {
+    issues.push('courseRowsInvalid');
+  }
+  if (form.courses.some((course) => textTooLong(course.code, MAIL_COMPOSE_LIMITS.registration.courseCode))) {
+    issues.push('courseCodeTooLong');
+  }
+  if (form.courses.some((course) => textTooLong(course.name, MAIL_COMPOSE_LIMITS.registration.courseName))) {
+    issues.push('courseNameTooLong');
+  }
+  if (form.courses.some((course) => textTooLong(course.lecturer, MAIL_COMPOSE_LIMITS.registration.lecturer))) {
+    issues.push('lecturerTooLong');
+  }
+  if (form.courses.some((course) => textTooLong(course.schedule, MAIL_COMPOSE_LIMITS.registration.schedule))) {
+    issues.push('scheduleTooLong');
+  }
+  // Invalid credits must block the send instead of being silently clamped or
+  // rounded into a payload the DTO will reject.
+  if (form.courses.some((course) => !rowCreditsValid(course.credits ?? ''))) {
+    issues.push('creditsInvalid');
+  }
+  const totalCredits = form.totalCredits ?? sumCourseCredits(
+    form.courses.map(({ credits }) => ({ credits: credits ?? '' })),
+  );
+  if (!Number.isInteger(totalCredits) || totalCredits < 0 || totalCredits > MAIL_COMPOSE_LIMITS.registration.totalCredits) {
+    issues.push('totalCreditsInvalid');
+  }
+  return [...new Set(issues)];
 }
 
 export interface MailGradeAlertFormInput {
@@ -222,12 +414,24 @@ export interface MailGradeAlertFormInput {
   gpa4: string;
   gpa10: string;
   conductScore: string;
-  grades: ReadonlyArray<{ courseCode: string; courseName: string; credits: number | string; score10: number | string }>;
+  semester?: string;
+  academicStanding?: string;
+  conductRank?: string;
+  grades: ReadonlyArray<{
+    courseCode: string;
+    courseName: string;
+    credits: number | string;
+    score10: number | string;
+    scoreLetter?: string;
+  }>;
 }
 
 export function gradeAlertFormIssues(form: MailGradeAlertFormInput): MailFieldIssue[] {
   const found: MailFieldIssue[] = [];
   const email = form.to.trim();
+  if (email.length > MAIL_COMPOSE_LIMITS.gradeAlert.email) {
+    found.push('emailTooLong');
+  }
   if (!email) {
     found.push('emailRequired');
   } else if (!isValidEmail(email)) {
@@ -236,43 +440,77 @@ export function gradeAlertFormIssues(form: MailGradeAlertFormInput): MailFieldIs
   if (!form.studentName.trim()) {
     found.push('studentNameRequired');
   }
+  if (textTooLong(form.studentName, MAIL_COMPOSE_LIMITS.gradeAlert.studentName)) {
+    found.push('studentNameTooLong');
+  }
   if (!form.studentId.trim()) {
     found.push('studentIdRequired');
+  }
+  if (textTooLong(form.studentId, MAIL_COMPOSE_LIMITS.gradeAlert.studentId)) {
+    found.push('studentIdTooLong');
+  }
+  if (textTooLong(form.semester, MAIL_COMPOSE_LIMITS.gradeAlert.semester)) {
+    found.push('semesterTooLong');
   }
   // Optional summary metrics: when present they must sit inside the scale.
   const gpa4 = parseNumericInput(form.gpa4);
   if (gpa4 !== null && (gpa4 < 0 || gpa4 > 4)) {
-    found.push('gpaInvalid');
+    found.push('gpa4Invalid');
   }
   const gpa10 = parseNumericInput(form.gpa10);
   if (gpa10 !== null && (gpa10 < 0 || gpa10 > 10)) {
-    found.push('gpaInvalid');
+    found.push('gpa10Invalid');
   }
   const conduct = parseNumericInput(form.conductScore);
   if (conduct !== null && (conduct < 0 || conduct > 100)) {
     found.push('conductInvalid');
   }
+  if (textTooLong(form.academicStanding, MAIL_COMPOSE_LIMITS.gradeAlert.academicStanding)) {
+    found.push('academicStandingTooLong');
+  }
+  if (textTooLong(form.conductRank, MAIL_COMPOSE_LIMITS.gradeAlert.conductRank)) {
+    found.push('conductRankTooLong');
+  }
+  if (form.grades.length > MAIL_COMPOSE_LIMITS.gradeAlert.grades) {
+    found.push('gradesTooMany');
+  }
   if (form.grades.length === 0) {
     found.push('gradesRequired');
-  } else {
-    const rowsValid = form.grades.every(
-      (row) =>
-        row.courseCode.trim()
-        && row.courseName.trim()
-        && scoreRowValid(row.score10),
-    );
-    if (!rowsValid) {
-      found.push('gradeRowsInvalid');
-    }
-    // Credits get their own issue so the inline message can point at the
-    // credits cell instead of the score cell: negative or junk input blocks
-    // the send rather than being silently clamped into the payload.
-    if (form.grades.some((row) => !rowCreditsValid(row.credits))) {
-      found.push('creditsInvalid');
-    }
+  }
+  const rowsValid = form.grades.every(
+    (row) =>
+      row.courseCode.trim()
+      && row.courseName.trim()
+      && scoreRowValid(row.score10),
+  );
+  if (!rowsValid) {
+    found.push('gradeRowsInvalid');
+  }
+  if (form.grades.some((row) => textTooLong(row.courseCode, MAIL_COMPOSE_LIMITS.gradeAlert.courseCode))) {
+    found.push('courseCodeTooLong');
+  }
+  if (form.grades.some((row) => textTooLong(row.courseName, MAIL_COMPOSE_LIMITS.gradeAlert.courseName))) {
+    found.push('courseNameTooLong');
+  }
+  if (form.grades.some((row) => textTooLong(row.scoreLetter, MAIL_COMPOSE_LIMITS.gradeAlert.scoreLetter))) {
+    found.push('scoreLetterTooLong');
+  }
+  // Credits get their own issue so the inline message can point at the
+  // credits cell instead of the score cell.
+  if (form.grades.some((row) => !rowCreditsValid(row.credits))) {
+    found.push('creditsInvalid');
   }
   return [...new Set(found)];
 }
+
+function textTooLong(value: string | undefined, max: number): boolean {
+  return typeof value === 'string' && value.trim().length > max;
+}
+
+function rawTextTooLong(value: string | undefined, max: number): boolean {
+  return typeof value === 'string' && value.length > max;
+}
+
 function scoreRowValid(score10: number | string): boolean {
   const score = parseNumericInput(score10);
   return score !== null && score >= 0 && score <= 10;

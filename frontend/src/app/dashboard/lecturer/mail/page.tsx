@@ -21,6 +21,7 @@ import {
   classifyMailError,
   creditWeightedAverage10,
   gradeAlertFormIssues,
+  MAIL_COMPOSE_LIMITS,
   mailPreviewUrl,
   noticeFormIssues,
   optionalText,
@@ -242,18 +243,20 @@ function StudentFields({
           type="email"
           autoComplete="email"
           inputMode="email"
+          maxLength={MAIL_COMPOSE_LIMITS.common.email}
           placeholder={copy.fields.emailPlaceholder}
           value={form.to}
-          error={issueText('emailRequired') || issueText('emailInvalid')}
+          error={issueText('emailTooLong') || issueText('emailRequired') || issueText('emailInvalid')}
           onChange={(event) => onChange({ to: event.target.value })}
         />
       </Field>
       <Field label={copy.fields.studentName} required htmlFor="student-name">
         <Input
           id="student-name"
+          maxLength={MAIL_COMPOSE_LIMITS.common.studentName}
           placeholder={copy.fields.recipientNamePlaceholder}
           value={form.studentName}
-          error={issueText('studentNameRequired')}
+          error={issueText('studentNameRequired') || issueText('studentNameTooLong')}
           onChange={(event) => onChange({ studentName: event.target.value })}
         />
       </Field>
@@ -261,9 +264,10 @@ function StudentFields({
         <Input
           id="student-id"
           inputMode="numeric"
+          maxLength={MAIL_COMPOSE_LIMITS.common.studentId}
           placeholder="22110001"
           value={form.studentId}
-          error={issueText('studentIdRequired')}
+          error={issueText('studentIdRequired') || issueText('studentIdTooLong')}
           onChange={(event) => onChange({ studentId: event.target.value })}
         />
       </Field>
@@ -323,26 +327,44 @@ export default function LecturerMailComposePage() {
 
   const issues = useMemo<MailFieldIssue[]>(() => {
     if (template === 'notice') {
-      return noticeFormIssues({ to: notice.to, title: notice.title, content: notice.content });
+      return noticeFormIssues({
+        to: notice.to,
+        recipientName: notice.recipientName,
+        category: copy.categories[notice.category as (typeof NOTICE_CATEGORIES)[number]],
+        title: notice.title,
+        author: notice.author,
+        content: notice.content,
+        highlights,
+        actionUrl: notice.actionUrl,
+        actionText: notice.actionText,
+      });
     }
     if (template === 'registration') {
       return registrationFormIssues({
         to: registration.to,
         studentName: registration.studentName,
         studentId: registration.studentId,
+        department: registration.department,
+        semester: registration.semester,
         courses,
+        totalCredits: sumCourseCredits(courses),
       });
     }
     return gradeAlertFormIssues({
       to: gradeAlert.to,
       studentName: gradeAlert.studentName,
       studentId: gradeAlert.studentId,
+      semester: gradeAlert.semester,
       gpa4: gradeAlert.gpa4,
       gpa10: gradeAlert.gpa10,
       conductScore: gradeAlert.conductScore,
-      grades,
+      academicStanding: gradeAlert.academicStanding
+        ? copy.standings[gradeAlert.academicStanding as (typeof ACADEMIC_STANDINGS)[number]]
+        : '',
+      conductRank: gradeAlert.conductRank,
+      grades: grades.map((row) => ({ ...row, scoreLetter: row.scoreLetter })),
     });
-  }, [template, notice, registration, courses, gradeAlert, grades]);
+  }, [template, notice, registration, courses, gradeAlert, grades, highlights, copy.categories, copy.standings]);
 
   // Field-level error text stays hidden until the first send attempt, so the
   // author is not yelled at while still typing.
@@ -661,17 +683,20 @@ export default function LecturerMailComposePage() {
                         type="email"
                         autoComplete="email"
                         inputMode="email"
+                        maxLength={MAIL_COMPOSE_LIMITS.notice.email}
                         placeholder={copy.fields.emailPlaceholder}
                         value={notice.to}
-                        error={issueText('emailRequired') || issueText('emailInvalid')}
+                        error={issueText('emailTooLong') || issueText('emailRequired') || issueText('emailInvalid')}
                         onChange={(event) => setNotice((current) => ({ ...current, to: event.target.value }))}
                       />
                     </Field>
                     <Field label={copy.fields.recipientName} htmlFor="mail-recipient-name">
                       <Input
                         id="mail-recipient-name"
+                        maxLength={MAIL_COMPOSE_LIMITS.notice.recipientName}
                         placeholder={copy.fields.recipientNamePlaceholder}
                         value={notice.recipientName}
+                        error={issueText('recipientNameTooLong')}
                         onChange={(event) => setNotice((current) => ({ ...current, recipientName: event.target.value }))}
                       />
                     </Field>
@@ -685,12 +710,17 @@ export default function LecturerMailComposePage() {
                         onChange={(event) => setNotice((current) => ({ ...current, category: event.target.value }))}
                         options={NOTICE_CATEGORIES.map((key) => ({ value: key, label: copy.categories[key] }))}
                       />
+                      {issueText('categoryTooLong') ? (
+                        <p className="mt-1.5 text-sm text-destructive" role="alert">{copy.validation.categoryTooLong}</p>
+                      ) : null}
                     </Field>
                     <Field label={copy.fields.author} htmlFor="mail-author">
                       <Input
                         id="mail-author"
+                        maxLength={MAIL_COMPOSE_LIMITS.notice.author}
                         placeholder={copy.fields.authorPlaceholder}
                         value={notice.author}
+                        error={issueText('authorTooLong')}
                         onChange={(event) => setNotice((current) => ({ ...current, author: event.target.value }))}
                       />
                     </Field>
@@ -698,19 +728,23 @@ export default function LecturerMailComposePage() {
                   <Field label={copy.fields.title} required htmlFor="mail-title">
                     <Input
                       id="mail-title"
+                      maxLength={MAIL_COMPOSE_LIMITS.notice.title}
                       placeholder={copy.fields.titlePlaceholder}
                       value={notice.title}
-                      error={issueText('titleRequired')}
+                      error={issueText('titleTooLong') || issueText('titleRequired')}
                       onChange={(event) => setNotice((current) => ({ ...current, title: event.target.value }))}
                     />
                   </Field>
                   <Field label={copy.fields.content} required htmlFor="mail-content">
                     <Textarea
                       id="mail-content"
+                      maxLength={MAIL_COMPOSE_LIMITS.notice.content}
                       placeholder={copy.fields.contentPlaceholder}
                       value={notice.content}
-                      error={issueText('contentRequired')}
-                      hint={copy.fields.charCount.replace('{count}', formatNumber(notice.content.length))}
+                      error={issueText('contentTooLong') || issueText('contentRequired')}
+                      hint={copy.fields.charCount
+                        .replace('{count}', formatNumber(notice.content.length))
+                        .replace('{max}', formatNumber(MAIL_COMPOSE_LIMITS.notice.content))}
                       onChange={(event) => setNotice((current) => ({ ...current, content: event.target.value }))}
                     />
                   </Field>
@@ -718,8 +752,10 @@ export default function LecturerMailComposePage() {
                     <div className="flex gap-2">
                       <Input
                         id="mail-highlight"
+                        maxLength={MAIL_COMPOSE_LIMITS.notice.highlight}
                         placeholder={copy.fields.highlightPlaceholder}
                         value={highlightDraft}
+                        error={issueText('highlightTooLong')}
                         onChange={(event) => setHighlightDraft(event.target.value)}
                         onKeyDown={(event) => {
                           if (event.key === 'Enter') {
@@ -752,6 +788,9 @@ export default function LecturerMailComposePage() {
                         ))}
                       </ul>
                     ) : null}
+                    {issueText('highlightsTooMany') ? (
+                      <p className="mt-1.5 text-sm text-destructive" role="alert">{copy.validation.highlightsTooMany}</p>
+                    ) : null}
                   </Field>
                   <div className="grid gap-4 sm:grid-cols-2">
                     <Field label={copy.fields.actionUrl} htmlFor="mail-action-url">
@@ -759,16 +798,20 @@ export default function LecturerMailComposePage() {
                         id="mail-action-url"
                         type="url"
                         inputMode="url"
+                        maxLength={MAIL_COMPOSE_LIMITS.notice.actionUrl}
                         placeholder={copy.fields.actionUrlPlaceholder}
                         value={notice.actionUrl}
+                        error={issueText('actionUrlTooLong')}
                         onChange={(event) => setNotice((current) => ({ ...current, actionUrl: event.target.value }))}
                       />
                     </Field>
                     <Field label={copy.fields.actionText} htmlFor="mail-action-text">
                       <Input
                         id="mail-action-text"
+                        maxLength={MAIL_COMPOSE_LIMITS.notice.actionText}
                         placeholder={copy.fields.actionTextPlaceholder}
                         value={notice.actionText}
+                        error={issueText('actionTextTooLong')}
                         onChange={(event) => setNotice((current) => ({ ...current, actionText: event.target.value }))}
                       />
                     </Field>
@@ -788,16 +831,20 @@ export default function LecturerMailComposePage() {
                     <Field label={copy.fields.department} htmlFor="mail-department">
                       <Input
                         id="mail-department"
+                        maxLength={MAIL_COMPOSE_LIMITS.registration.department}
                         placeholder={copy.fields.departmentPlaceholder}
                         value={registration.department}
+                        error={issueText('departmentTooLong')}
                         onChange={(event) => setRegistration((current) => ({ ...current, department: event.target.value }))}
                       />
                     </Field>
                     <Field label={copy.fields.semester} htmlFor="mail-semester">
                       <Input
                         id="mail-semester"
+                        maxLength={MAIL_COMPOSE_LIMITS.registration.semester}
                         placeholder={copy.fields.semesterPlaceholder}
                         value={registration.semester}
+                        error={issueText('semesterTooLong')}
                         onChange={(event) => setRegistration((current) => ({ ...current, semester: event.target.value }))}
                       />
                     </Field>
@@ -831,10 +878,12 @@ export default function LecturerMailComposePage() {
                                   <Field label={copy.fields.code} htmlFor={`course-${index}-code`} hideLabel compact>
                                     <Input
                                       id={`course-${index}-code`}
+                                      maxLength={MAIL_COMPOSE_LIMITS.registration.courseCode}
                                       className={cn(rowInvalid && INVALID_BORDER)}
                                       aria-invalid={rowInvalid ? true : undefined}
                                       placeholder={copy.fields.code}
                                       value={row.code}
+                                      error={issueText('courseCodeTooLong')}
                                       onChange={(event) => setCourses((current) => current.map((item, i) => (i === index ? { ...item, code: event.target.value } : item)))}
                                     />
                                   </Field>
@@ -843,10 +892,12 @@ export default function LecturerMailComposePage() {
                                   <Field label={copy.fields.courseName} htmlFor={`course-${index}-name`} hideLabel compact>
                                     <Input
                                       id={`course-${index}-name`}
+                                      maxLength={MAIL_COMPOSE_LIMITS.registration.courseName}
                                       className={cn(rowInvalid && INVALID_BORDER)}
                                       aria-invalid={rowInvalid ? true : undefined}
                                       placeholder={copy.fields.courseName}
                                       value={row.name}
+                                      error={issueText('courseNameTooLong')}
                                       onChange={(event) => setCourses((current) => current.map((item, i) => (i === index ? { ...item, name: event.target.value } : item)))}
                                     />
                                   </Field>
@@ -881,16 +932,20 @@ export default function LecturerMailComposePage() {
                                 <Field label={copy.fields.lecturer} htmlFor={`course-${index}-lecturer`} hideLabel compact>
                                   <Input
                                     id={`course-${index}-lecturer`}
+                                    maxLength={MAIL_COMPOSE_LIMITS.registration.lecturer}
                                     placeholder={copy.fields.lecturer}
                                     value={row.lecturer}
+                                    error={issueText('lecturerTooLong')}
                                     onChange={(event) => setCourses((current) => current.map((item, i) => (i === index ? { ...item, lecturer: event.target.value } : item)))}
                                   />
                                 </Field>
                                 <Field label={copy.fields.schedule} htmlFor={`course-${index}-schedule`} hideLabel compact>
                                   <Input
                                     id={`course-${index}-schedule`}
+                                    maxLength={MAIL_COMPOSE_LIMITS.registration.schedule}
                                     placeholder={copy.fields.schedule}
                                     value={row.schedule}
+                                    error={issueText('scheduleTooLong')}
                                     onChange={(event) => setCourses((current) => current.map((item, i) => (i === index ? { ...item, schedule: event.target.value } : item)))}
                                   />
                                 </Field>
@@ -909,6 +964,12 @@ export default function LecturerMailComposePage() {
                             {copy.fields.credits}: {formatNumber(totalCredits)}
                           </span>
                         </div>
+                        {issueText('coursesTooMany') ? (
+                          <p className="text-sm text-destructive" role="alert">{copy.validation.coursesTooMany}</p>
+                        ) : null}
+                        {issueText('totalCreditsInvalid') ? (
+                          <p className="text-sm text-destructive" role="alert">{copy.validation.totalCreditsInvalid}</p>
+                        ) : null}
                       </div>
                     )}
                   </section>
@@ -926,8 +987,10 @@ export default function LecturerMailComposePage() {
                   <Field label={copy.fields.semester} htmlFor="mail-grade-semester">
                     <Input
                       id="mail-grade-semester"
+                      maxLength={MAIL_COMPOSE_LIMITS.gradeAlert.semester}
                       placeholder={copy.fields.semesterPlaceholder}
                       value={gradeAlert.semester}
+                      error={issueText('semesterTooLong')}
                       onChange={(event) => setGradeAlert((current) => ({ ...current, semester: event.target.value }))}
                     />
                   </Field>
@@ -938,7 +1001,7 @@ export default function LecturerMailComposePage() {
                         inputMode="decimal"
                         placeholder="3.82"
                         value={gradeAlert.gpa4}
-                        error={issueText('gpaInvalid')}
+                        error={issueText('gpa4Invalid')}
                         onChange={(event) => setGradeAlert((current) => ({ ...current, gpa4: event.target.value }))}
                       />
                     </Field>
@@ -948,7 +1011,7 @@ export default function LecturerMailComposePage() {
                         inputMode="decimal"
                         placeholder="9.15"
                         value={gradeAlert.gpa10}
-                        error={issueText('gpaInvalid')}
+                        error={issueText('gpa10Invalid')}
                         onChange={(event) => setGradeAlert((current) => ({ ...current, gpa10: event.target.value }))}
                       />
                     </Field>
@@ -962,6 +1025,9 @@ export default function LecturerMailComposePage() {
                           ...ACADEMIC_STANDINGS.map((key) => ({ value: key, label: copy.standings[key] })),
                         ]}
                       />
+                      {issueText('academicStandingTooLong') ? (
+                        <p className="mt-1.5 text-sm text-destructive" role="alert">{copy.validation.academicStandingTooLong}</p>
+                      ) : null}
                     </Field>
                   </div>
                   <div className="grid gap-4 sm:grid-cols-2">
@@ -978,8 +1044,10 @@ export default function LecturerMailComposePage() {
                     <Field label={copy.fields.conductRank} htmlFor="mail-conduct-rank">
                       <Input
                         id="mail-conduct-rank"
+                        maxLength={MAIL_COMPOSE_LIMITS.gradeAlert.conductRank}
                         placeholder={copy.standings.excellent}
                         value={gradeAlert.conductRank}
+                        error={issueText('conductRankTooLong')}
                         onChange={(event) => setGradeAlert((current) => ({ ...current, conductRank: event.target.value }))}
                       />
                     </Field>
@@ -1014,10 +1082,12 @@ export default function LecturerMailComposePage() {
                                   <Field label={copy.fields.code} htmlFor={`grade-${index}-code`} hideLabel compact>
                                     <Input
                                       id={`grade-${index}-code`}
+                                      maxLength={MAIL_COMPOSE_LIMITS.gradeAlert.courseCode}
                                       className={cn(rowInvalid && INVALID_BORDER)}
                                       aria-invalid={rowInvalid ? true : undefined}
                                       placeholder={copy.fields.code}
                                       value={row.courseCode}
+                                      error={issueText('courseCodeTooLong')}
                                       onChange={(event) => setGrades((current) => current.map((item, i) => (i === index ? { ...item, courseCode: event.target.value } : item)))}
                                     />
                                   </Field>
@@ -1026,10 +1096,12 @@ export default function LecturerMailComposePage() {
                                   <Field label={copy.fields.courseName} htmlFor={`grade-${index}-name`} hideLabel compact>
                                     <Input
                                       id={`grade-${index}-name`}
+                                      maxLength={MAIL_COMPOSE_LIMITS.gradeAlert.courseName}
                                       className={cn(rowInvalid && INVALID_BORDER)}
                                       aria-invalid={rowInvalid ? true : undefined}
                                       placeholder={copy.fields.courseName}
                                       value={row.courseName}
+                                      error={issueText('courseNameTooLong')}
                                       onChange={(event) => setGrades((current) => current.map((item, i) => (i === index ? { ...item, courseName: event.target.value } : item)))}
                                     />
                                   </Field>
@@ -1082,6 +1154,9 @@ export default function LecturerMailComposePage() {
                         })}
                         {issueText('gradeRowsInvalid') ? (
                           <p className="text-sm text-destructive" role="alert">{copy.validation.gradeRowsInvalid}</p>
+                        ) : null}
+                        {issueText('gradesTooMany') ? (
+                          <p className="text-sm text-destructive" role="alert">{copy.validation.gradesTooMany}</p>
                         ) : null}
                       </div>
                     )}
@@ -1175,7 +1250,7 @@ export default function LecturerMailComposePage() {
               size="lg"
               className="w-full"
               onClick={() => void handleSend()}
-              disabled={isSending || !readyToSend}
+              disabled={isSending}
               title={readyToSend ? undefined : copy.incomplete}
             >
               <Send className="mr-2 h-4 w-4" aria-hidden="true" />
