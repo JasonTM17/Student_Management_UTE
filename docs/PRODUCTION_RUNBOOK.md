@@ -63,6 +63,9 @@ guidance in `docs/DEMO_RUNBOOK.md`.
   user, `/api/v1/users/*/password-reset` 3/hour per user, JSON body caps of
   1 MB global / 64 KB assistant / 4 KB on credential routes (login, refresh,
   change-password, logout).
+- Mutating-request defaults: login 15/minute (configurable), refresh 30/minute,
+  thesis 20/minute, and enrollment 15/minute. See the [rate-limit policy](../java-services/restful-api/src/main/java/io/campuscore/restfulapi/security/ratelimit/filter/RateLimitFilter.java)
+  and [configuration defaults](../java-services/restful-api/src/main/resources/application.yml).
 
 ## Render + Neon operating notes
 
@@ -140,22 +143,17 @@ cited lexical answer with a degraded product status.
 
 ## Render cold-start mitigation
 
-The GitHub Actions heartbeat (`keepalive-heartbeat.yml`) probes Render, Supabase
-and Vercel every 6 hours with three bounded retries; a target that stays
-unreachable after all attempts fails the workflow visibly instead of logging a
-fake success. Render's free tier still sleeps between runs, so two extra layers
-cover the gap:
-
-1. The frontend axios layer retries idempotent GETs once (3s backoff) when the
-   gateway answers 502/503/504, which absorbs single cold-start requests.
-2. `supabase/migrations/20260920210000_render_keepalive_warm_ping.sql` schedules
-   a 10-minute in-database ping via `pg_cron` + `pg_net`. It is a no-op unless
-   both extensions are enabled (Dashboard -> Database -> Extensions), then
-   re-apply the migration to register the job. Verify with
-   `SELECT jobname, schedule FROM cron.job;`.
-
-A paid Render instance removes the cold start entirely; that is a cost decision
-tracked outside this runbook.
+The GitHub Actions [keep-alive workflow](../.github/workflows/keepalive-heartbeat.yml)
+is scheduled every 10 minutes, but the schedule is not reliable enough to
+guarantee a free Render service stays warm. The optional Supabase `pg_cron`
+ping also depends on extensions and is not an uptime guarantee. For lower
+cold-start frequency, use an independently operated external pinger against
+`GET /api/v1/health/liveness` every 5 minutes.
+Confirm that pinger in its own operator console before claiming it is active;
+this repository does not establish its configuration. The frontend still
+retries idempotent GETs once after gateway 502/503/504 responses to absorb an
+individual cold start. A paid Render instance removes the sleep interval and
+remains a cost decision.
 
 ## Restoring or moving the production database
 

@@ -52,6 +52,7 @@ flowchart TD
 3. **Phân quyền xác thực Client**:
    - Web Client: Sử dụng HTTP-only SameSite=Strict cookies và CSRF double-submit tokens.
    - Mobile Client: Sử dụng OAuth2-compatible Bearer Access & Refresh Tokens.
+   - Same-origin API và OpenAPI proxies trả `400` cho dot-segments trước khi chuyển tiếp; xem [API path validation](../frontend/src/lib/proxy-url.ts) và [OpenAPI path validation](../frontend/src/lib/safe-path.ts).
    - Cả hai client đều tuân thủ cùng một bản hợp đồng OpenAPI (`/v3/api-docs`).
 
 ---
