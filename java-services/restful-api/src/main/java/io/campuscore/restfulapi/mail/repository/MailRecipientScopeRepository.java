@@ -9,12 +9,7 @@ import org.springframework.jdbc.core.namedparam.MapSqlParameterSource;
 import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
 import org.springframework.stereotype.Repository;
 
-/**
- * Resolves mail recipients for lecturer-scoped sends. A lecturer may only mail
- * students enrolled (current or completed) in sections they teach — the
- * recipient address and identity come from the database, never from the
- * request body.
- */
+/** Resolves active mail recipients and lecturer-scoped student recipients. */
 @Repository
 @Profile("persistence")
 public class MailRecipientScopeRepository {
@@ -28,6 +23,61 @@ public class MailRecipientScopeRepository {
 
     public MailRecipientScopeRepository(NamedParameterJdbcTemplate jdbc) {
         this.jdbc = jdbc;
+    }
+
+    /**
+     * Finds an active account by email for administrator-authored notices.
+     * The caller uses the returned address and name instead of request data.
+     */
+    public ScopedRecipient findActiveRecipientByEmail(String email) {
+        if (email == null || email.isBlank()) {
+            return null;
+        }
+        List<ScopedRecipient> rows = jdbc.query(
+                "SELECT u.\"email\" AS student_email, u.\"firstName\" AS first_name,"
+                        + " u.\"lastName\" AS last_name, CAST(NULL AS VARCHAR(120)) AS student_number"
+                        + " FROM " + USER + " u"
+                        + " WHERE LOWER(u.\"email\") = LOWER(:email) AND u.\"status\" = 'ACTIVE' LIMIT 1",
+                new MapSqlParameterSource("email", email.trim()),
+                MailRecipientScopeRepository::map);
+        return rows.isEmpty() ? null : rows.get(0);
+    }
+
+    /** Finds the caller's active account when an access token has no email claim. */
+    public ScopedRecipient findActiveRecipientByUserId(String userId) {
+        if (userId == null || userId.isBlank()) {
+            return null;
+        }
+        List<ScopedRecipient> rows = jdbc.query(
+                "SELECT u.\"email\" AS student_email, u.\"firstName\" AS first_name,"
+                        + " u.\"lastName\" AS last_name, CAST(NULL AS VARCHAR(120)) AS student_number"
+                        + " FROM " + USER + " u"
+                        + " WHERE u.\"id\" = :userId AND u.\"status\" = 'ACTIVE' LIMIT 1",
+                new MapSqlParameterSource("userId", userId.trim()),
+                MailRecipientScopeRepository::map);
+        return rows.isEmpty() ? null : rows.get(0);
+    }
+
+    /**
+     * Finds an active student by student number or account email for the
+     * administrator-only student templates.
+     */
+    public ScopedRecipient findActiveStudentRecipient(String studentKey) {
+        if (studentKey == null || studentKey.isBlank()) {
+            return null;
+        }
+        List<ScopedRecipient> rows = jdbc.query(
+                "SELECT student_user.\"email\" AS student_email,"
+                        + " student_user.\"firstName\" AS first_name, student_user.\"lastName\" AS last_name,"
+                        + " s.\"studentId\" AS student_number"
+                        + " FROM " + STUDENT + " s"
+                        + " JOIN " + USER + " student_user ON student_user.\"id\" = s.\"userId\""
+                        + " WHERE (s.\"studentId\" = :studentKey"
+                        + " OR LOWER(student_user.\"email\") = LOWER(:studentKey))"
+                        + " AND s.\"status\" = 'ACTIVE' AND student_user.\"status\" = 'ACTIVE' LIMIT 1",
+                new MapSqlParameterSource("studentKey", studentKey.trim()),
+                MailRecipientScopeRepository::map);
+        return rows.isEmpty() ? null : rows.get(0);
     }
 
     /**

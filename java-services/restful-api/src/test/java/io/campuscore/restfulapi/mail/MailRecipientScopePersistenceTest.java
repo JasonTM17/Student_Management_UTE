@@ -44,14 +44,16 @@ class MailRecipientScopePersistenceTest {
                     "id" VARCHAR(120) PRIMARY KEY,
                     "email" VARCHAR(255) NOT NULL,
                     "firstName" VARCHAR(120),
-                    "lastName" VARCHAR(120)
+                    "lastName" VARCHAR(120),
+                    "status" VARCHAR(40) NOT NULL DEFAULT 'ACTIVE'
                 )
                 """);
         jdbc.execute("""
                 CREATE TABLE IF NOT EXISTS "academic"."Student" (
                     "id" VARCHAR(120) PRIMARY KEY,
                     "userId" VARCHAR(120) NOT NULL,
-                    "studentId" VARCHAR(40) NOT NULL
+                    "studentId" VARCHAR(40) NOT NULL,
+                    "status" VARCHAR(40) NOT NULL DEFAULT 'ACTIVE'
                 )
                 """);
         jdbc.execute("""
@@ -108,6 +110,43 @@ class MailRecipientScopePersistenceTest {
         ScopedRecipient recipient = scope.findScopedRecipient("lecturer-a", "minh@campuscore.edu");
         assertThat(recipient).isNotNull();
         assertThat(recipient.studentNumber()).isEqualTo("SV002");
+    }
+
+    @Test
+    void adminResolvesActiveAccountByEmailOrJwtSubject() {
+        ScopedRecipient byEmail = scope.findActiveRecipientByEmail("LINH@campuscore.edu");
+        ScopedRecipient bySubject = scope.findActiveRecipientByUserId("u1");
+
+        assertThat(byEmail).isNotNull();
+        assertThat(byEmail.email()).isEqualTo("linh@campuscore.edu");
+        assertThat(byEmail.fullName()).isEqualTo("Nguyen Linh");
+        assertThat(bySubject).isNotNull();
+        assertThat(bySubject.email()).isEqualTo("linh@campuscore.edu");
+    }
+
+    @Test
+    void adminResolvesActiveStudentByStudentNumberOrEmail() {
+        ScopedRecipient byStudentNumber = scope.findActiveStudentRecipient("SV001");
+        ScopedRecipient byEmail = scope.findActiveStudentRecipient("LINH@campuscore.edu");
+
+        assertThat(byStudentNumber).isNotNull();
+        assertThat(byStudentNumber.email()).isEqualTo("linh@campuscore.edu");
+        assertThat(byStudentNumber.studentNumber()).isEqualTo("SV001");
+        assertThat(byEmail).isNotNull();
+        assertThat(byEmail.studentNumber()).isEqualTo("SV001");
+    }
+
+    @Test
+    void adminLookupsRejectInactiveUsersAndStudents() {
+        jdbc.update("UPDATE \"campuscore_auth\".\"User\" SET \"status\" = 'DISABLED' WHERE \"id\" = 'u1'");
+
+        assertThat(scope.findActiveRecipientByEmail("linh@campuscore.edu")).isNull();
+        assertThat(scope.findActiveRecipientByUserId("u1")).isNull();
+        assertThat(scope.findActiveStudentRecipient("SV001")).isNull();
+
+        jdbc.update("UPDATE \"campuscore_auth\".\"User\" SET \"status\" = 'ACTIVE' WHERE \"id\" = 'u1'");
+        jdbc.update("UPDATE \"academic\".\"Student\" SET \"status\" = 'INACTIVE' WHERE \"id\" = 's1'");
+        assertThat(scope.findActiveStudentRecipient("SV001")).isNull();
     }
 
     @Test

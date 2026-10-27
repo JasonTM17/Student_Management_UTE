@@ -55,7 +55,10 @@ class MailControllerTest {
     }
 
     private static Jwt adminJwt() {
-        return jwtWithRoles(List.of("ADMIN"), null);
+        Jwt jwt = jwtWithRoles(List.of("ADMIN"), null);
+        when(jwt.getClaimAsString("email")).thenReturn("admin@campuscore.local");
+        when(jwt.getSubject()).thenReturn("admin-user");
+        return jwt;
     }
 
     private static Jwt lecturerJwt() {
@@ -63,34 +66,62 @@ class MailControllerTest {
     }
 
     @Test
-    void sendTestEmailInvokesService() {
-        TestEmailRequest request = new TestEmailRequest("admin@campuscore.local", "Admin", "Hello");
-        ResponseEntity<MailDispatchResponse> response = controller.sendTestEmail(request);
+    void sendTestEmailAlwaysUsesAuthenticatedAccountEmail() {
+        TestEmailRequest request = new TestEmailRequest("evil@example.org", "Admin", "Hello");
+        ResponseEntity<MailDispatchResponse> response = controller.sendTestEmail(adminJwt(), request);
 
         assertEquals(HttpStatus.OK, response.getStatusCode());
         assertNotNull(response.getBody());
         assertTrue(response.getBody().success());
         assertEquals("admin@campuscore.local", response.getBody().recipient());
+        assertTrue(response.getBody().message().contains("email tài khoản đang đăng nhập"));
         verify(emailService).sendTestEmail("admin@campuscore.local", "Admin", "Hello");
     }
 
     @Test
-    void sendTestEmailFallsBackToInstitutionDefaultRecipient() {
-        // Regression: the default used to be a personal Gmail inbox. With no
-        // recipient supplied, dispatch must go to the institution-owned sink.
-        ResponseEntity<MailDispatchResponse> response = controller.sendTestEmail(null);
+    void sendTestEmailWithoutRequestUsesAuthenticatedAccountEmail() {
+        ResponseEntity<MailDispatchResponse> response = controller.sendTestEmail(adminJwt(), null);
+
+        assertEquals(HttpStatus.OK, response.getStatusCode());
+        assertEquals("admin@campuscore.local", response.getBody().recipient());
+        verify(emailService).sendTestEmail("admin@campuscore.local", "Quản trị viên CampusUTE", null);
+    }
+
+    @Test
+    void sendTestEmailResolvesAccountEmailFromJwtSubjectWhenClaimIsMissing() {
+        Jwt jwt = jwtWithRoles(List.of("ADMIN"), null);
+        when(jwt.getSubject()).thenReturn("admin-user");
+        when(scopeRepository.findActiveRecipientByUserId("admin-user"))
+                .thenReturn(new ScopedRecipient("admin@campuscore.edu", "Quản trị viên", null));
+
+        ResponseEntity<MailDispatchResponse> response = controller.sendTestEmail(jwt,
+                new TestEmailRequest("other@example.org", "Admin", "Hello"));
+
+        assertEquals(HttpStatus.OK, response.getStatusCode());
+        assertEquals("admin@campuscore.edu", response.getBody().recipient());
+        verify(emailService).sendTestEmail("admin@campuscore.edu", "Admin", "Hello");
+    }
+
+    @Test
+    void sendTestEmailFallsBackToInstitutionDefaultRecipientWhenAccountEmailIsUnavailable() {
+        Jwt jwt = jwtWithRoles(List.of("ADMIN"), null);
+        when(jwt.getSubject()).thenReturn(null);
+        ResponseEntity<MailDispatchResponse> response = controller.sendTestEmail(jwt, null);
 
         assertEquals(HttpStatus.OK, response.getStatusCode());
         assertNotNull(response.getBody());
         assertEquals("no-reply@campuscore.local", response.getBody().recipient());
+        assertTrue(response.getBody().message().contains("hộp thư mặc định"));
         verify(emailService).sendTestEmail("no-reply@campuscore.local", "Quản trị viên CampusUTE", null);
     }
 
     @Test
-    void sendNoticeInvokesServiceForAdmin() {
+    void sendNoticeRebuildsAdminRecipientFromActiveUser() {
+        when(scopeRepository.findActiveRecipientByEmail("student@campuscore.edu"))
+                .thenReturn(new ScopedRecipient("verified.student@campuscore.edu", "Tên Trong Cơ Sở Dữ Liệu", null));
         AcademicNoticeRequest request = new AcademicNoticeRequest(
                 "student@campuscore.edu",
-                "Sinh viên",
+                "Tên giả mạo",
                 "HỌC VỤ",
                 "Tiêu đề",
                 "Phòng ĐT",
@@ -103,7 +134,11 @@ class MailControllerTest {
 
         assertEquals(HttpStatus.OK, response.getStatusCode());
         assertTrue(response.getBody().success());
-        verify(emailService).sendAcademicNotice(request);
+        ArgumentCaptor<AcademicNoticeRequest> captor = ArgumentCaptor.forClass(AcademicNoticeRequest.class);
+        verify(emailService).sendAcademicNotice(captor.capture());
+        assertEquals("verified.student@campuscore.edu", captor.getValue().to());
+        assertEquals("Tên Trong Cơ Sở Dữ Liệu", captor.getValue().recipientName());
+        assertEquals("verified.student@campuscore.edu", response.getBody().recipient());
     }
 
     @Test
@@ -270,10 +305,12 @@ class MailControllerTest {
     }
 
     @Test
-    void sendRegistrationInvokesServiceForAdmin() {
+    void sendRegistrationRebuildsAdminStudentFromDatabase() {
+        when(scopeRepository.findActiveStudentRecipient("22110001"))
+                .thenReturn(new ScopedRecipient("verified.student@campuscore.edu", "Tên Trong Cơ Sở Dữ Liệu", "22110001"));
         CourseRegistrationRequest request = new CourseRegistrationRequest(
-                "student@campuscore.edu",
-                "Sơn",
+                "attacker@example.org",
+                "Tên giả mạo",
                 "22110001",
                 "CNTT",
                 "HK1",
@@ -284,14 +321,21 @@ class MailControllerTest {
 
         assertEquals(HttpStatus.OK, response.getStatusCode());
         assertTrue(response.getBody().success());
-        verify(emailService).sendCourseRegistration(request);
+        ArgumentCaptor<CourseRegistrationRequest> captor = ArgumentCaptor.forClass(CourseRegistrationRequest.class);
+        verify(emailService).sendCourseRegistration(captor.capture());
+        assertEquals("verified.student@campuscore.edu", captor.getValue().to());
+        assertEquals("Tên Trong Cơ Sở Dữ Liệu", captor.getValue().studentName());
+        assertEquals("22110001", captor.getValue().studentId());
+        assertEquals("verified.student@campuscore.edu", response.getBody().recipient());
     }
 
     @Test
-    void sendGradeAlertInvokesServiceForAdmin() {
+    void sendGradeAlertRebuildsAdminStudentFromDatabase() {
+        when(scopeRepository.findActiveStudentRecipient("22110001"))
+                .thenReturn(new ScopedRecipient("verified.student@campuscore.edu", "Tên Trong Cơ Sở Dữ Liệu", "22110001"));
         GradeAlertRequest request = new GradeAlertRequest(
-                "student@campuscore.edu",
-                "Sơn",
+                "attacker@example.org",
+                "Tên giả mạo",
                 "22110001",
                 "HK1",
                 3.8,
@@ -305,7 +349,34 @@ class MailControllerTest {
 
         assertEquals(HttpStatus.OK, response.getStatusCode());
         assertTrue(response.getBody().success());
-        verify(emailService).sendGradeAlert(request);
+        ArgumentCaptor<GradeAlertRequest> captor = ArgumentCaptor.forClass(GradeAlertRequest.class);
+        verify(emailService).sendGradeAlert(captor.capture());
+        assertEquals("verified.student@campuscore.edu", captor.getValue().to());
+        assertEquals("Tên Trong Cơ Sở Dữ Liệu", captor.getValue().studentName());
+        assertEquals("22110001", captor.getValue().studentId());
+        assertEquals("verified.student@campuscore.edu", response.getBody().recipient());
+    }
+
+    @Test
+    void adminStudentTemplatesRejectUnknownRecipients() {
+        CourseRegistrationRequest registration = new CourseRegistrationRequest(
+                "unknown@example.org", "Tên giả mạo", "SV-UNKNOWN", "CNTT", "HK1",
+                List.of(new CourseItem("SE013", "Web", 3, "GV", "T2")), 3);
+        GradeAlertRequest gradeAlert = new GradeAlertRequest(
+                "unknown@example.org", "Tên giả mạo", "SV-UNKNOWN", "HK1", 3.8, 9.0,
+                "XUẤT SẮC", 95, "XUẤT SẮC", List.of(new GradeItem("SE001", "LT", 3, 9.5, "A+")));
+
+        DomainException registrationError = assertThrows(DomainException.class,
+                () -> controller.sendRegistration(adminJwt(), registration));
+        DomainException gradeError = assertThrows(DomainException.class,
+                () -> controller.sendGradeAlert(adminJwt(), gradeAlert));
+
+        assertEquals(HttpStatus.FORBIDDEN, registrationError.status());
+        assertEquals("MAIL_RECIPIENT_UNKNOWN", registrationError.code());
+        assertEquals(HttpStatus.FORBIDDEN, gradeError.status());
+        assertEquals("MAIL_RECIPIENT_UNKNOWN", gradeError.code());
+        verify(emailService, never()).sendCourseRegistration(any());
+        verify(emailService, never()).sendGradeAlert(any());
     }
 
     @Test
