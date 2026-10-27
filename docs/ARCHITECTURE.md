@@ -18,7 +18,7 @@ flowchart TD
     end
 
     subgraph BACKEND["TẦNG DỊCH VỤ JAVA (JAVA APPLICATION LAYER)"]
-        REST["Spring Boot 3.5 REST API\n(:4010 | /api/v1/)\n• Auth & RBAC Security Filter\n• 4-Layer Registration Engine\n• Gradebook & Transcript Service\n• Thesis Lifecycle Manager\n• Assistant Gateway & Quota Guard"]
+        REST["Spring Boot 4.1 REST API\n(:4010 | /api/v1/)\n• Auth & RBAC Security Filter\n• 4-Layer Registration Engine\n• Gradebook & Transcript Service\n• Thesis Lifecycle Manager\n• Assistant Gateway & Quota Guard"]
         RAG["Private rag-service Sidecar\n(:4011 | chỉ expose nội bộ)\n• Bilingual Prompt-Injection Guard\n• Lexical ranking BM25\n• Snapshot runtime reader\n• Thực thi Flyway migration trong compose"]
     end
 

@@ -4,7 +4,7 @@
 > Kiến trúc hướng dịch vụ: một Spring Boot Java REST API trung tâm, một Next.js Web Portal, một PostgreSQL quản lý bằng Flyway và một RAG Sidecar riêng tư chỉ chạy trong mạng nội bộ.
 
 [![Java 21](https://img.shields.io/badge/Java-21-orange.svg?style=flat-square&logo=openjdk)](https://openjdk.org/)
-[![Spring Boot 3.5](https://img.shields.io/badge/Spring%20Boot-3.5-brightgreen.svg?style=flat-square&logo=springboot)](https://spring.io/projects/spring-boot)
+[![Spring Boot 4.1](https://img.shields.io/badge/Spring%20Boot-4.1-brightgreen.svg?style=flat-square&logo=springboot)](https://spring.io/projects/spring-boot)
 [![Next.js 15](https://img.shields.io/badge/Next.js-15-black.svg?style=flat-square&logo=next.js)](https://nextjs.org/)
 [![PostgreSQL 15](https://img.shields.io/badge/PostgreSQL-15-blue.svg?style=flat-square&logo=postgresql)](https://www.postgresql.org/)
 [![Flyway](https://img.shields.io/badge/Flyway-Migrations-red.svg?style=flat-square)](https://flywaydb.org/)
@@ -252,7 +252,7 @@ flowchart TD
     end
 
     subgraph BACKEND["TẦNG DỊCH VỤ JAVA (APPLICATION SERVICES)"]
-        REST["Spring Boot 3.5 REST API\n(:4010 | /api/v1/)\n• Auth & RBAC Security Filter\n• Registration Engine chống race 4 lớp\n• Gradebook & Transcript Service\n• Thesis Lifecycle Manager\n• Assistant Gateway & Quota Guard"]
+        REST["Spring Boot 4.1 REST API\n(:4010 | /api/v1/)\n• Auth & RBAC Security Filter\n• Registration Engine chống race 4 lớp\n• Gradebook & Transcript Service\n• Thesis Lifecycle Manager\n• Assistant Gateway & Quota Guard"]
         RAG["Private rag-service Sidecar\n(:4011 | chỉ expose nội bộ)\n• Prompt-Injection Guard song ngữ\n• Lexical ranking BM25\n• Snapshot runtime reader\n• Thực thi Flyway migration trong cụm compose"]
     end
 
@@ -473,13 +473,13 @@ flowchart LR
 
 | Phân tầng | Công nghệ chính | Phiên bản | Vai trò & Mục đích sử dụng |
 | --- | --- | --- | --- |
-| **Backend API** | Java / Spring Boot | 21 / 3.5.16 | RESTful API trung tâm, Spring Security, Validation, JPA/Hibernate |
+| **Backend API** | Java / Spring Boot | 21 / 4.1.2 | RESTful API trung tâm, Spring Security, Validation, JPA/Hibernate |
 | **Frontend Web** | Next.js (App Router) | 15.5 | Cổng thông tin tương tác, Server Components, proxy cùng nguồn `/api/v1` |
 | **Thư viện UI** | Tailwind CSS, Radix UI, TinyMCE | 3.4 / Radix / 8 | Hệ thống thiết kế nhận diện HCMUTE, bảng biểu dữ liệu, soạn thảo rich-text |
 | **Biên dịch & Gói** | Maven / Node.js | 3.9.12 / 20 | Build tool cho Java backend và Node runtime cho frontend |
 | **Cơ sở dữ liệu** | PostgreSQL | 15 (postgres:15-alpine) | Giao dịch ACID, Partial Index, Full-text Search tsvector |
 | **Quản lý Schema** | Flyway | kèm Spring Boot | Versioned migration trong `java-services/restful-api/src/main/resources/db/migration/` |
-| **RAG Sidecar** | Spring Boot (chế độ sidecar) | 3.5.16 | Dịch vụ AI nội bộ cổng 4011, xếp hạng Lexical, Prompt-injection guard |
+| **RAG Sidecar** | Spring Boot (chế độ sidecar) | 4.1.2 | Dịch vụ AI nội bộ cổng 4011, xếp hạng Lexical, Prompt-injection guard |
 | **Mô hình AI** | DeepSeek | deepseek-v4-flash | LLM tùy chọn cho câu hỏi suy luận, tắt được hoàn toàn qua `DEEPSEEK_ENABLED` |
 | **Kiểm thử Email** | Mailpit | v1.21 | SMTP server ảo giả lập gửi nhận email thông báo trên môi trường dev |
 | **Kiểm thử & QA** | JUnit 5, Mockito, node:test, Playwright | Latest | Kiểm thử đơn vị backend, smoke test frontend, e2e Playwright |
