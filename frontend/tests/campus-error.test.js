@@ -71,7 +71,11 @@ test('student and lecturer pages map failures instead of backend envelope fields
   // Password changes report backend PASSWORD_* / INVALID_OLD_PASSWORD codes,
   // so the profile form uses the code-aware mapper like register does.
   assert.match(profile, /campusCodeMessage\(/);
-  assert.match(lecturerGrades, /campusErrorMessage\(/);
+  // Grade save/publish report business codes (GRADES_EMPTY,
+  // GRADES_PUBLISHED_LOCKED, GRADE_COMPONENTS_INCOMPLETE,
+  // ENROLLMENT_NOT_GRADEABLE, SECTION_CANCELLED); the kind-level mapper drops
+  // them into a generic conflict toast, so this sheet is code-aware too.
+  assert.match(lecturerGrades, /campusCodeMessage\(/);
   assert.doesNotMatch(register, /Java API/);
   assert.match(register, /ACTIVE_ENROLLMENT_STATUSES\.has\(enrollment\.status\)\) continue/);
 });
@@ -161,6 +165,10 @@ test('academic registration and catalog failures have bilingual code copy', () =
     'CREDIT_LIMIT_APPLICATION_STATUS_INVALID',
     'ENROLLMENT_FORBIDDEN',
     'ENROLLMENT_NOT_ACTIVE',
+    'ENROLLMENT_NOT_GRADEABLE',
+    'GRADE_COMPONENTS_INCOMPLETE',
+    'GRADES_EMPTY',
+    'GRADES_PUBLISHED_LOCKED',
     'IDEMPOTENCY_CONFLICT',
     'IDEMPOTENCY_KEY_REQUIRED',
     'INVALID_CAPACITY',

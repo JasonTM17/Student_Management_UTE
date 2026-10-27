@@ -24,7 +24,7 @@ import { useConfirmationDialog } from '@/components/ui/use-confirmation-dialog';
 import { UnsavedChangesConfirmDialog } from '@/components/ui/unsaved-changes-confirm';
 import { useUnsavedChangesGuard } from '@/lib/use-unsaved-changes-guard';
 import { useI18n } from '@/i18n';
-import { campusErrorMessage } from '@/lib/campus-error';
+import { campusCodeMessage } from '@/lib/campus-error';
 import {
   calculateGrade,
   computeGradeSummary,
@@ -387,7 +387,7 @@ export default function SectionGradingPage() {
     } catch (requestError: any) {
       if (isCurrent()) {
         setError(
-          campusErrorMessage(requestError, messages.common.campusErrors, copy.loadFailed),
+          campusCodeMessage(requestError, messages.common.campusErrors, copy.loadFailed),
         );
       }
     } finally {
@@ -645,7 +645,7 @@ export default function SectionGradingPage() {
     } catch (requestError: any) {
       if (saveIsCurrent()) {
         toast.error(
-          campusErrorMessage(requestError, messages.common.campusErrors, copy.saveFailed),
+          campusCodeMessage(requestError, messages.common.campusErrors, copy.saveFailed),
         );
       }
     } finally {
@@ -685,7 +685,7 @@ export default function SectionGradingPage() {
     } catch (requestError: any) {
       if (publishIsCurrent()) {
         toast.error(
-          campusErrorMessage(requestError, messages.common.campusErrors, copy.publishFailed),
+          campusCodeMessage(requestError, messages.common.campusErrors, copy.publishFailed),
         );
       }
     } finally {
