@@ -126,16 +126,18 @@ $env:BASE_URL="http://localhost:3100"; node scripts/prod-smoke.mjs   # stack loc
 
 ---
 
+> Bộ minh họa hiện tại: [ảnh/GIF Việt](media-showcase.vi.md) · [English](media-showcase.en.md). GIF là chuỗi ảnh màn hình, không phải video thao tác liên tục.
+
 ## 3. Kịch bản Demo Chấm Điểm 5 Phút (Step-by-Step)
 
 ### Bước 1: Trang chủ & Khả năng Song ngữ Tức thời (30 giây)
 - Mở trình duyệt tại `http://127.0.0.1:3100`.
-- Thể hiện khả năng chuyển đổi ngôn ngữ Việt - Anh mượt mà bằng nút chuyển đổi trên Header (ảnh minh họa: `docs/assets/campuscore-language-tour-live.gif`).
+- Thể hiện khả năng chuyển đổi ngôn ngữ Việt - Anh mượt mà bằng nút chuyển đổi trên Header (ảnh minh họa: `docs/assets/showcase-2026-10/language-tour.gif`).
 - Thể hiện chế độ Dark Mode / Light Mode thích ứng.
 
 ### Bước 2: Cổng Đăng nhập Phân luồng & Đăng nhập Sinh viên (30 giây)
 - Nhấn "Đăng nhập" để vào `http://127.0.0.1:3100/vi/login`.
-- Giới thiệu 3 Portal Tab: **Sinh viên**, **Giảng viên**, **Quản trị**.
+- Giới thiệu 3 Portal Tab: **Sinh viên**, **Giảng viên**, **Trưởng khoa**.
 - Nhấn nút **"Điền nhanh"** (Quick fill) để tự động nạp tài khoản `student@campuscore.edu` / `password123` và đăng nhập.
 
 ### Bước 3: Bảng điều khiển Sinh viên & Thời khóa biểu (60 giây)
