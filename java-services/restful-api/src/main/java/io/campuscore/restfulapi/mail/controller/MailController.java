@@ -40,6 +40,8 @@ import io.campuscore.restfulapi.mail.dto.MailDtos;
 @Tag(name = "Mail Services", description = "Hệ thống gửi Email SMTP & Thymeleaf Templates")
 public class MailController {
 
+    private static final String DEFAULT_TEST_RECIPIENT = "no-reply@campuscore.local";
+
     private final EmailService emailService;
     private final ObjectProvider<MailRecipientScopeRepository> recipientScope;
 
@@ -51,21 +53,24 @@ public class MailController {
     @PostMapping("/test")
     @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN')")
     @Operation(summary = "Gửi email kiểm thử hệ thống SMTP Gmail")
-    public ResponseEntity<MailDispatchResponse> sendTestEmail(@Valid @RequestBody(required = false) TestEmailRequest request) {
-        // Default is an institution-owned sink; an explicitly passed `to` wins.
-        String to = (request != null && request.to() != null && !request.to().isBlank())
-                ? request.to()
-                : "no-reply@campuscore.local";
+    public ResponseEntity<MailDispatchResponse> sendTestEmail(
+            @AuthenticationPrincipal Jwt jwt,
+            @Valid @RequestBody(required = false) TestEmailRequest request) {
+        String accountEmail = authenticatedAccountEmail(jwt);
+        String to = accountEmail != null ? accountEmail : DEFAULT_TEST_RECIPIENT;
         String name = (request != null && request.recipientName() != null)
                 ? request.recipientName()
                 : "Quản trị viên CampusUTE";
         String intro = (request != null) ? request.introMessage() : null;
+        String message = accountEmail != null
+                ? "Email kiểm thử chỉ được gửi đến email tài khoản đang đăng nhập; địa chỉ người nhận trong yêu cầu không được sử dụng."
+                : "Không tìm thấy email tài khoản; email kiểm thử đã được gửi đến hộp thư mặc định no-reply@campuscore.local.";
 
         emailService.sendTestEmail(to, name, intro);
 
         return ResponseEntity.ok(new MailDispatchResponse(
                 true,
-                "Email kiểm thử đã được gửi thành công qua SMTP Gmail!",
+                message,
                 to,
                 "test-verification",
                 Instant.now()));
@@ -119,18 +124,8 @@ public class MailController {
                 Instant.now()));
     }
 
-    /**
-     * Lecturer sends are bound to their own students: the recipient is resolved
-     * from the request's student number/email and must be (or have been)
-     * enrolled in a section taught by the caller. The address and identity are
-     * then rebuilt from the database so the request body cannot redirect the
-     * email or impersonate another student.
-     */
+    /** Lecturer sends are restricted to students enrolled in sections they teach. */
     private ScopedRecipient requireScopedRecipient(Jwt jwt, String studentKey) {
-        List<String> roles = jwt != null ? jwt.getClaimAsStringList("roles") : null;
-        if (roles != null && (roles.contains("ADMIN") || roles.contains("SUPER_ADMIN"))) {
-            return null;
-        }
         String lecturerId = jwt != null ? jwt.getClaimAsString("lecturerId") : null;
         MailRecipientScopeRepository scope = recipientScope.getIfAvailable();
         if (lecturerId == null || lecturerId.isBlank() || scope == null) {
@@ -145,11 +140,57 @@ public class MailController {
         return recipient;
     }
 
-    private CourseRegistrationRequest scopeStudentRecipient(Jwt jwt, CourseRegistrationRequest request) {
-        ScopedRecipient recipient = requireScopedRecipient(jwt, request.studentId());
-        if (recipient == null) {
-            return request;
+    private String authenticatedAccountEmail(Jwt jwt) {
+        String email = jwt != null ? jwt.getClaimAsString("email") : null;
+        if (email != null && !email.isBlank()) {
+            return email.trim();
         }
+        String userId = jwt != null ? jwt.getSubject() : null;
+        MailRecipientScopeRepository scope = recipientScope.getIfAvailable();
+        if (userId == null || userId.isBlank() || scope == null) {
+            return null;
+        }
+        ScopedRecipient recipient = scope.findActiveRecipientByUserId(userId);
+        return recipient == null || recipient.email() == null || recipient.email().isBlank()
+                ? null
+                : recipient.email();
+    }
+
+    private boolean isAdministrator(Jwt jwt) {
+        List<String> roles = jwt != null ? jwt.getClaimAsStringList("roles") : null;
+        return roles != null && (roles.contains("ADMIN") || roles.contains("SUPER_ADMIN"));
+    }
+
+    private ScopedRecipient requireActiveRecipient(String email) {
+        MailRecipientScopeRepository scope = recipientScope.getIfAvailable();
+        ScopedRecipient recipient = scope == null ? null : scope.findActiveRecipientByEmail(email);
+        if (recipient == null) {
+            throw new DomainException(HttpStatus.FORBIDDEN, "MAIL_RECIPIENT_UNKNOWN",
+                    "Người nhận không tồn tại hoặc tài khoản không hoạt động");
+        }
+        return recipient;
+    }
+
+    private ScopedRecipient requireActiveStudentRecipient(String studentId, String email) {
+        MailRecipientScopeRepository scope = recipientScope.getIfAvailable();
+        ScopedRecipient recipient = null;
+        if (scope != null) {
+            recipient = scope.findActiveStudentRecipient(studentId == null ? "" : studentId.trim());
+            if (recipient == null && email != null && !email.isBlank()) {
+                recipient = scope.findActiveStudentRecipient(email.trim());
+            }
+        }
+        if (recipient == null) {
+            throw new DomainException(HttpStatus.FORBIDDEN, "MAIL_RECIPIENT_UNKNOWN",
+                    "Sinh viên nhận email không tồn tại hoặc tài khoản không hoạt động");
+        }
+        return recipient;
+    }
+
+    private CourseRegistrationRequest scopeStudentRecipient(Jwt jwt, CourseRegistrationRequest request) {
+        ScopedRecipient recipient = isAdministrator(jwt)
+                ? requireActiveStudentRecipient(request.studentId(), request.to())
+                : requireScopedRecipient(jwt, request.studentId());
         return new CourseRegistrationRequest(
                 recipient.email(),
                 recipient.fullName().isBlank() ? recipient.studentNumber() : recipient.fullName(),
@@ -161,10 +202,9 @@ public class MailController {
     }
 
     private GradeAlertRequest scopeStudentRecipient(Jwt jwt, GradeAlertRequest request) {
-        ScopedRecipient recipient = requireScopedRecipient(jwt, request.studentId());
-        if (recipient == null) {
-            return request;
-        }
+        ScopedRecipient recipient = isAdministrator(jwt)
+                ? requireActiveStudentRecipient(request.studentId(), request.to())
+                : requireScopedRecipient(jwt, request.studentId());
         return new GradeAlertRequest(
                 recipient.email(),
                 recipient.fullName().isBlank() ? recipient.studentNumber() : recipient.fullName(),
@@ -179,10 +219,9 @@ public class MailController {
     }
 
     private AcademicNoticeRequest scopeNoticeRecipient(Jwt jwt, AcademicNoticeRequest request) {
-        ScopedRecipient recipient = requireScopedRecipient(jwt, request.to());
-        if (recipient == null) {
-            return request;
-        }
+        ScopedRecipient recipient = isAdministrator(jwt)
+                ? requireActiveRecipient(request.to())
+                : requireScopedRecipient(jwt, request.to());
         return new AcademicNoticeRequest(
                 recipient.email(),
                 recipient.fullName().isBlank() ? recipient.studentNumber() : recipient.fullName(),
