@@ -154,7 +154,7 @@ test('validation predicates gate each template form', async (t) => {
         conductScore: '120',
         grades: [],
       }),
-      ['gpaInvalid', 'conductInvalid', 'gradesRequired'],
+      ['gpa4Invalid', 'gpa10Invalid', 'conductInvalid', 'gradesRequired'],
     );
     assert.deepEqual(
       helpers.gradeAlertFormIssues({
@@ -335,6 +335,16 @@ test('mail compose wiring is registered across api, layout, routes, and i18n', (
   assert.match(page, /mailApi\.sendGradeAlert/);
   assert.match(page, /mailPreviewUrl\(API_BASE_URL, template\)/);
   assert.match(page, /classifyMailError/);
+  // Field-level validation copy lives behind `attemptedSend`, which only
+  // flips inside handleSend — so the send button must stay clickable while
+  // issues exist, otherwise invalid input (e.g. GPA 9.99 > 4) leaves the
+  // author with a permanently disabled button and no error text at all.
+  assert.doesNotMatch(
+    page,
+    /disabled=\{isSending \|\| !readyToSend\}/,
+    'send button must not be disabled by unmet issues; the click is what reveals them',
+  );
+  assert.match(page, /setAttemptedSend\(true\)/);
   // PR #8 follow-ups: int wire values and credits validation, not silent clamps.
   assert.match(page, /conductScore: toWireInt\(parseNumericInput\(gradeAlert\.conductScore\)\)/);
   assert.match(page, /rowCreditsValid/);
@@ -354,4 +364,244 @@ test('mail compose wiring is registered across api, layout, routes, and i18n', (
     2,
     'the sidebar label must exist for both en and vi',
   );
+});
+
+test('mail validators block payloads outside the MailDtos bounds', async (t) => {
+  const helpers = await getHelpers();
+  const validNotice = {
+    to: 'sv@student.ute.edu.vn',
+    recipientName: 'Nguyen Van A',
+    category: 'Academic affairs',
+    title: 'Registration notice',
+    author: 'Faculty of Information Technology',
+    content: 'Registration opens on Monday.',
+    highlights: ['Registration opens Monday'],
+    actionUrl: 'https://campus.example/registration',
+    actionText: 'Open registration',
+  };
+  const validRegistration = {
+    to: 'sv@student.ute.edu.vn',
+    studentName: 'Nguyen Van A',
+    studentId: '22110001',
+    department: 'Faculty of Information Technology',
+    semester: 'Semester 1, 2026-2027',
+    courses: [{ code: 'SE013', name: 'Web Development', credits: 3, lecturer: 'Tran B', schedule: 'Mon 1-3' }],
+    totalCredits: 3,
+  };
+  const validGradeAlert = {
+    to: 'sv@student.ute.edu.vn',
+    studentName: 'Nguyen Van A',
+    studentId: '22110001',
+    semester: 'Semester 1, 2026-2027',
+    gpa4: '3.6',
+    gpa10: '8.5',
+    academicStanding: 'Good',
+    conductScore: '90',
+    conductRank: 'Very good',
+    grades: [{ courseCode: 'SE013', courseName: 'Web Development', credits: 3, score10: '8.5', scoreLetter: 'A' }],
+  };
+
+  await t.test('notice content above 20,000 characters blocks sending', () => {
+    assert.deepEqual(
+      helpers.noticeFormIssues({ ...validNotice, content: 'x'.repeat(20_001) }),
+      ['contentTooLong'],
+    );
+  });
+
+  await t.test('notice title above 300 characters blocks sending', () => {
+    assert.deepEqual(
+      helpers.noticeFormIssues({ ...validNotice, title: 'x'.repeat(301) }),
+      ['titleTooLong'],
+    );
+  });
+
+  await t.test('more than 20 notice highlights blocks sending', () => {
+    assert.deepEqual(
+      helpers.noticeFormIssues({
+        ...validNotice,
+        highlights: Array.from({ length: 21 }, (_, index) => `Highlight ${index + 1}`),
+      }),
+      ['highlightsTooMany'],
+    );
+  });
+
+  await t.test('a notice highlight above 500 characters blocks sending', () => {
+    assert.deepEqual(
+      helpers.noticeFormIssues({ ...validNotice, highlights: ['x'.repeat(501)] }),
+      ['highlightTooLong'],
+    );
+  });
+
+  await t.test('registration course credits above 30 block sending', () => {
+    assert.deepEqual(
+      helpers.registrationFormIssues({
+        ...validRegistration,
+        courses: [{ ...validRegistration.courses[0], credits: 31 }],
+        totalCredits: 31,
+      }),
+      ['creditsInvalid'],
+    );
+  });
+
+  await t.test('registration totals above 60 block sending', () => {
+    const courses = [20, 20, 21].map((credits, index) => ({
+      code: `SE00${index + 1}`,
+      name: `Course ${index + 1}`,
+      credits,
+    }));
+    assert.deepEqual(
+      helpers.registrationFormIssues({ ...validRegistration, courses, totalCredits: 61 }),
+      ['totalCreditsInvalid'],
+    );
+  });
+
+  await t.test('GPA 4.5 returns a field-specific blocking issue', () => {
+    assert.deepEqual(
+      helpers.gradeAlertFormIssues({ ...validGradeAlert, gpa4: '4.5' }),
+      ['gpa4Invalid'],
+    );
+  });
+
+  await t.test('grade values and row counts stay inside DTO bounds', () => {
+    assert.deepEqual(
+      helpers.gradeAlertFormIssues({
+        ...validGradeAlert,
+        grades: [{ ...validGradeAlert.grades[0], credits: 31 }],
+      }),
+      ['creditsInvalid'],
+    );
+    assert.deepEqual(
+      helpers.gradeAlertFormIssues({
+        ...validGradeAlert,
+        grades: [{ ...validGradeAlert.grades[0], score10: '10.1' }],
+      }),
+      ['gradeRowsInvalid'],
+    );
+    assert.deepEqual(
+      helpers.gradeAlertFormIssues({
+        ...validGradeAlert,
+        grades: Array.from({ length: 61 }, (_, index) => ({
+          courseCode: `SE${index}`,
+          courseName: `Course ${index}`,
+          credits: 1,
+          score10: 8,
+        })),
+      }),
+      ['gradesTooMany'],
+    );
+  });
+
+  await t.test('the validators accept typical notice, registration, and grade payloads', () => {
+    assert.deepEqual(helpers.noticeFormIssues(validNotice), []);
+    assert.deepEqual(helpers.registrationFormIssues(validRegistration), []);
+    assert.deepEqual(helpers.gradeAlertFormIssues(validGradeAlert), []);
+  });
+
+  await t.test('the standalone test-email intro message limit is exposed and validated', () => {
+    assert.deepEqual(
+      helpers.testEmailFormIssues({ introMessage: 'x'.repeat(20_001) }),
+      ['introMessageTooLong'],
+    );
+  });
+
+  await t.test('all optional notice strings stay within their DTO bounds', () => {
+    const cases = [
+      ['to', `${'a'.repeat(250)}@example.com`, 'emailTooLong'],
+      ['recipientName', 'x'.repeat(256), 'recipientNameTooLong'],
+      ['category', 'x'.repeat(256), 'categoryTooLong'],
+      ['author', 'x'.repeat(256), 'authorTooLong'],
+      ['actionUrl', 'x'.repeat(2_049), 'actionUrlTooLong'],
+      ['actionText', 'x'.repeat(501), 'actionTextTooLong'],
+    ];
+    for (const [field, value, issue] of cases) {
+      assert.ok(
+        helpers.noticeFormIssues({ ...validNotice, [field]: value }).includes(issue),
+        `${field} must return ${issue}`,
+      );
+    }
+  });
+
+  await t.test('registration identity, text, row, and course-string bounds are enforced', () => {
+    const cases = [
+      [{ studentName: 'x'.repeat(256) }, 'studentNameTooLong'],
+      [{ studentId: 'x'.repeat(256) }, 'studentIdTooLong'],
+      [{ department: 'x'.repeat(256) }, 'departmentTooLong'],
+      [{ semester: 'x'.repeat(256) }, 'semesterTooLong'],
+      [{ courses: [{ code: 'x'.repeat(256), name: 'Course', credits: 3 }] }, 'courseCodeTooLong'],
+      [{ courses: [{ code: 'SE013', name: 'x'.repeat(256), credits: 3 }] }, 'courseNameTooLong'],
+      [{ courses: [{ code: 'SE013', name: 'Course', credits: 3, lecturer: 'x'.repeat(256) }] }, 'lecturerTooLong'],
+      [{ courses: [{ code: 'SE013', name: 'Course', credits: 3, schedule: 'x'.repeat(256) }] }, 'scheduleTooLong'],
+      [{ courses: Array.from({ length: 31 }, (_, index) => ({ code: `SE${index}`, name: `Course ${index}`, credits: 1 })), totalCredits: 31 }, 'coursesTooMany'],
+    ];
+    for (const [patch, issue] of cases) {
+      assert.ok(
+        helpers.registrationFormIssues({ ...validRegistration, ...patch }).includes(issue),
+        `${issue} must be returned for the matching registration field`,
+      );
+    }
+  });
+
+  await t.test('grade identity, summary, and row strings match the DTO bounds', () => {
+    const cases = [
+      [{ studentName: 'x'.repeat(256) }, 'studentNameTooLong'],
+      [{ studentId: 'x'.repeat(256) }, 'studentIdTooLong'],
+      [{ semester: 'x'.repeat(256) }, 'semesterTooLong'],
+      [{ academicStanding: 'x'.repeat(101) }, 'academicStandingTooLong'],
+      [{ conductRank: 'x'.repeat(101) }, 'conductRankTooLong'],
+      [{ gpa10: '10.1' }, 'gpa10Invalid'],
+      [{ conductScore: '101' }, 'conductInvalid'],
+      [{ grades: [{ ...validGradeAlert.grades[0], courseCode: 'x'.repeat(256) }] }, 'courseCodeTooLong'],
+      [{ grades: [{ ...validGradeAlert.grades[0], courseName: 'x'.repeat(256) }] }, 'courseNameTooLong'],
+      [{ grades: [{ ...validGradeAlert.grades[0], scoreLetter: 'x'.repeat(101) }] }, 'scoreLetterTooLong'],
+    ];
+    for (const [patch, issue] of cases) {
+      assert.ok(
+        helpers.gradeAlertFormIssues({ ...validGradeAlert, ...patch }).includes(issue),
+        `${issue} must be returned for the matching grade field`,
+      );
+    }
+  });
+});
+
+test('lecturer mail controls expose backend text limits and localized counters', () => {
+  const page = read('src/app/dashboard/lecturer/mail/page.tsx');
+  for (const limit of [
+    'notice.email',
+    'notice.recipientName',
+    'notice.title',
+    'notice.content',
+    'notice.highlight',
+    'notice.actionUrl',
+    'notice.actionText',
+    'common.studentName',
+    'common.studentId',
+    'registration.courseCode',
+    'registration.courseName',
+    'registration.lecturer',
+    'registration.schedule',
+    'gradeAlert.semester',
+    'gradeAlert.courseCode',
+    'gradeAlert.courseName',
+    'gradeAlert.conductRank',
+  ]) {
+    assert.ok(page.includes(`maxLength={MAIL_COMPOSE_LIMITS.${limit}}`), `${limit} must have a maxLength attribute`);
+  }
+
+  const messages = read('src/i18n/messages.ts');
+  const viStart = messages.indexOf('export const vi');
+  const en = messages.slice(0, viStart);
+  const vi = messages.slice(viStart);
+  assert.match(en, /charCount: '\{count\} \/ \{max\} characters'/);
+  assert.match(vi, /charCount: '\{count\} \/ \{max\} ký tự'/);
+  for (const issue of [
+    'contentTooLong',
+    'highlightsTooMany',
+    'titleTooLong',
+    'creditsInvalid',
+    'totalCreditsInvalid',
+    'gpa4Invalid',
+  ]) {
+    assert.match(en, new RegExp(`${issue}:`), `${issue} must be localized in English`);
+    assert.match(vi, new RegExp(`${issue}:`), `${issue} must be localized in Vietnamese`);
+  }
 });
