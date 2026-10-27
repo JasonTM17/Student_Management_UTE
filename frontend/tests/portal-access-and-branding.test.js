@@ -17,7 +17,7 @@ test('homepage header CTA stays mounted during auth load', () => {
   assert.match(home, /messages\.common\.actions\.openDashboard/);
 });
 
-test('leftover permission pages no longer spinner-gate authLoading or hasAccess', () => {
+test('permission pages no longer spinner-gate authLoading or hasAccess', () => {
   const files = [
     'src/app/dashboard/announcements/page.tsx',
     'src/app/dashboard/lecturer/announcements/page.tsx',
@@ -51,7 +51,7 @@ test('public signup explains that student accounts are issued by the Academic Of
   assert.match(login, /portal === 'admin' \? null/);
 });
 
-test('leftover sources do not add new locale === vi UI dictionaries', () => {
+test('portal sources do not add new locale === vi UI dictionaries', () => {
   const protectedRoute = read('src/components/ProtectedRoute.tsx');
   assert.doesNotMatch(protectedRoute, /locale === 'vi'/);
   assert.match(protectedRoute, /messages\.workspaceForbidden/);

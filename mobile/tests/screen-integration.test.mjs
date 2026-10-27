@@ -69,11 +69,11 @@ test('staff copy stays inside the retained academic course scope', () => {
   assert.match(copy, /family: 'staff'/);
 });
 
-test('npm test runs the atlas and Phase 6 regressions explicitly', () => {
+test('npm test runs the atlas and screen integration regressions explicitly', () => {
   const packageJson = JSON.parse(read('package.json'));
 
   assert.match(packageJson.scripts.test, /screen-atlas\.test\.mjs/);
-  assert.match(packageJson.scripts.test, /phase-six-repair\.test\.mjs/);
+  assert.match(packageJson.scripts.test, /screen-integration\.test\.mjs/);
 });
 
 test('mobile assistant keeps native transport buffered and owner-history operations explicit', () => {

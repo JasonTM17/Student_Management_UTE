@@ -137,7 +137,7 @@ test('admin user search commits one query per submit instead of per keystroke', 
   assert.doesNotMatch(page, /onChange=\{\(e\) => setSearch\(e\.target\.value\)\}/);
 });
 
-test('feedback polish: registration groups classes, filters browse-first, and keeps drop nearby', () => {
+test('registration groups classes, filters browse-first, and keeps drop nearby', () => {
   const page = read('src/app/dashboard/register/page.tsx');
   const messages = read('src/i18n/messages.ts');
 
@@ -161,7 +161,7 @@ test('feedback polish: registration groups classes, filters browse-first, and ke
   assert.match(messages, /groupSectionCount/);
 });
 
-test('feedback polish: schedule makes the timetable primary and removes summary cards', () => {
+test('schedule makes the timetable primary and removes summary cards', () => {
   const page = read('src/app/dashboard/schedule/page.tsx');
   const grid = read('src/components/schedule/weekly-grid.tsx');
 
@@ -174,7 +174,7 @@ test('feedback polish: schedule makes the timetable primary and removes summary 
   assert.doesNotMatch(page, /metricToneClass/);
 });
 
-test('feedback polish: profile supports local photo preview and password visibility controls', () => {
+test('profile supports local photo preview and password visibility controls', () => {
   const page = read('src/app/dashboard/profile/page.tsx');
   const layout = read('src/app/dashboard/layout.tsx');
   const api = read('src/lib/api.ts');
@@ -198,7 +198,7 @@ test('feedback polish: profile supports local photo preview and password visibil
   assert.match(messages, /photoUploadFailed/);
 });
 
-test('feedback polish: office-issued credentials are server-generated while student signup stays managed', () => {
+test('office-issued credentials are server-generated while student signup stays managed', () => {
   const signup = read('src/app/register/page.tsx');
   const adminUsers = read('src/app/admin/users/page.tsx');
 
@@ -212,7 +212,7 @@ test('feedback polish: office-issued credentials are server-generated while stud
   assert.match(adminUsers, /usersApi\.resetPassword/);
 });
 
-test('feedback polish: curriculum counts stay localized and enrolled schedules use CampusCore weekdays', () => {
+test('curriculum counts stay localized and enrolled schedules use CampusCore weekdays', () => {
   const page = read('src/app/dashboard/enrollments/page.tsx');
   const grid = read('src/lib/weekly-grid.ts');
 
@@ -241,7 +241,7 @@ test('feedback polish: curriculum counts stay localized and enrolled schedules u
   assert.doesNotMatch(grid, /item\.dayOfWeek === 0 \? 7/);
 });
 
-test('feedback polish: transcript semester selector is singular and chart controls expose state', () => {
+test('transcript semester selector is singular and chart controls expose state', () => {
   const page = read('src/app/dashboard/transcript/page.tsx');
 
   assert.equal((page.match(/aria-label=\{copy\.selectSemester\}/g) ?? []).length, 1);
@@ -369,7 +369,7 @@ test('thesis lecturer-student multi-role flow provides group approval, rejection
   assert.doesNotMatch(thesisPageSource, /MSSV:[\s\S]{0,90}\{member\.studentId\}/);
 });
 
-test('dogfood audit: registration conflicts surface the specific backend code', () => {
+test('registration conflicts surface the specific backend code', () => {
   const libSource = read('src/lib/campus-error.ts');
   const registerPage = read('src/app/dashboard/register/page.tsx');
   const messagesSource = read('src/i18n/messages.ts');
@@ -420,7 +420,7 @@ test('conduct score page localizes dense records and gives mobile its own cards'
   assert.doesNotMatch(page, /selectedActivity\.(title|category|organizer|activityDate)/);
 });
 
-test('dogfood audit: admin enrollments section lookup respects the 100 cap and covers all pages', () => {
+test('admin enrollments section lookup respects the 100 cap and covers all pages', () => {
   const page = read('src/app/admin/enrollments/page.tsx');
   // Per-request the call still honors the /sections 100-row cap; fetchAllPages
   // walks the remaining pages so the dropdown stops hiding sections >100.
@@ -428,7 +428,7 @@ test('dogfood audit: admin enrollments section lookup respects the 100 cap and c
   assert.doesNotMatch(page, /sectionsApi\.getAll\(\{\s*courseId,\s*limit: ACADEMIC_REFERENCE_LIMIT/);
 });
 
-test('feedback polish: admin enrollment opens a student-focused detail profile', () => {
+test('admin enrollment opens a student-focused detail profile', () => {
   const page = read('src/app/admin/enrollments/page.tsx');
 
   assert.match(page, /function getLearnerLabel\(enrollment: Enrollment\)/);
@@ -444,7 +444,7 @@ test('feedback polish: admin enrollment opens a student-focused detail profile',
   assert.doesNotMatch(page, /selectedEnrollment\.finalGrade \?/);
 });
 
-test('feedback polish: grade breakdown opens through native controls and guards numeric scores', () => {
+test('grade breakdown opens through native controls and guards numeric scores', () => {
   const page = read('src/app/dashboard/grades/page.tsx');
   const modal = read('src/components/dashboard/GradeDetailModal.tsx');
   const spec = read('e2e/demo-polish.spec.ts');
@@ -469,7 +469,7 @@ test('feedback polish: grade breakdown opens through native controls and guards 
   assert.match(spec, /page\.keyboard\.press\('Enter'\)/);
 });
 
-test('dogfood audit: student group card shows the real group status', () => {
+test('student group card shows the real group status', () => {
   const page = read('src/app/dashboard/thesis/page.tsx');
   // The old derived label claimed SUBMITTED whenever a topic existed, even
   // while the group was still DRAFT and the supervisor saw no approve button.
@@ -477,7 +477,7 @@ test('dogfood audit: student group card shows the real group status', () => {
   assert.match(page, /messages\.thesis\.status\[currentGroup\.status\]/);
 });
 
-test('dogfood audit: profile form is gated on the loaded user and keeps local dates', () => {
+test('profile form is gated on the loaded user and keeps local dates', () => {
   const page = read('src/app/dashboard/profile/page.tsx');
   assert.match(page, /profileFormState\(user\)/);
   assert.match(page, /if \(!user\) \{/);
@@ -485,7 +485,7 @@ test('dogfood audit: profile form is gated on the loaded user and keeps local da
   assert.match(page, /function localDateInput/);
 });
 
-test('dogfood audit: weekly timetable grid maps Sunday dayOfWeek 0 to day 1 and lecturer agenda covers full week', () => {
+test('weekly timetable grid maps Sunday dayOfWeek 0 to day 1 and lecturer agenda covers full week', () => {
   const { buildWeeklyGrid } = load('src/lib/weekly-grid.ts');
   const grid = buildWeeklyGrid([
     { dayOfWeek: 0, startTime: '08:00', endTime: '10:00', courseCode: 'SE499', sectionNumber: 'SE499-01' },
@@ -503,7 +503,7 @@ test('dogfood audit: weekly timetable grid maps Sunday dayOfWeek 0 to day 1 and 
   assert.match(lecturerSchedule, /\[1,\s*2,\s*3,\s*4,\s*5,\s*6,\s*7\]\.map/);
 });
 
-test('dogfood audit: admin user management protects against self-deletion, self-demotion, and unauthorized super-admin actions', () => {
+test('admin user management protects against self-deletion, self-demotion, and unauthorized super-admin actions', () => {
   const page = read('src/app/admin/users/page.tsx');
   assert.match(page, /user\.id === userRecord\.id \|\| user\.email === userRecord\.email/);
   assert.match(page, /users\.length === 1 && page > 1/);
@@ -513,14 +513,14 @@ test('dogfood audit: admin user management protects against self-deletion, self-
   assert.match(page, /isRecordSuperAdmin/);
 });
 
-test('dogfood audit: thesis topic proposal wires academic departments list', () => {
+test('thesis topic proposal wires academic departments list', () => {
   const thesis = read('src/app/dashboard/thesis/page.tsx');
   assert.match(thesis, /departmentsApi\.getAll/);
   assert.match(thesis, /scopedDepartments\.map/);
   assert.match(thesis, /getLocalizedName\(locale,\s*dept,\s*dept\.name\)/);
 });
 
-test('dogfood audit: i18n, metadata, and language toggle regressions stay guarded', () => {
+test('i18n, metadata, and language toggle regressions stay guarded', () => {
   const messages = read('src/i18n/messages.ts');
   const server = read('src/i18n/server.ts');
   const sitemap = read('src/app/sitemap.ts');
