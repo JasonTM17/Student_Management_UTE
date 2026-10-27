@@ -13,7 +13,7 @@
   "dependencies": {
     "@expo-google-fonts/be-vietnam-pro": "^0.4.1",
     "@expo/vector-icons": "^15.1.1",
-    "expo": "~57.0.19",
+    "expo": "~57.0.31",
     "expo-font": "~57.0.3",
     "react": "19.2.3",
     "react-native": "0.86.3"
