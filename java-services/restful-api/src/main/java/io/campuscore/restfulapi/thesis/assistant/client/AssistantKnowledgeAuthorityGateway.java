@@ -1,7 +1,8 @@
 package io.campuscore.restfulapi.thesis.assistant.client;
 
-import com.fasterxml.jackson.core.type.TypeReference;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.core.type.TypeReference;
+import tools.jackson.core.JacksonException;
+import tools.jackson.databind.ObjectMapper;
 import io.campuscore.restfulapi.thesis.assistant.dto.KnowledgeDocumentView;
 import io.campuscore.restfulapi.thesis.assistant.dto.KnowledgeRequest;
 import io.campuscore.restfulapi.thesis.assistant.dto.KnowledgeRevision;
@@ -127,7 +128,7 @@ public class AssistantKnowledgeAuthorityGateway {
             if (type == null || response.body() == null || response.body().isBlank()) return null;
             try {
                 return mapper.readValue(response.body(), type);
-            } catch (IOException malformed) {
+            } catch (JacksonException malformed) {
                 throw new DomainException(HttpStatus.BAD_GATEWAY, "RAG_RESPONSE_INVALID", "Knowledge authority response was invalid");
             }
         } catch (DomainException exception) {
@@ -174,7 +175,7 @@ public class AssistantKnowledgeAuthorityGateway {
     private HttpRequest.BodyPublisher bodyPublisher(Object body) {
         try {
             return HttpRequest.BodyPublishers.ofString(mapper.writeValueAsString(body), StandardCharsets.UTF_8);
-        } catch (IOException exception) {
+        } catch (JacksonException exception) {
             throw new DomainException(HttpStatus.BAD_REQUEST, "KNOWLEDGE_REQUEST_INVALID", "Knowledge request could not be serialized");
         }
     }
@@ -193,7 +194,7 @@ public class AssistantKnowledgeAuthorityGateway {
                 ApiError error = mapper.readValue(body, ApiError.class);
                 if (error.code() != null && !error.code().isBlank()) code = error.code();
                 if (error.message() != null && !error.message().isBlank()) message = error.message();
-            } catch (IOException ignored) {
+            } catch (JacksonException ignored) {
                 // Never reflect an upstream body or provider detail to callers.
             }
         }

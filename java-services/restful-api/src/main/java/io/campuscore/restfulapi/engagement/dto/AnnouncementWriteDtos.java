@@ -1,7 +1,7 @@
 package io.campuscore.restfulapi.engagement.dto;
 
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.node.ObjectNode;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.node.ObjectNode;
 import jakarta.validation.constraints.NotNull;
 import java.time.Instant;
 import java.time.format.DateTimeParseException;
@@ -155,7 +155,7 @@ public final class AnnouncementWriteDtos {
 
     private static Set<String> presentAllowedFields(ObjectNode body, boolean lifecycleAllowed) {
         Set<String> present = new LinkedHashSet<>();
-        Iterator<String> fieldNames = body.fieldNames();
+        Iterator<String> fieldNames = body.propertyNames().iterator();
         while (fieldNames.hasNext()) {
             String field = fieldNames.next();
             if (!ANNOUNCEMENT_FIELDS.contains(field)) {
@@ -169,7 +169,7 @@ public final class AnnouncementWriteDtos {
     }
 
     private static void presentLifecycleFields(ObjectNode body) {
-        Iterator<String> fieldNames = body.fieldNames();
+        Iterator<String> fieldNames = body.propertyNames().iterator();
         while (fieldNames.hasNext()) {
             String field = fieldNames.next();
             if (!LIFECYCLE_FIELDS.contains(field)) {

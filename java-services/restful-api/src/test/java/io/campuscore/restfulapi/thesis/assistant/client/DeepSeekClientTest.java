@@ -2,7 +2,7 @@ package io.campuscore.restfulapi.thesis.assistant.client;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.ObjectMapper;
 import io.campuscore.restfulapi.thesis.assistant.model.CompletionRequest;
 import io.campuscore.restfulapi.thesis.assistant.model.ProviderSegment;
 import java.io.ByteArrayInputStream;
@@ -44,12 +44,12 @@ class DeepSeekClientTest {
     @Test
     void whitespaceOnlyTokensPreserveWordAndParagraphBoundariesWithoutBlankSegments() {
         DeepSeekClient client = new DeepSeekClient(new DeepSeekProperties(false, "",
-                "https://api.deepseek.com", "deepseek-v4-flash", 8000, 800), new ObjectMapper());
+                "https://api.deepseek.com", "deepseek-v4-flash", 8000, 800), tools.jackson.databind.json.JsonMapper.builder().build());
         var request = new CompletionRequest("question", "vi", "context", List.of("source-1"));
         StringBuilder wire = new StringBuilder();
         for (String text : List.of("lợi", " ", "ích", "\n\n", "Tối", " ", "ưu", " ", "SE421", " ", "A-101")) {
             wire.append("data: {\"choices\":[{\"delta\":{\"content\":")
-                    .append(new ObjectMapper().valueToTree(text).toString()).append("},\"finish_reason\":null}]}\n\n");
+                    .append(tools.jackson.databind.json.JsonMapper.builder().build().valueToTree(text).toString()).append("},\"finish_reason\":null}]}\n\n");
         }
         wire.append("data: {\"choices\":[{\"delta\":{},\"finish_reason\":\"stop\"}]}\n\n")
                 .append("data: [DONE]\n\n");
@@ -70,7 +70,7 @@ class DeepSeekClientTest {
     @Test
     void disabledProviderFailsBeforeAnyNetworkCall() {
         DeepSeekProperties properties = new DeepSeekProperties(false, "", "https://api.deepseek.com", "deepseek-v4-flash", 8000, 800);
-        DeepSeekClient client = new DeepSeekClient(properties, new ObjectMapper());
+        DeepSeekClient client = new DeepSeekClient(properties, tools.jackson.databind.json.JsonMapper.builder().build());
         assertThrows(ProviderUnavailableException.class,
                 () -> client.complete("question", "context", "vi"));
     }
@@ -78,7 +78,7 @@ class DeepSeekClientTest {
     @Test
     void hostileBaseUrlIsRejected() {
         DeepSeekProperties properties = new DeepSeekProperties(true, "fixture", "https://api.deepseek.com.evil", "deepseek-v4-flash", 8000, 800);
-        DeepSeekClient client = new DeepSeekClient(properties, new ObjectMapper());
+        DeepSeekClient client = new DeepSeekClient(properties, tools.jackson.databind.json.JsonMapper.builder().build());
         assertThrows(ProviderUnavailableException.class,
                 () -> client.complete("question", "context", "vi"));
     }
@@ -86,7 +86,7 @@ class DeepSeekClientTest {
     @Test
     void providerStreamRequiresDoneMarkerAndTerminalStopReason() {
         DeepSeekProperties properties = new DeepSeekProperties(false, "", "https://api.deepseek.com", "deepseek-v4-flash", 8000, 800);
-        DeepSeekClient client = new DeepSeekClient(properties, new ObjectMapper());
+        DeepSeekClient client = new DeepSeekClient(properties, tools.jackson.databind.json.JsonMapper.builder().build());
         var request = new CompletionRequest("question", "en", "context", List.of("source-1"));
         String missingDone = "data: {\"choices\":[{\"delta\":{\"content\":\"answer\"},\"finish_reason\":\"stop\"}]}\n\n";
         ProviderUnavailableException exception = assertThrows(ProviderUnavailableException.class,

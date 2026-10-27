@@ -7,8 +7,8 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.ObjectMapper;
 import io.campuscore.restfulapi.thesis.repository.ThesisDatabaseClockRepository;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
@@ -17,7 +17,7 @@ import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
+import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -262,7 +262,7 @@ class ThesisRoundRegistrationScheduleTest {
                 .andExpect(status().isOk())
                 .andReturn().getResponse().getContentAsString();
 
-        JsonNode round = new ObjectMapper().readTree(response).get(0);
+        JsonNode round = tools.jackson.databind.json.JsonMapper.builder().build().readTree(response).get(0);
         assertThat(round).isNotNull();
         assertThat(round.get("id").asText()).isEqualTo(roundId.toString());
         assertThat(round.hasNonNull("serverNow")).isTrue();

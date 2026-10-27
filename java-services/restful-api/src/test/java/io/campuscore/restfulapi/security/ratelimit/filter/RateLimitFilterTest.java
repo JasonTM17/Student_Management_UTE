@@ -7,7 +7,7 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.ObjectMapper;
 import io.campuscore.restfulapi.exception.response.ApiErrorWriter;
 import io.campuscore.restfulapi.security.ratelimit.properties.RateLimitProperties;
 import io.campuscore.restfulapi.security.ratelimit.service.ClientIpResolver;
@@ -35,7 +35,7 @@ class RateLimitFilterTest {
         // trustProxyHeaders=false keeps the default socket-address client key,
         // matching direct (non-proxied) request handling in these tests.
         properties = new RateLimitProperties(true, false, false, "", 5, 40, 60);
-        errorWriter = new ApiErrorWriter(new ObjectMapper());
+        errorWriter = new ApiErrorWriter(tools.jackson.databind.json.JsonMapper.builder().build());
         filter = new RateLimitFilter(limiterService, properties, errorWriter, new ClientIpResolver(properties));
         SecurityContextHolder.clearContext();
     }

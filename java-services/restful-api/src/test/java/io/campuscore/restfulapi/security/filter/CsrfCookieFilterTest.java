@@ -4,7 +4,7 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.ObjectMapper;
 import io.campuscore.restfulapi.exception.response.ApiErrorWriter;
 import jakarta.servlet.FilterChain;
 import org.junit.jupiter.api.Test;
@@ -20,7 +20,7 @@ class CsrfCookieFilterTest {
             "cc_refresh_token",
             "cc_csrf",
             "X-CSRF-Token",
-            new ApiErrorWriter(new ObjectMapper()));
+            new ApiErrorWriter(tools.jackson.databind.json.JsonMapper.builder().build()));
 
     @Test
     void cookieMutationRequiresMatchingDoubleSubmitToken() throws Exception {

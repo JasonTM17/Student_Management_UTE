@@ -1,6 +1,6 @@
 package io.campuscore.restfulapi.engagement.controller;
 
-import com.fasterxml.jackson.databind.JsonNode;
+import tools.jackson.databind.JsonNode;
 import io.campuscore.restfulapi.engagement.service.AnnouncementWriteService;
 import io.campuscore.restfulapi.engagement.dto.AnnouncementReadDtos.AnnouncementHistoryListResponse;
 import io.campuscore.restfulapi.engagement.dto.AnnouncementReadDtos.AnnouncementResponse;

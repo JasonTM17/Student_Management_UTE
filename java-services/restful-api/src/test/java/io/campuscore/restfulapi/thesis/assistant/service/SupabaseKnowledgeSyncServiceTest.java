@@ -9,7 +9,7 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.ObjectMapper;
 import io.campuscore.restfulapi.thesis.assistant.dto.SyncResult;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
@@ -231,7 +231,7 @@ class SupabaseKnowledgeSyncServiceTest {
                 "https://supabase.example", "service-role", "assistant",
                 "knowledge_release", "knowledge_release_document", 500, 1_000);
         SupabaseKnowledgeSyncService sync = new SupabaseKnowledgeSyncService(properties, jdbc,
-                new ObjectMapper(), runner(), http);
+                tools.jackson.databind.json.JsonMapper.builder().build(), runner(), http);
 
         SyncResult result = sync.syncNow();
 
@@ -290,7 +290,7 @@ class SupabaseKnowledgeSyncServiceTest {
         SupabaseKnowledgeProperties properties = new SupabaseKnowledgeProperties(true,
                 "https://supabase.example", "service-role", "assistant",
                 "knowledge_release", "knowledge_release_document", 500, 1_000);
-        return new SupabaseKnowledgeSyncService(properties, jdbc, new ObjectMapper(),
+        return new SupabaseKnowledgeSyncService(properties, jdbc, tools.jackson.databind.json.JsonMapper.builder().build(),
                 runner(), http);
     }
 

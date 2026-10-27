@@ -6,7 +6,7 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.ObjectMapper;
 import io.campuscore.restfulapi.exception.response.ApiErrorWriter;
 import jakarta.servlet.FilterChain;
 import org.junit.jupiter.api.BeforeEach;
@@ -27,7 +27,7 @@ class JsonBodyCapFilterTest {
 
     @BeforeEach
     void setUp() {
-        filter = new JsonBodyCapFilter(new ApiErrorWriter(new ObjectMapper()));
+        filter = new JsonBodyCapFilter(new ApiErrorWriter(tools.jackson.databind.json.JsonMapper.builder().build()));
     }
 
     private MockHttpServletRequest jsonPost(String uri, int contentLength) {
