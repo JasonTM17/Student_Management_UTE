@@ -10,6 +10,7 @@ import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import java.util.List;
@@ -126,6 +127,26 @@ class MailEndpointSecurityTest {
     }
 
     @Test
+    void adminCannotSendInstitutionMailToUnknownExternalAddress() throws Exception {
+        String notice = """
+                {"to":"evil@example.org","recipientName":"Target","category":"HỌC VỤ",
+                 "title":"Account verification required","author":"CampusCore","content":"Open this link"}
+                """;
+        when(recipientScope.findActiveRecipientByEmail("evil@example.org")).thenReturn(null);
+
+        mvc.perform(post("/api/v1/mail/notice")
+                        .with(superAdminJwt())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(notice))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("MAIL_RECIPIENT_UNKNOWN"))
+                .andExpect(jsonPath("$.message").value("Người nhận không tồn tại hoặc tài khoản không hoạt động"));
+
+        org.mockito.Mockito.verify(recipientScope).findActiveRecipientByEmail("evil@example.org");
+        org.mockito.Mockito.verifyNoInteractions(emailService);
+    }
+
+    @Test
     void anonymousPreviewIsRejected() throws Exception {
         mvc.perform(get("/api/v1/mail/preview/grade-alert"))
                 .andExpect(status().isUnauthorized());
@@ -133,12 +154,15 @@ class MailEndpointSecurityTest {
 
     @Test
     void superAdminMaySendTestEmailAndGradeAlerts() throws Exception {
+        when(recipientScope.findActiveStudentRecipient("SV1234"))
+                .thenReturn(new ScopedRecipient("sv@campuscore.edu", "Nguyen Van A", "SV1234"));
+
         mvc.perform(post("/api/v1/mail/test")
                         .with(superAdminJwt())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(VALID_TEST_MAIL))
                 .andExpect(status().isOk());
-        verify(emailService).sendTestEmail(any(), any(), any());
+        verify(emailService).sendTestEmail(eq("mail-super-admin-user@fixture.invalid"), any(), any());
 
         mvc.perform(post("/api/v1/mail/grade-alert")
                         .with(superAdminJwt())
