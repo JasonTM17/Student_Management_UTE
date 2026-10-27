@@ -8,6 +8,7 @@ import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
+import java.util.Set;
 import io.campuscore.restfulapi.exception.response.ApiErrorWriter;
 import org.springframework.http.HttpStatus;
 import org.springframework.beans.factory.annotation.Value;
@@ -18,6 +19,20 @@ import org.springframework.web.filter.OncePerRequestFilter;
 /** Enforces the existing double-submit CSRF contract for cookie-authenticated web requests. */
 @Component
 public class CsrfCookieFilter extends OncePerRequestFilter {
+
+    /**
+     * Endpoints an anonymous caller may legitimately reach while holding stale
+     * session cookies (permitAll in SecurityConfig). The double-submit check
+     * exists to protect actions taken under an established session; none of
+     * these paths consume session authority, so leftover cookies must not
+     * lock a signed-out user out of signing in or resetting a password.
+     * /api/v1/auth/refresh stays enforced: it rotates the session itself.
+     */
+    private static final Set<String> ANONYMOUS_AUTH_PATHS = Set.of(
+            "/api/v1/auth/login",
+            "/api/v1/auth/two-factor/verify",
+            "/api/v1/auth/forgot-password",
+            "/api/v1/auth/reset-password");
 
     private final String accessTokenCookie;
     private final String refreshTokenCookie;
@@ -45,7 +60,8 @@ public class CsrfCookieFilter extends OncePerRequestFilter {
             FilterChain filterChain) throws ServletException, IOException {
         if (isSafeMethod(request.getMethod())
                 || hasBearerHeader(request)
-                || !hasSessionCookie(request)) {
+                || !hasSessionCookie(request)
+                || ANONYMOUS_AUTH_PATHS.contains(request.getRequestURI())) {
             filterChain.doFilter(request, response);
             return;
         }
