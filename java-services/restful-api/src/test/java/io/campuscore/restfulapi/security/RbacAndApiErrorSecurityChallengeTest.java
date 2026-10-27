@@ -242,6 +242,11 @@ class RbacAndApiErrorSecurityChallengeTest {
         @Test
         @DisplayName("Super Admin can access all Mail endpoints (/test, /notice, /registration, /grade-alert)")
         void superAdminCanAccessAllMailEndpoints() throws Exception {
+            when(recipientScope.findActiveRecipientByEmail("student@campuscore.edu"))
+                    .thenReturn(new ScopedRecipient("student@campuscore.edu", "Student A", null));
+            when(recipientScope.findActiveStudentRecipient("SV9999"))
+                    .thenReturn(new ScopedRecipient("student@campuscore.edu", "Student A", "SV9999"));
+
             mvc.perform(post("/api/v1/mail/test")
                             .with(superAdminJwt())
                             .contentType(MediaType.APPLICATION_JSON)
