@@ -114,3 +114,4 @@ scratch/
 /database/domain_management_system*.sql
 /docs/report_images/
 ~$*
+*.docx
