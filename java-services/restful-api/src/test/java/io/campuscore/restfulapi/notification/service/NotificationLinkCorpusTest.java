@@ -1,7 +1,7 @@
 package io.campuscore.restfulapi.notification.service;
 
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.ObjectMapper;
 import io.campuscore.restfulapi.exception.DomainException;
 import java.io.InputStream;
 import org.junit.jupiter.api.Test;
@@ -16,7 +16,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
  */
 class NotificationLinkCorpusTest {
 
-    private static final ObjectMapper MAPPER = new ObjectMapper();
+    private static final ObjectMapper MAPPER = tools.jackson.databind.json.JsonMapper.builder().build();
 
     @Test
     void everyCorpusValueClassifiesTheSame() throws Exception {

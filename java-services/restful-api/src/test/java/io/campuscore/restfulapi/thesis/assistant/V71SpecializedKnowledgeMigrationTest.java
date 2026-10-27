@@ -2,7 +2,7 @@ package io.campuscore.restfulapi.thesis.assistant;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.ObjectMapper;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.regex.Pattern;
@@ -137,7 +137,7 @@ class V71SpecializedKnowledgeMigrationTest {
     @Test
     void specializedSupabaseSeedPassesThePublicKnowledgeGuard() throws Exception {
         Path corpus = Path.of("../../supabase/seed/assistant-specialized-knowledge.json");
-        var documents = new ObjectMapper().readTree(Files.readString(corpus));
+        var documents = tools.jackson.databind.json.JsonMapper.builder().build().readTree(Files.readString(corpus));
         // V71's 24 original topics remain; forward-only V115 adds two DI articles.
         assertThat(documents.size()).isEqualTo(26);
         var rejected = new java.util.ArrayList<String>();

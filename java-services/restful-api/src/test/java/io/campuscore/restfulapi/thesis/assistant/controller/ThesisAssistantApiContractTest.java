@@ -5,7 +5,7 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.ObjectMapper;
 import io.campuscore.restfulapi.thesis.assistant.dto.StreamDelta;
 import io.campuscore.restfulapi.thesis.assistant.dto.StreamDone;
 import io.campuscore.restfulapi.thesis.assistant.dto.StreamMeta;
@@ -71,7 +71,7 @@ class ThesisAssistantApiContractTest {
 
     @Test
     void streamEventsCarryDiscriminatorsAndStableTerminalShape() throws Exception {
-        ObjectMapper mapper = new ObjectMapper();
+        ObjectMapper mapper = tools.jackson.databind.json.JsonMapper.builder().build();
         UUID client = UUID.randomUUID();
         String meta = mapper.writeValueAsString(new StreamMeta(UUID.randomUUID(), client,
                 UUID.randomUUID(), UUID.randomUUID(), "model", "en"));

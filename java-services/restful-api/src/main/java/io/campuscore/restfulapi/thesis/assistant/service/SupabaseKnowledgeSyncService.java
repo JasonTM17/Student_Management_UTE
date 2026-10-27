@@ -1,7 +1,8 @@
 package io.campuscore.restfulapi.thesis.assistant.service;
 
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.core.JacksonException;
+import tools.jackson.databind.ObjectMapper;
 import io.campuscore.restfulapi.thesis.assistant.dto.SyncResult;
 import java.io.IOException;
 import java.net.URI;
@@ -280,7 +281,7 @@ public class SupabaseKnowledgeSyncService {
             HttpResponse<String> response = http.send(request, HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8));
             if (response.statusCode() / 100 != 2) throw new SyncFailure("Supabase request was rejected");
             try { return mapper.readTree(response.body()); }
-            catch (IOException malformed) { throw new SyncFailure("Supabase response was malformed"); }
+            catch (JacksonException malformed) { throw new SyncFailure("Supabase response was malformed"); }
         } catch (IOException exception) {
             throw new SyncFailure("Supabase request failed");
         } catch (InterruptedException exception) {

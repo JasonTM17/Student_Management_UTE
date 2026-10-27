@@ -1,7 +1,7 @@
 package io.campuscore.restfulapi.notification.dto;
 
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.node.ObjectNode;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.node.ObjectNode;
 import java.util.Collections;
 import java.util.Iterator;
 import java.util.LinkedHashSet;
@@ -86,7 +86,7 @@ public final class NotificationWriteDtos {
 
     private static Set<String> presentAllowedFields(ObjectNode body, Set<String> allowedFields) {
         Set<String> present = new LinkedHashSet<>();
-        Iterator<String> fieldNames = body.fieldNames();
+        Iterator<String> fieldNames = body.propertyNames().iterator();
         while (fieldNames.hasNext()) {
             String field = fieldNames.next();
             if (!allowedFields.contains(field)) {

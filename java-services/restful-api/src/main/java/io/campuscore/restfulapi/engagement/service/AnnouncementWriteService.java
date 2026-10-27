@@ -1,7 +1,7 @@
 package io.campuscore.restfulapi.engagement.service;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.core.JacksonException;
+import tools.jackson.databind.ObjectMapper;
 import io.campuscore.restfulapi.engagement.model.SanitizationResult;
 import io.campuscore.restfulapi.engagement.repository.AnnouncementAuditRepository;
 import io.campuscore.restfulapi.engagement.model.AuditCommand;
@@ -618,7 +618,7 @@ public class AnnouncementWriteService {
         }
         try {
             return objectMapper.writeValueAsString(value);
-        } catch (JsonProcessingException exception) {
+        } catch (JacksonException exception) {
             throw new IllegalStateException("Announcement audit snapshot could not be serialized", exception);
         }
     }

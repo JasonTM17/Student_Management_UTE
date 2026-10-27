@@ -1,9 +1,9 @@
 package io.campuscore.restfulapi.site.service;
 
-import com.fasterxml.jackson.core.JacksonException;
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.node.ObjectNode;
+import tools.jackson.core.JacksonException;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.ObjectMapper;
+import tools.jackson.databind.node.ObjectNode;
 import io.campuscore.restfulapi.site.dto.SiteAppearancePayload;
 import io.campuscore.restfulapi.site.repository.SiteAppearanceRepository;
 import java.time.Instant;
