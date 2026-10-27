@@ -1181,7 +1181,7 @@ export default function LecturerMailComposePage() {
               </RailRow>
               <RailRow label={copy.templateLabel}>{templateTitle(template)}</RailRow>
               {template === 'notice' ? (
-                <RailRow label={copy.fields.charCount.replace('{count}', '').trim()}>
+                <RailRow label={copy.fields.contentLength}>
                   {formatNumber(notice.content.length)}
                 </RailRow>
               ) : null}
