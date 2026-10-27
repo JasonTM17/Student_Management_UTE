@@ -14,7 +14,7 @@ const root = path.resolve(__dirname, '..');
  *
  * These assertions pin the shape that fixes both halves, following the same
  * submit-commits-one-query contract already proven for the users page in
- * project-scan-fixes.test.js: a controlled input, a committed term, `search`
+ * portal-data-integrity.test.js: a controlled input, a committed term, `search`
  * handed to the API, the fetch keyed on page + search, and no surviving
  * in-memory narrowing of the fetched rows.
  */
