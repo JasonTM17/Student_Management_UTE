@@ -12,6 +12,12 @@
 *.scss text eol=lf
 *.html text eol=lf
 *.sh text eol=lf
+*.mjs text eol=lf
+*.cjs text eol=lf
+*.py text eol=lf
+*.svg text eol=lf
+*.xml text eol=lf
+*.toml text eol=lf
 # Flyway fingerprints migration content, so a checkout that rewrites line
 # endings changes the recorded checksum and aborts the next boot.
 *.sql text eol=lf
@@ -25,3 +31,4 @@
 *.ico binary
 *.pdf binary
 *.zip binary
+*.webp binary
