@@ -1650,7 +1650,7 @@ test('session transport: the cold-start retry honors the opt-out flag only', asy
 });
 
 test('session transport: a discovered 401 publishes signed-out to sibling tabs before redirecting', async () => {
-  const { interceptors, getCalls, sessionSyncPublished } = loadApiModule();
+  const { interceptors, getCalls, postCalls, sessionSyncPublished } = loadApiModule();
   const previousWindow = globalThis.window;
   const previousDocument = globalThis.document;
   const location = { pathname: '/dashboard', origin: 'http://localhost', href: '' };
@@ -1662,6 +1662,17 @@ test('session transport: a discovered 401 publishes signed-out to sibling tabs b
     const meCalls = getCalls.filter((call) => call.args[0] === '/auth/me');
     assert.equal(meCalls.length, 1, 'the redirect boundary confirms the cookie once');
     meCalls[0].reject({ response: { status: 401 } });
+    let refreshCalls = [];
+    for (let attempt = 0; attempt < 50 && refreshCalls.length === 0; attempt += 1) {
+      await settle();
+      refreshCalls = postCalls.filter((call) => call.args[0] === '/auth/refresh');
+    }
+    assert.equal(
+      refreshCalls.length,
+      1,
+      'the confirm must rotate once before declaring the session dead',
+    );
+    refreshCalls[0].reject({ response: { status: 401 } });
     await settle();
     assert.deepEqual(
       sessionSyncPublished,
@@ -1676,7 +1687,7 @@ test('session transport: a discovered 401 publishes signed-out to sibling tabs b
 });
 
 test('session transport: a dead cookie on /login does not reload the page in a loop', async () => {
-  const { interceptors, getCalls, sessionSyncPublished } = loadApiModule();
+  const { interceptors, getCalls, postCalls, sessionSyncPublished } = loadApiModule();
   const previousWindow = globalThis.window;
   const previousDocument = globalThis.document;
   const location = { pathname: '/vi/login', origin: 'http://localhost', href: '' };
@@ -1688,6 +1699,13 @@ test('session transport: a dead cookie on /login does not reload the page in a l
     const meCalls = getCalls.filter((call) => call.args[0] === '/auth/me');
     assert.equal(meCalls.length, 1, 'the redirect boundary confirms the cookie once');
     meCalls[0].reject({ response: { status: 401 } });
+    let refreshCalls = [];
+    for (let attempt = 0; attempt < 50 && refreshCalls.length === 0; attempt += 1) {
+      await settle();
+      refreshCalls = postCalls.filter((call) => call.args[0] === '/auth/refresh');
+    }
+    assert.equal(refreshCalls.length, 1);
+    refreshCalls[0].reject({ response: { status: 401 } });
     await settle();
     assert.deepEqual(sessionSyncPublished, ['signed-out'], 'siblings still converge on the dead session');
     assert.equal(location.href, '', 'already on /login — navigating again would reload the login page forever');
@@ -2673,7 +2691,7 @@ test('api 401: a protected 401 confirms me() first and stays put while the cooki
 test('api 401: a dead shared cookie publishes signed-out and navigates once under concurrent 401s', async () => {
   const env = mountApiBrowserGlobals();
   try {
-    const { interceptors, getCalls, sessionSyncPublished } = loadApiModule();
+    const { interceptors, getCalls, postCalls, sessionSyncPublished } = loadApiModule();
     const first = interceptors
       .responseError({
         response: { status: 401 },
@@ -2692,6 +2710,17 @@ test('api 401: a dead shared cookie publishes signed-out and navigates once unde
     meCalls[0].reject({ response: { status: 401 } });
     await first;
     await second;
+    let refreshCalls = [];
+    for (let attempt = 0; attempt < 50 && refreshCalls.length === 0; attempt += 1) {
+      await settle();
+      refreshCalls = postCalls.filter((call) => call.args[0] === '/auth/refresh');
+    }
+    assert.equal(
+      refreshCalls.length,
+      1,
+      'concurrent confirmations share one rotation single-flight',
+    );
+    refreshCalls[0].reject({ response: { status: 401 } });
     await settle();
     assert.deepEqual(sessionSyncPublished, ['signed-out']);
     assert.equal(env.navigations.length, 1, 'concurrent 401s share one redirect');
@@ -2985,6 +3014,13 @@ test('session poll: a confirmed 401 publishes signed-out once and navigates to l
     assert.equal(mounted.meCalls.length, 2);
     mounted.meCalls[1].reject({ response: { status: 401 } });
     await settle();
+    assert.equal(
+      mounted.refreshCalls.length,
+      1,
+      'a probe 401 rotates once before the signed-out verdict',
+    );
+    mounted.refreshCalls[0].reject({ response: { status: 401 } });
+    await settle();
     assert.deepEqual(mounted.sessionSync.published, ['signed-out']);
     assert.equal(env.replaces.length, 1);
     assert.match(env.replaces[0], /\/en\/login/);
@@ -3073,7 +3109,7 @@ test('session poll: unmount clears the interval and strict remount owns one time
 test('api 401: a rotated CSRF hint during the held confirmation suppresses the sign-out', async () => {
   const env = mountApiBrowserGlobals();
   try {
-    const { interceptors, getCalls, sessionSyncPublished } = loadApiModule();
+    const { interceptors, getCalls, postCalls, sessionSyncPublished } = loadApiModule();
     const rejection = interceptors
       .responseError({
         response: { status: 401 },
@@ -3086,6 +3122,13 @@ test('api 401: a rotated CSRF hint during the held confirmation suppresses the s
     env.documentObj.cookie = 'cc_csrf=hint-b';
     meCalls[0].reject({ response: { status: 401 } });
     await rejection;
+    let refreshCalls = [];
+    for (let attempt = 0; attempt < 50 && refreshCalls.length === 0; attempt += 1) {
+      await settle();
+      refreshCalls = postCalls.filter((call) => call.args[0] === '/auth/refresh');
+    }
+    assert.equal(refreshCalls.length, 1, 'the confirm rotates under the newer cookie');
+    refreshCalls[0].reject({ response: { status: 401 } });
     await settle();
     assert.deepEqual(
       sessionSyncPublished,
@@ -3112,6 +3155,13 @@ test('session poll: a 401 arriving after the CSRF hint rotated never signs the t
 
     env.documentObj.cookie = 'cc_csrf=hint-b';
     mounted.meCalls[1].reject({ response: { status: 401 } });
+    await settle();
+    assert.equal(
+      mounted.refreshCalls.length,
+      1,
+      'the poll rotates once before judging the 401',
+    );
+    mounted.refreshCalls[0].reject({ response: { status: 401 } });
     await settle();
     assert.deepEqual(
       mounted.sessionSync.published,
