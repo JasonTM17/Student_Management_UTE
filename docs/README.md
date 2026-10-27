@@ -30,7 +30,7 @@ the authority for current implementation behavior.
 - [Secret provisioning](../ops/secrets/README.md)
 - [Systemd operations](../ops/systemd/README.md)
 
-## Integrations and proposals
+## Integrations
 
 - [Attendance date keys](integrations/attendance-date-keys.md)
 - [DeepSeek assistant](integrations/deepseek-assistant.md)
@@ -38,15 +38,6 @@ the authority for current implementation behavior.
 - [Thesis cancellation history](integrations/thesis-cancellation-history.md)
 - [Thesis group governance](integrations/thesis-group-governance.md)
 - [Thesis report storage](integrations/thesis-report-storage.md)
-- [Production RAG proposal](proposals/20260904-campuscore-production-rag-proposal.md)
-
-## Historical audit snapshots
-
-These documents preserve dated findings and evidence. Recheck their status
-against the current source and runtime before treating an item as open or fixed.
-
-- [Recommendations, rounds 7–9](RECOMMENDATIONS.md)
-- [Recommendations, round 10](RECOMMENDATIONS-round10.md)
 
 ## Visual assets
 

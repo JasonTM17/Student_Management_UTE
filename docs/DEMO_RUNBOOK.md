@@ -200,7 +200,7 @@ npm run lint --prefix frontend
 
 ## 5. Demo Mở Rộng: Vòng Đời Đề Tài (NCKH/TLCN/KLTN) — Án Yêu Cầu Đồ Án Cuối Kỳ
 
-Module `thesis` đáp ứng trọn vẹn yêu cầu "Quản lý đề tài" (plans/20260909-pdf-requirements-audit):
+Module `thesis` đáp ứng trọn vẹn yêu cầu "Quản lý đề tài":
 đợt 2 giai đoạn, nhóm ≤3 SV, đề tài 1–2 GVHD, báo cáo do nhóm trưởng nộp, hội đồng
 3–5 GV (chủ tịch + thư ký), điểm cuối = trung bình điểm DEFENSE của các thành viên hội đồng hợp lệ, cấm GVHD chấm đề tài
 mình hướng dẫn, công bố kết quả cho sinh viên.
@@ -217,7 +217,7 @@ gắn cho tài khoản Admin. Giảng viên/Sinh viên dùng tài khoản demo m
   dừng giữa buổi): cửa sổ GV `[giờ demo, +10 phút]`, cửa sổ SV `[+10 phút, 23:59 hôm nay]`,
   hạn GVPB sau khi cửa sổ SV kết thúc (ví dụ tháng sau), ngày báo cáo hội đồng sau hạn GVPB.
 
-**Kịch bản demo 5 bước** (chi tiết đầy đủ: `plans/20260909-pdf-requirements-audit/reports/acceptance-walkthrough.md`):
+**Kịch bản demo 5 bước** (các bước thao tác chi tiết bên dưới):
 
 1. **Admin → Quản trị Luận văn → Tạo đợt**: chọn loại (Môn học/NCKH/TLCN/KLTN),
    nhập 2 cửa sổ theo công thức thời gian ở trên + hạn GVPB (TLCN/KLTN) + ngày báo cáo
