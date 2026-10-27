@@ -50,7 +50,7 @@ import jakarta.servlet.http.Cookie;
 
 /** Root-owned real PostgreSQL schedules with explicit User-before-child-lock assertions. */
 @EnabledIf("postgresTargetConfigured")
-@SpringBootTest(properties = {"spring.flyway.enabled=false", "deepseek.enabled=false"})
+@SpringBootTest(properties = {"spring.flyway.locations=classpath:db/migration", "deepseek.enabled=false"})
 @ActiveProfiles({"test", "persistence"})
 class CredentialSessionLockOrderPostgresIT {
     private static final int WAIT_SECONDS = 20;

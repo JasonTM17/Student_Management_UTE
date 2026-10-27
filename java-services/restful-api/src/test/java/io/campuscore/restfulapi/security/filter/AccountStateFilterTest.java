@@ -7,7 +7,7 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.ObjectMapper;
 import io.campuscore.restfulapi.auth.model.AccountAuthorization;
 import io.campuscore.restfulapi.auth.repository.AuthUserRepository;
 import io.campuscore.restfulapi.exception.response.ApiErrorWriter;
@@ -41,7 +41,7 @@ class AccountStateFilterTest {
         repository = mock(AuthUserRepository.class);
         objectProvider = mock(ObjectProvider.class);
         when(objectProvider.getIfAvailable()).thenReturn(repository);
-        errorWriter = new ApiErrorWriter(new ObjectMapper());
+        errorWriter = new ApiErrorWriter(tools.jackson.databind.json.JsonMapper.builder().build());
         filter = new AccountStateFilter(objectProvider, errorWriter);
     }
 

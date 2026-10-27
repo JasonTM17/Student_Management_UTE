@@ -8,8 +8,8 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 import static org.mockito.Mockito.verify;
 
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.ObjectMapper;
 import io.campuscore.restfulapi.thesis.assistant.dto.KnowledgeRequest;
 import io.campuscore.restfulapi.thesis.assistant.dto.KnowledgeRevision;
 import io.campuscore.restfulapi.exception.DomainException;
@@ -38,7 +38,7 @@ class SupabaseKnowledgeAuthorityServiceTest {
             sent[0] = invocation.getArgument(0);
             return response(200, "{\"documentId\":\"11111111-1111-4111-8111-111111111111\",\"revisionId\":\"22222222-2222-4222-8222-222222222222\",\"version\":1,\"state\":\"DRAFT\"}");
         });
-        ObjectMapper mapper = new ObjectMapper();
+        ObjectMapper mapper = tools.jackson.databind.json.JsonMapper.builder().build();
         SupabaseKnowledgeAuthorityService service = new SupabaseKnowledgeAuthorityService(properties(), mapper, http);
 
         KnowledgeRevision result = service.create(new KnowledgeRequest(
@@ -61,7 +61,7 @@ class SupabaseKnowledgeAuthorityServiceTest {
                 "{\"message\":\"second_admin_required\",\"hint\":\"secret internal detail\"}");
         when(http.send(any(HttpRequest.class), any(HttpResponse.BodyHandler.class)))
                 .thenReturn(rejected);
-        SupabaseKnowledgeAuthorityService service = new SupabaseKnowledgeAuthorityService(properties(), new ObjectMapper(), http);
+        SupabaseKnowledgeAuthorityService service = new SupabaseKnowledgeAuthorityService(properties(), tools.jackson.databind.json.JsonMapper.builder().build(), http);
 
         DomainException failure = assertThrows(DomainException.class,
                 () -> service.publish(UUID.randomUUID(), "admin-a"));
@@ -75,7 +75,7 @@ class SupabaseKnowledgeAuthorityServiceTest {
         HttpClient http = mock(HttpClient.class);
         when(http.send(any(HttpRequest.class), any(HttpResponse.BodyHandler.class)))
                 .thenThrow(new java.io.IOException("network down"));
-        SupabaseKnowledgeAuthorityService service = new SupabaseKnowledgeAuthorityService(properties(), new ObjectMapper(), http);
+        SupabaseKnowledgeAuthorityService service = new SupabaseKnowledgeAuthorityService(properties(), tools.jackson.databind.json.JsonMapper.builder().build(), http);
 
         DomainException failure = assertThrows(DomainException.class,
                 () -> service.list("admin-a", null, null));

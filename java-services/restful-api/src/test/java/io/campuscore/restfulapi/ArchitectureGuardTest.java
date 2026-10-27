@@ -33,7 +33,7 @@ class ArchitectureGuardTest {
     private static final byte[] REST_CONTROLLER_ADVICE =
             "Lorg/springframework/web/bind/annotation/RestControllerAdvice;".getBytes();
     private static final byte[] OBJECT_MAPPER =
-            "Lcom/fasterxml/jackson/databind/ObjectMapper;".getBytes();
+            "Ltools/jackson/databind/ObjectMapper;".getBytes();
     private static final byte[] PRINT_WRITER =
             "Ljava/io/PrintWriter;".getBytes();
     private static final byte[] RUNTIME_EXCEPTION =

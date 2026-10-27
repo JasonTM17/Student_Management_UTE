@@ -1,6 +1,6 @@
 package io.campuscore.restfulapi.notification.controller;
 
-import com.fasterxml.jackson.databind.JsonNode;
+import tools.jackson.databind.JsonNode;
 import io.campuscore.restfulapi.notification.service.NotificationWriteService;
 import io.campuscore.restfulapi.notification.dto.NotificationReadDtos.NotificationResponse;
 import io.campuscore.restfulapi.notification.dto.NotificationWriteDtos.CreateNotificationRequest;

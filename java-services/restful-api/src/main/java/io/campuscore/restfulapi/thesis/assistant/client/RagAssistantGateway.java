@@ -1,9 +1,10 @@
 package io.campuscore.restfulapi.thesis.assistant.client;
 
-import com.fasterxml.jackson.core.type.TypeReference;
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.node.ObjectNode;
+import tools.jackson.core.type.TypeReference;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.core.JacksonException;
+import tools.jackson.databind.ObjectMapper;
+import tools.jackson.databind.node.ObjectNode;
 import io.campuscore.restfulapi.thesis.assistant.dto.CancelResponse;
 import io.campuscore.restfulapi.thesis.assistant.dto.ConversationCreated;
 import io.campuscore.restfulapi.thesis.assistant.dto.CreateConversationRequest;
@@ -185,7 +186,7 @@ public class RagAssistantGateway {
                     watchdog.cancel(false);
                 }
             }
-        } catch (IOException exception) {
+        } catch (IOException | JacksonException exception) {
             throw unavailable("RAG_SERVICE_UNAVAILABLE", "RAG service request failed");
         } catch (InterruptedException exception) {
             Thread.currentThread().interrupt();
@@ -215,7 +216,7 @@ public class RagAssistantGateway {
                 value = objectMapper.readValue(response.body(), type);
             }
             return new RemotePage<>(value, response.headers().firstValue("X-Next-Cursor").orElse(null));
-        } catch (IOException exception) {
+        } catch (IOException | JacksonException exception) {
             throw unavailable("RAG_SERVICE_UNAVAILABLE", "RAG service request failed");
         } catch (InterruptedException exception) {
             Thread.currentThread().interrupt();
@@ -296,7 +297,7 @@ public class RagAssistantGateway {
     private HttpRequest.BodyPublisher bodyPublisher(Object body) {
         try {
             return HttpRequest.BodyPublishers.ofString(objectMapper.writeValueAsString(body), StandardCharsets.UTF_8);
-        } catch (IOException exception) {
+        } catch (JacksonException exception) {
             throw new DomainException(HttpStatus.BAD_GATEWAY, "RAG_REQUEST_SERIALIZATION_FAILED", "Failed to serialize assistant request");
         }
     }
@@ -500,7 +501,7 @@ public class RagAssistantGateway {
                 if (error.message() != null && !error.message().isBlank()) {
                     message = error.message();
                 }
-            } catch (IOException ignored) {
+            } catch (JacksonException ignored) {
                 // Keep the synthesized status message when the remote service
                 // returns a non-CampusCore payload.
             }

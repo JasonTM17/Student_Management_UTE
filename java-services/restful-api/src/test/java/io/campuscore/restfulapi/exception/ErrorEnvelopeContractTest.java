@@ -10,8 +10,8 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 
-import com.fasterxml.jackson.core.type.TypeReference;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.core.type.TypeReference;
+import tools.jackson.databind.ObjectMapper;
 import io.campuscore.restfulapi.security.filter.JsonBodyCapFilter;
 import io.campuscore.restfulapi.security.filter.RequestIdFilter;
 import io.campuscore.restfulapi.exception.response.ApiErrorWriter;
@@ -64,7 +64,7 @@ class ErrorEnvelopeContractTest {
     private static final List<String> WRITER_KEYS =
             List.of("status", "code", "message", "path", "requestId", "timestamp", "fields");
 
-    private final ObjectMapper mapper = new ObjectMapper();
+    private final ObjectMapper mapper = tools.jackson.databind.json.JsonMapper.builder().build();
     private final MockMvc mvc = MockMvcBuilders
             .standaloneSetup(new ProbeController())
             .setControllerAdvice(new GlobalExceptionHandler())
@@ -145,7 +145,7 @@ class ErrorEnvelopeContractTest {
         @GetMapping("/probe/no-resource")
         Object noResource() throws org.springframework.web.servlet.resource.NoResourceFoundException {
             throw new org.springframework.web.servlet.resource.NoResourceFoundException(
-                    org.springframework.http.HttpMethod.GET, "/probe/no-resource");
+                    org.springframework.http.HttpMethod.GET, "/probe/no-resource", "/probe/no-resource");
         }
 
         @GetMapping("/probe/int-param")

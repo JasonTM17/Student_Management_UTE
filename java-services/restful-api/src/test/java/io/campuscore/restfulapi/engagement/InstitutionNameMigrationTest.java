@@ -2,7 +2,7 @@ package io.campuscore.restfulapi.engagement;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.ObjectMapper;
 import java.sql.Connection;
 import java.util.Map;
 import java.util.UUID;
@@ -14,7 +14,7 @@ import org.springframework.jdbc.datasource.init.ScriptUtils;
 
 class InstitutionNameMigrationTest {
     private static final String NAME = "Trường Đại học Công nghệ Kỹ thuật TP.HCM";
-    private final ObjectMapper mapper = new ObjectMapper();
+    private final ObjectMapper mapper = tools.jackson.databind.json.JsonMapper.builder().build();
 
     @Test
     void correctsFullNamesAndRetainsPublicationMetadataAndPriorAudits() throws Exception {
