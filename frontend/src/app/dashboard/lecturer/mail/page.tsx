@@ -1250,7 +1250,7 @@ export default function LecturerMailComposePage() {
               size="lg"
               className="w-full"
               onClick={() => void handleSend()}
-              disabled={isSending || !readyToSend}
+              disabled={isSending}
               title={readyToSend ? undefined : copy.incomplete}
             >
               <Send className="mr-2 h-4 w-4" aria-hidden="true" />
