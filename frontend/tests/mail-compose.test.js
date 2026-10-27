@@ -335,6 +335,16 @@ test('mail compose wiring is registered across api, layout, routes, and i18n', (
   assert.match(page, /mailApi\.sendGradeAlert/);
   assert.match(page, /mailPreviewUrl\(API_BASE_URL, template\)/);
   assert.match(page, /classifyMailError/);
+  // Field-level validation copy lives behind `attemptedSend`, which only
+  // flips inside handleSend — so the send button must stay clickable while
+  // issues exist, otherwise invalid input (e.g. GPA 9.99 > 4) leaves the
+  // author with a permanently disabled button and no error text at all.
+  assert.doesNotMatch(
+    page,
+    /disabled=\{isSending \|\| !readyToSend\}/,
+    'send button must not be disabled by unmet issues; the click is what reveals them',
+  );
+  assert.match(page, /setAttemptedSend\(true\)/);
   // PR #8 follow-ups: int wire values and credits validation, not silent clamps.
   assert.match(page, /conductScore: toWireInt\(parseNumericInput\(gradeAlert\.conductScore\)\)/);
   assert.match(page, /rowCreditsValid/);
