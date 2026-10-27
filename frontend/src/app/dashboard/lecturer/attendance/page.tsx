@@ -255,7 +255,7 @@ export default function LecturerAttendancePage() {
     if (!shouldReset) return;
     // Remember which rows had marks so handleSave can send RESET entries for
     // them — otherwise the backend kept the stale row and the reset silently
-    // no-opped (round-2 sweep finding write-1).
+    // no-opped.
     setResetStudentIds(
       new Set(
         roster

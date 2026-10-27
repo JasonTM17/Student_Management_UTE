@@ -135,7 +135,7 @@ public class TwoFactorService {
      * Confirms the ENABLE challenge and flips the account switch on. Wrong
      * attempts must persist across the transaction boundary (same 5-strikes
      * lock as the LOGIN branch), so AppException is exempted from the
-     * rollback. K17: the credential revision advances, so access tokens
+     * rollback. the credential revision advances, so access tokens
      * issued before the switch flipped stop authenticating immediately,
      * and refresh sessions issued before it are revoked — keeping only the
      * caller's current browser refresh session (see
@@ -149,7 +149,7 @@ public class TwoFactorService {
         verifyCode(challenge, code);
         users.setTwoFactorEnabled(userId, true);
         challenges.consume(challenge.id(), clock.instant());
-        // Round-3 ct-4: turning 2FA on is a security-posture change — the
+        // turning 2FA on is a security-posture change — the
         // trail records who and when, next to the password events.
         audit.record(userId, null, "TWO_FACTOR_ENABLED", "USER", userId,
                 "User enabled two-factor authentication");
@@ -158,7 +158,7 @@ public class TwoFactorService {
     }
 
     /**
-     * Round-4 verified finding: turning 2FA OFF used to require only the
+     * turning 2FA OFF used to require only the
      * password — the second factor was never asked when it was being removed,
      * so a stolen session plus a phished password unenrolled the victim
      * without touching their inbox. Disable now mirrors ENABLE: the password
@@ -181,7 +181,7 @@ public class TwoFactorService {
 
     /**
      * Confirms the DISABLE challenge and flips the account switch off.
-     * K17: like the enable path, the credential revision advances so access
+     * like the enable path, the credential revision advances so access
      * tokens issued before the change stop authenticating immediately, and
      * refresh sessions issued before it are revoked while the caller's
      * current browser refresh session survives.
@@ -220,7 +220,7 @@ public class TwoFactorService {
     }
 
     /**
-     * K17: enabling or disabling two-factor auth is a security-posture change,
+     * enabling or disabling two-factor auth is a security-posture change,
      * so refresh sessions issued before it must stop working. The caller's
      * current session — pinned by row id in {@link #resolveCurrentSessionId}
      * before the credential lock is taken — is kept so the user is not signed
@@ -289,7 +289,7 @@ public class TwoFactorService {
         String code = generateCode();
         Instant expiresAt = clock.instant().plus(CODE_TTL);
         // The digest binds the owner id: a code issued for one account can
-        // never verify against another account's challenge (Wukong P2.3).
+        // never verify against another account's challenge.
         String challengeId = challenges.insert(userId, purpose, sha256(userId + ':' + code), expiresAt);
         deliver(challengeId, userId, code);
         return challengeId;

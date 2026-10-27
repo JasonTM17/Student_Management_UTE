@@ -65,7 +65,7 @@ class ThesisAssistantRagCorrectnessTest {
     }
 
     @Test
-    @DisplayName("CB-P2-5: quota exhaustion returns the grounded lexical answer with QUOTA_EXCEEDED, not a 429")
+    @DisplayName("quota exhaustion returns the grounded lexical answer with QUOTA_EXCEEDED, not a 429")
     void quotaExhaustionReturnsGroundedLexicalAnswerInsteadOf429() {
         ThesisAssistantKnowledgeRepository knowledge = mock(ThesisAssistantKnowledgeRepository.class);
         DeepSeekClient provider = mock(DeepSeekClient.class);
@@ -119,7 +119,7 @@ class ThesisAssistantRagCorrectnessTest {
     }
 
     @Test
-    @DisplayName("CB-P2-5: the quota bucket date follows the ICT wall clock near midnight")
+    @DisplayName("the quota bucket date follows the ICT wall clock near midnight")
     void quotaBucketDateUsesIctWallClock() {
         // 23:59:59 ICT on Jan 15 (16:59:59Z) must bucket to Jan 15...
         assertEquals(LocalDate.of(2026, 1, 15),
@@ -134,7 +134,7 @@ class ThesisAssistantRagCorrectnessTest {
     }
 
     @Test
-    @DisplayName("CB-P2-3: every retrieval alias (folded and accented) is admitted by the scope pre-gate")
+    @DisplayName("every retrieval alias (folded and accented) is admitted by the scope pre-gate")
     void everyAliasIsAdmittedByThePublicScopeGate() {
         assertTrue(ThesisAssistantService.VIETNAMESE_FOLDED_PHRASE_ALIASES.size() >= 40);
         for (Map.Entry<String, String> alias : ThesisAssistantService.VIETNAMESE_FOLDED_PHRASE_ALIASES.entrySet()) {
@@ -154,7 +154,7 @@ class ThesisAssistantRagCorrectnessTest {
     }
 
     @Test
-    @DisplayName("CB-P3-2: the stop-word list carries the common Vietnamese function words in both views")
+    @DisplayName("the stop-word list carries the common Vietnamese function words in both views")
     void stopWordsCarryCommonVietnameseFunctionWords() {
         for (String word : List.of("bị", "bi", "đã", "da", "sẽ", "se", "phải", "phai", "một", "mot")) {
             assertTrue(ThesisAssistantService.STOP_WORDS.contains(word), "missing stop word: " + word);
@@ -162,7 +162,7 @@ class ThesisAssistantRagCorrectnessTest {
     }
 
     @Test
-    @DisplayName("CB-P2-7: a context near the character budget contains only complete documents")
+    @DisplayName("a context near the character budget contains only complete documents")
     void contextNearLimitContainsOnlyCompleteDocuments() {
         String docOneContent = "First document sentence one. First document sentence two. Final sentence of one.";
         String docTwoContent = "Second document opens here. Second document continues with more words and never fits.";
@@ -183,7 +183,7 @@ class ThesisAssistantRagCorrectnessTest {
     }
 
     @Test
-    @DisplayName("CB-P2-7: a single oversized document truncates at a sentence boundary, never mid-sentence")
+    @DisplayName("a single oversized document truncates at a sentence boundary, never mid-sentence")
     void singleOversizedDocumentTruncatesAtSentenceBoundary() {
         String content = "Short opener. " + "A deliberately long sentence that will not fit inside the budget. ".repeat(6);
         List<KnowledgeDocument> documents = List.of(
@@ -199,7 +199,7 @@ class ThesisAssistantRagCorrectnessTest {
     }
 
     @Test
-    @DisplayName("CB-P2-7: text with no sentence boundary inside the budget is omitted, never half-emitted")
+    @DisplayName("text with no sentence boundary inside the budget is omitted, never half-emitted")
     void textWithoutBoundaryIsDroppedNotSliced() {
         String noBoundary = "one-long-word-without-any-terminator".repeat(20);
         assertEquals("", ThesisAssistantService.truncateAtBoundary(noBoundary, 40));
@@ -209,7 +209,7 @@ class ThesisAssistantRagCorrectnessTest {
     }
 
     @Test
-    @DisplayName("CB-P2-6: top-k is configurable and clamped to 3-10 with the historical default 5")
+    @DisplayName("top-k is configurable and clamped to 3-10 with the historical default 5")
     void topKIsConfigurableAndClamped() {
         assertEquals(5, new AssistantProperties(6000, 2000, 20, 200, 90, true, null).topK());
         assertEquals(3, new AssistantProperties(6000, 2000, 20, 200, 90, true, 1).topK());

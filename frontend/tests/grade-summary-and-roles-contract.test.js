@@ -41,7 +41,7 @@ function grade(overrides) {
   };
 }
 
-// STUD-P2-4: a course taken twice (F then improved to B) used to be counted
+// a course taken twice (F then improved to B) used to be counted
 // twice by "Tín chỉ hoàn tất" because the stat summed every non-F COMPLETED
 // row while the GPA card used best attempts. One derivation now feeds both.
 
@@ -93,7 +93,7 @@ test('empty grade list yields zeroes without dividing by zero', () => {
   assert.equal(summary.courseCount, 0);
 });
 
-// ADM-P2-3: the admin users API now returns `roles` as an array (matching
+// the admin users API now returns `roles` as an array (matching
 // AuthUserResponse), so the console page must not compensate by splitting a
 // comma-joined string.
 

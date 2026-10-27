@@ -819,7 +819,7 @@ class ThesisGovernanceIntegrationTest {
                 .andExpect(jsonPath("$.code").value("SCORE_ALREADY_FINALIZED"));
     }
 
-    // ---------- K16: score audit trail and SUPER_ADMIN parity ----------
+    // ---------- score audit trail and SUPER_ADMIN parity ----------
 
     @Test
     void councilScoreWritesAndFinalizationLeaveAnAdminAuditTrail() throws Exception {

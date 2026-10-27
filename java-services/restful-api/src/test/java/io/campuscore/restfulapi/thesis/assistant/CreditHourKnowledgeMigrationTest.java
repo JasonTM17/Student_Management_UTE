@@ -11,7 +11,7 @@ import java.util.List;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
- * Pins the V90 credit-hour knowledge fill (round-2 sweep write-2): the
+ * Pins the V90 credit-hour knowledge fill: the
  * question "Một tín chỉ lý thuyết tương đương bao nhiêu tiết?" was answered
  * with the withdrawal/credit-load regulation instead of the hour-equivalence
  * fact. Guards the bilingual slugs, the governed release projection

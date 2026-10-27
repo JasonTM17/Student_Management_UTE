@@ -34,7 +34,7 @@ function globalsCss() {
 test('the chrome accent is defined in every theme and accent scope', () => {
   const css = globalsCss();
   const declarations = css.match(/--portal-chrome-accent:\s*[^;]+;/g) ?? [];
-  // :root, the two light accent variants, .dark, and the two dark-accent variants.
+  // root, the two light accent variants, .dark, and the two dark-accent variants.
   assert.ok(
     declarations.length >= 6,
     `expected --portal-chrome-accent in all 6 token scopes, found ${declarations.length}: ${declarations.join(' ')}`,

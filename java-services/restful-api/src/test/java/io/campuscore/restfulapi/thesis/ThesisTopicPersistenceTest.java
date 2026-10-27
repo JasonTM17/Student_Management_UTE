@@ -201,7 +201,7 @@ class ThesisTopicPersistenceTest {
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.code").value("THESIS_GROUP_NOT_FOUND"));
 
-        // LEC-P2-1: a lecturer who supervises no topic in this round no longer
+        // a lecturer who supervises no topic in this round no longer
         // receives every group (their rosters carry external members' contact
         // details); the listing comes back empty for them instead.
         mvc.perform(get("/api/v1/thesis/groups")
@@ -838,7 +838,7 @@ class ThesisTopicPersistenceTest {
      * Regression guard for the PostgreSQL failure
      * {@code PSQLException: Can't infer the SQL type to use for an instance of java.time.Instant}
      * that made {@code POST /api/v1/thesis/rounds} return HTTP 500 for every payload — found by
-     * the Wukong adversarial pass on 2026-09-12. The service must bind {@link java.sql.Timestamp}
+     * an adversarial review. The service must bind {@link java.sql.Timestamp}
      * (see {@code ThesisMutationService.tsOf}) rather than a raw {@link Instant}.
      *
      * <p>Caveat: this suite runs on H2 in PostgreSQL mode, whose driver is more permissive than
@@ -1034,7 +1034,7 @@ class ThesisTopicPersistenceTest {
     private org.springframework.test.web.servlet.request.RequestPostProcessor lecturerJwt(String userId) {
         ensureLecturer(userId);
         // Production lecturer tokens carry the lecturerId claim (AuthTokenService),
-        // and createTopic rejects a LECTURER creator without it (LEC-P2-2) instead
+        // and createTopic rejects a LECTURER creator without it instead
         // of silently mis-keying the supervisor row with the User id.
         return ThesisAuthorityFixture.lecturer(jdbc, userId);
     }

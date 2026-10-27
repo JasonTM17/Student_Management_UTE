@@ -238,12 +238,12 @@ public class MailController {
     @PreAuthorize("hasAnyRole('STUDENT','LECTURER','ADMIN','SUPER_ADMIN','TRUONG_KHOA')")
     @Operation(summary = "Xem trước trực tiếp giao diện HTML email trên trình duyệt")
     public ResponseEntity<String> previewTemplate(@PathVariable String templateName) {
-        // Wukong finding: the name flows into "mail/" + templateName, so only
+        // the name flows into "mail/" + templateName, so only
         // plain template slugs are accepted — no paths, no traversal.
         if (!templateName.matches("[a-z0-9-]+")) {
             return ResponseEntity.notFound().build();
         }
-        // WS-Admin round-11: an unknown but well-formed slug used to escape
+        // an unknown but well-formed slug used to escape
         // into the template engine and surface as a 500 TemplateInputException.
         // Only the known preview templates exist; anything else is a 404.
         if (!PREVIEW_TEMPLATES.contains(templateName)) {

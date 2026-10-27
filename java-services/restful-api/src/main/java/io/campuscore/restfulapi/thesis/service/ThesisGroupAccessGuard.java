@@ -88,7 +88,7 @@ class ThesisGroupAccessGuard {
      * term and a graduation thesis later).
      */
     void requireNotInAnotherActiveGroup(UUID roundId, String studentId) {
-        // Round-3 contract thesis-3: a leader's only way out of a group is
+        // a leader's only way out of a group is
         // PATCH progress → CANCELLED, but the member rows stayed — so the
         // same-round membership check locked the leader out of every new group
         // for the rest of the round. A cancelled group holds no seat.

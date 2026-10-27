@@ -29,7 +29,7 @@ import org.junit.jupiter.api.Test;
  * warning level, and that every document in the applied V40/V41/V43 corpus that
  * carries a defect is superseded.
  *
- * <p>Wukong falsified the first version of this corpus fix: it reconciled the
+ * <p>A regression test falsified the first version of this corpus fix: it reconciled the
  * scholarship tiers to a LINEAR scale conversion, while the application converts
  * through letter bands and V41's curriculum document already stated those bands.
  * Release 0057 therefore shipped two documents giving two different 4.0 values
@@ -71,9 +71,9 @@ class AcademicRegulationsCorpusConsistencyTest {
 
     /**
      * Every phrase that must not survive in the EFFECTIVE corpus: the undefined
-     * warning level (CB-P1-2), the wrong scholarship conversion (CB-P1-1), the
-     * superseded eligibility percentage range (CB-P2-1) and the superseded
-     * exit-TOEIC range (CB-P2-2), plus the contradictory V43 scholarship tier.
+     * warning level, the wrong scholarship conversion, the
+     * superseded eligibility percentage range and the superseded
+     * exit-TOEIC range, plus the contradictory V43 scholarship tier.
      */
     private static final Pattern VIOLATION = Pattern.compile(
             "mức 3|mức 2/3|mức 2 hoặc mức 3|Level 3 warning|Level 3 academic|Level 2/3"
@@ -247,7 +247,7 @@ class AcademicRegulationsCorpusConsistencyTest {
     }
 
     @Test
-    @DisplayName("CB-P1-1: the Khá scholarship tier is stated on the 10-point scale with the app's grade")
+    @DisplayName("the Khá scholarship tier is stated on the 10-point scale with the app's grade")
     void khoTierIsConsistentlyStated() {
         // V57 reconciled this tier to a linear 2.8/4.0 pair, which the application's
         // banded conversion makes wrong (7.0/10 is a B, worth 3.0). V59 states the
@@ -273,7 +273,7 @@ class AcademicRegulationsCorpusConsistencyTest {
     }
 
     @Test
-    @DisplayName("CB-P1-2: the two-level warning scheme is stated explicitly (no level 3)")
+    @DisplayName("the two-level warning scheme is stated explicitly (no level 3)")
     void warningSchemeIsTwoLevel() {
         assertThat(revisedContentBySlug.get("academic-probation-and-thesis-eligibility-vi"))
                 .contains("Cảnh báo mức 1")
@@ -286,7 +286,7 @@ class AcademicRegulationsCorpusConsistencyTest {
     }
 
     @Test
-    @DisplayName("CB-P2-1: thesis eligibility is one canonical set stated identically in V40 and V43 documents")
+    @DisplayName("thesis eligibility is one canonical set stated identically in V40 and V43 documents")
     void thesisEligibilityIsCanonical() {
         String vi40 = revisedContentBySlug.get("academic-probation-and-thesis-eligibility-vi");
         String vi43 = revisedContentBySlug.get("graduation-thesis-eligibility-defense-vi");
@@ -311,7 +311,7 @@ class AcademicRegulationsCorpusConsistencyTest {
     }
 
     @Test
-    @DisplayName("CB-P2-2: exit TOEIC is the canonical 500/600 split, never a range")
+    @DisplayName("exit TOEIC is the canonical 500/600 split, never a range")
     void exitToeiThresholdIsCanonical() {
         assertThat(revisedContentBySlug.get("scholarships-graduation-requirements-vi"))
                 .contains("TOEIC từ 500 điểm với khối ngành kỹ thuật và công nghệ")

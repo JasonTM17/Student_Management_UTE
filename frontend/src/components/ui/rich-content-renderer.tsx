@@ -48,7 +48,7 @@ export interface ArticleHeading {
 }
 
 /**
- * RT-P3-a: TinyMCE headings arrive as bare `<h1>`..`<h6>` with no anchor, so a
+ * TinyMCE headings arrive as bare `<h1>`..`<h6>` with no anchor, so a
  * `dangerouslySetInnerHTML` article had nothing for the table of contents to
  * link to. The TOC and the rendered markup are produced by the same walker
  * below on purpose: two independent slug implementations drift, and a drifting
@@ -214,7 +214,7 @@ function SafeImage({ src, alt }: { src: string; alt: string }) {
   );
 }
 
-// RT-P1-1: the markdown branch once carried its own weaker `isSafeUrl` that
+// the markdown branch once carried its own weaker `isSafeUrl` that
 // only looked for a `javascript:`/`data:`/`vbscript:` prefix after a trim.
 // Browsers strip `\t\n\r` from URLs before resolving them, so
 // `[x](java\tscript:alert(1))` slipped past and fired in every reader's
@@ -508,7 +508,7 @@ function sanitizeHtml(html: string): string {
 }
 
 /**
- * RT-P2-3: TinyMCE emits bare fragments from ordinary authoring — a bulleted
+ * TinyMCE emits bare fragments from ordinary authoring — a bulleted
  * list is `<ul><li>…</li></ul>`, a quote is `<blockquote>…</blockquote>` — and
  * the old leading-tag allowlist missed all of them, so those announcements
  * fell into the markdown converter, which does not understand those constructs
@@ -565,7 +565,7 @@ export function RichContentRenderer({
   className,
   fallbackText,
 }: RichContentRendererProps) {
-  // RT-P3-f: the reader re-renders on every scroll frame, and the allowlist
+  // the reader re-renders on every scroll frame, and the allowlist
   // rebuild walks the whole body (up to the server's 200k-character cap). The
   // result depends only on `content`, so it is cached: same bytes in, same bytes
   // out, sanitized once per document instead of once per frame.

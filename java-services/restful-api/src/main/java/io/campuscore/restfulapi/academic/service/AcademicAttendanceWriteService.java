@@ -114,8 +114,7 @@ public class AcademicAttendanceWriteService {
 
             String upperStatus = entry.status() != null ? entry.status().trim().toUpperCase() : "";
             // "RESET" clears a previously saved record for (student, section,
-            // date) instead of writing a new one — round-2 sweep finding
-            // write-1: the UI's Reset button saved rows the backend silently
+            // date) instead of writing a new one: the UI's Reset button saved rows the backend silently
             // kept, so a lecturer could never un-mark an attendance entry.
             if ("RESET".equals(upperStatus)) {
                 targetStudentIds.add(normalizedStudentId);

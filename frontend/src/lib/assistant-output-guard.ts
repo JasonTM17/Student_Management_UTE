@@ -30,7 +30,7 @@ const INTERNAL_API_PATH_SENSITIVE = /(?<![\p{L}\p{N}_])\/api\/v\d\/(?:(?:admin|a
  * a lesson. The technical-phrasing half below is separate because the
  * specialized corpus legitimately TEACHES it (Docker Compose, pipelines,
  * EXPLAIN plans) — mirroring the server, where scope='specialized' skips the
- * technical-request gate (round-3 chat-8).
+ * technical-request gate.
  */
 const INTERNAL_DETAIL_SECRET = /\b(?:system\s+prompt|developer\s+message|stack\s+trace|traceback|deepseek(?:[- ]v?\d+)?|provider\s+(?:error|response|model)|api\s+key|jwt\s+secret|bearer\s+token|v4\s+flash)\b/i;
 const INTERNAL_DETAIL_TECH = /\b(?:retrieved\s+context|api\s+endpoints?|curl\s+commands?|docker\s+compose(?:\s+instructions?)?)\b/i;
@@ -289,7 +289,7 @@ export function isAssistantOutputSafe(
       || STACK_TRACE.test(normalized)) {
     return false;
   }
-  // Round-5: the specialized corpus teaches command-style content; its answers
+  // the specialized corpus teaches command-style content; its answers
   // were replaced wholesale by the technical-refusal copy ("Docker compose up"
   // in a DevOps lesson tripped INLINE_COMMAND/INTERNAL_DETAIL_TECH). Bare
   // /api/vN path examples stay allowed there too — only host-bound and

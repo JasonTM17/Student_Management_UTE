@@ -522,7 +522,7 @@ class AuthLoginPersistenceTest {
     }
 
     /**
-     * SEC-P1-1: a refresh token that was already rotated (or revoked) and is
+     * a refresh token that was already rotated (or revoked) and is
      * then replayed is the classic stolen-token signal. The replay must be
      * refused AND the whole session family for that account must die — the
      * freshly rotated token included — instead of silently 401-ing while the
@@ -553,7 +553,7 @@ class AuthLoginPersistenceTest {
         assertNotEquals(staleRefreshToken, liveRefreshToken);
 
         // Age the rotation past the overlap window: a replay arriving later is
-        // indistinguishable from theft and must keep the SEC-P1-1 contract.
+        // indistinguishable from theft and must keep the  contract.
         stampRotatedAt(Instant.now().minusSeconds(120));
 
         // Replaying the stale token: refused, and the family is revoked.

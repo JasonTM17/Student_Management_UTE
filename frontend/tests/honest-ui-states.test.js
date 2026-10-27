@@ -16,7 +16,7 @@ function readFromRepo(relativePath) {
 }
 
 // ---------------------------------------------------------------------------
-// Phase 03 — the certificate surface mints nothing official and invents nobody
+// the certificate surface mints nothing official and invents nobody
 // ---------------------------------------------------------------------------
 
 test('lecturer grade sheet does not claim ungraded students on an empty roster', () => {
@@ -128,7 +128,7 @@ test('certificate labels live in the shared dictionary for both locales', () => 
 });
 
 // ---------------------------------------------------------------------------
-// Phase 03 / STUD-P1-4 — the conduct record modal invents nothing
+// the conduct record modal invents nothing
 // ---------------------------------------------------------------------------
 
 test('conduct activity record uses only real fields and claims no issuance', () => {
@@ -150,7 +150,7 @@ test('conduct activity record uses only real fields and claims no issuance', () 
 });
 
 // ---------------------------------------------------------------------------
-// Phase 04 / STUD-P1-7 — announcements never invent official notices
+// announcements never invent official notices
 // ---------------------------------------------------------------------------
 
 test('announcements page renders no fabricated notices on error or empty feed', () => {
@@ -169,7 +169,7 @@ test('announcements page renders no fabricated notices on error or empty feed', 
 });
 
 // ---------------------------------------------------------------------------
-// Phase 04 / STUD-P1-5 + STUD-P2-7 — conduct UI binds to reported state only
+// conduct UI binds to reported state only
 // ---------------------------------------------------------------------------
 
 test('conduct badges and claims follow the status and score the API returned', () => {
@@ -195,7 +195,7 @@ test('conduct badges and claims follow the status and score the API returned', (
 });
 
 // ---------------------------------------------------------------------------
-// Phase 04 / STUD-P2-1 — the conduct page matches the backend role gate
+// the conduct page matches the backend role gate
 // ---------------------------------------------------------------------------
 
 test('conduct page is student-only so staff see the forbidden screen', () => {
@@ -205,7 +205,7 @@ test('conduct page is student-only so staff see the forbidden screen', () => {
 });
 
 // ---------------------------------------------------------------------------
-// Phase 04 / STUD-P2-3, UX-P1-4, UX-P1-5 — dialogs use the shared modal
+// dialogs use the shared modal
 // ---------------------------------------------------------------------------
 
 test('shared modal traps focus and closes on Escape', () => {
@@ -246,7 +246,7 @@ test('forced password rotation gate uses the shared non-dismissible dialog', () 
 });
 
 // ---------------------------------------------------------------------------
-// Phase 04 / STUD-P2-2 — no literal-id demo identity in the production path
+// no literal-id demo identity in the production path
 // ---------------------------------------------------------------------------
 
 test('conduct controller no longer aliases literal demo ids to a real student', () => {
@@ -266,7 +266,7 @@ test('conduct controller no longer aliases literal demo ids to a real student', 
 });
 
 // ---------------------------------------------------------------------------
-// Phase 04 / LEC-P2-3, LEC-P2-4, LEC-P2-6 — lecturer-facing honesty fixes
+// lecturer-facing honesty fixes
 // ---------------------------------------------------------------------------
 
 test('grade component inputs have distinct screen-reader labels', () => {
@@ -298,7 +298,7 @@ test('removing a supervised group member asks for confirmation', () => {
 });
 
 // ---------------------------------------------------------------------------
-// Phase 04 / STUD-P2-6 — the transcript GPA card is labelled cumulative
+// the transcript GPA card is labelled cumulative
 // ---------------------------------------------------------------------------
 
 test('transcript header and GPA card describe the cumulative figure', () => {
@@ -311,7 +311,7 @@ test('transcript header and GPA card describe the cumulative figure', () => {
 });
 
 // ---------------------------------------------------------------------------
-// Phase 04 / ADM-P1-4 — failed branding writes are reported, not faked
+// failed branding writes are reported, not faked
 // ---------------------------------------------------------------------------
 
 test('site appearance PUT fails loudly when persistence fails', () => {

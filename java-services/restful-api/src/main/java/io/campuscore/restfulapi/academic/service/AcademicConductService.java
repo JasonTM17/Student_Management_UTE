@@ -57,7 +57,7 @@ public class AcademicConductService {
     }
 
     /**
-     * LEC-P1-5: a lecturer may read conduct only for students they actually teach.
+     * a lecturer may read conduct only for students they actually teach.
      * The path parameter accepts either the profile id or the student code, so
      * both are matched against the Student table before looking at enrollments.
      */

@@ -30,5 +30,5 @@ export function renderInlineBold(text: string): React.ReactNode[] {
 }
 
 // The dashboard metric tile itself was consolidated into
-// `WorkspaceMetricCard` (components/dashboard/WorkspaceSurface) in Phase 6 —
+// `WorkspaceMetricCard` (components/dashboard/WorkspaceSurface) —
 // this module now holds only the shared thesis copy/file-size helpers.

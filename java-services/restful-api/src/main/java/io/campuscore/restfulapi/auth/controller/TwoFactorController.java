@@ -92,7 +92,7 @@ public class TwoFactorController {
     }
 
     /**
-     * Round-4 verified fix: disable is now a two-step flow like enable — the
+     * disable is now a two-step flow like enable — the
      * password alone used to remove the second factor, so a stolen session
      * plus a phished password could unenroll the victim without touching
      * their inbox. The password starts a DISABLE challenge (code emailed);

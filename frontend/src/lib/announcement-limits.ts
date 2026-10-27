@@ -1,5 +1,5 @@
 /**
- * RT-P1-2: the announcement content limits that must stay satisfiable
+ * the announcement content limits that must stay satisfiable
  * together. The server (`AnnouncementWriteService.java`) rejects bodies over
  * `MAX_ANNOUNCEMENT_CONTENT_CHARS` characters *after* the author has finished
  * writing, which used to make publish permanently impossible: the editor

@@ -14,7 +14,7 @@ import org.jsoup.nodes.Element;
 import org.jsoup.safety.Safelist;
 
 /**
- * RT-P2-5: vetted (Jsoup) HTML sanitizer applied to announcement bodies at the
+ * vetted (Jsoup) HTML sanitizer applied to announcement bodies at the
  * write boundary. The frontend allowlist sanitizer stays the render-time
  * guarantee and the regex {@code ACTIVE_CONTENT} blacklist in
  * {@link AnnouncementWriteService} stays the hard reject; this layer closes
@@ -22,7 +22,7 @@ import org.jsoup.safety.Safelist;
  * render-time sanitizer.
  *
  * The policy mirrors {@code frontend/tests/fixtures/announcement-content-policy.json}
- * (RT-P2-2/RT-P2-5): {@code details}/{@code summary} survive so the editor's
+ *{@code details}/{@code summary} survive so the editor's
  * accordion plugin round-trips, a restricted {@code id} survives so the anchor
  * plugin round-trips, and {@code iframe}/{@code video} (the editor's removed
  * {@code media} plugin) is dropped. {@code AnnouncementWriteServiceTest}

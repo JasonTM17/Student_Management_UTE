@@ -1506,8 +1506,7 @@ class AcademicEnrollmentMutationPersistenceTest {
 
     @Test
     void enrollPathBillsCurrentCourseCreditsNotTheStaleSnapshot() throws Exception {
-        // Regression for the WRITE path of the 15-vs-16 quota drift (Wukong
-        // round-4): the student's existing enrollment carries a stale
+        // Regression for the WRITE path of the 15-vs-16 quota drift: the student's existing enrollment carries a stale
         // 15-credit snapshot while the course now bills 16 credits. The cap
         // check inside enrollLocked must bill the current 16 — pre-fix it
         // summed the snapshot (15) and let 15+15=30 slip past a 30-credit cap

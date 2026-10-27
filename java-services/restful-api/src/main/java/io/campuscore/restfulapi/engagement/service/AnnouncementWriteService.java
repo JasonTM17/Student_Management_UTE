@@ -230,7 +230,7 @@ public class AnnouncementWriteService {
         }
         requireEditableField(request);
         Instant now = Instant.now(clock);
-        // RT-P2-5: sanitize before persist and keep the removed-element count
+        // sanitize before persist and keep the removed-element count
         // so the write-time mutation is observable in the audit trail.
         SanitizedContent contentPatch =
                 request.has("content") ? sanitizePublicHtml(request.content()) : null;
@@ -501,7 +501,7 @@ public class AnnouncementWriteService {
         String id = requireText(announcementId, "announcement id");
         requirePage(page, limit);
         AnnouncementResponse announcement = requireAnnouncement(id);
-        // Round-3 contract ct-1: the audit trail carries actor identity and
+        // the audit trail carries actor identity and
         // full before/after snapshots. It used to be readable by ANY lecturer
         // for ANY announcement — including system/admin-authored ones whose
         // write verbs are individually owner-scoped. Lecturers keep history
@@ -678,7 +678,7 @@ public class AnnouncementWriteService {
                     + "|(?:href|src|xlink:href)\\s*=\\s*[\"']?\\s*(?:javascript|vbscript|data\\s*:\\s*text/html)");
 
     /**
-     * RT-P2-5: validated, length-capped, blacklisted and finally sanitized
+     * validated, length-capped, blacklisted and finally sanitized
      * through the vetted Jsoup policy (defence in depth, in that order).
      * Applied on create/update writes ONLY — historical rows are deliberately
      * not backfilled: they stay safe because every read path renders through

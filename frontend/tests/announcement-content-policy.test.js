@@ -21,7 +21,7 @@ function loadTs(relativePath) {
 
 const FIXTURE = JSON.parse(read('tests/fixtures/announcement-content-policy.json'));
 
-test('RT-P2-5 TypeScript sanitizer policy matches the shared allowlist fixture', () => {
+test('TypeScript sanitizer policy matches the shared allowlist fixture', () => {
   const sanitizer = loadTs('src/lib/html-sanitizer.ts');
 
   assert.deepEqual(
@@ -50,7 +50,7 @@ test('RT-P2-5 TypeScript sanitizer policy matches the shared allowlist fixture',
   assert.equal(String(sanitizer.ID_VALUE_RE), `/${FIXTURE.idValuePattern}/`);
 });
 
-test('RT-P1-2 client image cap is derived from the server cap and stays satisfiable', () => {
+test('client image cap is derived from the server cap and stays satisfiable', () => {
   const limits = loadTs('src/lib/announcement-limits.ts');
   const serverCap = FIXTURE.editorLimits.maxContentChars;
 
@@ -80,11 +80,11 @@ test('RT-P1-2 client image cap is derived from the server cap and stays satisfia
   assert.equal(limits.assessAnnouncementContentLength('x'.repeat(serverCap + 1)), 'exceeded');
 });
 
-test('RT-P2-2 editor ships only plugins whose output survives the sanitizer', () => {
+test('editor ships only plugins whose output survives the sanitizer', () => {
   const source = read('src/components/ui/tinymce-editor.tsx');
 
   // media was removed: its <iframe>/<video> output cannot survive either
-  // sanitizer and there is no real upload endpoint (RT-P2-6).
+  // sanitizer and there is no real upload endpoint.
   for (const plugin of FIXTURE.pluginsRemoved) {
     assert.doesNotMatch(
       source,
@@ -107,7 +107,7 @@ test('RT-P2-2 editor ships only plugins whose output survives the sanitizer', ()
   assert.doesNotMatch(sanitizeAnnouncementHtml('<p id="has space">x</p>'), /id=/);
 });
 
-test('RT-P1-2 editor enforces the derived image cap and warns before the server limit', () => {
+test('editor enforces the derived image cap and warns before the server limit', () => {
   const source = read('src/components/ui/tinymce-editor.tsx');
   // The cap comes from the shared module, not a second magic number.
   assert.match(source, /MAX_INLINE_IMAGE_BYTES/);
@@ -117,7 +117,7 @@ test('RT-P1-2 editor enforces the derived image cap and warns before the server 
   assert.match(source, /role="status"/);
 });
 
-test('RT-P1-2 several images at the cap cannot compose an unpublishable document', () => {
+test('several images at the cap cannot compose an unpublishable document', () => {
   const limits = loadTs('src/lib/announcement-limits.ts');
   const serverCap = FIXTURE.editorLimits.maxContentChars;
 
@@ -144,7 +144,7 @@ test('RT-P1-2 several images at the cap cannot compose an unpublishable document
   );
 });
 
-test('RT-P1-2 publish is blocked client-side on every authoring surface', () => {
+test('publish is blocked client-side on every authoring surface', () => {
   const limits = loadTs('src/lib/announcement-limits.ts');
 
   // A warning is not a gate: content over the cap that still reaches the server
@@ -195,7 +195,7 @@ test('RT-P1-2 publish is blocked client-side on every authoring surface', () => 
   );
 });
 
-test('RT-P3-1 editor loads the self-hosted Vietnamese language pack', () => {
+test('editor loads the self-hosted Vietnamese language pack', () => {
   const source = read('src/components/ui/tinymce-editor.tsx');
   assert.match(source, /language: isVi \? 'vi' : undefined/);
   assert.match(source, /language_url: isVi \? '\/tinymce\/langs\/vi\.js' : undefined/);
@@ -215,7 +215,7 @@ test('RT-P3-1 editor loads the self-hosted Vietnamese language pack', () => {
   assert.match(read('public/tinymce/langs/vi.js'), /tinymce\.addI18n\("vi"/);
 });
 
-test('RT-P3-2 editor import failure shows a real error with retry, not an eternal spinner', () => {
+test('editor import failure shows a real error with retry, not an eternal spinner', () => {
   const source = read('src/components/ui/tinymce-editor.tsx');
   assert.match(source, /EditorLoadError/);
   assert.match(source, /role="alert"/);
@@ -224,7 +224,7 @@ test('RT-P3-2 editor import failure shows a real error with retry, not an eterna
   assert.doesNotMatch(source, /from 'next\/dynamic'/);
 });
 
-test('RT-P3-3 unsaved-changes guard is reusable and wired into the announcement editor', () => {
+test('unsaved-changes guard is reusable and wired into the announcement editor', () => {
   const hook = read('src/lib/use-unsaved-changes-guard.ts');
   assert.match(hook, /export function useUnsavedChangesGuard/);
   assert.match(hook, /addEventListener\('beforeunload', handleBeforeUnload\)/);
@@ -240,13 +240,13 @@ test('RT-P3-3 unsaved-changes guard is reusable and wired into the announcement 
   assert.match(editorPage, /unsaved\.requestLeave\(/);
 });
 
-test('RT-P3-4 showWordCount toggles the wordcount toolbar control', () => {
+test('showWordCount toggles the wordcount toolbar control', () => {
   const source = read('src/components/ui/tinymce-editor.tsx');
   // Conditional toolbar token instead of the previous dead prop.
   assert.match(source, /showWordCount \? 'wordcount' : null/);
 });
 
-test('RT-P2-4 CSP is enforced with a per-request nonce in middleware', () => {
+test('CSP is enforced with a per-request nonce in middleware', () => {
   const mw = read('src/middleware.ts');
   // Enforced policy: nonce + strict-dynamic on script-src, set on the
   // response, and mirrored onto request headers so Next.js threads the nonce

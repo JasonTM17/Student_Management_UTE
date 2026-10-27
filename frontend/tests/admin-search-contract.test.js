@@ -111,7 +111,7 @@ test('no catalog admin page narrows the fetched page in memory with the search t
   }
 });
 
-// Round-2 review: the pages now send `search`, but four of the client signatures
+// the pages now send `search`, but four of the client signatures
 // still declared only {page, limit}. Nothing failed because a variable argument
 // bypasses excess-property checking, so the declared contract silently lagged the
 // route. The declaration is the contract, so assert it.

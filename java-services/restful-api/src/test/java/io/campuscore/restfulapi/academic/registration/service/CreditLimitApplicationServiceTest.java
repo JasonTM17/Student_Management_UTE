@@ -18,7 +18,7 @@ import org.springframework.test.context.ActiveProfiles;
 import org.springframework.web.server.ResponseStatusException;
 
 /**
- * Round-10 finding C2: the credit-limit / eligibility domain is a
+ * the credit-limit / eligibility domain is a
  * README-claimed feature whose Java behavior had zero coverage — only a
  * manual e2e run protected it. These tests pin the service contract:
  * window-gated submit, single active application per round, the admin

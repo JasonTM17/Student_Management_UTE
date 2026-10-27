@@ -14,7 +14,7 @@ const CENTER = read('src/components/dashboard/NotificationsCenterPage.tsx');
 const API = read('src/lib/api.ts');
 
 /**
- * Round 8 fixed the notifications center's deep links but left the dashboard
+ * An earlier fix addressed the notifications center's deep links but left the dashboard
  * bell guessing destinations from title/body keywords — 'thi' inside 'lịch
  * thi' opened the timetable and admin-authored broadcast links were discarded.
  * Both surfaces must now resolve from the authored link/type data, and the

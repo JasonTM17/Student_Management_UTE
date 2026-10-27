@@ -340,7 +340,7 @@ public class AuthLoginService {
      * seeded profiles carry unsplash-style avatar URLs, and a GET→PUT
      * round-trip of the profile used to fail its own validator ("avatar must
      * be a png, jpeg or webp data URL") because the accepted-on-write shape
-     * was narrower than the served shape (round-2 sweep write-3).
+     * was narrower than the served shape.
      */
     private static String normalizeAvatar(String avatar) {
         String trimmed = avatar.trim();
@@ -443,7 +443,7 @@ public class AuthLoginService {
     }
 
     /**
-     * Round-3 ct-4: a self-service credential rotation is exactly the
+     * a self-service credential rotation is exactly the
      * operation whose author an investigation needs to know — the trail
      * previously covered only admin-initiated resets (PASSWORD_RESET).
      * An office-issued temporary credential reaching its rotation is

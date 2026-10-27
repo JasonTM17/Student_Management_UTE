@@ -13,7 +13,7 @@ import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.TestPropertySource;
 
 /**
- * SEC-P0-1: every seeded demo account (README-documented credentials plus the
+ * every seeded demo account (README-documented credentials plus the
  * whole @campuscore.demo population) is LOCKED once V48 applies, so a
  * Flyway-initialized deployment never ships working documented logins by
  * default. V82 subsequently re-activates exactly the runbook-documented .demo

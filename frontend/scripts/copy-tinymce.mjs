@@ -36,7 +36,7 @@ if (fs.existsSync(srcDir)) {
   console.warn('[copy-tinymce] node_modules/tinymce not found, skipping copy.');
 }
 
-// RT-P3-1: self-hosted Vietnamese UI language pack for TinyMCE 8, so the
+// self-hosted Vietnamese UI language pack for TinyMCE 8, so the
 // editor menus are localized for Vietnamese authors without any Tiny Cloud
 // request. `tinymce-i18n` ships the packs per major version under `langs8/`.
 const langPackDir = path.join(rootDir, 'node_modules', 'tinymce-i18n', 'langs8');

@@ -115,7 +115,7 @@ const HTML_ARTICLE = [
 
 // --- (a) contents for HTML bodies -------------------------------------------
 
-test('RT-P3-a an HTML article produces contents entries with de-duplicated anchors', () => {
+test('an HTML article produces contents entries with de-duplicated anchors', () => {
   const { extractTocHeadings } = loadToc(loadRenderer());
 
   const headings = extractTocHeadings(HTML_ARTICLE);
@@ -140,7 +140,7 @@ test('RT-P3-a an HTML article produces contents entries with de-duplicated ancho
   assert.deepEqual(extractTocHeadings('<p>Không có tiêu đề nào</p>'), []);
 });
 
-test('RT-P3-a the rendered HTML branch carries the ids the contents links to', () => {
+test('the rendered HTML branch carries the ids the contents links to', () => {
   const renderer = loadRenderer();
   const { extractTocHeadings } = loadToc(renderer);
 
@@ -160,7 +160,7 @@ test('RT-P3-a the rendered HTML branch carries the ids the contents links to', (
   assert.match(markup, /<p>Nội dung một\.<\/p>/);
 });
 
-test('RT-P3-a markdown bodies still produce contents and cannot collide either', () => {
+test('markdown bodies still produce contents and cannot collide either', () => {
   const renderer = loadRenderer();
   const { extractTocHeadings } = loadToc(renderer);
 
@@ -192,7 +192,7 @@ test('RT-P3-a markdown bodies still produce contents and cannot collide either',
   assert.equal(markup.includes('id="khong-phai-tieu-de"'), false);
 });
 
-test('RT-P3-a anchoring runs after sanitizing so every generated id survives', () => {
+test('anchoring runs after sanitizing so every generated id survives', () => {
   const renderer = loadRenderer();
   const body = '<h2>2025 Tuyển sinh</h2><h2 id="muc-1">Mục 1</h2>';
 
@@ -212,7 +212,7 @@ test('RT-P3-a anchoring runs after sanitizing so every generated id survives', (
 
 // --- (f) render-pipeline cost ------------------------------------------------
 
-test('RT-P3-f the HTML render computation is cached on the content string', () => {
+test('the HTML render computation is cached on the content string', () => {
   const source = read('src/components/ui/rich-content-renderer.tsx');
 
   // The sanitizer rebuilds the whole body (up to the 200k-character server cap),
@@ -234,7 +234,7 @@ test('RT-P3-f the HTML render computation is cached on the content string', () =
   assert.equal(first, renderer.annotateHtmlHeadingIds(sanitizer.sanitizeAnnouncementHtml(HTML_ARTICLE)));
 });
 
-test('RT-P3-f scroll progress is re-measured when a reading preference reflows the article', () => {
+test('scroll progress is re-measured when a reading preference reflows the article', () => {
   const source = read('src/components/announcements/AnnouncementReaderModal.tsx');
   const effect = /container\.removeEventListener\('scroll', handleScroll\);[\s\S]*?\}, \[([\s\S]*?)\]\);/.exec(source);
   assert.ok(effect, 'the scroll listener effect must keep its teardown shape');
@@ -295,13 +295,13 @@ function bodyOf(markup) {
   return markup.slice(start);
 }
 
-test('RT-P3-b the hero picture is shown once, not repeated under the hero', () => {
+test('the hero picture is shown once, not repeated under the hero', () => {
   const markup = magazineMarkup({});
   assert.equal(countOccurrences(markup, HERO_MARKER), 1, 'the body image became the hero, so the body drops it');
   assert.match(markup, /<h2 id="dieu-khoan"/, 'stripping must not eat the rest of the body');
 });
 
-test('RT-P3-b a picture the hero never showed stays in the body', () => {
+test('a picture the hero never showed stays in the body', () => {
   // A relative `./` source renders fine for the reader but is invisible to the
   // cover extractors, so the hero fell back to the branded placeholder while the
   // strip deleted the author's only picture — it appeared nowhere.
@@ -315,7 +315,7 @@ test('RT-P3-b a picture the hero never showed stays in the body', () => {
   );
 });
 
-test('RT-P3-b a strip that would delete the wrong picture is refused', () => {
+test('a strip that would delete the wrong picture is refused', () => {
   // The extractors land on the second image (the first is a relative `./` src),
   // while the strip removes the first one. Losing a picture is worse than
   // showing the hero twice, so the body is kept whole.
@@ -326,7 +326,7 @@ test('RT-P3-b a strip that would delete the wrong picture is refused', () => {
   assert.ok(bodyOf(markup).includes(HERO_MARKER), 'and nothing else may be lost either');
 });
 
-test('RT-P3-b an imageless article keeps the branded placeholder hero and its body', () => {
+test('an imageless article keeps the branded placeholder hero and its body', () => {
   const markup = renderElement(loadMagazine().EditorialArticleMagazine, {
     announcement: {
       id: 'ann-2',
@@ -346,7 +346,7 @@ test('RT-P3-b an imageless article keeps the branded placeholder hero and its bo
 
 // --- (c) pagebreak ----------------------------------------------------------
 
-test('RT-P3-c the editor offers no page break, which nothing honoured anyway', () => {
+test('the editor offers no page break, which nothing honoured anyway', () => {
   const source = read('src/components/ui/tinymce-editor.tsx');
 
   const plugins = source.slice(source.indexOf('plugins: ['), source.indexOf('],', source.indexOf('plugins: [')));
@@ -364,7 +364,7 @@ test('RT-P3-c the editor offers no page break, which nothing honoured anyway', (
 
 // --- (d) SVG images ---------------------------------------------------------
 
-test('RT-P3-d an inlined SVG really is unpublishable, so the editor must refuse it', () => {
+test('an inlined SVG really is unpublishable, so the editor must refuse it', () => {
   // Premise of the fix: the sanitizer drops the `src`, leaving a broken image.
   const svgBody = '<p><img src="data:image/svg+xml;base64,PHN2Zy8-" alt="Sơ đồ"></p>';
   const cleaned = sanitizer.sanitizeAnnouncementHtml(svgBody);
@@ -401,7 +401,7 @@ test('RT-P3-d an inlined SVG really is unpublishable, so the editor must refuse 
   );
 });
 
-test('RT-P3-d the image picker only lists the formats the reader allowlist keeps', () => {
+test('the image picker only lists the formats the reader allowlist keeps', () => {
   const source = read('src/components/ui/tinymce-editor.tsx');
   const accept = /input\.setAttribute\('accept', '([^']+)'\)/.exec(source);
   assert.ok(accept, 'the picker must declare an explicit accept list');
@@ -435,9 +435,9 @@ function cssRuleBodies(css, selector) {
   return bodies;
 }
 
-test('RT-P3-e readers style the blocks the editor styles, with tokens only', () => {
+test('readers style the blocks the editor styles, with tokens only', () => {
   const css = read('src/app/globals.css');
-  const parity = css.slice(css.indexOf('/* RT-P3-e'), css.indexOf('@media (prefers-reduced-motion'));
+  const parity = css.slice(css.indexOf('/* Reader block styles:'), css.indexOf('@media (prefers-reduced-motion'));
   assert.ok(parity.length > 200, 'the reader parity block must exist');
 
   for (const selector of [
@@ -464,7 +464,7 @@ test('RT-P3-e readers style the blocks the editor styles, with tokens only', () 
 
 // --- (f) print --------------------------------------------------------------
 
-test('RT-P3-f printing stops orphaning the article and forces the paper palette', () => {
+test('printing stops orphaning the article and forces the paper palette', () => {
   const css = read('src/app/globals.css');
   const printBlock = css.slice(css.indexOf('@media print'), css.indexOf('[data-reader-theme] {'));
   assert.ok(printBlock.length > 100, 'the print block must exist');
@@ -513,7 +513,7 @@ test('RT-P3-f printing stops orphaning the article and forces the paper palette'
   }
 });
 
-test('RT-P3-a an authored anchor later in the document wins over an earlier generated slug', () => {
+test('an authored anchor later in the document wins over an earlier generated slug', () => {
   // Adversarial case: the first heading would claim `quy-che` as its generated
   // slug while a later heading authors that exact id. Reserving authored ids in
   // a single forward pass let both end up with the same anchor, so the contents
@@ -537,7 +537,7 @@ test('RT-P3-a an authored anchor later in the document wins over an earlier gene
   }
 });
 
-// Round-2 review: the cover pickers accepted any `data:image/` subtype, so an
+// the cover pickers accepted any `data:image/` subtype, so an
 // inlined SVG became the cover and then rendered as the broken frame the editor
 // refuses to insert. The cover must satisfy the same allow-list as the body.
 test('a cover is only taken from a source the reader allow-list keeps', () => {

@@ -272,7 +272,7 @@ class AcademicAdminAuditPersistenceTest {
 
     @Test
     void republishConflictsAndDoesNotRetouchOrRenotifyPublishedRows() {
-        // Kongming C2: a repeat publish of a fully-published section used to
+        // a repeat publish of a fully-published section used to
         // re-update the same enrollments (status COMPLETED stayed eligible)
         // and fan out a second inbox notification to every student.
         seedEnrollment("enr-pub-1", "ENROLLED", "DRAFT");

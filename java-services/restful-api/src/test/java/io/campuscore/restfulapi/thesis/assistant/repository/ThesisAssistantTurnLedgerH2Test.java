@@ -112,7 +112,7 @@ class ThesisAssistantTurnLedgerH2Test {
         Reservation reservation = turns.reserve(owner, key, AssistantInputGuard.canonicalHash("topic", "en", null), null, "en", "lease-a", 90);
         turns.markSnapshotReady(reservation.turnId(), owner, reservation.leaseGeneration(), "b".repeat(64));
         assertEquals("QUOTA_EXCEEDED", turns.dispatch(reservation.turnId(), owner, reservation.leaseGeneration(), 1, 1).reasonCode());
-        // CB-P2-5: a quota block no longer downgrades the turn to
+        // a quota block no longer downgrades the turn to
         // FAILED_PRE_DISPATCH. The row stays SNAPSHOT_READY so the service can
         // complete the grounded lexical answer with the QUOTA_EXCEEDED reason,
         // and the quota buckets stay uncharged.
@@ -177,7 +177,7 @@ class ThesisAssistantTurnLedgerH2Test {
 
     @Test
     void standaloneRefundOnAFailedChargeNeverDrainsTheBucket() {
-        // Wukong N1(a): a charge attempt that rolled back must not refund —
+        // a charge attempt that rolled back must not refund —
         // decrementing a bucket the request never charged hands out free
         // quota (and drags the GLOBAL bucket negative for everyone). A
         // refused charge also leaves no row the refund could underflow.

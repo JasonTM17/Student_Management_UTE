@@ -29,7 +29,7 @@ test('enrollment status helpers expose exactly one shared definition', () => {
 });
 
 test('active membership matches the seeded demo statuses', () => {
-  // Current contract: confirmed/enrolled rows are active; the phase-4 seat
+  // Current contract: confirmed/enrolled rows are active; the seat
   // accounting parity change updates this list and this test together.
   assert.equal(status.isActiveEnrollment('ENROLLED'), true);
   assert.equal(status.isActiveEnrollment('CONFIRMED'), true);

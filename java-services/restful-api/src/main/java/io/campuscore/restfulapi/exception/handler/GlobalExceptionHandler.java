@@ -81,7 +81,7 @@ public class GlobalExceptionHandler {
             ResponseStatusException exception,
             HttpServletRequest request) {
         HttpStatus status = HttpStatus.valueOf(exception.getStatusCode().value());
-        // Round-3 ct-8: a not-found raised through ResponseStatusException used
+        // a not-found raised through ResponseStatusException used
         // to answer code HTTP_404 while DomainException paths answered
         // NOT_FOUND for the same situation. The generic 404 now shares the
         // semantic code; every other status keeps the HTTP_ form.
@@ -152,7 +152,7 @@ public class GlobalExceptionHandler {
     }
 
     /**
-     * WS-Security round-11: a JSON body endpoint hit with a non-JSON content
+     * a JSON body endpoint hit with a non-JSON content
      * type used to fall through to the 500 catch-all. A wrong media type is a
      * client mistake: answer 415 with the standard envelope, never a 5xx.
      */
@@ -168,7 +168,7 @@ public class GlobalExceptionHandler {
     }
 
     /**
-     * WS-Admin round-11: an Accept header the endpoint cannot honour (for
+     * an Accept header the endpoint cannot honour (for
      * example JSON on the HTML mail preview) used to fall through to the 500
      * catch-all via HttpMediaTypeNotAcceptableException. An unacceptable
      * Accept is a client mistake: answer 406 with the standard envelope.
@@ -209,7 +209,7 @@ public class GlobalExceptionHandler {
                 Map.of());
     }
 
-    /** Wukong finding: an oversize multipart used to fall through to the 500
+    /** an oversize multipart used to fall through to the 500
      *  catch-all; the report-upload contract promises a 413 envelope. */
     @ExceptionHandler(MaxUploadSizeExceededException.class)
     public ResponseEntity<ErrorResponse> handleMaxUploadSize(MaxUploadSizeExceededException exception, HttpServletRequest request) {

@@ -152,7 +152,7 @@ class ThesisAssistantTurnStateMachineTest {
                 .andReturn().getResponse().getContentAsString();
         UUID conversation = UUID.fromString(mapper.readTree(created).get("id").asText());
 
-        // Round-3 cb3-9: a conversation the client created explicitly is
+        // a conversation the client created explicitly is
         // VISIBLE right away — the old hidden-until-first-turn contract made
         // an abandoned-but-real session an orphan the owner could not see or
         // delete from the list. Ledger-created conversations still flip to

@@ -193,7 +193,7 @@ public class AcademicEnrollmentReadRepository {
     }
 
     /**
-     * Round-11: the grade-items read used to answer a silent empty list for a
+     * the grade-items read used to answer a silent empty list for a
      * section the caller does not own, while the sibling grades read/write
      * endpoints raise 403 SECTION_FORBIDDEN. Ownership must be checkable so
      * all section-scoped reads agree.

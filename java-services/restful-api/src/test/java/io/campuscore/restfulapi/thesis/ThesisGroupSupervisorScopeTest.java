@@ -28,12 +28,12 @@ import org.springframework.test.web.servlet.MvcResult;
 import org.springframework.test.web.servlet.request.RequestPostProcessor;
 
 /**
- * LEC-P2-1: thesis-group reads used to hand every LECTURER every group,
+ * thesis-group reads used to hand every LECTURER every group,
  * including external members' declared contact details. A lecturer now sees
  * only groups whose topic they supervise — the same rule the report-read
  * path applies.
  *
- * LEC-P2-2: createTopic used to fall back to the actor's User id when the
+ * createTopic used to fall back to the actor's User id when the
  * lecturerId claim was blank, seeding thesis_topic_supervisor rows that
  * never join. A LECTURER creator without the claim now gets a 400 and no
  * supervisor row is written.
@@ -171,7 +171,7 @@ class ThesisGroupSupervisorScopeTest {
     }
 
     /**
-     * GOV-P2-1: a TRUONG_KHOA account always carries the companion LECTURER
+     * a TRUONG_KHOA account always carries the companion LECTURER
      * role, and create/updateTopic used to run the lecturer-department check
      * first — so a dean could not curate topics for other departments inside
      * their own faculty. The faculty scope now wins; an out-of-faculty
@@ -214,7 +214,7 @@ class ThesisGroupSupervisorScopeTest {
     }
 
     /**
-     * GOV-P2-2: the governance read branch used to strip member contacts from
+     * the governance read branch used to strip member contacts from
      * every group — even ones the dean personally supervises — and hid
      * supervised groups outside the faculty scope entirely. A supervised
      * group now keeps its contacts regardless of scope; other groups stay
@@ -257,7 +257,7 @@ class ThesisGroupSupervisorScopeTest {
     }
 
     /**
-     * GOV-P2-3: updateTopic used to scope only the *request's* departmentId —
+     * updateTopic used to scope only the *request's* departmentId —
      * a dean could rewrite a foreign-faculty topic and pull it into their own
      * faculty by supplying an in-faculty departmentId. The topic's current
      * department must already be inside the dean's faculty (or personally
@@ -392,7 +392,7 @@ class ThesisGroupSupervisorScopeTest {
     }
 
     /**
-     * AGG-P3-1: the workload aggregation joined every group on a supervised
+     * the workload aggregation joined every group on a supervised
      * topic, so a cancelled group still inflated group_count and pending_count.
      * Cancelled groups must not count as active workload.
      */

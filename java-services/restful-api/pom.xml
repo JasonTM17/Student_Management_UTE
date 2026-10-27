@@ -24,7 +24,7 @@
         <!-- H2 2.4.240 retains closed sessions in CHECK constraints across connections. -->
         <h2.version>2.5.252</h2.version>
         <springdoc.version>3.2.0</springdoc.version>
-        <!-- RT-P2-5: vetted HTML sanitizer for announcement bodies at the write boundary. -->
+        <!-- vetted HTML sanitizer for announcement bodies at the write boundary. -->
         <jsoup.version>1.23.2</jsoup.version>
         <jackson-2-bom.version>2.21.8</jackson-2-bom.version>
         <log4j2.version>2.25.5</log4j2.version>

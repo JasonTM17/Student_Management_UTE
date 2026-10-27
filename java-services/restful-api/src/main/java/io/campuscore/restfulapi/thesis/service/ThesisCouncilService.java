@@ -380,7 +380,7 @@ public class ThesisCouncilService {
     /**
      * Actor-scoped council listing for the API surface: governance staff see
      * every council of the round; a lecturer sees only councils they sit on.
-     * Before round 11 the list endpoint answered {@code isAuthenticated()},
+     * Previously the list endpoint answered {@code isAuthenticated},
      * which handed every authenticated caller — students included — the full
      * roster and pre-publication topic assignments of every council.
      *
@@ -621,7 +621,7 @@ public class ThesisCouncilService {
             throw conflict("TOPIC_WITHDRAWN", "A withdrawn topic cannot receive defense scores");
         }
         requireApprovedGroupForTopic(topicId);
-        // K16: the row is overwritten DELETE-then-INSERT, so the outgoing value
+        // the row is overwritten DELETE-then-INSERT, so the outgoing value
         // only exists here — capture it for the audit trail before the delete.
         Map<String, Object> previousRow = jdbc.query(
                 "SELECT score, comment FROM thesis.thesis_topic_score WHERE topic_id = :topicId "
@@ -1906,7 +1906,7 @@ public class ThesisCouncilService {
 
     private void requireScoreReadAccess(UUID councilId, UUID topicId, Jwt actor) {
         List<String> roles = actor == null ? null : actor.getClaimAsStringList("roles");
-        // Round-4 council sweep: SUPER_ADMIN is governance staff everywhere
+        // SUPER_ADMIN is governance staff everywhere
         // ADMIN is (same class of gap as ThesisReportService, fixed in
         // be5ec0c0) — the controller already advertises SUPER_ADMIN on these
         // routes while the service answered 403.

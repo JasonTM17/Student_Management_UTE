@@ -676,7 +676,7 @@ class ThesisAssistantControllerTest {
 
     @Test
     void storedSpecializedScopePinsEarlyPathRoutingOnResumedConversation() throws Exception {
-        // Kongming C5: the stored conversation scope must pin every early
+        // the stored conversation scope must pin every early
         // path — a technical ask resumed under scope='academic' into a
         // specialized conversation must skip the academic-only
         // TECHNICAL_REQUEST_BLOCKED gate and reach the ledger path with the

@@ -179,7 +179,7 @@ public class ThesisAssistantController {
     }
 
     /**
-     * Round-3 chat-7: persists an intercepted PERSONAL_CONTEXT turn into the
+     * persists an intercepted PERSONAL_CONTEXT turn into the
      * requested conversation so the history endpoint shows it, and returns the
      * response with the conversation id stamped. An unknown or foreign
      * conversationId throws 404 CONVERSATION_NOT_FOUND — the same contract the
@@ -189,7 +189,7 @@ public class ThesisAssistantController {
      */
     private ChatResponse persistPersonalTurn(ChatRequest request, ChatResponse personal, String owner) {
         try {
-            // Round-3 cb3-7/cb3-10: a personal turn without a conversationId
+            // a personal turn without a conversationId
             // used to skip persistence entirely — the answer vanished from
             // history AND the idempotency key stayed unconsumed (prod probe
             // caught the 200-reuse). Create the conversation on the fly so
@@ -258,7 +258,7 @@ public class ThesisAssistantController {
                     ThesisAssistantService.MODEL, true, guard.reasonCode(), locale, List.of(),
                     UUID.randomUUID(), request.clientRequestId(), null, false, "REJECTED", null, null);
         }
-        // Round-3 chat-8: the specialized scope serves the curated DevOps/REST
+        // the specialized scope serves the curated DevOps/REST
         // corpus, so the general-chatbot technical gate must not run ahead of
         // its routing — "Docker compose để chạy dự án" was blocked with zero
         // citations before the scope was ever consulted. Privacy (inspect)
@@ -286,7 +286,7 @@ public class ThesisAssistantController {
             return personalContext.privacyRefusal(request);
         }
         if (personalContext != null && personalContext.handles(request.message())) {
-            // Round-3 cb3-10: a reused clientRequestId with a different payload
+            // a reused clientRequestId with a different payload
             // conflicts exactly like the KB path instead of being answered.
             try {
                 assistant.enforcePersonalIdempotency(subject(actor), request.clientRequestId(),
@@ -296,13 +296,13 @@ public class ThesisAssistantController {
                 // The idempotency ledger read is down — the SSE path surfaces
                 // the same outage as an ASSISTANT_UNAVAILABLE frame instead of
                 // a bare 500, so JSON answers with the structured retryable
-                // contract too (Kongming F3).
+                // contract too.
                 throw new DomainException(HttpStatus.SERVICE_UNAVAILABLE, "ASSISTANT_UNAVAILABLE",
                         "Assistant is temporarily unavailable; please retry");
             }
             ChatResponse personal = personalContext.answer(request, actor);
             if (personal != null) {
-                // Round-3 chat-7: an intercepted personal answer used to skip
+                // an intercepted personal answer used to skip
                 // the ledger entirely — the turn vanished from
                 // /conversations/{id}/messages and a deleted conversationId was
                 // answered 200 instead of the KB path's 404. Persist both
@@ -314,7 +314,7 @@ public class ThesisAssistantController {
         // academic signal, so the campus corpus could never ground them; the
         // provider answers them directly instead of the KB miss (owner
         // request 2026-09-30). Scope='specialized' skips this: the
-        // professional corpus is the right source there (round-2 chat-1).
+        // professional corpus is the right source there.
         ChatResponse general = assistant.generalAnswerIfOffTopic(request.message(), locale,
                 request.clientRequestId(), scopedRequest.scope(), owner,
                 AssistantInputGuard.canonicalHash(request.message(), locale,

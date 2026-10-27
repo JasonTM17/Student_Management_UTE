@@ -459,7 +459,7 @@ public class DeepSeekClient implements AssistantCompletionProvider {
                 // first-person "Tôi". Ban those explicitly and pin the pronoun.
                 + "When information is absent, state the fact as the portal (\"Cổng học vụ chưa công bố X\") — never \"ở đây\", \"thông tin được công bố ở đây\", \"thông tin hiện có\", \"chưa được nêu\", or \"không có trong dữ liệu ... mà tôi hỗ trợ\". "
                 + "In Vietnamese answers always refer to yourself as \"mình\", never \"Tôi\"; address the user as \"bạn\". "
-                // Round-3 chat-8: the blanket "only published academic
+                // the blanket "only published academic
                 // information" refusal made the model turn away questions the
                 // provided context DOES cover — the specialized corpus teaches
                 // Docker/CI-CD study content and retrieval had already found

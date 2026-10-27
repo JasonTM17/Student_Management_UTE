@@ -1,7 +1,7 @@
 /** @type {import('next').NextConfig} */
 
 /**
- * RT-P2-4 graduated: Content-Security-Policy is now ENFORCED with a
+ * Content-Security-Policy is now ENFORCED with a
  * per-request nonce minted in src/middleware.ts (script-src nonce +
  * strict-dynamic). The policy cannot live in `headers()` — those values are
  * static while nonces must be minted per request. The inline scripts that

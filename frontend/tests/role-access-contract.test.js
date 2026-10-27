@@ -276,7 +276,7 @@ test('conduct record modal contains no QR code', () => {
   const source = readSource('src/app/dashboard/conduct/page.tsx');
   assert.ok(!source.includes('QrCode'), 'must not render QrCode icon');
   assert.ok(!source.includes('XÁC THỰC SỐ UTE'), 'must not render old QR verification text');
-  // Honesty phase 03 (STUD-P1-4): no digital-verification seal is claimed at
+  // no digital-verification seal is claimed at
   // all — the modal is an explicitly labelled preview record.
   assert.ok(!source.includes('digitallyVerified'), 'must not claim digital verification');
   assert.ok(source.includes('copy.previewNote'), 'labels itself as an honest preview');

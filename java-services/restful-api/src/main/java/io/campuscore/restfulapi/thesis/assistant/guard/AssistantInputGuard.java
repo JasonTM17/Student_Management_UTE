@@ -18,7 +18,7 @@ public final class AssistantInputGuard {
     private static final Pattern STUDENT_ID = Pattern.compile("(?i)\\b(?:student\\s*id|mssv|ma\\s*sv|sinh\\s*vien)\\s*[:#-]?\\s*[a-z0-9-]*\\d[a-z0-9-]{3,20}\\b");
     private static final Pattern SECRET = Pattern.compile("(?i)\\b(?:bearer\\s+|sk-[a-z0-9_-]{12,}|api[_ -]?key\\s*[:：=＝]|token\\s*[:：=＝]|pass(?:word|wd)\\s*[:：=＝])");
     /**
-     * Round-3 chat-8: bare tool/keyword mentions are split out of the technical
+     * bare tool/keyword mentions are split out of the technical
      * gate. "em muốn học về postgresql index", "hướng dẫn cài docker desktop"
      * and "jwt là gì" are legitimate study questions about the very courses the
      * portal teaches — they were refused with TECHNICAL_REQUEST_BLOCKED even in
@@ -29,7 +29,7 @@ public final class AssistantInputGuard {
     private static final Pattern TECHNICAL_TOKENS = Pattern.compile(
             "(?i)(?:"
                     + "\\b(?:curl|wget|invoke-webrequest|iwr|docker(?:\\s+compose)?|docker-compose|kubectl|helm|psql|mysql|redis-cli|npm|pnpm|yarn|bun|npx|mvnw?|gradlew?|git\\s+(?:push|pull|clone|commit|rebase|merge|remote|repo|command)|powershell|pwsh|bash)\\b"
-                    // Round-2 sweep chat-2: natural phrasing slipped past the
+                    // natural phrasing slipped past the
                     // old list ("Viết giúp câu JDBC connect tới postgres của
                     // trường") — bare jdbc/postgres tokens are technical here.
                     + "|\\bjdbc\\b|\\bpostgres(?:ql)?\\b"
@@ -276,7 +276,7 @@ public final class AssistantInputGuard {
         if (TECHNICAL_REQUEST_HARD.matcher(normalized).find()) return true;
         if (TECHNICAL_REQUEST_HARD_FOLDED.matcher(foldForMatching(normalized)).find()) return true;
         // Bare tokens become legitimate study questions when the message names
-        // a learning or install-study context; without it the round-2 rule
+        // a learning or install-study context; without it the existing rule
         // stands (a bare jdbc/postgres mention stays technical).
         boolean learning = LEARNING_CONTEXT.matcher(normalized).find()
                 || LEARNING_CONTEXT_FOLDED.matcher(foldForMatching(normalized)).find();
@@ -364,7 +364,7 @@ public final class AssistantInputGuard {
             String candidate = matcher.group();
             if (isWithinUuid(normalized, matcher.start(), matcher.end())) continue;
             // Academic year ranges such as 2023 - 2024 or 2026-2027 are legitimate academic metadata, not phone numbers.
-            // Round-3 chat-1: the range may sit NEXT TO a term number — the
+            // the range may sit NEXT TO a term number — the
             // candidate "1 2025-2026" from "GPA for semester 1 2025-2026" is a
             // term plus year range, not a dial string. Any candidate containing
             // a year range is exempt, wherever the range sits inside it.
