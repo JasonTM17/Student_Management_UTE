@@ -17,6 +17,10 @@ class-level annotations, the filter chain, and service/repository scope all matt
 - [AuthLoginService](../../java-services/restful-api/src/main/java/io/campuscore/restfulapi/auth/service/AuthLoginService.java)
   owns refresh-session validation and reissuance. Refresh and logout have their
   own session rules rather than inheriting business-route authority.
+- [CsrfCookieFilter](../../java-services/restful-api/src/main/java/io/campuscore/restfulapi/security/filter/CsrfCookieFilter.java)
+  and [CookieOrBearerTokenResolver](../../java-services/restful-api/src/main/java/io/campuscore/restfulapi/security/token/CookieOrBearerTokenResolver.java)
+  define stale-cookie exceptions; the [web session poll](../../frontend/src/context/AuthContext.tsx)
+  owns the client recovery attempt.
 
 ## Current authority and re-authentication
 
@@ -26,6 +30,12 @@ snapshot requires re-authentication; the request must not silently acquire newer
 privileges. Database unavailability fails closed because authority cannot be
 established. This applies to authenticated AI routes too: provider fallback is
 not permission to bypass account verification.
+
+Login, two-factor verification, forgot-password and reset-password bypass both
+the cookie CSRF double-submit check and bearer-token resolution, so stale or
+invalid cookies cannot block authentication or recovery. Refresh remains CSRF
+protected because it rotates the session. When the frontend's `/auth/me` poll
+gets `401`, it attempts one single-flight refresh before signing out.
 
 Office-issued temporary passwords must be rotated before business use. The
 rotation exception exists only to let the user inspect the account and change
@@ -161,6 +171,13 @@ retroactively identify password changes made before the revision existed.
   [ThesisGroupReadController](../../java-services/restful-api/src/main/java/io/campuscore/restfulapi/thesis/controller/ThesisGroupReadController.java),
   and [NotificationReadController](../../java-services/restful-api/src/main/java/io/campuscore/restfulapi/notification/controller/NotificationReadController.java).
   A supplied record ID is a locator, never proof of access.
+- **Administrative mail dispatch** to `/mail/notice`, `/mail/registration` and
+  `/mail/grade-alert` requires an existing active recipient for `ADMIN` and
+  `SUPER_ADMIN`; an unknown recipient returns `403 MAIL_RECIPIENT_UNKNOWN`.
+  Lecturer sends remain scoped to students in taught sections. `/mail/test`
+  targets only the caller's account email or the no-reply sink. Request bounds
+  and lecturer composer limits live in [MailDtos](../../java-services/restful-api/src/main/java/io/campuscore/restfulapi/mail/dto/MailDtos.java)
+  and [mail-compose](../../frontend/src/lib/mail-compose.ts).
 - **Student directory data** is relationship-scoped, not role-scoped. Admins
   keep the full directory; students still read only their own record.
   Lecturers — including `TRUONG_BO_MON`/`TRUONG_KHOA` — see only students
@@ -242,6 +259,11 @@ retroactively identify password changes made before the revision existed.
   round row lock; closing while the results-retract grace window is still
   open is refused (`409 RETRACT_WINDOW_OPEN`) so a lawful retract is never
   silently blocked.
+- **Withdrawn thesis topics** return the same `404` to student callers who are
+  neither the topic owner nor members of its group. Supervisor assignments
+  require both an active lecturer profile and an `ACTIVE` linked account; see
+  [ThesisTopicService](../../java-services/restful-api/src/main/java/io/campuscore/restfulapi/thesis/service/ThesisTopicService.java)
+  and [ThesisSupervisorService](../../java-services/restful-api/src/main/java/io/campuscore/restfulapi/thesis/service/ThesisSupervisorService.java).
 - **Thesis registration eligibility** is an academic precondition, not an
   authorization rule: any authenticated student caller may register only when
   their published transcript meets `thesis.eligibility.min-credits` (110) and

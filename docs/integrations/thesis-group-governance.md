@@ -72,6 +72,14 @@ before. A future postgraduate round type opts in by returning `true` from
 single owner is `ThesisGovernanceCapabilities`, which feeds both the write
 path and the round read model (`counterReviewWaiverAllowed`).
 
+For KLTN and TLCN rounds, an `ADMIN`, `TRUONG_KHOA` or `SUPER_ADMIN` may
+extend the GVPB deadline forward while the round is live. If the new deadline
+passes the report date, the report date moves to that deadline; a KLTN defense
+date earlier than that deadline moves with it. The audit row records
+before-and-after GVPB, report and defense dates in the same transaction. See
+[ThesisMutationController](../../java-services/restful-api/src/main/java/io/campuscore/restfulapi/thesis/controller/ThesisMutationController.java)
+and [ThesisRoundLifecycleService](../../java-services/restful-api/src/main/java/io/campuscore/restfulapi/thesis/service/ThesisRoundLifecycleService.java).
+
 ## Registration eligibility (accumulated credits + CPA)
 
 A student may register (create a group, be added as a member, or pick the
