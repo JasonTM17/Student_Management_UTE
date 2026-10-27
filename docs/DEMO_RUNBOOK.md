@@ -211,7 +211,7 @@ riêng của giảng viên mang chức danh (demo: `truongkhoa@campuscore.demo`)
 gắn cho tài khoản Admin. Giảng viên/Sinh viên dùng tài khoản demo mặc định.
 
 **Cảnh báo trước khi demo**:
-- Dùng **một tab duy nhất** (đa tab có thể gặp race refresh gây đăng xuất nhầm).
+- Nếu bộ thăm dò phiên `/auth/me` nhận `401`, web thử refresh phiên single-flight trước; chỉ đăng xuất khi refresh hoặc lần kiểm tra lại tiếp tục trả `401`.
 - **Tạo đợt mới**, không dùng lại đợt seed cũ (đợt legacy không có hạn GVPB).
 - **Công thức thời gian cửa sổ** (guards dùng giờ hệ thống — nếu nhập sai, bước sau sẽ
   dừng giữa buổi): cửa sổ GV `[giờ demo, +10 phút]`, cửa sổ SV `[+10 phút, 23:59 hôm nay]`,
