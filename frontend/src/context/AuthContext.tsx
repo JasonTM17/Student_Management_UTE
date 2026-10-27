@@ -456,9 +456,42 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         }
         const status = (error as { response?: { status?: number } } | undefined)
           ?.response?.status;
-        if (status === 401 && readCsrfSessionHint() === csrfHintBefore) {
-          publishSessionChange('signed-out');
-          handleExternalSessionChange('signed-out');
+        if (status !== 401) {
+          return;
+        }
+        // The probe may 401 on an expired access cookie while the refresh
+        // session is still alive; rotate once before declaring death.
+        try {
+          await refreshSessionSingleFlight();
+          if (!isCurrent()) {
+            return;
+          }
+          const recovered = await authApi.me();
+          if (!isCurrent()) {
+            return;
+          }
+          const previous = latestIdentityRef.current;
+          if (
+            previous &&
+            identitySignature(recovered) !== identitySignature(previous)
+          ) {
+            handleExternalSessionChange('changed');
+          }
+          return;
+        } catch (recoveryError) {
+          if (!isCurrent()) {
+            return;
+          }
+          const recoveryStatus = (
+            recoveryError as { response?: { status?: number } } | undefined
+          )?.response?.status;
+          if (
+            recoveryStatus === 401 &&
+            readCsrfSessionHint() === csrfHintBefore
+          ) {
+            publishSessionChange('signed-out');
+            handleExternalSessionChange('signed-out');
+          }
         }
       } finally {
         pollInFlight = false;
