@@ -605,3 +605,25 @@ test('lecturer mail controls expose backend text limits and localized counters',
     assert.match(vi, new RegExp(`${issue}:`), `${issue} must be localized in Vietnamese`);
   }
 });
+
+test('recipient summary rail label never leaks a raw {max} placeholder', () => {
+  const page = read('src/app/dashboard/lecturer/mail/page.tsx');
+  // Regression for the recipient-summary rail: reusing the {count}/{max}
+  // hint template with only {count} stripped rendered the literal "{max}"
+  // text as the row label. The rail must use its own static label key.
+  assert.ok(
+    !page.includes("RailRow label={copy.fields.charCount"),
+    'rail label must not reuse the charCount hint template',
+  );
+  assert.ok(
+    page.includes('RailRow label={copy.fields.contentLength}'),
+    'expected a dedicated contentLength rail label',
+  );
+
+  const messages = read('src/i18n/messages.ts');
+  const viStart = messages.indexOf('export const vi');
+  const en = messages.slice(0, viStart);
+  const vi = messages.slice(viStart);
+  assert.match(en, /contentLength: '[^']+'/, 'contentLength must be localized in English');
+  assert.match(vi, /contentLength: '[^']+'/, 'contentLength must be localized in Vietnamese');
+});
