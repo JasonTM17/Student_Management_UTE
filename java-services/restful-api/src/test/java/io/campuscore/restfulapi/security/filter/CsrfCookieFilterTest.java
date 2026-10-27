@@ -80,6 +80,32 @@ class CsrfCookieFilterTest {
     }
 
     @Test
+    void anonymousLoginWithStaleSessionCookieIsNotRejectedByCsrf() throws Exception {
+        MockHttpServletRequest request = new MockHttpServletRequest("POST", "/api/v1/auth/login");
+        request.setCookies(new jakarta.servlet.http.Cookie("cc_refresh_token", "stale"));
+        MockHttpServletResponse response = new MockHttpServletResponse();
+        FilterChain chain = mock(FilterChain.class);
+
+        filter.doFilter(request, response, chain);
+
+        assertEquals(200, response.getStatus());
+        verify(chain).doFilter(request, response);
+    }
+
+    @Test
+    void anonymousPasswordResetWithStaleSessionCookieIsNotRejectedByCsrf() throws Exception {
+        MockHttpServletRequest request = new MockHttpServletRequest("POST", "/api/v1/auth/forgot-password");
+        request.setCookies(new jakarta.servlet.http.Cookie("cc_access_token", "stale"));
+        MockHttpServletResponse response = new MockHttpServletResponse();
+        FilterChain chain = mock(FilterChain.class);
+
+        filter.doFilter(request, response, chain);
+
+        assertEquals(200, response.getStatus());
+        verify(chain).doFilter(request, response);
+    }
+
+    @Test
     void matchingCookieAndHeaderAllowsCookieMutation() throws Exception {
         MockHttpServletRequest request = new MockHttpServletRequest("POST", "/api/v1/contract/ping");
         request.setCookies(
