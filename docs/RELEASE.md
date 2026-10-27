@@ -99,3 +99,12 @@ login, refresh, logout and core student flows on an emulator or device.
 - Remove only exact old local microservice image tags after runtime proof.
 - Never run `docker system prune`, `docker volume prune` or
   `docker compose down -v`.
+
+## History rewrite note
+
+The default branch history was rewritten on 2026-10-27 to normalize commit
+metadata; file contents were not changed. The `v1.1.1` container images were
+published under the pre-rewrite SHA tag
+`936f7e342a271ddf2e7832f35b8eb0d55c1b54a3`. That commit has the identical tree
+to `c3d181031956c7affb3af600c385fb715853c77b`, which `v1.1.1` now points to.
+Later releases are published under SHAs on the rewritten history.
