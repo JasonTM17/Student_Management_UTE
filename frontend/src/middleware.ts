@@ -9,7 +9,7 @@ import {
 const LOCALE_COOKIE = 'cc_locale';
 const COOKIE_MAX_AGE = 60 * 60 * 24 * 365;
 
-// RT-P2-4 graduation: the report-only CSP is now enforced with a per-request
+// The report-only CSP is now enforced with a per-request
 // nonce. Setting the policy on the *request* headers is what lets Next.js
 // thread the nonce into its own scripts (flight data, webpack bootstrap);
 // the response header is what the browser enforces. 'strict-dynamic' extends

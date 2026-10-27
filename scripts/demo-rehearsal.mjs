@@ -1,4 +1,4 @@
-// Round-10 item 4: automated demo rehearsal against a CLEAN CLONE stack.
+// automated demo rehearsal against a CLEAN CLONE stack.
 // Proves the runbook's core claims end-to-end over HTTP on a freshly
 // provisioned compose database:
 //   1. the three .edu showcase accounts + the V82 runbook accounts log in

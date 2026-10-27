@@ -21,7 +21,7 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.request.RequestPostProcessor;
 
 /**
- * WS-Security round-11 D3: admin-only mutation surfaces (users, admin/*) deny
+ * admin-only mutation surfaces (users, admin/*) deny
  * wrong roles at the URL level, so a request whose body also fails bean
  * validation is answered 403 ACCESS_DENIED — the validation contract (field
  * names, requiredness) is not disclosed to callers who were never allowed to

@@ -187,7 +187,7 @@ public class ThesisAssistantRepository {
             predicate += " AND scope=:scope";
             params.addValue("scope", "specialized".equalsIgnoreCase(scope) ? "specialized" : "academic");
         }
-        // Round-3 cb3-9: PENDING joins the list — a conversation created
+        // PENDING joins the list — a conversation created
         // explicitly via POST /conversations but never messaged was invisible
         // here (an orphan the owner could not see or delete from the list).
         // Crash residue between a ledger reserve and its first append shows up

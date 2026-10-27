@@ -51,7 +51,7 @@ public class AcademicConductController {
     }
 
     /**
-     * LEC-P1-5: a lecturer may read conduct only for students they actually teach.
+     * a lecturer may read conduct only for students they actually teach.
      *
      * <p>Without this, any lecturer could read every student's conduct record by id
      * — the same over-broad read the attendance endpoints already avoided with their

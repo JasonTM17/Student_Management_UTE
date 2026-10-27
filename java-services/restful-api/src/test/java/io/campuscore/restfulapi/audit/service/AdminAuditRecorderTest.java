@@ -20,7 +20,7 @@ import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * ADM-P0-3: the audit trail for destructive administrative operations.
+ * the audit trail for destructive administrative operations.
  *
  * <p>Two properties matter more than the plumbing, and both are asserted here:
  * the record must never contain a credential, and it must join the caller's

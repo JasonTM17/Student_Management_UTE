@@ -1,5 +1,5 @@
 {
-  "description": "Shared announcement content allowlist (RT-P2-2/RT-P2-5). Single source of truth for BOTH the TypeScript read-time sanitizer (frontend/src/lib/html-sanitizer.ts) and the Java write-time sanitizer (AnnouncementHtmlSanitizer.java). Each suite asserts its policy matches this fixture, so the two hand-maintained policies cannot drift apart silently.",
+  "description": "Shared announcement content allowlist. Single source of truth for BOTH the TypeScript read-time sanitizer (frontend/src/lib/html-sanitizer.ts) and the Java write-time sanitizer (AnnouncementHtmlSanitizer.java). Each suite asserts its policy matches this fixture, so the two hand-maintained policies cannot drift apart silently.",
   "allowedTags": [
     "a", "abbr", "b", "blockquote", "br", "caption", "code", "col", "colgroup",
     "dd", "details", "div", "dl", "dt", "em", "figcaption", "figure", "h1",

@@ -16,7 +16,7 @@ function load(relativePath) {
   return moduleRecord.exports;
 }
 
-test('CB-P2-9: comment-only heartbeat frames produce no events', () => {
+test('comment-only heartbeat frames produce no events', () => {
   const { createAssistantSseParser } = load('src/lib/assistant-stream.ts');
   const events = [];
   const parser = createAssistantSseParser((event) => events.push(event));
@@ -25,7 +25,7 @@ test('CB-P2-9: comment-only heartbeat frames produce no events', () => {
   assert.deepEqual(events, []);
 });
 
-test('CB-P2-9: heartbeats interleaved between events do not disturb ordering or sequencing', () => {
+test('heartbeats interleaved between events do not disturb ordering or sequencing', () => {
   const { createAssistantSseParser, AssistantStreamOrder, parseAssistantStreamEvent } =
     load('src/lib/assistant-stream.ts');
   const events = [];
@@ -57,7 +57,7 @@ test('CB-P2-9: heartbeats interleaved between events do not disturb ordering or 
   assert.equal(order.currentPhase, 'terminal');
 });
 
-test('CB-P2-9: a heartbeat frame split across chunk boundaries stays inert', () => {
+test('a heartbeat frame split across chunk boundaries stays inert', () => {
   const { createAssistantSseParser } = load('src/lib/assistant-stream.ts');
   const events = [];
   const parser = createAssistantSseParser((event) => events.push(event));
@@ -68,7 +68,7 @@ test('CB-P2-9: a heartbeat frame split across chunk boundaries stays inert', () 
   assert.deepEqual(events, [{ type: 'delta', text: 'ok' }]);
 });
 
-test('CB-P3-1: replace with reason ANSWERED does not set the degraded flag', () => {
+test('replace with reason ANSWERED does not set the degraded flag', () => {
   const { assistantReducer, initialState } = load('src/components/assistant/assistant-reducer.ts');
   let state = assistantReducer(initialState, {
     type: 'assistant-start',
@@ -88,7 +88,7 @@ test('CB-P3-1: replace with reason ANSWERED does not set the degraded flag', () 
   assert.equal(state.messages[0].degraded, false);
 });
 
-test('CB-P3-1: replace with a non-ANSWERED reason still degrades', () => {
+test('replace with a non-ANSWERED reason still degrades', () => {
   const { assistantReducer, initialState } = load('src/components/assistant/assistant-reducer.ts');
   let state = assistantReducer(initialState, {
     type: 'assistant-start',

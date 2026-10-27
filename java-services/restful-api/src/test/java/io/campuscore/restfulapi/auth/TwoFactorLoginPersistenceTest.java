@@ -350,8 +350,7 @@ class TwoFactorLoginPersistenceTest {
         String wrongCode = correctCode.equals("000000") ? "000001" : "000000";
 
         // Attempts 1-4: wrong code -> TWO_FACTOR_CODE_INVALID; each attempt must
-        // persist across the transaction boundary (Kongming condition on the
-        // ENABLE branch).
+        // persist across the transaction boundary (including the ENABLE branch).
         for (int attempt = 1; attempt <= 4; attempt++) {
             mvc.perform(post("/api/v1/me/two-factor/confirm")
                             .with(io.campuscore.restfulapi.testsupport.CurrentAccountJwt.currentJwt(jdbc, "student-user"))
@@ -449,7 +448,7 @@ class TwoFactorLoginPersistenceTest {
 
     @Test
     void externallyWrittenExpiryIsHonouredRegardlessOfJvmTimezone() throws Exception {
-        // Regression for the TZ conversion defect (Wukong, 2026-09-26): an
+        // Regression for the TZ conversion defect: an
         // external writer stamps expiresAt with plain SQL relative to the
         // database clock. The repository must honour the stored instant — the
         // previous toLocalDateTime()/UTC round trip shifted it by the JVM
@@ -482,7 +481,7 @@ class TwoFactorLoginPersistenceTest {
                 .andReturn();
         assertNotNull(challenge);
 
-        // Round-4 verified fix: the password alone must NOT remove the second
+        // the password alone must NOT remove the second
         // factor — it starts an emailed DISABLE challenge like the enable flow.
         MvcResult disableChallenge = mvc.perform(post("/api/v1/me/two-factor/disable/challenge")
                         .with(io.campuscore.restfulapi.testsupport.CurrentAccountJwt.currentJwt(jdbc, "student-user"))
@@ -515,7 +514,7 @@ class TwoFactorLoginPersistenceTest {
                 .andExpect(jsonPath("$.maskedEmail").doesNotExist());
     }
 
-    // ---------- K17: the security-posture change revokes old sessions ----------
+    // ---------- the security-posture change revokes old sessions ----------
 
     @Test
     void confirmEnableRevokesOtherRefreshSessionsAndKeepsTheCurrentOne() throws Exception {

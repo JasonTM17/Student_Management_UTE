@@ -60,7 +60,7 @@ public class AnnouncementReadController {
     }
 
     /**
-     * Round-3 ct-9: detail by id for authed staff clients — the collection
+     * detail by id for authed staff clients — the collection
      * endpoints existed but a single id answered 405 METHOD_NOT_ALLOWED.
      * Read scope matches the collections the caller can already list; archived
      * rows included because the caller asked for one specific record.

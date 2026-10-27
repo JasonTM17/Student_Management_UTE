@@ -40,7 +40,7 @@ function EditorLoading({ isVi }: { isVi: boolean }) {
   );
 }
 
-// RT-P3-2: the previous `dynamic()` wrapper only had a `loading` state, so a
+// the previous `dynamic()` wrapper only had a `loading` state, so a
 // blocked or timed-out editor chunk left an eternal spinner on a flaky campus
 // network. The loader below tracks failure and offers a real retry: webpack
 // evicts a failed chunk from its cache, so a re-import re-downloads it.
@@ -56,7 +56,7 @@ function loadEditorModule(): Promise<React.ComponentType<any>> {
   const attempt = import('@tinymce/tinymce-react').then(
     (mod) => mod.Editor as unknown as React.ComponentType<any>,
     (error) => {
-      // K3: this module-level cache used to keep the rejected promise forever,
+      // this module-level cache used to keep the rejected promise forever,
       // so "Retry" re-entered the error branch without ever attempting another
       // import. Dropping the cache lets the next call re-import the chunk (and
       // recover once the network is back).
@@ -110,7 +110,7 @@ function EditorLoadError({ isVi, onRetry }: { isVi: boolean; onRetry: () => void
 }
 
 // ---------------------------------------------------------------------------
-// K6: TinyMCE autosave draft hygiene
+// TinyMCE autosave draft hygiene
 // ---------------------------------------------------------------------------
 
 /** Must stay in sync with the `autosave_prefix` used in `init` below. */
@@ -139,7 +139,7 @@ export function clearTinyMceAutosaveDrafts(editorId?: string): void {
 }
 
 // ---------------------------------------------------------------------------
-// K5: foreign-paste cleanup
+// foreign-paste cleanup
 // ---------------------------------------------------------------------------
 
 /**
@@ -274,7 +274,7 @@ export interface TinyMceEditorProps {
   readOnly?: boolean;
   locale?: 'vi' | 'en';
   id?: string;
-  /** Document title used for the downloaded file name (K2). */
+  /** Document title used for the downloaded file name. */
   documentTitle?: string;
   showTemplates?: boolean;
   showWordCount?: boolean;
@@ -472,7 +472,7 @@ export function TinyMceEditor({
   const [copied, setCopied] = useState(false);
   const [editorState, reloadEditor] = useEditorModule();
 
-  // RT-P1-2: the server refuses bodies over MAX_ANNOUNCEMENT_CONTENT_CHARS,
+  // the server refuses bodies over MAX_ANNOUNCEMENT_CONTENT_CHARS,
   // so tell the author BEFORE they try to publish instead of surfacing a quota
   // error after they have finished writing.
   const contentLengthState = assessAnnouncementContentLength(value);
@@ -496,7 +496,7 @@ export function TinyMceEditor({
 
   const isVi = locale === 'vi';
 
-  // RT-P3-d: the reader sanitizer accepts only base64 png/jpeg/gif/webp/bmp
+  // the reader sanitizer accepts only base64 png/jpeg/gif/webp/bmp
   // image sources, so an inlined SVG looks fine in the author's preview and
   // comes back with its `src` deleted for every reader — an unexplained broken
   // image. Refuse it at both insert points, before the payload is embedded,
@@ -550,7 +550,7 @@ export function TinyMceEditor({
     }
   };
 
-  // Export HTML as file. K2: same naming rule as the studio export — the
+  // Export HTML as file. same naming rule as the studio export — the
   // title slug when there is one, otherwise the previous dated fallback.
   const handleExportHtml = () => {
     const blob = new Blob([value], { type: 'text/html;charset=utf-8' });
@@ -668,7 +668,7 @@ export function TinyMceEditor({
         </div>
       </div>
 
-      {/* RT-P1-2: warn while composing — the server rejects bodies over the
+      {/* warn while composing — the server rejects bodies over the
           200k-character cap, so the author must see the budget shrinking
           before they hit publish, not as a quota error afterwards. */}
       {contentLengthState !== 'ok' ? (
@@ -723,7 +723,7 @@ export function TinyMceEditor({
             height,
             menubar: 'file edit view insert format tools table help',
             menu: {
-              // K6: the autosave plugin keeps writing a recovery draft, so the
+              // the autosave plugin keeps writing a recovery draft, so the
               // File menu keeps `restoredraft` as the only way to read it back
               // after a crash or a closed tab (upstream's default file menu).
               // The studio clears the draft on every active discard — New
@@ -732,11 +732,11 @@ export function TinyMceEditor({
               file: { title: 'File', items: 'newdocument restoredraft | preview | print' },
               edit: { title: 'Edit', items: 'undo redo | cut copy paste pastetext | selectall | searchreplace' },
               view: { title: 'View', items: 'code | visualaid visualchars visualblocks | preview fullscreen' },
-              // RT-P2-2: `media` was removed from the insert menu and plugin
+              // `media` was removed from the insert menu and plugin
               // list — its output is <iframe>/<video>, which the announcement
-              // allowlist drops (no upload endpoint exists, RT-P2-6), so the
+              // allowlist drops (no upload endpoint exists), so the
               // feature produced content that silently vanished for readers.
-              // RT-P3-c: `pagebreak` is gone for the same reason. The reader
+              // `pagebreak` is gone for the same reason. The reader
               // and print CSS never honoured `<!-- pagebreak -->`, the server
               // sanitizer strips the comment, and the author's own preview
               // showed it as literal junk.
@@ -756,7 +756,7 @@ export function TinyMceEditor({
               'code',
               'codesample',
               'directionality',
-              // K4: the upstream fullscreen plugin is the single fullscreen
+              // the upstream fullscreen plugin is the single fullscreen
               // mechanism. The old app-level overlay set the iframe height in
               // `init`, which the React wrapper only reads at mount, so it kept
               // the stale inline height around a full-screen frame.
@@ -775,9 +775,9 @@ export function TinyMceEditor({
               'visualchars',
               'wordcount',
             ],
-            // RT-P2-2: accordion + anchor are kept because their output
+            // accordion + anchor are kept because their output
             // (<details>/<summary> and a restricted `id`) is allowlisted by
-            // the sanitizer on both the read and write paths; RT-P3-4:
+            // the sanitizer on both the read and write paths;
             // `wordcount` is only offered when `showWordCount` is set.
             // `emoticons` is deliberately absent: official administrative
             // content offers no sticker insertion; `charmap` covers the
@@ -859,7 +859,7 @@ export function TinyMceEditor({
             // Pasted screenshots go through the same upload handler instead of
             // being silently dropped (TinyMCE's default rejects data images).
             paste_data_images: true,
-            // K5: TinyMCE 8 no longer filters Word/Google-Docs markup and the
+            // TinyMCE 8 no longer filters Word/Google-Docs markup and the
             // server sanitizer keeps class/style, so external paste is reduced
             // to the app's rendering allowlist here. Internal
             // editor-to-editor paste carries TinyMCE's `internal` marker and is
@@ -871,7 +871,7 @@ export function TinyMceEditor({
             },
             images_upload_handler: (blobInfo: any) =>
               new Promise((resolve, reject) => {
-                // RT-P1-2: inline base64 payloads land in the announcement
+                // inline base64 payloads land in the announcement
                 // content, so the cap is DERIVED from the server's 200k-char
                 // body limit (see lib/announcement-limits.ts) instead of the
                 // old independent 1MB number, which made the base64-encoded
@@ -999,7 +999,7 @@ export function TinyMceEditor({
             branding: false,
             promotion: false,
             placeholder: placeholder || (isVi ? 'Bắt đầu soạn thảo nội dung với đầy đủ công cụ TinyMCE chuyên nghiệp...' : 'Start composing content with professional TinyMCE tools...'),
-            // RT-P3-1: self-hosted Vietnamese language pack (copied from
+            // self-hosted Vietnamese language pack (copied from
             // tinymce-i18n by scripts/copy-tinymce.mjs to /tinymce/langs/vi.js);
             // the English locale uses TinyMCE's built-in strings.
             language: isVi ? 'vi' : undefined,

@@ -7,7 +7,7 @@ import java.nio.file.Path;
 import org.junit.jupiter.api.Test;
 
 /**
- * Round-10 finding G5: V80 closed the round-9 course-code duplication
+ * V80 closed the course-code duplication
  * (SE401-404 were seeded twice for different courses) by renumbering the
  * second set to SE421-424 and enforcing a school-wide unique index on
  * academic."Course"("code"). The H2 harness stops at V24, so the index itself

@@ -17,7 +17,7 @@ export interface UnsavedChangesGuardOptions {
   /** Set false to suspend the guard (e.g. while a save is in flight). */
   enabled?: boolean;
   /**
-   * LEC-P3-B1: additionally intercept in-app route changes — sidebar and
+   * additionally intercept in-app route changes — sidebar and
    * header <Link> clicks and browser Back/forward — which beforeunload never
    * sees because they are SPA navigations. Opt-in so existing editors keep
    * their current behavior until they adopt it.
@@ -45,7 +45,7 @@ export interface UnsavedChangesGuard {
 type PendingKind = 'explicit' | 'anchor' | 'popstate';
 
 /**
- * RT-P3-3 / LEC-P3-B1: shared unsaved-changes guard for editors (announcement
+ * shared unsaved-changes guard for editors (announcement
  * studio, grade sheet). A dirty editor needs four layers:
  *
  * - a `beforeunload` listener for tab close / reload / external navigation,
@@ -161,7 +161,7 @@ export function useUnsavedChangesGuard({
     }
   }, [armSentinel]);
 
-  // LEC-P3-B1 layer 1: same-origin <a> clicks while dirty. Capture phase at
+  // layer 1: same-origin <a> clicks while dirty. Capture phase at
   // document runs before the React root (and therefore before Link's own
   // onClick); the event is swallowed, one confirm is shown, and on accept
   // the click is replayed under the bypass so Link (for SPA links) or the
@@ -213,7 +213,7 @@ export function useUnsavedChangesGuard({
     return () => document.removeEventListener('click', handleClick, true);
   }, [interceptRouteChanges, armLeave]);
 
-  // LEC-P3-B1 layer 2: arm the history sentinel on the clean→dirty
+  // layer 2: arm the history sentinel on the clean→dirty
   // transition so a Back press lands on this same URL (see popstate below).
   useEffect(() => {
     if (!interceptRouteChanges) return;
@@ -221,7 +221,7 @@ export function useUnsavedChangesGuard({
     armSentinel();
   }, [interceptRouteChanges, dirtyNow, armSentinel]);
 
-  // LEC-P3-B1 layer 3: the App Router's own popstate handler has already
+  // layer 3: the App Router's own popstate handler has already
   // restored the same-URL page by the time this runs; decide whether the
   // absorbed press may continue (clean — replay it) or needs the confirm
   // first (dirty — OK replays the real step, Cancel re-arms the sentinel).

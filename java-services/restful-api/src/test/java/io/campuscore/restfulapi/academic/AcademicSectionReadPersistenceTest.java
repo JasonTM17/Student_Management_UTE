@@ -108,7 +108,7 @@ class AcademicSectionReadPersistenceTest {
                 .andExpect(jsonPath("$[0].enrolledCount").value(2))
                 // The semester wire fields carry the chatbot's semester
                 // scoping — if the SELECT ever drops them the advisor's
-                // newest/named filter silently degrades (Kongming F9).
+                // newest/named filter silently degrades.
                 .andExpect(jsonPath("$[0].semesterId").value("semester-1"))
                 .andExpect(jsonPath("$[0].semesterName").isNotEmpty())
                 .andExpect(jsonPath("$[0].semesterNameEn").isNotEmpty())
@@ -170,7 +170,7 @@ class AcademicSectionReadPersistenceTest {
 
     @Test
     void lecturerGradingDropsCancelledSectionsFromTheScopedSemester() throws Exception {
-        // Wukong round-10 F2: a cancelled section is not grading workload —
+        // a cancelled section is not grading workload —
         // the assistant scope already excludes it, and the list must agree
         // instead of showing a dead class as pending grade entry.
         jdbc.update("UPDATE \"academic\".\"Section\" SET \"status\" = 'CANCELLED' WHERE \"id\" = 'section-2'");

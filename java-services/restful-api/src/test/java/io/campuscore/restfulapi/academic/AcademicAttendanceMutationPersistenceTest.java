@@ -201,7 +201,7 @@ class AcademicAttendanceMutationPersistenceTest {
                         .with(lecturerJwt("lecturer-1")))
                 .andExpect(status().isOk());
 
-        // Round-2 sweep write-1: a RESET entry must DELETE the saved row for
+        // a RESET entry must DELETE the saved row for
         // that student instead of being ignored (the old contract kept the
         // stale record while the UI reported the reset as saved).
         String resetPayload = """

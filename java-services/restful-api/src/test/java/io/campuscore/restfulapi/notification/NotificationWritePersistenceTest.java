@@ -98,7 +98,7 @@ class NotificationWritePersistenceTest {
                 OTHER_USER, "student2@campuscore.edu",
                 "admin-user", "admin@campuscore.edu");
 
-        // K14: admin notification writes now record an AdminAudit row in the
+        // admin notification writes now record an AdminAudit row in the
         // same transaction. Flyway is disabled in this context, so the table
         // the recorder INSERTs into must exist here as well.
         jdbc.execute("CREATE SCHEMA IF NOT EXISTS campuscore_audit");

@@ -29,7 +29,7 @@ import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 
 /**
- * RT-P2-5 write-boundary proving tests: the sanitizer runs on create/update
+ * write-boundary proving tests: the sanitizer runs on create/update
  * only (history is never backfilled), the stored value is the sanitized one,
  * the removed-element count is observable in the audit reason, and the length
  * cap the client derives its image budget from still holds.

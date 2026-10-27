@@ -70,7 +70,7 @@ class AccountDeactivationPersistenceTest {
     }
 
     /**
-     * A-P1-1: the delete path must enforce the same role ceiling as
+     * the delete path must enforce the same role ceiling as
      * update/reset — a plain administrator cannot hard-delete another
      * administrator, and the target row plus its sessions survive.
      */

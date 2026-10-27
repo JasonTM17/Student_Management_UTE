@@ -77,7 +77,7 @@ function serverAllowedQueryParams(controllerSource, route) {
 }
 
 // ---------------------------------------------------------------------------
-// DEEP-P3-1: GET /enrollments/my/transcript is the cumulative whole-programme
+// GET /enrollments/my/transcript is the cumulative whole-programme
 // transcript, so the route allow-lists no query parameter at all (Set.of()).
 // The client still declared an optional `semesterId` and forwarded it, so every
 // caller that honoured the published signature got HTTP 400. The transcript must
@@ -135,7 +135,7 @@ test('no caller passes an argument to getMyTranscript', () => {
 });
 
 // ---------------------------------------------------------------------------
-// DEEP-P3-2: GET /courses allow-listed only page/limit/search, while
+// GET /courses allow-listed only page/limit/search, while
 // coursesApi.getAll advertised an optional `departmentId` that the route
 // answered with HTTP 400. The admin page worked around the refusal by slicing
 // the already-paginated 20-row page in the browser, so a department with more

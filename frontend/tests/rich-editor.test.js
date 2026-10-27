@@ -114,7 +114,7 @@ test('announcement HTML sanitizer neutralizes stored-XSS payloads', () => {
     '<p>Đào tạo &amp; Khoa học</p>',
   );
 
-  // T-P1-4: vetted inline styles survive so the reader matches the editor
+  // vetted inline styles survive so the reader matches the editor
   // preview (template letterheads, callouts, seals), while scheme-bearing
   // style values are stripped with the attribute.
   const styled = sanitizeAnnouncementHtml(
@@ -191,7 +191,7 @@ test('rich-content-renderer securely parses and renders markdown structures and 
   assert.match(source, /export function RichContentRenderer/);
   assert.match(source, /export interface RichContentRendererProps/);
 
-  // Security: RT-P1-1 — the markdown branch must not carry its own scheme
+  // Security: the markdown branch must not carry its own scheme
   // check; it delegates to the sanitizer's policy (asserted behaviorally
   // below). The old weak `isSafeUrl` must stay gone.
   assert.doesNotMatch(source, /function isSafeUrl/);
@@ -216,7 +216,7 @@ test('rich-content-renderer securely parses and renders markdown structures and 
   assert.match(source, /type="checkbox"/);
 });
 
-test('RT-P1-1 markdown link and image schemes share the sanitizer policy', () => {
+test('markdown link and image schemes share the sanitizer policy', () => {
   // Regression for the stored-XSS markdown bypass: the pre-fix renderer kept
   // its own `trim().toLowerCase().startsWith('javascript:')` guard, which
   // interior tab/newline/carriage-return defeats because browsers strip
@@ -249,7 +249,7 @@ test('RT-P1-1 markdown link and image schemes share the sanitizer policy', () =>
   assert.equal(isSafeAnnouncementUrl('/vi/dashboard/thesis'), true);
 });
 
-test('RT-P2-3 list-only and blockquote-only HTML bodies render as HTML, not literal tags', () => {
+test('list-only and blockquote-only HTML bodies render as HTML, not literal tags', () => {
   const renderer = loadRichContentRenderer();
   const { sanitizeAnnouncementHtml } = loadTs('src/lib/html-sanitizer.ts');
 
@@ -379,7 +379,7 @@ test('tinymce-editor component provides self-hosted offline wysiwyg capabilities
   assert.ok(pkg.dependencies['tinymce'], 'tinymce must be a dependency');
   assert.match(pkg.scripts.prebuild, /copy-tinymce\.mjs/);
 
-  // Dashboard editor integration. The page also imports the K6 draft-clearing
+  // Dashboard editor integration. The page also imports the draft-clearing
   // helper from the same module.
   assert.match(
     editorPage,
@@ -436,7 +436,7 @@ test('sortablejs integration empowers admin block building and announcement reor
 
 
 
-// --- K3/K4/K5/K6 + F-2: TinyMCE shell and studio action integrity ---
+// --- K3/K4/K5/+ TinyMCE shell and studio action integrity ---
 
 function loadTinymceEditorModule() {
   const dummyComponent = function DummyComponent() {
@@ -452,7 +452,7 @@ function loadTinymceEditorModule() {
   });
 }
 
-test('K5 internal TinyMCE paste is never rewritten; external paste gets cleaned', () => {
+test('internal TinyMCE paste is never rewritten; external paste gets cleaned', () => {
   const editorModule = loadTinymceEditorModule();
   // TinyMCE marks content copied from a TinyMCE editor as internal; this app's
   // own editors set that marker, so their paste must pass through untouched.
@@ -470,14 +470,14 @@ test('K5 internal TinyMCE paste is never rewritten; external paste gets cleaned'
   assert.match(source, /PASTE_KEPT_CLASS/);
 });
 
-test('K3 a failed editor chunk import clears the cache so Retry re-imports', () => {
+test('a failed editor chunk import clears the cache so Retry re-imports', () => {
   const source = read('src/components/ui/tinymce-editor.tsx');
   assert.match(source, /if \(editorModulePromise\) return editorModulePromise;/);
   assert.match(source, /editorModulePromise = null;/);
   assert.match(source, /const attempt = import\('@tinymce\/tinymce-react'\)/);
 });
 
-test('K4 one fullscreen mechanism: the upstream plugin, no app-level overlay', () => {
+test('one fullscreen mechanism: the upstream plugin, no app-level overlay', () => {
   const source = read('src/components/ui/tinymce-editor.tsx');
   assert.doesNotMatch(source, /setIsFullscreen/, 'the app-level overlay state must be gone');
   assert.doesNotMatch(
@@ -489,7 +489,7 @@ test('K4 one fullscreen mechanism: the upstream plugin, no app-level overlay', (
   assert.match(source, /preview fullscreen/, 'its toolbar control stays available');
 });
 
-test('K6 crash drafts stay restorable while discarded drafts are cleared', () => {
+test('crash drafts stay restorable while discarded drafts are cleared', () => {
   const source = read('src/components/ui/tinymce-editor.tsx');
   assert.match(source, /export function clearTinyMceAutosaveDrafts/);
   // A crash or a closed tab must leave a way back in: the autosave plugin keeps
@@ -512,7 +512,7 @@ test('K6 crash drafts stay restorable while discarded drafts are cleared', () =>
   assert.match(modal, /onClose=\{handleClose\}/, 'Escape/backdrop close uses the scoped cleanup');
 });
 
-test('F-2 the feed-order save is locked against a double submission', () => {
+test('the feed-order save is locked against a double submission', () => {
   const page = read('src/app/dashboard/editor/page.tsx');
   const save = page.slice(
     page.indexOf('const handleSaveNoticeOrder'),
@@ -526,7 +526,7 @@ test('F-2 the feed-order save is locked against a double submission', () => {
   );
 });
 
-// Round-2 review: an unclosed container from a legacy row used to emit its
+// an unclosed container from a legacy row used to emit its
 // source as escaped prose, so the reader saw stylesheet text under the article.
 test('an unterminated code container cannot leave its source as visible text', () => {
   const { sanitizeAnnouncementHtml } = loadTs('src/lib/html-sanitizer.ts');

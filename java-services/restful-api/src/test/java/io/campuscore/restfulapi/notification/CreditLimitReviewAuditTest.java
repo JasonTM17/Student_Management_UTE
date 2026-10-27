@@ -24,7 +24,7 @@ import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
 import org.springframework.jdbc.core.namedparam.SqlParameterSource;
 
 /**
- * K15: approving or rejecting a per-student credit-limit exception is a
+ * approving or rejecting a per-student credit-limit exception is a
  * privilege-affecting decision and must leave an AdminAudit row carrying the
  * deciding admin, the request/round it belongs to, and the state transition.
  *

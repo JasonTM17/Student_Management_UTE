@@ -321,7 +321,7 @@ public class ThesisAssistantService {
             Map.entry("giay to", "giấy tờ"),
             Map.entry("nghi hoc", "nghỉ học"),
             Map.entry("lam lai", "làm lại"),
-            // Round-4 format sweep: unaccented "tu van" folds onto the same
+            // unaccented "tu van" folds onto the same
             // advisory phrase (the bare syllables are retrieval noise).
             Map.entry("tu van", "tư vấn"),
             // Backlog sweep: "CSDL" is the acronym students actually type, but
@@ -395,7 +395,7 @@ public class ThesisAssistantService {
             "devops", "ci[/+-]cd", "cicd", "ci", "cd", "pipeline", "pipelines",
             "docker", "container", "containers", "kubernetes", "deploy", "deployment",
             "deployments", "runbook",
-            // Round-2 sweep static-3: course-name vocabulary missing from the
+            // course-name vocabulary missing from the
             // gate — "Nhập môn lập trình là gì?" was hijacked into the general
             // fallback while the SPECIALIZED corpus owns a document for it.
             "lap\\s*trinh", "giai\\s*thuat", "co\\s*so\\s*du\\s*lieu", "csdl",
@@ -836,7 +836,7 @@ public class ThesisAssistantService {
      *        proof, and the outage contract (KNOWLEDGE_UNAVAILABLE, degraded,
      *        no citations) must win over the curated content fallback.
      * @param scope request scope; "specialized" skips the technical gate in
-     *        the lexical path (round-3 chat-8)
+     *        the lexical path
      */
     public ChatResponse groundedFallback(String message, String locale, boolean dbDownAtRequestStart, String scope) {
         return groundedFallback(message, locale, dbDownAtRequestStart, scope, false);
@@ -938,7 +938,7 @@ public class ThesisAssistantService {
 
     public static ChatResponse conversationalAnswer(String message, String locale, java.util.UUID clientRequestId) {
         if (message == null || message.isBlank()) return null;
-        // Wukong round-9 F8: normalize like the other tiers — NFD and
+        // normalize like the other tiers — NFD and
         // invisible-separator input used to skip the openers entirely and
         // fall to the provider path ("cảm\u200Bơn", NFD "xin chào").
         String normalized = AssistantInputGuard.normalizeMessage(message)
@@ -952,7 +952,7 @@ public class ThesisAssistantService {
                 || (CONVERSATIONAL_THANKS_PATTERN.matcher(normalized).find())
                 || (CONVERSATIONAL_BYE_PATTERN.matcher(normalized).find());
         if (!matches) return null;
-        // Coverage check (Wukong round-7 A8): the tier must apply only when
+        // Coverage check: the tier must apply only when
         // the WHOLE message is conversational. "Cảm ơn, lịch học của tôi" and
         // "Thanks, what is my schedule?" open with a thanks token and used to
         // return the boilerplate, hijacking the real question — remove every
@@ -961,7 +961,7 @@ public class ThesisAssistantService {
         String residue = CONVERSATIONAL_ANY_PATTERN.matcher(normalized).replaceAll(" ");
         residue = CONVERSATIONAL_FILLER.matcher(residue).replaceAll(" ");
         // \p{S} joins the residue strip: "hi 👋" / "chào 😊" are genuine
-        // small talk and no emoji is academic content (Wukong round-8 L1).
+        // small talk and no emoji is academic content.
         if (!residue.replaceAll("[\\s\\p{P}\\p{S}]+", "").isEmpty()) return null;
         String text;
         if (CONVERSATIONAL_THANKS_PATTERN.matcher(normalized).find()) {
@@ -1023,7 +1023,7 @@ public class ThesisAssistantService {
      * path; scope='specialized' also returns {@code null} because the
      * professional corpus is the RIGHT source there — the lexical gate cannot
      * see specialist terms like "SOLID" and used to hijack those questions
-     * into ungrounded general prose (round-2 sweep chat-1); a provider miss
+     * into ungrounded general prose; a provider miss
      * also returns {@code null} so the caller falls back to the normal chain
      * (owner request 2026-09-30).
      */
@@ -1199,7 +1199,7 @@ public class ThesisAssistantService {
             // "bai" (bye transliteration) was dropped: it collides with the
             // real academic noun "bài" (assignment/test paper) — "bai cua
             // toi" used to get whole-message coverage via the filler words
-            // and return the goodbye boilerplate (Wukong round-8 M6).
+            // and return the goodbye boilerplate.
             "tạm\\s*biệt", "tam\\s*biet", "\\bbye\\b", "\\bgoodbye\\b", "\\bsee\\s+you\\b",
             "hẹn\\s*gặp\\s*lại", "hen\\s*gap\\s*lai");
 
@@ -1229,7 +1229,7 @@ public class ThesisAssistantService {
                     + "|ơi|oi|ạ|a|nhé|nhe|nha|nhỉ|nhi|nhiều|nhieu|lắm|lam|rồi|roi|đi|vậy|vay"
                     + "|thôi|luôn|đấy|đó|hén|hen|được|duoc|cho|của|cua|nữa|nua|vui|lòng|long|mến|men"
                     + "|ok|okay|okie|pls|please|me|my|you|your|dear|friend|friends|sis|bro|guys"
-                    // Wukong round-9 F9: Vietnamese intensifiers — "cảm ơn
+                    // Vietnamese intensifiers — "cảm ơn
                     // rất nhiều / quá / vô cùng" left residue and missed the
                     // tier.
                     + "|rất|rat|quá|qua|vô\\s*cùng|vo\\s*cung"
@@ -1539,7 +1539,7 @@ public class ThesisAssistantService {
     }
 
     /**
-     * Round-3 chat-7: records both sides of an intercepted PERSONAL_CONTEXT
+     * records both sides of an intercepted PERSONAL_CONTEXT
      * turn so it shows up in /conversations/{id}/messages like every KB turn.
      * The conversation must exist and belong to the caller — requireOwnedConversation
      * throws 404 CONVERSATION_NOT_FOUND otherwise, matching the KB path's
@@ -1547,7 +1547,7 @@ public class ThesisAssistantService {
      * the response echo, or null when history persistence is not configured.
      */
     /**
-     * Round-3 cb3-10: ledger parity for the personal-context path. A reused
+     * ledger parity for the personal-context path. A reused
      * clientRequestId with a DIFFERENT payload conflicts exactly like the KB
      * path's reserve (409 IDEMPOTENCY_CONFLICT); an exact replay falls through
      * and gets a freshly computed answer — for personal data that is the
@@ -1608,7 +1608,7 @@ public class ThesisAssistantService {
         UUID conversation = turn == null ? null : parseConversation(turn.conversationId());
         UUID assistantMessage = turn == null ? null : parseConversation(turn.messageId());
         try {
-            // Round-3 cb3-10: consume the idempotency key like every KB turn
+            // consume the idempotency key like every KB turn
             // so a personal-vs-personal key reuse conflicts instead of
             // silently passing — including the conversation-less turns.
             turns.recordCompletedPersonalTurn(ownerId, clientRequestId, requestHash,
@@ -1675,7 +1675,7 @@ public class ThesisAssistantService {
                 ? legacyHistory.conversationScope(requestedConversation, ownerId)
                 : null;
         String effectiveScope = storedScope != null && !storedScope.isBlank() ? storedScope : scope;
-        // Round-3 chat-8: same scope rule as the controller — the specialized
+        // same scope rule as the controller — the specialized
         // scope serves the curated DevOps/REST corpus, so its requests must
         // not be re-blocked here after the controller already passed them.
         if (!"specialized".equalsIgnoreCase(effectiveScope) && AssistantInputGuard.isTechnicalRequest(normalized)) {
@@ -2351,7 +2351,7 @@ public class ThesisAssistantService {
         if (INTENT_FEES.matcher(folded).find()) families++;
         if (isCourseRegistrationQuery(message)) families++;
         if (isCertificateQuery(message)) families++;
-        // Kongming C4: the credit-limit/prerequisite predicates must be
+        // the credit-limit/prerequisite predicates must be
         // reachable as detectors too — "SE101 tiên quyết gì, và học phí bao
         // nhiêu?" previously counted one family and dropped the fees half.
         if (isCreditLimitQuery(message)) families++;
@@ -2644,7 +2644,7 @@ public class ThesisAssistantService {
                 }
             }
         }
-        // Round-4 format sweep: degraded answers (QUOTA_EXCEEDED, provider
+        // degraded answers (QUOTA_EXCEEDED, provider
         // truncated/unavailable) serve the top document verbatim. Give the raw
         // content the same structure the LLM pathway produces — a title
         // heading and one bullet per numbered point — so the panel renders a
@@ -2719,13 +2719,13 @@ public class ThesisAssistantService {
             String blocked = guardMessage(guard.reasonCode(), normalizedLocale);
             return new ChatResponse(blocked, MODEL, true, guard.reasonCode(), normalizedLocale, List.of());
         }
-        // Round-3 chat-8: parity with the controller and execute() gates — the
+        // parity with the controller and execute() gates — the
         // specialized scope answers from the curated DevOps/REST corpus.
         if (!"specialized".equalsIgnoreCase(scope) && AssistantInputGuard.isTechnicalRequest(normalized)) {
             return new ChatResponse(technicalOutputMessage(normalizedLocale), MODEL, true,
                     "TECHNICAL_REQUEST_BLOCKED", normalizedLocale, List.of());
         }
-        // Round-4 latent fix: the scope was only consulted for the technical
+        // the scope was only consulted for the technical
         // gate and then dropped — every specialized question reaching this
         // path (groundedFallback, legacyAnswer) searched the DEFAULT corpus,
         // which excludes domain SPECIALIZED, so the curated professional set
@@ -2904,7 +2904,7 @@ public class ThesisAssistantService {
                 case "ký" -> expanded.add("đăng ký");
                 case "học" -> expanded.add("học phần");
                 case "phần" -> expanded.add("học phần");
-                // Round-4 format sweep: "tư vấn" is one concept; the bare
+                // "tư vấn" is one concept; the bare
                 // syllables are noise that substring-matched "truy vấn" and
                 // "phỏng vấn", ranking the wrong doc #1 under quota (prod
                 // screenshot: DevOps question answered with the CSDL doc).

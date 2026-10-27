@@ -27,7 +27,7 @@ import io.campuscore.restfulapi.thesis.assistant.dto.ThesisAssistantDtos;
 import io.campuscore.restfulapi.thesis.assistant.repository.ThesisAssistantKnowledgeRepository;
 
 /**
- * DEEP-P3-3 regression gate for assistant retrieval of the seeded DevOps/CI-CD
+ * regression gate for assistant retrieval of the seeded DevOps/CI-CD
  * document.
  *
  * Three defects stacked up: the scope pre-gate refused any question that did

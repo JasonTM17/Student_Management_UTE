@@ -26,7 +26,7 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.request.RequestPostProcessor;
 
 /**
- * K14: an admin creating, editing or deleting a notification must leave an
+ * an admin creating, editing or deleting a notification must leave an
  * {@code campuscore_audit."AdminAudit"} row naming the actor and the affected
  * notification, while the response contracts stay exactly as they were.
  *

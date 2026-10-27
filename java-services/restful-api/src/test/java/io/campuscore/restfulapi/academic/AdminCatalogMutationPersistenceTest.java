@@ -577,7 +577,7 @@ class AdminCatalogMutationPersistenceTest {
                 .isEqualTo(Instant.parse("2027-06-30T23:59:59Z"));
     }
 
-    // ---------- ADM-P1-1: the date-range validation used to be dead code ----------
+    // ---------- the date-range validation used to be dead code ----------
 
     @Test
     void semesterCreateRejectsInvertedDateOnlyRange() throws Exception {
@@ -706,7 +706,7 @@ class AdminCatalogMutationPersistenceTest {
                 .andExpect(jsonPath("$.code").value("INVALID_DATE_RANGE"));
     }
 
-    // ---------- ADM-P1-2: the update path ran none of the create-time validators ----------
+    // ---------- the update path ran none of the create-time validators ----------
 
     @Test
     void courseUpdateRejectsCreditsOutsideTheCreateBounds() throws Exception {

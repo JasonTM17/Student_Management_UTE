@@ -199,7 +199,7 @@ public class CreditLimitApplicationService {
             throw problem(HttpStatus.CONFLICT, "CREDIT_LIMIT_APPLICATION_NOT_PENDING",
                     "Only a pending credit-limit application can be reviewed");
         }
-        // K15: approving/rejecting a per-student credit-limit exception is a
+        // approving/rejecting a per-student credit-limit exception is a
         // privilege-affecting decision, so it must leave an audit row with the
         // deciding admin and the state transition. The business rules above are
         // unchanged; this only records the decision that already happened.

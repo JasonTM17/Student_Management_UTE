@@ -23,7 +23,7 @@ interface TableOfContentsProps {
 }
 
 /**
- * RT-P3-a: TinyMCE bodies are HTML, so an author's `<h2>` produced no markdown
+ * TinyMCE bodies are HTML, so an author's `<h2>` produced no markdown
  * `##` line and the contents stayed empty. Headings are read the same way the
  * renderer anchors them (one shared slug/dedupe implementation in
  * `rich-content-renderer.tsx`), otherwise a row points at an id that was never

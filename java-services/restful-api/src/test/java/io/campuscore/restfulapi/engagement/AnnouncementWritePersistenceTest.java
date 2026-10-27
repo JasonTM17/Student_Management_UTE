@@ -894,9 +894,9 @@ class AnnouncementWritePersistenceTest {
 
     @Test
     void dueNotificationPickupCoversImmediateRowsAndClaimRejectsRescheduled() {
-        // Kongming C1: an immediate announcement (publishAt NULL) whose
+        // an immediate announcement (publishAt NULL) whose
         // create-path fan-out failed keeps notifiedAt NULL — the refire job
-        // must still pick it up. Kongming C4: a reschedule-to-future landing
+        // must still pick it up. a reschedule-to-future landing
         // between the due-scan and the stamp must reject the claim so the
         // marker survives for the real refire.
         seedAnnouncement();

@@ -14,7 +14,7 @@ import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.web.servlet.MockMvc;
 
 /**
- * WS-Security round-11: a JSON body endpoint hit with a non-JSON content type
+ * a JSON body endpoint hit with a non-JSON content type
  * used to fall through to the 500 catch-all (HttpMediaTypeNotSupportedException
  * had no handler). A wrong media type is a client mistake: the contract is a
  * 415 envelope, never a 5xx.

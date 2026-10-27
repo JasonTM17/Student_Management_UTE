@@ -79,7 +79,7 @@ export function AnnouncementReaderModal({
     handleScroll();
 
     return () => container.removeEventListener('scroll', handleScroll);
-    // RT-P3-f: the progress bar is measured against the document box, and the
+    // the progress bar is measured against the document box, and the
     // reading preferences resize that box — a bigger font or a serif/dark theme
     // changes `scrollHeight` and the offset of the current position. The mode,
     // theme, font family and font size therefore all re-run this effect so the

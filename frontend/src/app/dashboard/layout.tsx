@@ -218,7 +218,7 @@ interface NotificationItem {
 }
 
 // Deep links resolve from the authored data, never from the title/body text:
-// the round-8 fix landed on the notifications center but not here, and the old
+// the earlier fix landed on the notifications center but not here, and the old
 // keyword matcher mis-routed on substring collisions ('thi' inside 'lịch thi'
 // opened the timetable, 'điểm' inside 'điểm rèn luyện' opened the transcript)
 // while silently discarding the link an admin broadcast was authored with.

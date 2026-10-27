@@ -19,7 +19,7 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import io.campuscore.restfulapi.audit.repository.AdminAuditReadRepository;
 
 /**
- * Round-3 contract ct-2: the governance read side for the admin audit trail.
+ * the governance read side for the admin audit trail.
  * ADMIN and SUPER_ADMIN only; lecturers and students never see it. Filters are
  * exact-match and the page shape follows the {data, meta} contract the other
  * admin lists use.

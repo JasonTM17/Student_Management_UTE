@@ -245,7 +245,7 @@ public class AdminUserMutationService {
     }
 
     /**
-     * Round-3 contract ct-7: five failed logins lock an account for 30 minutes
+     * five failed logins lock an account for 30 minutes
      * and no API could clear it — the only clearing write (recordSuccessfulLogin)
      * sits behind the very gate the lock trips, and the admin update path never
      * touched lockedUntil, so "the correct password still says Invalid
@@ -267,7 +267,7 @@ public class AdminUserMutationService {
     }
 
     /**
-     * Round-3 ct-9: single-user detail for the admin console (the collection
+     * single-user detail for the admin console (the collection
      * existed; one id used to answer 405). A protected account's detail is
      * subject to the same ceiling as managing it.
      */
@@ -379,7 +379,7 @@ public class AdminUserMutationService {
             revokeSessions(id);
         }
         if (requestedRole != null) {
-            // Round-2 sweep static-2: roles live in the JWT claims, and the
+            // roles live in the JWT claims, and the
             // account-state filter never re-derives them from the DB — a
             // demoted admin's old access token kept ROLE_ADMIN until its 15
             // -minute TTL. A genuine role change now cuts live sessions the

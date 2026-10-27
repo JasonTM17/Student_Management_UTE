@@ -155,7 +155,7 @@ class AssistantPersonalContextAdvisorTest {
         assertFalse(advisor.handles("cách đăng ký học phần"));
         assertFalse(advisor.handles("điều kiện đăng ký lớp học phần"));
 
-        // Wukong counterexamples: a first-person TOKEN elsewhere in the
+        // a first-person TOKEN elsewhere in the
         // message must not impersonate the possessor inside the phrase —
         // "toi" from "tối nay", a vocative "em", or a policy question built
         // like the progressive branch.
@@ -164,7 +164,7 @@ class AssistantPersonalContextAdvisorTest {
         assertFalse(advisor.handles("Chính sách cho phép em đang học tối đa mấy môn?"));
         assertFalse(advisor.handles("Theo quy chế em đang học được bao nhiêu môn mỗi kỳ?"));
 
-        // Wukong re-verify: third-person subjects wearing a first-person
+        // third-person subjects wearing a first-person
         // token — a possessive pronoun inside the span is position, not
         // ownership, and the verb-first order must bind the possessor
         // immediately before "đang".
@@ -174,7 +174,7 @@ class AssistantPersonalContextAdvisorTest {
         assertFalse(advisor.handles("Em oi, dang hoc mon nay co kho khong?"));
         assertFalse(advisor.handles("Anh ấy đang học lớp nào? Tôi cũng muốn biết."));
 
-        // Wukong round-2: the veto must be construction-level, not a token
+        // the veto must be construction-level, not a token
         // list — possessive insertion ("bạn của tôi"), uncovered relations
         // ("em tôi"), standalone third-person subjects ("nó đang học"),
         // uncovered false-friends ("tối qua"), and third-person phrasings
@@ -192,7 +192,7 @@ class AssistantPersonalContextAdvisorTest {
         assertFalse(advisor.handles("Thứ 3 lớp em ấy đang học môn gì?"));
         assertFalse(advisor.handles("Điểm của em ấy thế nào?"));
 
-        // Wukong round-3: without UNICODE_CHARACTER_CLASS the \b anchors used
+        // without UNICODE_CHARACTER_CLASS the \b anchors used
         // ASCII \w, so accented finals (đó/sẽ/có/ông/đứa) were dead code and
         // "em/ba" matched mid-word inside xem/bang/điem. These pins exercise
         // the accented spellings users actually type, uncovered relations,
@@ -214,7 +214,7 @@ class AssistantPersonalContextAdvisorTest {
         assertTrue(advisor.handles("bang diem cua toi"));
         assertTrue(advisor.handles("bay gio toi dang hoc mon gi?"));
 
-        // Wukong round-4 (FALSIFIED -> repaired): surviving impersonation
+        // surviving impersonation
         // holes and over-blocks in the token-list construction.
         // (a) "của X" missed most non-self kinship and bare pronouns.
         assertFalse(advisor.handles("Lịch học của mẹ"));
@@ -226,7 +226,7 @@ class AssistantPersonalContextAdvisorTest {
         assertFalse(advisor.handles("Cho tôi xem bảng điểm của mẹ"));
         assertFalse(advisor.handles("Cho tôi xem GPA của nó"));
         // (c) bare relation + verb subjects — rule E only knew pronouns.
-        // Wukong round-9 F3: bare "bạn" is OUT of arm E — addressing the bot
+        // bare "bạn" is OUT of arm E — addressing the bot
         // it is the second person, and keeping it vetoed real request frames
         // ("bạn có thể cho tôi xem điểm"). The residual reading ("bạn" =
         // a friend) serves the asker's own rows with honest labels — the
@@ -255,7 +255,7 @@ class AssistantPersonalContextAdvisorTest {
         assertFalse(advisor.handles("my professor's schedule"));
         assertFalse(advisor.handles("my teacher's timetable"));
 
-        // Round-4 over-blocks that must now pass through to the personal
+        // over-blocks that must now pass through to the personal
         // path: vocative address, the "anh em" collective, comma-separated
         // vocatives, the day/dạy demonstrative collision, and the counter-
         // word "con số".
@@ -270,7 +270,7 @@ class AssistantPersonalContextAdvisorTest {
         assertTrue(advisor.handles("mẹ, tôi đang học lớp nào"));
         assertTrue(advisor.handles("mẹ ơi, tôi đang học lớp nào"));
 
-        // Kongming round-4: homograph collisions — "ba" is also "thứ ba"
+        // homograph collisions — "ba" is also "thứ ba"
         // (Tuesday) and the numeral 3; "con toi" is unaccented "còn tôi".
         // Both were dropped from the veto because the miss is fail-soft
         // (the advisor only ever serves the ASKER's own rows).
@@ -295,7 +295,7 @@ class AssistantPersonalContextAdvisorTest {
         // span ("tối nay" is not a day word, so this answers the list).
         assertTrue(advisor.handles("Tối nay tôi có lớp gì?"));
 
-        // Wukong round-5 (FALSIFIED -> repaired): E-subject homographs —
+        // E-subject homographs —
         // unaccented di/ma/cha/bo/mo are far more often the common words
         // đi/mà/chả/bỏ/mở than kinship, and vetoed the asker's own
         // questions. Same homograph policy as ba/con (miss is fail-soft).
@@ -319,7 +319,7 @@ class AssistantPersonalContextAdvisorTest {
         // ...while real teacher references keep the veto.
         assertFalse(advisor.handles("giáo viên tôi đang dạy môn gì"));
         assertFalse(advisor.handles("cô giáo tôi đang dạy môn gì"));
-        // Round-5 impersonation escapes that must now veto: negation
+        // impersonation escapes that must now veto: negation
         // first-word, "người yêu/bạn bè" compound subjects, possessive
         // spans over the old 15-char cap, and "của X" gaps.
         assertFalse(advisor.handles("me khong hoc lop nao, toi muon biet"));
@@ -352,7 +352,7 @@ class AssistantPersonalContextAdvisorTest {
                 Normalizer.normalize("Tối nay tôi có lớp gì?", Normalizer.Form.NFD)));
         assertFalse(advisor.handles(
                 Normalizer.normalize("Lịch học của mẹ", Normalizer.Form.NFD)));
-        // Kongming review pins — unaccented coverage gaps and false-friend
+        // Regression coverage — unaccented coverage gaps and false-friend
         // collisions fixed on the same snapshot.
         // "chị em mình" unaccented twin is the same collective "we".
         assertTrue(advisor.handles("chi em minh dang hoc lop nao"));
@@ -383,7 +383,7 @@ class AssistantPersonalContextAdvisorTest {
         // today (documented residual — never wired to the personal path).
         assertFalse(advisor.handles("Sinh viên nào chưa có điểm?"));
 
-        // Wukong round-6 (FALSIFIED -> repaired), second pass:
+
         // Collective forms beyond "anh em mình" — "anh em bon/chung minh"
         // and "anh chị em minh" all mean "we"; the strip leaves the real
         // pronoun, so the asker's own list still answers.
@@ -414,7 +414,7 @@ class AssistantPersonalContextAdvisorTest {
         // opinion shape stays personal.
         assertTrue(advisor.handles("cho em hỏi em đang học môn gì"));
 
-        // Wukong round-7 (FALSIFIED -> repaired):
+
         // The deadline guard's bare "han" matched inside "học phAn",
         // "thÁNg", "hẰNg" — ordinary enrollment phrasing died at the
         // knowledge path. Context wording keeps "hạn đăng ký" public.
@@ -460,7 +460,7 @@ class AssistantPersonalContextAdvisorTest {
         assertFalse(advisor.handles("Nam’s schedule"));
         assertFalse(advisor.handles("my partner's schedule"));
 
-        // Wukong round-8 (FALSIFIED -> repaired):
+
         // M1 — the "em <kinship>" family: em gái/em trai/em họ/em út/em
         // ruột/em chồng/em vợ/em này are unambiguous non-self relations,
         // but bare "em" filled the first-person pronoun slot in the intent
@@ -513,18 +513,18 @@ class AssistantPersonalContextAdvisorTest {
         // third party.
         assertTrue(advisor.handles("chú em ơi tôi đang học môn gì"));
         assertTrue(advisor.handles("cô em oi cho em xem bang diem"));
-        // Round-8 repaired over-blocks must stay personal.
+        // repaired over-blocks must stay personal.
         assertTrue(advisor.handles("bai toi dang hoc mon nao"));
         assertTrue(advisor.handles("Học kỳ 1 năm 2025 tôi học môn gì?"));
 
-        // ---- Wukong round-9 pins ----
+        // ---- Ownership regression coverage ----
         // F1 — unaccented "thu N" day tokens must route (and parse a day —
         // exercised end-to-end by the "thu 3" answer pin below).
         assertTrue(advisor.handles("thu 3 toi co lop gi"));
         assertTrue(advisor.handles("thu nam toi day mon gi"));
         // F2 — "của tháng" (of the month) is not a person.
         assertTrue(advisor.handles("lich hoc cua thang nay"));
-        // Round-9 self-find: under CASE_INSENSITIVE|UNICODE_CASE, \p{Lu}
+        // under CASE_INSENSITIVE|UNICODE_CASE, \p{Lu}
         // also matched lowercase, so the named-person arm vetoed EVERY
         // noun after "của" — objects, time words, "của môn/kỳ". The
         // (?-i:…) scope restores real uppercase matching; these objects
@@ -570,7 +570,7 @@ class AssistantPersonalContextAdvisorTest {
         // F12 — pronoun-stem contractions are not possessives.
         assertTrue(advisor.handles("let's check my grades"));
 
-        // ---- Wukong round-10 pins ----
+        // ---- Scope regression coverage ----
         // F1 — a CapitalizedName spelled like a first-person pronoun still
         // names ANOTHER person: the exemption only protects lowercase-typed
         // pronouns, so "của Minh"/"của Em" veto to the knowledge path
@@ -582,7 +582,7 @@ class AssistantPersonalContextAdvisorTest {
         // "em" exemption used to swallow the following name token.
         assertFalse(advisor.handles("diem cua em Lan"));
         assertFalse(advisor.handles("lich hoc cua em Hung"));
-        // Wukong round-11 follow-up: the relation+name frame generalizes —
+        // the relation+name frame generalizes —
         // "của anh Tuấn"/"của chị Lan"/"của thầy Hùng"/"của bạn Minh" also
         // name someone else, not the asker.
         assertFalse(advisor.handles("lich hoc cua anh Tuan"));
@@ -615,7 +615,7 @@ class AssistantPersonalContextAdvisorTest {
         assertTrue(answer.contains("SE401"), answer);
         assertFalse(answer.contains("SE403"), "day-qualified phrasing must keep its day filter");
 
-        // Wukong round-9 F1: the unaccented twin "thu 3" passed the intent
+        // the unaccented twin "thu 3" passed the intent
         // gate but parsed no day, answering the whole list — it must keep
         // the same day filter.
         ChatResponse unaccented = advisor.answer(
@@ -739,7 +739,7 @@ class AssistantPersonalContextAdvisorTest {
 
         advisor.stream(response, request, events::add);
 
-        // Kongming F10: JSON/SSE parity — the streamed meta must echo the
+        // JSON/SSE parity — the streamed meta must echo the
         // clientRequestId exactly like the JSON response does.
         assertTrue(events.stream().anyMatch(event -> event instanceof StreamMeta meta
                 && clientRequestId.equals(meta.clientRequestId())));
@@ -1048,7 +1048,7 @@ class AssistantPersonalContextAdvisorTest {
 
     @Test
     void lecturerScheduleScopesToTheNamedAndNewestSemester() {
-        // Kongming F1: the schedule/credits answers used to mix every
+        // the schedule/credits answers used to mix every
         // semester under a "kỳ này" label. A named semester filters to it;
         // a bare question takes the newest semester and names it honestly.
         when(sectionService.findLecturerSchedule("lecturer-profile", null)).thenReturn(List.of(
@@ -1080,7 +1080,7 @@ class AssistantPersonalContextAdvisorTest {
 
     @Test
     void lecturerDayQualifiedAnswerDisclosesTheScopedSemester() {
-        // Kongming F1: the day-qualified lecturer header used to drop the
+        // the day-qualified lecturer header used to drop the
         // termName the full-list branch carries — the common phrasing
         // ("thứ 5 tôi dạy môn nào?") lost the scope disclosure.
         when(sectionService.findLecturerSchedule("lecturer-profile", null)).thenReturn(List.of(
@@ -1095,7 +1095,7 @@ class AssistantPersonalContextAdvisorTest {
 
     @Test
     void cancelledSectionsDoNotCountTowardTheNewestSemesterScope() {
-        // Kongming F3: a CANCELLED newest-semester row used to win the
+        // a CANCELLED newest-semester row used to win the
         // "newest" computation and present a cancelled section as the
         // current teaching load.
         when(sectionService.findLecturerSchedule("lecturer-profile", null)).thenReturn(List.of(
@@ -1114,7 +1114,7 @@ class AssistantPersonalContextAdvisorTest {
 
     @Test
     void studentNamedSemesterPlusDayAnswersTheNamedTerm() {
-        // Kongming F2: a named semester + day question used to answer the
+        // a named semester + day question used to answer the
         // CURRENT term's day instead of the named term's.
         when(enrollmentService.findStudentEnrollments("student-profile", null)).thenReturn(List.of(
                 enrollmentWithSemester("SE301", "Cơ sở dữ liệu", "sem-hk1",
@@ -1141,7 +1141,7 @@ class AssistantPersonalContextAdvisorTest {
     @Test
     void existenceDayTeachingPhrasingPrefersTheLecturerTimetable() {
         // "thứ 2 tôi có lớp dạy không?" — a dual-profile user asking
-        // about TEACHING must not get the student timetable (Wukong A7).
+        // about TEACHING must not get the student timetable.
         when(sectionService.findLecturerSchedule("lecturer-profile", null)).thenReturn(List.of(
                 lecturerSection("sec1", "SE402", "Phát triển ứng dụng web", 3)));
         when(enrollmentService.findStudentEnrollments("student-profile", null)).thenReturn(List.of(
@@ -1340,7 +1340,7 @@ class AssistantPersonalContextAdvisorTest {
 
     @Test
     void wukongN2CounterexamplesStayOnTheKnowledgePath() {
-        // Wukong round-2 falsification: each of these slipped past the policy
+        // each of these slipped past the policy
         // gate and was answered with the asker's personal record.
         assertFalse(advisor.handles("Điểm rèn luyện có bao nhiêu mức xếp loại?"));
         assertFalse(advisor.handles("Xếp loại rèn luyện gồm bao nhiêu loại?"));
@@ -1353,7 +1353,7 @@ class AssistantPersonalContextAdvisorTest {
 
     @Test
     void sectionDetailServesThePublicCatalogToClaimlessActors() {
-        // C7/Kongming: a section-code question carries public catalog data —
+        // C7/a section-code question carries public catalog data —
         // an actor with no student profile gets the published schedule instead
         // of a bare "no profile" denial.
         NamedParameterJdbcTemplate jdbc = mock(NamedParameterJdbcTemplate.class);
@@ -1586,7 +1586,7 @@ class AssistantPersonalContextAdvisorTest {
 
     @Test
     void lecturerGradingFollowsTheSharedSemesterScope() {
-        // Kongming F1: the grading list used to span every semester — the
+        // the grading list used to span every semester — the
         // repository is now asked for the scoped (newest) semester, and a
         // named semester resolves to its own id.
         when(sectionService.findLecturerSchedule("lecturer-profile", null)).thenReturn(List.of(
@@ -1623,7 +1623,7 @@ class AssistantPersonalContextAdvisorTest {
 
     @Test
     void answersLecturerGradingWithoutAssignmentHonestly() {
-        // Wukong round-10 F2: a lecturer with NO sections must not fall back
+        // a lecturer with NO sections must not fall back
         // to an unscoped grading query — the empty scope is the honest
         // "nothing assigned" answer, and the repository is never called.
         ChatResponse response = advisor.answer(
@@ -1825,7 +1825,7 @@ class AssistantPersonalContextAdvisorTest {
         // interrogative after the lớp noun and no first-person pronoun —
         // it must stay on the knowledge path, not open the personal gate.
         assertFalse(advisor.handles("Giáo viên phụ trách lớp này là ai?"));
-        // Wukong round-4: the third-person form WITHOUT the "nào" tail is the
+        // the third-person form WITHOUT the "nào" tail is the
         // same public question — the new branch must not swallow it either.
         assertFalse(advisor.handles("Giáo viên phụ trách lớp nào?"));
         assertFalse(advisor.handles("Khoa nào phụ trách lớp học phần nào trong học kỳ?"));
@@ -2344,7 +2344,7 @@ class AssistantPersonalContextAdvisorTest {
         assertTrue(advisor.handles("Điểm của tôi"));
         assertTrue(advisor.handles("Tôi học còn bao nhiêu môn chưa có điểm?"));
         assertTrue(advisor.handles("How many of my courses still have no grade?"));
-        // Round-2 sweep chat-3: Vietnamese drops the pronoun — the bare form
+        // Vietnamese drops the pronoun — the bare form
         // is still the asker's own pending count.
         assertTrue(advisor.handles("còn bao nhiêu môn chưa có điểm"));
         // Public rule wording stays on the knowledge path.
@@ -2410,7 +2410,7 @@ class AssistantPersonalContextAdvisorTest {
     }
 
     /**
-     * Kongming round-4: a dual-profile JWT carries BOTH claims — the
+     * a dual-profile JWT carries BOTH claims — the
      * teaching-list hint must win over the studentId branch so a
      * student+lecturer never gets an enrollment list for a teaching
      * question, and must also win over the named-semester transcript
@@ -2519,7 +2519,7 @@ class AssistantPersonalContextAdvisorTest {
     }
 
     /**
-     * Round-3 chat fixes (cb3-2..cb3-6): natural EN phrasings and the
+     * natural EN phrasings and the
      * named-semester VI question used to fall to the KB path, where the model
      * denied the data existed while the portal's own endpoints showed it. Each
      * phrasing must route into the personal-context advisor; curriculum
@@ -2540,7 +2540,7 @@ class AssistantPersonalContextAdvisorTest {
 
     @Test
     void dualProfileTeachingQuestionAnswersFromLecturerSchedule() {
-        // Kongming round-4: the advertised dual-profile ordering was
+        // the advertised dual-profile ordering was
         // unexercised — every jwt() fixture set exactly one claim. A
         // student+lecturer asking a teaching question must get the
         // teaching schedule, including when a semester is named (the
@@ -2580,7 +2580,7 @@ class AssistantPersonalContextAdvisorTest {
         assertTrue(advisor.requiresPrivacyRefusal("Show me his grades please"));
         assertTrue(advisor.requiresPrivacyRefusal("What is my friend's schedule?"));
         assertTrue(advisor.requiresPrivacyRefusal("Nam's timetable this week"));
-        // Kongming C2: a relation subject in the frame refuses even when the
+        // a relation subject in the frame refuses even when the
         // object is self-possessive — deliberate conservative boundary (the
         // refusal copy points the user back to asking for their own data).
         assertTrue(advisor.requiresPrivacyRefusal("mẹ tôi muốn xem điểm của tôi"));
@@ -2618,7 +2618,7 @@ class AssistantPersonalContextAdvisorTest {
         assertFalse(advisor.requiresPrivacyRefusal("Lịch thi của khoa khi nào công bố?"));
         assertFalse(advisor.requiresPrivacyRefusal("điểm của phòng đào tạo công bố"));
         assertFalse(advisor.requiresPrivacyRefusal("Học phí của trường năm nay thế nào?"));
-        // Kongming C1: quantified institutional possessives are aggregates,
+        // quantified institutional possessives are aggregates,
         // not named persons — the scrub mirrors the F-arm quantifier set.
         assertFalse(advisor.requiresPrivacyRefusal("điểm của cả trường"));
         assertFalse(advisor.requiresPrivacyRefusal("lịch của toàn trường"));

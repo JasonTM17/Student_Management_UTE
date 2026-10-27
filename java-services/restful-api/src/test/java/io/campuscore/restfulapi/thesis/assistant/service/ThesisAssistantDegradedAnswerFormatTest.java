@@ -9,7 +9,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import io.campuscore.restfulapi.thesis.assistant.repository.ThesisAssistantKnowledgeRepository;
 
 /**
- * Round-4 format sweep: the degraded-answer contract. "Tư vấn về DevOps" must
+ * the degraded-answer contract. "Tư vấn về DevOps" must
  * retrieve as the ADVISORY PHRASE plus the topic token — the bare syllables
  * "tư"/"vấn" substring-matched "truy vấn"/"phỏng vấn" and ranked the CSDL doc
  * #1 under quota (prod screenshot answered a DevOps question with database

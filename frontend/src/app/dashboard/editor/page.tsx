@@ -182,7 +182,7 @@ export default function AcademicEditorPage() {
   const [editingNoticeModal, setEditingNoticeModal] = useState<AnnouncementRecord | null>(null);
   const studioEditorRef = useRef<{ id: string } | null>(null);
 
-  // RT-P3-3: unsaved-changes guard (beforeunload + in-app confirm) shared with
+  // unsaved-changes guard (beforeunload + in-app confirm) shared with
   // the other editors via lib/use-unsaved-changes-guard.ts. A document is
   // dirty once the author typed a title or moved the body off the template.
   const defaultBodyFor = useCallback(
@@ -209,7 +209,7 @@ export default function AcademicEditorPage() {
   );
   const [blocks, setBlocks] = useState<ContentBlock[]>(defaultBlocks);
   const [hasUnsavedNoticeOrder, setHasUnsavedNoticeOrder] = useState(false);
-  // F-2: the order save runs a site-appearance PUT plus one PUT per dragged
+  // the order save runs a site-appearance PUT plus one PUT per dragged
   // row; without an in-flight lock a double click re-runs the whole chain.
   const [isSavingNoticeOrder, setIsSavingNoticeOrder] = useState(false);
   // The pinned-notices list is a `tbody` SortableList, which cannot carry its own
@@ -346,7 +346,7 @@ export default function AcademicEditorPage() {
         if (parsed.editorType) {
           setEditorType(parsed.editorType);
         }
-        // K1: a draft saved while a saved announcement was open has to restore
+        // a draft saved while a saved announcement was open has to restore
         // that edit context too. Without it a reload left editingId null and
         // "Publish" silently created a duplicate of the record being updated;
         // the amber editing banner keys off this state as well.
@@ -424,7 +424,7 @@ export default function AcademicEditorPage() {
       content,
       editorType,
       updatedAt: timestamp,
-      // K1: the draft carries the edit context, so hydrating it can resume the
+      // the draft carries the edit context, so hydrating it can resume the
       // update of a saved announcement instead of losing that association.
       editingId,
       editingVersion,
@@ -457,7 +457,7 @@ export default function AcademicEditorPage() {
     const isHtml = editorType === 'tinymce';
     const ext = isHtml ? 'html' : 'md';
     const mime = isHtml ? 'text/html;charset=utf-8' : 'text/markdown;charset=utf-8';
-    // K2: Unicode-aware slug shared with the TinyMCE shell export, so both
+    // Unicode-aware slug shared with the TinyMCE shell export, so both
     // download buttons produce the same name for the same title.
     const filename = buildDocumentFilename(title, ext);
 
@@ -487,10 +487,10 @@ export default function AcademicEditorPage() {
   }, []);
 
   const handleReset = useCallback(() => {
-    // RT-P3-3: routed through the unsaved-changes guard so the confirm text
+    // routed through the unsaved-changes guard so the confirm text
     // and the beforeunload protection come from one mechanism.
     unsaved.requestLeave(() => {
-      // K1: "New Document" is the create-new flow, so it must also leave the
+      // "New Document" is the create-new flow, so it must also leave the
       // edit context — otherwise Publish would overwrite the record that was
       // open before the reset.
       setEditingId(null);
@@ -505,7 +505,7 @@ export default function AcademicEditorPage() {
       } catch {
         // ignore
       }
-      // K6: a discarded document must not be resurrected from TinyMCE's own
+      // a discarded document must not be resurrected from TinyMCE's own
       // autosave draft.
       clearTinyMceAutosaveDrafts(studioEditorRef.current?.id);
     });
@@ -597,7 +597,7 @@ export default function AcademicEditorPage() {
 
   // Save announcements order to site appearance & Spring Boot backend
   const handleSaveNoticeOrder = async () => {
-    // F-2: the header button is rendered with animate-pulse while the order is
+    // the header button is rendered with animate-pulse while the order is
     // unsaved, which invites the double click that used to re-run the whole
     // PUT chain. One run at a time, and both triggers reflect it.
     if (isSavingNoticeOrder) return;
@@ -839,7 +839,7 @@ export default function AcademicEditorPage() {
 
   // Cancel edit mode and start new
   const handleCancelEdit = () => {
-    // RT-P3-3: the announcement being edited is lost on cancel, so the same
+    // the announcement being edited is lost on cancel, so the same
     // unsaved-changes guard protects it.
     unsaved.requestLeave(() => {
       setEditingId(null);
@@ -849,9 +849,9 @@ export default function AcademicEditorPage() {
       setTitle('');
       setContent(defaultBodyFor());
       try {
-        // K1: the stored draft holds the edit context; cancelling the edit has
+        // the stored draft holds the edit context; cancelling the edit has
         // to drop it as well, or the next reload restores the edit the author
-        // just left. K6: also drop the TinyMCE autosave draft.
+        // just left. also drop the TinyMCE autosave draft.
         localStorage.removeItem(STORAGE_KEY);
       } catch {
         // ignore
@@ -863,7 +863,7 @@ export default function AcademicEditorPage() {
 
   // Publish announcement to backend feed
   const handlePublishAnnouncement = async () => {
-    // K1: when a saved announcement is open in the editor, "Publish" means
+    // when a saved announcement is open in the editor, "Publish" means
     // "save this document". It must update the live record instead of pushing a
     // duplicate of it; the create-new flow is reached by cancelling the edit or
     // starting a new document, both of which clear editingId.
@@ -1984,7 +1984,7 @@ export default function AcademicEditorPage() {
         />
       )}
 
-      {/* RT-P3-3: unsaved-changes confirm for destructive in-page actions */}
+      {/* unsaved-changes confirm for destructive in-page actions */}
       <UnsavedChangesConfirmDialog
         open={unsaved.confirmOpen}
         title={editorCopy.unsavedTitle}
