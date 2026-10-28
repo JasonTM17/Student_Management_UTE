@@ -188,7 +188,7 @@ Tham chiếu `jakarta.persistence` chỉ được phép trong các lớp nằm t
 - Academic enrollment: `Student -> Section` rồi khóa tập enrollment liên quan; `RegistrationService` đọc đợt bằng `openRoundReadOnly` trong đường enroll, không khóa Round ở bước đó. Auth dùng `User -> Session` và `User -> ResetToken`.
 - Thesis có thứ tự theo thao tác, không có một chuỗi `group -> round` chung: tạo nhóm/khôi phục đợt khóa `round -> Student`; membership và governance có chốt khóa nhóm riêng. `ThesisSupervisorService` khóa `round -> topic`. Đọc đúng service/repository của thao tác trước khi sửa khóa.
 - Assistant: `conversation -> ledger` (`ThesisAssistantRepository`).
-- Phương thức khóa đặt tên `lock...ForUpdate` và chú thích `@Transactional(propagation = MANDATORY)` để không bao giờ chạy ngoài transaction của caller.
+- Các repository có chốt transaction bằng `@Transactional(propagation = MANDATORY)` cho những method khóa được đánh dấu; các helper khóa khác dựa trên transaction của service caller. Tên `lock...` không tự bảo đảm propagation.
 
 **Thêm một câu query mới:** đặt SQL + `RowMapper` trong `repository/` của module; service gọi method đó và sở hữu `@Transactional` khi cần; query `FOR UPDATE`/`FOR SHARE` phải đi qua method `lock...ForUpdate` có `MANDATORY`; exception translation (`DuplicateKeyException`, `DataIntegrityViolationException`, …) ở lại đúng statement trong repository method.
 
