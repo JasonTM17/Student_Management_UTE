@@ -69,7 +69,7 @@ ports are not reachable from the public interface.
 `DemoAccountGate` re-applies demo account state on every boot from
 `DEMO_ACCOUNTS_ENABLED` (ACTIVE when `true`, LOCKED when `false`). The public
 Render blueprint explicitly configures `DEMO_ACCOUNTS_ENABLED=true` (owner
-decision, 2026-09-25) so visitors can use the published runbook credentials —
+decision) so visitors can use the published runbook credentials —
 this includes a demo admin login; see the risk note in `render.yaml` and the
 guidance in [DEMO_RUNBOOK.md](DEMO_RUNBOOK.md). Configuration does not prove
 the current live environment has those settings.

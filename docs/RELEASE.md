@@ -107,7 +107,7 @@ login, refresh, logout and core student flows on an emulator or device.
 
 ## History rewrite note
 
-The default branch history was rewritten on 2026-10-27 to normalize commit
+The default branch history was rewritten once to normalize commit
 metadata; file contents were not changed. The `v1.1.1` container images were
 published under the pre-rewrite SHA tag
 `936f7e342a271ddf2e7832f35b8eb0d55c1b54a3`. That commit has the identical tree

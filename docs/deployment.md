@@ -2,7 +2,7 @@
 
 ## 1. Cấu hình triển khai và địa chỉ được ghi nhận
 
-Tài liệu đối chiếu cấu hình tại HEAD; không xác nhận trạng thái dịch vụ hiện tại. URL/domain dưới đây là địa chỉ được repository ghi nhận. Lịch sử bên dưới là ghi chép tại thời điểm phát hành, có SHA trước lần viết lại lịch sử 27/10/2026; không phải bằng chứng triển khai HEAD hay lượt kiểm thử mới. Xem [ghi chú release](RELEASE.md#history-rewrite-note).
+Tài liệu đối chiếu cấu hình tại HEAD; không xác nhận trạng thái dịch vụ hiện tại. URL/domain dưới đây là địa chỉ được repository ghi nhận. Lịch sử bên dưới là ghi chép tại thời điểm phát hành, có SHA trước lần viết lại lịch sử; không phải bằng chứng triển khai HEAD hay lượt kiểm thử mới. Xem [ghi chú release](RELEASE.md#history-rewrite-note).
 
 | Thành phần | Nền tảng | Domain sản xuất | Trạng thái |
 |---|---|---|---|
