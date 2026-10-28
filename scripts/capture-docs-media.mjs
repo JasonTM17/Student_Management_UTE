@@ -7,7 +7,7 @@ const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const base = process.env.DOCS_CAPTURE_BASE_URL;
 const password = process.env.DOCS_CAPTURE_DEMO_PASSWORD;
 if (!base || !password) throw new Error('Set DOCS_CAPTURE_BASE_URL and DOCS_CAPTURE_DEMO_PASSWORD for a disposable demo runtime.');
-const output = path.resolve(root, process.env.DOCS_CAPTURE_OUTPUT || 'docs/assets/showcase-2026-10');
+const output = path.resolve(root, process.env.DOCS_CAPTURE_OUTPUT || 'docs/assets/showcase');
 const { chromium } = await import(pathToFileURL(path.join(root, 'frontend/node_modules/playwright/index.mjs')));
 const viewport = { width: 1440, height: 1000 };
 const locales = ['vi', 'en'];
