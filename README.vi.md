@@ -38,55 +38,55 @@ Tài khoản do **Phòng Đào tạo cấp phát**; không có tự đăng ký c
 <a id="showcase"></a>
 ## Ảnh giao diện và GIF
 
-Bộ ảnh chụp từ **build local theo source hiện tại**, với PostgreSQL/demo riêng, không dùng dữ liệu production. Mỗi vai trò đăng nhập thật và kiểm danh tính qua API. [Nguồn chụp, toàn bộ ảnh và giới hạn](docs/media-showcase.vi.md) · [Manifest runtime](docs/assets/showcase-2026-10/provenance.json).
+Bộ ảnh chụp từ **build local theo source hiện tại**, với PostgreSQL/demo riêng, không dùng dữ liệu production. Mỗi vai trò đăng nhập thật và kiểm danh tính qua API. [Nguồn chụp, toàn bộ ảnh và giới hạn](docs/media-showcase.vi.md) · [Manifest runtime](docs/assets/showcase/provenance.json).
 
 ### Trang công khai và cổng đăng nhập
 
 | Trang chủ Việt | Trang chủ Anh |
 |---|---|
-| ![Trang chủ Việt](docs/assets/showcase-2026-10/public-home-vi.png) | ![Trang chủ Anh](docs/assets/showcase-2026-10/public-home-en.png) |
+| ![Trang chủ Việt](docs/assets/showcase/public-home-vi.png) | ![Trang chủ Anh](docs/assets/showcase/public-home-en.png) |
 
 | Cổng đăng nhập hiện tại | Hướng dẫn khôi phục tài khoản |
 |---|---|
-| ![Đăng nhập ba cổng hiện hành](docs/assets/showcase-2026-10/public-login-vi.png) | ![Khôi phục tài khoản](docs/assets/showcase-2026-10/public-recovery-vi.png) |
+| ![Đăng nhập ba cổng hiện hành](docs/assets/showcase/public-login-vi.png) | ![Khôi phục tài khoản](docs/assets/showcase/public-recovery-vi.png) |
 
 ### Hành trình sinh viên
 
 | Tổng quan | Đăng ký và kế hoạch CTĐT |
 |---|---|
-| ![Tổng quan sinh viên](docs/assets/showcase-2026-10/student-dashboard-vi.png) | ![Đăng ký học phần](docs/assets/showcase-2026-10/student-registration-vi.png) |
+| ![Tổng quan sinh viên](docs/assets/showcase/student-dashboard-vi.png) | ![Đăng ký học phần](docs/assets/showcase/student-registration-vi.png) |
 
 | Thời khóa biểu | Bảng điểm tích lũy |
 |---|---|
-| ![Lịch học](docs/assets/showcase-2026-10/student-schedule-vi.png) | ![Bảng điểm](docs/assets/showcase-2026-10/student-transcript-vi.png) |
+| ![Lịch học](docs/assets/showcase/student-schedule-vi.png) | ![Bảng điểm](docs/assets/showcase/student-transcript-vi.png) |
 
 | Điểm danh | Đồ án – khóa luận |
 |---|---|
-| ![Điểm danh sinh viên](docs/assets/showcase-2026-10/student-attendance-vi.png) | ![Khóa luận sinh viên](docs/assets/showcase-2026-10/student-thesis-vi.png) |
+| ![Điểm danh sinh viên](docs/assets/showcase/student-attendance-vi.png) | ![Khóa luận sinh viên](docs/assets/showcase/student-thesis-vi.png) |
 
 | Điểm rèn luyện | Trợ lý chuyên sâu, trả lời từ corpus kỹ thuật |
 |---|---|
-| ![Điểm rèn luyện](docs/assets/showcase-2026-10/student-conduct-vi.png) | ![Trả lời trợ lý chuyên sâu](docs/assets/showcase-2026-10/student-assistant-answer-vi.png) |
+| ![Điểm rèn luyện](docs/assets/showcase/student-conduct-vi.png) | ![Trả lời trợ lý chuyên sâu](docs/assets/showcase/student-assistant-answer-vi.png) |
 
 ### Giảng viên và quản lý học thuật
 
 | Điểm học phần | Email học vụ |
 |---|---|
-| ![Quản lý điểm](docs/assets/showcase-2026-10/lecturer-grades-vi.png) | ![Soạn email học vụ](docs/assets/showcase-2026-10/lecturer-mail-vi.png) |
+| ![Quản lý điểm](docs/assets/showcase/lecturer-grades-vi.png) | ![Soạn email học vụ](docs/assets/showcase/lecturer-mail-vi.png) |
 
 | Khóa luận giảng viên | Tổng quan trưởng khoa |
 |---|---|
-| ![Khóa luận giảng viên](docs/assets/showcase-2026-10/lecturer-thesis-vi.png) | ![Quan sát khóa luận toàn khoa](docs/assets/showcase-2026-10/dean-dashboard-vi.png) |
+| ![Khóa luận giảng viên](docs/assets/showcase/lecturer-thesis-vi.png) | ![Quan sát khóa luận toàn khoa](docs/assets/showcase/dean-dashboard-vi.png) |
 
 ### Quản trị
 
 | Tài khoản và vai trò | Đợt đồ án – khóa luận |
 |---|---|
-| ![Người dùng](docs/assets/showcase-2026-10/admin-users-vi.png) | ![Quản trị đợt](docs/assets/showcase-2026-10/admin-thesis-vi.png) |
+| ![Người dùng](docs/assets/showcase/admin-users-vi.png) | ![Quản trị đợt](docs/assets/showcase/admin-thesis-vi.png) |
 
 | Đăng ký mặc định theo CTĐT | Tri thức có kiểm duyệt |
 |---|---|
-| ![Chạy thử và áp dụng đăng ký CTĐT](docs/assets/showcase-2026-10/admin-curriculum-defaults-vi.png) | ![Quản trị tri thức](docs/assets/showcase-2026-10/admin-knowledge-vi.png) |
+| ![Chạy thử và áp dụng đăng ký CTĐT](docs/assets/showcase/admin-curriculum-defaults-vi.png) | ![Quản trị tri thức](docs/assets/showcase/admin-knowledge-vi.png) |
 
 ### GIF hành trình
 
@@ -94,19 +94,19 @@ GIF là **chuỗi màn hình thật**, mỗi màn hình giữ khoảng 4 giây; 
 
 **Sinh viên:** tổng quan → đăng ký → lịch → bảng điểm → khóa luận → trợ lý.
 
-![Hành trình sinh viên tiếng Việt](docs/assets/showcase-2026-10/student-tour-vi.gif)
+![Hành trình sinh viên tiếng Việt](docs/assets/showcase/student-tour-vi.gif)
 
 **Giảng viên và quản trị:** điểm → điểm danh → email → tổng quan quản trị → tri thức.
 
-![Hành trình giảng viên và quản trị](docs/assets/showcase-2026-10/staff-tour-vi.gif)
+![Hành trình giảng viên và quản trị](docs/assets/showcase/staff-tour-vi.gif)
 
 **Quản trị khóa luận:** sinh viên → giảng viên → trưởng khoa → quản lý đợt → audit.
 
-![Hành trình khóa luận](docs/assets/showcase-2026-10/thesis-governance-tour-vi.gif)
+![Hành trình khóa luận](docs/assets/showcase/thesis-governance-tour-vi.gif)
 
 **Song ngữ:** đối chiếu trang chủ, dashboard sinh viên và trưởng khoa Việt/Anh.
 
-![Giao diện Việt Anh](docs/assets/showcase-2026-10/language-tour.gif)
+![Giao diện Việt Anh](docs/assets/showcase/language-tour.gif)
 
 <a id="techniques"></a>
 ## Kỹ thuật toàn dự án

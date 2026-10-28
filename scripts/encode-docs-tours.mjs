@@ -4,7 +4,7 @@ import { fileURLToPath } from 'node:url';
 import { spawnSync } from 'node:child_process';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const directory = path.resolve(root, process.env.DOCS_CAPTURE_OUTPUT || 'docs/assets/showcase-2026-10');
+const directory = path.resolve(root, process.env.DOCS_CAPTURE_OUTPUT || 'docs/assets/showcase');
 const tours = [];
 for (const locale of ['vi', 'en']) {
   tours.push({ name: `student-tour-${locale}`, files: ['student-dashboard', 'student-registration', 'student-schedule', 'student-transcript', 'student-thesis', 'student-assistant-answer'].map(x => `${x}-${locale}.png`) });
@@ -17,8 +17,9 @@ const list = path.join(directory, '.tour-frames.txt');
 try {
   for (const tour of tours) {
     for (const file of tour.files) await access(path.join(directory, file));
-    const lines = tour.files.flatMap(file => [`file '${path.join(directory, file).replaceAll('\\', '/')}'`, 'duration 4']);
-    lines.push(`file '${path.join(directory, tour.files.at(-1)).replaceAll('\\', '/')}'`);
+    // Concat resolves filenames beside the list; checkout paths need no quoting.
+    const lines = tour.files.flatMap(file => [`file '${file}'`, 'duration 4']);
+    lines.push(`file '${tour.files.at(-1)}'`);
     await writeFile(list, lines.join('\n') + '\n');
     const result = spawnSync('ffmpeg', ['-hide_banner', '-loglevel', 'error', '-y', '-f', 'concat', '-safe', '0', '-i', list,
       '-filter_complex', 'fps=2,scale=1200:-1:flags=lanczos,split[a][b];[a]palettegen=stats_mode=diff[p];[b][p]paletteuse=dither=bayer:bayer_scale=3',

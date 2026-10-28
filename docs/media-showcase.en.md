@@ -13,7 +13,7 @@ Screens were rendered from a local build of the current source in the isolated `
 - 1440×1000 PNGs; 1200px-wide GIF screenshot sequences hold each view for approximately four seconds; not continuous action recordings.
 - External DeepSeek and SMTP dispatch were disabled; rate limits stayed enabled.
 
-[Full manifest and checksums](assets/showcase-2026-10/provenance.json) · [Reproduction](technical/operations-verification.en.md)
+[Full manifest and checksums](assets/showcase/provenance.json) · [Reproduction](technical/operations-verification.en.md)
 
 The manifest hashes match all 77 binary assets. Its two SVG hashes/sizes describe
 the original Windows CRLF text; Git-normalized LF SVG blobs differ byte-for-byte.
@@ -32,49 +32,49 @@ The existing lecturer mail recipient summary still displays the literal `{max}` 
 
 | Journey | Animation |
 |---|---|
-| Student | [student-tour-en.gif](assets/showcase-2026-10/student-tour-en.gif) |
-| Lecturer / Admin | [staff-tour-en.gif](assets/showcase-2026-10/staff-tour-en.gif) |
-| Thesis governance | [thesis-governance-tour-en.gif](assets/showcase-2026-10/thesis-governance-tour-en.gif) |
-| VI / EN | [language-tour.gif](assets/showcase-2026-10/language-tour.gif) |
+| Student | [student-tour-en.gif](assets/showcase/student-tour-en.gif) |
+| Lecturer / Admin | [staff-tour-en.gif](assets/showcase/staff-tour-en.gif) |
+| Thesis governance | [thesis-governance-tour-en.gif](assets/showcase/thesis-governance-tour-en.gif) |
+| VI / EN | [language-tour.gif](assets/showcase/language-tour.gif) |
 
 ## Complete screen gallery
 
 | Screen | Tiếng Việt | English |
 |---|---|---|
-| admin announcements | [PNG](assets/showcase-2026-10/admin-announcements-vi.png) | [PNG](assets/showcase-2026-10/admin-announcements-en.png) |
-| admin appeals | [PNG](assets/showcase-2026-10/admin-appeals-vi.png) | [PNG](assets/showcase-2026-10/admin-appeals-en.png) |
-| admin audit | [PNG](assets/showcase-2026-10/admin-audit-vi.png) | [PNG](assets/showcase-2026-10/admin-audit-en.png) |
-| admin curriculum defaults | [PNG](assets/showcase-2026-10/admin-curriculum-defaults-vi.png) | [PNG](assets/showcase-2026-10/admin-curriculum-defaults-en.png) |
-| admin dashboard | [PNG](assets/showcase-2026-10/admin-dashboard-vi.png) | [PNG](assets/showcase-2026-10/admin-dashboard-en.png) |
-| admin knowledge | [PNG](assets/showcase-2026-10/admin-knowledge-vi.png) | [PNG](assets/showcase-2026-10/admin-knowledge-en.png) |
-| admin sections | [PNG](assets/showcase-2026-10/admin-sections-vi.png) | [PNG](assets/showcase-2026-10/admin-sections-en.png) |
-| admin thesis | [PNG](assets/showcase-2026-10/admin-thesis-vi.png) | [PNG](assets/showcase-2026-10/admin-thesis-en.png) |
-| admin users | [PNG](assets/showcase-2026-10/admin-users-vi.png) | [PNG](assets/showcase-2026-10/admin-users-en.png) |
-| dean dashboard | [PNG](assets/showcase-2026-10/dean-dashboard-vi.png) | [PNG](assets/showcase-2026-10/dean-dashboard-en.png) |
-| dean thesis | [PNG](assets/showcase-2026-10/dean-thesis-vi.png) | [PNG](assets/showcase-2026-10/dean-thesis-en.png) |
-| lecturer announcements | [PNG](assets/showcase-2026-10/lecturer-announcements-vi.png) | [PNG](assets/showcase-2026-10/lecturer-announcements-en.png) |
-| lecturer attendance | [PNG](assets/showcase-2026-10/lecturer-attendance-vi.png) | [PNG](assets/showcase-2026-10/lecturer-attendance-en.png) |
-| lecturer dashboard | [PNG](assets/showcase-2026-10/lecturer-dashboard-vi.png) | [PNG](assets/showcase-2026-10/lecturer-dashboard-en.png) |
-| lecturer grades | [PNG](assets/showcase-2026-10/lecturer-grades-vi.png) | [PNG](assets/showcase-2026-10/lecturer-grades-en.png) |
-| lecturer mail | [PNG](assets/showcase-2026-10/lecturer-mail-vi.png) | [PNG](assets/showcase-2026-10/lecturer-mail-en.png) |
-| lecturer schedule | [PNG](assets/showcase-2026-10/lecturer-schedule-vi.png) | [PNG](assets/showcase-2026-10/lecturer-schedule-en.png) |
-| lecturer thesis | [PNG](assets/showcase-2026-10/lecturer-thesis-vi.png) | [PNG](assets/showcase-2026-10/lecturer-thesis-en.png) |
-| public home | [PNG](assets/showcase-2026-10/public-home-vi.png) | [PNG](assets/showcase-2026-10/public-home-en.png) |
-| public login | [PNG](assets/showcase-2026-10/public-login-vi.png) | [PNG](assets/showcase-2026-10/public-login-en.png) |
-| public recovery | [PNG](assets/showcase-2026-10/public-recovery-vi.png) | [PNG](assets/showcase-2026-10/public-recovery-en.png) |
-| student assistant | [PNG](assets/showcase-2026-10/student-assistant-vi.png) | [PNG](assets/showcase-2026-10/student-assistant-en.png) |
-| student assistant answer | [PNG](assets/showcase-2026-10/student-assistant-answer-vi.png) | [PNG](assets/showcase-2026-10/student-assistant-answer-en.png) |
-| student attendance | [PNG](assets/showcase-2026-10/student-attendance-vi.png) | [PNG](assets/showcase-2026-10/student-attendance-en.png) |
-| student conduct | [PNG](assets/showcase-2026-10/student-conduct-vi.png) | [PNG](assets/showcase-2026-10/student-conduct-en.png) |
-| student curriculum | [PNG](assets/showcase-2026-10/student-curriculum-vi.png) | [PNG](assets/showcase-2026-10/student-curriculum-en.png) |
-| student dashboard | [PNG](assets/showcase-2026-10/student-dashboard-vi.png) | [PNG](assets/showcase-2026-10/student-dashboard-en.png) |
-| student enrollments | [PNG](assets/showcase-2026-10/student-enrollments-vi.png) | [PNG](assets/showcase-2026-10/student-enrollments-en.png) |
-| student grades | [PNG](assets/showcase-2026-10/student-grades-vi.png) | [PNG](assets/showcase-2026-10/student-grades-en.png) |
-| student notifications | [PNG](assets/showcase-2026-10/student-notifications-vi.png) | [PNG](assets/showcase-2026-10/student-notifications-en.png) |
-| student registration | [PNG](assets/showcase-2026-10/student-registration-vi.png) | [PNG](assets/showcase-2026-10/student-registration-en.png) |
-| student schedule | [PNG](assets/showcase-2026-10/student-schedule-vi.png) | [PNG](assets/showcase-2026-10/student-schedule-en.png) |
-| student thesis | [PNG](assets/showcase-2026-10/student-thesis-vi.png) | [PNG](assets/showcase-2026-10/student-thesis-en.png) |
-| student transcript | [PNG](assets/showcase-2026-10/student-transcript-vi.png) | [PNG](assets/showcase-2026-10/student-transcript-en.png) |
+| admin announcements | [PNG](assets/showcase/admin-announcements-vi.png) | [PNG](assets/showcase/admin-announcements-en.png) |
+| admin appeals | [PNG](assets/showcase/admin-appeals-vi.png) | [PNG](assets/showcase/admin-appeals-en.png) |
+| admin audit | [PNG](assets/showcase/admin-audit-vi.png) | [PNG](assets/showcase/admin-audit-en.png) |
+| admin curriculum defaults | [PNG](assets/showcase/admin-curriculum-defaults-vi.png) | [PNG](assets/showcase/admin-curriculum-defaults-en.png) |
+| admin dashboard | [PNG](assets/showcase/admin-dashboard-vi.png) | [PNG](assets/showcase/admin-dashboard-en.png) |
+| admin knowledge | [PNG](assets/showcase/admin-knowledge-vi.png) | [PNG](assets/showcase/admin-knowledge-en.png) |
+| admin sections | [PNG](assets/showcase/admin-sections-vi.png) | [PNG](assets/showcase/admin-sections-en.png) |
+| admin thesis | [PNG](assets/showcase/admin-thesis-vi.png) | [PNG](assets/showcase/admin-thesis-en.png) |
+| admin users | [PNG](assets/showcase/admin-users-vi.png) | [PNG](assets/showcase/admin-users-en.png) |
+| dean dashboard | [PNG](assets/showcase/dean-dashboard-vi.png) | [PNG](assets/showcase/dean-dashboard-en.png) |
+| dean thesis | [PNG](assets/showcase/dean-thesis-vi.png) | [PNG](assets/showcase/dean-thesis-en.png) |
+| lecturer announcements | [PNG](assets/showcase/lecturer-announcements-vi.png) | [PNG](assets/showcase/lecturer-announcements-en.png) |
+| lecturer attendance | [PNG](assets/showcase/lecturer-attendance-vi.png) | [PNG](assets/showcase/lecturer-attendance-en.png) |
+| lecturer dashboard | [PNG](assets/showcase/lecturer-dashboard-vi.png) | [PNG](assets/showcase/lecturer-dashboard-en.png) |
+| lecturer grades | [PNG](assets/showcase/lecturer-grades-vi.png) | [PNG](assets/showcase/lecturer-grades-en.png) |
+| lecturer mail | [PNG](assets/showcase/lecturer-mail-vi.png) | [PNG](assets/showcase/lecturer-mail-en.png) |
+| lecturer schedule | [PNG](assets/showcase/lecturer-schedule-vi.png) | [PNG](assets/showcase/lecturer-schedule-en.png) |
+| lecturer thesis | [PNG](assets/showcase/lecturer-thesis-vi.png) | [PNG](assets/showcase/lecturer-thesis-en.png) |
+| public home | [PNG](assets/showcase/public-home-vi.png) | [PNG](assets/showcase/public-home-en.png) |
+| public login | [PNG](assets/showcase/public-login-vi.png) | [PNG](assets/showcase/public-login-en.png) |
+| public recovery | [PNG](assets/showcase/public-recovery-vi.png) | [PNG](assets/showcase/public-recovery-en.png) |
+| student assistant | [PNG](assets/showcase/student-assistant-vi.png) | [PNG](assets/showcase/student-assistant-en.png) |
+| student assistant answer | [PNG](assets/showcase/student-assistant-answer-vi.png) | [PNG](assets/showcase/student-assistant-answer-en.png) |
+| student attendance | [PNG](assets/showcase/student-attendance-vi.png) | [PNG](assets/showcase/student-attendance-en.png) |
+| student conduct | [PNG](assets/showcase/student-conduct-vi.png) | [PNG](assets/showcase/student-conduct-en.png) |
+| student curriculum | [PNG](assets/showcase/student-curriculum-vi.png) | [PNG](assets/showcase/student-curriculum-en.png) |
+| student dashboard | [PNG](assets/showcase/student-dashboard-vi.png) | [PNG](assets/showcase/student-dashboard-en.png) |
+| student enrollments | [PNG](assets/showcase/student-enrollments-vi.png) | [PNG](assets/showcase/student-enrollments-en.png) |
+| student grades | [PNG](assets/showcase/student-grades-vi.png) | [PNG](assets/showcase/student-grades-en.png) |
+| student notifications | [PNG](assets/showcase/student-notifications-vi.png) | [PNG](assets/showcase/student-notifications-en.png) |
+| student registration | [PNG](assets/showcase/student-registration-vi.png) | [PNG](assets/showcase/student-registration-en.png) |
+| student schedule | [PNG](assets/showcase/student-schedule-vi.png) | [PNG](assets/showcase/student-schedule-en.png) |
+| student thesis | [PNG](assets/showcase/student-thesis-vi.png) | [PNG](assets/showcase/student-thesis-en.png) |
+| student transcript | [PNG](assets/showcase/student-transcript-vi.png) | [PNG](assets/showcase/student-transcript-en.png) |
 
 ## Current diagrams
 

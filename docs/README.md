@@ -48,5 +48,5 @@ the authority for current implementation behavior.
 ## Visual assets
 
 - [Architecture diagrams and project media](assets/)
-- [Current screenshots, diagrams and GIFs](assets/showcase-2026-10/)
-- [Capture provenance and asset checksums](assets/showcase-2026-10/provenance.json)
+- [Current screenshots, diagrams and GIFs](assets/showcase/)
+- [Capture provenance and asset checksums](assets/showcase/provenance.json)

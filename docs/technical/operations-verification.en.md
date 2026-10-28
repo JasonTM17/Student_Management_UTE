@@ -104,4 +104,4 @@ Capture uses Playwright from frontend dependencies; encoding requires FFmpeg in 
 
 Links alone are insufficient: decode GIFs, inspect timing/dimensions, review contact sheets and original images for loading, errors, unreadable text or the wrong role. Record fixture limitations rather than fabricating content or changing business data for attractive images. New asset paths avoid caching an earlier screenshot URL on repository viewers.
 
-**Owners:** [capture script](../../scripts/capture-docs-media.mjs), [encoder](../../scripts/encode-docs-tours.mjs), [media provenance](../assets/showcase-2026-10/provenance.json).
+**Owners:** [capture script](../../scripts/capture-docs-media.mjs), [encoder](../../scripts/encode-docs-tours.mjs), [media provenance](../assets/showcase/provenance.json).

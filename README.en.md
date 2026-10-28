@@ -38,55 +38,55 @@ The **academic office issues accounts**; public self-registration is unavailable
 <a id="showcase"></a>
 ## Screenshots and GIFs
 
-Captured from a **local build of the current source**, using a separate PostgreSQL/demo environment without production data. Every role signs in and checks identity through the API. [Complete gallery, provenance and limitations](docs/media-showcase.en.md) · [Runtime manifest](docs/assets/showcase-2026-10/provenance.json).
+Captured from a **local build of the current source**, using a separate PostgreSQL/demo environment without production data. Every role signs in and checks identity through the API. [Complete gallery, provenance and limitations](docs/media-showcase.en.md) · [Runtime manifest](docs/assets/showcase/provenance.json).
 
 ### Public pages and login
 
 | Vietnamese homepage | English homepage |
 |---|---|
-| ![Vietnamese homepage](docs/assets/showcase-2026-10/public-home-vi.png) | ![English homepage](docs/assets/showcase-2026-10/public-home-en.png) |
+| ![Vietnamese homepage](docs/assets/showcase/public-home-vi.png) | ![English homepage](docs/assets/showcase/public-home-en.png) |
 
 | Current login portals | Account recovery guidance |
 |---|---|
-| ![Current login](docs/assets/showcase-2026-10/public-login-en.png) | ![Account recovery](docs/assets/showcase-2026-10/public-recovery-en.png) |
+| ![Current login](docs/assets/showcase/public-login-en.png) | ![Account recovery](docs/assets/showcase/public-recovery-en.png) |
 
 ### Student journey
 
 | Dashboard | Registration and curriculum plan |
 |---|---|
-| ![Student dashboard](docs/assets/showcase-2026-10/student-dashboard-en.png) | ![Course registration](docs/assets/showcase-2026-10/student-registration-en.png) |
+| ![Student dashboard](docs/assets/showcase/student-dashboard-en.png) | ![Course registration](docs/assets/showcase/student-registration-en.png) |
 
 | Weekly schedule | Cumulative transcript |
 |---|---|
-| ![Schedule](docs/assets/showcase-2026-10/student-schedule-en.png) | ![Transcript](docs/assets/showcase-2026-10/student-transcript-en.png) |
+| ![Schedule](docs/assets/showcase/student-schedule-en.png) | ![Transcript](docs/assets/showcase/student-transcript-en.png) |
 
 | Attendance | Projects and theses |
 |---|---|
-| ![Attendance](docs/assets/showcase-2026-10/student-attendance-en.png) | ![Student thesis workspace](docs/assets/showcase-2026-10/student-thesis-en.png) |
+| ![Attendance](docs/assets/showcase/student-attendance-en.png) | ![Student thesis workspace](docs/assets/showcase/student-thesis-en.png) |
 
 | Conduct results | Specialized assistant with technical-corpus answer |
 |---|---|
-| ![Conduct](docs/assets/showcase-2026-10/student-conduct-en.png) | ![Specialized answer](docs/assets/showcase-2026-10/student-assistant-answer-en.png) |
+| ![Conduct](docs/assets/showcase/student-conduct-en.png) | ![Specialized answer](docs/assets/showcase/student-assistant-answer-en.png) |
 
 ### Lecturers and academic governance
 
 | Course grading | Academic email |
 |---|---|
-| ![Grade management](docs/assets/showcase-2026-10/lecturer-grades-en.png) | ![Mail compose workspace](docs/assets/showcase-2026-10/lecturer-mail-en.png) |
+| ![Grade management](docs/assets/showcase/lecturer-grades-en.png) | ![Mail compose workspace](docs/assets/showcase/lecturer-mail-en.png) |
 
 | Lecturer thesis workspace | Faculty-head overview |
 |---|---|
-| ![Lecturer theses](docs/assets/showcase-2026-10/lecturer-thesis-en.png) | ![Faculty thesis overview](docs/assets/showcase-2026-10/dean-dashboard-en.png) |
+| ![Lecturer theses](docs/assets/showcase/lecturer-thesis-en.png) | ![Faculty thesis overview](docs/assets/showcase/dean-dashboard-en.png) |
 
 ### Administration
 
 | Accounts and roles | Project/thesis rounds |
 |---|---|
-| ![Users](docs/assets/showcase-2026-10/admin-users-en.png) | ![Rounds](docs/assets/showcase-2026-10/admin-thesis-en.png) |
+| ![Users](docs/assets/showcase/admin-users-en.png) | ![Rounds](docs/assets/showcase/admin-thesis-en.png) |
 
 | Curriculum default registration | Governed knowledge |
 |---|---|
-| ![Curriculum dry-run and apply](docs/assets/showcase-2026-10/admin-curriculum-defaults-en.png) | ![Knowledge governance](docs/assets/showcase-2026-10/admin-knowledge-en.png) |
+| ![Curriculum dry-run and apply](docs/assets/showcase/admin-curriculum-defaults-en.png) | ![Knowledge governance](docs/assets/showcase/admin-knowledge-en.png) |
 
 ### Animated walkthroughs
 
@@ -94,19 +94,19 @@ GIFs are **sequences of real captured screens**, held for approximately four sec
 
 **Student:** dashboard → registration → schedule → transcript → thesis → assistant.
 
-![Student journey in English](docs/assets/showcase-2026-10/student-tour-en.gif)
+![Student journey in English](docs/assets/showcase/student-tour-en.gif)
 
 **Lecturer and admin:** grades → attendance → email → admin overview → knowledge.
 
-![Staff journey in English](docs/assets/showcase-2026-10/staff-tour-en.gif)
+![Staff journey in English](docs/assets/showcase/staff-tour-en.gif)
 
 **Thesis governance:** student → lecturer → faculty head → round management → audit.
 
-![Thesis governance journey](docs/assets/showcase-2026-10/thesis-governance-tour-en.gif)
+![Thesis governance journey](docs/assets/showcase/thesis-governance-tour-en.gif)
 
 **Languages:** compare VI/EN homepages, student dashboards and dean overviews.
 
-![Language comparison](docs/assets/showcase-2026-10/language-tour.gif)
+![Language comparison](docs/assets/showcase/language-tour.gif)
 
 <a id="techniques"></a>
 ## Whole-project techniques

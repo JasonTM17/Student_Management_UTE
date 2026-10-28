@@ -127,7 +127,7 @@ node scripts/prod-smoke.mjs
 
 ### Bước 1: Trang chủ & Khả năng Song ngữ Tức thời (30 giây)
 - Mở trình duyệt tại `http://127.0.0.1:3000`.
-- Thể hiện khả năng chuyển đổi ngôn ngữ Việt - Anh mượt mà bằng nút chuyển đổi trên Header (ảnh minh họa: `docs/assets/showcase-2026-10/language-tour.gif`).
+- Thể hiện khả năng chuyển đổi ngôn ngữ Việt - Anh mượt mà bằng nút chuyển đổi trên Header (ảnh minh họa: `docs/assets/showcase/language-tour.gif`).
 - Thể hiện chế độ Dark Mode / Light Mode thích ứng.
 
 ### Bước 2: Cổng Đăng nhập Phân luồng & Đăng nhập Sinh viên (30 giây)

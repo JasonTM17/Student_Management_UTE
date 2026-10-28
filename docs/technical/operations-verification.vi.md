@@ -104,4 +104,4 @@ Script capture dùng Playwright cài trong frontend; encoder cần FFmpeg trong 
 
 Kiểm link/ảnh không đủ: phải decode GIF, kiểm thời lượng/kích thước, xem contact sheet và mở ảnh gốc để phát hiện loading, lỗi, chữ nhỏ hoặc ảnh khác role. Hạn chế seed phải được ghi lại; không sửa dữ liệu nghiệp vụ hoặc giả nội dung chỉ để ảnh đẹp. Tên asset mới tránh cache của link ảnh cũ trên nền tảng đọc repo.
 
-**Nguồn:** [capture script](../../scripts/capture-docs-media.mjs), [encoder](../../scripts/encode-docs-tours.mjs), [media provenance](../assets/showcase-2026-10/provenance.json).
+**Nguồn:** [capture script](../../scripts/capture-docs-media.mjs), [encoder](../../scripts/encode-docs-tours.mjs), [media provenance](../assets/showcase/provenance.json).
