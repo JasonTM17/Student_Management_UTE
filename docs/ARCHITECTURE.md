@@ -2,9 +2,33 @@
 
 [Tiếng Việt: kỹ thuật kiến trúc](technical/architecture-security.vi.md) · [English: architecture techniques](technical/architecture-security.en.md) · [Full technical index](technical/README.en.md)
 
-![Current system architecture](assets/showcase-2026-10/architecture-en.png)
+```mermaid
+flowchart TD
+    subgraph CLIENT["Clients"]
+        WEB["Next.js 15 web<br/>HttpOnly cookies · CSRF · Vietnamese/English"]
+        MOB["Expo / React Native mobile<br/>Bearer JWT · in development"]
+    end
+    subgraph APP["Application"]
+        API["Java REST API · Spring Boot 4.1<br/>modular monolith · RBAC + scope<br/>transactions in the service layer"]
+        RAG["Internal RAG sidecar :4011<br/>same Java artifact · not published to the host"]
+    end
+    subgraph DATA["Data and integrations"]
+        PG[("PostgreSQL 15<br/>Flyway · constraints · RLS")]
+        STO["Report storage<br/>local · database · Supabase"]
+        SMTP["SMTP<br/>optional"]
+        DS["DeepSeek<br/>optional · timeout and fallback"]
+    end
+    WEB -->|"same-origin /api/v1"| API
+    MOB -->|"/api/v1 · Bearer"| API
+    API --> PG
+    API --> STO
+    API -->|"service token"| RAG
+    RAG --> PG
+    API -.->|"MAIL_ENABLED"| SMTP
+    RAG -.->|"DEEPSEEK_ENABLED"| DS
+```
 
-[English SVG](assets/showcase-2026-10/architecture-en.svg) · [Vietnamese diagram](assets/showcase-2026-10/architecture-vi.png) · [Local capture provenance](assets/showcase-2026-10/provenance.json)
+Host ports, integration flags and start order belong to the [Compose file](../docker-compose.yml); the diagram shows runtime boundaries only.
 
 ## 1. Runtime ownership
 
@@ -65,6 +89,20 @@ flowchart TD
 ```
 
 The actual service has additional conversational, off-topic and recovery branches. This diagram is an orientation map, not a replacement for [ThesisAssistantService](../java-services/restful-api/src/main/java/io/campuscore/restfulapi/thesis/assistant/service/ThesisAssistantService.java). Ranking uses title/content substring and whole-word weights 3/1/4/2, not BM25. Quota applies according to dispatch branches and campus-day buckets. RLS uses a restricted assistant connection and transaction-local identity. Pattern guards do not guarantee complete prompt-injection prevention. Read [AI techniques](technical/assistant-engagement.en.md).
+
+Governed knowledge publication keeps the author and the publisher distinct:
+
+```mermaid
+stateDiagram-v2
+    [*] --> DRAFT: Admin A creates or edits a draft
+    DRAFT --> PENDING_REVIEW: Admin A submits
+    PENDING_REVIEW --> PUBLISHED: Admin B, not the author, publishes
+    PENDING_REVIEW --> PENDING_REVIEW: Author publishing is rejected with 409 KNOWLEDGE_SECOND_REVIEW_REQUIRED
+    PUBLISHED --> ARCHIVED: A newer revision is published or the document is archived
+    ARCHIVED --> [*]
+```
+
+The publisher must differ from the author; publication re-validates the public content and writes an audit record before the assistant reads the new snapshot. Owner: [AssistantKnowledgeAdminService](../java-services/restful-api/src/main/java/io/campuscore/restfulapi/thesis/assistant/service/AssistantKnowledgeAdminService.java).
 
 ## 5. Thesis writes and governed publication
 
@@ -185,10 +223,10 @@ Mọi quan tâm về exception nằm trong các package riêng theo vai trò:
 Tham chiếu `jakarta.persistence` chỉ được phép trong các lớp nằm trong `JPA_ISLAND_CLASSES` của `ArchitectureGuardTest` (toàn bộ entity + `AssistantDatabaseConfiguration` + các entity/repository hiện hữu) — guard test chặn mọi tham chiếu mới ngoài allow-list; thêm entity mới đòi hỏi một entry tường minh, reviewable trong danh sách đó.
 
 **Hợp đồng thứ tự khóa (lock order) sống trong SQL:**
-- Academic: `Student -> Section -> Round` (`RegistrationService`); auth dùng `User -> Session` và `User -> ResetToken`.
-- Thesis: `group -> round` (`ThesisMutationService`); council khóa `round -> topic` (`ThesisSupervisorService`).
+- Academic enrollment: `Student -> Section` rồi khóa tập enrollment liên quan; `RegistrationService` đọc đợt bằng `openRoundReadOnly` trong đường enroll, không khóa Round ở bước đó. Auth dùng `User -> Session` và `User -> ResetToken`.
+- Thesis có thứ tự theo thao tác, không có một chuỗi `group -> round` chung: tạo nhóm/khôi phục đợt khóa `round -> Student`; membership và governance có chốt khóa nhóm riêng. `ThesisSupervisorService` khóa `round -> topic`. Đọc đúng service/repository của thao tác trước khi sửa khóa.
 - Assistant: `conversation -> ledger` (`ThesisAssistantRepository`).
-- Phương thức khóa đặt tên `lock...ForUpdate` và chú thích `@Transactional(propagation = MANDATORY)` để không bao giờ chạy ngoài transaction của caller.
+- Các repository có chốt transaction bằng `@Transactional(propagation = MANDATORY)` cho những method khóa được đánh dấu; các helper khóa khác dựa trên transaction của service caller. Tên `lock...` không tự bảo đảm propagation.
 
 **Thêm một câu query mới:** đặt SQL + `RowMapper` trong `repository/` của module; service gọi method đó và sở hữu `@Transactional` khi cần; query `FOR UPDATE`/`FOR SHARE` phải đi qua method `lock...ForUpdate` có `MANDATORY`; exception translation (`DuplicateKeyException`, `DataIntegrityViolationException`, …) ở lại đúng statement trong repository method.
 

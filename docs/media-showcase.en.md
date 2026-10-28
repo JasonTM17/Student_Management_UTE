@@ -4,7 +4,7 @@
 
 ## Capture provenance
 
-Screens were rendered from a new 27 October 2026 source build in the isolated `campuscore-docs` Compose project with fresh seed data. The UI displays CampusUTE branding; the codebase is CampusCore.
+Screens were rendered from a local build of the current source in the isolated `campuscore-docs` Compose project with fresh seed data. The UI displays CampusUTE branding; the codebase is CampusCore.
 
 - Source: `fb9b60af3b0ad2f854047036c1cc5bb19466ead3`
 - Next build: `N4g1GZ8EeONCvY1oewd5t`
@@ -14,6 +14,11 @@ Screens were rendered from a new 27 October 2026 source build in the isolated `c
 - External DeepSeek and SMTP dispatch were disabled; rate limits stayed enabled.
 
 [Full manifest and checksums](assets/showcase-2026-10/provenance.json) · [Reproduction](technical/operations-verification.en.md)
+
+The manifest hashes match all 77 binary assets. Its two SVG hashes/sizes describe
+the original Windows CRLF text; Git-normalized LF SVG blobs differ byte-for-byte.
+Reconstructing CRLF matches those recorded hashes; this is line-ending provenance,
+not a fresh screenshot capture.
 
 ## Observed limitations
 
@@ -73,6 +78,4 @@ The existing lecturer mail recipient summary still displays the literal `{max}` 
 
 ## Current diagrams
 
-![Architecture](assets/showcase-2026-10/architecture-en.png)
-
-[SVG](assets/showcase-2026-10/architecture-en.svg)
+The architecture diagrams are Mermaid; see the [README](../README.en.md#architecture) and [ARCHITECTURE.md](ARCHITECTURE.md).

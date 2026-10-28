@@ -11,8 +11,13 @@ authorize production deployment.
   remains. The internal `rag-service` sidecar is an intentional course-runtime
   component and is addressed only through its token-protected
   `/internal/rag/**` contract. The current release workflow publishes the
-  four course images to both Docker Hub (`nguyenson1710/campuscore-*`) and
-  GHCR (`ghcr.io/jasontm17/campuscore-*`) from the same commit.
+  four course images to both Docker Hub (`docker.io/nguyenson1710/student-management-ute-*`) and
+  GHCR (`ghcr.io/jasontm17/student-management-ute-*`) from the same commit.
+
+Git release tags present in the repository are `v1.0.0`, `v1.1.0` and `v1.1.1`.
+They are distinct from container tags: the publication workflow uses the full
+40-character source commit SHA, not a release version or `latest`. Local tags
+do not prove a GitHub release or registry artifact is available.
 
 ## API and database
 
@@ -21,7 +26,7 @@ mvn -q -f java-services/pom.xml verify
 docker compose config
 docker compose up -d --build postgres mailpit rag-service restful-api web
 curl.exe http://127.0.0.1:4010/api/v1/health/liveness
-curl.exe -H "X-Health-Key: local-course-health-key" http://127.0.0.1:4010/api/v1/health/readiness
+curl.exe -H "X-Health-Key: <HEALTH_READINESS_KEY>" http://127.0.0.1:4010/api/v1/health/readiness
 curl.exe http://127.0.0.1:4010/v3/api-docs
 curl.exe http://127.0.0.1:3000/
 curl.exe http://127.0.0.1:8025/
@@ -42,9 +47,9 @@ DeepSeek smoke is optional, chargeable and only allowed after a rotated runtime
 key is injected explicitly. Java 21 is the course compile, CI, and Docker runtime authority for this
 successor. A local run on another JDK is recorded as NOT_RUN for that gate.
 
-The published GHCR images mirror the local stack and can be smoked without a
+The configured GHCR image set mirrors the local stack and can be smoked without a
 rebuild. Pin `CAMPUSCORE_IMAGE_TAG` to the reviewed full commit SHA for a
-reproducible smoke. The published-artifact overlay rejects an unset tag so a
+reproducible smoke. The published-artifact overlay (`docker-compose.rag.override.yml`) rejects an unset tag so a
 moving registry alias cannot be selected accidentally. This
 includes `student-management-ute-database`, a thin
 `postgres:15-alpine` wrapper with no migrations or credentials. Flyway in the
@@ -56,8 +61,8 @@ $env:CAMPUSCORE_IMAGE_TAG = "<full-commit-sha>"
 docker compose -f docker-compose.yml -f docker-compose.rag.override.yml up -d --no-build postgres mailpit rag-service restful-api web
 ```
 
-The same workflow publishes Docker Hub tags with the `campuscore-*` names.
-Each registry receives an immutable full-commit-SHA tag; the workflow binds it
+The same workflow publishes Docker Hub tags with the `student-management-ute-*` names.
+Each registry is configured to receive an immutable full-commit-SHA tag; the workflow binds it
 to `org.opencontainers.image.revision`, refuses wrong-revision or mismatched
 tags, and fails closed when a previous run left only one registry populated;
 that partial state requires an operator-run blob copy after source verification.
@@ -102,7 +107,7 @@ login, refresh, logout and core student flows on an emulator or device.
 
 ## History rewrite note
 
-The default branch history was rewritten on 2026-10-27 to normalize commit
+The default branch history was rewritten once to normalize commit
 metadata; file contents were not changed. The `v1.1.1` container images were
 published under the pre-rewrite SHA tag
 `936f7e342a271ddf2e7832f35b8eb0d55c1b54a3`. That commit has the identical tree

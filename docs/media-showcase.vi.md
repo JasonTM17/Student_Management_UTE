@@ -4,7 +4,7 @@
 
 ## Nguồn chụp
 
-Ảnh được render thật từ build ngày 27/10/2026 theo mã nguồn hiện tại, trong project Compose `campuscore-docs` với database seed riêng. Giao diện hiển thị thương hiệu CampusUTE; tên codebase là CampusCore.
+Ảnh được render thật từ build local theo mã nguồn hiện tại, trong project Compose `campuscore-docs` với database seed riêng. Giao diện hiển thị thương hiệu CampusUTE; tên codebase là CampusCore.
 
 - Source: `fb9b60af3b0ad2f854047036c1cc5bb19466ead3`
 - Next build: `N4g1GZ8EeONCvY1oewd5t`
@@ -14,6 +14,10 @@
 - DeepSeek và gửi SMTP bên ngoài tắt; rate limit giữ bật.
 
 [Manifest và checksum đầy đủ](assets/showcase-2026-10/provenance.json) · [Cách tái tạo](technical/operations-verification.vi.md)
+
+Hash trong manifest khớp cả 77 tài sản nhị phân. Hash/kích thước của hai SVG
+thuộc bản gốc Windows CRLF; blob SVG được Git chuẩn hóa LF khác ở mức byte.
+Khôi phục CRLF khớp hash đã ghi; đây là khác biệt xuống dòng, không phải lượt chụp mới.
 
 ## Giới hạn được quan sát
 
@@ -73,6 +77,4 @@ Trang email giảng viên hiện còn hiển thị placeholder `{max}` trong ph�
 
 ## Sơ đồ hiện tại
 
-![Architecture](assets/showcase-2026-10/architecture-vi.png)
-
-[SVG](assets/showcase-2026-10/architecture-vi.svg)
+Sơ đồ kiến trúc là Mermaid, nằm trong [README](../README.md#architecture) và [ARCHITECTURE.md](ARCHITECTURE.md).

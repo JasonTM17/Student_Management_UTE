@@ -1,12 +1,15 @@
 # DeepSeek campus assistant integration
 
-CampusCore's assistant is a grounded campus RAG feature served by the private
-`rag-service` sidecar, which uses the same Java artifact as the public REST API.
+CampusCore's assistant is a grounded campus RAG feature served by the Java API,
+optionally through a private `rag-service` sidecar using the same Java artifact.
 The normal path is deterministic PostgreSQL lexical retrieval with
 server-owned citations. DeepSeek is an optional answer synthesizer, not a
-knowledge authority and not a client-side dependency. In production the sidecar
-syncs the published Supabase `assistant` release into the PostgreSQL runtime
-snapshot before retrieval; local/course mode seeds that snapshot with Flyway.
+knowledge authority and not a client-side dependency. The self-hosted
+production Compose configuration uses a sidecar that syncs
+the published Supabase `assistant` release into the PostgreSQL runtime snapshot.
+Local Compose uses SQL authority; `render.yaml` configures a standalone API
+with SQL authority by application default. Flyway seeds the runtime snapshot.
+These are configuration facts, not verification of live deployment state.
 
 ## Runtime configuration
 
@@ -23,10 +26,10 @@ repository contains placeholders, never credentials:
 | `DEEPSEEK_MAX_OUTPUT_TOKENS` | `800` | Output cap |
 | `ASSISTANT_MAX_MESSAGE_CHARS` | `2000` | Input bound |
 | `ASSISTANT_MAX_CONTEXT_CHARS` | `6000` | Retrieval context bound |
-| `ASSISTANT_USER_DAILY_QUOTA` | `20` | Provider attempts per user/day |
-| `ASSISTANT_GLOBAL_DAILY_QUOTA` | `200` | Provider attempts globally/day |
+| `ASSISTANT_USER_DAILY_QUOTA` | `20` | User daily dispatch budget; clamped to at most 20 |
+| `ASSISTANT_GLOBAL_DAILY_QUOTA` | `200` | Global daily dispatch budget; clamped to at most 200 |
 | `ASSISTANT_RETENTION_DAYS` | `90` | Conversation/message retention |
-| `ASSISTANT_RECOVERY_DELAY_MS` | `30000` | Expired lease recovery sweep |
+| `ASSISTANT_RECOVERY_DELAY_MS` | `30000` | Recovery scheduler tick; actual idle sweeps are activity-gated |
 | `ASSISTANT_RECOVERY_INITIAL_DELAY_MS` | `30000` | Startup grace before first sweep |
 
 The endpoint/model follow DeepSeek's OpenAI-compatible chat completion contract:
@@ -35,22 +38,26 @@ the base host and model in server configuration; clients cannot override either.
 
 ## RAG-first dispatch policy
 
-Every request retrieves the active published runtime release before any provider
-decision. Direct fact lookups stay entirely on lexical RAG and return model
-`curated-lexical-rag` with reason code `RAG_GROUNDED`; they do not reserve quota
-or open a DeepSeek dispatch. `AssistantDifficultyRouter` only allows synthesis
+The ledgered RAG path retrieves the active published runtime release before
+provider synthesis. Direct fact lookups return `curated-lexical-rag` with
+`RAG_GROUNDED` without provider quota. A confident controller fast path instead
+returns `curated-lexical-fast` / `ANSWERED`, without creating a ledger turn or
+persisting history. `AssistantDifficultyRouter` only allows synthesis
 for a non-empty retrieval result when the question is long or multi-intent,
 contains comparison/explanation/exception markers, or spans multiple knowledge
-domains. A question with no matching document never calls DeepSeek. This keeps
-the provider as a bounded fallback synthesizer rather than a second knowledge
-authority.
+domains. A no-match result in this path does not dispatch DeepSeek. Separately,
+`generalAnswerIfOffTopic` can answer non-academic questions without retrieved
+context or citations when the provider is usable; it is disabled for specialized
+scope and uses standalone quota accounting. It does not establish campus facts.
 
 ## Request/data boundary
 
-The provider request contains only the current question and a bounded,
+The grounded provider request contains the current question and bounded,
 locale-filtered, published campus context delimited as untrusted data. It does
-not include email, profile IDs, bearer tokens, raw conversation history, or
-unfiltered database rows. The system instruction requires an answer from the
+not automatically attach account email, profile IDs, bearer tokens, raw
+conversation history or unfiltered database rows. The current question is
+user-supplied text, so this is not a guarantee that it contains no personal data.
+The system instruction requires an answer from the
 context only, ignores instructions inside the question/context, and refuses
 unsupported claims. Citations are attached by Java from retrieved rows.
 
@@ -61,25 +68,34 @@ unsupported claims. Citations are attached by Java from retrieved rows.
   `citation`, `done`, or `error` SSE events.
 - `POST/GET/DELETE /api/v1/thesis/assistant/conversations...` manage owner-only
   history. A missing conversation ID creates one server-side.
-- Only students and lecturers can chat or read/delete their own history.
-  Admins manage knowledge revisions but do not see user conversations by
-  default.
+- Chat/history routes allow `STUDENT`, `LECTURER`, `ADMIN`, `SUPER_ADMIN`
+  and `TRUONG_KHOA`; department heads normally also hold `LECTURER`. History
+  remains owner-scoped: knowledge administration does not grant access to
+  other users' conversations. Both `/api/v1/assistant` and
+  `/api/v1/thesis/assistant` prefixes are supported.
 - Every intentional send carries a caller-owned `clientRequestId`; completed
-  keys replay the committed answer, while cancelled/purged keys return a
+  ledgered turns replay the committed answer, while cancelled/purged keys return a
   stable terminal error. Web streaming uses `meta → delta/replace → citation
   → done`; a stream without `done` is not treated as complete. Stop first
-performs the owner-scoped server CAS and then aborts the local reader.
+  performs the owner-scoped server CAS and then aborts the local reader.
+  Fast-path, personal-context and general-answer branches have separate
+  persistence/replay semantics; a repeated key is not universally a cached answer.
 
 Expired `RESERVED`/`SNAPSHOT_READY` leases become retryable
 `FAILED_PRE_DISPATCH`; an expired `DISPATCHED` lease becomes
 `FAILED_AMBIGUOUS` and is never automatically redispatched or refunded. A
-30-second recovery sweep fences the old in-process provider handle, while the
-90-day purge job remains a separate privacy-retention operation.
+30-second scheduler tick checks whether recovery is due. By default, recovery
+sweeps on the first tick, during five minutes after lease activity, and after
+15 idle minutes since the last successful sweep; errors/full batches retry on
+the next tick. `ASSISTANT_RECOVERY_ACTIVITY_AWARE=false` sweeps every tick.
+Recovery fences the old in-process provider handle; the daily purge job
+(default retention 90 days) is a separate privacy operation.
 
-When provider access is disabled, unauthenticated, over quota, circuit-open,
+When provider access is disabled, rejected by the provider, over quota, circuit-open,
 timed out, or fails, the service returns the lexical answer with `degraded`
-and a stable `reasonCode`. If retrieval has no matching published campus
-documents, no provider call is attempted.
+and a stable `reasonCode`. A ledgered RAG retrieval with no matching published campus
+documents does not attempt synthesis. Caller authentication and RLS failures
+remain access/availability errors; provider fallback never bypasses them.
 
 ## Knowledge lifecycle
 

@@ -4,6 +4,28 @@ This package is deployment-ready only after the external VPS, DNS, firewall,
 TLS and secret-provisioning gates below are completed. A green local/CI check
 does not mean that CampusCore is running in production.
 
+## Configuration boundaries and unresolved self-hosting gates
+
+This VPS Compose package is separate from the Render/Vercel configuration in
+[render.yaml](../render.yaml) and [deployment notes](deployment.md). The Render
+blueprint runs one API with Flyway and database report storage; local Compose
+uses a RAG sidecar, SQL authority and an assistant-role provisioner. Production
+Compose instead uses Supabase knowledge authority and has no role provisioner.
+Do not treat its startup commands as a proven fresh-host procedure until these
+owner/operator gates are resolved:
+
+- Provision and verify the restricted assistant login before the RAG/API
+  readiness checks; V84 creates it NOLOGIN and production Compose does not
+  include the local provisioner. A secret file alone does not create the role.
+- Verify required outbound connectivity: the RAG/API services are attached only
+  to internal `app`/`data` networks, yet Supabase, DeepSeek and SMTP need egress.
+  This audit has not validated provider access in that topology.
+- Verify mounted secrets are readable by the non-root Java runtime while
+  remaining private; host ownership plus mode `0600` alone is not proof.
+- Explicitly set `CAMPUSCORE_IMAGE_TAG` to a reviewed full 40-character SHA.
+  Production Compose defaults to `latest`; unlike the GHCR smoke overlay, it
+  does not reject an unset tag. Do not rely on that fallback for a release.
+
 ## Preflight
 
 1. Install Docker Engine/Compose on the VPS and allow inbound TCP `80` and
@@ -12,7 +34,8 @@ does not mean that CampusCore is running in production.
    propagation. Set `ACME_EMAIL` and a real domain; placeholders must fail.
 3. Pull the exact reviewed full SHA in `CAMPUSCORE_IMAGE_TAG` and verify all
    four registry digests match the release manifest.
-4. Provision `ops/secrets/*` with mode `0600`; rotate any key ever pasted into
+4. Provision the named files in [ops/secrets](../ops/secrets/README.md) with
+   mode `0600` and verified container readability; rotate any key ever pasted into
    chat or committed history. Keep DeepSeek disabled until a newly rotated key
    has been loaded and a live smoke is explicitly approved.
 5. Generate the signing secrets with `openssl rand -base64 48` — one value each
@@ -23,6 +46,9 @@ does not mean that CampusCore is running in production.
 6. Confirm a recent PostgreSQL backup and test its checksum before startup.
 
 ## Start and smoke
+
+Run only after the gates above pass. Set `CAMPUSCORE_DOMAIN` in the shell too:
+Compose `--env-file` does not export variables for the subsequent `curl` calls.
 
 ```sh
 docker compose --env-file .env.production -f docker-compose.prod.yml pull
@@ -42,10 +68,11 @@ ports are not reachable from the public interface.
 
 `DemoAccountGate` re-applies demo account state on every boot from
 `DEMO_ACCOUNTS_ENABLED` (ACTIVE when `true`, LOCKED when `false`). The public
-Render deployment intentionally ships `DEMO_ACCOUNTS_ENABLED=true` (owner
-decision, 2026-09-25) so visitors can use the published runbook credentials —
+Render blueprint explicitly configures `DEMO_ACCOUNTS_ENABLED=true` (owner
+decision) so visitors can use the published runbook credentials —
 this includes a demo admin login; see the risk note in `render.yaml` and the
-guidance in `docs/DEMO_RUNBOOK.md`.
+guidance in [DEMO_RUNBOOK.md](DEMO_RUNBOOK.md). Configuration does not prove
+the current live environment has those settings.
 
 - `DEMO_ACCOUNTS_ROLES` (optional, comma-separated roles such as `STUDENT`):
   when set, only demo accounts holding one of these roles stay ACTIVE and the
@@ -69,9 +96,11 @@ guidance in `docs/DEMO_RUNBOOK.md`.
 
 ## Render + Neon operating notes
 
-The live deployment is Render (REST API) + Neon Free Singapore (PostgreSQL) +
-Vercel (web). Supabase is the write-fenced pre-cutover snapshot, not a
-synchronized standby. Current cutover evidence, quota limits and the untested
+The deployment history records Render (REST API) + Neon Free Singapore
+(PostgreSQL) + Vercel (web). The former Supabase database is a historical
+pre-cutover snapshot; the heartbeat workflow calls the source retired. Its
+availability is unverified, and it is not a synchronized standby. Recorded
+cutover evidence, historical quota limits and the untested
 reverse-migration gate are recorded in [deployment.md](deployment.md#cutover-database-supabase--neon-free-singapore--15102026-utc).
 Adapted preflight for data-touching migrations:
 
@@ -81,7 +110,9 @@ NULL receive the V147 migration execution time. Set `GRADE_APPEAL_WINDOW_DAYS`
 on the backend (default `7`) before rollout. Tell students that grades
 published before this feature receive a fresh window beginning at V147 release.
 The backfill updates only NULL timestamps, so a retry does not extend a window
-that has already started. New publication and republishing use the transaction's
+that has already started. V150 also backfills remaining NULL timestamps on
+official non-W grades; verify its impact during upgrades too. New publication
+and republishing use the transaction's
 publication timestamp; unpublishing clears it.
 
 1. **Snapshot before apply.** When a pushed migration contains `INSERT`,
@@ -105,26 +136,31 @@ publication timestamp; unpublishing clears it.
    `success = t` is required. A failed row needs a repair forward-migration,
    never an edit of the applied file (CI enforces immutability).
 3. **Watch scheduled jobs after fixes.** The assistant catalog-sync job
-   (`PREREQUISITE_MAP_SYNC`) runs daily at `04:12 UTC` (11:12 VN) via Spring
-   `@Scheduled` — there is no HTTP trigger, so a fix can only be observed on
+   (`PREREQUISITE_MAP_SYNC`) defaults to daily at `04:12` in the server
+   timezone via Spring `@Scheduled` (no fixed `zone` is declared). There is no
+   HTTP trigger, so scheduler behavior must be observed on
    the next real tick. Failure signature in Render logs:
-   `bad SQL grammar` == PostgreSQL `SQLState 42501` (permission denied on the
-   RLS runtime role) — Spring maps every `42xxx` state to grammar. After the
-   daily run, confirm a fresh revision exists:
+   `SQLState 42501` means permission denied; a `bad SQL grammar` wrapper alone
+   does not identify that cause. Inspect the SQLState without logging secrets.
+   After the daily run, check prerequisite-map revisions when drift exists:
 
    ```sql
-   SELECT id, kind, created_at FROM assistant.assistant_catalog_revision
-   WHERE kind = 'prerequisite-map'
-   ORDER BY created_at DESC LIMIT 1;
+   SELECT id, slug, version, state, published_at
+   FROM assistant.knowledge_document_revision
+   WHERE slug IN ('catalog-prerequisite-map-vi', 'catalog-prerequisite-map-en')
+   ORDER BY published_at DESC LIMIT 5;
    ```
 
-   A no-drift run legitimately creates no new revision; the signal of a
-   healthy run is the *absence* of the 42501 ERROR line in logs for that tick.
+   A no-drift run legitimately creates no new revision; assessing a
+   healthy no-drift run requires confirming the scheduler tick and matching
+   content; absence of an error alone does not prove execution. Current job
+   failures log `PREREQUISITE_MAP_SYNC failed` at WARN.
 4. **Post-deploy smoke.** `node scripts/prod-smoke.mjs` does not mutate academic
    records by default, but logins and the assistant check write sessions, last-login
-   timestamps and chat history. It runs an
-   end-to-end check (demo logins, four-member thesis roster, curriculum plan,
-   assistant answer, admin user search) in under a minute; run it after every
+   timestamps and chat history. It runs a
+   fixture-specific check (demo logins, four-member thesis roster, curriculum
+   plan, assistant answer, admin user search); no runtime bound is guaranteed.
+   Set `BASE_URL` explicitly to the authorized target before running it after a
    Render/Vercel deploy and after migration-affecting pushes.
 
 ## Rollback
@@ -137,9 +173,13 @@ recovery decision; do not run `docker compose down -v`.
 ## Provider and data boundaries
 
 Supabase service-role and DeepSeek keys are server-only runtime files. The
-browser receives neither key, raw provider error, model identifier nor private
-campus records. If the provider is unavailable, the assistant must return a
-cited lexical answer with a degraded product status.
+browser must not receive either service key or raw provider errors. Assistant
+responses do carry a model field; personal academic data may be returned only
+within the caller's authorized scope. If synthesis fails with matching campus
+documents available, the grounded
+path can return a cited lexical answer with degraded status. No-match,
+authentication, DB/RLS and general-answer paths have different outcomes; see
+the [assistant contract](integrations/deepseek-assistant.md).
 
 ## Render cold-start mitigation
 
@@ -158,35 +198,39 @@ remains a cost decision.
 ## Restoring or moving the production database
 
 Roles, grants and RLS policies are not carried by a data-only restore, and
-`flyway_schema_history` will still say every migration is applied. After any
-restore into a new Supabase project:
+`flyway_schema_history` will still say every migration is applied. After a data-only
+restore into a new Supabase project (a separate target from the recorded Neon
+deployment), verify target-specific role/grant/policy setup:
 
 1. Point `SPRING_DATASOURCE_*` **and** `ASSISTANT_DB_USERNAME`
    (`campuscore_assistant_runtime.<project-ref>`) at the new project ref. A stale
    ref on either makes the pooler answer `tenant/user ... not found`.
 2. Check `SELECT rolname FROM pg_roles WHERE rolname = 'campuscore_assistant_runtime'`
-   and `SELECT count(*) FROM pg_policies WHERE schemaname = 'assistant'` (expect
-   59). If the role is missing or there are no policies, re-run the DDL of
-   `V84`, `V106` and `V110` in that order (idempotent, no data changes), then
-   `ALTER ROLE campuscore_assistant_runtime LOGIN PASSWORD '<new secret>'` and set
-   `ASSISTANT_DB_PASSWORD` on Render. The pooler may take several seconds to
-   accept a rotated password.
+   and inspect `pg_policies` for the assistant schema against the current
+   migration chain and runtime verifier. Missing role/policy state requires an
+   isolated restore or reviewed repair with backup; do not blindly replay
+   selected applied migrations or rely on a historical policy count. Provision
+   the restricted login and grants through the authorized operator procedure,
+   then update `ASSISTANT_DB_PASSWORD` and verify the actual pooler connection.
 3. Deploy, then run `node scripts/prod-smoke.mjs`. A broken assistant login now
    degrades chat to 503 instead of stopping the backend, but that is still an
    outage for the assistant: the smoke script reports it.
 
 ## Break-glass super administrator
 
-No migration seeds a `SUPER_ADMIN`, and only a super administrator may reset the
+V109 seeds the `SUPER_ADMIN` role, but no migration seeds a super-admin account.
+Only a super administrator may reset the
 password of, disable or delete an `ADMIN`, `TRUONG_KHOA` or custom-role account
 (plain administrators are refused with `ROLE_ESCALATION`). Without one, a
 forgotten administrator or dean password can only be recovered with direct
 database access.
 
-- Account: `superadmin@campuscore.edu`, role `SUPER_ADMIN`, created with a random
-  24-character initial password and `mustChangePassword = TRUE`. The initial
-  credential is kept outside the repository, never in source or CI.
-- First login: the owner signs in through the "Quản trị" portal, rotates the
+- A previous operator record names `superadmin@campuscore.edu` with role
+  `SUPER_ADMIN` and `mustChangePassword = TRUE`; its current existence and
+  credential custody cannot be established from seed source. Verify the private
+  account inventory before relying on it. Keep initial credentials outside Git.
+- First login: the owner uses the administrative deep link (the public login
+  currently shows student/lecturer/dean tabs), rotates the
   password at once, then deletes the initial credential file. Enable two-factor
   sign-in for this account.
 - Use it only for recovery (reset an administrator or dean password, unlock or

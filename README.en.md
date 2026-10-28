@@ -38,7 +38,7 @@ The **academic office issues accounts**; public self-registration is unavailable
 <a id="showcase"></a>
 ## Screenshots and GIFs
 
-Captured from a **new local build of the 27 October 2026 source**, using a separate PostgreSQL/demo environment without production data. Every role signs in and checks identity through the API. [Complete gallery, provenance and limitations](docs/media-showcase.en.md) · [Runtime manifest](docs/assets/showcase-2026-10/provenance.json).
+Captured from a **local build of the current source**, using a separate PostgreSQL/demo environment without production data. Every role signs in and checks identity through the API. [Complete gallery, provenance and limitations](docs/media-showcase.en.md) · [Runtime manifest](docs/assets/showcase-2026-10/provenance.json).
 
 ### Public pages and login
 
@@ -129,17 +129,117 @@ Key distinctions: row locks serialize contested records without making every tra
 <a id="architecture"></a>
 ## Architecture
 
-![Current architecture](docs/assets/showcase-2026-10/architecture-en.png)
+### Runtime overview
 
-[SVG](docs/assets/showcase-2026-10/architecture-en.svg) · [Architecture boundaries](docs/ARCHITECTURE.md)
-
-```text
-Next.js web ── same-origin /api/v1 ──► Java REST API ──► PostgreSQL
-Expo mobile ───── Bearer JWT ────────►       │
-                                            ├──► Report storage
-                                            ├──► SMTP (optional)
-                                            └──► Internal RAG sidecar ──► DeepSeek (optional)
+```mermaid
+flowchart TD
+    subgraph CLIENT["Clients"]
+        WEB["Next.js 15 web<br/>HttpOnly cookies · CSRF · Vietnamese/English"]
+        MOB["Expo / React Native mobile<br/>Bearer JWT · in development"]
+    end
+    subgraph APP["Application"]
+        API["Java REST API · Spring Boot 4.1<br/>modular monolith · RBAC + scope<br/>transactions in the service layer"]
+        RAG["Internal RAG sidecar :4011<br/>same Java artifact · not published to the host"]
+    end
+    subgraph DATA["Data and integrations"]
+        PG[("PostgreSQL 15<br/>Flyway · constraints · RLS")]
+        STO["Report storage<br/>local · database · Supabase"]
+        SMTP["SMTP<br/>optional"]
+        DS["DeepSeek<br/>optional · timeout and fallback"]
+    end
+    WEB -->|"same-origin /api/v1"| API
+    MOB -->|"/api/v1 · Bearer"| API
+    API --> PG
+    API --> STO
+    API -->|"service token"| RAG
+    RAG --> PG
+    API -.->|"MAIL_ENABLED"| SMTP
+    RAG -.->|"DEEPSEEK_ENABLED"| DS
 ```
+
+Host ports, integration flags and start order belong to the [Compose file](docker-compose.yml); the diagram shows runtime boundaries only.
+
+### Enrollment transaction
+
+```mermaid
+sequenceDiagram
+    participant S as Student
+    participant Web as Next.js
+    participant API as RegistrationService
+    participant DB as PostgreSQL
+    S->>Web: Pick a section
+    Web->>API: POST /api/v1/me/enrollments (Idempotency-Key)
+    API->>DB: BEGIN, claim owner key + payload hash
+    alt Completed matching request
+        DB-->>API: Existing enrollment
+        API-->>Web: Replay the earlier result
+    else New request
+        API->>DB: Lock Student, then Section
+        API->>DB: Check round, course, prerequisites, credits, schedule
+        API->>DB: Conditional seat increment while open and below capacity
+        alt Section full or constraint violated
+            API->>DB: ROLLBACK
+            API-->>Web: 409 / structured business error
+        else Valid
+            API->>DB: Insert enrollment, event, complete the request record
+            API->>DB: COMMIT
+            API-->>Web: 201 Enrollment
+        end
+    end
+    Web-->>S: Update schedule and show the result
+```
+
+Lock and statement order belong to [RegistrationService](java-services/restful-api/src/main/java/io/campuscore/restfulapi/academic/registration/service/RegistrationService.java); a row lock does not upgrade every query to serializable isolation.
+
+### Assistant flow
+
+```mermaid
+flowchart TD
+    U["Question + locale + scope"] --> G["Input · authority · scope guards"]
+    G --> P{"Needs the caller's<br/>personal context?"}
+    P -->|Yes| C["Authorized academic services"]
+    P -->|No| R["Published corpus<br/>weighted lexical ranking"]
+    R --> D{"Synthesis needed and<br/>provider configured?"}
+    D -->|No| L["Local grounded answer with citations"]
+    D -->|Yes| Q["Ledger · lease · atomic quota"]
+    Q --> M["Optional DeepSeek with timeout"]
+    M -->|Failure| L
+    M --> O["Output guard · citations · terminal turn state"]
+    C --> O
+    L --> O
+    O --> S["SSE for web · JSON for mobile"]
+```
+
+Orientation map; it omits the conversational, off-topic and recovery branches. Ranking is weighted lexical, not BM25 or vector search, and pattern guards do not guarantee complete prompt-injection prevention.
+
+### Two-admin knowledge governance
+
+```mermaid
+stateDiagram-v2
+    [*] --> DRAFT: Admin A creates or edits a draft
+    DRAFT --> PENDING_REVIEW: Admin A submits
+    PENDING_REVIEW --> PUBLISHED: Admin B, not the author, publishes
+    PENDING_REVIEW --> PENDING_REVIEW: Author publishing is rejected with 409 KNOWLEDGE_SECOND_REVIEW_REQUIRED
+    PUBLISHED --> ARCHIVED: A newer revision is published or the document is archived
+    ARCHIVED --> [*]
+```
+
+The publisher must differ from the author; publication re-validates the public content and writes an audit record before the assistant reads the new snapshot.
+
+### Roles and scope
+
+```mermaid
+flowchart LR
+    SV["Student"] --> A1["Own records<br/>registration · schedule · grades · attendance<br/>thesis · assistant"]
+    GV["Lecturer"] --> A2["Actual classes, topics, assignments<br/>grades · attendance · email · supervision"]
+    TK["Department head / Dean"] --> A3["Department / faculty<br/>review · progress · workload"]
+    AD["Admin / Super Admin"] --> A4["Accounts · catalogs · rounds<br/>appeals · audit · RAG knowledge"]
+    A1 & A2 & A3 & A4 --> Z["Re-checked in services and the database"]
+```
+
+Menu visibility never replaces service and database checks; see the [authorization model](docs/security/authorization-model.md).
+
+Details and boundaries for each diagram: [architecture](docs/ARCHITECTURE.md).
 
 <a id="stack"></a>
 ## Technology
@@ -176,12 +276,14 @@ curl.exe http://127.0.0.1:4010/api/v1/health/liveness
 | Mailpit UI / SMTP | 8025 / 1025 | `MAILPIT_UI_HOST_PORT` / `MAILPIT_SMTP_HOST_PORT` |
 | RAG | Internal 4011 only | No published host port |
 
+The migration set is validated by `node scripts/check-migrations.mjs`; Node/Java versions run in [CI](.github/workflows/ci.yml) and client versions are pinned in the lockfiles.
+
 OpenAPI is `/v3/api-docs`, Swagger `/swagger-ui.html` on the API origin. Readiness requires the configured `X-Health-Key`. Compose provisions the assistant role before migration; RAG runs Flyway and API disables it. A running Mailpit does not mean `MAIL_ENABLED` is on. See [operations](docs/technical/operations-verification.en.md) for builds, storage and recovery.
 
 <a id="demo"></a>
 ## Demo accounts
 
-Use only in authorized local/evaluation environments with `DEMO_ACCOUNTS_ENABLED=true`. Local Compose opts in; public deployments must verify demo lockout. `DemoAccountGate` reapplies policy on boot; manual SQL unlocking is not a substitute.
+Use only in authorized local/evaluation environments with `DEMO_ACCOUNTS_ENABLED=true`. Local Compose opts in; `render.yaml` also explicitly enables demo accounts, including admin, under the documented owner decision. Review demo exposure for each public deployment. `DemoAccountGate` reapplies policy on boot; manual SQL unlocking is not a substitute.
 
 | Role | Seed account |
 |---|---|

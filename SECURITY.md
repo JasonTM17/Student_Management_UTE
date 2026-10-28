@@ -18,7 +18,7 @@ We take the security of CampusCore seriously. If you discover a security vulnera
 
 ### How to Report
 
-Please email the project maintainer directly:
+Use the repository's [private security advisory form](https://github.com/JasonTM17/Student_Management_UTE/security/advisories/new), or email the project maintainer directly:
 - **Contact:** Nguyen Tien Son
 - **Email:** `jasonbmt06@gmail.com`
 
@@ -38,4 +38,4 @@ Include the following details in your report:
 
 - Secrets, private keys, database passwords, and third-party tokens must **never** be committed to the repository.
 - Follow the runtime provisioning instructions in [`ops/secrets/README.md`](ops/secrets/README.md).
-- Automated CI scans (`node scripts/check-assistant-secrets.mjs` and GitLeaks) run before releases to reject accidental credential exposure.
+- The [CI workflow](.github/workflows/ci.yml) runs `node scripts/check-assistant-secrets.mjs` and a tracked-file provider-key pattern check. The [image publication workflow](.github/workflows/publish-ghcr.yml) requires successful CI for the exact source SHA. These checks do not prove that all secrets are absent.
