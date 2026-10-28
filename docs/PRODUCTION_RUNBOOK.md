@@ -158,7 +158,7 @@ publication timestamp; unpublishing clears it.
 4. **Post-deploy smoke.** `node scripts/prod-smoke.mjs` does not mutate academic
    records by default, but logins and the assistant check write sessions, last-login
    timestamps and chat history. It runs a
-   fixture-specific check (demo logins, four-member thesis roster, curriculum
+   fixture-specific check (demo logins, three-to-four-member thesis roster, curriculum
    plan, assistant answer, admin user search); no runtime bound is guaranteed.
    Set `BASE_URL` explicitly to the authorized target before running it after a
    Render/Vercel deploy and after migration-affecting pushes.
