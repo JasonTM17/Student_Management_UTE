@@ -10,12 +10,23 @@ import {
 
 export const STATIC_STALE_TIME_MS = 10 * 60_000;
 export const DEFAULT_STALE_TIME_MS = 5 * 60_000;
+export const DEFAULT_GC_TIME_MS = 10 * 60_000;
+
+export const ACADEMIC_QUERY_KEYS = {
+  semesters: ['academic', 'semesters'] as const,
+  courses: (params?: unknown) => ['courses', params ?? 'all'] as const,
+  curriculum: ['curriculum', 'mine'] as const,
+  transcript: ['grades', 'transcript'] as const,
+  grades: (semesterId?: string) => ['grades', 'my', semesterId ?? 'all'] as const,
+  currentUser: ['auth', 'me'] as const,
+} as const;
 
 export function createQueryClient(): QueryClient {
   return new QueryClient({
     defaultOptions: {
       queries: {
         staleTime: DEFAULT_STALE_TIME_MS,
+        gcTime: DEFAULT_GC_TIME_MS,
         refetchOnWindowFocus: false,
         retry: 1,
       },

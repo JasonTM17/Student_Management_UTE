@@ -769,14 +769,38 @@ export function clearThesisSupervisorsCache(topicId?: string): void {
   }
 }
 
+const thesisRoundsCache = new Map<string, { promise: Promise<ThesisRound[]>; timestamp: number }>();
+const THESIS_ROUNDS_CACHE_TTL_MS = 5 * 60_000;
+
+export function clearThesisRoundsCache(): void {
+  thesisRoundsCache.clear();
+}
+
 export const thesisApi = {
-  listRounds: async (status?: ThesisRoundStatus): Promise<ThesisRound[]> => {
+  listRounds: async (status?: ThesisRoundStatus, options?: { forceRefresh?: boolean }): Promise<ThesisRound[]> => {
     // No status is the "active" list: archived CLOSED rounds stay out of
     // default pickers; status=CLOSED is the admin's explicit archive view.
-    const response = await api.get<ThesisRound[]>('/thesis/rounds', {
-      params: status ? { status } : {},
-    });
-    return response.data;
+    const key = status || 'active';
+    const now = Date.now();
+    const cached = thesisRoundsCache.get(key);
+    if (!options?.forceRefresh && cached && now - cached.timestamp < THESIS_ROUNDS_CACHE_TTL_MS) {
+      return cached.promise;
+    }
+    const promise = api
+      .get<ThesisRound[]>('/thesis/rounds', {
+        params: status ? { status } : {},
+      })
+      .then(
+        (response) => response.data,
+        (error) => {
+          if (thesisRoundsCache.get(key)?.promise === promise) {
+            thesisRoundsCache.delete(key);
+          }
+          throw error;
+        },
+      );
+    thesisRoundsCache.set(key, { promise, timestamp: now });
+    return promise;
   },
 
   createRound: async (data: {
@@ -791,11 +815,13 @@ export const thesisApi = {
     reportDate?: string;
     defenseDate?: string;
   }): Promise<ThesisRound> => {
+    clearThesisRoundsCache();
     const response = await api.post<ThesisRound>('/thesis/rounds', data);
     return response.data;
   },
 
   openRegistration: async (roundId: string): Promise<ThesisRound> => {
+    clearThesisRoundsCache();
     const response = await api.post<ThesisRound>(
       '/thesis/rounds/' + roundId + '/open-registration',
     );
@@ -803,6 +829,7 @@ export const thesisApi = {
   },
 
   closeRegistration: async (roundId: string): Promise<ThesisRound> => {
+    clearThesisRoundsCache();
     const response = await api.post<ThesisRound>(
       '/thesis/rounds/' + roundId + '/close-registration',
     );
@@ -984,11 +1011,13 @@ export const thesisApi = {
       defenseDate?: string;
     },
   ): Promise<ThesisRound> => {
+    clearThesisRoundsCache();
     const response = await api.put<ThesisRound>('/thesis/rounds/' + roundId, data);
     return response.data;
   },
 
   cancelRound: async (roundId: string): Promise<ThesisRound> => {
+    clearThesisRoundsCache();
     const response = await api.post<ThesisRound>(
       '/thesis/rounds/' + roundId + '/cancel',
     );
@@ -1001,6 +1030,7 @@ export const thesisApi = {
     roundId: string,
     targetStatus?: ThesisRoundStatus,
   ): Promise<ThesisRound> => {
+    clearThesisRoundsCache();
     const response = await api.post<ThesisRound>(
       '/thesis/rounds/' + roundId + '/restore',
       targetStatus ? { targetStatus } : {},
@@ -1012,6 +1042,7 @@ export const thesisApi = {
    * server refuses with ROUND_HAS_DATA while any thesis data still points at
    * the round, so cancel stays the archive path. */
   deleteRound: async (roundId: string, reason: string): Promise<void> => {
+    clearThesisRoundsCache();
     await api.delete('/thesis/rounds/' + roundId, { data: { reason } });
   },
 
@@ -1019,6 +1050,7 @@ export const thesisApi = {
    * results stay viewable). Refused with RETRACT_WINDOW_OPEN while the
    * retraction grace window is still open. Reason required; audited. */
   closeRound: async (roundId: string, reason: string): Promise<ThesisRound> => {
+    clearThesisRoundsCache();
     const response = await api.post<ThesisRound>(
       '/thesis/rounds/' + roundId + '/close',
       { reason },
@@ -1029,6 +1061,7 @@ export const thesisApi = {
   /** Reverses the archive: CLOSED -> RESULTS_PUBLISHED restores exactly the
    * published state the round left. Reason required; audited. */
   reopenRound: async (roundId: string, reason: string): Promise<ThesisRound> => {
+    clearThesisRoundsCache();
     const response = await api.post<ThesisRound>(
       '/thesis/rounds/' + roundId + '/reopen',
       { reason },

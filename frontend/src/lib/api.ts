@@ -554,11 +554,19 @@ export class SessionVerificationError extends Error {
 }
 
 // Auth API
+let cachedMe: { promise: Promise<User>; timestamp: number } | null = null;
+const AUTH_ME_CACHE_TTL_MS = 3 * 60_000; // 3 minutes
+
+export function clearAuthMeCache(): void {
+  cachedMe = null;
+}
+
 export const authApi = {
   // A normal sign-in resolves to a full session; an account with two-factor
   // enabled instead answers with TwoFactorChallengeResponse (no tokens) and
   // the caller must finish with verifyTwoFactor.
   login: async (email: string, password: string): Promise<LoginResult> => {
+    clearAuthMeCache();
     const response = await withSessionTransport(() =>
       api.post<LoginResult>(
         '/auth/login',
@@ -583,6 +591,7 @@ export const authApi = {
     challengeId: string,
     code: string,
   ): Promise<LoginResponse> => {
+    clearAuthMeCache();
     const response = await withSessionTransport(() =>
       api.post<LoginResponse>(
         '/auth/two-factor/verify',
@@ -643,14 +652,29 @@ export const authApi = {
     return response.data;
   },
 
-  me: async (): Promise<User> => {
-    const response = await api.get<User>('/auth/me', {
-      skipAuthRedirect: true,
-      skipAuthRefresh: true,
-      skipColdStartRetry: true,
-      timeout: SESSION_TRANSPORT_TIMEOUT_MS,
-    } as AuthRequestConfig);
-    return response.data;
+  me: async (options?: { forceRefresh?: boolean }): Promise<User> => {
+    const now = Date.now();
+    if (!options?.forceRefresh && cachedMe && now - cachedMe.timestamp < AUTH_ME_CACHE_TTL_MS) {
+      return cachedMe.promise;
+    }
+    const promise = api
+      .get<User>('/auth/me', {
+        skipAuthRedirect: true,
+        skipAuthRefresh: true,
+        skipColdStartRetry: true,
+        timeout: SESSION_TRANSPORT_TIMEOUT_MS,
+      } as AuthRequestConfig)
+      .then(
+        (response) => response.data,
+        (error) => {
+          if (cachedMe?.promise === promise) {
+            cachedMe = null;
+          }
+          throw error;
+        },
+      );
+    cachedMe = { promise, timestamp: now };
+    return promise;
   },
 
   // Names and date of birth are school-managed, so they are not part of this
@@ -660,11 +684,16 @@ export const authApi = {
     address?: string;
     avatar?: string;
   }): Promise<User> => {
+    clearAuthMeCache();
     const response = await api.put<User>('/auth/profile', data);
     return response.data;
   },
 
   logout: async (): Promise<void> => {
+    clearAuthMeCache();
+    clearCurriculumCache();
+    clearCoursesCache();
+    clearTranscriptCache();
     clearNotificationCache();
     clearSemestersCache();
     clearDepartmentsCache();
@@ -694,6 +723,7 @@ export const authApi = {
     accessToken: string | null;
     refreshToken: string | null;
   }> => {
+    clearAuthMeCache();
     // The server pins the session to keep by this request's refresh cookie,
     // so a queued rotation must land first — sending mid-refresh would pin a
     // stale hash, resolve nothing, and revoke every session instead.
@@ -1457,42 +1487,85 @@ export const departmentsApi = {
 };
 
 // Courses API
+const coursesCache = new Map<string, { promise: Promise<ApiResponse<Course[]>>; timestamp: number }>();
+const COURSES_CACHE_TTL_MS = 5 * 60_000; // 5 minutes
+
+export function clearCoursesCache(): void {
+  coursesCache.clear();
+}
+
 export const coursesApi = {
   // GET /courses allow-lists its query parameters server side and rejects
   // anything else with HTTP 400, so this signature is the wire contract: only
   // parameters the route actually answers may appear here. `departmentId` is a
   // server-side filter on the course's department, which is what lets callers
   // page a department instead of narrowing one 20-row page in the browser.
-  getAll: async (params?: {
-    page?: number;
-    limit?: number;
-    search?: string;
-    departmentId?: string;
-  }): Promise<ApiResponse<Course[]>> => {
-    const response = await api.get<ApiResponse<Course[]>>('/courses', {
-      params,
-    });
-    return response.data;
+  getAll: async (
+    params?: {
+      page?: number;
+      limit?: number;
+      search?: string;
+      departmentId?: string;
+    },
+    options?: { forceRefresh?: boolean },
+  ): Promise<ApiResponse<Course[]>> => {
+    const key = JSON.stringify(params || {});
+    const now = Date.now();
+    const cached = coursesCache.get(key);
+    if (!options?.forceRefresh && cached && now - cached.timestamp < COURSES_CACHE_TTL_MS) {
+      return cached.promise;
+    }
+    const promise = api
+      .get<ApiResponse<Course[]>>('/courses', {
+        params,
+        timeout: CACHED_GET_TIMEOUT_MS,
+      })
+      .then(
+        (response) => response.data,
+        (error) => {
+          if (coursesCache.get(key)?.promise === promise) {
+            coursesCache.delete(key);
+          }
+          throw error;
+        },
+      );
+    coursesCache.set(key, { promise, timestamp: now });
+    for (const [k, entry] of coursesCache) {
+      if (now - entry.timestamp >= COURSES_CACHE_TTL_MS) {
+        coursesCache.delete(k);
+      }
+    }
+    return promise;
   },
   getById: async (id: string): Promise<Course> => {
     const response = await api.get<Course>(`/courses/${id}`);
     return response.data;
   },
   create: async (data: Partial<Course>): Promise<Course> => {
+    clearCoursesCache();
     const response = await api.post<Course>('/courses', data);
     return response.data;
   },
   update: async (id: string, data: Partial<Course>): Promise<Course> => {
+    clearCoursesCache();
     const response = await api.put<Course>(`/courses/${id}`, data);
     return response.data;
   },
   delete: async (id: string): Promise<{ message: string }> => {
+    clearCoursesCache();
     const response = await api.delete<{ message: string }>(`/courses/${id}`);
     return response.data;
   },
 };
 
 // Grades API
+let cachedTranscript: { promise: Promise<StudentTranscript>; timestamp: number } | null = null;
+const TRANSCRIPT_CACHE_TTL_MS = 5 * 60_000; // 5 minutes
+
+export function clearTranscriptCache(): void {
+  cachedTranscript = null;
+}
+
 export const gradesApi = {
   getMyGrades: async (semesterId?: string): Promise<StudentGradeRecord[]> => {
     const response = await api.get<StudentGradeRecord[]>(
@@ -1504,11 +1577,26 @@ export const gradesApi = {
 
   // The transcript is cumulative over the whole programme: the route accepts no
   // query parameters at all, so a semesterId here would be a guaranteed 400.
-  getMyTranscript: async (): Promise<StudentTranscript> => {
-    const response = await api.get<StudentTranscript>(
-      '/enrollments/my/transcript',
-    );
-    return response.data;
+  getMyTranscript: async (options?: { forceRefresh?: boolean }): Promise<StudentTranscript> => {
+    const now = Date.now();
+    if (!options?.forceRefresh && cachedTranscript && now - cachedTranscript.timestamp < TRANSCRIPT_CACHE_TTL_MS) {
+      return cachedTranscript.promise;
+    }
+    const promise = api
+      .get<StudentTranscript>('/enrollments/my/transcript', {
+        timeout: CACHED_GET_TIMEOUT_MS,
+      })
+      .then(
+        (response) => response.data,
+        (error) => {
+          if (cachedTranscript?.promise === promise) {
+            cachedTranscript = null;
+          }
+          throw error;
+        },
+      );
+    cachedTranscript = { promise, timestamp: now };
+    return promise;
   },
 
   getMyGradeAppeals: async (): Promise<GradeAppeal[]> => {
@@ -1575,10 +1663,38 @@ export const gradeAppealsApi = {
 };
 
 // Curriculum API
+let cachedMyCurriculum: { promise: Promise<MyCurriculumResponse>; timestamp: number } | null = null;
+const CURRICULUM_CACHE_TTL_MS = 5 * 60_000; // 5 minutes
+
+export function clearCurriculumCache(): void {
+  cachedMyCurriculum = null;
+}
+
 export const curriculumApi = {
-  getMyCurriculum: async (): Promise<MyCurriculumResponse> => {
-    const response = await api.get<MyCurriculumResponse>('/me/curriculum');
-    return response.data;
+  getMyCurriculum: async (options?: { forceRefresh?: boolean }): Promise<MyCurriculumResponse> => {
+    const now = Date.now();
+    if (
+      !options?.forceRefresh &&
+      cachedMyCurriculum &&
+      now - cachedMyCurriculum.timestamp < CURRICULUM_CACHE_TTL_MS
+    ) {
+      return cachedMyCurriculum.promise;
+    }
+    const promise = api
+      .get<MyCurriculumResponse>('/me/curriculum', {
+        timeout: CACHED_GET_TIMEOUT_MS,
+      })
+      .then(
+        (response) => response.data,
+        (error) => {
+          if (cachedMyCurriculum?.promise === promise) {
+            cachedMyCurriculum = null;
+          }
+          throw error;
+        },
+      );
+    cachedMyCurriculum = { promise, timestamp: now };
+    return promise;
   },
 };
 
