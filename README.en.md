@@ -5,7 +5,7 @@
 [Tiếng Việt](README.vi.md) · [English](README.en.md) · [Complete technical guide](docs/technical/README.en.md) · [Current screenshots/GIFs](docs/media-showcase.en.md)
 
 ![Java 21](https://img.shields.io/badge/Java-21-orange?logo=openjdk)
-![Spring Boot 4.1](https://img.shields.io/badge/Spring_Boot-4.1-green?logo=springboot)
+![Spring Boot 4.1.2](https://img.shields.io/badge/Spring_Boot-4.1.2-green?logo=springboot)
 ![Next.js 15](https://img.shields.io/badge/Next.js-15-black?logo=nextdotjs)
 ![PostgreSQL 15](https://img.shields.io/badge/PostgreSQL-15-blue?logo=postgresql)
 
@@ -146,10 +146,10 @@ Expo mobile ───── Bearer JWT ────────►       │
 
 | Layer | Technology and version owner |
 |---|---|
-| Java API | Java 21, Spring Boot 4.1, Spring Security/Validation, JDBC, limited JPA — [Maven](java-services/pom.xml) |
-| Web | Next.js 15, React 18, TypeScript, React Query, Tailwind, Radix, TinyMCE — [package.json](frontend/package.json) |
+| Java API | Java 21, Spring Boot 4.1.2, Spring Security/Validation, JDBC, limited JPA — [Maven](java-services/pom.xml) |
+| Web | Next.js 15.5.28, React 18.3.1, TypeScript, React Query, Tailwind, Radix, TinyMCE — [package.json](frontend/package.json) |
 | Data | PostgreSQL 15, Flyway, constraints/triggers/indexes/RLS — [database image](database/Dockerfile), [migrations](java-services/restful-api/src/main/resources/db/migration/) |
-| Mobile | Expo, React Native, TypeScript — [mobile manifest](mobile/package.json) |
+| Mobile | Expo 57.0.31, React Native 0.86.3, React 19.2.3, TypeScript — [mobile manifest](mobile/package.json) |
 | Integrations | Internal lexical RAG; configurable DeepSeek, SMTP, Supabase storage — [Compose](docker-compose.yml) |
 | QA/operations | JUnit/Mockito, PostgreSQL IT, node:test, Playwright, Docker/Compose, GitHub Actions — [CI](.github/workflows/ci.yml) |
 
@@ -176,12 +176,14 @@ curl.exe http://127.0.0.1:4010/api/v1/health/liveness
 | Mailpit UI / SMTP | 8025 / 1025 | `MAILPIT_UI_HOST_PORT` / `MAILPIT_SMTP_HOST_PORT` |
 | RAG | Internal 4011 only | No published host port |
 
+The PostgreSQL migration directory contains **146 versioned SQL files**, through **V150** (version gaps are intentional); [CI](.github/workflows/ci.yml) uses **Node 20** and Java 21. Locked client versions are recorded in the package lockfiles.
+
 OpenAPI is `/v3/api-docs`, Swagger `/swagger-ui.html` on the API origin. Readiness requires the configured `X-Health-Key`. Compose provisions the assistant role before migration; RAG runs Flyway and API disables it. A running Mailpit does not mean `MAIL_ENABLED` is on. See [operations](docs/technical/operations-verification.en.md) for builds, storage and recovery.
 
 <a id="demo"></a>
 ## Demo accounts
 
-Use only in authorized local/evaluation environments with `DEMO_ACCOUNTS_ENABLED=true`. Local Compose opts in; public deployments must verify demo lockout. `DemoAccountGate` reapplies policy on boot; manual SQL unlocking is not a substitute.
+Use only in authorized local/evaluation environments with `DEMO_ACCOUNTS_ENABLED=true`. Local Compose opts in; `render.yaml` also explicitly enables demo accounts, including admin, under the documented owner decision. Review demo exposure for each public deployment. `DemoAccountGate` reapplies policy on boot; manual SQL unlocking is not a substitute.
 
 | Role | Seed account |
 |---|---|

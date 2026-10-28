@@ -82,22 +82,24 @@ and [ThesisRoundLifecycleService](../../java-services/restful-api/src/main/java/
 
 ## Registration eligibility (accumulated credits + CPA)
 
-A student may register (create a group, be added as a member, or pick the
-group's topic) only when their published transcript meets the regulation's
+For configured round types (default `KLTN`), the eligibility policy evaluates
+creating a group, adding a member and picking a topic against the regulation's
 condition: at least `thesis.eligibility.min-credits` accumulated credits
 (default `110`) and a cumulative GPA of at least `thesis.eligibility.min-cpa`
 (default `2.0`, 4.0 scale). Both numbers come from the canonical transcript
 summary — published grades only, best attempt per course, letter `F` earns
-nothing. A student with no published academic data fails closed
-(`ACADEMIC_DATA_UNAVAILABLE`).
+nothing. A student with no published academic data is marked ineligible
+(`ACADEMIC_DATA_UNAVAILABLE`); mutation blocking depends on enforcement mode.
 
-- `thesis.eligibility.enforcement` = `ENFORCE` (default) refuses the mutation
+- `thesis.eligibility.enforcement` defaults to `ADVISORY`
+  (`THESIS_ELIGIBILITY_ENFORCEMENT`). Explicit `ENFORCE` refuses the mutation
   with `409 THESIS_ELIGIBILITY_NOT_MET` plus `details` carrying
   `earnedCredits`, `requiredCredits`, `cpa`, `requiredCpa` and a `reasons`
   list. `ADVISORY` still evaluates and reports in the read model but never
   blocks.
 - The round read model carries `eligibility` for student callers; group
-  members carry an `eligible` flag for roster chips. No extra round trip.
+  members carry an `eligible` flag for roster chips within caller scope.
+  Student callers see only their own eligibility details. No extra round trip.
 - Governance escape hatches are deliberately not blocked: the audited roster
   override admits an ineligible student, and the audit row records the
   ineligibility note (`student does not meet thesis eligibility (...)` +

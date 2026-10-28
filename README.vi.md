@@ -5,7 +5,7 @@
 [Tiếng Việt](README.vi.md) · [English](README.en.md) · [Tài liệu kỹ thuật đầy đủ](docs/technical/README.vi.md) · [Bộ ảnh/GIF hiện tại](docs/media-showcase.vi.md)
 
 ![Java 21](https://img.shields.io/badge/Java-21-orange?logo=openjdk)
-![Spring Boot 4.1](https://img.shields.io/badge/Spring_Boot-4.1-green?logo=springboot)
+![Spring Boot 4.1.2](https://img.shields.io/badge/Spring_Boot-4.1.2-green?logo=springboot)
 ![Next.js 15](https://img.shields.io/badge/Next.js-15-black?logo=nextdotjs)
 ![PostgreSQL 15](https://img.shields.io/badge/PostgreSQL-15-blue?logo=postgresql)
 
@@ -146,10 +146,10 @@ Mobile Expo ───── Bearer JWT ─────────►       │
 
 | Tầng | Công nghệ và chủ sở hữu phiên bản |
 |---|---|
-| Java API | Java 21, Spring Boot 4.1, Spring Security/Validation, JDBC, JPA có giới hạn — [Maven](java-services/pom.xml) |
-| Web | Next.js 15, React 18, TypeScript, React Query, Tailwind, Radix, TinyMCE — [package.json](frontend/package.json) |
+| Java API | Java 21, Spring Boot 4.1.2, Spring Security/Validation, JDBC, JPA có giới hạn — [Maven](java-services/pom.xml) |
+| Web | Next.js 15.5.28, React 18.3.1, TypeScript, React Query, Tailwind, Radix, TinyMCE — [package.json](frontend/package.json) |
 | Dữ liệu | PostgreSQL 15, Flyway, constraint/trigger/index/RLS — [database image](database/Dockerfile), [migrations](java-services/restful-api/src/main/resources/db/migration/) |
-| Mobile | Expo, React Native, TypeScript — [mobile manifest](mobile/package.json) |
+| Mobile | Expo 57.0.31, React Native 0.86.3, React 19.2.3, TypeScript — [mobile manifest](mobile/package.json) |
 | Tích hợp | RAG lexical nội bộ; DeepSeek, SMTP, Supabase storage theo cấu hình — [Compose](docker-compose.yml) |
 | Kiểm thử/vận hành | JUnit/Mockito, PostgreSQL IT, node:test, Playwright, Docker/Compose, GitHub Actions — [CI](.github/workflows/ci.yml) |
 
@@ -176,12 +176,14 @@ curl.exe http://127.0.0.1:4010/api/v1/health/liveness
 | Mailpit UI / SMTP | 8025 / 1025 | `MAILPIT_UI_HOST_PORT` / `MAILPIT_SMTP_HOST_PORT` |
 | RAG | Chỉ nội bộ 4011 | Không publish ra host |
 
+Thư mục migration PostgreSQL có **146 file SQL phiên bản hóa**, mới nhất **V150** (có khoảng trống phiên bản); [CI](.github/workflows/ci.yml) dùng **Node 20** và Java 21. Phiên bản client được khóa trong các package lockfile.
+
 OpenAPI ở `/v3/api-docs`, Swagger ở `/swagger-ui.html` trên origin API. Readiness cần `X-Health-Key` đúng cấu hình. Compose chạy role provisioner trước migration; RAG chạy Flyway, API tắt Flyway. Mailpit có mặt không đồng nghĩa `MAIL_ENABLED` đã bật. Xem [hướng dẫn vận hành](docs/technical/operations-verification.vi.md) cho build, storage và restore.
 
 <a id="demo"></a>
 ## Tài khoản demo
 
-Chỉ dùng trong môi trường local/đánh giá đã chủ động bật `DEMO_ACCOUNTS_ENABLED=true`; Compose local opt-in, deployment công khai phải kiểm cấu hình khóa demo. `DemoAccountGate` áp lại chính sách mỗi lần boot; không mở khóa bằng SQL để lách gate.
+Chỉ dùng trong môi trường local/đánh giá đã chủ động bật `DEMO_ACCOUNTS_ENABLED=true`; Compose local opt-in; `render.yaml` cũng chủ động bật tài khoản demo, gồm admin, theo quyết định chủ sở hữu đã ghi nhận. Kiểm tra phạm vi demo cho từng deployment công khai. `DemoAccountGate` áp lại chính sách mỗi lần boot; không mở khóa bằng SQL để lách gate.
 
 | Vai trò | Tài khoản seed |
 |---|---|
