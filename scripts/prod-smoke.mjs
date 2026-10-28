@@ -77,8 +77,13 @@ function matchesTeamGroup(group) {
   const roster = group?.members || [];
   return group?.id === GROUP_ID && group?.leaderStudentId === 'student-profile'
     && roster.length >= MIN_ROSTER && roster.length <= TEAM.length
+    && new Set(roster.map(member => member.studentId)).size === roster.length
     && roster.filter(member => member.isLeader).length === 1
     && roster.every(matchesDemoMember);
+}
+
+function rosterIds(group) {
+  return (group?.members || []).map(member => member.studentId).sort().join(',');
 }
 
 (async () => {
@@ -130,18 +135,19 @@ function matchesTeamGroup(group) {
   const liveTeam = leaderView?.arr.find(matchesTeamGroup);
   check('thesis team roster valid', leaderView?.status === 200 && !!liveTeam,
     `status=${leaderView?.status} groups=${leaderView?.arr.length}`);
+  const sameRoster = group => matchesTeamGroup(group) && rosterIds(group) === rosterIds(liveTeam);
   for (const { key, profileId } of TEAM) {
     if (!sessions[key].cc_access_token) continue;
     if (!(liveTeam?.members || []).some(member => member.studentId === profileId)) continue;
     const { status, arr } = await groups(sessions[key]);
-    check(`thesis team visible for ${key}`, status === 200 && arr.some(matchesTeamGroup),
+    check(`thesis team visible for ${key}`, status === 200 && arr.some(sameRoster),
       `status=${status} groups=${arr.length}`);
   }
 
   // -- Lecturer: sees the team as an active supervised group -----------------
   if (sessions.lecturer.cc_access_token) {
     const { status, arr } = await groups(sessions.lecturer);
-    const supervised = arr.find(group => (group.approvalStatus === 'PENDING' || group.approvalStatus === 'APPROVED') && matchesTeamGroup(group));
+    const supervised = arr.find(group => (group.approvalStatus === 'PENDING' || group.approvalStatus === 'APPROVED') && sameRoster(group));
     check('lecturer sees supervised team group', status === 200 && !!supervised, `status=${status}`);
   }
 
