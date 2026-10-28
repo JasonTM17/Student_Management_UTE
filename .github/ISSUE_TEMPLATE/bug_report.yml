@@ -1,0 +1,33 @@
+name: Bug report
+description: Report a reproducible problem in CampusCore.
+title: "[Bug]: "
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Do not include secrets, tokens, personal/student data, or unredacted logs.
+        Report vulnerabilities through [Security reports](https://github.com/JasonTM17/Student_Management_UTE/security/advisories/new).
+  - type: textarea
+    id: problem
+    attributes:
+      label: What happened?
+      description: Describe the actual behavior and what you expected.
+    validations:
+      required: true
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: Steps to reproduce
+      description: Use a minimal example with synthetic data and the affected route.
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Commit or release
+      description: Provide the full commit SHA or release tag, if known.
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment and evidence
+      description: Include the component, OS, browser/runtime versions, role, and sanitized errors or screenshots. Never upload a database dump.

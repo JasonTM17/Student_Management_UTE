@@ -1,0 +1,5 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Security reports
+    url: https://github.com/JasonTM17/Student_Management_UTE/security/advisories/new
+    about: Report vulnerabilities privately; do not disclose them in public issues.

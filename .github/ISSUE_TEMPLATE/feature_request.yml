@@ -1,0 +1,28 @@
+name: Feature request
+description: Suggest an improvement to CampusCore.
+title: "[Feature]: "
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Use synthetic examples; do not include secrets or personal/student data.
+        Report vulnerabilities through [Security reports](https://github.com/JasonTM17/Student_Management_UTE/security/advisories/new).
+  - type: textarea
+    id: need
+    attributes:
+      label: Problem or user need
+      description: Who is affected, and what are they trying to accomplish?
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed outcome
+      description: Describe the desired behavior and how success could be checked.
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives and constraints
+      description: Include workarounds, affected roles, or academic rules that must be preserved.
