@@ -2,9 +2,33 @@
 
 [Tiếng Việt: kỹ thuật kiến trúc](technical/architecture-security.vi.md) · [English: architecture techniques](technical/architecture-security.en.md) · [Full technical index](technical/README.en.md)
 
-![Current system architecture](assets/showcase-2026-10/architecture-en.png)
+```mermaid
+flowchart TD
+    subgraph CLIENT["Clients"]
+        WEB["Next.js 15 web<br/>HttpOnly cookies · CSRF · Vietnamese/English"]
+        MOB["Expo / React Native mobile<br/>Bearer JWT · in development"]
+    end
+    subgraph APP["Application"]
+        API["Java REST API · Spring Boot 4.1<br/>modular monolith · RBAC + scope<br/>transactions in the service layer"]
+        RAG["Internal RAG sidecar :4011<br/>same Java artifact · not published to the host"]
+    end
+    subgraph DATA["Data and integrations"]
+        PG[("PostgreSQL 15<br/>Flyway · constraints · RLS")]
+        STO["Report storage<br/>local · database · Supabase"]
+        SMTP["SMTP<br/>optional"]
+        DS["DeepSeek<br/>optional · timeout and fallback"]
+    end
+    WEB -->|"same-origin /api/v1"| API
+    MOB -->|"/api/v1 · Bearer"| API
+    API --> PG
+    API --> STO
+    API -->|"service token"| RAG
+    RAG --> PG
+    API -.->|"MAIL_ENABLED"| SMTP
+    RAG -.->|"DEEPSEEK_ENABLED"| DS
+```
 
-[English SVG](assets/showcase-2026-10/architecture-en.svg) · [Vietnamese diagram](assets/showcase-2026-10/architecture-vi.png) · [Local capture provenance](assets/showcase-2026-10/provenance.json)
+Host ports, integration flags and start order belong to the [Compose file](../docker-compose.yml); the diagram shows runtime boundaries only.
 
 ## 1. Runtime ownership
 
@@ -65,6 +89,20 @@ flowchart TD
 ```
 
 The actual service has additional conversational, off-topic and recovery branches. This diagram is an orientation map, not a replacement for [ThesisAssistantService](../java-services/restful-api/src/main/java/io/campuscore/restfulapi/thesis/assistant/service/ThesisAssistantService.java). Ranking uses title/content substring and whole-word weights 3/1/4/2, not BM25. Quota applies according to dispatch branches and campus-day buckets. RLS uses a restricted assistant connection and transaction-local identity. Pattern guards do not guarantee complete prompt-injection prevention. Read [AI techniques](technical/assistant-engagement.en.md).
+
+Governed knowledge publication keeps the author and the publisher distinct:
+
+```mermaid
+stateDiagram-v2
+    [*] --> DRAFT: Admin A creates or edits a draft
+    DRAFT --> PENDING_REVIEW: Admin A submits
+    PENDING_REVIEW --> PUBLISHED: Admin B, not the author, publishes
+    PENDING_REVIEW --> PENDING_REVIEW: Author publishing is rejected with 409 KNOWLEDGE_SECOND_REVIEW_REQUIRED
+    PUBLISHED --> ARCHIVED: A newer revision is published or the document is archived
+    ARCHIVED --> [*]
+```
+
+The publisher must differ from the author; publication re-validates the public content and writes an audit record before the assistant reads the new snapshot. Owner: [AssistantKnowledgeAdminService](../java-services/restful-api/src/main/java/io/campuscore/restfulapi/thesis/assistant/service/AssistantKnowledgeAdminService.java).
 
 ## 5. Thesis writes and governed publication
 

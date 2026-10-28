@@ -146,16 +146,6 @@
       "sha256": "6a03574873000f085f65c964692acd8e597390f3053fa992f8d4343537759880"
     },
     {
-      "file": "architecture-en.png",
-      "bytes": 151749,
-      "sha256": "525ee701691dceb69d7e3f3d7851713d0c25dd09e77ca7ef025d9242f395f434"
-    },
-    {
-      "file": "architecture-vi.png",
-      "bytes": 149646,
-      "sha256": "32f1223a36f14d45bb7a6c17178d20db51d9389806060840de329d0baa386a4f"
-    },
-    {
       "file": "dean-dashboard-en.png",
       "bytes": 195030,
       "sha256": "a39d36c91a2de1106da598969d90fa22304bfdf4943104c42109474d9de13bba"
@@ -439,16 +429,6 @@
       "file": "thesis-governance-tour-vi.gif",
       "bytes": 897186,
       "sha256": "483c56b889ddcfe05026b1ed36768dc44dca85e8974394d453aa0fd74eec6290"
-    },
-    {
-      "file": "architecture-en.svg",
-      "bytes": 5150,
-      "sha256": "273b10112b3bff4450e3856617251d6a1645bed49d786919f349f7a224b64b17"
-    },
-    {
-      "file": "architecture-vi.svg",
-      "bytes": 5197,
-      "sha256": "51cc930220d39c02df9ddf4592e24d542e46abf182e7e7a35d96f600bd6d79cc"
     }
   ]
 }

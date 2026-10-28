@@ -5,7 +5,7 @@
 [Tiếng Việt](README.vi.md) · [English](README.en.md) · [Tài liệu kỹ thuật đầy đủ](docs/technical/README.vi.md) · [Bộ ảnh/GIF hiện tại](docs/media-showcase.vi.md)
 
 ![Java 21](https://img.shields.io/badge/Java-21-orange?logo=openjdk)
-![Spring Boot 4.1.2](https://img.shields.io/badge/Spring_Boot-4.1.2-green?logo=springboot)
+![Spring Boot 4.1](https://img.shields.io/badge/Spring_Boot-4.1-green?logo=springboot)
 ![Next.js 15](https://img.shields.io/badge/Next.js-15-black?logo=nextdotjs)
 ![PostgreSQL 15](https://img.shields.io/badge/PostgreSQL-15-blue?logo=postgresql)
 
@@ -38,7 +38,7 @@ Tài khoản do **Phòng Đào tạo cấp phát**; không có tự đăng ký c
 <a id="showcase"></a>
 ## Ảnh giao diện và GIF
 
-Bộ ảnh chụp từ **build local mới theo source ngày 27/10/2026**, với PostgreSQL/demo riêng, không dùng dữ liệu production. Mỗi vai trò đăng nhập thật và kiểm danh tính qua API. [Nguồn chụp, toàn bộ ảnh và giới hạn](docs/media-showcase.vi.md) · [Manifest runtime](docs/assets/showcase-2026-10/provenance.json).
+Bộ ảnh chụp từ **build local theo source hiện tại**, với PostgreSQL/demo riêng, không dùng dữ liệu production. Mỗi vai trò đăng nhập thật và kiểm danh tính qua API. [Nguồn chụp, toàn bộ ảnh và giới hạn](docs/media-showcase.vi.md) · [Manifest runtime](docs/assets/showcase-2026-10/provenance.json).
 
 ### Trang công khai và cổng đăng nhập
 
@@ -129,27 +129,127 @@ Các chốt quan trọng: khóa dòng tuần tự hóa truy cập vào bản ghi
 <a id="architecture"></a>
 ## Kiến trúc
 
-![Kiến trúc hiện tại](docs/assets/showcase-2026-10/architecture-vi.png)
+### Tổng thể runtime
 
-[SVG](docs/assets/showcase-2026-10/architecture-vi.svg) · [Chi tiết kiến trúc và ranh giới](docs/ARCHITECTURE.md)
-
-```text
-Web Next.js ── same-origin /api/v1 ──► Java REST API ──► PostgreSQL
-Mobile Expo ───── Bearer JWT ─────────►       │
-                                            ├──► Report storage
-                                            ├──► SMTP (tùy chọn)
-                                            └──► RAG sidecar nội bộ ──► DeepSeek (tùy chọn)
+```mermaid
+flowchart TD
+    subgraph CLIENT["Máy khách"]
+        WEB["Web Next.js 15<br/>Cookie HttpOnly · CSRF · Việt/Anh"]
+        MOB["Mobile Expo / React Native<br/>Bearer JWT · đang phát triển"]
+    end
+    subgraph APP["Ứng dụng"]
+        API["Java REST API · Spring Boot 4.1<br/>modular monolith · RBAC + scope<br/>transaction ở tầng service"]
+        RAG["RAG sidecar nội bộ :4011<br/>cùng artifact Java · không publish ra host"]
+    end
+    subgraph DATA["Dữ liệu và tích hợp"]
+        PG[("PostgreSQL 15<br/>Flyway · constraint · RLS")]
+        STO["Lưu trữ báo cáo<br/>local · database · Supabase"]
+        SMTP["SMTP<br/>tùy chọn"]
+        DS["DeepSeek<br/>tùy chọn · timeout và fallback"]
+    end
+    WEB -->|"cùng origin /api/v1"| API
+    MOB -->|"/api/v1 · Bearer"| API
+    API --> PG
+    API --> STO
+    API -->|"token dịch vụ"| RAG
+    RAG --> PG
+    API -.->|"MAIL_ENABLED"| SMTP
+    RAG -.->|"DEEPSEEK_ENABLED"| DS
 ```
+
+Cổng host, cờ tích hợp và thứ tự khởi động thuộc [Compose](docker-compose.yml); sơ đồ chỉ thể hiện ranh giới runtime.
+
+### Giao dịch đăng ký học phần
+
+```mermaid
+sequenceDiagram
+    participant SV as Sinh viên
+    participant Web as Next.js
+    participant API as RegistrationService
+    participant DB as PostgreSQL
+    SV->>Web: Chọn lớp học phần
+    Web->>API: POST /api/v1/me/enrollments (Idempotency-Key)
+    API->>DB: BEGIN, giữ khóa theo chủ + hash payload
+    alt Yêu cầu trùng đã hoàn tất
+        DB-->>API: Bản đăng ký hiện có
+        API-->>Web: Trả lại kết quả cũ
+    else Yêu cầu mới
+        API->>DB: Khóa Student, rồi Section
+        API->>DB: Kiểm tra đợt, khóa học, tiên quyết, tín chỉ, lịch học
+        API->>DB: Tăng sĩ số có điều kiện khi lớp còn mở và chưa đầy
+        alt Lớp đầy hoặc vi phạm ràng buộc
+            API->>DB: ROLLBACK
+            API-->>Web: 409 / lỗi nghiệp vụ có cấu trúc
+        else Hợp lệ
+            API->>DB: Ghi enrollment, sự kiện, hoàn tất bản ghi yêu cầu
+            API->>DB: COMMIT
+            API-->>Web: 201 Enrollment
+        end
+    end
+    Web-->>SV: Cập nhật lịch và thông báo kết quả
+```
+
+Thứ tự khóa và câu lệnh thuộc [RegistrationService](java-services/restful-api/src/main/java/io/campuscore/restfulapi/academic/registration/service/RegistrationService.java); khóa dòng không tự nâng mọi truy vấn lên serializable.
+
+### Luồng trợ lý AI
+
+```mermaid
+flowchart TD
+    U["Câu hỏi + ngôn ngữ + phạm vi"] --> G["Guard đầu vào · quyền · phạm vi"]
+    G --> P{"Cần ngữ cảnh cá nhân<br/>của người hỏi?"}
+    P -->|Có| C["Dịch vụ học vụ có kiểm quyền"]
+    P -->|Không| R["Corpus đã công bố<br/>xếp hạng lexical có trọng số"]
+    R --> D{"Cần tổng hợp và<br/>đã cấu hình nhà cung cấp?"}
+    D -->|Không| L["Trả lời cục bộ có trích dẫn"]
+    D -->|Có| Q["Ledger · lease · quota nguyên tử"]
+    Q --> M["DeepSeek tùy chọn, có timeout"]
+    M -->|Lỗi| L
+    M --> O["Guard đầu ra · trích dẫn · chốt trạng thái lượt"]
+    C --> O
+    L --> O
+    O --> S["SSE cho web · JSON cho mobile"]
+```
+
+Bản đồ định hướng, chưa gồm các nhánh hội thoại, ngoài chủ đề và phục hồi. Xếp hạng lexical có trọng số, không phải BM25 hay vector search; guard mẫu không bảo đảm chặn hoàn toàn prompt injection.
+
+### Kiểm duyệt tri thức hai người
+
+```mermaid
+stateDiagram-v2
+    [*] --> DRAFT: Admin A tạo hoặc sửa bản nháp
+    DRAFT --> PENDING_REVIEW: Admin A gửi duyệt
+    PENDING_REVIEW --> PUBLISHED: Admin B khác người tạo xuất bản
+    PENDING_REVIEW --> PENDING_REVIEW: Chính Admin A xuất bản bị chặn 409 KNOWLEDGE_SECOND_REVIEW_REQUIRED
+    PUBLISHED --> ARCHIVED: Bản mới được xuất bản hoặc tài liệu bị lưu trữ
+    ARCHIVED --> [*]
+```
+
+Người xuất bản phải khác người tạo; xuất bản kiểm lại nội dung công khai và ghi audit trước khi trợ lý đọc snapshot mới.
+
+### Vai trò và phạm vi
+
+```mermaid
+flowchart LR
+    SV["Sinh viên"] --> A1["Hồ sơ của mình<br/>đăng ký · lịch · điểm · điểm danh<br/>khóa luận · trợ lý"]
+    GV["Giảng viên"] --> A2["Lớp, đề tài, phân công thực tế<br/>điểm · điểm danh · email · hướng dẫn"]
+    TK["Trưởng bộ môn / Trưởng khoa"] --> A3["Bộ môn / khoa<br/>thẩm định · tiến độ · khối lượng"]
+    AD["Admin / Super Admin"] --> A4["Tài khoản · danh mục · đợt<br/>phúc khảo · audit · tri thức RAG"]
+    A1 & A2 & A3 & A4 --> Z["Kiểm tra lại ở service và database"]
+```
+
+Quyền trên menu không thay thế kiểm tra ở service và database; xem [mô hình phân quyền](docs/security/authorization-model.md).
+
+Chi tiết và ranh giới từng sơ đồ: [kiến trúc](docs/ARCHITECTURE.md).
 
 <a id="stack"></a>
 ## Công nghệ
 
 | Tầng | Công nghệ và chủ sở hữu phiên bản |
 |---|---|
-| Java API | Java 21, Spring Boot 4.1.2, Spring Security/Validation, JDBC, JPA có giới hạn — [Maven](java-services/pom.xml) |
-| Web | Next.js 15.5.28, React 18.3.1, TypeScript, React Query, Tailwind, Radix, TinyMCE — [package.json](frontend/package.json) |
+| Java API | Java 21, Spring Boot 4.1, Spring Security/Validation, JDBC, JPA có giới hạn — [Maven](java-services/pom.xml) |
+| Web | Next.js 15, React 18, TypeScript, React Query, Tailwind, Radix, TinyMCE — [package.json](frontend/package.json) |
 | Dữ liệu | PostgreSQL 15, Flyway, constraint/trigger/index/RLS — [database image](database/Dockerfile), [migrations](java-services/restful-api/src/main/resources/db/migration/) |
-| Mobile | Expo 57.0.31, React Native 0.86.3, React 19.2.3, TypeScript — [mobile manifest](mobile/package.json) |
+| Mobile | Expo, React Native, TypeScript — [mobile manifest](mobile/package.json) |
 | Tích hợp | RAG lexical nội bộ; DeepSeek, SMTP, Supabase storage theo cấu hình — [Compose](docker-compose.yml) |
 | Kiểm thử/vận hành | JUnit/Mockito, PostgreSQL IT, node:test, Playwright, Docker/Compose, GitHub Actions — [CI](.github/workflows/ci.yml) |
 
@@ -176,7 +276,7 @@ curl.exe http://127.0.0.1:4010/api/v1/health/liveness
 | Mailpit UI / SMTP | 8025 / 1025 | `MAILPIT_UI_HOST_PORT` / `MAILPIT_SMTP_HOST_PORT` |
 | RAG | Chỉ nội bộ 4011 | Không publish ra host |
 
-Thư mục migration PostgreSQL có **146 file SQL phiên bản hóa**, mới nhất **V150** (có khoảng trống phiên bản); [CI](.github/workflows/ci.yml) dùng **Node 20** và Java 21. Phiên bản client được khóa trong các package lockfile.
+Danh mục migration do `node scripts/check-migrations.mjs` kiểm tra; phiên bản Node/Java chạy trong [CI](.github/workflows/ci.yml), phiên bản client được khóa trong các lockfile.
 
 OpenAPI ở `/v3/api-docs`, Swagger ở `/swagger-ui.html` trên origin API. Readiness cần `X-Health-Key` đúng cấu hình. Compose chạy role provisioner trước migration; RAG chạy Flyway, API tắt Flyway. Mailpit có mặt không đồng nghĩa `MAIL_ENABLED` đã bật. Xem [hướng dẫn vận hành](docs/technical/operations-verification.vi.md) cho build, storage và restore.
 
