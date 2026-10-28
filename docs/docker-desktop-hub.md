@@ -1,20 +1,21 @@
 # Docker Desktop Hub lookup
 
-Do not guess the Hub namespace from GitHub (`jasontm17`). Read the signed-in Docker Desktop account.
+The release workflow fixes Docker Hub to `docker.io/nguyenson1710` and GHCR to
+`ghcr.io/jasontm17`. A signed-in local account is not the authority for these
+repository release destinations.
 
 ## Find the username
 
-1. Confirm Docker Desktop is running and signed in.
-2. Open `%APPDATA%\Docker\login-info.json`.
-3. Field `0` is Base64 JSON. Decode it and use `Username`.
-4. Never commit that file. It is machine-local login state.
+Use Docker Desktop's account menu to inspect the active local account.
+Do not read, decode or commit local authentication files. Account-file formats
+are implementation details and are not part of this repository's contract.
 
-## Publish images manually (fallback)
+## Manual tag examples (not the verified release path)
 
 ```powershell
-docker tag student-management-ute-frontend:local nguyenson1710/student-management-ute-frontend:<version>
-docker push nguyenson1710/student-management-ute-frontend:<version>
-docker manifest inspect docker.io/nguyenson1710/student-management-ute-frontend:<version>
+docker tag student-management-ute-frontend:local nguyenson1710/student-management-ute-frontend:<full-commit-sha>
+docker push nguyenson1710/student-management-ute-frontend:<full-commit-sha>
+docker manifest inspect docker.io/nguyenson1710/student-management-ute-frontend:<full-commit-sha>
 ```
 
 The supported release path is the `Publish container images` workflow. It
@@ -32,8 +33,11 @@ The workflow needs repository secrets `DOCKERHUB_USERNAME` and
 an immutable full-commit-SHA tag, refuses to overwrite an existing or mismatched
 tag, emits BuildKit provenance and SBOM attestations, and binds each image to
 the full source commit without a non-atomic cross-registry `latest` move.
-The workflow runs on the default branch after GHCR/Docker Hub digest parity is
-verified.
+The workflow is manually dispatched with the exact current main SHA and an
+independent review confirmation. It checks successful CI before publication,
+then verifies registry parity, source revision and attestation manifests.
+Manual pushes below do not reproduce those gates or the release manifest;
+use the workflow for an accepted release and do not overwrite an existing tag.
 
 For a no-build smoke, set `CAMPUSCORE_IMAGE_TAG` to the reviewed full commit SHA so
 all services resolve the same immutable release across registries:
@@ -47,15 +51,17 @@ GitHub Packages stays separate:
 
 ```powershell
 gh auth token | docker login ghcr.io -u JasonTM17 --password-stdin
-docker tag student-management-ute-frontend:local ghcr.io/jasontm17/student-management-ute-frontend:<version>
-docker push ghcr.io/jasontm17/student-management-ute-frontend:<version>
+docker tag student-management-ute-frontend:local ghcr.io/jasontm17/student-management-ute-frontend:<full-commit-sha>
+docker push ghcr.io/jasontm17/student-management-ute-frontend:<full-commit-sha>
 ```
 
 The GHCR workflow publishes the same course stack as four artifacts. The
 database artifact is a migration-free PostgreSQL runtime wrapper; Flyway in
-the REST API still owns schema and seed data.
+Java owns schema and seed data: `rag-service` runs Flyway in Compose, while
+the standalone Render API runs Flyway itself. See [release identity and the
+history rewrite](RELEASE.md#history-rewrite-note) before choosing older tags.
 
 ```powershell
-docker tag student-management-ute-database:local ghcr.io/jasontm17/student-management-ute-database:<version>
-docker push ghcr.io/jasontm17/student-management-ute-database:<version>
+docker tag student-management-ute-database:local ghcr.io/jasontm17/student-management-ute-database:<full-commit-sha>
+docker push ghcr.io/jasontm17/student-management-ute-database:<full-commit-sha>
 ```

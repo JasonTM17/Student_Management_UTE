@@ -15,6 +15,10 @@
 
 [Manifest và checksum đầy đủ](assets/showcase-2026-10/provenance.json) · [Cách tái tạo](technical/operations-verification.vi.md)
 
+Hash trong manifest khớp cả 77 tài sản nhị phân. Hash/kích thước của hai SVG
+thuộc bản gốc Windows CRLF; blob SVG được Git chuẩn hóa LF khác ở mức byte.
+Khôi phục CRLF khớp hash đã ghi; đây là khác biệt xuống dòng, không phải lượt chụp mới.
+
 ## Giới hạn được quan sát
 
 Bản seed có một metadata báo cáo nhóm trả 404 ở cả hai locale; bộ ảnh không xác nhận upload, tải hay khôi phục tài liệu. Danh sách phúc khảo và lịch sử batch CTĐT có thể trống vì chưa tạo hồ sơ. Job reconcile cảnh báo drift sĩ số seed; không tự sửa dữ liệu để chụp. Trợ lý được hỏi câu kỹ thuật trong workspace chuyên sâu, với provider ngoài tắt.

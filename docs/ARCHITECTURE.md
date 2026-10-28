@@ -185,8 +185,8 @@ Mọi quan tâm về exception nằm trong các package riêng theo vai trò:
 Tham chiếu `jakarta.persistence` chỉ được phép trong các lớp nằm trong `JPA_ISLAND_CLASSES` của `ArchitectureGuardTest` (toàn bộ entity + `AssistantDatabaseConfiguration` + các entity/repository hiện hữu) — guard test chặn mọi tham chiếu mới ngoài allow-list; thêm entity mới đòi hỏi một entry tường minh, reviewable trong danh sách đó.
 
 **Hợp đồng thứ tự khóa (lock order) sống trong SQL:**
-- Academic: `Student -> Section -> Round` (`RegistrationService`); auth dùng `User -> Session` và `User -> ResetToken`.
-- Thesis: `group -> round` (`ThesisMutationService`); council khóa `round -> topic` (`ThesisSupervisorService`).
+- Academic enrollment: `Student -> Section` rồi khóa tập enrollment liên quan; `RegistrationService` đọc đợt bằng `openRoundReadOnly` trong đường enroll, không khóa Round ở bước đó. Auth dùng `User -> Session` và `User -> ResetToken`.
+- Thesis có thứ tự theo thao tác, không có một chuỗi `group -> round` chung: tạo nhóm/khôi phục đợt khóa `round -> Student`; membership và governance có chốt khóa nhóm riêng. `ThesisSupervisorService` khóa `round -> topic`. Đọc đúng service/repository của thao tác trước khi sửa khóa.
 - Assistant: `conversation -> ledger` (`ThesisAssistantRepository`).
 - Phương thức khóa đặt tên `lock...ForUpdate` và chú thích `@Transactional(propagation = MANDATORY)` để không bao giờ chạy ngoài transaction của caller.
 

@@ -76,7 +76,9 @@ For KLTN and TLCN rounds, an `ADMIN`, `TRUONG_KHOA` or `SUPER_ADMIN` may
 extend the GVPB deadline forward while the round is live. If the new deadline
 passes the report date, the report date moves to that deadline; a KLTN defense
 date earlier than that deadline moves with it. The audit row records
-before-and-after GVPB, report and defense dates in the same transaction. See
+before-and-after GVPB, report and defense dates in the same transaction. If
+the upload deadline previously inherited GVPB, the old deadline is pinned in
+`report_deadline`; extending GVPB alone does not reopen report editing. See
 [ThesisMutationController](../../java-services/restful-api/src/main/java/io/campuscore/restfulapi/thesis/controller/ThesisMutationController.java)
 and [ThesisRoundLifecycleService](../../java-services/restful-api/src/main/java/io/campuscore/restfulapi/thesis/service/ThesisRoundLifecycleService.java).
 

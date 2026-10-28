@@ -15,6 +15,11 @@ Screens were rendered from a new 27 October 2026 source build in the isolated `c
 
 [Full manifest and checksums](assets/showcase-2026-10/provenance.json) · [Reproduction](technical/operations-verification.en.md)
 
+The manifest hashes match all 77 binary assets. Its two SVG hashes/sizes describe
+the original Windows CRLF text; Git-normalized LF SVG blobs differ byte-for-byte.
+Reconstructing CRLF matches those recorded hashes; this is line-ending provenance,
+not a fresh screenshot capture.
+
 ## Observed limitations
 
 One seeded group report metadata request returned 404 in each locale. These captures establish no upload, download or recovery acceptance. Appeals and curriculum-batch histories may be empty because no records were submitted. Reconciliation warned about seeded seat-count drift; no fixture repair was performed for screenshots. The specialized assistant received a technical-corpus prompt with external providers off.
